@@ -18,8 +18,18 @@ docs, and cite the project.
 git clone https://github.com/lean-dojo/TorchLean.git
 cd TorchLean
 lake build
+python3 scripts/datasets/download_example_data.py --auto-mpg
 lake exe torchlean mlp --cpu --steps 10
+lake exe torchlean mlp --steps 10 --dtype float --backend eager
+
+# Optional CUDA run, if the CUDA toolkit and an NVIDIA GPU are available:
+lake build -K cuda=true
+lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000
 ```
+
+The first MLP command uses the executable IEEE-style Float32 path. The second
+uses Lean's builtin `Float` runtime path. The CUDA command uses the native GPU
+runtime path and is meant as a quick smoke test, not a trusted proof boundary.
 
 TorchLean is pinned by `lean-toolchain` and currently builds with
 `leanprover/lean4:v4.29.0`.
@@ -43,6 +53,7 @@ lake build NN.Examples.Zoo
 - Project site: <https://lean-dojo.github.io/TorchLean/>
 - Guide: <https://lean-dojo.github.io/TorchLean/blueprint/>
 - API reference: <https://lean-dojo.github.io/TorchLean/docs/>
+- Updates and recent validation notes: <https://lean-dojo.github.io/TorchLean/updates/>
 - Paper: [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631)
   (arXiv:2602.22631)
 

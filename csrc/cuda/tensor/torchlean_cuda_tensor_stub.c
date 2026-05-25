@@ -21,6 +21,34 @@
 // CPU stub keeps the deterministic-reductions flag for API parity; lazily init from env (C init constraints).
 static uint32_t g_torchlean_deterministic_reductions = 0u;
 static uint32_t g_torchlean_deterministic_reductions_inited = 0u;
+static uint64_t g_torchlean_cuda_live_bytes = 0u;
+static uint64_t g_torchlean_cuda_peak_bytes = 0u;
+static uint64_t g_torchlean_cuda_alloc_count = 0u;
+static uint64_t g_torchlean_cuda_free_count = 0u;
+
+static uint64_t torchlean_cuda_bytes_for(size_t n) {
+  const uint64_t max = UINT64_MAX / (uint64_t)sizeof(float);
+  if ((uint64_t)n > max) {
+    return UINT64_MAX;
+  }
+  return (uint64_t)n * (uint64_t)sizeof(float);
+}
+
+static void torchlean_cuda_note_alloc(size_t n) {
+  const uint64_t bytes = torchlean_cuda_bytes_for(n);
+  g_torchlean_cuda_alloc_count++;
+  g_torchlean_cuda_live_bytes += bytes;
+  if (g_torchlean_cuda_live_bytes > g_torchlean_cuda_peak_bytes) {
+    g_torchlean_cuda_peak_bytes = g_torchlean_cuda_live_bytes;
+  }
+}
+
+static void torchlean_cuda_note_free(size_t n) {
+  const uint64_t bytes = torchlean_cuda_bytes_for(n);
+  g_torchlean_cuda_free_count++;
+  g_torchlean_cuda_live_bytes =
+      g_torchlean_cuda_live_bytes > bytes ? g_torchlean_cuda_live_bytes - bytes : 0u;
+}
 
 LEAN_EXPORT void torchlean_cuda_set_deterministic_reductions(uint32_t on) {
   g_torchlean_deterministic_reductions = on ? 1u : 0u;
@@ -49,6 +77,9 @@ static void torchlean_cuda_buffer_finalize(void* ptr) {
   torchlean_cuda_buffer* b = (torchlean_cuda_buffer*)ptr;
   if (!b) {
     return;
+  }
+  if (b->data) {
+    torchlean_cuda_note_free(b->size);
   }
   free(b->data);
   free(b);
@@ -95,8 +126,39 @@ torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
       free(b);
       lean_internal_panic_out_of_memory();
     }
+    torchlean_cuda_note_alloc(n);
   }
   return b;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_live_bytes(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_live_bytes;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_peak_bytes(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_peak_bytes;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_alloc_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_alloc_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_free_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_free_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_free_bytes(uint32_t u) {
+  (void)u;
+  return 0u;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_total_bytes(uint32_t u) {
+  (void)u;
+  return 0u;
 }
 
 LEAN_EXPORT uint32_t torchlean_cuda_buffer_size(b_lean_obj_arg BObj) {
@@ -113,6 +175,7 @@ LEAN_EXPORT uint32_t torchlean_cuda_buffer_release(b_lean_obj_arg BObj) {
     return 0;
   }
   free(b->data);
+  torchlean_cuda_note_free(b->size);
   // Explicit release is an eager-runtime lifetime hint. We mark the handle as empty so accidental
   // reuse fails by size checks instead of touching freed memory.
   b->data = NULL;

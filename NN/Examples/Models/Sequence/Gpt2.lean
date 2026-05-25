@@ -216,6 +216,9 @@ def log (train : TrainOptions) : _root_.Runtime.Training.LogDestination :=
 def logPath (train : TrainOptions) : System.FilePath :=
   train.base.train.logPath
 
+def cudaMemWatch (train : TrainOptions) : Nat :=
+  train.base.cudaMemWatch
+
 end TrainOptions
 
 def parseTrainOptions (opts : Runtime.Autograd.Torch.Options) (args : List String) :
@@ -546,9 +549,11 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
         (beta2 := 0.999)
         (epsilon := 1e-8)
       let optH ← TorchLean.Optim.handle (α := Float) m opt
+      let mut memWatch? ← Common.reportCudaMemWatch opts train.cudaMemWatch train.steps 0 none
       for step in [0:train.steps] do
         let sample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
         optH.step sample
+        memWatch? ← Common.reportCudaMemWatch opts train.cudaMemWatch train.steps (step + 1) memWatch?
 
       let L1 ← meanLossOnSamples model m samples
       let logits1 ← nn.eval1 (α := Float) opts model
@@ -572,7 +577,8 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
           s!"windows={train.windows}",
           s!"temperature={train.temperature}", s!"top_k={train.topK}", s!"sample_seed={train.seed}",
           s!"repeat_penalty={train.repeatPenalty}", s!"repeat_window={train.repeatWindow}",
-          s!"ascii_only={train.asciiOnly}"]
+          s!"ascii_only={train.asciiOnly}",
+          s!"cuda_mem_watch={train.cudaMemWatch}"]
       match train.saveParams? with
       | none => pure ()
       | some path =>

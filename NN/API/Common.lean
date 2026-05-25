@@ -174,19 +174,80 @@ structure ModelTrainFlags where
   train : LoggedTrainFlags
   /-- Learning rate for the default Adam optimizer used by examples. -/
   lr : Float
+  /--
+  Print CUDA allocator telemetry every `N` training steps when running on CUDA.
+
+  `0` disables reporting.  This is intentionally part of the common model-training flags because
+  long-run memory drift is a runtime property, not a GPT/CNN/MLP-specific option.
+  -/
+  cudaMemWatch : Nat := 0
 deriving Repr
 
-/-- Parse the standard model-training flags: `--steps`/`--epochs`, `--log`, and `--lr`. -/
+/-- Parse the standard model-training flags: `--steps`/`--epochs`, `--log`, `--lr`, and CUDA telemetry. -/
 def parseModelTrainFlags (exeName : String) (args : List String)
     (defaultLogPath : System.FilePath) (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
     (allowZeroSteps : Bool := false) :
     Except String (ModelTrainFlags × List String) := do
   let (train, args) ← parseLoggedTrainFlags exeName args defaultLogPath defaultSteps allowZeroSteps
   let (lr?, args) ← CLI.takeFloatFlagOnce args "lr"
+  let (cudaMemWatch?, args) ← CLI.takeNatFlagOnce args "cuda-mem-watch"
   let lr := lr?.getD defaultLr
   if lr <= 0.0 then
     throw s!"{exeName}: --lr must be > 0"
-  pure ({ train := train, lr := lr }, args)
+  pure ({ train := train, lr := lr, cudaMemWatch := cudaMemWatch?.getD 0 }, args)
+
+/-! ### CUDA Memory Watch Helpers -/
+
+/--
+State for a simple CUDA-memory drift detector.
+
+The first reported sample becomes the baseline.  Later samples compare current CUDA free memory
+against that baseline and warn once if the observed per-step drop projects failure before the
+requested run length.
+-/
+structure CudaMemWatchState where
+  firstStep : Nat
+  firstFreeBytes : Nat
+  warned : Bool
+deriving Repr
+
+/--
+Maybe print a one-line CUDA allocator report.
+
+This is shared by model examples.  It is intentionally lightweight: it does not try to fix memory
+growth, but it makes allocator behavior visible enough to distinguish a steady-state run from a
+per-step retention bug.
+-/
+def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
+    (watchEvery totalSteps done : Nat) (state? : Option CudaMemWatchState) :
+    IO (Option CudaMemWatchState) := do
+  if !opts.useGpu || watchEvery = 0 || (done != 0 && done % watchEvery != 0) then
+    pure state?
+  else
+    let stats ← _root_.Runtime.Autograd.Cuda.Buffer.allocatorStatsWithToken (UInt32.ofNat done)
+    IO.println s!"  cuda_mem step={done}: {stats.format}"
+    let freeNow := stats.deviceFreeBytes.toNat
+    match state? with
+    | none =>
+        pure (some { firstStep := done, firstFreeBytes := freeNow, warned := false })
+    | some st =>
+        if st.warned || done <= st.firstStep || st.firstFreeBytes <= freeNow then
+          pure (some st)
+        else
+          let span := done - st.firstStep
+          let drop := st.firstFreeBytes - freeNow
+          let dropPerStep := drop / Nat.max 1 span
+          if dropPerStep = 0 then
+            pure (some st)
+          else
+            let projectedFailure := done + freeNow / dropPerStep
+            if projectedFailure < totalSteps then
+              IO.println <|
+                s!"  cuda_mem warning: free device memory is dropping by ~{dropPerStep} bytes/step; " ++
+                  s!"projected allocation failure before requested step count (around step {projectedFailure})."
+              pure (some { st with warned := true })
+            else
+              pure (some st)
 
 /--
 Default Adam optimizer constructor used by supervised and vision examples.

@@ -34,6 +34,62 @@ static std::atomic<uint32_t> g_torchlean_deterministic_reductions{0u};
 // 0 = uninitialized, 1 = initialized, 2 = another thread is initializing.
 static std::atomic<uint32_t> g_torchlean_deterministic_reductions_inited{0u};
 
+static std::atomic<uint64_t> g_torchlean_cuda_live_bytes{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_peak_bytes{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_alloc_count{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_free_count{0u};
+
+static uint64_t torchlean_cuda_bytes_for(size_t n) {
+  const uint64_t max = UINT64_MAX / (uint64_t)sizeof(float);
+  if ((uint64_t)n > max) {
+    return UINT64_MAX;
+  }
+  return (uint64_t)n * (uint64_t)sizeof(float);
+}
+
+static void torchlean_cuda_note_alloc(size_t n) {
+  const uint64_t bytes = torchlean_cuda_bytes_for(n);
+  g_torchlean_cuda_alloc_count.fetch_add(1u, std::memory_order_relaxed);
+  const uint64_t live =
+      g_torchlean_cuda_live_bytes.fetch_add(bytes, std::memory_order_relaxed) + bytes;
+  uint64_t peak = g_torchlean_cuda_peak_bytes.load(std::memory_order_relaxed);
+  while (live > peak &&
+         !g_torchlean_cuda_peak_bytes.compare_exchange_weak(
+             peak, live, std::memory_order_relaxed, std::memory_order_relaxed)) {
+  }
+}
+
+static void torchlean_cuda_note_free(size_t n) {
+  const uint64_t bytes = torchlean_cuda_bytes_for(n);
+  g_torchlean_cuda_free_count.fetch_add(1u, std::memory_order_relaxed);
+  uint64_t live = g_torchlean_cuda_live_bytes.load(std::memory_order_relaxed);
+  while (true) {
+    const uint64_t next = live > bytes ? live - bytes : 0u;
+    if (g_torchlean_cuda_live_bytes.compare_exchange_weak(
+            live, next, std::memory_order_relaxed, std::memory_order_relaxed)) {
+      return;
+    }
+  }
+}
+
+static void torchlean_cuda_panic_malloc_failed(size_t n, cudaError_t err) {
+  size_t freeBytes = 0;
+  size_t totalBytes = 0;
+  (void)cudaMemGetInfo(&freeBytes, &totalBytes);
+  char msg[512];
+  snprintf(msg, sizeof(msg),
+           "cudaMalloc buffer failed: requested=%llu bytes live=%llu peak=%llu "
+           "allocs=%llu frees=%llu cuda_free=%llu cuda_total=%llu error=%s",
+           (unsigned long long)torchlean_cuda_bytes_for(n),
+           (unsigned long long)g_torchlean_cuda_live_bytes.load(std::memory_order_relaxed),
+           (unsigned long long)g_torchlean_cuda_peak_bytes.load(std::memory_order_relaxed),
+           (unsigned long long)g_torchlean_cuda_alloc_count.load(std::memory_order_relaxed),
+           (unsigned long long)g_torchlean_cuda_free_count.load(std::memory_order_relaxed),
+           (unsigned long long)freeBytes, (unsigned long long)totalBytes,
+           cudaGetErrorString(err));
+  lean_internal_panic(msg);
+}
+
 static void torchlean_cuda_free_best_effort(void* ptr, const char* what) {
   if (!ptr) {
     return;
@@ -52,6 +108,7 @@ static void torchlean_cuda_buffer_finalize(void* ptr) {
   if (b->data) {
     // cudaFree is synchronous w.r.t. work using this allocation, so freeing is safe even if GC
     // runs before a kernel finishes.
+    torchlean_cuda_note_free(b->size);
     torchlean_cuda_free_best_effort(b->data, "cudaFree buffer finalizer failed");
   }
   free(b);
@@ -93,7 +150,12 @@ extern "C" torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
   b->size = n;
   b->data = NULL;
   if (n > 0) {
-    checkCuda(cudaMalloc((void**)&b->data, n * sizeof(float)), "cudaMalloc buffer failed");
+    cudaError_t err = cudaMalloc((void**)&b->data, n * sizeof(float));
+    if (err != cudaSuccess) {
+      free(b);
+      torchlean_cuda_panic_malloc_failed(n, err);
+    }
+    torchlean_cuda_note_alloc(n);
   }
   return b;
 }
@@ -459,6 +521,42 @@ extern "C" LEAN_EXPORT uint32_t torchlean_cuda_set_deterministic_reductions_chec
   return torchlean_cuda_get_deterministic_reductions();
 }
 
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_live_bytes(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_live_bytes.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_peak_bytes(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_peak_bytes.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_alloc_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_alloc_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_free_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_free_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_free_bytes(uint32_t u) {
+  (void)u;
+  size_t freeBytes = 0;
+  size_t totalBytes = 0;
+  cudaError_t err = cudaMemGetInfo(&freeBytes, &totalBytes);
+  return err == cudaSuccess ? (uint64_t)freeBytes : 0u;
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_total_bytes(uint32_t u) {
+  (void)u;
+  size_t freeBytes = 0;
+  size_t totalBytes = 0;
+  cudaError_t err = cudaMemGetInfo(&freeBytes, &totalBytes);
+  return err == cudaSuccess ? (uint64_t)totalBytes : 0u;
+}
+
 extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_size(b_lean_obj_arg BObj) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   if (b->size > 0xFFFFFFFFULL) {
@@ -473,6 +571,7 @@ extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_release(b_lean_obj_arg BOb
     return 0;
   }
   checkCuda(cudaFree(b->data), "cudaFree buffer release failed");
+  torchlean_cuda_note_free(b->size);
   // Explicit release is an eager-runtime lifetime hint. We mark the handle as empty so accidental
   // reuse fails by size checks instead of touching freed device memory.
   b->data = NULL;

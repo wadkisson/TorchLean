@@ -66,6 +66,14 @@ def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) := do
   RealData.loadCifarLoader (α := α) exeName batch nRows seed xPath yPath
 
+def cudaMemWatchCallbacks {α : Type} (opts : Runtime.Autograd.Torch.Options)
+    (watchEvery totalSteps : Nat) : IO (train.Callbacks α) := do
+  let stateRef ← IO.mkRef (none : Option Common.CudaMemWatchState)
+  pure <| train.onStep (α := α) (fun ev => do
+    let state ← stateRef.get
+    let state ← Common.reportCudaMemWatch opts watchEvery totalSteps (ev.step + 1) state
+    stateRef.set state)
+
 def main (args : List String) : IO UInt32 := do
   Common.runAnyOrFloat exeName args
     (preferFloat := fun args => args.contains "--cuda" || CLI.hasFlagValue args "log")
@@ -82,9 +90,12 @@ def main (args : List String) : IO UInt32 := do
         let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
         let module ← TorchLean.Module.instantiateWithOptions (α := α) modDef cast opts
         let opt := Common.adamOptimizer (α := α) cast (nn.paramShapes model) trainCfg.lr
+        let memHooks ← cudaMemWatchCallbacks (α := α) opts trainCfg.cudaMemWatch
+          trainCfg.train.steps
         let hooks : train.Callbacks α :=
           (train.onTrainStart (α := α) do
             train.Report.reportMeanLossModuleLoader module loader "train(before)")
+          ++ memHooks
           ++ train.onTrainEnd (α := α) (fun _ =>
             train.Report.reportMeanLossModuleLoader module loader "train(after)")
         let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
@@ -102,11 +113,14 @@ def main (args : List String) : IO UInt32 := do
         let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
         let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
         let curveRef ← IO.mkRef ({} : _root_.Runtime.Training.Curve)
+        let memHooks ← cudaMemWatchCallbacks (α := Float) opts trainCfg.cudaMemWatch
+          trainCfg.train.steps
         let hooks : train.Callbacks Float :=
           (train.onTrainStart (α := Float) do
             train.Report.reportMeanLossModuleLoader module loader "train(before)")
           ++ train.onStep (α := Float) (fun ev =>
             curveRef.modify (fun c => c.push ev.step ev.loss))
+          ++ memHooks
           ++ train.onTrainEnd (α := Float) (fun _ =>
             train.Report.reportMeanLossModuleLoader module loader "train(after)")
         let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
@@ -115,6 +129,7 @@ def main (args : List String) : IO UInt32 := do
         Common.writeCurveLogTo trainCfg.train.log "CNN training" curve "loss"
           #[s!"data=cifar10", s!"x={xPath}", s!"y={yPath}", s!"nRows={nRows}",
             s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"lr={trainCfg.lr}",
-            s!"epochs={trainCfg.train.steps}", s!"batch={batch}"])
+            s!"epochs={trainCfg.train.steps}", s!"batch={batch}",
+            s!"cuda_mem_watch={trainCfg.cudaMemWatch}"])
 
 end NN.Examples.Models.Vision.Cnn

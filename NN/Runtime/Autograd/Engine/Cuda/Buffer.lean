@@ -67,6 +67,76 @@ def setDeterministicReductions (on : Bool) : Unit :=
 def getDeterministicReductions : Bool :=
   getDeterministicReductionsRaw 0 != 0
 
+/-! ### Allocator Telemetry -/
+
+@[extern "torchlean_cuda_allocator_live_bytes"]
+opaque allocatorLiveBytesRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_allocator_peak_bytes"]
+opaque allocatorPeakBytesRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_allocator_alloc_count"]
+opaque allocatorAllocCountRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_allocator_free_count"]
+opaque allocatorFreeCountRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_allocator_device_free_bytes"]
+opaque allocatorDeviceFreeBytesRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_allocator_device_total_bytes"]
+opaque allocatorDeviceTotalBytesRaw (u : UInt32) : UInt64
+
+/--
+Snapshot of the CUDA buffer allocator.
+
+`liveBytes`/`peakBytes` count TorchLean buffers created by this runtime layer. `deviceFreeBytes`
+and `deviceTotalBytes` come from `cudaMemGetInfo` in the CUDA build and are `0` in the CPU stub.
+Together they let long-running examples distinguish a TorchLean lifetime leak from broader CUDA
+memory pressure or fragmentation.
+-/
+structure AllocatorStats where
+  liveBytes : UInt64
+  peakBytes : UInt64
+  allocCount : UInt64
+  freeCount : UInt64
+  deviceFreeBytes : UInt64
+  deviceTotalBytes : UInt64
+deriving Repr
+
+/--
+Read the current CUDA allocator counters.
+
+`token` is ignored by the native implementation.  It exists so call sites that sample repeatedly
+can pass a changing value (for example, the training step), preventing Lean from treating repeated
+FFI reads as identical pure expressions.
+-/
+def allocatorStatsWithToken (token : UInt32) : IO AllocatorStats := do
+  pure
+    { liveBytes := allocatorLiveBytesRaw token
+      peakBytes := allocatorPeakBytesRaw token
+      allocCount := allocatorAllocCountRaw token
+      freeCount := allocatorFreeCountRaw token
+      deviceFreeBytes := allocatorDeviceFreeBytesRaw token
+      deviceTotalBytes := allocatorDeviceTotalBytesRaw token }
+
+/-- Read the current CUDA allocator counters. Prefer `allocatorStatsWithToken` in repeated loops. -/
+def allocatorStats : IO AllocatorStats :=
+  allocatorStatsWithToken 0
+
+def mibString (bytes : UInt64) : String :=
+  let mib := (Float.ofNat bytes.toNat) / (1024.0 * 1024.0)
+  toString mib ++ " MiB"
+
+/-- One-line allocator report for progress logs. -/
+def AllocatorStats.format (s : AllocatorStats) : String :=
+  "live=" ++ mibString s.liveBytes ++
+  " peak=" ++ mibString s.peakBytes ++
+  " allocs=" ++ toString s.allocCount ++
+  " frees=" ++ toString s.freeCount ++
+  " cuda_free=" ++ mibString s.deviceFreeBytes ++
+  " cuda_total=" ++ mibString s.deviceTotalBytes
+
 /-- Create a device buffer by copying from a host `FloatArray` (casts each element to float32). -/
 @[extern "torchlean_cuda_buffer_of_float_array"]
 opaque ofFloatArray (a : FloatArray) : Buffer
