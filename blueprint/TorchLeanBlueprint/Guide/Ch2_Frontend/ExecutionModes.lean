@@ -36,10 +36,15 @@ With CUDA enabled, model demos that support device buffers add a device choice:
 
 ```
 lake exe torchlean mlp --cuda --steps 100
+lake exe torchlean mlp --cuda --steps 1000 --cuda-mem-watch 100
 ```
 
 The flags change how the model is evaluated. They do not change the layer structure or parameter
-shapes.
+shapes. The `--cuda-mem-watch` flag is only a runtime diagnostic: it asks the example to print
+CUDA allocator samples during training so that long runs expose memory drift while they are still
+running. The public model examples use the same step-counted training convention here: `--steps`
+means optimizer updates, and loader-based examples stop after that many updates rather than after an
+accidental number of data-loader passes.
 
 The runtime choices are easiest to read this way:
 
@@ -49,6 +54,9 @@ The runtime choices are easiest to read this way:
   eager tape or a reusable graph-shaped artifact.
 - Device choice: `--cpu` or `--cuda` changes whether supported numeric buffers live on the host or
   on CUDA device memory.
+- CUDA diagnostics: `--cuda-mem-watch N` samples native allocator state every `N` training updates.
+  Long CUDA model runs choose a small default cadence so the terminal shows whether device memory is
+  steady, growing slowly, or approaching exhaustion.
 - Mode choice: train/eval mode changes runtime behavior for mode-sensitive layers such as dropout
   or normalization. The declared model and parameter payload stay visible.
 

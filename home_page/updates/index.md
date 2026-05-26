@@ -21,32 +21,52 @@ For source-level provenance and release hygiene, use
 
 ## May 2026: CUDA Training Stability Update
 
-Recent CUDA training runs exposed two practical runtime issues in the model
-examples:
+Longer CUDA training runs exposed a practical bug in the eager runtime. A
+GPT-style example could train normally for thousands of updates and then stop
+with a CUDA allocation failure. The surprising part was that the same kind of
+problem could show up even on small examples if enough per-step CUDA objects
+were kept alive.
 
-- Long training logs could retain too much per-step structure and make ordinary
-  runs harder to scale.
-- CUDA eager/autograd paths needed more aggressive release of temporary gradient,
-  tape, and downloaded device buffers after each optimization step.
+The issue was not that the model suddenly needed more parameters. It was that
+some temporary values created during training -- tape entries, gradient buffers,
+and kernel scratch buffers -- could stay attached to the run longer than they
+needed to. Over many optimizer updates, that turns into allocator pressure. The
+fix was to make the training loop and CUDA eager backend more explicit about
+which values are returned to the caller and which temporary buffers can be
+released after the step finishes.
 
-The current runtime and examples now treat `--steps` as optimizer updates,
-stream or sample long training logs, and release CUDA/autograd temporary buffers
-after the values needed by the caller have been extracted.
+The CUDA training path used by the public model examples now follows three
+user-facing conventions:
 
-Fresh-clone validation included:
+- loader-based model commands now treat `--steps` as optimizer updates;
+- CUDA eager/autograd releases temporary tape, gradient, and scratch buffers
+  after the values needed by the caller have been extracted;
+- longer CUDA example runs report allocator telemetry by default, with
+  `--cuda-mem-watch N` available when a user wants an exact sampling cadence.
+
+The allocator report is a runtime diagnostic. It prints live and peak allocator
+state while a run is still in progress, and it warns if the observed free-memory
+trend would run out before the requested training horizon. It is there for the
+same reason loss logging is useful: if a long run is going wrong, the terminal
+should show that early instead of leaving the user to discover it at the end.
+It does not change the Lean-side trust-boundary story; it makes the native
+runtime behavior easier to inspect.
+
+Validation for this update included:
 
 - `lake build`
 - `lake build -K cuda=true`
-- `lake test -R -K cuda=true`
-- `lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000`
-- `lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 50000`
-- `lake exe -K cuda=true torchlean cnn --cuda --steps 2000`
-- `lake exe -K cuda=true torchlean gpt2 --cuda --steps 100 --generate 0`
+- `lake exe torchlean mlp --cpu --steps 10 --log false`
+- `lake exe torchlean mlp --steps 10 --dtype float --backend eager --log false`
+- `lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000 --log false`
+- `lake exe -K cuda=true torchlean cnn --cuda --steps 1000 --log false`
+- `lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --steps 1200 --generate 0 --log false`
+- `lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 50 --log false`
 
-These checks cover the public build, CUDA build, curated CUDA runtime stress
-tests, and representative model-level CUDA training runs. CUDA execution remains
-an implementation path; the mathematical trust boundary is still documented
-separately.
+The smoke runs above checked two things: representative losses or MSE values
+went down, and the CUDA allocator stayed bounded on the exercised runs. CUDA
+execution remains an implementation path; the mathematical trust boundary is
+still documented separately.
 
 ## May 2026: Quickstart Data Note
 

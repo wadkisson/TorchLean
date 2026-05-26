@@ -227,72 +227,34 @@ def parseTrainOptions (opts : Runtime.Autograd.Torch.Options) (args : List Strin
   let (base, args) ← Common.parseModelTrainFlags exeName args defaultLogJson defaultSteps 0.001
     (allowZeroSteps := true)
   let (windows?, args) ← CLI.takeNatFlagOnce args "windows"
-  let (prompt?, args) ← CLI.takeFlagValueOnce args "prompt"
-  let (generate?, args) ← CLI.takeNatFlagOnce args "generate"
-  let (temperature?, args) ← CLI.takeFloatFlagOnce args "temperature"
-  let (topK?, args) ← CLI.takeNatFlagOnce args "top-k"
-  let (repeatPenalty?, args) ← CLI.takeFloatFlagOnce args "repeat-penalty"
-  let (repeatWindow?, args) ← CLI.takeNatFlagOnce args "repeat-window"
-  let (seed?, args) ← CLI.takeNatFlagOnce args "sample-seed"
-  let (asciiOnlyRaw?, args) ← CLI.takeFlagValueOnce args "ascii-only"
-  let (asciiOnlyFlag, args) ← CLI.takeBoolFlagOnce args "ascii-only"
-  let asciiOnly :=
-    match asciiOnlyRaw? with
-    | none => asciiOnlyFlag
-    | some v =>
-        if v = "true" || v = "1" then true
-        else if v = "false" || v = "0" then false
-        else
-          -- Keep the parser total; validation happens below.
-          asciiOnlyFlag
+  let (gen, args) ← text.parseGenerationOptions exeName args
+    { prompt := "First Citizen:"
+      generate := 64
+      temperature := 0.85
+      topK := 12
+      repeatPenalty := 1.25
+      repeatWindow := 24
+      seed := 0
+      asciiOnly := false }
   let (interactive, args) ← CLI.takeBoolFlagOnce args "interactive"
   let (loadParamsRaw?, args) ← CLI.takeFlagValueOnce args "load-params"
   let (saveParamsRaw?, args) ← CLI.takeFlagValueOnce args "save-params"
-  let temperature := temperature?.getD 0.85
-  if temperature <= 0.0 then
-    throw s!"{exeName}: --temperature must be > 0"
-  let repeatPenalty := repeatPenalty?.getD 1.25
-  if repeatPenalty < 0.0 then
-    throw s!"{exeName}: --repeat-penalty must be >= 0"
   let windows := windows?.getD 128
   if windows = 0 then
     throw s!"{exeName}: --windows must be > 0"
-  match asciiOnlyRaw? with
-  | none => pure ()
-  | some v =>
-      if v = "true" || v = "1" || v = "false" || v = "0" then
-        pure ()
-      else
-        throw s!"{exeName}: --ascii-only expects true/false (or 1/0), got {v}"
   pure ({ base := base
           windows := windows
-          prompt := prompt?.getD "First Citizen:"
-          generate := generate?.getD 64
-          temperature := temperature
-          topK := topK?.getD 12
-          repeatPenalty := repeatPenalty
-          repeatWindow := repeatWindow?.getD 24
-          seed := seed?.getD 0
-          asciiOnly := asciiOnly
+          prompt := gen.prompt
+          generate := gen.generate
+          temperature := gen.temperature
+          topK := gen.topK
+          repeatPenalty := gen.repeatPenalty
+          repeatWindow := gen.repeatWindow
+          seed := gen.seed
+          asciiOnly := gen.asciiOnly
           interactive := interactive
           loadParams? := loadParamsRaw?.map (fun p => (p : System.FilePath))
           saveParams? := saveParamsRaw?.map (fun p => (p : System.FilePath)) }, args)
-
-def escapeByte (b : Nat) : String :=
-  if b = 10 then "\\n"
-  else if b = 9 then "\\t"
-  else if b = 34 then "\\\""
-  else if b = 92 then "\\\\"
-  else if 32 ≤ b && b ≤ 126 then
-    String.singleton (Char.ofNat b)
-  else
-    let hex : Array Char := #['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
-    let hi := (b / 16) % 16
-    let lo := b % 16
-    "\\x" ++ String.singleton (hex.getD hi '0') ++ String.singleton (hex.getD lo '0')
-
-def escapeByteIdsForDisplay (ids : List Nat) : String :=
-  "\"" ++ String.join (ids.map escapeByte) ++ "\""
 
 def tokenWindowIds (input : String) (offset : Nat) : List Nat :=
   text.tokenWindow text.Tokenizer.byte seqLen input (offset := offset) (padId := 32)
@@ -301,9 +263,9 @@ def tokenWindowIds (input : String) (offset : Nat) : List Nat :=
 def printPredictionProbe (label : String) (input : String) (logits : Tensor Float σ) :
     IO Unit := do
   let predIds := text.argmaxTokenIdsFromBatchLogits (α := Float) logits ⟨0, by decide⟩
-  IO.println s!"  {label} pred={escapeByteIdsForDisplay predIds}"
-  IO.println s!"  prompt={escapeByteIdsForDisplay (tokenWindowIds input 0)}"
-  IO.println s!"  target={escapeByteIdsForDisplay (tokenWindowIds input 1)}"
+  IO.println s!"  {label} pred={text.escapeByteIdsForDisplay predIds}"
+  IO.println s!"  prompt={text.escapeByteIdsForDisplay (tokenWindowIds input 0)}"
+  IO.println s!"  target={text.escapeByteIdsForDisplay (tokenWindowIds input 1)}"
 
 def inputTensorFromIds (ids : List Nat) : Tensor Float σ :=
   let (x2DF, _) := text.causalLmXYOneHotMatFloat (seqLen := seqLen) (vocab := vocab) ids
@@ -325,38 +287,6 @@ def logitsArrayAt (logits : Tensor Float σ) (pos : Nat) : Array Float :=
                 match cols j with
                 | Tensor.scalar x => x)
 
-/--
-Apply a lightweight repetition penalty during decoding.
-
-This is intentionally a generation-side control, not a training shortcut. This compact GPT-2-style example can
-learn the local next-token objective but still fall into byte-level loops such as `oooooo`; reducing
-the logits of recently emitted bytes makes the example's sampled text reflect more of the learned
-distribution instead of the first local attractor it finds.
--/
-def penalizedScores (scores : Array Float) (recent : List Nat) (repeatPenalty : Float) : Array Float :=
-  text.penalizeRepeats scores recent repeatPenalty
-
-def asciiAllowed (i : Nat) : Bool :=
-  i = 10 || (32 ≤ i && i ≤ 126)
-
-def restrictToAscii (scores : Array Float) : Array Float :=
-  text.restrictScores scores asciiAllowed
-
-def greedyTokenAt (logits : Tensor Float σ) (pos : Nat)
-    (recent : List Nat := []) (repeatPenalty : Float := 0.0) (asciiOnly : Bool := false) : Nat :=
-  let base := penalizedScores (logitsArrayAt logits pos) recent repeatPenalty
-  let scores := if asciiOnly then restrictToAscii base else base
-  (text.topKIndices scores 1).head?.getD 32
-
-def sampleFromLogitsAt (logits : Tensor Float σ) (pos : Nat)
-    (temperature : Float) (topK seed counter : Nat)
-    (recent : List Nat := []) (repeatPenalty : Float := 0.0) (asciiOnly : Bool := false) : Nat := Id.run do
-  let base := penalizedScores (logitsArrayAt logits pos) recent repeatPenalty
-  let scores := if asciiOnly then restrictToAscii base else base
-  let tok := text.sampleTopKIndex scores temperature topK seed counter
-  -- Keep the same "space" fallback convention as the byte-level demos.
-  if tok < vocab then tok else 32
-
 mutual
 
 partial def generateSampledFromIds
@@ -364,6 +294,16 @@ partial def generateSampledFromIds
     (params : TorchLean.ParamList Float (nn.paramShapes model))
     (promptIds : List Nat) (steps : Nat) (temperature : Float) (topK seed repeatWindow : Nat)
     (repeatPenalty : Float) (asciiOnly : Bool) : IO (List Nat) := do
+  let gen : text.GenerationOptions :=
+    { prompt := ""
+      generate := steps
+      temperature := temperature
+      topK := topK
+      repeatPenalty := repeatPenalty
+      repeatWindow := repeatWindow
+      seed := seed
+      asciiOnly := asciiOnly }
+  let allowId := if asciiOnly then text.printableAsciiByte else fun _ => true
   let rec loop (ids : List Nat) : Nat → IO (List Nat)
     | 0 => pure ids
     | n + 1 => do
@@ -378,12 +318,9 @@ partial def generateSampledFromIds
             []
           else
             ids.drop (ids.length - Nat.min ids.length repeatWindow)
-        let nextTok :=
-          if topK = 1 then
-            greedyTokenAt logits predPos recent repeatPenalty (asciiOnly := asciiOnly)
-          else
-            sampleFromLogitsAt logits predPos temperature topK seed generatedSoFar recent repeatPenalty
-              (asciiOnly := asciiOnly)
+        let tok := text.chooseNextToken (logitsArrayAt logits predPos) gen generatedSoFar recent allowId
+        -- Keep the same "space" fallback convention as the byte-level demos.
+        let nextTok := if tok < vocab then tok else 32
         loop (ids ++ [nextTok]) n
   loop promptIds steps
 
@@ -418,9 +355,8 @@ def meanLossOnSamples
     (model : nn.Sequential σ τ)
     (m : TorchLean.Module.ScalarModule Float (nn.paramShapes model) [σ, τ])
     (samples : Array (API.sample.Supervised Float σ τ)) : IO Float := do
-  -- Reporting loss over every training window is surprisingly expensive on eager CUDA because each
-  -- scalar forward builds temporary tape state. A fixed probe subset keeps the metric stable enough
-  -- for example logs without turning evaluation into the memory bottleneck.
+  -- Reporting loss over every training window would run a separate scalar forward for each window.
+  -- A fixed probe subset keeps example logs stable without making evaluation dominate training.
   let evalCount := Nat.min samples.size 32
   let mut total := 0.0
   for i in [0:evalCount] do
@@ -452,7 +388,7 @@ partial def interactiveLoopFloat
       IO.println "  interactive: cleared context"
       loop []
     else if prompt = ":show" then
-      IO.println s!"  context={escapeByteIdsForDisplay ctx}"
+      IO.println s!"  context={text.escapeByteIdsForDisplay ctx}"
       loop ctx
     else
       let inputIds := ctx ++ text.Tokenizer.byte.encode prompt ++ [10]
@@ -460,7 +396,7 @@ partial def interactiveLoopFloat
         generateSampledFromIds opts model m.trainer.params inputIds train.generate
           train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
       let genOnly := outIds.drop inputIds.length
-      IO.println s!"  generated={escapeByteIdsForDisplay genOnly}"
+      IO.println s!"  generated={text.escapeByteIdsForDisplay genOnly}"
       loop outIds
   loop []
 
@@ -525,7 +461,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
         interactiveLoopFloat opts model m train
       let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
         train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
-      let generated := escapeByteIdsForDisplay generatedIds
+      let generated := text.escapeByteIdsForDisplay generatedIds
       Common.writeBeforeAfterLossLogTo train.log "GPT-2 byte prompt training" train.steps L0 L0
         #[s!"device={if opts.useGpu then "cuda" else "cpu"}",
           s!"prompt={text.escapeForDisplay train.prompt}",
@@ -549,11 +485,12 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
         (beta2 := 0.999)
         (epsilon := 1e-8)
       let optH ← TorchLean.Optim.handle (α := Float) m opt
-      let mut memWatch? ← Common.reportCudaMemWatch opts train.cudaMemWatch train.steps 0 none
+      let cudaMemWatch := Common.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
+      let mut memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps 0 none
       for step in [0:train.steps] do
         let sample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
         optH.step sample
-        memWatch? ← Common.reportCudaMemWatch opts train.cudaMemWatch train.steps (step + 1) memWatch?
+        memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps (step + 1) memWatch?
 
       let L1 ← meanLossOnSamples model m samples
       let logits1 ← nn.eval1 (α := Float) opts model
@@ -562,7 +499,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       printPredictionProbe "after " train.prompt logits1
       let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
         train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
-      let generated := escapeByteIdsForDisplay generatedIds
+      let generated := text.escapeByteIdsForDisplay generatedIds
       IO.println s!"  generated={generated}"
       IO.println s!"  corpus_bytes={input.toByteArray.size} windows={samples.size}"
       IO.println s!"  steps={train.steps} lr={train.lr} loss0={L0} loss1={L1}"
@@ -578,7 +515,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
           s!"temperature={train.temperature}", s!"top_k={train.topK}", s!"sample_seed={train.seed}",
           s!"repeat_penalty={train.repeatPenalty}", s!"repeat_window={train.repeatWindow}",
           s!"ascii_only={train.asciiOnly}",
-          s!"cuda_mem_watch={train.cudaMemWatch}"]
+          s!"cuda_mem_watch={cudaMemWatch}"]
       match train.saveParams? with
       | none => pure ()
       | some path =>
@@ -588,30 +525,22 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       pure (L0, L1, generated)
 
 def main (args : List String) : IO UInt32 := do
-  if args.contains "--cuda" || CLI.hasFlagValue args "log" then
-    TorchLean.Module.run exeName args
-      (.float (fun opts rest => do
-        let (input, rest) ← takeInputText rest
-        let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
-        Common.orThrow exeName <| CLI.requireNoArgs rest
-        let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train
-      ))
-      { banner? := some (fun opts =>
-          s!"{exeName}: causal LM training (device={if opts.useGpu then "cuda" else "cpu"})")
-        printOk := true }
-  else
-    TorchLean.Module.run exeName args
-      (.any (fun {α} _ _ _ _ cast opts rest => do
-        let (input, rest) ← takeInputText rest
-        let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
-        Common.orThrow exeName <| CLI.requireNoArgs rest
-        if train.interactive then
-          throw <| IO.userError s!"{exeName}: --interactive is supported only by the Float/CUDA path"
-        let _ ← unitTrainSteps (α := α) cast opts input (steps := train.steps)
-        pure ()
-      ))
-      { banner? := some (fun opts =>
-          s!"{exeName}: causal LM training (device={if opts.useGpu then "cuda" else "cpu"})")
-        printOk := true }
+  Common.runAnyOrFloat exeName args
+    (preferFloat := fun args => args.contains "--cuda" || CLI.hasFlagValue args "log")
+    (banner := fun opts =>
+      s!"{exeName}: causal LM training (device={if opts.useGpu then "cuda" else "cpu"})")
+    (anyK := fun {α} _ _ _ _ cast opts rest => do
+      let (input, rest) ← takeInputText rest
+      let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
+      Common.orThrow exeName <| CLI.requireNoArgs rest
+      if train.interactive then
+        throw <| IO.userError s!"{exeName}: --interactive is supported only by the Float/CUDA path"
+      let _ ← unitTrainSteps (α := α) cast opts input (steps := train.steps)
+      pure ())
+    (floatK := fun opts rest => do
+      let (input, rest) ← takeInputText rest
+      let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
+      Common.orThrow exeName <| CLI.requireNoArgs rest
+      let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train)
 
 end NN.Examples.Models.Sequence.Gpt2

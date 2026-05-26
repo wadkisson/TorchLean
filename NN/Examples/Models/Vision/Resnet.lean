@@ -25,7 +25,7 @@ Runnable `torchlean resnet` example. It trains a compact ResNet-style classifier
 `API.nn.resnetBasicBlock` on a prepared CIFAR-10 minibatch.
 
 The reusable model wiring lives in `NN.API.Models.Resnet` (`nn.models.resnet`). This file is the
-runnable wrapper (CIFAR loader construction + multi-epoch training loop).
+runnable wrapper (CIFAR loader construction + step-limited training loop).
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
@@ -75,60 +75,42 @@ def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) := do
   RealData.loadCifarLoader (α := α) exeName batch nRows seed xPath yPath
 
+/--
+Train the ResNet-style classifier through the shared Float module-training API.
+
+Only the architecture and loss are local to this file.  The runner-level mechanics -- optimizer
+state, exact step counting, CUDA memory watch callbacks, before/after reports, and JSON logging --
+stay in `NN.API.train` so future image models do not have to repeat this boilerplate.
+-/
+def fitCifar (opts : Runtime.Autograd.Torch.Options)
+    (xPath yPath : System.FilePath) (nRows seed : Nat) (trainCfg : Common.ModelTrainFlags) :
+    IO (train.FitReport Float) := do
+  let loader ← loadCifarLoader (α := Float) xPath yPath nRows seed
+  nn.withModel mkModel fun model => do
+    let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
+    let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+    let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
+    let cudaMemWatch :=
+      Common.effectiveCudaMemWatch opts trainCfg.train.steps trainCfg.cudaMemWatch
+    let (report, _loader') ← train.fitModuleLoaderStepsLoggedFloat module opt opts
+      trainCfg.train.steps loader trainCfg.train.log "ResNet CIFAR training"
+      #[s!"data=cifar10", s!"x={xPath}", s!"y={yPath}", s!"nRows={nRows}",
+        s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"lr={trainCfg.lr}",
+        s!"steps={trainCfg.train.steps}", s!"batch={batch}", s!"cuda_mem_watch={cudaMemWatch}"]
+      "loss" trainCfg.cudaMemWatch
+    pure report
+
 def main (args : List String) : IO UInt32 := do
-  -- The generic branch checks that the same model/training loop is scalar-polymorphic; the Float
-  -- branch is the runtime path that writes curve artifacts for CUDA/CPU demos.
-  Common.runAnyOrFloat exeName args
-    (preferFloat := fun args => args.contains "--cuda" || CLI.hasFlagValue args "log")
+  Common.runFloat exeName args
     (banner := fun opts =>
       s!"{exeName}: ResNet CIFAR training (device={if opts.useGpu then "cuda" else "cpu"})")
-    (anyK := fun {α} _ _ _ _ cast opts rest => do
+    (k := fun opts rest => do
       let (xPath, yPath, nRows, seed, rest) ← Common.orThrow exeName <|
         RealData.parseCifarFlags rest
       let (trainCfg, rest) ← Common.orThrow exeName <|
         Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let loader ← loadCifarLoader (α := α) xPath yPath nRows seed
-      nn.withModel mkModel fun model => do
-        -- Build a standard image-classification loop: cross-entropy module, Adam optimizer,
-        -- before/after loader evaluation, and a multi-epoch fit call.
-        let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-        let module ← TorchLean.Module.instantiateWithOptions (α := α) modDef cast opts
-        let opt := Common.adamOptimizer (α := α) cast (nn.paramShapes model) trainCfg.lr
-        let hooks : train.Callbacks α :=
-          (train.onTrainStart (α := α) do
-            train.Report.reportMeanLossModuleLoader module loader "train(before)")
-          ++ train.onTrainEnd (α := α) (fun _ =>
-            train.Report.reportMeanLossModuleLoader module loader "train(after)")
-        let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-        IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-      pure ())
-    (floatK := fun opts rest => do
-      let (xPath, yPath, nRows, seed, rest) ← Common.orThrow exeName <|
-        RealData.parseCifarFlags rest
-      let (trainCfg, rest) ← Common.orThrow exeName <|
-        Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
-      Common.orThrow exeName <| CLI.requireNoArgs rest
-      let loader ← loadCifarLoader (α := Float) xPath yPath nRows seed
-      nn.withModel mkModel fun model => do
-        -- The Float branch records the same training signal as a TrainLog curve for the website.
-        let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-        let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-        let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
-        let curveRef ← IO.mkRef ({} : _root_.Runtime.Training.Curve)
-        let hooks : train.Callbacks Float :=
-          (train.onTrainStart (α := Float) do
-            train.Report.reportMeanLossModuleLoader module loader "train(before)")
-          ++ train.onStep (α := Float) (fun ev =>
-            curveRef.modify (fun c => c.push ev.step ev.loss))
-          ++ train.onTrainEnd (α := Float) (fun _ =>
-            train.Report.reportMeanLossModuleLoader module loader "train(after)")
-        let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-        let curve ← curveRef.get
-        IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-        Common.writeCurveLogTo trainCfg.train.log "ResNet CIFAR training" curve "loss"
-          #[s!"data=cifar10", s!"x={xPath}", s!"y={yPath}", s!"nRows={nRows}",
-            s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"lr={trainCfg.lr}",
-            s!"epochs={trainCfg.train.steps}", s!"batch={batch}"])
+      let report ← fitCifar opts xPath yPath nRows seed trainCfg
+      IO.println s!"  steps={trainCfg.train.steps} loss0={report.before} loss1={report.after}")
 
 end NN.Examples.Models.Vision.Resnet

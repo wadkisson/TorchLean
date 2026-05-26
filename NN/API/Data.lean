@@ -1062,6 +1062,29 @@ def batchLoader {α : Type} {σ τ : Spec.Shape}
     BatchLoader α batchSize σ τ :=
   { raw := loader ds batchSize (shuffle := shuffle) (seed := seed) (dropLast := dropLast) }
 
+/--
+Load a numeric supervised CSV and immediately wrap it as a typed minibatch loader.
+
+The CSV convention is the same as `TabularSupervisedSource`: each row contains `inDim` feature
+columns followed by `outDim` target columns.  This belongs in the data API rather than in an
+individual model file because tabular examples, benchmarks, and downstream users all need the same
+operation: CSV -> typed dataset -> shuffled minibatch loader.
+-/
+def tabularCsvLoader {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α]
+    (path : System.FilePath) (batchSize inDim outDim : Nat)
+    (csvOptions : CsvOptions := {}) (shuffle : Bool := true) (seed : Nat := 0)
+    (dropLast : Bool := true) :
+    IO (Except String (BatchLoader α batchSize (NN.Tensor.Shape.Vec inDim)
+      (NN.Tensor.Shape.Vec outDim))) := do
+  let src : TabularSupervisedSource :=
+    { path := path, inDim := inDim, outDim := outDim, csvOptions := csvOptions }
+  let dsE ← src.load (α := α)
+  match dsE with
+  | .error e => pure (.error e)
+  | .ok ds =>
+      pure <| .ok <| batchLoader (α := α) ds batchSize (shuffle := shuffle)
+        (seed := seed) (dropLast := dropLast)
+
 /-- Build a batch loader when the batch size is only known at runtime. -/
 def loaderAny {α : Type} {σ τ : Spec.Shape}
     (ds : Dataset (sample.Supervised α σ τ))

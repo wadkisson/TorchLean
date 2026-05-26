@@ -111,30 +111,17 @@ def parseTrainOptions (opts : Runtime.Autograd.Torch.Options) (args : List Strin
   let (batch?, args) ← CLI.takeNatFlagOnce args "batch"
   let (seqLen?, args) ← CLI.takeNatFlagOnce args "seq-len"
   let (windows?, args) ← CLI.takeNatFlagOnce args "windows"
-  let (prompt?, args) ← CLI.takeFlagValueOnce args "prompt"
-  let (generate?, args) ← CLI.takeNatFlagOnce args "generate"
-  let (temperature?, args) ← CLI.takeFloatFlagOnce args "temperature"
-  let (topK?, args) ← CLI.takeNatFlagOnce args "top-k"
-  let (repeatPenalty?, args) ← CLI.takeFloatFlagOnce args "repeat-penalty"
-  let (repeatWindow?, args) ← CLI.takeNatFlagOnce args "repeat-window"
-  let (seed?, args) ← CLI.takeNatFlagOnce args "sample-seed"
-  let (asciiOnlyRaw?, args) ← CLI.takeFlagValueOnce args "ascii-only"
-  let (asciiOnlyFlag, args) ← CLI.takeBoolFlagOnce args "ascii-only"
-  let asciiOnly :=
-    match asciiOnlyRaw? with
-    | none => asciiOnlyFlag
-    | some v =>
-        if v = "true" || v = "1" then true
-        else if v = "false" || v = "0" then false
-        else asciiOnlyFlag
+  let (gen, args) ← text.parseGenerationOptions exeName args
+    { prompt := "First Citizen:"
+      generate := 200
+      temperature := 0.9
+      topK := 12
+      repeatPenalty := 1.15
+      repeatWindow := 64
+      seed := 7
+      asciiOnly := false }
   let (loadParamsRaw?, args) ← CLI.takeFlagValueOnce args "load-params"
   let (saveParamsRaw?, args) ← CLI.takeFlagValueOnce args "save-params"
-  let temperature := temperature?.getD 0.9
-  if temperature <= 0.0 then
-    throw s!"{exeName}: --temperature must be > 0"
-  let repeatPenalty := repeatPenalty?.getD 1.15
-  if repeatPenalty < 0.0 then
-    throw s!"{exeName}: --repeat-penalty must be >= 0"
   let batch := batch?.getD 4
   if batch = 0 then
     throw s!"{exeName}: --batch must be > 0"
@@ -144,23 +131,18 @@ def parseTrainOptions (opts : Runtime.Autograd.Torch.Options) (args : List Strin
   let windows := windows?.getD 256
   if windows = 0 then
     throw s!"{exeName}: --windows must be > 0"
-  match asciiOnlyRaw? with
-  | none => pure ()
-  | some v =>
-      if v = "true" || v = "1" || v = "false" || v = "0" then pure ()
-      else throw s!"{exeName}: --ascii-only expects true/false (or 1/0), got {v}"
   pure ({ base := base
           batch := batch
           seqLen := seqLen
           windows := windows
-          prompt := prompt?.getD "First Citizen:"
-          generate := generate?.getD 200
-          temperature := temperature
-          topK := topK?.getD 12
-          repeatPenalty := repeatPenalty
-          repeatWindow := repeatWindow?.getD 64
-          seed := seed?.getD 7
-          asciiOnly := asciiOnly
+          prompt := gen.prompt
+          generate := gen.generate
+          temperature := gen.temperature
+          topK := gen.topK
+          repeatPenalty := gen.repeatPenalty
+          repeatWindow := gen.repeatWindow
+          seed := gen.seed
+          asciiOnly := gen.asciiOnly
           loadParams? := loadParamsRaw?.map (fun p => (p : System.FilePath))
           saveParams? := saveParamsRaw?.map (fun p => (p : System.FilePath)) }, args)
 
@@ -179,6 +161,15 @@ partial def generateSampledFromIds
     (steps : Nat) (temperature : Float) (topK seed repeatWindow : Nat)
     (repeatPenalty : Float) (allowId : Nat → Bool := fun _ => true)
     (padId : Nat := 0) : IO (List Nat) := do
+  let gen : text.GenerationOptions :=
+    { prompt := ""
+      generate := steps
+      temperature := temperature
+      topK := topK
+      repeatPenalty := repeatPenalty
+      repeatWindow := repeatWindow
+      seed := seed
+      asciiOnly := false }
   if hSeqLen : seqLen = 0 then
     -- The CLI rejects this case, but keeping the definition total makes the helper reusable.
     pure promptIds
@@ -225,20 +216,17 @@ partial def generateSampledFromIds
                   | _ => Array.replicate vocab 0.0
               | _ => Array.replicate vocab 0.0
           | _ => Array.replicate vocab 0.0
-        let scores := text.penalizeRepeats scores recent repeatPenalty
-        let scores := text.restrictScores scores allowId
         let nextTok : Nat :=
-          if topK = 1 then
-            text.greedyIndex scores
-          else
-            text.sampleTopKIndex scores temperature topK seed generatedSoFar
+          text.chooseNextToken scores gen generatedSoFar recent allowId
         loop (ids ++ [nextTok]) n
   loop promptIds steps
 
 def main (args : List String) : IO UInt32 := do
   if args.contains "--cuda" || CLI.hasFlagValue args "log" then
-    TorchLean.Module.run exeName args
-      (.float (fun opts rest => do
+    Common.runFloat exeName args
+      (banner := fun opts =>
+        s!"{exeName}: char-level GPT training (device={if opts.useGpu then "cuda" else "cpu"})")
+      (k := fun opts rest => do
         let (corpus, rest) ← takeInputText rest
         let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
         Common.orThrow exeName <| CLI.requireNoArgs rest
@@ -336,15 +324,8 @@ def main (args : List String) : IO UInt32 := do
               TorchLean.ParamIO.saveModuleParamsBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ])
                 m path
               IO.println s!"  wrote params: {path}"
-      ))
-      { banner? := some (fun opts =>
-          s!"{exeName}: char-level GPT training (device={if opts.useGpu then "cuda" else "cpu"})")
-        printOk := true }
+      )
   else
-    TorchLean.Module.run exeName args
-      (.float (fun _ _ => do
-        throw <| IO.userError s!"{exeName}: use --cuda (CPU char-gpt is extremely slow in eager mode)"
-      ))
-      { printOk := true }
+    throw <| IO.userError s!"{exeName}: use --cuda (CPU char-gpt is extremely slow in eager mode)"
 
 end NN.Examples.Models.Sequence.CharGpt

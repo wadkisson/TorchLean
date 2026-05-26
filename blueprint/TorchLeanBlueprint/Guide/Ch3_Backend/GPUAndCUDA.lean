@@ -58,7 +58,18 @@ scripts/checks/cuda_sanitize_tests.sh --all-tools
 
 The flag `-K cuda=true` is a *build* flag. It selects the native CUDA objects in the
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) and links CUDA libraries such as cuBLAS and cuFFT. The
-command line flag `--cuda` is a *runtime* flag: it asks a demo to use the CUDA eager backend.
+command line flag `--cuda` is a *runtime* flag. For long training runs, model commands also expose:
+
+```
+--cuda-mem-watch N
+```
+
+That flag samples the CUDA allocator every `N` optimizer updates. It reports live and peak runtime
+allocation state and warns if the observed free-memory trend would exhaust the device before the
+requested run length. When a long CUDA run does not pass an explicit cadence, the public model
+examples choose a small default number of samples. This is part of the public runner interface, not
+a one-off benchmark script, so MLP, CNN, GPT-style, ResNet, ViT, and other model commands can report
+the same kind of long-run memory signal.
 
 If either piece is missing, TorchLean should fail loudly rather than silently claiming that GPU
 execution happened.
@@ -296,6 +307,15 @@ the local VJP rules call CUDA kernels.
 
 This is still an eager runtime backend. Verification passes consume the shared IR described in
 *Graphs and IR*; they do not verify a particular GPU schedule.
+
+The runtime is explicit about CUDA buffer ownership. During eager training, each forward/backward
+step creates tape values, gradient buffers, and local scratch buffers for kernels such as matmul,
+convolution, normalization, attention, and FNO spectral convolution. The values returned to the
+caller are kept; temporary buffers are released after their contribution has been consumed. This is
+the practical reason the examples include allocator telemetry: if a future kernel holds on to
+scratch state across steps, the terminal should show the trend before it becomes an allocation
+failure. The same ownership rule is used by the public step-based model runners, so a long command
+does not keep old per-step tensors merely because the loader loop continued.
 
 In practice this gives TorchLean three related but distinct CUDA layers:
 

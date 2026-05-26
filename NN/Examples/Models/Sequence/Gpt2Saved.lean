@@ -86,44 +86,24 @@ def parseLoadOptions (args : List String) : Except String (LoadOptions × List S
     match paramsRaw? with
     | some p => pure p
     | none => throw s!"{exeName}: missing required --params <path>"
-  let (prompt?, args) ← CLI.takeFlagValueOnce args "prompt"
-  let (generate?, args) ← CLI.takeNatFlagOnce args "generate"
-  let (temperature?, args) ← CLI.takeFloatFlagOnce args "temperature"
-  let (topK?, args) ← CLI.takeNatFlagOnce args "top-k"
-  let (repeatPenalty?, args) ← CLI.takeFloatFlagOnce args "repeat-penalty"
-  let (repeatWindow?, args) ← CLI.takeNatFlagOnce args "repeat-window"
-  let (seed?, args) ← CLI.takeNatFlagOnce args "sample-seed"
-  let (asciiOnlyRaw?, args) ← CLI.takeFlagValueOnce args "ascii-only"
-  let (asciiOnlyFlag, args) ← CLI.takeBoolFlagOnce args "ascii-only"
-  let asciiOnly :=
-    match asciiOnlyRaw? with
-    | none => asciiOnlyFlag
-    | some v =>
-        if v = "true" || v = "1" then true
-        else if v = "false" || v = "0" then false
-        else asciiOnlyFlag
-  match asciiOnlyRaw? with
-  | none => pure ()
-  | some v =>
-      if v = "true" || v = "1" || v = "false" || v = "0" then
-        pure ()
-      else
-        throw s!"{exeName}: --ascii-only expects true/false (or 1/0), got {v}"
-  let temperature := temperature?.getD 0.85
-  if temperature <= 0.0 then
-    throw s!"{exeName}: --temperature must be > 0"
-  let repeatPenalty := repeatPenalty?.getD 1.25
-  if repeatPenalty < 0.0 then
-    throw s!"{exeName}: --repeat-penalty must be >= 0"
+  let (gen, args) ← text.parseGenerationOptions exeName args
+    { prompt := "First Citizen:"
+      generate := 96
+      temperature := 0.85
+      topK := 12
+      repeatPenalty := 1.25
+      repeatWindow := 24
+      seed := 7
+      asciiOnly := false }
   pure ({ paramsPath := (paramsRaw : System.FilePath)
-          prompt := prompt?.getD "First Citizen:"
-          generate := generate?.getD 96
-          temperature := temperature
-          topK := topK?.getD 12
-          repeatPenalty := repeatPenalty
-          repeatWindow := repeatWindow?.getD 24
-          seed := seed?.getD 7
-          asciiOnly := asciiOnly }, args)
+          prompt := gen.prompt
+          generate := gen.generate
+          temperature := gen.temperature
+          topK := gen.topK
+          repeatPenalty := gen.repeatPenalty
+          repeatWindow := gen.repeatWindow
+          seed := gen.seed
+          asciiOnly := gen.asciiOnly }, args)
 
 /--
 Load parameters from disk and run sampling with the fixed tutorial architecture.
@@ -142,22 +122,20 @@ def sampleWithSavedParams (opts : Runtime.Autograd.Torch.Options) (load : LoadOp
     let outIds ←
       NN.Examples.Models.Sequence.Gpt2.generateSampled opts model params load.prompt load.generate
         load.temperature load.topK load.seed load.repeatWindow load.repeatPenalty load.asciiOnly
-    let txt := NN.Examples.Models.Sequence.Gpt2.escapeByteIdsForDisplay outIds
+    let txt := text.escapeByteIdsForDisplay outIds
     IO.println s!"  loaded={load.paramsPath}"
     IO.println s!"  prompt={text.escapeForDisplay load.prompt}"
     IO.println s!"  sampled={txt}"
     pure txt
 
 def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
+  Common.runFloat exeName args
+    (banner := fun opts =>
+      s!"{exeName}: sample from saved params (device={if opts.useGpu then "cuda" else "cpu"})")
+    (k := fun opts rest => do
       let (load, rest) ← Common.orThrow exeName <| parseLoadOptions rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
       let _ ← sampleWithSavedParams opts load
-      pure ()
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: sample from saved params (device={if opts.useGpu then "cuda" else "cpu"})")
-      printOk := true }
+      pure ())
 
 end NN.Examples.Models.Sequence.Gpt2Saved

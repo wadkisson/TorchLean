@@ -233,18 +233,32 @@ structure AnyParam (α : Type) where
 
 namespace AnyParam
 
+/--
+Make the result of a native CUDA cleanup call observable in `IO`.
+
+Some CUDA cleanup functions are exposed as pure opaque calls because they are also useful in pure
+buffer-building expressions. In executable cleanup paths, we still want the native call to be
+sequenced with the surrounding eager-session updates. Branching into `IO` on the returned flag gives
+Lean a real dependency on the result without printing anything or changing behavior.
+-/
+def observeCudaCleanupFlag (released : UInt32) : IO Unit :=
+  if released == 0 then
+    IO.sleep 0
+  else
+    pure ()
+
 /-- Release a cached CUDA mirror, if one exists.
 
 CUDA buffers are external objects whose native finalizer tolerates repeated cleanup attempts, but
-long training loops should not wait for GC pressure before returning replaced parameter mirrors to
-the allocator.
+parameter updates know exactly when an old device mirror is no longer the current value. Releasing
+that mirror here keeps eager CUDA sessions explicit about ownership.
 -/
 def releaseCachedCudaValue {α : Type} {s : Shape} (p : Param α s) : IO Unit := do
   match ← p.cudaValue.get with
   | none => pure ()
   | some any =>
-      let _ := Runtime.Autograd.Cuda.Buffer.release any.buf
-      pure ()
+      let released := Runtime.Autograd.Cuda.Buffer.release any.buf
+      observeCudaCleanupFlag released
 
 /--
 Package a typed `Param α s` as an `AnyParam α`, checking shape on `set`.
@@ -446,10 +460,7 @@ def new {α : Type} (opts : Options := {}) : IO (EagerSession α) := do
 /-- Force-free a CUDA buffer allocation; the external finalizer is safe to call twice. -/
 def releaseCudaBuffer (b : Runtime.Autograd.Cuda.Buffer) : IO Unit := do
   let released := Runtime.Autograd.Cuda.Buffer.release b
-  if released == 0 then
-    pure ()
-  else
-    pure ()
+  AnyParam.observeCudaCleanupFlag released
 
 /-- Force-release a shape-erased CUDA buffer. -/
 def releaseCudaAnyBuffer (b : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit :=
@@ -458,9 +469,9 @@ def releaseCudaAnyBuffer (b : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit :=
 /--
 Release current CUDA tape values that are not persistent parameter mirrors.
 
-Eager CUDA training creates many temporary buffers per step. Relying only on external-object
-finalizers can produce high transient memory pressure in long runs, so reset/step paths call this
-before discarding the current tape snapshot.
+Eager CUDA training creates temporary buffers for forward values and backward scratch. Reset paths
+call this before discarding the current tape snapshot, while persistent parameter mirrors remain
+owned by their `Param` objects.
 -/
 def releaseCudaTapeNonParamValues {α : Type} (s : EagerSession α) : IO Unit := do
   let t ← s.cudaTape.get
@@ -514,11 +525,7 @@ def releaseCudaAnyBufferArray (xs : Array Runtime.Autograd.Cuda.AnyBuffer) : IO 
 /-- Ask the native allocator to return/free pages after a large CUDA eager step. -/
 def collectCudaAllocator : IO Unit := do
   let released := Runtime.Autograd.Cuda.Buffer.collectAllocator true
-  -- Branch on the opaque FFI result so the collector call is not optimized away.
-  if released == 0 then
-    pure ()
-  else
-    pure ()
+  AnyParam.observeCudaCleanupFlag released
 
 /--
 Reset the tape and side tables.
@@ -2267,6 +2274,9 @@ def sgdStepAll {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
         let updatedDev : Runtime.Autograd.Cuda.AnyBuffer :=
           { s := p.s, buf := Runtime.Autograd.Cuda.Buffer.axpy pBuf gDev.buf (-lrF) }
         p.setCuda updatedDev
+        -- The uploaded host gradient is only a temporary bridge buffer for this update.
+        let released := Runtime.Autograd.Cuda.Buffer.release gDev.buf
+        AnyParam.observeCudaCleanupFlag released
       else
         throw <| IO.userError "torch: internal grad shape mismatch during SGD"
   else

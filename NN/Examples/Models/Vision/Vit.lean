@@ -30,7 +30,7 @@ prepared CIFAR-10 minibatch: patch embedding by convolution, token reshape, tran
 linear head.
 
 The reusable model wiring lives in `NN.API.Models.Vit` (`nn.models.vit1`). This file is the
-runnable wrapper (CIFAR loader construction + multi-epoch training loop).
+runnable wrapper (CIFAR loader construction + step-limited training loop).
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
@@ -105,55 +105,41 @@ def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) := do
   RealData.loadCifarLoader (α := α) exeName batch nRows seed xPath yPath
 
+/--
+Train the ViT-style classifier through the same Float runtime path used by the other image models.
+
+The ViT-specific work is in `mkModel`; this function only connects that model to the standard
+cross-entropy module and shared training/logging helper.
+-/
+def fitCifar (opts : Runtime.Autograd.Torch.Options)
+    (xPath yPath : System.FilePath) (nRows seed : Nat) (trainCfg : Common.ModelTrainFlags) :
+    IO (train.FitReport Float) := do
+  let loader ← loadCifarLoader (α := Float) xPath yPath nRows seed
+  nn.withModel mkModel fun model => do
+    let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
+    let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+    let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
+    let cudaMemWatch :=
+      Common.effectiveCudaMemWatch opts trainCfg.train.steps trainCfg.cudaMemWatch
+    let (report, _loader') ← train.fitModuleLoaderStepsLoggedFloat module opt opts
+      trainCfg.train.steps loader trainCfg.train.log "ViT CIFAR training"
+      #[s!"x={xPath}", s!"y={yPath}", s!"nRows={nRows}",
+        s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"lr={trainCfg.lr}",
+        s!"steps={trainCfg.train.steps}", s!"batch={batch}", s!"cuda_mem_watch={cudaMemWatch}"]
+      "loss" trainCfg.cudaMemWatch
+    pure report
+
 def main (args : List String) : IO UInt32 := do
-  Common.runAnyOrFloat exeName args
-    (preferFloat := fun args => args.contains "--cuda" || CLI.hasFlagValue args "log")
+  Common.runFloat exeName args
     (banner := fun opts =>
       s!"{exeName}: ViT CIFAR training (device={if opts.useGpu then "cuda" else "cpu"})")
-    (anyK := fun {α} _ _ _ _ cast opts rest => do
+    (k := fun opts rest => do
         let (xPath, yPath, nRows, seed, rest) ← Common.orThrow exeName <|
           RealData.parseCifarFlags rest
         let (trainCfg, rest) ← Common.orThrow exeName <|
           Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
         Common.orThrow exeName <| CLI.requireNoArgs rest
-        let loader ← loadCifarLoader (α := α) xPath yPath nRows seed
-        nn.withModel mkModel fun model => do
-          let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-          let module ← TorchLean.Module.instantiateWithOptions (α := α) modDef cast opts
-          let opt := Common.adamOptimizer (α := α) cast (nn.paramShapes model) trainCfg.lr
-          let hooks : train.Callbacks α :=
-            (train.onTrainStart (α := α) do
-              train.Report.reportMeanLossModuleLoader module loader "train(before)")
-            ++ train.onTrainEnd (α := α) (fun _ =>
-              train.Report.reportMeanLossModuleLoader module loader "train(after)")
-          let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-          IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-        pure ())
-    (floatK := fun opts rest => do
-        let (xPath, yPath, nRows, seed, rest) ← Common.orThrow exeName <|
-          RealData.parseCifarFlags rest
-        let (trainCfg, rest) ← Common.orThrow exeName <|
-          Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
-        Common.orThrow exeName <| CLI.requireNoArgs rest
-        let loader ← loadCifarLoader (α := Float) xPath yPath nRows seed
-        nn.withModel mkModel fun model => do
-          let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-          let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-          let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
-          let curveRef ← IO.mkRef ({} : _root_.Runtime.Training.Curve)
-          let hooks : train.Callbacks Float :=
-            (train.onTrainStart (α := Float) do
-              train.Report.reportMeanLossModuleLoader module loader "train(before)")
-            ++ train.onStep (α := Float) (fun ev =>
-              curveRef.modify (fun c => c.push ev.step ev.loss))
-            ++ train.onTrainEnd (α := Float) (fun _ =>
-              train.Report.reportMeanLossModuleLoader module loader "train(after)")
-          let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-          let curve ← curveRef.get
-          IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-          Common.writeCurveLogTo trainCfg.train.log "ViT CIFAR training" curve "loss"
-            #[s!"x={xPath}", s!"y={yPath}", s!"nRows={nRows}",
-              s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"lr={trainCfg.lr}",
-              s!"epochs={trainCfg.train.steps}", s!"batch={batch}"])
+        let report ← fitCifar opts xPath yPath nRows seed trainCfg
+        IO.println s!"  steps={trainCfg.train.steps} loss0={report.before} loss1={report.after}")
 
 end NN.Examples.Models.Vision.Vit

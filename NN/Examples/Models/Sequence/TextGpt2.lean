@@ -644,8 +644,10 @@ def main (args : List String) : IO UInt32 := do
       IO.eprintln s!"{exeName}: {e}"
       pure 1
   | .ok args =>
-      TorchLean.Module.run exeName args
-        (.float (fun opts rest => do
+      Common.runFloat exeName args
+        (banner := fun opts =>
+          s!"{exeName}: GPU corpus trainer (device={if opts.useGpu then "cuda" else "cpu"})")
+        (k := fun opts rest => do
           if !opts.useGpu then
             throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
           let (trainOpts, rest) ← Common.orThrow exeName <| parseTrainOptions rest
@@ -669,9 +671,6 @@ def main (args : List String) : IO UInt32 := do
               IO.eprintln s!"{exeName}: projected BPE ids to local vocabulary {lv.size}/{BpeGpt2.vocab}"
               trainBpeCorpusFloat opts trainOpts tok lv localTokens
           | _, _ =>
-              trainCorpusFloat opts trainOpts bytes))
-        { banner? := some (fun opts =>
-            s!"{exeName}: GPU corpus trainer (device={if opts.useGpu then "cuda" else "cpu"})")
-          printOk := true }
+              trainCorpusFloat opts trainOpts bytes)
 
 end NN.Examples.Models.Sequence.TextGpt2

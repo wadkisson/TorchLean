@@ -125,3 +125,6 @@ the text-model and diffusion walkthroughs. For the clearest motivation, read Bug
 
 CUDA is opt-in. The build flags, runtime path, and agreement assumptions are explained in
 [GPU and CUDA]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+For long CUDA training runs, model commands also expose allocator telemetry through
+`--cuda-mem-watch N`; longer runs choose a small default cadence so device-memory behavior is visible
+while the example is running.

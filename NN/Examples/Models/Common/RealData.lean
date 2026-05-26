@@ -142,9 +142,8 @@ def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
           "to regenerate the default 200-row slice, run:\n" ++
           "  python3 scripts/datasets/download_example_data.py --cifar10"
         throw <| IO.userError hint
-  -- Return the general typed minibatch loader, not just one batch.  Model examples can either take
-  -- the first batch for a small fixed-sample check or pass the whole loader to
-  -- `train.fitModuleLoaderWith` for real multi-epoch training over shuffled batches.
+  -- Return the typed minibatch loader. Callers can take one batch for a fixed-sample check or pass
+  -- the loader to the shared training helpers for shuffled multi-step training.
   let dl := Data.batchLoader ds batch (shuffle := true) (seed := seed) (dropLast := true)
   pure dl
 

@@ -14,7 +14,8 @@ public import NN.Examples.Data.RealPaths
 /-!
 # LSTM Seasonal Regression / Forecasting
 
-Run this when you want a real regression-style sequence example, not just a text-shaped smoke test.
+This is the runnable supervised sequence example: an LSTM fits a small real-valued forecasting task
+and works with the same CPU/CUDA runtime flags as the other model commands.
 
 The default data path uses the UCI Individual Household Electric Power Consumption dataset:
 minute-level power readings from one household over almost four years. The preparation script turns
@@ -203,7 +204,7 @@ def printForecastProbe
   for i in [0:Nat.min seqLen 8] do
     IO.println s!"    t+{i+1}: pred={readSeriesAt pred i} target={readSeriesAt target i}"
 
-/-- Example-specific training options after `TorchLean.Module.run` has handled CPU/CUDA flags. -/
+/-- Example-specific training options after the shared runtime parser has handled CPU/CUDA flags. -/
 structure TrainOptions where
   /-- Optimizer steps. Use `1` on CUDA for smoke; use around `200` on CUDA to see learning. -/
   steps : Nat
@@ -227,7 +228,7 @@ deriving Repr
 Parse example-specific flags.
 
 Runtime flags such as `--cpu`, `--cuda`, `--dtype`, and `--backend` are handled by
-`TorchLean.Module.run`; this parser handles data, forecasting, and logging knobs.
+`Common.runFloat`; this parser handles data, forecasting, and logging knobs.
 -/
 def parseTrainOptions (args : List String) : Except String (TrainOptions × List String) := do
   let (train, args) ← Common.parseLoggedTrainFlags exeName args defaultLogJson 100
@@ -291,26 +292,18 @@ def trainForecast (opts : Runtime.Autograd.Torch.Options) (train : TrainOptions)
     IO.println s!"  steps={train.steps} windows={xs.size} lr={train.lr} loss0={L0} loss1={L1}"
     pure (L0, L1)
 
-/--
-Executable entrypoint.
-
-This is a numeric training tutorial, so it uses the `Float` runtime path. If you are proving a layer
-property, use the spec/proof files; if you want to see an LSTM actually fit a small forecasting task,
-run this file.
--/
+/-- Executable entrypoint for CPU/CUDA Float training. -/
 def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
+  Common.runFloat exeName args
+    (banner := fun opts =>
+      s!"{exeName}: LSTM time-series regression (device={if opts.useGpu then "cuda" else "cpu"})")
+    (k := fun opts rest => do
       let (train, rest) ← Common.orThrow exeName <| parseTrainOptions rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
       let (L0, L1) ← trainForecast opts train
       Common.writeBeforeAfterLossLogTo train.log "LSTM seasonal regression" train.steps L0 L1
         (#[s!"device={if opts.useGpu then "cuda" else "cpu"}", s!"windows={train.windows}",
           s!"lr={train.lr}", s!"probe_index={train.probeOffset}",
-          "task=next-step household power forecasting"] ++ dataTags train.xPath train.yPath)
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: LSTM time-series regression (device={if opts.useGpu then "cuda" else "cpu"})")
-      printOk := true }
+          "task=next-step household power forecasting"] ++ dataTags train.xPath train.yPath))
 
 end NN.Examples.Models.Supervised.LstmRegression

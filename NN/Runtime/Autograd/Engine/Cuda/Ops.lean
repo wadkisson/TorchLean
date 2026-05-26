@@ -84,7 +84,9 @@ def sigmoidBuf (x : Buffer) (n : UInt32) : Buffer :=
   let negx := Buffer.scale x (-1.0)
   let ex := Buffer.exp negx
   let denom := Buffer.add ones ex
-  Buffer.div ones denom
+  let y := Buffer.div ones denom
+  Buffer.releaseThen ones <| Buffer.releaseThen negx <|
+    Buffer.releaseThen ex <| Buffer.releaseThen denom y
 
 /-- Hyperbolic tangent implemented as `(exp(2x)-1)/(exp(2x)+1)`. -/
 def tanhBuf (x : Buffer) (n : UInt32) : Buffer :=
@@ -93,19 +95,24 @@ def tanhBuf (x : Buffer) (n : UInt32) : Buffer :=
   let e2x := Buffer.exp twoX
   let num := Buffer.sub e2x ones
   let den := Buffer.add e2x ones
-  Buffer.div num den
+  let y := Buffer.div num den
+  Buffer.releaseThen ones <| Buffer.releaseThen twoX <| Buffer.releaseThen e2x <|
+    Buffer.releaseThen num <| Buffer.releaseThen den y
 
 /-- Numerically stable softplus: `max(x,0) + log(1 + exp(-abs(x)))`. -/
 def softplusBuf (x : Buffer) (n : UInt32) : Buffer :=
-  -- Stable softplus: max(x,0) + log(1 + exp(-abs(x)))
   let zeros := Buffer.full n 0.0
   let ones := Buffer.full n 1.0
   let max0 := Buffer.max x zeros
   let absx := Buffer.abs x
   let negAbs := Buffer.scale absx (-1.0)
   let expNegAbs := Buffer.exp negAbs
-  let logTerm := Buffer.log (Buffer.add ones expNegAbs)
-  Buffer.add max0 logTerm
+  let onePlusExp := Buffer.add ones expNegAbs
+  let logTerm := Buffer.log onePlusExp
+  let y := Buffer.add max0 logTerm
+  Buffer.releaseThen zeros <| Buffer.releaseThen ones <| Buffer.releaseThen max0 <|
+    Buffer.releaseThen absx <| Buffer.releaseThen negAbs <| Buffer.releaseThen expNegAbs <|
+      Buffer.releaseThen onePlusExp <| Buffer.releaseThen logTerm y
 
 /--
 Row-wise stable softmax plus scratch buffers that should be released after the backward pass.
@@ -134,7 +141,8 @@ def softmax2dBwd (y dLdy : Buffer) (rows cols : UInt32) : Buffer :=
   let dot := Buffer.reduceSumAxis1 dy_y rows cols
   let dotB := Buffer.broadcastVecToCols dot rows cols
   let centered := Buffer.sub dLdy dotB
-  Buffer.mul y centered
+  Buffer.releaseThen dy_y <| Buffer.releaseThen dot <| Buffer.releaseThen dotB <|
+    Buffer.releaseThen centered <| Buffer.mul y centered
 
 /--
 Row-wise stable log-softmax plus scratch buffers that should be released after backprop.
@@ -143,9 +151,6 @@ This computes `x - rowMax - log(sum(exp(x-rowMax)))` directly, avoiding the less
 `log(softmax(x))` route.
 -/
 def logSoftmax2dFwdWithCleanup (x : Buffer) (rows cols : UInt32) : Buffer × List Buffer :=
-  -- Stable row-wise log-softmax:
-  --   x - rowMax - log(sum(exp(x - rowMax))).
-  -- This avoids the `softmax` then `log` underflow path and matches PyTorch's intended primitive.
   let rowMax := Buffer.reduceMaxAxis1 x rows cols
   let maxB := Buffer.broadcastVecToCols rowMax rows cols
   let shifted := Buffer.sub x maxB
@@ -165,10 +170,16 @@ def logSoftmax2dBwd (y dLdy : Buffer) (rows cols : UInt32) : Buffer :=
   let probs := Buffer.exp y
   let rowSum := Buffer.reduceSumAxis1 dLdy rows cols
   let sumB := Buffer.broadcastVecToCols rowSum rows cols
-  Buffer.sub dLdy (Buffer.mul probs sumB)
+  let scaled := Buffer.mul probs sumB
+  Buffer.releaseThen probs <| Buffer.releaseThen rowSum <| Buffer.releaseThen sumB <|
+    Buffer.releaseThen scaled <| Buffer.sub dLdy scaled
 
 /-!
 ## Elementwise ops
+
+The backward closures below return newly allocated gradient buffers. When a derivative uses
+intermediate CUDA buffers, it releases those intermediates before returning the final gradient. The
+returned buffers are owned by the tape/gradient accumulator; scratch buffers are owned locally.
 -/
 
 /-- Elementwise addition. -/
@@ -238,7 +249,10 @@ def div {s : Shape} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) :=
       let da := Buffer.div dLdy b
       let b2 := Buffer.mul b b
       let aOverB2 := Buffer.div a b2
-      let db := Buffer.scale (Buffer.mul dLdy aOverB2) (-1.0)
+      let dLdyA := Buffer.mul dLdy aOverB2
+      let dbRaw := Buffer.scale dLdyA (-1.0)
+      let db := Buffer.releaseThen b2 <| Buffer.releaseThen aOverB2 <|
+        Buffer.releaseThen dLdyA dbRaw
       (da, db))
 
 /-- Elementwise ReLU. -/
@@ -251,13 +265,17 @@ def relu {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
 def exp {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
   unary (t := t) "exp" xId s s
     (forward := Buffer.exp)
-    (backward := fun x dLdy => Buffer.mul dLdy (Buffer.exp x))
+    (backward := fun x dLdy =>
+      let ex := Buffer.exp x
+      Buffer.releaseThen ex <| Buffer.mul dLdy ex)
 
 /-- Elementwise log. -/
 def log {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
   unary (t := t) "log" xId s s
     (forward := Buffer.log)
-    (backward := fun x dLdy => Buffer.mul dLdy (Buffer.inv x))
+    (backward := fun x dLdy =>
+      let invX := Buffer.inv x
+      Buffer.releaseThen invX <| Buffer.mul dLdy invX)
 
 /-- Elementwise reciprocal `1/x`. -/
 def inv {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
@@ -266,7 +284,9 @@ def inv {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
     (backward := fun x dLdy =>
       let invx := Buffer.inv x
       let invx2 := Buffer.mul invx invx
-      Buffer.scale (Buffer.mul dLdy invx2) (-1.0))
+      let prod := Buffer.mul dLdy invx2
+      Buffer.releaseThen invx <| Buffer.releaseThen invx2 <|
+        Buffer.releaseThen prod <| Buffer.scale prod (-1.0))
 
 /--
 Elementwise "safe log" that protects against `log(0)` by adding a small `ε` internally.
@@ -279,14 +299,17 @@ def safeLog {s : Shape} (t : Tape) (xId : Nat) (ε : Float) : Result (Tape × Na
     (forward := fun x =>
       let epsBuf := Buffer.full n ε
       let sp := softplusBuf x n
-      Buffer.log (Buffer.add sp epsBuf))
+      let denom := Buffer.add sp epsBuf
+      let y := Buffer.log denom
+      Buffer.releaseThen epsBuf <| Buffer.releaseThen sp <| Buffer.releaseThen denom y)
     (backward := fun x dLdy =>
       let epsBuf := Buffer.full n ε
       let sp := softplusBuf x n
       let denom := Buffer.add sp epsBuf
       let sig := sigmoidBuf x n
       let dlog := Buffer.div sig denom
-      Buffer.mul dLdy dlog)
+      Buffer.releaseThen epsBuf <| Buffer.releaseThen sp <| Buffer.releaseThen denom <|
+        Buffer.releaseThen sig <| Buffer.releaseThen dlog <| Buffer.mul dLdy dlog)
 
 /-- Elementwise sigmoid (logistic). -/
 def sigmoid {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
@@ -296,8 +319,10 @@ def sigmoid {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
     (backward := fun x dLdy =>
       let y := sigmoidBuf x n
       let ones := Buffer.full n 1.0
-      let dy := Buffer.mul y (Buffer.sub ones y)
-      Buffer.mul dLdy dy)
+      let oneMinusY := Buffer.sub ones y
+      let dy := Buffer.mul y oneMinusY
+      Buffer.releaseThen y <| Buffer.releaseThen ones <| Buffer.releaseThen oneMinusY <|
+        Buffer.releaseThen dy <| Buffer.mul dLdy dy)
 
 /-- Elementwise tanh. -/
 def tanh {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
@@ -307,8 +332,10 @@ def tanh {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
     (backward := fun x dLdy =>
       let y := tanhBuf x n
       let ones := Buffer.full n 1.0
-      let dy := Buffer.sub ones (Buffer.mul y y)
-      Buffer.mul dLdy dy)
+      let y2 := Buffer.mul y y
+      let dy := Buffer.sub ones y2
+      Buffer.releaseThen y <| Buffer.releaseThen ones <| Buffer.releaseThen y2 <|
+        Buffer.releaseThen dy <| Buffer.mul dLdy dy)
 
 /-- Elementwise softplus. -/
 def softplus {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
@@ -317,7 +344,7 @@ def softplus {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
     (forward := fun x => softplusBuf x n)
     (backward := fun x dLdy =>
       let dy := sigmoidBuf x n
-      Buffer.mul dLdy dy)
+      Buffer.releaseThen dy <| Buffer.mul dLdy dy)
 
 /-!
 ## Reductions / views
@@ -455,7 +482,7 @@ def reduceMean {s : Shape} (axis : Nat) [valid : Shape.valid_axis_inst axis s] [
         match getDimSize s axis with
         | some n => n
         | none => 1
-      Buffer.scale dLdx (1.0 / (Float.ofNat denomNat)))
+      Buffer.releaseThen dLdx <| Buffer.scale dLdx (1.0 / (Float.ofNat denomNat)))
 
 /-!
 ## Linear algebra
@@ -477,7 +504,7 @@ def matmul {m n p : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
       let aT := Buffer.transpose2d a m32 n32
       let dA := Buffer.bmm dLdy bT one32 m32 p32 n32
       let dB := Buffer.bmm aT dLdy one32 n32 m32 p32
-      (dA, dB))
+      (Buffer.releaseThen bT dA, Buffer.releaseThen aT dB))
 
 /-- Batched matrix multiply. -/
 def bmm {batch m n p : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
@@ -499,7 +526,7 @@ def bmm {batch m n p : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) :=
       let dA := Buffer.bmm dLdy bT b32 m32 p32 n32
       -- dB = aᵀ @ dLdy  (batch,n,m) * (batch,m,p) -> (batch,n,p)
       let dB := Buffer.bmm aT dLdy b32 n32 m32 p32
-      (dA, dB))
+      (Buffer.releaseThen bT dA, Buffer.releaseThen aT dB))
 
 /--
 Fused real-FFT spectral convolution used by the CUDA FNO1D path.
@@ -573,7 +600,7 @@ def linear {outDim inDim : Nat} (t : Tape) (wId bId xId : Nat) : Result (Tape ×
         let dW := Buffer.bmm g xBuf one32 out32 one32 in32
         let db := Buffer.copy g
         let wT := Buffer.transpose2d wBuf out32 in32
-        let dx := Buffer.bmm wT g one32 in32 out32 one32
+        let dx := Buffer.releaseThen wT <| Buffer.bmm wT g one32 in32 out32 one32
         pure
           [ (wId, { s := .dim outDim (.dim inDim .scalar), buf := dW })
           , (bId, { s := .dim outDim .scalar, buf := db })
@@ -1483,19 +1510,33 @@ def layerNorm {seqLen embedDim : Nat} (h_seq_pos : seqLen > 0) (h_embed_pos : em
         let dLdy ← requireGrad dLdyAny outShape
         -- dBeta / dGamma (sum over seqLen axis).
         let dBeta := Buffer.reduceSumAxis0 dLdy.buf rows32 cols32
-        let dGamma := Buffer.reduceSumAxis0 (Buffer.mul dLdy.buf xHat) rows32 cols32
+        let dGammaPointwise := Buffer.mul dLdy.buf xHat
+        let dGamma := Buffer.releaseThen dGammaPointwise <|
+          Buffer.reduceSumAxis0 dGammaPointwise rows32 cols32
         -- dX
         let dXhat := Buffer.mul dLdy.buf gammaB
         let sumDXhat := Buffer.reduceSumAxis1 dXhat rows32 cols32         -- (rows)
-        let sumDXhatXhat := Buffer.reduceSumAxis1 (Buffer.mul dXhat xHat) rows32 cols32
+        let dXhatXhat := Buffer.mul dXhat xHat
+        let sumDXhatXhat := Buffer.releaseThen dXhatXhat <|
+          Buffer.reduceSumAxis1 dXhatXhat rows32 cols32
         let sum1B := Buffer.broadcastVecToCols sumDXhat rows32 cols32
         let sum2B := Buffer.broadcastVecToCols sumDXhatXhat rows32 cols32
+        let scaledDXhat := Buffer.scale dXhat (Float.ofNat embedDim)
+        let centeredDXhat := Buffer.sub scaledDXhat sum1B
+        let xHatSum2 := Buffer.mul xHat sum2B
         let term :=
-          Buffer.sub (Buffer.sub (Buffer.scale dXhat (Float.ofNat embedDim)) sum1B)
-            (Buffer.mul xHat sum2B)
+          Buffer.sub centeredDXhat xHatSum2
         let invStd := Buffer.inv std
         let invStdB := Buffer.broadcastVecToCols invStd rows32 cols32
-        let dx := Buffer.scale (Buffer.mul term invStdB) invCols
+        let termInv := Buffer.mul term invStdB
+        let dxRaw := Buffer.scale termInv invCols
+        let dx :=
+          Buffer.releaseThen dXhat <| Buffer.releaseThen sumDXhat <|
+            Buffer.releaseThen sumDXhatXhat <| Buffer.releaseThen sum1B <|
+              Buffer.releaseThen sum2B <| Buffer.releaseThen scaledDXhat <|
+                Buffer.releaseThen centeredDXhat <| Buffer.releaseThen xHatSum2 <|
+                  Buffer.releaseThen term <| Buffer.releaseThen invStd <|
+                    Buffer.releaseThen invStdB <| Buffer.releaseThen termInv dxRaw
         pure [
           (xId, { s := outShape, buf := dx }),
           (gammaId, { s := .dim embedDim .scalar, buf := dGamma }),
@@ -1555,19 +1596,32 @@ def batchnormChannelFirst
         let dLdy ← requireGrad dLdyAny xShape
         -- dBeta / dGamma sum over spatial dimension (axis=1 of the folded matrix).
         let dBeta := Buffer.reduceSumAxis1 dLdy.buf rows32 cols32
-        let dGamma := Buffer.reduceSumAxis1 (Buffer.mul dLdy.buf xHat) rows32 cols32
+        let dGammaPointwise := Buffer.mul dLdy.buf xHat
+        let dGamma := Buffer.releaseThen dGammaPointwise <|
+          Buffer.reduceSumAxis1 dGammaPointwise rows32 cols32
         -- dX
         let dXhat := Buffer.mul dLdy.buf gammaB
         let sumDXhat := Buffer.reduceSumAxis1 dXhat rows32 cols32
-        let sumDXhatXhat := Buffer.reduceSumAxis1 (Buffer.mul dXhat xHat) rows32 cols32
+        let dXhatXhat := Buffer.mul dXhat xHat
+        let sumDXhatXhat := Buffer.releaseThen dXhatXhat <|
+          Buffer.reduceSumAxis1 dXhatXhat rows32 cols32
         let sum1B := Buffer.broadcastVecToCols sumDXhat rows32 cols32
         let sum2B := Buffer.broadcastVecToCols sumDXhatXhat rows32 cols32
-        let term :=
-          Buffer.sub (Buffer.sub (Buffer.scale dXhat (Float.ofNat cols)) sum1B)
-            (Buffer.mul xHat sum2B)
+        let scaledDXhat := Buffer.scale dXhat (Float.ofNat cols)
+        let centeredDXhat := Buffer.sub scaledDXhat sum1B
+        let xHatSum2 := Buffer.mul xHat sum2B
+        let term := Buffer.sub centeredDXhat xHatSum2
         let invStd := Buffer.inv std
         let invStdB := Buffer.broadcastVecToCols invStd rows32 cols32
-        let dx := Buffer.scale (Buffer.mul term invStdB) invCols
+        let termInv := Buffer.mul term invStdB
+        let dxRaw := Buffer.scale termInv invCols
+        let dx :=
+          Buffer.releaseThen dXhat <| Buffer.releaseThen sumDXhat <|
+            Buffer.releaseThen sumDXhatXhat <| Buffer.releaseThen sum1B <|
+              Buffer.releaseThen sum2B <| Buffer.releaseThen scaledDXhat <|
+                Buffer.releaseThen centeredDXhat <| Buffer.releaseThen xHatSum2 <|
+                  Buffer.releaseThen term <| Buffer.releaseThen invStd <|
+                    Buffer.releaseThen invStdB <| Buffer.releaseThen termInv dxRaw
         pure [
           (xId, { s := xShape, buf := dx }),
           (gammaId, { s := .dim channels .scalar, buf := dGamma }),
@@ -1753,9 +1807,11 @@ def multiHeadAttention
         let dLdy ← requireGrad dLdyAny outShape
         -- Backprop through output projection: y = concat @ wo
         let woT := Buffer.transpose2d wo proj32 dModel32
-        let dConcat := Buffer.bmm dLdy.buf woT one32 n32 dModel32 proj32
+        let dConcat := Buffer.releaseThen woT <|
+          Buffer.bmm dLdy.buf woT one32 n32 dModel32 proj32
         let concatT := Buffer.transpose2d concat n32 proj32
-        let dWo := Buffer.bmm concatT dLdy.buf one32 proj32 n32 dModel32
+        let dWo := Buffer.releaseThen concatT <|
+          Buffer.bmm concatT dLdy.buf one32 proj32 n32 dModel32
         -- Backprop combine-heads: reshape/view then swap back
         let dSwapped := dConcat -- view (n,numHeads,headDim)
         let dOutHeads := Buffer.swapAdjacentAtDepth dSwapped dimsView depth0 -- (numHeads,n,headDim)
@@ -1763,10 +1819,11 @@ def multiHeadAttention
           if useFlash then
             -- Fused VJP for the native attention primitive. The kernels recompute the row-wise
             -- softmax summaries instead of materializing/storing the full attention matrix.
-            pure
-              ( Buffer.flashAttentionBwdQ Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-              , Buffer.flashAttentionBwdK Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-              , Buffer.flashAttentionBwdV Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale )
+            let dQh := Buffer.flashAttentionBwdQ Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+            let dKh := Buffer.flashAttentionBwdK Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+            let dVh := Buffer.releaseThen dOutHeads <|
+              Buffer.flashAttentionBwdV Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+            pure (dQh, dKh, dVh)
           else
             let dimsAttn : Array Nat := #[numHeads, n, n]
             let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1
@@ -1781,13 +1838,20 @@ def multiHeadAttention
                   let ones := Buffer.full total32 1.0
                   let invMask := Buffer.sub ones maskB
                   let fill := Buffer.full total32 (-1000.0)
-                  pure <| Buffer.add (Buffer.mul scaled0 maskB) (Buffer.mul fill invMask)
+                  let scaledMask := Buffer.mul scaled0 maskB
+                  let fillMask := Buffer.mul fill invMask
+                  pure <| Buffer.releaseThen ones <| Buffer.releaseThen invMask <|
+                    Buffer.releaseThen fill <| Buffer.releaseThen scaledMask <|
+                      Buffer.releaseThen fillMask <| Buffer.add scaledMask fillMask
             let rowsFold32 ← u32 (numHeads * n)
             let attn := softmax2dFwd scaled rowsFold32 n32
             let VhT := Buffer.swapAdjacentAtDepth Vh dimsHead depth1
-            let dAttn := Buffer.bmm dOutHeads VhT h32 n32 head32 n32
+            let dAttn := Buffer.releaseThen VhT <|
+              Buffer.bmm dOutHeads VhT h32 n32 head32 n32
             let attnT := Buffer.swapAdjacentAtDepth attn dimsAttn depth1
-            let dVh := Buffer.bmm attnT dOutHeads h32 n32 n32 head32
+            let dVh := Buffer.releaseThen attnT <|
+              Buffer.releaseThen dOutHeads <|
+                Buffer.bmm attnT dOutHeads h32 n32 n32 head32
             let dScaled := softmax2dBwd attn dAttn rowsFold32 n32
             let dScoresMasked := Buffer.scale dScaled scale
             let dScores :=
@@ -1796,24 +1860,35 @@ def multiHeadAttention
               | some _ => Buffer.mul dScoresMasked maskB
             let dQh := Buffer.bmm dScores Kh h32 n32 n32 head32
             let dScoresT := Buffer.swapAdjacentAtDepth dScores dimsAttn depth1
-            let dKh := Buffer.bmm dScoresT Qh h32 n32 n32 head32
+            let dKh := Buffer.releaseThen dScoresT <|
+              Buffer.bmm dScoresT Qh h32 n32 n32 head32
+            let dQh := Buffer.releaseThen KhT <| Buffer.releaseThen scores <|
+              Buffer.releaseThen scaled0 <| Buffer.releaseThen scaled <|
+                Buffer.releaseThen attn <| Buffer.releaseThen dAttn <|
+                  Buffer.releaseThen dScaled <| Buffer.releaseThen dScoresMasked <|
+                    Buffer.releaseThen dScores dQh
             pure (dQh, dKh, dVh)
         -- Backprop split-head permutations: swap back to (n,numHeads,headDim), then view as (n,projDim).
-        let dQ := Buffer.swapAdjacentAtDepth dQh dimsHead depth0
-        let dK := Buffer.swapAdjacentAtDepth dKh dimsHead depth0
-        let dV := Buffer.swapAdjacentAtDepth dVh dimsHead depth0
+        let dQ := Buffer.releaseThen dQh <| Buffer.swapAdjacentAtDepth dQh dimsHead depth0
+        let dK := Buffer.releaseThen dKh <| Buffer.swapAdjacentAtDepth dKh dimsHead depth0
+        let dV := Buffer.releaseThen dVh <| Buffer.swapAdjacentAtDepth dVh dimsHead depth0
         -- Backprop projections Q = x @ wq etc.
         let wqT := Buffer.transpose2d wq dModel32 proj32
         let wkT := Buffer.transpose2d wk dModel32 proj32
         let wvT := Buffer.transpose2d wv dModel32 proj32
-        let dxQ := Buffer.bmm dQ wqT one32 n32 proj32 dModel32
-        let dxK := Buffer.bmm dK wkT one32 n32 proj32 dModel32
-        let dxV := Buffer.bmm dV wvT one32 n32 proj32 dModel32
-        let dx := Buffer.add (Buffer.add dxQ dxK) dxV
+        let dxQ := Buffer.releaseThen wqT <| Buffer.bmm dQ wqT one32 n32 proj32 dModel32
+        let dxK := Buffer.releaseThen wkT <| Buffer.bmm dK wkT one32 n32 proj32 dModel32
+        let dxV := Buffer.releaseThen wvT <| Buffer.bmm dV wvT one32 n32 proj32 dModel32
+        let dxQK := Buffer.add dxQ dxK
+        let dxRaw := Buffer.add dxQK dxV
+        let dx := Buffer.releaseThen dxQ <| Buffer.releaseThen dxK <|
+          Buffer.releaseThen dxV <| Buffer.releaseThen dxQK dxRaw
         let xT := Buffer.transpose2d x n32 dModel32
         let dWq := Buffer.bmm xT dQ one32 dModel32 n32 proj32
         let dWk := Buffer.bmm xT dK one32 dModel32 n32 proj32
-        let dWv := Buffer.bmm xT dV one32 dModel32 n32 proj32
+        let dWv := Buffer.releaseThen xT <| Buffer.bmm xT dV one32 dModel32 n32 proj32
+        let dWv := Buffer.releaseThen dConcat <| Buffer.releaseThen dQ <|
+          Buffer.releaseThen dK <| Buffer.releaseThen dV dWv
         pure [
           (xId,  { s := .dim n (.dim dModel .scalar), buf := dx }),
           (wqId, { s := .dim dModel (.dim projDim .scalar), buf := dWq }),

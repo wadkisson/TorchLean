@@ -441,6 +441,85 @@ def escapeForDisplay (s : String) : String :=
 
 /-! ## Simple Sampling Helpers (Top-k) -/
 
+/-- Shared text-generation flags for GPT-style demos. -/
+structure GenerationOptions where
+  /-- Prompt used to seed autoregressive generation. -/
+  prompt : String
+  /-- Number of new tokens to append. -/
+  generate : Nat
+  /-- Softmax temperature. Must be positive. -/
+  temperature : Float
+  /-- Top-k cutoff. `1` gives greedy decoding. -/
+  topK : Nat
+  /-- Penalty subtracted for repeated recent tokens. `0` disables it. -/
+  repeatPenalty : Float
+  /-- Number of recent tokens considered by the repeat penalty. `0` disables the window. -/
+  repeatWindow : Nat
+  /-- Deterministic RNG seed for sampling. -/
+  seed : Nat
+  /-- Restrict generated ids to a model-specific ASCII allow-list. -/
+  asciiOnly : Bool
+deriving Repr
+
+/-- Defaults for `parseGenerationOptions`. -/
+structure GenerationDefaults where
+  prompt : String := "First Citizen:"
+  generate : Nat := 64
+  temperature : Float := 0.85
+  topK : Nat := 12
+  repeatPenalty : Float := 1.25
+  repeatWindow : Nat := 24
+  seed : Nat := 0
+  asciiOnly : Bool := false
+deriving Repr
+
+/-- Parse `--ascii-only`, accepting either a bare flag or `true`/`false` value. -/
+def parseAsciiOnlyFlag (exeName : String) (args : List String) :
+    Except String (Bool × List String) := do
+  let (raw?, args) ← CLI.takeFlagValueOnce args "ascii-only"
+  let (bare, args) ← CLI.takeBoolFlagOnce args "ascii-only"
+  match raw? with
+  | none => pure (bare, args)
+  | some v =>
+      if v = "true" || v = "1" then
+        pure (true, args)
+      else if v = "false" || v = "0" then
+        pure (false, args)
+      else
+        throw s!"{exeName}: --ascii-only expects true/false (or 1/0), got {v}"
+
+/--
+Parse the generation flags shared by GPT-style examples.
+
+The model file still owns its training/data flags. This helper only handles prompt, sampling, repeat
+penalty, deterministic seed, and ASCII restriction.
+-/
+def parseGenerationOptions (exeName : String) (args : List String)
+    (defaults : GenerationDefaults := {}) :
+    Except String (GenerationOptions × List String) := do
+  let (prompt?, args) ← CLI.takeFlagValueOnce args "prompt"
+  let (generate?, args) ← CLI.takeNatFlagOnce args "generate"
+  let (temperature?, args) ← CLI.takeFloatFlagOnce args "temperature"
+  let (topK?, args) ← CLI.takeNatFlagOnce args "top-k"
+  let (repeatPenalty?, args) ← CLI.takeFloatFlagOnce args "repeat-penalty"
+  let (repeatWindow?, args) ← CLI.takeNatFlagOnce args "repeat-window"
+  let (seed?, args) ← CLI.takeNatFlagOnce args "sample-seed"
+  let (asciiOnly, args) ← parseAsciiOnlyFlag exeName args
+  let temperature := temperature?.getD defaults.temperature
+  if temperature <= 0.0 then
+    throw s!"{exeName}: --temperature must be > 0"
+  let repeatPenalty := repeatPenalty?.getD defaults.repeatPenalty
+  if repeatPenalty < 0.0 then
+    throw s!"{exeName}: --repeat-penalty must be >= 0"
+  pure ({ prompt := prompt?.getD defaults.prompt
+          generate := generate?.getD defaults.generate
+          temperature := temperature
+          topK := topK?.getD defaults.topK
+          repeatPenalty := repeatPenalty
+          repeatWindow := repeatWindow?.getD defaults.repeatWindow
+          seed := seed?.getD defaults.seed
+          asciiOnly := asciiOnly || defaults.asciiOnly }, args)
+
 /--
 Return the indices of the top `k` scores (largest first).
 
@@ -492,6 +571,33 @@ This is mainly used by byte-level demos to optionally restrict output to printab
 def restrictScores (scores : Array Float) (allowId : Nat → Bool) : Array Float :=
   scores.mapIdx (fun i s => if allowId i then s else (-1.0e30))
 
+/-- Apply repeat penalty and an allow-list mask before sampling. -/
+def prepareScoresForGeneration (scores : Array Float) (recent : List Nat)
+    (repeatPenalty : Float) (allowId : Nat → Bool := fun _ => true) : Array Float :=
+  restrictScores (penalizeRepeats scores recent repeatPenalty) allowId
+
+/-- Printable ASCII bytes plus newline. -/
+def printableAsciiByte (i : Nat) : Bool :=
+  i = 10 || (32 ≤ i && i ≤ 126)
+
+/-- Escape one byte token for display inside a quoted string. -/
+def escapeByteId (b : Nat) : String :=
+  if b = 10 then "\\n"
+  else if b = 9 then "\\t"
+  else if b = 34 then "\\\""
+  else if b = 92 then "\\\\"
+  else if 32 ≤ b && b ≤ 126 then
+    String.singleton (Char.ofNat b)
+  else
+    let hex : Array Char := #['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
+    let hi := (b / 16) % 16
+    let lo := b % 16
+    "\\x" ++ String.singleton (hex.getD hi '0') ++ String.singleton (hex.getD lo '0')
+
+/-- Escape byte ids as a one-line quoted display string. -/
+def escapeByteIdsForDisplay (ids : List Nat) : String :=
+  "\"" ++ String.join (ids.map escapeByteId) ++ "\""
+
 /--
 Sample one token id from `scores` using temperature + top-k sampling.
 
@@ -524,6 +630,15 @@ def sampleTopKIndex (scores : Array Float) (temperature : Float) (topK seed coun
         let chosen' := if cum <= target then p.1 else chosen
         (chosen', cum + p.2))
       (init, 0.0)).1
+
+/-- Select the next token from prepared logits using greedy or temperature/top-k sampling. -/
+def chooseNextToken (scores : Array Float) (opts : GenerationOptions) (counter : Nat)
+    (recent : List Nat := []) (allowId : Nat → Bool := fun _ => true) : Nat :=
+  let scores := prepareScoresForGeneration scores recent opts.repeatPenalty allowId
+  if opts.topK = 1 then
+    greedyIndex scores
+  else
+    sampleTopKIndex scores opts.temperature opts.topK opts.seed counter
 
 /--
 Decode a matrix of token logits by taking `argmax` independently at each sequence position.

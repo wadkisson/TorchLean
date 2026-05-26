@@ -88,8 +88,7 @@ def check (tag msg : String) (b : Bool) : IO Unit :=
 Write a standard JSON training artifact for routines that record an initial and final loss.
 
 This is a convenience wrapper around `Runtime.Training.TrainLog.beforeAfterLoss` and the stable
-TrainLog JSON format. It is intentionally independent of any particular model, dataset, or
-runtime backend.
+TrainLog JSON format. The output schema is independent of the model, dataset, and runtime backend.
 -/
 def writeBeforeAfterLossLog (path : System.FilePath) (title : String) (steps : Nat)
     (loss0 loss1 : Float) (notes : Array String := #[]) : IO Unit := do
@@ -177,8 +176,8 @@ structure ModelTrainFlags where
   /--
   Print CUDA allocator telemetry every `N` training steps when running on CUDA.
 
-  `0` disables reporting.  This is intentionally part of the common model-training flags because
-  long-run memory drift is a runtime property, not a GPT/CNN/MLP-specific option.
+  `0` disables reporting. The flag lives with the common model-training options because allocator
+  telemetry is a runtime concern shared by all CUDA examples.
   -/
   cudaMemWatch : Nat := 0
 deriving Repr
@@ -199,6 +198,22 @@ def parseModelTrainFlags (exeName : String) (args : List String)
 /-! ### CUDA Memory Watch Helpers -/
 
 /--
+Choose a CUDA memory-watch cadence for public examples.
+
+Users can pass `--cuda-mem-watch N` to choose an exact cadence. When no cadence is supplied, long
+CUDA runs sample about ten times over the requested training horizon. Short runs and CPU runs stay
+quiet by default, so the examples do not print allocator telemetry unless it is likely to be useful.
+-/
+def effectiveCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
+    (steps requested : Nat) : Nat :=
+  if requested != 0 then
+    requested
+  else if opts.useGpu && steps >= 1000 then
+    Nat.max 1 (steps / 10)
+  else
+    0
+
+/--
 State for a simple CUDA-memory drift detector.
 
 The first reported sample becomes the baseline.  Later samples compare current CUDA free memory
@@ -214,9 +229,8 @@ deriving Repr
 /--
 Maybe print a one-line CUDA allocator report.
 
-This is shared by model examples.  It is intentionally lightweight: it does not try to fix memory
-growth, but it makes allocator behavior visible enough to distinguish a steady-state run from a
-per-step retention bug.
+The report samples the native allocator at a fixed cadence and warns if the observed free-memory
+slope would cross zero before the requested training horizon.
 -/
 def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
     (watchEvery totalSteps done : Nat) (state? : Option CudaMemWatchState) :
@@ -286,6 +300,51 @@ def runAnyOrFloat
     TorchLean.Module.run exeName args (.float floatK) runOpts
   else
     TorchLean.Module.run exeName args (.any anyK) runOpts
+
+/--
+Run an executable on the concrete `Float` runtime path.
+
+We use this for runnable training commands that produce Float-valued artifacts: CPU/CUDA eager
+execution, native kernels, and JSON loss curves. Commands that need to expose another scalar backend
+can use `runAnyOrFloat`.
+-/
+def runFloat
+    (exeName : String) (args : List String)
+    (banner : TorchLean.Options → String)
+    (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
+    (printOk : Bool := true) : IO UInt32 :=
+  TorchLean.Module.run exeName args (.float k)
+    { banner? := some banner, printOk := printOk }
+
+/-! ### Common model-run parsers -/
+
+/-- Common arguments for a model command that reads one supervised CSV. -/
+structure CsvModelTrainFlags where
+  /-- CSV file containing model inputs and targets. -/
+  csvPath : System.FilePath
+  /-- Seed used for model initialization and data shuffling. -/
+  seed : Nat
+  /-- Shared training flags: steps, log destination, learning rate, and CUDA telemetry. -/
+  train : ModelTrainFlags
+deriving Repr
+
+/--
+Parse common flags for a supervised CSV model runner.
+
+This keeps the parser shape out of individual models.  Model files still choose their default CSV,
+default log path, default step count, and default learning rate.
+-/
+def parseCsvModelTrainFlags (exeName : String) (args : List String)
+    (defaultCsv : System.FilePath) (defaultLogPath : System.FilePath)
+    (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
+    (allowZeroSteps : Bool := false) :
+    Except String (CsvModelTrainFlags × List String) := do
+  let (csv?, args) ← CLI.takePathFlagOnce args "csv"
+  let csvPath := csv?.getD defaultCsv
+  let (seed, args) ← CLI.takeSeed args 0
+  let (train, args) ← parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
+    allowZeroSteps
+  pure ({ csvPath := csvPath, seed := seed, train := train }, args)
 
 /-- List generator: `[0, 1, ..., n-1]` mapped through `f`. -/
 def listGen {α : Type} (n : Nat) (f : Nat → α) : List α :=

@@ -2317,8 +2317,8 @@ This namespace is designed for executable demos: it wires together
 - an optimizer config (`API.optim`)
 - optional LR schedules
 
-It stays intentionally lightweight: rather than hiding everything behind a large framework, it
-exposes a small set of default building blocks so tutorials can focus on models and verification.
+The API exposes a small set of default building blocks, so tutorials can share the same training
+path while still making the model, loss, optimizer, and logging choices explicit.
 
 ### PyTorch Mapping
 
@@ -2588,8 +2588,8 @@ structure EpochEvent where
 /--
 Hooks for instrumenting `fitLoaderBatched`-style training loops.
 
-These are lightweight by design (IO callbacks). If you want richer logging, consider building a wrapper
-in your own project that translates these events into structured JSON/metrics.
+Callbacks are ordinary `IO` hooks. They can print progress, update an in-memory curve, sample CUDA
+allocator state, or forward events to a project-specific metrics backend.
 -/
 structure Callbacks (α : Type) where
   /-- Called once before training starts. -/
@@ -2639,6 +2639,20 @@ def onTrainStart {α : Type} (action : IO Unit) : Callbacks α :=
 /-- Build callbacks that observe every training step. -/
 def onStep {α : Type} (f : StepEvent α → IO Unit) : Callbacks α :=
   { onStep := f }
+
+/--
+Build a training callback that samples the CUDA allocator at a fixed step cadence.
+
+The callback owns a small `IO.Ref` for the previous sample, so examples can compose it with ordinary
+loss-logging callbacks without threading allocator state through their training loops.
+-/
+def cudaMemWatchCallbacks {α : Type} (opts : _root_.Runtime.Autograd.Torch.Options)
+    (watchEvery totalSteps : Nat) : IO (Callbacks α) := do
+  let stateRef ← IO.mkRef (none : Option Common.CudaMemWatchState)
+  pure <| onStep (α := α) (fun ev => do
+    let state ← stateRef.get
+    let state ← Common.reportCudaMemWatch opts watchEvery totalSteps (ev.step + 1) state
+    stateRef.set state)
 
 /-- Build callbacks that run at the end of each epoch. -/
 def onEpochEnd {α : Type} (f : EpochEvent → IO Unit) : Callbacks α :=
@@ -2797,6 +2811,60 @@ def fitModuleLoaderWith {σ τ : Spec.Shape} {n : Nat} {paramShapes : List Spec.
       optState ← TorchLean.Module.stepWith module optimizer optState sample
       globalStep := globalStep + 1
     callbacks.onEpochEnd { epoch := epochIdx, steps := globalStep }
+
+  let after ← meanLossModuleLoader module dl
+  let report := { before := before, after := after }
+  callbacks.onTrainEnd report
+  pure (report, dl)
+
+/--
+Train a runtime scalar module for exactly `steps` optimizer updates.
+
+`fitModuleLoaderWith` above is epoch-based: each unit means one full pass over the loader. This
+variant is update-based, which is the convention used by runnable examples that expose a `--steps`
+flag.
+
+The loop still draws shuffled minibatches from `Data.batchLoader` epoch by epoch, but it stops as
+soon as the requested number of optimizer updates has run. The returned loader is the advanced
+loader state, so callers can continue training from the next shuffled epoch if they want to.
+-/
+def fitModuleLoaderStepsWith {σ τ : Spec.Shape} {n : Nat} {paramShapes : List Spec.Shape}
+    {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
+    [Add α] [Div α] [Zero α] [Coe Nat α]
+    (module : TorchLean.Module.ScalarModule α paramShapes [Spec.Shape.dim n σ, Spec.Shape.dim n τ])
+    (optimizer : TorchLean.Optim.Optimizer α paramShapes)
+    (steps : Nat)
+    (loader : Data.BatchLoader α n σ τ)
+    (callbacks : Callbacks α := Callbacks.empty) :
+    IO (FitReport α × Data.BatchLoader α n σ τ) := do
+  let before ← meanLossModuleLoader module loader
+  callbacks.onTrainStart
+
+  let mut optState ← TorchLean.Module.initOptim module optimizer
+  let mut dl := loader
+  let mut globalStep : Nat := 0
+  let mut epochIdx : Nat := 0
+
+  while globalStep < steps do
+    let (rawNext, rawBatches) ←
+      match Data.epoch "train.fitModuleLoaderStepsWith" dl.raw with
+      | Except.ok out => pure out
+      | Except.error msg => throw <| IO.userError s!"train.fitModuleLoaderStepsWith: {msg}"
+    if rawBatches.isEmpty then
+      throw <| IO.userError "train.fitModuleLoaderStepsWith: loader produced no batches"
+    dl := { raw := rawNext }
+    let epochStart := globalStep
+    for rawBatch in rawBatches do
+      if globalStep < steps then
+        let sample ← Common.orThrow "train.fitModuleLoaderStepsWith" <|
+          Data.collateSupervised (α := α) (σ := σ) (τ := τ) n rawBatch
+        let lossTensor ← TorchLean.Module.forward module sample
+        let loss := Spec.Tensor.toScalar lossTensor
+        callbacks.onStep { epoch := epochIdx, step := globalStep, loss := loss }
+        optState ← TorchLean.Module.stepWith module optimizer optState sample
+        globalStep := globalStep + 1
+    callbacks.onEpochEnd { epoch := epochIdx, steps := globalStep - epochStart }
+    epochIdx := epochIdx + 1
 
   let after ← meanLossModuleLoader module dl
   let report := { before := before, after := after }
@@ -3072,6 +3140,87 @@ def reportLossAccuracyOneHotLoader
   IO.println s!"accuracy({label}) = {correct}/{total}"
 
 end Report
+
+/--
+Train a runtime module for a fixed number of optimizer updates with the standard runtime reports.
+
+This is the common path for direct-module training, not an example-only helper.  It composes the
+generic step loop with before/after mean-loss reporting and CUDA allocator telemetry, while still
+accepting extra callbacks for projects that want their own metrics, validation, or tracing.
+-/
+def fitModuleLoaderStepsReport {σ τ : Spec.Shape} {n : Nat} {paramShapes : List Spec.Shape}
+    {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
+    [Add α] [Div α] [Zero α] [Coe Nat α]
+    (module : TorchLean.Module.ScalarModule α paramShapes [Spec.Shape.dim n σ, Spec.Shape.dim n τ])
+    (optimizer : TorchLean.Optim.Optimizer α paramShapes)
+    (opts : _root_.Runtime.Autograd.Torch.Options)
+    (steps : Nat)
+    (loader : Data.BatchLoader α n σ τ)
+    (cudaMemWatch : Nat := 0)
+    (extraCallbacks : Callbacks α := Callbacks.empty) :
+    IO (FitReport α × Data.BatchLoader α n σ τ) := do
+  let watchEvery := Common.effectiveCudaMemWatch opts steps cudaMemWatch
+  let memHooks ← cudaMemWatchCallbacks (α := α) opts watchEvery steps
+  let hooks : Callbacks α :=
+    (onTrainStart (α := α) do
+      Report.reportMeanLossModuleLoader module loader "train(before)")
+    ++ extraCallbacks
+    ++ memHooks
+    ++ onTrainEnd (α := α) (fun _ =>
+      Report.reportMeanLossModuleLoader module loader "train(after)")
+  fitModuleLoaderStepsWith module optimizer steps loader hooks
+
+/--
+Float-specialized module training that also records a scalar loss curve.
+
+The training loop itself is the same as `fitModuleLoaderStepsReport`; this wrapper only adds a
+`Curve` callback for JSON logs and website widgets.  Keeping it in `train` lets future model files
+request a curve without reimplementing callback plumbing.
+-/
+def fitModuleLoaderStepsCurveFloat {σ τ : Spec.Shape} {n : Nat}
+    {paramShapes : List Spec.Shape}
+    (module : TorchLean.Module.ScalarModule Float paramShapes [Spec.Shape.dim n σ,
+      Spec.Shape.dim n τ])
+    (optimizer : TorchLean.Optim.Optimizer Float paramShapes)
+    (opts : _root_.Runtime.Autograd.Torch.Options)
+    (steps : Nat)
+    (loader : Data.BatchLoader Float n σ τ)
+    (cudaMemWatch : Nat := 0)
+    (extraCallbacks : Callbacks Float := Callbacks.empty) :
+    IO (FitReport Float × Data.BatchLoader Float n σ τ × _root_.Runtime.Training.Curve) := do
+  let curveRef ← IO.mkRef ({} : _root_.Runtime.Training.Curve)
+  let curveHooks : Callbacks Float :=
+    onStep (α := Float) (fun ev => curveRef.modify (fun c => c.push ev.step ev.loss))
+  let (report, loader') ← fitModuleLoaderStepsReport module optimizer opts steps loader
+    cudaMemWatch (extraCallbacks ++ curveHooks)
+  let curve ← curveRef.get
+  pure (report, loader', curve)
+
+/--
+Train a Float runtime module, write a standard scalar-curve log, and return the fit report.
+
+This is the high-level path used by runnable training commands.  The caller provides the model,
+optimizer, loader, runtime options, and metadata notes; the library owns the callback composition,
+CUDA telemetry, before/after reports, and JSON curve emission.
+-/
+def fitModuleLoaderStepsLoggedFloat {σ τ : Spec.Shape} {n : Nat}
+    {paramShapes : List Spec.Shape}
+    (module : TorchLean.Module.ScalarModule Float paramShapes [Spec.Shape.dim n σ,
+      Spec.Shape.dim n τ])
+    (optimizer : TorchLean.Optim.Optimizer Float paramShapes)
+    (opts : _root_.Runtime.Autograd.Torch.Options)
+    (steps : Nat)
+    (loader : Data.BatchLoader Float n σ τ)
+    (log : _root_.Runtime.Training.LogDestination)
+    (title : String)
+    (notes : Array String := #[])
+    (seriesName : String := "loss")
+    (cudaMemWatch : Nat := 0) :
+    IO (FitReport Float × Data.BatchLoader Float n σ τ) := do
+  let (report, loader', curve) ← fitModuleLoaderStepsCurveFloat module optimizer opts steps loader
+    cudaMemWatch
+  Common.writeCurveLogTo log title curve seriesName notes
+  pure (report, loader')
 
 end train
 

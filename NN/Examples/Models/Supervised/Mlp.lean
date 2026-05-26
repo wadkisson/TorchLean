@@ -19,9 +19,11 @@ public import NN.Examples.Data.RealPaths
 /-!
 # MLP Tabular Regression
 
-We use UCI Auto MPG because it is small, public, predictable, and entirely numeric: seven car
-features predict miles per gallon. That makes this a clean first supervised example without
-inventing data in Lean.
+This example trains a small MLP on the UCI Auto MPG regression task.  The prepared CSV has seven
+normalized numeric car features and one normalized target column for miles per gallon, so the model
+is just ordinary supervised tabular regression:
+
+`x1..x7 -> Linear -> ReLU -> Linear -> y`.
 
 Prepare the CSV once:
 
@@ -62,91 +64,56 @@ abbrev τ : Shape :=
 def mkModel : nn.M (nn.Sequential σ τ) :=
   nn.models.mlp1Relu cfg
 
-def loadCsvLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
+/--
+Load the prepared Auto MPG CSV as a typed minibatch loader.
+
+The dataset-specific facts stay here: the default preparation script writes columns `x1..x7,y`,
+the first seven columns are inputs, the last column is the regression target, and we use full
+minibatches of size `batch`.  The generic CSV-to-loader mechanics live in `Data.tabularCsvLoader`.
+-/
+def loadAutoMpg {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     (path : System.FilePath) (seed : Nat) : IO (Data.BatchLoader α batch (Shape.Vec inDim)
       (Shape.Vec outDim)) := do
   unless (← path.pathExists) do
     throw <| IO.userError
       s!"{exeName}: missing CSV dataset: {path}\nRun: python3 scripts/datasets/download_example_data.py --auto-mpg"
-  let src : Data.TabularSupervisedSource :=
-    { path := path, inDim := inDim, outDim := outDim, csvOptions := { skipHeader := true } }
-  let dsE ← src.load (α := α)
-  let ds ← Common.orThrow exeName dsE
-  let dl := Data.batchLoader ds batch (shuffle := true) (seed := seed) (dropLast := true)
-  pure dl
+  let loaderE ← Data.tabularCsvLoader (α := α) path batch inDim outDim
+    (csvOptions := { skipHeader := true }) (shuffle := true) (seed := seed) (dropLast := true)
+  Common.orThrow exeName loaderE
 
-def cudaMemWatchCallbacks {α : Type} (opts : Runtime.Autograd.Torch.Options)
-    (watchEvery totalSteps : Nat) : IO (train.Callbacks α) := do
-  let stateRef ← IO.mkRef (none : Option Common.CudaMemWatchState)
-  pure <| train.onStep (α := α) (fun ev => do
-    let state ← stateRef.get
-    let state ← Common.reportCudaMemWatch opts watchEvery totalSteps (ev.step + 1) state
-    stateRef.set state)
+/--
+Instantiate the MLP, attach Adam, train for the requested number of updates, and write the standard
+training log if logging is enabled.
+
+CPU and CUDA both use the same Float runtime module; `opts` selects the device and backend.
+-/
+def fitAutoMpg (opts : Runtime.Autograd.Torch.Options)
+    (flags : Common.CsvModelTrainFlags) : IO (train.FitReport Float) := do
+  let loader ← loadAutoMpg (α := Float) flags.csvPath flags.seed
+  nn.withModel mkModel fun model => do
+    let modDef := nn.mseScalarModuleDef model
+    let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+    let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) flags.train.lr
+    let cudaMemWatch :=
+      Common.effectiveCudaMemWatch opts flags.train.train.steps flags.train.cudaMemWatch
+    let (report, _loader') ← train.fitModuleLoaderStepsLoggedFloat module opt opts
+      flags.train.train.steps loader flags.train.train.log "MLP tabular training"
+      #[s!"dataset={flags.csvPath}", s!"device={if opts.useGpu then "cuda" else "cpu"}",
+        s!"lr={flags.train.lr}", s!"steps={flags.train.train.steps}", s!"batch={batch}",
+        s!"cuda_mem_watch={cudaMemWatch}"]
+      "loss" flags.train.cudaMemWatch
+    pure report
 
 def main (args : List String) : IO UInt32 := do
-  -- `runAnyOrFloat` keeps the same training script usable for scalar-polymorphic checks and for
-  -- Float/CUDA runs. The Float branch records a loss curve because those runs are the ones used for
-  -- plotted training artifacts.
-  Common.runAnyOrFloat exeName args
-    (preferFloat := fun args => args.contains "--cuda" || CLI.hasFlagValue args "log")
+  Common.runFloat exeName args
     (banner := fun opts =>
       s!"{exeName}: Auto MPG MLP regression (device={if opts.useGpu then "cuda" else "cpu"})")
-    (anyK := fun {α} _ _ _ _ cast opts rest => do
-      let (csv?, rest) ← Common.orThrow exeName <| CLI.takePathFlagOnce rest "csv"
-      let csvPath := csv?.getD (_root_.NN.Examples.Data.RealPaths.autoMpgCsv)
-      let (seed, rest) ← Common.orThrow exeName <| CLI.takeSeed rest 0
-      let (trainCfg, rest) ← Common.orThrow exeName <|
-        Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
+    (k := fun opts rest => do
+      let (flags, rest) ← Common.orThrow exeName <|
+        Common.parseCsvModelTrainFlags exeName rest
+          _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let loader ← loadCsvLoader (α := α) csvPath seed
-      nn.withModel mkModel fun model => do
-        -- Build the module, optimizer, and reporting hooks in the same order as a PyTorch loop:
-        -- instantiate model, attach optimizer, fit the loader, then compare before/after loss.
-        let modDef := nn.mseScalarModuleDef model
-        let module ← TorchLean.Module.instantiateWithOptions (α := α) modDef cast opts
-        let opt := Common.adamOptimizer (α := α) cast (nn.paramShapes model) trainCfg.lr
-        let memHooks ← cudaMemWatchCallbacks (α := α) opts trainCfg.cudaMemWatch
-          trainCfg.train.steps
-        let hooks : train.Callbacks α :=
-          (train.onTrainStart (α := α) do
-            train.Report.reportMeanLossModuleLoader module loader "train(before)")
-          ++ memHooks
-          ++ train.onTrainEnd (α := α) (fun _ =>
-            train.Report.reportMeanLossModuleLoader module loader "train(after)")
-        let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-        IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-      pure ())
-    (floatK := fun opts rest => do
-      let (csv?, rest) ← Common.orThrow exeName <| CLI.takePathFlagOnce rest "csv"
-      let csvPath := csv?.getD (_root_.NN.Examples.Data.RealPaths.autoMpgCsv)
-      let (seed, rest) ← Common.orThrow exeName <| CLI.takeSeed rest 0
-      let (trainCfg, rest) ← Common.orThrow exeName <|
-        Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
-      Common.orThrow exeName <| CLI.requireNoArgs rest
-      let loader ← loadCsvLoader (α := Float) csvPath seed
-      nn.withModel mkModel fun model => do
-        -- The Float path mirrors the generic path and additionally records per-step loss for the
-        -- website training curve.
-        let modDef := nn.mseScalarModuleDef model
-        let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-        let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) trainCfg.lr
-        let curveRef ← IO.mkRef ({} : _root_.Runtime.Training.Curve)
-        let memHooks ← cudaMemWatchCallbacks (α := Float) opts trainCfg.cudaMemWatch
-          trainCfg.train.steps
-        let hooks : train.Callbacks Float :=
-          (train.onTrainStart (α := Float) do
-            train.Report.reportMeanLossModuleLoader module loader "train(before)")
-          ++ train.onStep (α := Float) (fun ev =>
-            curveRef.modify (fun c => c.push ev.step ev.loss))
-          ++ memHooks
-          ++ train.onTrainEnd (α := Float) (fun _ =>
-            train.Report.reportMeanLossModuleLoader module loader "train(after)")
-        let (report, _loader') ← train.fitModuleLoaderWith module opt trainCfg.train.steps loader hooks
-        let curve ← curveRef.get
-        IO.println s!"  epochs={trainCfg.train.steps} loss0={report.before} loss1={report.after}"
-        Common.writeCurveLogTo trainCfg.train.log "MLP tabular training" curve "loss"
-          #[s!"dataset={csvPath}", s!"device={if opts.useGpu then "cuda" else "cpu"}",
-            s!"lr={trainCfg.lr}", s!"epochs={trainCfg.train.steps}", s!"batch={batch}",
-            s!"cuda_mem_watch={trainCfg.cudaMemWatch}"])
+      let report ← fitAutoMpg opts flags
+      IO.println s!"  steps={flags.train.train.steps} loss0={report.before} loss1={report.after}")
 
 end NN.Examples.Models.Supervised.Mlp
