@@ -41,7 +41,7 @@ that makes model code easier to read. For the Python ecosystem, see the official
 ```bibtex
 @misc{george2026torchleanformalizingneuralnetworks,
       title={TorchLean: Formalizing Neural Networks in Lean},
-      author={Robert Joseph George and Jennifer Cruden and Xiangru Zhong and Huan Zhang and Anima Anandkumar},
+      author={Robert Joseph George and Jennifer Cruden and Will Adkisson and Xiangru Zhong and Huan Zhang and Anima Anandkumar},
       year={2026},
       eprint={2602.22631},
       archivePrefix={arXiv},
