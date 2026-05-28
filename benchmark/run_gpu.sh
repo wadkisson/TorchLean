@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# TorchLean vs PyTorch benchmarks on CUDA (1000 + 10000 steps, 12 timed runs).
+# TorchLean vs PyTorch benchmarks on CUDA (1000, 10000, 100000 steps).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+RESULTS="benchmark/results.log"
+: > "$RESULTS"
+exec > >(tee -a "$RESULTS") 2>&1
 
 python3 scripts/datasets/download_example_data.py --auto-mpg --cifar10 --tiny-shakespeare
 lake build -K cuda=true
 
-for STEPS in 1000 10000; do
+for STEPS in 1000 10000 100000; do
   echo
   echo "========== steps=$STEPS =========="
 
@@ -28,3 +32,6 @@ for STEPS in 1000 10000; do
   echo "--- pytorch_gpt2 ---"
   time python3 benchmark/pytorch/train_gpt2.py --steps "$STEPS" --device cuda
 done
+
+echo
+echo "Wrote $RESULTS"
