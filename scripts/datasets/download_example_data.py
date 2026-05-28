@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import pickle
+import sys
 import tarfile
 import urllib.request
 import warnings
@@ -103,6 +104,16 @@ def load_cifar_batch(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return x, y
 
 
+def extract_tar_gz(archive: Path, dest: Path) -> None:
+    """Extract a `.tar.gz` archive, compatible with Python 3.8+."""
+    with tarfile.open(archive, "r:gz") as tf:
+        # `filter=` requires Python 3.12+; DGX boxes often run 3.8–3.10.
+        if sys.version_info >= (3, 12):
+            tf.extractall(dest, filter="data")
+        else:
+            tf.extractall(dest)
+
+
 def prepare_cifar10(root: Path, *, limit_train: int | None, limit_test: int | None) -> None:
     """Download CIFAR-10, extract it, and export train/test `.npy` tensors."""
     raw_dir = root / "raw"
@@ -111,8 +122,7 @@ def prepare_cifar10(root: Path, *, limit_train: int | None, limit_test: int | No
     extract_root = raw_dir / "cifar-10-batches-py"
     if not extract_root.exists():
         print(f"[extract] {archive}")
-        with tarfile.open(archive, "r:gz") as tf:
-            tf.extractall(raw_dir, filter="data")
+        extract_tar_gz(archive, raw_dir)
 
     train_xs: list[np.ndarray] = []
     train_ys: list[np.ndarray] = []
