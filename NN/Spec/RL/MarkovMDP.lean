@@ -23,7 +23,7 @@ Why this layer exists (and why it is separate from the finite-state tensor MDPs)
 - Many RL models are naturally measure-theoretic (continuous state spaces, stochastic dynamics).
   For these, the right abstraction is a Markov kernel `κ : (S × A) → Measure S`.
 
-This file stays intentionally small:
+This file stays focused:
 
 - deterministic policies `π : S → A`,
 - Markov-kernel transitions for next states,
@@ -95,7 +95,7 @@ structure Valid (mdp : MDP S A) : Prop where
   /-- Discount factor is strictly less than `1`. -/
   discount_lt_one : mdp.discount < 1
 
-/-- The transition measure `P(. | s, a)` (convenience wrapper around the kernel application). -/
+/-- The transition measure `P(. | s, a)` obtained by applying the Markov kernel. -/
 noncomputable def transitionMeasure (mdp : MDP S A) (state : S) (action : A) : Measure S :=
   mdp.transition (state, action)
 

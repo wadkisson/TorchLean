@@ -82,8 +82,8 @@ Practical checklist:
      umbrella so users can access it through `import NN.Entrypoint.Spec`, `import NN.Library`, or
      `import NN`.
 
-7. Add a quick smoke test (recommended)
-   - Put a small compile only / small eval test in `NN/Tests/Runtime/Floats/ModelsSmoke.lean`.
+7. Add a short runtime check (recommended)
+   - Put a small compile only / small eval test in `NN/Tests/Runtime/Floats/ModelsCheck.lean`.
    - Keep it deterministic and small (a few steps of training, or a single forward).
 
 8. Build the files you touched

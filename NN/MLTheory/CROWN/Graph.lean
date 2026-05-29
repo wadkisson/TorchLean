@@ -16,7 +16,7 @@ public import NN.MLTheory.CROWN.Graph.Theorems
 
 Public façade for the graph-based LiRPA/CROWN engine.
 
-The implementation is split into focused modules:
+The code is organized into focused modules:
 - `Graph/Core`: graph aliases, flattened affine-bound state, and propagation state records,
 - `Graph/Engine`: the executable engine: IBP, derivative IBP, forward affine CROWN, and
   objective-dependent backward CROWN,

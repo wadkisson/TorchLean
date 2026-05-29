@@ -3,7 +3,7 @@ title: Verification Bounds
 usemathjax: true
 ---
 
-This page is the tutorial entry point for TorchLean’s verification demos. It explains what interval
+This page is the tutorial entry point for TorchLean’s verification examples. It explains what interval
 bound propagation computes, what CROWN-style affine bounds add, how a TorchLean model becomes a
 verification graph, and what it means to check an external certificate.
 
@@ -234,9 +234,9 @@ lake exe verify -- abcrown-leaf \
 
 ## Where To Read The Source
 
-- TorchLean-native graph and IBP demo:
+- TorchLean-native graph and IBP example:
   [`NN/Examples/Verification/TorchLean/TorchLeanIBP.lean`]({{ '/docs/NN/Examples/Verification/TorchLean/TorchLeanIBP.html' | relative_url }})
-- CROWN operation demo:
+- CROWN operation example:
   [`NN/Examples/Verification/TorchLean/TorchLeanCrownOps.lean`]({{ '/docs/NN/Examples/Verification/TorchLean/TorchLeanCrownOps.html' | relative_url }})
 - α,β-CROWN leaf certificate checker:
   [`NN.Verification.Cert.AbCrownLeafCert`]({{ '/docs/NN/Verification/Cert/AbCrownLeafCert.html' | relative_url }})

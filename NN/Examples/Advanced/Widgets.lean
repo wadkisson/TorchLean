@@ -23,8 +23,8 @@ This file is best explored in an editor:
 - Lean will render a small interactive HTML panel in the infoview.
 
 These widgets are inspection tools for teaching, debugging, and reviewing artifacts
-without leaving Lean. They are intentionally available through the dedicated widget entrypoint
-(`import NN.Entrypoint.Widgets`) so ordinary runtime and proof imports stay lightweight.
+without leaving Lean. They are available through the dedicated widget entrypoint
+(`import NN.Entrypoint.Widgets`) so ordinary runtime and proof imports stay focused.
 -/
 
 open Spec
@@ -36,7 +36,7 @@ open TensorBridge TensorArray
 /-!
 ## RL (GridWorld) widgets
 
-These small panels are useful when iterating on RL specs and proofs: they let you quickly sanity-check
+These compact panels are useful when iterating on RL specs and proofs: they let you inspect
 state encodings, policies, and rollout traces in the infoview.
 -/
 
@@ -44,18 +44,22 @@ namespace GridWorldWidgets
 
 open Spec.RL.Envs
 
+/-- A small 4×4 GridWorld used by the widget gallery. -/
 def gw44 : GridWorld 4 4 :=
   { start := (⟨0, by decide⟩, ⟨0, by decide⟩)
     goal := (⟨3, by decide⟩, ⟨3, by decide⟩)
     -- Discount isn't used by the widgets, so we pick a simple literal.
     discount := 0 }
 
+/-- Example GridWorld position rendered by the state widget. -/
 def pos : GridWorld.State 4 4 :=
   (⟨1, by decide⟩, ⟨2, by decide⟩)
 
+/-- Constant policy used to illustrate policy visualization. -/
 def goRightPolicy : GridWorld.State 4 4 → GridWorld.Action :=
   fun _ => GridAction.right
 
+/-- Example rollout path rendered by the GridWorld trace widget. -/
 def samplePath : Array (GridWorld.State 4 4) :=
   #[
     (⟨0, by decide⟩, ⟨0, by decide⟩),
@@ -100,7 +104,7 @@ def sampleTrainLog : Runtime.Training.TrainLog :=
 /-!
 Actual training curve (SGD on a small regression dataset).
 
-This is a real “training loop” computed in Lean. It is intentionally compact (2→2→1 MLP) so the
+This is a real “training loop” computed in Lean. It is kept compact (2→2→1 MLP) so the
 widget evaluator can run it quickly inside the editor.
 
 Note:
@@ -344,7 +348,7 @@ def sampleTape : Tape Float :=
     match Tape.add (α := Float) (t := t2) (s := Shape.scalar) abId bId with
     | .ok r => r
     | .error _ => (t2, 0)
-  -- Sanity: in this construction we expect ids [0=a,1=b,2=mul,3=add].
+  -- In this construction we expect ids [0=a,1=b,2=mul,3=add].
   -- We keep the final tape even if a future implementation changes ids.
   let _ := outId
   t3

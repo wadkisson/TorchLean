@@ -245,8 +245,7 @@ open TorchLean.Floats.IEEE754
 /--
 Real interpretation of an executable IEEE-754 binary32 trajectory.
 
-This is intentionally just `toReal`. Rounding/error guarantees have to be proved before these
-wrappers are invoked; this abbreviation only keeps theorem statements readable.
+This abbreviation is the real-valued view used after the caller has supplied the required rounding and error guarantees.
 -/
 abbrev ieee32RealView (g : ℝ → IEEE32Exec) : ℝ → ℝ := fun t => IEEE32Exec.toReal (g t)
 

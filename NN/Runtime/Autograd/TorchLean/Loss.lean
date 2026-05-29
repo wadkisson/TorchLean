@@ -15,7 +15,7 @@ import Mathlib.Algebra.Order.Algebra
 
 TorchLean loss helpers in the style of `torch.nn.functional`.
 
-These are small conveniences for writing readable training loops:
+These helpers keep training loops close to the familiar `torch.nn.functional` style:
 
 ```
 loss = Loss.mse yhat y

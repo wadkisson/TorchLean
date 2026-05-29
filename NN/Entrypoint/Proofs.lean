@@ -50,6 +50,13 @@ public import NN.Proofs.Tensor
 public import NN.Proofs.Verification
 
 /-!
+Proof entry point used by downstream packages.
+
+This module collects the maintained proof surface: tensor facts, autograd correctness,
+runtime-approximation theorems, model proofs, and verification soundness results.
+-/
+
+/-!
 # Proof entrypoint
 
 Umbrella import for TorchLean's core proof infrastructure.
@@ -58,7 +65,7 @@ This is the set of proof modules that `NN.Library` considers part of the support
 library surface area (as opposed to tests, examples, or executable workflows).
 
 Notes:
-- This is intentionally *curated* (not “import everything under `NN/Proofs`”).
+- This is curated rather than "import everything under `NN/Proofs`".
 - If you add a new proof module that should be part of the stable surface,
   add it here.
 
@@ -75,7 +82,7 @@ References / context:
 - PyTorch autograd background:
   https://pytorch.org/docs/stable/autograd.html
 - The theorem bundles re-exported here document the math/model references they rely on locally, so
-  this file stays a thin, stable import surface rather than duplicating long bibliographies.
+  this file stays a stable import surface rather than duplicating long bibliographies.
 -/
 
 @[expose] public section

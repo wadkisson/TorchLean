@@ -34,6 +34,7 @@ open Spec
 open Tensor
 open Runtime.Autograd
 
+/-- Input channel count used by the Conv2D/pooling CUDA coverage cases. -/
 abbrev inC : Nat := 1
 abbrev outC : Nat := 1
 abbrev kH : Nat := 2
@@ -64,7 +65,7 @@ def input : Tensor Float (shape![inC, inH, inW]) :=
   ]
 
 /-!
-## N-D smoke cases (d = 3)
+## N-D runtime cases (d = 3)
 
 These exercise the new "ND" ConvPool CUDA entrypoints (`conv`/`max_pool`/`avg_pool`/`smooth_max_pool`)
 which accept per-axis parameters.

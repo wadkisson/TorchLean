@@ -30,7 +30,7 @@ NumPy / PyTorch analogue:
 import numpy as np
 
 lo, hi = np.float32(-0.5), np.float32(0.5)
-endpoint_box = (np.tanh(lo), np.tanh(hi))   # common quick check, not a rigorous enclosure
+endpoint_box = (np.tanh(lo), np.tanh(hi))   # common fast check, not a rigorous enclosure
 ```
 
 TorchLean's lesson is more explicit: endpoint evaluation is useful for debugging, but rigorous
@@ -136,7 +136,7 @@ def runOne (func : String) (lo hi : Float) (precBits digits : Nat) : IO Unit := 
     np.array([f(lo), f(hi)], dtype=np.float32)
     ```
 
-    That is a useful sanity check, but it is not generally an interval proof for nonlinear
+    That is a useful consistency check, but it is not generally an interval proof for nonlinear
     functions. The Arb-backed line below is the rigorous path when Arb is installed.
     -/
     let I :=
@@ -318,7 +318,7 @@ def main (_args : List String) : IO UInt32 := do
   let precBits := 200
   let digits := 50
 
-  IO.println "Arb vs IEEE32Exec quick comparison (unary funcs + one polynomial)"
+  IO.println "Arb vs IEEE32Exec comparison (unary funcs + one polynomial)"
   IO.println "(Arb is rigorous; IEEE32Exec is endpoint evaluation for transcendentals.)"
   IO.println ""
 

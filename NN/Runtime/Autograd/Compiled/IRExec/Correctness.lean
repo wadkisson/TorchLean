@@ -16,7 +16,7 @@ public import NN.Runtime.Autograd.Compiled.IRExec.Correctness.Ops
 Correctness for the IR → executable SSA graph bridge.
 
 This file collects per-op forward-correctness lemmas for `Runtime.Autograd.Compiled.execGraphOfIR`.
-It is intentionally split out from `NN.Runtime.Autograd.Compiled.IRExec` so that routine builds of
+It is split out from `NN.Runtime.Autograd.Compiled.IRExec` so that routine builds of
 TorchLean's runtime do not have to import proof internals one file at a time.
 
 Reusable helper lemmas live in `NN.Runtime.Autograd.Compiled.IRExec.Correctness.Common`.
@@ -27,7 +27,7 @@ Operator-step lemmas live under `...Correctness.Ops`, grouped by role:
 - `...Correctness.Ops.Pooling`
 - `...Correctness.Ops.Random`
 
-The recursive end-to-end theorem lives in `...Correctness.SemanticEquivalence` and is intentionally not
+The recursive end-to-end theorem lives in `...Correctness.SemanticEquivalence` and is not
 imported here.
 
 ## Main definitions
@@ -37,8 +37,8 @@ imported here.
 
 ## Implementation notes
 
-- Separating "reusable infrastructure" (`Common`) from "op-specific steps" keeps the
-  way to keep large correctness proofs maintainable.
+- Separating reusable infrastructure (`Common`) from op-specific steps keeps large correctness
+  proofs maintainable.
 - Import `...Correctness.SemanticEquivalence` explicitly when you want the recursive end-to-end theorem.
 
 ## References

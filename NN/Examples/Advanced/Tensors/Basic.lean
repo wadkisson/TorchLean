@@ -23,7 +23,7 @@ usually ask about once they understand typed shapes:
 - manual reshaping when you want the row-major convention to be visible.
 
 The bridge functions themselves live in `NN/Spec/Core/TensorBridge.lean`. This example imports that
-library code and only supplies concrete demo values. In other words: this file is a tour, not a
+library code and only supplies concrete example values. In other words: this file is a tour, not a
 second tensor implementation.
 
 ## Why both representations exist
@@ -40,7 +40,7 @@ uses a *row-major* convention for flattening/unflattening, so that the last axis
 
 ## How to read this file
 
-The sections below are small "micro demos" you can copy into other scratch files:
+The sections below are small "micro examples" you can copy into other scratch files:
 
 - Convert an array-backed matrix to a `Spec.Tensor` and index into it.
 - Do a simple linear `matvec` in `TensorArray`, then convert the output back to `Spec.Tensor`.
@@ -98,7 +98,7 @@ def firstRowAsArray : TensorArray.Tensor Float [3] :=
 /-!
 Widget lane for this section.
 
-These `meta` declarations deliberately mirror the ordinary definitions above. They are not the
+These `meta` declarations mirror the ordinary definitions above. They are not the
 recommended programming style; they simply make the bridge computation executable for ProofWidgets.
 -/
 meta def matrixSpecView : Spec.Tensor Float (listToShape [2, 3]) :=

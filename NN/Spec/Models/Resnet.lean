@@ -64,7 +64,7 @@ PyTorch mental model:
 - `torchvision.models.resnet.ResNet` fixes a few "stem" choices (7×7 conv, stride 2, etc.) and
   varies the per-stage widths and block counts based on a small config.
 
-TorchLean’s spec ResNet is intentionally smaller in scope:
+TorchLean’s spec ResNet has a narrower scope:
 - blocks keep `stride=1` so spatial resolution stays constant inside `layer1..layer4`,
 - we still expose the stem / stage widths / stage block counts as explicit configuration so the
   model definition does not hide numeric architecture choices in its types.
@@ -317,7 +317,7 @@ def ResNetBlockSpec.forward {inChannels outChannels inH inW : Nat}
 (same input/output channels).
 
 We keep the `rest` blocks in a list rather than a fixed-length vector so that the definition stays
-lightweight and easy to build in examples. The `blockCount` index is documentation: the list length
+compact and easy to build in examples. The `blockCount` index is documentation: the list length
 is the source of truth for "how many blocks are actually present".
 -/
 structure ResNetLayerSpec (α : Type) (inChannels outChannels blockCount : Nat)
@@ -1192,7 +1192,7 @@ def ResNetSpec.depth {cfg : ResNetConfig} {inputChannels numClasses : Nat}
   (1 + resnet.layer4.rest.length) + -- layer4: first + rest
   1   -- classifier
 
-/-- Compute a lightweight parameter-count estimate for model summaries. -/
+/-- Compute a parameter-count estimate for model summaries. -/
 def ResNetSpec.parameterCount {cfg : ResNetConfig} {inputChannels numClasses : Nat}
   (h1 : inputChannels ≠ 0) (h2 : numClasses ≠ 0) (_hCfg : cfg.WF)
   (_resnet : ResNetSpec cfg α inputChannels numClasses h1 h2 _hCfg) : Nat :=

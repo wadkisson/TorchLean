@@ -579,8 +579,8 @@ def conv2dSpec {inC outC kH kW stride padding inH inW : Nat}
   --
   -- Reason: the generic shape is expressed via `Vector.toList`, which elaborates through
   -- `Array.ofFn`; the cast proof `conv2d_multi_out_shape_eq` is therefore not definitionally
-  -- transparent. Downstream proofs that pattern-match on `conv2dSpec` outputs become brittle
-  -- because `match`-auxiliaries differ up to opaque definitional equality.
+  -- transparent. Downstream proofs pattern-match directly on `conv2dSpec`, so the specialized
+  -- tensor constructor keeps those matches at the expected shape.
   --
   -- Instead, we replay the same `mkInputIdx?`-based definition with explicit 2D dimension lists,
   -- which makes the output tensor constructor-built at the expected `(outC,outH,outW)` shape.
@@ -742,9 +742,9 @@ abbrev ConvTransposeKernel (outC inC kH kW : Nat) (α : Type) :=
 /-- Parameters for a 2D transpose convolution. -/
 structure ConvTranspose2DSpec (inC outC kH kW stride padding : Nat) (α : Type)
     (h1 : inC > 0) (h2 : kH ≠ 0) (h3 : kW ≠ 0) where
-  /-- kernel. -/
+  /-- Transposed-convolution kernel tensor. -/
   kernel : ConvTransposeKernel outC inC kH kW α
-  /-- bias. -/
+  /-- Per-output-channel bias. -/
   bias   : Tensor α (.dim outC .scalar)
 
 /-- Output spatial shape `(outH,outW)` for `ConvTranspose2d` (with `output_padding = 0`). -/

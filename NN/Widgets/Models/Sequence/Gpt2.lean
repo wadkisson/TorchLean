@@ -92,9 +92,9 @@ def gpt2TrainLogHtml (log : TrainLog) : ProofWidgets.Html :=
 ## One-shot Prompt Runner
 
 `#gpt2_prompt_view "..."` runs the `torchlean gpt2` executable (CUDA) with a small default
-configuration, writes a temporary JSON `TrainLog`, then renders it.
+configuration, writes a per-run JSON `TrainLog`, then renders it.
 
-This is meant for quick "does it run?" checks inside the infoview. It is not a replacement for
+This is meant for local "does it run?" checks inside the infoview. It is not a replacement for
 the CLI interactive loop, and it will still take noticeable time if you increase `--steps`.
 -/
 

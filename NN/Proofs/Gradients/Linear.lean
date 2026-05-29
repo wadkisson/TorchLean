@@ -109,7 +109,7 @@ theorem linear_bias_gradient_correct
   rfl
 
 /--
-Shape/typing sanity check: all backward specs return tensors of the expected shapes.
+Shape/typing theorem: all backward specs return tensors of the expected shapes.
 
 This is “free” from Lean’s dependent types, but it is sometimes convenient as a lemma when writing
 documentation-style proofs.

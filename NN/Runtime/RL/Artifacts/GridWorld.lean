@@ -14,7 +14,7 @@ public import NN.Runtime.RL.Artifacts.GridWorld.Path
 # GridWorld Run Artifacts (Umbrella)
 
 Stable import for small GridWorld JSON artifacts used by TorchLean RL workflows and widgets. The
-implementation is split into:
+code is organized into:
 
 - `Position`: shared `(row, col)` JSON helpers;
 - `Policy`: before/after greedy policy snapshots;

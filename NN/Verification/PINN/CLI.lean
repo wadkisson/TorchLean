@@ -143,6 +143,7 @@ inductive Backend where
   | float
   | neuralfloat
 
+/-- Parse the backend flag used by the PINN residual CLI. -/
 def parseBackendArg (s : String) : Option Backend :=
   match s with
   | "--backend=float" => some .float
@@ -152,6 +153,7 @@ def parseBackendArg (s : String) : Option Backend :=
 private def parseWeightsArg (s : String) : Option String :=
   if s.startsWith "--weights=" then some ((s.drop 10).toString) else none
 
+/-- Parse a JSON-style Float literal, rejecting trailing characters. -/
 def parseFloat (s : String) : Option Float :=
   match parseNumber { s := s } with
   | .ok (v, st) => if st.i = s.rawEndPos then some v else none
@@ -278,6 +280,7 @@ def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod 
     | some (al, ah) => pure { base with u := some (al, ah) }
     | none => pure base
 
+/-- User-facing bound method selected by `--method`. -/
 inductive Method
   | ibp
   | crownFwd
@@ -289,24 +292,27 @@ instance : ToString Method :=
     | .crownFwd => "crown-fwd"
     | .crownBwd => "crown-bwd"⟩
 
+/-- Parse the `--method` value accepted by the PINN residual checker. -/
 def parseMethodVal (s : String) : Option Method :=
   match s.toLower with
   | "ibp" => some .ibp
-  | "partial" => some .crownBwd -- backwards-compatible alias
   | "crown" => some .crownBwd
   | "crown-fwd" => some .crownFwd
   | "crown-bwd" => some .crownBwd
   | _ => none
 
+/-- Parsed options for the PINN residual CLI. -/
 structure Opts where
-  /-- method. -/
+  /-- Bound propagation method used for the output interval. -/
   method : Method := .ibp
-  /-- Execution backend selection. -/
+  /-- Runtime backend used for interval evaluation. -/
   backend : Backend := .float
+  /-- Optional PyTorch-exported PINN weights JSON. -/
   weights? : Option String := none
-  /-- split Depth. -/
+  /-- Recursive interval split depth for one-dimensional checks. -/
   splitDepth : Nat := 0
 
+/-- Parse recognized flags and return the remaining positional arguments. -/
 partial def parseFlags (opts : Opts) (args : List String) : Opts × List String :=
   match args with
   | [] => (opts, [])
@@ -352,7 +358,7 @@ For certificate checking, use:
 `lake exe verify -- pinn-cert [NN/Examples/Verification/PINN/pinn_cert.json]`
 
 Run:
-`lake exe verify -- pinn-cli -- [--method=ibp|crown-fwd|crown-bwd|partial] [--split-depth=N]
+`lake exe verify -- pinn-cli -- [--method=ibp|crown-fwd|crown-bwd] [--split-depth=N]
   [--backend=float|neuralfloat] [--weights=PATH.json] "<PDE>" x eps`
 or (2D):
 `lake exe verify -- pinn-cli -- [flags] "<PDE>" x y eps`
@@ -521,10 +527,10 @@ def main (args : List String) : IO Unit := do
   | _ =>
     throw <| IO.userError <|
       ("Usage:\n  lake exe verify -- pinn-cli -- " ++
-        "[--method=ibp|crown-fwd|crown-bwd|partial] [--split-depth=N] " ++
+        "[--method=ibp|crown-fwd|crown-bwd] [--split-depth=N] " ++
         "[--backend=float|neuralfloat] [--weights=path.json] \"<PDE>\" x eps   " ++
         " # 1D\n  lake exe verify -- pinn-cli -- " ++
-        "[--method=ibp|crown-fwd|crown-bwd|partial] [--split-depth=N] " ++
+        "[--method=ibp|crown-fwd|crown-bwd] [--split-depth=N] " ++
         "[--backend=float|neuralfloat] [--weights=path.json] \"<PDE>\" x y eps " ++
         " # 2D")
 

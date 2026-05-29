@@ -3,8 +3,8 @@
 
 This is a pragmatic baseline for TorchLean:
   - Fast, well-tested training loop (Python).
-  - Useful to sanity-check environment + target performance ("solved" CartPole) while TorchLean’s
-    Lean-side PPO/GAE definitions and boundary contracts evolve.
+  - Useful for comparing environment behavior and target performance ("solved" CartPole) against
+    TorchLean's Lean-side PPO/GAE definitions and boundary contracts.
 
 Run:
   python3 -m pip install --user 'gymnasium>=1.0' stable-baselines3

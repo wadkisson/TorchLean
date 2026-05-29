@@ -72,21 +72,27 @@ structure Tokenizer where
 
 /-! ## Byte Escaping -/
 
+/-- Bytes that GPT-2 leaves at their visible Unicode code points. -/
 def bytesVisible : List Nat :=
   (List.range 94).map (fun i => i + 33)
 
+/-- First Latin-1 byte range kept visible by GPT-2 byte escaping. -/
 def bytesLatin1A : List Nat :=
   (List.range 12).map (fun i => i + 161)
 
+/-- Second Latin-1 byte range kept visible by GPT-2 byte escaping. -/
 def bytesLatin1B : List Nat :=
   (List.range 82).map (fun i => i + 174)
 
+/-- Bytes that do not need synthetic code points in GPT-2 byte escaping. -/
 def baseBytes : List Nat :=
   bytesVisible ++ bytesLatin1A ++ bytesLatin1B
 
+/-- Boolean membership test used while constructing the byte escape table. -/
 def containsNat (xs : List Nat) (x : Nat) : Bool :=
   xs.any (fun y => y == x)
 
+/-- GPT-2 byte-to-Unicode code-point table for all 256 byte values. -/
 def byteCodeTable : Array Nat := Id.run do
   let mut codes := Array.replicate 256 0
   for b in baseBytes do
@@ -126,21 +132,25 @@ def byteDecode? (s : String) : Option String := do
 
 /-! ## Pre-tokenization -/
 
+/-- Character classes used by the GPT-2 pre-tokenizer branches. -/
 inductive RegexClass where
   | letter
   | number
   | other
 deriving DecidableEq
 
+/-- Character predicate for GPT-2's non-whitespace, non-letter, non-number regex branch. -/
 def isRegexOther (c : Char) : Bool :=
   !Unicode.isRegexWhitespace c && !Unicode.isLetter c && !Unicode.isNumber c
 
+/-- Test whether a character belongs to one of the GPT-2 regex classes. -/
 def matchesRegexClass (cls : RegexClass) (c : Char) : Bool :=
   match cls with
   | .letter => Unicode.isLetter c
   | .number => Unicode.isNumber c
   | .other => isRegexOther c
 
+/-- Split a character list at the first character that fails `p`. -/
 def takeWhileChars (p : Char → Bool) : List Char → List Char × List Char
   | [] => ([], [])
   | c :: cs =>
@@ -150,6 +160,7 @@ def takeWhileChars (p : Char → Bool) : List Char → List Char × List Char
       else
         ([], c :: cs)
 
+/-- Consume one GPT-2 contraction token such as `'s` or `'ll`, if present. -/
 def consumeContraction? : List Char → Option (String × List Char)
   | '\'' :: 's' :: rest => some ("'s", rest)
   | '\'' :: 't' :: rest => some ("'t", rest)
@@ -160,6 +171,7 @@ def consumeContraction? : List Char → Option (String × List Char)
   | '\'' :: 'l' :: 'l' :: rest => some ("'ll", rest)
   | _ => none
 
+/-- Consume one GPT-2 letter/number/other run, allowing a leading ASCII space. -/
 def consumeClassRun? (cls : RegexClass) : List Char → Option (String × List Char)
   | ' ' :: c :: rest =>
       if matchesRegexClass cls c then
@@ -194,6 +206,7 @@ def consumeWhitespaceNotFollowedByNonspace? (xs : List Char) : Option (String ×
       | [] => none
       | last :: revPrefix => some (String.ofList revPrefix.reverse, last :: rest)
 
+/-- Consume a plain whitespace run when the lookahead-sensitive branch did not apply. -/
 def consumeWhitespaceRun? (xs : List Char) : Option (String × List Char) :=
   let (run, rest) := takeWhileChars Unicode.isRegexWhitespace xs
   if run.isEmpty then none else some (String.ofList run, rest)
@@ -236,15 +249,19 @@ def pretokenize (s : String) : List String :=
 
 /-! ## BPE Merging -/
 
+/-- Look up a token id in a loaded tokenizer. -/
 def vocabId? (tok : Tokenizer) (s : String) : Option Nat :=
   tok.vocabMap[s]?
 
+/-- Look up the token spelling for a token id. -/
 def tokenString? (tok : Tokenizer) (id : Nat) : Option String :=
   tok.idMap[id]?
 
+/-- Look up the merge rank for an adjacent pair of BPE symbols. -/
 def mergeRank? (tok : Tokenizer) (a b : String) : Option Nat :=
   tok.mergeMap[(a, b)]?
 
+/-- Find the lowest-ranked merge currently available in a symbol list. -/
 def bestMerge? (tok : Tokenizer) : List String → Option (String × String × Nat)
   | a :: b :: rest =>
       let here := (mergeRank? tok a b).map (fun r => (a, b, r))
@@ -255,6 +272,7 @@ def bestMerge? (tok : Tokenizer) : List String → Option (String × String × N
       | some x, some y => if x.2.2 ≤ y.2.2 then some x else some y
   | _ => none
 
+/-- Apply one BPE merge everywhere it appears in the current symbol list. -/
 def applyMerge (target : String × String) : List String → List String
   | a :: b :: rest =>
       if a == target.1 && b == target.2 then
@@ -263,6 +281,7 @@ def applyMerge (target : String × String) : List String → List String
         a :: applyMerge target (b :: rest)
   | xs => xs
 
+/-- Fuel-bounded BPE merge loop for a single escaped pre-token fragment. -/
 def bpeLoop (tok : Tokenizer) : Nat → List String → List String
   | 0, symbols => symbols
   | fuel + 1, symbols =>
@@ -327,9 +346,11 @@ recognizes exactly the JSON shape used by GPT-2 vocab files and decodes JSON str
 including `\uXXXX` escapes for byte-to-unicode code points.
 -/
 
+/-- Safe character lookup used by the specialized `vocab.json` parser. -/
 def charAtD (cs : Array Char) (i : Nat) : Char :=
   cs.getD i '\x00'
 
+/-- Skip JSON whitespace in the specialized GPT-2 vocabulary parser. -/
 def skipJsonWs (cs : Array Char) (i : Nat) : Nat :=
   Id.run do
     let mut j := i
@@ -339,6 +360,7 @@ def skipJsonWs (cs : Array Char) (i : Nat) : Nat :=
       j := j + 1
     return j
 
+/-- Interpret one hexadecimal digit from a JSON unicode escape. -/
 def hexVal? (c : Char) : Option Nat :=
   let n := c.toNat
   if 48 ≤ n && n ≤ 57 then
@@ -350,6 +372,7 @@ def hexVal? (c : Char) : Option Nat :=
   else
     none
 
+/-- Parse four hexadecimal digits starting at `i`. -/
 def parseHex4? (cs : Array Char) (i : Nat) : Option Nat := do
   let a ← hexVal? (charAtD cs i)
   let b ← hexVal? (charAtD cs (i + 1))
@@ -357,9 +380,11 @@ def parseHex4? (cs : Array Char) (i : Nat) : Option Nat := do
   let d ← hexVal? (charAtD cs (i + 3))
   some (((a * 16 + b) * 16 + c) * 16 + d)
 
+/-- Combine a JSON UTF-16 surrogate pair into one Unicode code point. -/
 def combineSurrogate (hi lo : Nat) : Nat :=
   0x10000 + ((hi - 0xD800) * 0x400) + (lo - 0xDC00)
 
+/-- Fuel-bounded worker for JSON string parsing with escape handling. -/
 def parseJsonStringAux (cs : Array Char) : Nat → Nat → List Char →
     Except String (String × Nat)
   | 0, _, _ => NN.API.Json.fail "vocab.json: string parser exhausted fuel"
@@ -406,11 +431,13 @@ def parseJsonStringAux (cs : Array Char) : Nat → Nat → List Char →
         else
           parseJsonStringAux cs fuel (i + 1) (c :: acc)
 
+/-- Parse a JSON string beginning at index `i`. -/
 def parseJsonStringAt (cs : Array Char) (i : Nat) : Except String (String × Nat) := do
   if charAtD cs i != '"' then
     NN.API.Json.fail "vocab.json: expected JSON string"
   parseJsonStringAux cs (cs.size - i + 1) (i + 1) []
 
+/-- Parse a natural-number literal beginning at index `i`. -/
 def parseNatAt (cs : Array Char) (i : Nat) : Except String (Nat × Nat) := do
   let mut j := i
   let mut n := 0
@@ -428,6 +455,7 @@ def parseNatAt (cs : Array Char) (i : Nat) : Except String (Nat × Nat) := do
   else
     NN.API.Json.fail "vocab.json: expected natural number"
 
+/-- Fuel-bounded loop for the specialized GPT-2 `vocab.json` object parser. -/
 def parseVocabTextLoop (cs : Array Char) : Nat → Nat → Array VocabEntry →
     Except String (Array VocabEntry)
   | 0, _, _ => NN.API.Json.fail "vocab.json: parser exhausted fuel"
@@ -462,15 +490,19 @@ def parseVocabText (s : String) : Except String (Array VocabEntry) := do
     NN.API.Json.fail "vocab.json: expected top-level object"
   parseVocabTextLoop cs (cs.size + 1) (i + 1) #[]
 
+/-- Build the token-to-id lookup table stored in a loaded GPT-2 BPE tokenizer. -/
 def vocabMapOf (vocab : Array VocabEntry) : Std.HashMap String Nat :=
   vocab.foldl (fun acc e => acc.insert e.token e.id) Std.HashMap.emptyWithCapacity
 
+/-- Build the id-to-token lookup table stored in a loaded GPT-2 BPE tokenizer. -/
 def idMapOf (vocab : Array VocabEntry) : Std.HashMap Nat String :=
   vocab.foldl (fun acc e => acc.insert e.id e.token) Std.HashMap.emptyWithCapacity
 
+/-- Build the pair-to-rank lookup table stored in a loaded GPT-2 BPE tokenizer. -/
 def mergeMapOf (merges : Array MergeRank) : Std.HashMap (String × String) Nat :=
   merges.foldl (fun acc m => acc.insert (m.left, m.right) m.rank) Std.HashMap.emptyWithCapacity
 
+/-- Parse one non-comment `merges.txt` line with its rank. -/
 def parseMergeLine? (rank : Nat) (line : String) : Option MergeRank :=
   let s := line.trimAscii.toString
   if s.isEmpty || String.isPrefixOf "#" s then

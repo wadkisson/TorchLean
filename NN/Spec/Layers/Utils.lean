@@ -21,7 +21,7 @@ plus padding and window‑extraction utilities used by conv/pooling layers.
 namespace Spec
 open Tensor
 
--- Abbreviations
+-- Tensor aliases for image-shaped layer specifications.
 /-- A 2-D image tensor of shape `[H, W]`. -/
 abbrev Image (H W : ℕ) (α : Type) := Tensor α (.dim H (.dim W .scalar))
 /-- A `C`-channel image tensor of shape `[C, H, W]` (channels-first, like PyTorch `NCHW` without
@@ -298,7 +298,6 @@ def channelIdentity {α : Type} {channels height width : ℕ}
   (img : MultiChannelImage channels height width α) :
   MultiChannelImage channels height width α := img
 
--- Set value at position
 /--
 Write a value at pixel `(x, y)` if it is in-bounds; otherwise return the original image.
 
@@ -312,7 +311,6 @@ def setValueAtPosition {α : Type} {H W : ℕ} (img : Image H W α) (x y : ℕ) 
     else img
   else img
 
--- Add value at position
 /--
 Add `value` to pixel `(x, y)` if it is in-bounds; otherwise return the original image.
 

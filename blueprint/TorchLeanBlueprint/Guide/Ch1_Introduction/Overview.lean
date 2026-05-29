@@ -76,7 +76,7 @@ not as a comment beside a script.
 
 # Three Views Of One Model
 
-At the top level, TorchLean provides a facade with PyTorch vocabulary over a shared internal model.
+At the top level, TorchLean provides a PyTorch-style API over a shared internal model.
 User code mostly starts from `import NN` and `open NN.API`, then works with familiar concepts:
 layers, datasets, optimizers, losses, and training loops.
 

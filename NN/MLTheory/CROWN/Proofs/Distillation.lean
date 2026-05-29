@@ -16,7 +16,7 @@ This module adds a distillation-style certificate:
 > prove that a Student network matches a Teacher network up to `ε`
 > on an input box, i.e. `|T(x) - S(x)| ≤ ε` componentwise for all inputs `x` in the domain.
 
-The implementation is deliberately simple and reuses TorchLean's existing, proved
+The implementation is kept simple and reuses TorchLean's existing, proved
 IBP soundness theorem for 2-layer MLPs (`NN.MLTheory.CROWN.Theorems.bound_ibp_sound`).
 -/
 

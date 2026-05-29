@@ -9,8 +9,8 @@ Dataset convention:
   - field `a`: initial condition u_0(x)
   - field `u`: solution u(x, T)
 
-The original file is large, so the defaults export a quick-check subset on a coarse grid. Increase
-`--grid`, `--ntrain`, and `--ntest` when you want a larger training run.
+The original file is large, so the defaults export a small subset on a coarse grid. Increase
+`--grid`, `--ntrain`, and `--ntest` for larger training runs.
 """
 
 from __future__ import annotations

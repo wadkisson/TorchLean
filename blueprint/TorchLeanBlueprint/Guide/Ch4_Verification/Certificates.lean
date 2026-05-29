@@ -86,7 +86,7 @@ on the leaf box, compare that recomputed bound with the exported `lb`, and then 
 margin witness.
 
 That would move more work from the external solver into Lean's checker. The current JSON format was
-kept deliberately small so the first boundary is clear.
+kept focused so the first boundary is clear.
 
 There are therefore three levels of confidence to keep straight:
 

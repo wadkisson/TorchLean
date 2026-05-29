@@ -24,14 +24,14 @@ namespace NN.MLTheory.Robustness.Spec
 /-!
 # Robustness specifications (polymorphic)
 
-This file defines a small vocabulary for specifying **robustness properties** of tensor-valued
+This file defines reusable vocabulary for specifying **robustness properties** of tensor-valued
 functions.
 
 All definitions are **scalar-polymorphic** in `α` via `[Context α]`, so the same spec can be
 instantiated for:
 
 - `ℝ` (paper-style theorems),
-- `Float` (fast, executable sanity checks),
+- `Float` (fast, executable consistency checks),
 - `Interval` (sound enclosures for verification),
 - executable IEEE-754 backends (bit-level runtime semantics).
 

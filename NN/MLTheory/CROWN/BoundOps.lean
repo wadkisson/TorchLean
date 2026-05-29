@@ -57,7 +57,7 @@ variable {α : Type} [Context α]
 /-!
 ## `BoundOps α`
 
-`BoundOps` is intentionally focused: it supplies directed-rounding versions of the arithmetic
+`BoundOps` supplies directed-rounding versions of the arithmetic
 primitives that appear in IBP for affine/linear layers and basic arithmetic nodes.
 
 If you want to swap in a quantized backend, the key is to provide an instance of `BoundOps` for

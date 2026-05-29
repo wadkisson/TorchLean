@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 
-DEFAULT_GOOD = Path("NN/Verification/Geometry3D/smoke_box3d_camera_cert.json")
+DEFAULT_GOOD = Path("NN/Verification/Geometry3D/check_box3d_camera_cert.json")
 DEFAULT_OUT_DIR = Path("_external/geometry3d/bad")
 
 

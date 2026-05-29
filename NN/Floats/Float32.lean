@@ -52,7 +52,7 @@ The intent is to let the rest of the codebase depend on a single *name* (`Float3
 keeping the boundary easy to see and easy to swap:
 
 - theorem statements and error bounds typically use `FP32`,
-- runnable demos typically use `IEEE32Exec`,
+- runnable examples typically use `IEEE32Exec`,
 - runtime `Float32` is treated as an explicitly trusted/assumed implementation detail.
 
 This design is described in the TorchLean paper appendix ("Appendix C (Numerical Semantics)"):
@@ -98,10 +98,10 @@ abbrev Float32 (mode : Float32Mode := .ieee754Exec) : Type :=
   | .fp32 => FP32
   | .ieee754Exec => IEEE32Exec
 
-/-- Short alias used in demos/docs. -/
+/-- Short alias used in examples/docs. -/
 abbrev F32 (mode : Float32Mode := .ieee754Exec) : Type := Float32 mode
 
-/-! ## Lightweight logging (CLI/examples) -/
+/-! ## CLI and Example Logging -/
 
 /-- Human-readable summary of the selected float32 semantics. -/
 def float32ModeSummary : Float32Mode → String

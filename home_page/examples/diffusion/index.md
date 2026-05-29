@@ -16,7 +16,7 @@ is represented, what the denoiser predicts, and what gets saved after a run.
 
 ## Run It First
 
-For a quick CPU smoke test, run only a tiny number of steps:
+For a short CPU runtime check, run a bounded number of steps:
 
 ```bash
 lake exe torchlean diffusion --dataset cifar10 --n-total 32 --steps 1 --hidden-c 4
@@ -139,7 +139,7 @@ def appendTimeChannel {batch c h w : Nat}
     Spec.Tensor Float (NN.Tensor.Shape.NCHW batch (c + 1) h w) := ...
 ```
 
-The model is a same-resolution residual CNN, deliberately small enough to run as an example. This
+The model is a same-resolution residual CNN sized to run as an example. This
 is a compressed excerpt of the real definition; the source file expands each convolution with the
 exact tensor shapes and seeded initializers:
 

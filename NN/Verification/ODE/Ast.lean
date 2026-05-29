@@ -83,23 +83,23 @@ against the mathematical interval rule it implements. -/
 @[inline] def leBool {α : Type} [Context α] (x y : α) : Bool :=
   not (Context.gtBool x y)
 
-/-- Binary minimum. -/
+/-- Minimum of two scalar endpoints, using the active scalar comparison. -/
 @[inline] def min2 {α : Type} [Context α] (a b : α) : α :=
   if leBool a b then a else b
 
-/-- Binary maximum. -/
+/-- Maximum of two scalar endpoints, using the active scalar comparison. -/
 @[inline] def max2 {α : Type} [Context α] (a b : α) : α :=
   if leBool a b then b else a
 
-/-- Interval addition. -/
+/-- Add two closed intervals endpointwise. -/
 @[inline] def add {α : Type} [Context α] (x y : α × α) : α × α :=
   let (xl, xh) := x; let (yl, yh) := y; (xl + yl, xh + yh)
 
-/-- Interval subtraction. -/
+/-- Subtract closed intervals using the standard outward endpoint formula. -/
 @[inline] def sub {α : Type} [Context α] (x y : α × α) : α × α :=
   let (xl, xh) := x; let (yl, yh) := y; (xl - yh, xh - yl)
 
-/-- Interval negation. -/
+/-- Negate a closed interval by swapping and negating endpoints. -/
 @[inline] def neg {α : Type} [Context α] (x : α × α) : α × α :=
   let (xl, xh) := x; (-xh, -xl)
 
@@ -246,9 +246,7 @@ def evalWithFuel {α : Type} [Context α] (ofFloat : Float → α) (fuel : Nat) 
       | some x => Ival.log x
       | none => none
 
-/-!
-Convenience wrapper with a generous fixed fuel.
--/
+/-- Evaluate an ODE expression with the default recursion fuel used by certificate checking. -/
 def eval {α : Type} [Context α] (ofFloat : Float → α) (env : Env α) (e : Expr) : Option (α × α) :=
   evalWithFuel ofFloat 512 env e
 

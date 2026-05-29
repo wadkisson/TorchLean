@@ -22,7 +22,7 @@ public import NN.Runtime.Autograd.Train.Optim
 
 `NN.Runtime.Autograd.Train` is the curated umbrella for TorchLean's dynamic-tape training helpers.
 
-This layer is intentionally about training-loop infrastructure, not model definitions:
+This layer is about training-loop infrastructure, not model definitions:
 
 - `Core` gives tagged errors plus typed value/gradient extraction from shape-erased tape data.
 - `Dataset` gives pure, deterministic datasets/loaders with seeded shuffling.

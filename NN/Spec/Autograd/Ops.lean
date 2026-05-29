@@ -23,7 +23,7 @@ The definitions are intentionally direct mathematical contracts and live purely 
 How to read this file:
 
 - Each operation below is an `OpSpec`: a pure `forward` plus a pure VJP `backward`.
-- Most ops here are thin wrappers around `*Spec` and derivative-spec definitions from `NN/Spec/*`.
+- Most ops here package `*Spec` and derivative-spec definitions from `NN/Spec/*`.
 
 Where this sits in TorchLean:
 
@@ -38,7 +38,7 @@ operations whose input-gradient VJP is naturally expressed as a single
 still have precise specs and runtime implementations, but their full backward state usually belongs
 in layer/runtime code rather than in this compact unary interface.
 
-PyTorch analogy (roughly):
+PyTorch analogy (approximately):
 
 - A spec `OpSpec` is like a compact `torch.autograd.Function` where we write down the VJP directly.
 - We do not model PyTorch's mutable `ctx`; the spec layer receives the input tensor `x` directly.
@@ -161,7 +161,7 @@ def logSoftmaxOp {s : Shape} : OpSpec α s s :=
 /-- Linear layer as an OpSpec: `y = W x + b`.
 
 This `OpSpec` only returns the input gradient `dL/dx`. Parameter gradients for `W` and `b`
-are intentionally not part of `OpSpec` (those live at the graph/runtime level).
+are not part of `OpSpec` (those live at the graph/runtime level).
 
 PyTorch analogy: `torch.nn.Linear` forward, with autograd producing grads for `x/W/b`. -/
 def linearOp [Add α] [Mul α] [Zero α] [One α] {inDim outDim : Nat}
@@ -256,7 +256,7 @@ def logOp   {s : Shape} : OpSpec α s s :=
 /--
 Elementwise log with epsilon shift, `log(x + ε)`.
 
-This is the default facade-safe logarithm: it is total as a spec expression and its VJP uses
+This is the default API-safe logarithm: it is total as a spec expression and its VJP uses
 `1/(x+ε)` pointwise.
 
 PyTorch analogy: often written manually as `torch.log(x + eps)`. -/
@@ -329,7 +329,7 @@ def invOp   {s : Shape} : OpSpec α s s :=
 /--
 Elementwise epsilon-shifted reciprocal, `1/(x+ε)`.
 
-This is the safe facade counterpart to `invOp`: the forward pass delegates to `safedivSpec` with
+This is the safe API counterpart to `invOp`: the forward pass delegates to `safedivSpec` with
 unit numerator, and the VJP is the derivative of the same shifted expression.
 
 PyTorch analogy: usually written manually as `1.0 / (x + eps)`.

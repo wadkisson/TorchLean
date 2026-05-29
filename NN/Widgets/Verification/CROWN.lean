@@ -24,7 +24,7 @@ and teaching rather than proofs:
 - `#crown_view g, st` shows a per-node table for a `CROWN.graph.PropState`, including optional IBP
   boxes and optional affine forms.
 
-The goal is to make it easy to sanity-check:
+The goal is to make it easy to inspect:
 - which nodes got bounds,
 - the shapes and flattened dimensions that the propagation engine believes it is operating on,
 - and small previews of the vectors/matrices involved.
@@ -177,7 +177,7 @@ private def flatBoxPreview {α : Type} [Context α] [ToString α] (b : FlatBox �
   let hi := toList (α := α) (s := .dim b.dim .scalar) b.hi
   s!"lo={listPreview (α := α) maxElems lo}, hi={listPreview (α := α) maxElems hi}"
 
-/-- Build a DOT graph for quick visualization of state coverage across nodes. -/
+/-- Build a DOT graph for compact visualization of state coverage across nodes. -/
 private def crownDot {α : Type} [Context α] [ToString α] (g : Graph) (ps : PropState α)
     (maxNodes : Nat := 400) : String :=
   let nG := g.size

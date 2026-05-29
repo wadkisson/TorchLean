@@ -25,11 +25,11 @@ A typical workflow looks like this:
 4. import or export a named artifact when Python belongs in the workflow,
 5. state a claim about the resulting model and check the artifact that supports it.
 
-The [public API facade](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) is the default entry point for this path. The
+The [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) is the default entry point for this path. The
 lower-layer pages become relevant when a chapter asks a more precise question about tensors,
 runtime execution, import/export, floating point, or verification.
 
-Here is the rough map:
+Here is the map:
 
 - When the user writes a tensor literal, TorchLean keeps the scalar type and shape.
 - When the user builds a model, TorchLean keeps the architecture and parameter shapes.
@@ -63,7 +63,7 @@ with predictions shaped `[batch, 1]` and targets shaped `[batch]` is often a mod
 does not try to guess whether the right convention is one-hot encoding, a singleton-dimension
 squeeze, a different loss, or a different model head.
 
-The same shape discipline appears at the model level. A small classifier states its input and output
+The same shape discipline appears at the model level. A compact classifier states its input and output
 shapes before it ever runs:
 
 ```
@@ -76,7 +76,7 @@ def classifier : nn.M (nn.Sequential (Shape.Vec 16) (Shape.Vec 4)) :=
 ```
 
 For tensor constructors and literals, see the [tensor API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Tensor/API.lean). For the model
-builder surface used above, start with the [public API facade](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean).
+builder surface used above, start with the [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean).
 
 # Building And Training
 
@@ -106,7 +106,7 @@ The training surface deliberately looks familiar:
 - `train.stepper` and `train.step` support manual loops familiar from PyTorch,
 - `optim.sgd`, `optim.adam`, and `optim.adamw` construct optimizer configurations.
 
-Those names live behind the same public facade, with implementation details in the
+Those names live behind the same public API, with implementation details in the
 [training runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train.lean) and the
 [runtime optimizer definitions](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Optim.lean).
 

@@ -255,7 +255,7 @@ def tag : OpKind → String
 /--
 Human-facing operation description including operation-local parameters.
 
-`tag` is intentionally short and stable for grouping/log filtering. `describe` is for diagnostics:
+`tag` is short and stable for grouping/log filtering. `describe` is for diagnostics:
 it prints axes, shapes, seeds, and convolution/pooling metadata so malformed graph dumps are useful
 without cross-referencing the original builder.
 -/

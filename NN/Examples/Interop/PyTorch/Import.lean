@@ -15,7 +15,7 @@ public import NN.Examples.Interop.PyTorch.Transformer.Import
 
 Architecture-specific JSON `state_dict` loaders for examples and verification workflows.
 
-These modules are small example consumers of the bridge, not the general PyTorch import pipeline. The
+These modules are compact example consumers of the bridge, not the general PyTorch import pipeline. The
 actual files live beside their JSON/Python fixtures under `MLP/`, `CNN/`, and `Transformer/`.
 The general path is:
 

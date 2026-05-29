@@ -13,7 +13,7 @@ public import NN.API.Models.PPO
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
-# PPO on Atari Pong (RAM Observations) (Executable Demo)
+# PPO on Atari Pong (RAM Observations) (Executable Example)
 
 This example mirrors `NN/Examples/Models/RL/PPOCartPole.lean`, but targets an Atari game via the
 Arcade Learning Environment (ALE) registered into Gymnasium as `ALE/Pong-v5`.
@@ -21,7 +21,7 @@ Arcade Learning Environment (ALE) registered into Gymnasium as `ALE/Pong-v5`.
 Why "RAM" observations?
 - Pixel-based Atari PPO is absolutely doable, but a JSON-lines subprocess bridge is not the right
   transport if you want millions of steps/hour. RAM observations (`obs_type="ram"`, shape `128`)
-  keep the bridge lightweight and make this run viable as a native Lean executable.
+  keep the bridge compact and make this run viable as a native Lean executable.
 
 The key TorchLean interface remains the same:
 
@@ -113,7 +113,7 @@ def gamma : Float := 0.99
 /-- GAE(λ) parameter controlling the bias/variance tradeoff of advantage estimates. -/
 def lam : Float := 0.95
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used for the Pong RAM actor-critic update. -/
 def lr : Float := 2.5e-4
 
 /-- Number of PPO optimization epochs per collected rollout batch. -/
@@ -175,7 +175,7 @@ def makeKwargs : List (String × Lean.Json) :=
 def contract : rl.boundary.Contract obsShape nActions :=
   { checkObsFinite := true
     checkRewardFinite := true
-    -- RAM bytes live in `[0,255]` by construction. This range check is a cheap sanity guard
+    -- RAM bytes live in `[0,255]` by construction. This range check guards
     -- against protocol bugs or unexpected wrappers.
     obsRange? := some (0, 255)
     rewardRange? := none

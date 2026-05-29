@@ -39,7 +39,7 @@ open Lean
 open Data
 open Json
 
-/-- Typed view of a PyTorch `state_dict` for the demo 2-block CNN.
+/-- Typed view of a PyTorch `state_dict` for the example 2-block CNN.
 
 This matches the keys used by the exporter (`conv1.*`, `conv2.*`, `fc.*`) and pins down the exact
 shapes expected by TorchLean.

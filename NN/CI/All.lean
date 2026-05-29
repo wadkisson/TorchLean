@@ -9,7 +9,7 @@ module
 public import NN.API.Common
 public import NN.API.Core
 public import NN.API.Data
-public import NN.Examples.Data.ToyPaths
+public import NN.Examples.Data.SamplePaths
 public import NN.API.Data.Transforms
 public import NN.API.Init
 public import NN.API.Macros
@@ -311,15 +311,15 @@ public import NN.Spec.Module.SpecModule
 public import NN.Spec.Module.Svm
 public import NN.Entrypoint.Tensor
 public import NN.Tests.Runtime.Floats.AllAutogradTests
-public import NN.Tests.Runtime.Floats.KnnSmoke
-public import NN.Tests.Runtime.Floats.ModelsSmoke
+public import NN.Tests.Runtime.Floats.KnnCheck
+public import NN.Tests.Runtime.Floats.ModelsCheck
 public import NN.Tests.Runtime.Floats.PINNDerivResidual
-public import NN.Tests.Runtime.Floats.RnnGruLstmBpttSmoke
+public import NN.Tests.Runtime.Floats.RnnGruLstmBpttCheck
 public import NN.Tests.Runtime.Floats.Suite
-public import NN.Tests.Runtime.Floats.TorchLeanIRExecEquivSmoke
-public import NN.Tests.Runtime.Floats.TorchLeanIndexShapeSmoke
-public import NN.Tests.Runtime.Floats.TorchLeanOpsSmoke
-public import NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivSmoke
+public import NN.Tests.Runtime.Floats.TorchLeanIRExecEquivCheck
+public import NN.Tests.Runtime.Floats.TorchLeanIndexShapeCheck
+public import NN.Tests.Runtime.Floats.TorchLeanOpsCheck
+public import NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivCheck
 public import NN.Tests.Runtime.Floats.Utils
 public import NN.Tests.Runtime.Rationals.AutogradEngineTest
 public import NN.Tests.Runtime.Rationals.MlpTest
@@ -339,6 +339,13 @@ public import NN.Verification.TorchLean.SpecEval
 public import NN.Verification.Util.FloatApprox
 public import NN.Verification.Util.Json
 public import NN.Entrypoint.Widgets
+
+/-!
+CI-facing import sweep.
+
+This file imports the public and internal surfaces that should remain buildable together in the
+continuous-integration configuration.
+-/
 
 /-!
 # All

@@ -98,7 +98,7 @@ open NN.MLTheory.CROWN
 /--
 Uniformly widen a real-valued `CROWN.Box` by `eps` in every component.
 
-The lower face moves down by `eps`; the upper face moves up by `eps`. This is intentionally simple
+The lower face moves down by `eps`; the upper face moves up by `eps`. This is kept simple
 and conservative, matching an `L∞`-style output error bound.
 -/
 noncomputable def inflateBoxUniform {s : Shape} (B : Box ℝ s) (eps : ℝ) : Box ℝ s :=

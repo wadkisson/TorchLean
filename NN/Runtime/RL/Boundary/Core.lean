@@ -75,10 +75,10 @@ def tensorInClosedInterval {s : Shape} (lo hi : Float) (t : Tensor Float s) : Bo
 /-!
 ## Contract for external discrete-action rollouts
 
-This contract is intentionally narrow:
+This contract is focused:
 
 - it does not try to verify the environment dynamics,
-- it checks only *syntactic* and *numeric sanity* properties that can be validated locally,
+- it checks the syntactic and numeric properties that can be validated locally,
 - it is designed to fail fast with a human-readable error.
 -/
 
@@ -252,7 +252,7 @@ variable {obsShape : Shape} {nActions : Nat}
 /--
 Proposition-level version of the observation checks performed by `checkObservation`.
 
-This is intentionally “syntactic”: it only states the locally checkable numeric/shape sanity
+This is syntactic by construction: it states the locally checkable numeric/shape
 conditions, not any semantic assumptions about the environment dynamics.
 -/
 def ObservationHolds (c : Contract obsShape nActions) (obs : Tensor Float obsShape) : Prop :=

@@ -37,7 +37,7 @@ RL algorithms manipulate.
 
 ## Implementation notes
 
-- We keep the rendering intentionally simple (cells + badges), because this tends to stay
+- We keep the rendering kept simple (cells + badges), because this tends to stay
   readable even on narrow infoview layouts.
 - We parse JSON artifacts inline in command macros so widget files remain self-contained and easy to
   experiment with in Lean.

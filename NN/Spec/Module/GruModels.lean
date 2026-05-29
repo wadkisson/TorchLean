@@ -99,7 +99,7 @@ def multilayerGruSpec
 
 /-- A simple GRU language-model style pipeline:
 
-`Linear` as a lightweight embedding/projection, then GRU, then a per-timestep projection back to
+`Linear` as the embedding/projection map, then GRU, then a per-timestep projection back to
 `vocabSize`.
 
 PyTorch analogy: embedding (often `nn.Embedding`), `nn.GRU`, and `nn.Linear(hiddenSize, vocabSize)`.
@@ -181,7 +181,6 @@ structure GRUGenerator (α : Type) (vocabSize hiddenSize : Nat) where
   /-- output projection. -/
   output_projection : LinearSpec α hiddenSize vocabSize
 
--- Bidirectional GRU model
 /--
 Bundle of parameters for a bidirectional GRU model with an output head.
 
@@ -196,7 +195,6 @@ structure BiGRUModel (α : Type) (inputSize hiddenSize outputSize : Nat) where
   /-- output layer. -/
   output_layer : LinearSpec α (hiddenSize + hiddenSize) outputSize
 
--- GRU Language Model
 /--
 Bundle of parameters for a stacked GRU language model with deterministic dropout.
 
@@ -528,13 +526,13 @@ Forward passes can choose additive, dot-product, or domain-specific attention se
 sharing this typed parameter bundle.
 -/
 structure AttentionGRUModel (α : Type) (inputSize hiddenSize outputSize : Nat) where
-  /-- encoder gru. -/
+  /-- Encoder GRU used to summarize the input sequence. -/
   encoder_gru : GRUSpec α inputSize hiddenSize
-  /-- decoder gru. -/
+  /-- Decoder GRU that consumes the previous token representation and attention context. -/
   decoder_gru : GRUSpec α (inputSize + hiddenSize) hiddenSize  -- Input + context
-  /-- attention weights. -/
+  /-- Linear scorer for additive attention over encoder states. -/
   attention_weights : LinearSpec α (hiddenSize + hiddenSize) 1   -- For attention scoring
-  /-- output layer. -/
+  /-- Projection from decoder hidden state to output features. -/
   output_layer : LinearSpec α hiddenSize outputSize
 
 -- GRU with residual connections
@@ -553,7 +551,6 @@ structure ResidualGRUModel (α : Type) (inputSize hiddenSize outputSize : Nat) w
   /-- output layer. -/
   output_layer : LinearSpec α hiddenSize outputSize
 
--- Residual GRU forward pass
 /--
 Forward pass for `ResidualGRUModel`.
 

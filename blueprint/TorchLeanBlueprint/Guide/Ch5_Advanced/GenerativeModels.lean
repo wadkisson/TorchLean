@@ -22,7 +22,7 @@ KL nonnegativity, nearest code facts, and generator/discriminator objective deco
 
 # Runtime Examples And Theory Statements
 
-The generative stack is split deliberately. The runnable examples exercise the training and data
+The generative stack is split by role. The runnable examples exercise the training and data
 path; the theorem declarations state the objective or sampler facts that can be checked in Lean.
 
 - *Diffusion*: the [diffusion command](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean) has
@@ -36,7 +36,7 @@ path; the theorem declarations state the objective or sampler facts that can be 
 - *GAN / LSGAN*: the [GAN warmup](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean) runs a small
   generator/discriminator objective; the theory side packages generator and discriminator losses.
 - *Autoencoder / MAE*: the [autoencoder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean) and
-  [masked autoencoder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean) demos connect to reconstruction
+  [masked autoencoder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean) examples connect to reconstruction
   and masked objective algebra.
 
 The formal layer currently proves objective and sampler facts. These are the pieces that future
@@ -71,7 +71,7 @@ constructor is in [NN.API.Models.Diffusion API](https://github.com/lean-dojo/Tor
 uses a compact residual convolutional epsilon predictor because it gives users a real noising and
 denoising training loop with an inspectable sampling artifact.
 
-A small CPU smoke run looks like:
+A small CPU runtime check looks like:
 
 ```
 lake exe torchlean diffusion --cpu --steps 5
@@ -137,7 +137,7 @@ Song et al., "Score-Based Generative Modeling through Stochastic Differential Eq
 
 # VAE And The ELBO Boundary
 
-The VAE example is intentionally modest. In
+The VAE example is kept modest. In
 [NN.Examples.Models.Generative.Vae API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean), the model
 trains on flattened CIFAR images with a supervised target that keeps reconstruction channels near
 the input and latent mean/log variance proxy channels near zero. That is a runnable beta VAE style
@@ -159,7 +159,7 @@ The proof statements are sharper:
 The precise VAE claim is: the runtime example trains a compact
 model shaped like a VAE, while the ML theory declarations prove algebraic and distributional facts about the
 VAE objective and diagonal reparameterization. That distinction is healthier than claiming that a
-tiny CIFAR smoke run formalizes all of variational inference.
+tiny CIFAR runtime check formalizes all of variational inference.
 
 The basic objective shape is:
 
@@ -234,10 +234,10 @@ The formal side is captured by two declaration groups:
   `generatorLoss_zero_of_fake_score_real` and `discriminatorLoss_zero_of_perfect_scores`.
 
 This gives us a clean citation line: TorchLean contains checked algebra for LSGAN style scalar
-objectives and a runnable generator/discriminator demo. Convergence and distribution-matching
+objectives and a runnable generator/discriminator example. Convergence and distribution-matching
 claims would require additional theorem layers.
 
-The objective packaging is deliberately simple:
+The objective packaging is kept simple:
 
 $$`\begin{aligned}
 \operatorname{generatorLoss}
@@ -253,7 +253,7 @@ $$`\begin{aligned}
 &\Longrightarrow \operatorname{generatorLoss}=0
 \end{aligned}`
 
-Those are small theorems, but they matter because they pin down which scalar objective the demo is
+Those are compact theorems, but they matter because they pin down which scalar objective the example is
 claiming to optimize.
 
 The original GAN reference is Goodfellow et al., "Generative Adversarial Nets" (NeurIPS 2014,
@@ -272,7 +272,7 @@ runtime path itself.
 The masked autoencoder in [the MAE example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean) is more
 architectural. It loads CIFAR image tensors, masks deterministic patches, embeds patch tokens with a
 small ViT style encoder, and trains a decoder head to reconstruct a flattened prefix of the image.
-This is a deliberately tiny ViT-MAE style path: real masking and patch tokens, but not a large
+This is a compact ViT-MAE style path: real masking and patch tokens, but not a large
 asymmetric MAE pretraining run.
 
 The paper anchor for MAE is He et al., "Masked Autoencoders Are Scalable Vision Learners" (CVPR

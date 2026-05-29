@@ -50,8 +50,8 @@ open NN.Verification.Json
 /--
 A closed scalar interval `[lo, hi]`.
 
-This intentionally stays compact: it is just enough to state and prove camera-parameter uncertainty
-theorems without pulling the 3D demo into a much larger interval-analysis framework.
+This module states and proves the camera-parameter uncertainty
+theorems without pulling the 3D example into a much larger interval-analysis framework.
 -/
 structure ScalarInterval (α : Type) where
   /-- Lower endpoint. -/
@@ -343,13 +343,13 @@ structure BoxCameraCert (α : Type) where
   /-- Claimed 2D box `[xmin,ymin,xmax,ymax]`. -/
   bbox : Box2D α
 
-/-- Claimed 2D box left edge. -/
+/-- Left edge `xmin` of the claimed 2D bounding box. -/
 def xmin {α : Type} (cert : BoxCameraCert α) : α := vecGet cert.bbox ⟨0, by decide⟩
-/-- Claimed 2D box top edge. -/
+/-- Top edge `ymin` of the claimed 2D bounding box. -/
 def ymin {α : Type} (cert : BoxCameraCert α) : α := vecGet cert.bbox ⟨1, by decide⟩
-/-- Claimed 2D box right edge. -/
+/-- Right edge `xmax` of the claimed 2D bounding box. -/
 def xmax {α : Type} (cert : BoxCameraCert α) : α := vecGet cert.bbox ⟨2, by decide⟩
-/-- Claimed 2D box bottom edge. -/
+/-- Bottom edge `ymax` of the claimed 2D bounding box. -/
 def ymax {α : Type} (cert : BoxCameraCert α) : α := vecGet cert.bbox ⟨3, by decide⟩
 
 /-- The pixel interval is contained in the claimed 2D box. -/
@@ -498,7 +498,7 @@ def certProjectZ {α : Type} [OfNat α 1] [Add α] [Mul α]
 def PositiveImageSize {α : Type} [OfNat α 0] [LT α] (cert : BoxCameraCert α) : Prop :=
   0 < cert.width ∧ 0 < cert.height
 
-/-- Basic sanity for the reported 2D box and tolerance. -/
+/-- Validate the reported 2D box and tolerance. -/
 def BBoxOrdered {α : Type} [OfNat α 0] [LE α] (cert : BoxCameraCert α) : Prop :=
   0 ≤ cert.tol ∧ xmin cert ≤ xmax cert ∧ ymin cert ≤ ymax cert
 
@@ -814,6 +814,7 @@ def vecFloatOfFlat (n : Nat) (xs : Array Float) :
     Spec.Tensor Float (NN.Tensor.Shape.Vec n) :=
   vecOfFn n (fun i => xs.getD i.val 0.0)
 
+/-- Reject a flat JSON tensor field whose length does not match the checker schema. -/
 def requireSize (ctx : String) (xs : Array Float) (expected : Nat) : IO Unit := do
   if xs.size != expected then
     throw <| IO.userError s!"{ctx}: expected {expected} floats, got {xs.size}"
@@ -855,7 +856,7 @@ def checkFile (path : String) : IO Bool := do
     IO.println s!"3D camera-box certificate rejected: {path}"
   pure ok
 
-/-- Convenience wrapper for CLI fixtures. -/
+/-- Check a camera-box certificate and raise a readable CLI error if it is rejected. -/
 def checkOrThrow (path : String) : IO Unit := do
   let ok ← checkFile path
   if !ok then

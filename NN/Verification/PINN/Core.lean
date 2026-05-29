@@ -44,13 +44,13 @@ open Json
 
 /-- Configuration parsed from a PINN certificate JSON. -/
 structure PinnCfg where
-  /-- pde. -/
+  /-- PDE identifier carried by the certificate. -/
   pde : String
-  /-- h. -/
+  /-- Grid spacing used by the exported finite-difference residual. -/
   h   : Float
-  /-- eps. -/
+  /-- Input perturbation radius for interval checking. -/
   eps : Float
-  /-- n Pts. -/
+  /-- Number of sample points encoded in `pts`. -/
   nPts : Nat
   /--
   Sample points as a length-`nPts` 1D tensor.
@@ -60,7 +60,7 @@ structure PinnCfg where
   -/
   pts : Spec.Tensor Float (.dim nPts .scalar)
 
-/-- Approximate equality for `Float` (used for lightweight sanity checks). -/
+/-- Approximate equality for `Float` used by certificate consistency checks. -/
 def approxEq (x y : Float) (tol : Float := 1e-5) : Bool :=
   let d := if x > y then x - y else y - x
   decide (d ≤ tol)
@@ -152,8 +152,8 @@ def seedInputFloat2D (ps : ParamStore Float) (x y : Float) (eps : Float) : Param
 /-
   Hessian/Laplacian helpers (2D)
   ------------------------------
-  Convenience wrappers to compute d2u/dx2, d2u/dy2, and their sum (Laplacian)
-  at the unique output node (id=5) from an already-seeded graph and params.
+  Helpers for computing d2u/dx2, d2u/dy2, and their sum (Laplacian) at the unique output node
+  (id=5) from an already-seeded graph and parameter store.
  -/
 
 /-- Compute (d2u/dx2, d2u/dy2) intervals at node id=5 when available.
@@ -194,6 +194,7 @@ def laplacianBounds2D (g : Graph) (ps : ParamStore Float) : Option (Float × Flo
   | some (lx, ux), none => some (lx, ux)
   | _, _ => none
 
+/-- Parse the JSON certificate consumed by the PINN verification CLI. -/
 def parseCert (j : Json) : Except String (PinnCfg × (List (Float × Float)) × (List (Float × Float))
   × (List (Float × (Float×Float) × (Float×Float) × (Float×Float)))) := do
   let o ← j.getObj?

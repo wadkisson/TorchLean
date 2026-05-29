@@ -14,14 +14,14 @@ public import NN.Runtime.Autograd.Train.IoLoader.Npy
 
 `NN.Runtime.Autograd.Train.IoLoader` is the public umbrella for file-backed training loaders.
 
-The implementation is split by responsibility:
+The loader surface has three parts:
 
 - `IoLoader.Common` contains small shared parser utilities and safety limits.
 - `IoLoader.Csv` contains CSV-to-tensor dataset readers.
 - `IoLoader.Npy` contains the supported NumPy `.npy` subset for vectors and matrices.
 
-Keeping this file as an umbrella preserves the public import path while avoiding a single large module
-that mixes CSV tokenization, NumPy header parsing, byte decoding, and tensor conversion.
+This umbrella keeps the import path stable while the parsing code stays close to the file format it
+checks.
 -/
 
 @[expose] public section

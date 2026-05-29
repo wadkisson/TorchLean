@@ -6,12 +6,12 @@ The proofs live under `NN/Proofs`; these tests have a different job. They run sm
 programs through the same public APIs, FFI paths, and CUDA kernels that users exercise in training
 and inference. That makes this directory useful for code Lean treats as a trust boundary: native
 CUDA kernels, external buffers, floating point execution, parser/serialization helpers, and CLI
-smoke tests.
+runtime checks.
 
 The suite is organized as follows:
 
 * `NN/Tests/Suite.lean` is the top-level executable umbrella.
-* `NN/Tests/Runtime/Floats` checks float autograd, model smoke tests, IR execution, PINN residuals,
+* `NN/Tests/Runtime/Floats` checks float autograd, model runtime checks, IR execution, PINN residuals,
   and other runtime regressions.
 * `NN/Tests/Runtime/Rationals` runs a small proof oriented scalar backend to catch semantic
   regressions without floating point noise.

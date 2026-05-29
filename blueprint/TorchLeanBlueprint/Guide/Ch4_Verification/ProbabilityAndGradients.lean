@@ -8,7 +8,7 @@ open Verso.Genre Manual
 tag := "probability-and-gradients"
 %%%
 
-Some proof declarations are intentionally small. They are not a full autograd or runtime
+Some proof declarations are compact. They are not a full autograd or runtime
 approximation development; they give reusable local facts: a probability kernel for diffusion, a
 linear layer gradient theorem, and activation derivative theorems. These pages are the little gears
 that larger model proofs reuse.
@@ -45,7 +45,7 @@ $$`\operatorname{forwardKernel}(a,b)(x)
 
 The exact schedule that chooses the coefficients belongs to the model spec. The probability proof
 material records the measure and kernel facts that can be reused independently of one executable
-diffusion demo. The important theorem names are:
+diffusion example. The important theorem names are:
 
 - `forwardNoising_eq_map`: the measure is the map of Gaussian noise through the affine noising
   function.
@@ -94,7 +94,7 @@ and `smooth_abs_deriv_correct`. The ReLU and ELU style theorems state their diff
 from kink points; the smooth activations state the ordinary derivative law everywhere their domains
 permit.
 
-These local theorems are intentionally not a replacement for the autograd tape proof. They are useful in a
+These local theorems are not a replacement for the autograd tape proof. They are useful in a
 different way. If a theorem only needs a local statement about one layer, it can cite a small local
 gradient theorem instead of pulling in the whole graph backprop layer.
 

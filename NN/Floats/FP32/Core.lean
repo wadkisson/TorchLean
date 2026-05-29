@@ -84,7 +84,7 @@ abbrev toReal (x : FP32) : ℝ := x.val
 
 /--
 Convenience constant: the largest finite magnitude representable by the binary32 parameters used by
-this model (i.e. roughly `(2 - 2^-23) * 2^127`).
+this model (i.e. approximately `(2 - 2^-23) * 2^127`).
 
 We keep this in `FP32` because it is a useful *proof-level* guard when you want to state “no
 overflow” side-conditions in a readable way.
@@ -94,7 +94,7 @@ noncomputable def maxFinite : ℝ :=
     neuralBpow binaryRadix (2^(NeuralPrecision.expBits NeuralPrecision.ieee_single - 1) - 1)
 
 /--
-Convenience constant: the smallest positive normal binary32 number (roughly `2^-126`).
+Convenience constant: the smallest positive normal binary32 number (approximately `2^-126`).
 
 Subnormals exist below this; this constant is mainly useful when you want to distinguish
 “normal-range” arguments from “subnormal-range” arguments in proofs.

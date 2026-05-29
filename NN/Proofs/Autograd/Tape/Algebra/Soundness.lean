@@ -248,9 +248,9 @@ with a proof that the shape at that position is `s`.
 
 /-- A typed index into a heterogeneous context `Γ`, carrying a proof of the expected shape `s`. -/
 structure Idx (Γ : List Shape) (s : Shape) where
-  /-- i. -/
+  /-- Position in the heterogeneous context. -/
   i : Fin Γ.length
-  /-- h. -/
+  /-- Proof that the selected context entry has shape `s`. -/
   h : Γ.get i = s
 
 /-- Read a tensor from a context at a typed index, casting along the stored shape equality. -/

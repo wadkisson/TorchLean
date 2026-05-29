@@ -13,7 +13,7 @@ public import NN.Proofs.Autograd.Tape.Algebra.Soundness
 
 Pure training-step algebra for proved autograd graphs.
 
-This file deliberately stays on the *mathematical* side of training:
+This file stays on the *mathematical* side of training:
 
 - `Graph.scalarLoss_grad_correct` specializes the tape/DAG backprop theorem to the scalar-loss
   convention used by training loops.
@@ -111,7 +111,7 @@ def step {Γ : List Shape} (params grads : TList α Γ) (lr : α) : TList α Γ 
 /--
 Cons-form unfolding of a context-level SGD step.
 
-This lemma is intentionally small but useful as documentation: the head tensor update is exactly
+This lemma is compact but useful as documentation: the head tensor update is exactly
 `subSpec p (scaleSpec g lr)`, and the tail recursively receives the same learning rate.
 -/
 @[simp] theorem step_cons {s : Shape} {Γ : List Shape} (p g : Tensor α s)

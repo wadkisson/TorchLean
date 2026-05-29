@@ -53,9 +53,9 @@ structure PinnLayer where
   inDim  : Nat
   /-- Output dimension. -/
   outDim : Nat
-  /-- weights. -/
+  /-- Layer weight matrix, shaped as PyTorch stores `Linear.weight`. -/
   weights : Tensor Float (.dim outDim (.dim inDim .scalar))
-  /-- bias. -/
+  /-- Layer bias vector. -/
   bias    : Tensor Float (.dim outDim .scalar)
 
 /-- A parsed PINN state dict together with the inferred TorchLean sequential PINN architecture. -/
@@ -98,7 +98,7 @@ Expected keys:
 - `layers.<i>.weight` and `layers.<i>.bias` for each layer index `i`
 - optional `meta.activation`
 
-Unlike fixed-shape demos, we infer `(outDim, inDim)` for each layer from the JSON matrix shape.
+Unlike fixed-shape examples, we infer `(outDim, inDim)` for each layer from the JSON matrix shape.
 -/
 def loadPinnState (j : Json) : Option PinnState := do
   -- Accepts both `{...}` and `{ "params": {...} }`.

@@ -31,7 +31,7 @@ We still keep the source files split by semantic layer:
   graph shape.
 - `NN.GraphSpec.Models.TorchLean.*` contains executable TorchLean constructors for models that are
   already useful as reusable autograd programs.
-- `NN.Examples.Models.*` contains runnable scripts and training demos.
+- `NN.Examples.Models.*` contains runnable scripts and training examples.
 
 That split avoids circular dependencies and keeps proofs honest, while this umbrella gives users a
 single architecture-facing import that includes both the broad spec catalog and the graph-authored

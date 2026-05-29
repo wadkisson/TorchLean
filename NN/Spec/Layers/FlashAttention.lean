@@ -26,7 +26,7 @@ choices.
 
 ## What is proved here?
 
-The theorems in this file are deliberately small but important:
+The theorems in this file are compact but important:
 
 - `onlineSoftmaxTiledAttention_eq_scaledDotProductAttention` proves the named FlashAttention
   algorithmic contract has the same denotation as standard attention.
@@ -169,8 +169,8 @@ The native runtime kernel is intended to compute the same row program in a fused
 2. compute the stabilized softmax normalization for that row;
 3. accumulate `Σ_j softmax(score_j) * V_j` directly into the output.
 
-`cudaLoopFlashAttention` is intentionally a **denotational target**, written with tensor
-combinators rather than CUDA thread/block syntax. The equalities below are definitional sanity
+`cudaLoopFlashAttention` is a **denotational target**, written with tensor
+combinators rather than CUDA thread/block syntax. The equalities below are definitional
 checks: they say the named fused operator denotes standard SDPA in the spec. They do not verify the
 CUDA source code, the online-softmax recurrence, or the memory-IO schedule. Those remain explicit
 runtime/FFI contracts tested against this target.

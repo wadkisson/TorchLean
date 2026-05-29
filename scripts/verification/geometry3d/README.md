@@ -1,6 +1,6 @@
-# Geometry3D Real Demo
+# Geometry3D Real-Image Certificate Path
 
-This is the Geometry3D demo for users. The Lean checker and theorem statements are under:
+This is the Geometry3D real-image path for users. The Lean checker and theorem statements are under:
 
 ```text
 NN/Verification/Geometry3D
@@ -11,7 +11,7 @@ JSON, ask Lean to check the exported tensor artifact, and render overlays for hu
 
 ## Real Model Path
 
-Run the real image smoke suite:
+Run the real-image certificate suite:
 
 ```bash
 python3 scripts/verification/regenerate_assets.py --group geometry3d-real --run
@@ -105,7 +105,7 @@ python3 scripts/verification/geometry3d/export_omni3d_box3d_cert.py \
 That path expects an external detector to have already produced `K`, image size, a 2D bbox, and
 `bbox3D` corners. The model and exporter are untrusted; Lean checks the final tensor artifact.
 
-## Bad Case Visual Demo
+## Bad Case Visual Check
 
 Run:
 

@@ -56,7 +56,7 @@ abbrev ΓElman (inputSize hiddenSize : Nat) : List Shape :=
 abbrev ssElmanCell (inputSize hiddenSize : Nat) : List Shape :=
   [.dim (inputSize + hiddenSize) .scalar, HShape hiddenSize, HShape hiddenSize]
 
-/-- Current input index. -/
+/-- Index of the current input vector in the Elman-cell context. -/
 def idxInput {inputSize hiddenSize : Nat} {ss : List Shape} :
     Idx (ΓElman inputSize hiddenSize ++ ss) (XShape inputSize) :=
   ⟨⟨0, by simp [ΓElman]⟩, by simp [ΓElman, XShape]⟩

@@ -13,7 +13,7 @@ public import NN.Verification.Util.Json
 
 Lean checker for per-example logit-margin certificates (`robust_margin_cert_v0_1`).
 
-This checker is intentionally lightweight: it does **not** re-run bound propagation.
+This checker is small and explicit: it does **not** re-run bound propagation.
 Instead, it verifies that the exported logit bounds imply the certified margin predicate:
 
   `logits_lo[label] > max_{j≠label} logits_hi[j]`
@@ -162,7 +162,7 @@ def checkWithTiming (path : String) (timing : Bool) (timingEvery : Nat) : IO Uni
       checkNatField "nominal_ok" counts.nominalOk
       checkNatField "certified_ok" counts.certifiedOk
 
-/-- Check a margin cert file with timing disabled (thin wrapper around `checkWithTiming`). -/
+/-- Check a margin certificate file with timing disabled. -/
 def check (path : String) : IO Unit :=
   checkWithTiming path false 0
 

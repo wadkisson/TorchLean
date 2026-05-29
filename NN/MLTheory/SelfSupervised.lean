@@ -24,7 +24,7 @@ The chapter contains:
 - JEPA-style joint-embedding prediction losses; and
 - VICReg/Barlow-Twins-style finite collapse guards.
 
-This layer is intentionally modest: these files formalize the objective-level contracts that model
+This layer is kept modest: these files formalize the objective-level contracts that model
 code should preserve, rather than claiming full optimization or population generalization guarantees.
 That keeps the statements reusable across ViT, convolutional, Mamba, or custom backbones.
 -/

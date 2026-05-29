@@ -7,10 +7,10 @@ TorchLean to CUDA, PyTorch, Julia, and Gymnasium style environments.
 Most downstream code should not import modules from this directory directly. Prefer:
 
 * `import NN` for the ordinary public surface,
-* `import NN.API.Runtime` for the stable runtime facade, or
-* `import NN.Entrypoint.Runtime` when you intentionally want the broad executable umbrella.
+* `import NN.API.Runtime` for the stable runtime API surface, or
+* `import NN.Entrypoint.Runtime` when you need the broad executable umbrella.
 
-There is deliberately no top level `NN.Runtime` Lean file. The project keeps public import
+There is no top level `NN.Runtime` Lean file. The project keeps public import
 surfaces under `NN.API.*` and `NN.Entrypoint.*` so that subsystem directories can contain
 implementation modules without creating competing umbrella names.
 
@@ -26,7 +26,7 @@ implementation modules without creating competing umbrella names.
 * `RL`: typed reinforcement learning runtimes, Gymnasium bridges, PPO helpers, and rollout
   boundary checks.
 * `External`: small process/Julia helpers used by executable integrations.
-* `Training`: lightweight training-log records shared by runtime examples and widgets.
+* `Training`: training-log records shared by runtime examples and widgets.
 
 ## Trust Boundaries
 

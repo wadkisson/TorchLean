@@ -31,7 +31,7 @@ Why we designed it this way:
 
 - We did not want separate "Float model code", "proof model code", and "verification model code"
   that slowly diverge and become inconsistent.
-- In practice, we iterate across phases: execute a small model, state the proof-level contract, then
+- In practice, we iterate across phases: execute a compact model, state the proof-level contract, then
   run verification bounds. Rewriting each model for each phase is error-prone.
 - A single scalar-polymorphic spec gives one source of truth for layers/models, while letting us
   swap numeric meaning by changing the scalar instance.
@@ -140,7 +140,7 @@ end Context
 instance {α : Type} [Context α] : DecidableRel ((· > ·) : α → α → Prop) :=
   Context.decidable_gt
 
--- Open for convenience
+-- Expose scalar math operations inside the standard context instances below.
 open MathFunctions
 
 /-- `MathFunctions` instance for Lean's `Float` (runtime-oriented backend). -/
@@ -218,7 +218,7 @@ instance : Coe Nat ℚ where
   coe := fun n => (n : Nat)
 
 /-!
-## A lightweight `ℚ` backend
+## Rational Backend
 
 `Context` includes transcendental functions and real-valued exponentiation (`Pow α α`) because many
 models (softmax, tanh, etc.) need them when instantiated over `Float` / `ℝ` / interval scalars.
@@ -242,7 +242,7 @@ Current policy:
 namespace NN.Spec.RationalAlgebraic
 
 /--
-`Pow ℚ ℚ` instance used for the lightweight rational backend.
+`Pow ℚ ℚ` instance used for the rational backend.
 
 Policy: support `x^y` only when `y` is an integer rational (`y.den = 1`); otherwise return `0`.
 The instance is scoped so it is unavailable unless the caller explicitly opens
@@ -256,7 +256,7 @@ scoped instance instPowRatRat : Pow ℚ ℚ where
       0
 
 /--
-`MathFunctions ℚ` dictionary for the lightweight rational backend.
+`MathFunctions ℚ` dictionary for the rational backend.
 
 Only `abs` is meaningful; other transcendental functions are defined as `0` in this scoped backend
 and should not be used for semantic claims. Keeping this scoped makes unsupported transcendental rational models fail at
@@ -275,7 +275,7 @@ scoped instance instMathFunctionsRat : MathFunctions ℚ where
   sinh := fun _ => 0
 
 /--
-`Numbers ℚ` dictionary for the lightweight rational backend.
+`Numbers ℚ` dictionary for the rational backend.
 
 The transcendentals (`log10`, etc.) are defined as `0` in this scoped backend; the basic rational
 literals are exact.

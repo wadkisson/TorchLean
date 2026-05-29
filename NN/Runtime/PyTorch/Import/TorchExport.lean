@@ -113,17 +113,17 @@ def jsonNat (ctx : String) : Json → Except String Nat
       | none => .error s!"PyTorch graph import: {ctx}: expected natural number, got {n}"
   | j => typeError ctx "natural number" j
 
-/-- Interpret a JSON string. -/
+/-- Decode a JSON value as a string, reporting the importing context on mismatch. -/
 def jsonString (ctx : String) : Json → Except String String
   | .str s => .ok s
   | j => typeError ctx "string" j
 
-/-- Interpret a JSON array. -/
+/-- Decode a JSON value as an array, reporting the importing context on mismatch. -/
 def jsonArray (ctx : String) : Json → Except String (Array Json)
   | .arr xs => .ok xs
   | j => typeError ctx "array" j
 
-/-- Interpret a JSON object. -/
+/-- Decode a JSON value as an object/state dictionary. -/
 def jsonObject (ctx : String) : Json → Except String StateDict
   | .obj o => .ok o
   | j => typeError ctx "object" j
@@ -162,17 +162,21 @@ def parseShape (ctx : String) (j : Json) : Except String Shape := do
 def parseParents (ctx : String) (j : Json) : Except String (List Nat) :=
   parseNatList ctx j
 
+/-- Read a natural-number field from a parsed Torch export JSON object. -/
 def natField (ctx key : String) (o : StateDict) : Except String Nat := do
   jsonNat s!"{ctx}.{key}" (← field ctx key o)
 
+/-- Read a Boolean field from a parsed Torch export JSON object. -/
 def boolField (ctx key : String) (o : StateDict) : Except String Bool := do
   match ← field ctx key o with
   | .bool b => pure b
   | bad => typeError s!"{ctx}.{key}" "boolean" bad
 
+/-- Read a shape-valued field from a parsed Torch export JSON object. -/
 def shapeField (ctx key : String) (o : StateDict) : Except String Shape := do
   parseShape s!"{ctx}.{key}" (← field ctx key o)
 
+/-- Read a natural-number list field from a parsed Torch export JSON object. -/
 def natListField (ctx key : String) (o : StateDict) : Except String (List Nat) := do
   parseNatList s!"{ctx}.{key}" (← field ctx key o)
 
@@ -201,7 +205,7 @@ def parseValueShape (ctx : String) (o : StateDict) : Except String ValueShape :=
 /--
 Parse a TorchLean IR op kind.
 
-The schema uses a stable string tag plus op-specific scalar fields. We intentionally avoid trying
+The schema uses a stable string tag plus op-specific scalar fields. We avoid trying
 to parse raw PyTorch operator names here; the Python adapter is responsible for translating
 `torch.ops.aten.*` / FX targets into these TorchLean tags.
 -/
@@ -504,7 +508,7 @@ def parseGraph (j : Json) : Except String CapturedGraph := do
 /--
 Guarantee exposed by the parser: a successfully parsed graph is well-shaped.
 
-This is intentionally small but important. It is the theorem downstream verification/export code can
+This theorem is compact but important. It is the theorem downstream verification/export code can
 quote when it receives a graph artifact through this importer.
 -/
 theorem parseGraph_wellShaped {j : Json} {cg : CapturedGraph}

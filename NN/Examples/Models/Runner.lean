@@ -13,7 +13,7 @@ public import NN.Examples.Data.Loaders.Csv
 public import NN.Examples.Data.Loaders.Npy
 public import NN.Examples.Data.Loaders.Cifar10Images
 public import NN.Examples.Interop.PyTorch.Roundtrip
-public import NN.Examples.Interop.PyTorch.TorchExportSmoke
+public import NN.Examples.Interop.PyTorch.TorchExportCheck
 
 /-!
 # TorchLean Example Runner
@@ -48,7 +48,7 @@ def usage : String :=
     , "  gpt_adder"
     , "  mamba"
     , "  ppo_cartpole | ppo_gridworld | ppo_pong_ram | dqn_replay"
-    , "  pytorch_roundtrip | pytorch_export_smoke"
+    , "  pytorch_roundtrip | pytorch_export_check"
     , "  data_csv | data_npy | data_cifar10"
     , "  floats_arb_ieee_compare | float32_modes | graphspec"
     , "  ir_axis_ops | one_semantic_universe | torch_ir_pytorch"
@@ -82,8 +82,8 @@ def usage : String :=
     , "  lake exe torchlean pytorch_roundtrip --model mlp --action import"
     , "  lake exe torchlean data_csv --epochs 1 --batch 5 --dtype float --backend eager"
     , "  lake exe torchlean data_npy --epochs 1 --batch 5 --dtype float --backend eager"
-    , "  lake exe torchlean data_cifar10 --quick --epochs 1 --batch 4 --train-size 8 --n-total 20"
-    , "  lake exe torchlean pytorch_export_smoke"
+    , "  lake exe torchlean data_cifar10 --check-only --epochs 1 --batch 4 --train-size 8 --n-total 20"
+    , "  lake exe torchlean pytorch_export_check"
     , "  lake exe torchlean float32_modes"
     , "  lake exe torchlean graphspec --backend eager"
     , "  lake exe torchlean ir_axis_ops --dtype float --backend eager"
@@ -157,7 +157,7 @@ def runCmd (cmd : String) (args : List String) : IO UInt32 := do
   | "pytorch_roundtrip" =>
       NN.Examples.Interop.PyTorch.Roundtrip.main args
       pure 0
-  | "pytorch_export_smoke" => NN.Examples.Interop.PyTorch.TorchExportSmoke.main args
+  | "pytorch_export_check" => NN.Examples.Interop.PyTorch.TorchExportCheck.main args
   | "floats_arb_ieee_compare" => NN.Examples.Advanced.Floats.ArbIEEEExecCompare.main args
   | "float32_modes" =>
       NN.Examples.Advanced.Floats.Float32Modes.main args

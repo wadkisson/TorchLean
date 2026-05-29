@@ -4,16 +4,16 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 
 ## Summary
 
-- Modules: `873`
-- Import edges: `3221`
-- Internal import edges: `2669`
-- Public imports: `2886`
-- Private imports: `335`
-- Critical-path length over internal imports: `33`
+- Modules: `1033`
+- Import edges: `3573`
+- Internal import edges: `3014`
+- Public imports: `3228`
+- Private imports: `345`
+- Critical-path length over internal imports: `86`
 - Findings: `0` (`0` errors, `0` warnings)
-- Lean files: `873`
-- Lean source lines: `276295`
-- Declaration headers: `10946`
+- Lean files: `1033`
+- Lean source lines: `280863`
+- Declaration headers: `10951`
 - Theorem/lemma headers: `1970`
 
 ## Top Fan-In Modules
@@ -37,33 +37,33 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 - `NN.Spec.Models`: `26` imports
 - `NN.Examples.Zoo`: `24` imports
 - `NN.MLTheory.API`: `23` imports
-- `NN.Tests.Runtime.Floats.ModelsSmoke`: `19` imports
+- `NN.Tests.Runtime.Floats.ModelsCheck`: `19` imports
 - `NN.Spec.Layers`: `18` imports
 - `NN.Entrypoint.Widgets`: `17` imports
 - `NN.Floats.IEEEExec`: `17` imports
 
 ## Layer Edges
 
-- `NN.Spec` -> `NN.Spec`: `297`
-- `NN.Runtime` -> `NN.Runtime`: `267`
-- `NN.MLTheory` -> `NN.MLTheory`: `196`
-- `NN.Proofs` -> `NN.Proofs`: `196`
-- `NN.Floats` -> `NN.Floats`: `144`
+- `NN.Runtime` -> `NN.Runtime`: `346`
+- `NN.Spec` -> `NN.Spec`: `313`
+- `NN.Proofs` -> `NN.Proofs`: `261`
+- `NN.MLTheory` -> `NN.MLTheory`: `221`
+- `NN.Floats` -> `NN.Floats`: `168`
 - `NN.Examples` -> `NN.Examples`: `142`
+- `NN.API` -> `NN.API`: `140`
 - `NN.CI` -> `NN.Spec`: `88`
+- `NN.Verification` -> `NN.Verification`: `84`
 - `NN.MLTheory` -> `NN.Spec`: `76`
 - `NN.CI` -> `NN.MLTheory`: `69`
-- `NN.Verification` -> `NN.Verification`: `69`
-- `NN.API` -> `NN.API`: `57`
 - `NN.Proofs` -> `NN.Spec`: `57`
-- `NN.Tests` -> `NN.Tests`: `52`
+- `NN.Tests` -> `NN.Tests`: `54`
 - `NN.CI` -> `NN.Floats`: `49`
 - `NN.Examples` -> `NN.API`: `48`
 - `NN.Examples` -> `NN`: `45`
 - `NN.Entrypoint` -> `NN.Proofs`: `42`
 - `NN.Tests` -> `NN.Runtime`: `42`
 - `NN.Runtime` -> `NN.Spec`: `37`
-- `NN.CI` -> `NN.Proofs`: `36`
+- `NN.API` -> `NN.Spec`: `36`
 
 ## Findings
 

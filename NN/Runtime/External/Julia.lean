@@ -63,7 +63,7 @@ def resolveJuliaCmd (juliaCmd : String := "julia") : IO String := do
 /--
 Check whether Julia is available by running `julia --version`.
 
-This is intentionally conservative: any exception (including “executable not found”) is treated as
+This is conservative by design: any exception (including “executable not found”) is treated as
 “not available”.
 -/
 def isAvailable (juliaCmd : String := "julia") : IO Bool := do
@@ -73,7 +73,7 @@ def isAvailable (juliaCmd : String := "julia") : IO Bool := do
 /--
 Require Julia to be available and return the resolved command.
 
-This is suitable for demo runners that want a friendly error message when Julia is missing.
+This is suitable for example runners that want a friendly error message when Julia is missing.
 -/
 def ensureAvailable (juliaCmd : String := "julia") : IO String := do
   let cmd ← resolveJuliaCmd juliaCmd
@@ -98,8 +98,8 @@ def run (args : Array String) (cwd : Option String := some ".") (juliaCmd : Stri
 /--
 Run Julia and parse `stdout` as JSON.
 
-This is a convenience wrapper used by “certificate producer” scripts that print a single JSON
-payload to stdout.
+Certificate producer scripts commonly print one JSON payload to stdout; this entrypoint checks the
+Julia process and parses that payload.
 -/
 def runJson (args : Array String) (cwd : Option String := some ".") (juliaCmd : String := "julia") :
     IO Json := do

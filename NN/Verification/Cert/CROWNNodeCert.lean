@@ -66,58 +66,13 @@ the artifact, compare decimal-serialized floats with an explicit tolerance, and 
 requirements before invoking the semantic checker.
 -/
 
-/-!
-`CROWNNodeCertificate` is the in-memory representation of a node-wise CROWN certificate read from JSON.
-
-This is part of the public surface of the checker because `readCROWNNodeCertificate` returns it,
-and because the blueprint points to it as the “shape of the artifact” being checked.
--/
-structure CROWNNodeCertificate where
-  /-- Affine-propagation context, including the chosen input node and flattened input dimension. -/
-  ctx : AffineCtx
-  /-- Optional per-node interval bounds used by nonlinear CROWN steps. -/
-  ibp : Array (Option (FlatBox Float))
-  /-- Optional per-node affine lower/upper bounds. -/
-  crown : Array (Option (FlatAffineBounds Float))
-  /-- Optional per-node α values for ReLU lower relaxations. -/
-  alpha : Array (Option (FlatVec Float))
+/-- In-memory representation of a node-wise α-CROWN certificate read from JSON. -/
+abbrev CROWNNodeCertificate := CROWNNodeCoreCertificate
 
 /-- Read a CROWN node certificate from JSON on disk. -/
 def readCROWNNodeCertificate (g : Graph) (path : String) : IO CROWNNodeCertificate := do
   let topObj ← readJsonObjectFile path
-  let ctxObj ← expectFieldObj topObj "ctx" "top-level"
-  let inputId ← expectFieldNat ctxObj "inputId" "ctx"
-  let inputDim ← expectFieldNat ctxObj "inputDim" "ctx"
-  let ctx : AffineCtx := { inputId := inputId, inputDim := inputDim }
-
-  let ibpArr ← expectFieldArray topObj "ibp" "top-level"
-  let crownArr ← expectFieldArray topObj "crown" "top-level"
-  let alphaArr ←
-    match ← optionalField? topObj "alpha" "top-level" with
-    | none => pure (Array.replicate g.nodes.size Json.null)
-    | some alphaJ => expectArray alphaJ "top-level.alpha"
-
-  if ibpArr.size ≠ g.nodes.size then
-    throw <| IO.userError s!"ibp length {ibpArr.size} ≠ g.nodes.size {g.nodes.size}"
-  if crownArr.size ≠ g.nodes.size then
-    throw <| IO.userError s!"crown length {crownArr.size} ≠ g.nodes.size {g.nodes.size}"
-  if alphaArr.size ≠ g.nodes.size then
-    throw <| IO.userError s!"alpha length {alphaArr.size} ≠ g.nodes.size {g.nodes.size}"
-
-  let mut ibp : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
-  let mut crown : Array (Option (FlatAffineBounds Float)) := Array.mkEmpty g.nodes.size
-  let mut alpha : Array (Option (FlatVec Float)) := Array.mkEmpty g.nodes.size
-
-  for i in [0:g.nodes.size] do
-    let outDim := g.nodes[i]!.outShape.size
-    let ibpEntry ← parseFlatBox? outDim ibpArr[i]!
-    ibp := ibp.push ibpEntry
-    let crownEntry ← parseAffineBounds? ctx.inputDim outDim crownArr[i]!
-    crown := crown.push crownEntry
-    let alphaEntry ← parseFlatVec? outDim alphaArr[i]!
-    alpha := alpha.push alphaEntry
-
-  pure { ctx := ctx, ibp := ibp, crown := crown, alpha := alpha }
+  parseCROWNNodeCoreCertificate g topObj
 
 /-- Check the local CROWN enclosure condition for one node against a certificate entry. -/
 def checkCROWNNode (g : Graph) (ps : ParamStore Float)
@@ -126,48 +81,9 @@ def checkCROWNNode (g : Graph) (ps : ParamStore Float)
     (certCrown : Array (Option (FlatAffineBounds Float)))
     (ctx : AffineCtx)
     (id : Nat) (tol : Float) : IO Bool := do
-  let node := g.nodes[id]!
-  let needsParents :=
-    match node.kind with
-    | .input | .const _ => false
-    | _ => true
-  if needsParents && !(parentsOk g certCrown id) then
-    IO.eprintln s!"[CROWNNodeCert] node {id}: parent affine bounds missing or not topo"
-    return false
-
-  let certB? := certCrown[id]!
   let computed? :=
     alphaCrownStepNode? (α := Float) g.nodes ps certIbp certAlpha certCrown ctx id
-
-  match certB?, computed? with
-  | none, _ =>
-      IO.eprintln s!"[CROWNNodeCert] node {id}: certificate missing (null)"
-      pure false
-  | _, none =>
-      IO.eprintln s!"[CROWNNodeCert] node {id}: Lean propagation produced no affine bound"
-      pure false
-  | some certB, some leanB =>
-      if certB.inDim ≠ ctx.inputDim then
-        IO.eprintln
-          s!"[CROWNNodeCert] node {id}: cert inDim {certB.inDim} ≠ ctx.inputDim {ctx.inputDim}"
-        pure false
-      else if certB.outDim ≠ node.outShape.size then
-        IO.eprintln
-          (s!"[CROWNNodeCert] node {id}: cert outDim {certB.outDim} ≠ " ++
-            s!"outShape.size {node.outShape.size}")
-        pure false
-      else if leanB.outDim ≠ node.outShape.size then
-        IO.eprintln
-          (s!"[CROWNNodeCert] node {id}: Lean outDim {leanB.outDim} ≠ " ++
-            s!"outShape.size {node.outShape.size}")
-        pure false
-      else if approxEqFlatAffineBounds certB leanB tol then
-        pure true
-      else
-        IO.eprintln s!"[CROWNNodeCert] mismatch at node {id} ({repr node.kind})"
-        IO.eprintln s!"  cert: {prettyAffineBounds certB}"
-        IO.eprintln s!"  lean: {prettyAffineBounds leanB}"
-        pure false
+  checkCROWNLikeNode "CROWNNodeCert" g certIbp certCrown ctx id tol computed?
 
 /--
 Check a per-node α-CROWN certificate against Lean's propagation rules.

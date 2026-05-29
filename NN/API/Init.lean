@@ -28,7 +28,7 @@ open Spec
 /-!
 ## Tensor Initialization Helpers
 
-This module is a thin wrapper around `Runtime.Autograd.Torch.Init` that returns TorchLean
+This module exposes `Runtime.Autograd.Torch.Init` through TorchLean
 `Spec.Tensor`s with shapes tracked in the type.
 
 All initializers are deterministic given an explicit `seed : Nat`, which is convenient for:

@@ -179,30 +179,30 @@ theorem interval_mul_sound {x y a b c d : ℝ}
 
 /-! ### ReLU Interval Soundness -/
 
-/-- ReLU function: max(0, x) -/
+/-- Real-valued ReLU used by the interval soundness lemmas. -/
 def relu (x : ℝ) : ℝ := max 0 x
 
-/-- ReLU is monotone -/
+/-- Monotonicity of ReLU on real inputs. -/
 theorem relu_monotone {x y : ℝ} (h : x ≤ y) : relu x ≤ relu y := by
   unfold relu
   exact max_le_max_left 0 h
 
-/-- ReLU is non-negative -/
+/-- ReLU outputs are always nonnegative. -/
 theorem relu_nonneg (x : ℝ) : 0 ≤ relu x := by
   unfold relu
   exact le_max_left 0 x
 
-/-- If x ≤ 0, then relu(x) = 0 -/
+/-- On the nonpositive branch, ReLU evaluates to zero. -/
 theorem relu_of_nonpos {x : ℝ} (h : x ≤ 0) : relu x = 0 := by
   unfold relu
   exact max_eq_left h
 
-/-- If 0 ≤ x, then relu(x) = x -/
+/-- On the nonnegative branch, ReLU is the identity function. -/
 theorem relu_of_nonneg {x : ℝ} (h : 0 ≤ x) : relu x = x := by
   unfold relu
   exact max_eq_right h
 
-/-- ReLU interval: if x ∈ [l, u], then relu(x) ∈ [max(0,l), max(0,u)] -/
+/-- ReLU maps an input interval `[l,u]` into `[max 0 l, max 0 u]`. -/
 theorem interval_relu_sound {x l u : ℝ} (h : inInterval x l u) :
     inInterval (relu x) (max 0 l) (max 0 u) := by
   unfold inInterval relu
@@ -212,17 +212,17 @@ theorem interval_relu_sound {x l u : ℝ} (h : inInterval x l u) :
 
 /-! ### Square Interval Soundness -/
 
-/-- Square function -/
+/-- Squaring function used by interval propagation lemmas. -/
 def square (x : ℝ) : ℝ := x * x
 
-/-- Square is non-negative -/
+/-- Squares over the reals are nonnegative. -/
 theorem square_nonneg (x : ℝ) : 0 ≤ square x := mul_self_nonneg x
 
 /-- If 0 ≤ a ≤ b, then a² ≤ b² -/
 theorem square_le_square_of_nonneg {a b : ℝ} (ha : 0 ≤ a) (hab : a ≤ b) :
     square a ≤ square b := mul_self_le_mul_self ha hab
 
-/-- Minimum square in an interval -/
+/-- Lower endpoint for the range of `x ↦ x^2` over an interval. -/
 noncomputable def intervalSquareMin (l u : ℝ) : ℝ :=
   if l < 0 then
     if 0 < u then 0

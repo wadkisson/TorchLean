@@ -30,25 +30,24 @@ These lemmas are infrastructure: they should not encode op-specific logic. Per-o
 ## Main definitions
 
 - `throw_bind_ne_ok`: eliminates impossible success branches after `throw`.
-- `NoMSELoss`: side condition for semantic equivalence theorems that intentionally exclude `.mse_loss`.
+- `NoMSELoss`: side condition for semantic equivalence theorems over fragments that exclude `.mse_loss`.
 - `dValsOfCtx_*`: typed-context to IR-array bridge lemmas.
 - `denoteAllState_*` helpers: semantic equivalence bridges between compiled state and IR denotation tables.
 
 ## Implementation notes
 
-- We keep this module deliberately stable: it is shared infrastructure, so predictable proof contracts
+- This module is shared infrastructure: predictable proof contracts
   matter more than clever proof tricks.
 - Many lemmas here are proof-irrelevance/indexing bridges; these are repetitive but they remove a
   lot of friction from op-specific proofs.
-- Collecting these utilities in one place avoids duplicated brittle simp chains across correctness
-  modules.
+- Collecting these utilities in one place gives op-specific correctness modules shared rewrite and
+  indexing lemmas instead of repeated local proof scripts.
 - These files can build slowly because they connect two representations at once: typed `TList`
   contexts on the compiled side and dynamically shaped `DVal` arrays on the IR side. Most of the
   cost is not arithmetic; it is Lean checking that shape casts, array indices, and proof-irrelevant
   casts line up exactly.
-- When the same proof pattern appears in
-  multiple operator files. The best long-term direction is fewer ad-hoc `simp` scripts in the op
-  proofs and more named lemmas with clear contracts.
+- When the same proof pattern appears in multiple operator files, prefer a named lemma with a clear
+  contract over another local `simp` script.
 
 ## Tags
 
@@ -93,7 +92,7 @@ def NoMSELoss (g : NN.IR.Graph) : Prop :=
 /--
 If a `do`-chain begins with `throw`, it cannot produce an `.ok` result.
 
-This is a small convenience lemma used throughout the compiled-correctness proofs to close
+This lemma is used throughout the compiled-correctness proofs to close
 impossible branches where compilation would have thrown an error message.
 -/
 theorem throw_bind_ne_ok {β γ : Type} {msg : String} {k : β → Except String γ} {v : γ}

@@ -15,7 +15,7 @@ public import NN.Spec.Module.Linear
 PyTorch code generation helpers.
 
 This module defines shared string-building utilities used by the PyTorch bridge and round-trip
-demos. It emits readable Python `nn.Module` code (optionally with weights embedded) and centralizes
+examples. It emits readable Python `nn.Module` code (optionally with weights embedded) and centralizes
 the common prelude used by the example MLP/CNN/Transformer exporters under
 `NN.Examples.Interop.PyTorch.{MLP,CNN,Transformer}.Export`.
 
@@ -56,7 +56,7 @@ open SpecChain
 Metadata for a generated PyTorch model snippet.
 
 Most exporters in `NN/Runtime/PyTorch/Export/*` produce a Python string as their final artifact. We keep a
-small structured record alongside that string so demos can report shapes/layer counts and decide
+small structured record alongside that string so examples can report shapes/layer counts and decide
 whether weights were embedded.
 -/
 structure PyTorchExportMetadata (α : Type) (s t : Shape) where
@@ -68,7 +68,7 @@ structure PyTorchExportMetadata (α : Type) (s t : Shape) where
   outputShape : Shape
   /-- Count of primitive layers/ops in the model (exporter-specific). -/
   layerCount : Nat
-  /-- A list of operation tags used for lightweight reporting in demos. -/
+  /-- A list of operation tags used for summary reporting in examples. -/
   operationTypes : List String
   /-- Whether the exporter embedded a `state_dict` literal in the emitted Python. -/
   hasWeights : Bool
@@ -94,12 +94,12 @@ def indent8 (s : String) : String := indent 8 s
 ## Common boilerplate fragments
 
 Many exporters emit the same small pieces of Python: `@property` metadata and a `get_model_info`
-dictionary. Shared boilerplate keeps the hand-written demo exporters
+dictionary. Shared boilerplate keeps the hand-written example exporters
 and the more general IR exporter.
 -/
 
 /--
-Emit a standard `get_model_info` method used by most TorchLean PyTorch demo modules.
+Emit a standard `get_model_info` method used by most TorchLean PyTorch example modules.
 
 `extraFields` are inserted after the `"model_name"` entry. Each element is `(key, valueExpr)` where
 `valueExpr` is emitted verbatim as Python code (e.g. `"self.input_shape"` or `"self.hidden_dim"`).
@@ -229,7 +229,7 @@ def tensor4DToPy {a b c d : Nat} (t : Tensor Float (.dim a (.dim b (.dim c (.dim
 /--
 Best-effort conversion of a float tensor to a Python list literal.
 
-This is a simple recursive printer used for demos and small regression tests; it is not intended
+This is a simple recursive printer used for examples and small regression tests; it is not intended
 to be fast.
 -/
 def tensorToPyString {s : Shape} (t : Tensor Float s) : String :=
@@ -461,7 +461,7 @@ def generateBasePyTorchModule (className : String) (docstring : String) : String
       , indent4 "raise NotImplementedError(\"Subclasses must implement operation_types\")"
       ]
 
-/-- Emit Python helpers for saving/loading state dictionaries and lightweight checkpoints. -/
+/-- Emit Python helpers for saving/loading state dictionaries and JSON checkpoints. -/
 def generateWeightLoadingUtils : String :=
   joinLines [
     "def load_weights_from_dict(model: nn.Module, state_dict: dict):",
@@ -486,7 +486,7 @@ def generateWeightLoadingUtils : String :=
     indent2 "return model"
   ]
 
-/-- Emit lightweight Python helpers for validating exported models. -/
+/-- Emit Python helpers for validating exported models. -/
 def generateTestingUtils : String :=
   joinLines [
     "def test_model_forward(model: nn.Module, input_shape: Tuple[int, ...], num_tests: int = 5):",
@@ -583,7 +583,7 @@ def generateCompletePyTorchExport (className : String) (docstring : String) : St
 /--
 Export a `SpecChain` to PyTorch and bundle the result in a metadata record.
 
-This is the "one call" entrypoint used by some demos.
+This is the "one call" entrypoint used by some examples.
 -/
 def exportGeneralModel {α : Type} {s t : Shape}
   (chain : SpecChain α s t) (className : String := "GeneralModel") : PyTorchExportMetadata α s t :=

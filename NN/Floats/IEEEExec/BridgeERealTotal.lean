@@ -52,17 +52,17 @@ noncomputable def toEReal? (x : IEEE32Exec) : Option EReal :=
   else
     some (toReal x : EReal)
 
-/-- Quick bridge: `toEReal?` is `none` exactly on NaN. -/
+/-- `toEReal?` is `none` exactly on NaN. -/
 theorem toEReal?_eq_none_iff_isNaN_eq_true (x : IEEE32Exec) :
     toEReal? x = none ↔ isNaN x = true := by
   cases hnan : isNaN x <;> cases hinf : isInf x <;> simp [toEReal?, hnan, hinf]
 
-/-- Quick bridge: NaNs stay `none`. -/
+/-- NaNs stay outside the extended-real interpretation. -/
 theorem toEReal?_eq_none_of_isNaN_eq_true (x : IEEE32Exec) (hx : isNaN x = true) :
     toEReal? x = none := by
   simp [toEReal?, hx]
 
-/-- Quick bridge: `isInf` rules out NaN. -/
+/-- A value classified as infinity is not classified as NaN. -/
 theorem isNaN_eq_false_of_isInf_eq_true (x : IEEE32Exec) (hx : isInf x = true) :
     isNaN x = false := by
   -- `isInf` implies `fracField x == 0`, hence `fracField x != 0` is false.
@@ -77,7 +77,7 @@ theorem isNaN_eq_false_of_isInf_eq_true (x : IEEE32Exec) (hx : isInf x = true) :
   -- With `fracField x != 0 = false`, `isNaN` is false regardless of the exponent bit.
   simp [isNaN, hfracNe]
 
-/-- Quick bridge: finite means neither NaN nor Inf. -/
+/-- A non-NaN, non-infinite value is finite. -/
 theorem isFinite_eq_true_of_isNaN_eq_false_of_isInf_eq_false (x : IEEE32Exec)
     (hnan : isNaN x = false) (hinf : isInf x = false) :
     isFinite x = true := by
@@ -103,7 +103,7 @@ theorem isFinite_eq_true_of_isNaN_eq_false_of_isInf_eq_false (x : IEEE32Exec)
             simp [hnan]  at this
           exact this.elim
 
-/-- Quick bridge: finite values coerce to `EReal` via `toReal`. -/
+/-- Finite executable floats coerce to `EReal` through their real interpretation. -/
 theorem toEReal?_eq_some_toReal_of_isFinite_eq_true (x : IEEE32Exec) (hx : isFinite x = true) :
     toEReal? x = some (toReal x : EReal) := by
   have hne : expField x ≠ expAllOnes := (bne_iff_ne).1 (by simpa [isFinite] using hx)
@@ -112,7 +112,7 @@ theorem toEReal?_eq_some_toReal_of_isFinite_eq_true (x : IEEE32Exec) (hx : isFin
   have hinf : isInf x = false := by simp [isInf, hexpFalse]
   simp [toEReal?, hnan, hinf]
 
-/-- Quick bridge: `add` becomes `fp32Round` in `EReal`. -/
+/-- In the finite case, executable addition agrees with rounded real addition in `EReal`. -/
 theorem toEReal?_add_eq_ite (x y : IEEE32Exec) :
     toEReal? (add x y) =
       if isNaN (add x y) then
@@ -139,7 +139,7 @@ theorem toEReal?_add_eq_ite (x y : IEEE32Exec) :
           unfold toEReal?
           rw [hnan, hinf, hrealE]
 
-/-- Quick bridge: `mul` becomes `fp32Round` in `EReal`. -/
+/-- In the finite case, executable multiplication agrees with rounded real multiplication in `EReal`. -/
 theorem toEReal?_mul_eq_ite (x y : IEEE32Exec) :
     toEReal? (mul x y) =
       if isNaN (mul x y) then

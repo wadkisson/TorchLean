@@ -163,15 +163,15 @@ scoped[ApproxTol] notation:50 spec " ≈ᵀ[" toSpec ", " tol "] " runtime =>
 
 /-- Packaged approximation witness (defaults to Linf on spec tensors). -/
 structure Witness (α : Type) (s : Shape) where
-  /-- to Spec. -/
+  /-- Map a runtime scalar into the specification scalar domain. -/
   toSpec : α → SpecScalar
-  /-- spec. -/
+  /-- Specification tensor. -/
   spec : SpecTensor s
-  /-- runtime. -/
+  /-- Runtime tensor being compared with the specification tensor. -/
   runtime : Tensor α s
-  /-- eps. -/
+  /-- Absolute error budget for the Linf comparison. -/
   eps : SpecScalar
-  /-- bound. -/
+  /-- Checked approximation statement connecting `spec` and `runtime`. -/
   bound : approxWith (α := α) (toSpec := toSpec) (norm := linfNorm) spec runtime eps
 
 /-- Map NeuralFloat tensors to spec scalars. -/

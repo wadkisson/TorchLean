@@ -23,8 +23,8 @@ The client is compact and reusable across examples:
 - validate observations/rewards/flags against a Lean-side trust-boundary contract
   (`Runtime.RL.Boundary.Contract`).
 
-We use a small startup handshake (`describe`) to sanity-check that the external environment's
-declared spaces match the Lean-side expectations (`obsShape`, `nActions`).
+Startup performs a `describe` handshake, checking that the external environment's declared spaces
+match the Lean-side expectations (`obsShape`, `nActions`).
 
 References:
 - Gymnasium API docs (`reset`/`step`, `terminated` vs `truncated`): https://gymnasium.farama.org/
@@ -47,7 +47,7 @@ open Json
 /-!
 ## Low-level client
 
-`Client` is a thin wrapper around `IO.Process.Child` that:
+`Client` owns an `IO.Process.Child` and:
 
 - sends a JSON object (one line) to stdin,
 - reads one JSON object response from stdout,
@@ -64,7 +64,7 @@ abbrev Child : Type := IO.Process.Child stdio
 /--
 Typed handle to a running Gymnasium subprocess environment.
 
-`Client` is intentionally small: it only provides request/response JSON helpers and enforces a
+`Client` provides request/response JSON helpers and enforces a
 Lean-side `Boundary.Contract` on all values received from the external process.
 -/
 structure Client (obsShape : Shape) (nActions : Nat) where
@@ -83,9 +83,9 @@ Send a request object and return the response object map.
 The expected response shape is:
 `{"ok": true, ...}` or `{"ok": false, "error": "..."}`
 
-This is deliberately kept in `Client.Internal`. Public callers should use `spawn`, `reset`,
+This stays in `Client.Internal`. Public callers should use `spawn`, `reset`,
 `stepRaw`, `close`, or the higher-level `Session` API, so JSON protocol details stay behind the
-Gymnasium trust boundary and out of the curated API facade.
+Gymnasium trust boundary and out of the curated API.
 -/
 def requestObj {obsShape : Shape} {nActions : Nat}
     (g : Client obsShape nActions) (j : Json) :
@@ -159,7 +159,7 @@ def spawn {obsShape : Shape} {nActions : Nat}
   let g : Client obsShape nActions := { child := child, contract := contract }
   try
     -- Fail fast if the external env's declared spaces do not match what the Lean code expects.
-    -- This is a cheap handshake that catches mismatches before we start collecting rollouts.
+    -- This handshake catches protocol mismatches before rollout collection starts.
     let o ← Internal.requestObj g (Json.mkObj [("cmd", "describe")])
     let nActionsJ ← Internal.requireField o "n_actions"
     let obsShapeJ ← Internal.requireField o "obs_shape"

@@ -494,7 +494,7 @@ def mseLossFast {α : Type}
   {s : Shape} (t : Tape α) (yhatId targetId : Nat) : Result (Tape α × Nat) := by
   match s with
   | .scalar =>
-      -- Scalars are already cheap; reuse the generic node.
+      -- Scalars use the generic node path.
       exact mseLoss (α := α) (t := t) (s := Shape.scalar) yhatId targetId
   | .dim n .scalar =>
       let go : Result (Tape α × Nat) := do

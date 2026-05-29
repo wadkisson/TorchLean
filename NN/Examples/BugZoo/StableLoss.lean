@@ -75,7 +75,7 @@ open Spec.Tensor
 /--
 The logits cross-entropy spec is literally the log-softmax form.
 
-This small theorem is useful as a public “contract card”: if a model uses
+This compact theorem is useful as a public “contract card”: if a model uses
 `crossEntropyLogitsSpec`, the intended decomposition is stable-logits first, then target weighting
 and mean reduction. That is the TorchLean answer to the TensorFuzz-style broken-cross-entropy class
 inside the verified fragment.

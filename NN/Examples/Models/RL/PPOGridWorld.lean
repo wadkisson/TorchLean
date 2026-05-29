@@ -17,7 +17,7 @@ public import NN.Spec.RL.Envs.GridWorld
 public import NN.Proofs.RL.Envs.GridWorld
 
 /-!
-# PPO on Lean-native GridWorld (Executable Demo + Formal Model)
+# PPO on Lean-native GridWorld (Executable Example + Formal Model)
 
 This example complements `torchlean ppo_cartpole`:
 
@@ -123,7 +123,7 @@ def gamma : Float := 0.99
 /-- GAE(λ) parameter controlling the bias/variance tradeoff of advantage estimates. -/
 def lam : Float := 0.95
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used for the GridWorld actor-critic update. -/
 def lr : Float := 3e-3
 
 /-- Number of PPO optimization epochs per collected rollout batch. -/
@@ -399,7 +399,7 @@ def main (args : List String) : IO UInt32 := do
       let mut rngCounter : Nat := 0
 
       -- Training curve: greedy-policy return before training, then at each `evalEvery` checkpoint.
-      -- We keep evaluation logs as a lightweight `Curve` because it targets JSON/widget display.
+      -- We keep evaluation logs as a compact `Curve` because it targets JSON/widget display.
       let mut curve : rl.train.Curve := {}
 
       -- Helper: build a fresh (checked) session for evaluation rollouts/paths.

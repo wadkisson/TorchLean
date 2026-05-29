@@ -80,7 +80,6 @@ structure GRUSpec (α : Type) (inputSize hiddenSize : Nat) where
   /-- Candidate-state bias. -/
   new_bias      : Tensor α (.dim hiddenSize .scalar)
 
--- Single GRU cell forward pass
 /--
 Forward pass for a single GRU cell.
 
@@ -654,10 +653,10 @@ def gruSequenceBackwardFullSpec {seqLen inputSize hiddenSize : Nat}
   (dResetW, dResetB, dUpdateW, dUpdateB, dNewW, dNewB, dInputs, dInitialHidden)
 
 /--
-Convenience wrapper: return only `(dInputs, dInitialHidden)` from `gruSequenceBackwardFullSpec`.
+Return the input-sequence and initial-hidden gradients from `gruSequenceBackwardFullSpec`.
 
-This is useful when you only need gradients w.r.t. the input sequence and initial hidden state, and
-not the full parameter-gradient bundle.
+The full backward pass also returns parameter gradients. This projection records the common contract
+used by callers that only propagate gradients to the preceding recurrent computation.
 -/
 def gruSequenceBackwardSpec {seqLen inputSize hiddenSize : Nat}
   (gru : GRUSpec α inputSize hiddenSize)

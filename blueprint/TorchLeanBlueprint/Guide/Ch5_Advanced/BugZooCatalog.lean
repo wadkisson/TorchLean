@@ -25,7 +25,7 @@ starts from a failure mode that can occur in ordinary ML code, then asks what ob
 the intended behavior explicit.
 
 That is why every BugZoo file is small. A tiny theorem is often a better public contract than a
-large demo. It lets us say "this is the exact thing we checked" beside the paper or issue from the
+large example. It lets us say "this is the exact thing we checked" beside the paper or issue from the
 real world that motivated the card.
 
 # Card Anatomy
@@ -77,7 +77,7 @@ running examples. In NumPy style tensor libraries, a reduced vector can silently
 matrix and still produce a plausible loss. In TorchLean, ordinary elementwise operations require the
 same shape, and explicit broadcasting carries `Shape.CanBroadcastTo` evidence.
 
-The local contract is deliberately concrete: `addSingletonBatch` names the batch insertion,
+The local contract is concrete: `addSingletonBatch` names the batch insertion,
 `reduceRows` names the reduction, and `broadcastRowToMatrix` names the expansion. The theorem
 `broadcastRowToMatrix_firstRow` does not claim to solve every shape bug in Python. It shows the
 preferred style: if a dimension is added, removed, or reintroduced, the documentation and proof
@@ -189,9 +189,9 @@ a recent [PyTorch compiler correctness study](https://arxiv.org/abs/2604.08720) 
 on silent `torch.compile` wrong outputs.
 
 The local object is the `SemanticBoundary` structure. It has a source evaluator, a target
-evaluator, an implementation relation, and a preservation field. This lightweight shape is the
+evaluator, an implementation relation, and a preservation field. This compact shape is the
 reusable claim behind heavier IR compiler correctness theorems: accepted target code must agree with
-the source semantics on every input. A smoke test can make us more confident, but it is not the same
+the source semantics on every input. A runtime check can make us more confident, but it is not the same
 kind of artifact as a semantic boundary.
 
 The reusable statement is:
@@ -261,7 +261,7 @@ autoregressive inference. LLM engines fail through shifted caches, wrong cache s
 mismatches, resource scheduling, and interaction with positions or tokenizers. The broader source
 trail is the [LLM inference engine bug study](https://arxiv.org/abs/2506.09713).
 
-The local contract is intentionally humble. A cache append operation should preserve existing
+The local contract is modest. A cache append operation should preserve existing
 entries and put the newly decoded key/value in the final slot. That sounds obvious, but it is the
 kind of invariant that becomes fragile when a serving stack layers paged attention, batching, and
 mutable buffers. The BugZoo card says what the reference operation means before any external cache

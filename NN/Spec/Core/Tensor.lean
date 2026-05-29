@@ -13,8 +13,8 @@ public import NN.Spec.Core.Tensor.API
 
 Umbrella module for the core tensor API.
 
-This file is the compatibility import most downstream modules use. The implementation is split
-across focused files and re-exported through `NN.Spec.Core.Tensor.API`:
+Most downstream modules import this umbrella. The concrete tensor definitions live in focused files
+and are re-exported through `NN.Spec.Core.Tensor.API`:
 - `NN.Spec.Core.Tensor.Core`          (datatype + accessors)
 - `NN.Spec.Core.Tensor.Constructors`  (total builders)
 - `NN.Spec.Core.Tensor.Linalg`        (matrix/vector ops)

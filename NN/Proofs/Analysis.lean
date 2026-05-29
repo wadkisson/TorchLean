@@ -33,7 +33,7 @@ The split between these files is intentional:
   Lipschitzness, matrix/operator bounds, and composition lemmas).
 - `InductiveProperties` carries structural tensor-induction patterns and dimension-lifting lemmas
   that depend on those norm facts.
-- `Softmax`, `Dropout`, and `Normalization` are small layer-specific sanity theorems.
+- `Softmax`, `Dropout`, and `Normalization` collect layer-specific algebraic theorems.
 - `Fft` is pure mathlib `ℂ` DFT algebra with no TorchLean runtime dependency.
 - `FftBridge` is the transport layer from TorchLean runtime FFT twiddle definitions to the exact
   `Fft` matrices. Keeping it separate prevents the pure DFT theorem file from importing the runtime

@@ -60,7 +60,7 @@ separate runtime layer with:
 Until that layer exists, `--backend compiled` should be read as TorchLean's proof/SSA graph backend,
 not as CUDA Graph execution.
 
-For a CUDA training smoke test:
+For a CUDA training check:
 
 ```bash
 lake exe torchlean gpt_adder --steps 500 --log-every 100

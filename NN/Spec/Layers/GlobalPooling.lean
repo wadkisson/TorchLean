@@ -103,7 +103,7 @@ def reduceSpatial {α : Type} (inH inW : ℕ)
 def channelSpatialMax {α : Type} [Max α] {inH inW : ℕ}
   (hH : inH ≠ 0) (hW : inW ≠ 0)
   (channel_data : Image inH inW α) : α :=
-  -- We intentionally avoid "fake -infinity" sentinels. Starting from the first element keeps the
+  -- We avoid "fake -infinity" sentinels. Starting from the first element keeps the
   -- definition correct for any scalar type that supports `Max`.
   let i0 : Fin inH := ⟨0, Nat.pos_of_ne_zero hH⟩
   let j0 : Fin inW := ⟨0, Nat.pos_of_ne_zero hW⟩

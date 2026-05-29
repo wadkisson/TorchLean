@@ -7,28 +7,28 @@ open Verso.Genre Manual
 tag := "cli"
 %%%
 
-The public command line has three jobs: run model demos, run individual Lean example files, and run
+The public command line has three jobs: run model examples, run individual Lean example files, and run
 verification tools. Everything else should be treated as internal unless a page points to it
 explicitly.
 
-TorchLean keeps that public surface intentionally small. The idea is not to expose every internal
+TorchLean keeps that public surface focused. The idea is not to expose every internal
 script as a public command. The idea is to make the first few commands easy to remember, easy to
 teach, and easy to cite in the book:
 
-- `lake exe torchlean <demo> [args...]` for the main model zoo,
+- `lake exe torchlean <example> [args...]` for the main model zoo,
 - `lake env lean --run NN/Examples/.../Foo.lean -- [args...]` for files in the
   [examples tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/),
 - `lake exe verify -- ...` for verification workflows and checkers.
 
-Three command families cover most everyday use: run a model zoo demo, run an advanced example
+Three command families cover most everyday use: run a model-zoo example, run an advanced example
 file, and run a verifier tool.
 
 | Command | Purpose |
 |---|---|
 | `lake build` | build the project |
 | `lake build NN.Examples.Zoo` | build curated examples |
-| `lake exe torchlean --help` | list model demos |
-| `lake exe torchlean <demo>` | run a model-zoo demo |
+| `lake exe torchlean --help` | list model examples |
+| `lake exe torchlean <example>` | run a model-zoo example |
 | `lake env lean --run NN/Examples/.../Foo.lean` | run a direct example file |
 | `lake exe verify -- list` | list verifier tools |
 | `lake exe verify -- <tool>` | run a verifier/checker |
@@ -36,7 +36,7 @@ file, and run a verifier tool.
 
 # Building with CUDA (optional)
 
-GPU-backed demos require a CUDA-enabled build of the Lean project so the native archives in the
+GPU-backed examples require a CUDA-enabled build of the Lean project so the native archives in the
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) link against the toolkit:
 
 ```
@@ -45,15 +45,15 @@ lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
 ```
 
 If `cuda=true` is not set, the same symbols resolve to CPU stubs and `--cuda` may error or fall back
-depending on the demo. See *GPU and CUDA* for the build/runtime split and each example's module
+depending on the example. See *GPU and CUDA* for the build/runtime split and each example's module
 header for model specific flags. Verification CLI tools (`lake exe verify`) do not need CUDA.
 
 # The Two Commands To Remember
 
-Run one model zoo demo:
+Run one model-zoo example:
 
 ```
-lake exe torchlean <demo> [args...]
+lake exe torchlean <example> [args...]
 ```
 
 Run one advanced example file:
@@ -77,14 +77,14 @@ lake exe verify -- <tool> [args...]
 That is most of the public CLI. The usual loop is list, pick a name, run it, then dig into source
 only when output or errors warrant it.
 
-Common failure modes are usually simple: CUDA examples need `-K cuda=true`; real-data demos need
+Common failure modes are usually simple: CUDA examples need `-K cuda=true`; real-data examples need
 the dataset files under `data/real`; some verifier tools need an external artifact; and Python
 producer workflows need their Python dependencies installed before Lean can check the exported
 artifact.
 
-# A Good First Smoke Test
+# A Good First Check Test
 
-After cloning, a fast smoke test is:
+After cloning, a fast runtime check is:
 
 ```
 lake build
@@ -143,13 +143,13 @@ lake exe verify -- list
 lake exe verify -- torchlean-ibp
 ```
 
-- Run the CROWN operator demo:
+- Run the CROWN operator example:
 
 ```
 lake exe verify -- torchlean-crown-ops
 ```
 
-These commands are intentionally plain, so the verification workflow is easy to invoke without
+These commands are plain, so the verification workflow is easy to invoke without
 knowing the internal directory structure of the repository.
 
 # Website Build
@@ -164,5 +164,5 @@ scripts/docs/build_site.sh
 That script builds the API docs with equation rendering disabled, rebuilds the Verso guide (from
 the `blueprint/` package), and installs the homepage bundle.
 
-For more runnable demos, see *Example Walkthroughs*. For what `verify` subcommands do internally, see
+For more runnable examples, see *Example Walkthroughs*. For what `verify` subcommands do internally, see
 *Verification*.

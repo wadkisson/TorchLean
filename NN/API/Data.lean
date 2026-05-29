@@ -202,7 +202,7 @@ def map {a b : Type} (f : a → b) (ds : _root_.Runtime.Autograd.Train.Dataset a
     _root_.Runtime.Autograd.Train.Dataset b :=
   _root_.Runtime.Autograd.Train.Dataset.map f ds
 
-/-- Concatenate two datasets. -/
+/-- Append two datasets, preserving order: all samples from `x` followed by all samples from `y`. -/
 def append {a : Type} (x y : _root_.Runtime.Autograd.Train.Dataset a) :
     _root_.Runtime.Autograd.Train.Dataset a :=
   _root_.Runtime.Autograd.Train.Dataset.append x y
@@ -221,7 +221,7 @@ def shuffle {a : Type} (seed : Nat) (ds : _root_.Runtime.Autograd.Train.Dataset 
     Nat × _root_.Runtime.Autograd.Train.Dataset a :=
   _root_.Runtime.Autograd.Train.Dataset.shuffle seed ds
 
-/-- Convenience wrapper around `shuffle` that discards the updated seed. -/
+/-- Deterministically shuffle a dataset when the caller does not need the updated seed. -/
 def shuffled {a : Type} (seed : Nat) (ds : _root_.Runtime.Autograd.Train.Dataset a) :
     _root_.Runtime.Autograd.Train.Dataset a :=
   (shuffle seed ds).snd

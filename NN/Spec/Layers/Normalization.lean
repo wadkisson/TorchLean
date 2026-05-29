@@ -689,7 +689,7 @@ def instanceNorm
   Tensor α (.dim channels sSpatial) :=
   batchNorm (x := x) (gamma := gamma) (beta := beta) (epsilon := epsilon)
 
-/-- Convenience wrapper: `batchNorm` specialized to a single channel-first image `(C,H,W)`. -/
+/-- `batchNorm` specialized to a single channel-first image `(C,H,W)`. -/
 def batchNorm2d
   {channels height width : Nat}
   (x : MultiChannelImage channels height width α)
@@ -818,7 +818,7 @@ def instanceNorm2d
   batchNorm2d (x := x) (gamma := gamma) (beta := beta) (h_c := h_c) (h_h := h_h) (h_w := h_w)
     (epsilon := epsilon)
 
-/-- Convenience wrapper: `batchNorm` specialized to a `(C, L)` tensor (BatchNorm1d-style). -/
+/-- `batchNorm` specialized to a `(C, L)` tensor (BatchNorm1d-style). -/
 def batchNorm1d
   {channels length : Nat}
   (x : Tensor α (.dim channels (.dim length .scalar)))
@@ -844,7 +844,7 @@ def instanceNorm1d
   batchNorm1d (x := x) (gamma := gamma) (beta := beta) (h_c := h_c) (h_l := h_l) (epsilon :=
     epsilon)
 
-/-- Convenience wrapper: `batchNorm` specialized to a `(C, D, H, W)` tensor (BatchNorm3d-style). -/
+/-- `batchNorm` specialized to a `(C, D, H, W)` tensor (BatchNorm3d-style). -/
 def batchNorm3d
   {channels depth height width : Nat}
   (x : Tensor α (.dim channels (.dim depth (.dim height (.dim width .scalar)))))
@@ -1111,7 +1111,7 @@ def batchNormInference
     (cb_gamma := cb)
     (cb_beta := cb)
 
-/-! Convenience wrapper: `batchNorm_inference` specialized to a single channel-first image `(C,H,W)`. -/
+/-! `batchNorm_inference` specialized to a single channel-first image `(C,H,W)`. -/
 def batchNorm2dInference
   {channels height width : Nat}
   (x : MultiChannelImage channels height width α)
@@ -1125,7 +1125,7 @@ def batchNorm2dInference
     (x := x) (runningMean := runningMean) (runningVar := runningVar) (gamma := gamma) (beta := beta)
     (epsilon := epsilon)
 
-/-- Convenience wrapper: `batchNorm_inference` specialized to a `(C, L)` tensor (BatchNorm1d-style). -/
+/-- `batchNorm_inference` specialized to a `(C, L)` tensor (BatchNorm1d-style). -/
 def batchNorm1dInference
   {channels length : Nat}
   (x : Tensor α (.dim channels (.dim length .scalar)))
@@ -1139,7 +1139,7 @@ def batchNorm1dInference
     (x := x) (runningMean := runningMean) (runningVar := runningVar) (gamma := gamma) (beta := beta)
     (epsilon := epsilon)
 
-/-- Convenience wrapper: `batchNorm_inference` specialized to a `(C, D, H, W)` tensor (BatchNorm3d-style). -/
+/-- `batchNorm_inference` specialized to a `(C, D, H, W)` tensor (BatchNorm3d-style). -/
 def batchNorm3dInference
   {channels depth height width : Nat}
   (x : Tensor α (.dim channels (.dim depth (.dim height (.dim width .scalar)))))

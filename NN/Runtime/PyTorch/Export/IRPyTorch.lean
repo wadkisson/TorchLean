@@ -19,7 +19,7 @@ emits a standalone PyTorch `nn.Module` implementation as a Python source string.
 
 What this is (and isn't):
 
-* This is an extraction/convenience layer used in round-trip demos: run/train in Python, then
+* This is an extraction/convenience layer used in round-trip examples: run/train in Python, then
   optionally import weights back to Lean.
 * This is **not** a formal proof of semantic equivalence between PyTorch execution and the Lean IR
   denotation. The "source of truth" semantics live on the Lean side (`NN.IR.Graph.denote*`, and the
@@ -27,7 +27,7 @@ What this is (and isn't):
 
 Assumptions:
 
-* Node ids index `g.nodes` consistently (we sanity-check this in `getNode`).
+* Node ids index `g.nodes` consistently; `getNode` checks that invariant.
 * The ParamStore contains parameters for the node kinds that require them (linear/conv2d/etc.).
 * Only a supported subset of IR node kinds is lowered.
 
@@ -92,7 +92,7 @@ def broadcastRow2D? (seqLen embedDim : Nat) (flat : List Float) : Option (List F
 /--
 Options controlling IR-to-PyTorch emission.
 
-Most knobs here configure demo emission (training scaffold, dtype), and how to
+Most knobs here configure example emission, dtype handling, and how to
 materialize constant nodes (buffers vs parameters, and whether to compress broadcasted parameters).
 -/
 structure Options where
@@ -100,7 +100,7 @@ structure Options where
   className : String := "ExportedIRModel"
   /-- Python expression used for the tensor dtype (e.g. `"torch.float32"`). -/
   dtypeExpr : String := "torch.float32"
-  /-- If true, include a small training skeleton and smoke-test in the emitted script. -/
+  /-- If true, include a small training skeleton and runtime-check in the emitted script. -/
   includeTrainingSkeleton : Bool := true
   /-- If true, emit IR `const` nodes as `nn.Parameter` when appropriate (learnable). -/
   learnableConsts : Bool := true
@@ -150,7 +150,7 @@ def pyTensorFromFlat (flatList : String) (shape : Shape) (dtypeVar : String := "
   s!"torch.tensor({flatList}, dtype={dtypeVar}).reshape({shapeToPyTupleString shape})"
 
 /--
-Retrieve a node from the graph, with a couple sanity checks.
+Retrieve a node from the graph and validate its id invariant.
 
 This yields more actionable error messages than directly indexing into `g.nodes`.
 -/
@@ -342,7 +342,7 @@ Each IR node `id` becomes a Python local `v{id}`. We emit nodes in graph order a
 -/
 private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings : ConstBindings)
     (inputId outputId : Nat) : Except String (List String) := do
-  -- Basic sanity: ensure input/output nodes exist.
+  -- Validate that input and output nodes exist.
   let _ ← getNode g inputId
   let outNode ← getNode g outputId
   let _ := outNode
@@ -571,7 +571,7 @@ This is the main entrypoint for IR exporters: it bundles:
 - imports,
 - a class definition with parameters/buffers materialized from the `ParamStore`,
 - a `forward` method implementing the IR, and
-- (optionally) a compact training scaffold for export checks.
+- (optionally) a compact training file for export checks.
 -/
 def emit
     (g : NN.IR.Graph) (ps : ParamStore Float) (inputId outputId : Nat)

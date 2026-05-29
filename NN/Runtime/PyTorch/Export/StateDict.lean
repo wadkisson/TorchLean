@@ -56,7 +56,7 @@ open Export.PyTorch
 /--
 Options for the generated Python checkpoint-to-JSON adapter.
 
-This adapter is intentionally conservative: it accepts tensor-valued entries only, drops common
+This adapter is conservative by design: it accepts tensor-valued entries only, drops common
 DataParallel prefixes when requested, and writes plain JSON rather than a PyTorch-specific binary
 format. That makes the output easy to inspect, diff, and parse in Lean.
 -/

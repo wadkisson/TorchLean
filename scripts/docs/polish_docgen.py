@@ -162,7 +162,7 @@ def write_index(docs: Path) -> None:
       </a>
       <a href="./NN/Verification/CLI.html">
         <strong>Check certificates</strong>
-        <span>Commands and declarations used by verification demos.</span>
+        <span>Commands and declarations used by verification examples.</span>
       </a>
     </section>
 

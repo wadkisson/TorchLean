@@ -13,7 +13,7 @@ public import NN.Runtime.Autograd.Compiled.IRExec
 /-!
 # IR axis operations
 
-IR axis-ops smoke tutorial.
+IR axis-ops runtime tutorial.
 
 This file is a small “regression guard” for three ops where TorchLean’s IR uses an explicit `axis`:
 

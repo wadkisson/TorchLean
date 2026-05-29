@@ -81,7 +81,7 @@ The common producer/checker roles are:
 
 # Lean-Side Plumbing
 
-The generic subprocess utilities live in `NN.Runtime.External`. They have a deliberately small job:
+The generic subprocess utilities live in `NN.Runtime.External`. They have one focused job:
 resolve an executable, check availability, run a command, capture stdout, and parse JSON.
 
 ```
@@ -103,7 +103,7 @@ namespace Runtime.External.Julia
 end Runtime.External.Julia
 ```
 
-The interface is intentionally plain. Oracle wrappers share the same environment-variable
+The interface is plain. Oracle wrappers share the same environment-variable
 conventions, error shape, and JSON parsing path so readers can see where external execution enters
 the trusted story.
 

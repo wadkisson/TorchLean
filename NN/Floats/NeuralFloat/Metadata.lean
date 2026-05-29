@@ -104,7 +104,7 @@ end NeuralPrecision
 /--
 Mixed-precision configuration: which named precision to use in each stage.
 
-This is a convenience record used by a few demos/spec layers; it is not part of the Flocq format
+This is a convenience record used by a few examples/spec layers; it is not part of the Flocq format
 definitions (`FIX`/`FLX`/`FLT`), but it gives a simple way to state “forward in FP16, gradients in
 FP32”, etc.
 -/
@@ -121,7 +121,7 @@ structure NeuralMixedFormat where
   loss_format : NeuralPrecision
 
 /--
-A conservative default used by TorchLean demos:
+A conservative default used by TorchLean examples:
 
 - FP16 forward (for speed),
 - FP32 for gradients/params/loss (for stability).

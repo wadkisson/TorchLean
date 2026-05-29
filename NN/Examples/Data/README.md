@@ -1,6 +1,6 @@
 # Data Examples
 
-TorchLean keeps the data boundary deliberately small. Python handles ecosystem formats and
+TorchLean keeps the data boundary focused. Python handles ecosystem formats and
 downloads; Lean receives `.npy`, numeric CSV, or text, then checks shapes and builds typed datasets.
 
 ```text
@@ -15,18 +15,18 @@ tensors, typed batching, training, verification, and reproducible evaluation.
 Generate the small ignored fixtures used by the loader tutorials:
 
 ```bash
-python3 NN/Examples/Data/generate_toy_data.py
+python3 NN/Examples/Data/generate_small_data.py
 ```
 
 This writes:
 
 | File | Shape / role |
 | --- | --- |
-| `toy_regression.csv` | numeric rows `x1,x2,y` |
-| `toy_regression_X.npy` | `(25, 2)` `float32` features |
-| `toy_regression_y.npy` | `(25, 1)` `float32` targets |
-| `toy_cifar10like_X.npy` | `(200, 3, 32, 32)` `float32` image-shaped features |
-| `toy_cifar10like_y.npy` | `(200,)` integer labels stored as `float32` |
+| `small_regression.csv` | numeric rows `x1,x2,y` |
+| `small_regression_X.npy` | `(25, 2)` `float32` features |
+| `small_regression_y.npy` | `(25, 1)` `float32` targets |
+| `small_cifar10like_X.npy` | `(200, 3, 32, 32)` `float32` image-shaped features |
+| `small_cifar10like_y.npy` | `(200,)` integer labels stored as `float32` |
 
 ## Dataset Shapes
 
@@ -67,7 +67,7 @@ The CIFAR-10 export defaults to a small real subset for interactive examples. Pa
 ```bash
 lake exe torchlean data_csv
 lake exe torchlean data_npy
-lake exe torchlean data_cifar10 --quick --epochs 1 --batch 4 --train-size 8 --n-total 20
+lake exe torchlean data_cifar10 --check-only --epochs 1 --batch 4 --train-size 8 --n-total 20
 ```
 
 Model examples use the same API:

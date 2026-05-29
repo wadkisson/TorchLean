@@ -14,8 +14,7 @@ public import NN.Spec.Module.SpecModule
 
 This file exposes conv specs as `NNModuleSpec`s.
 
-Compatibility wrappers for `Conv2D` and `ConvTranspose2D` are consolidated here with their public
-names.
+The wrappers for `Conv2D` and `ConvTranspose2D` are consolidated here with their public names.
 -/
 
 @[expose] public section

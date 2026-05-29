@@ -200,7 +200,7 @@ monitoring code, not only in the model definition.
 - `API.TorchLean.Schedulers.step`
 - `API.TorchLean.Schedulers.exponential`
 
-The scheduler layer is intentionally small and pure: it gives higher layer training code a stable
+The scheduler layer is pure and focused: it gives higher layer training code a stable
 place to compute learning-rate policies without entangling that logic with runtime state.
 
 # Execution Modes
@@ -285,13 +285,13 @@ These are one-import wrappers for focused subsystems:
 - `NN.Entrypoint.Verification`
 - `NN.Entrypoint.GraphSpec`
 
-They are especially useful in focused guide files or demos where the import surface should say
+They are especially useful in focused guide files or examples where the import surface should say
 what the file is about.
 
 ## `NN.GraphSpec`
 
 GraphSpec is the typed architecture DSL described in its own guide. It is not the default public
-API, but it is already connected to the runtime model zoo and to public demos such as
+API, but it is already connected to the runtime model zoo and to public examples such as
 `graphspec_mlp_demo`.
 
 ## Navigation tools
@@ -313,7 +313,7 @@ ordinary model code. Use `NN.Entrypoint.*` when a file is specifically about gra
 verification, widgets, or runtime internals. That keeps examples readable while preserving precise
 entry points for the lower layers.
 
-See *Training From Scratch* for workflows, *Example Walkthroughs* for curated demos, and *PyTorch Round-Trip*
+See *Training From Scratch* for workflows, *Example Walkthroughs* for curated examples, and *PyTorch Round-Trip*
 then *TorchLean vs PyTorch* for interop.
 
 # References

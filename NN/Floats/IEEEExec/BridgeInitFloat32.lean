@@ -116,7 +116,7 @@ convenient *value-level* rewriting lemmas below:
 These are the lemmas you use to “turn a runtime evaluation into an `IEEE32Exec` evaluation”.
 -/
 
--- `IEEE32Exec` is a thin wrapper around a `UInt32` bit pattern; equality is extensional on `.bits`.
+-- `IEEE32Exec` stores a `UInt32` bit pattern; equality is extensional on `.bits`.
 omit [RuntimeFloat32MatchesIEEE32Exec] in
 private theorem bits_inj {x y : IEEE32Exec} (h : x.bits = y.bits) : x = y := by
   cases x

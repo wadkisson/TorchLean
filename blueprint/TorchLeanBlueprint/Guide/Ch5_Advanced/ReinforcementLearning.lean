@@ -65,7 +65,7 @@ The runtime umbrella [NN.Runtime.RL API](https://github.com/lean-dojo/TorchLean/
 
 # MDP Semantics First
 
-The spec side is intentionally not "whatever the Python environment did." In
+The spec side is not "whatever the Python environment did." In
 [NN.Spec.RL API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL.lean), TorchLean collects several MDP vocabularies:
 
 - [Spec.RL.Core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Core.lean) gives discounted backups, TD residuals, returns, and
@@ -162,7 +162,7 @@ facts such as:
 Those facts are modest, but they matter. A DQN theorem should not have to assume that the storage
 layer forgot neither shape nor capacity. The repository also includes
 [NN.Examples.Models.RL.DQNReplay API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/DQNReplay.lean) as a small
-small example that uses the replay layer.
+compact example that uses the replay layer.
 
 # PPO Rollouts, Returns, And Advantages
 
@@ -257,7 +257,7 @@ runtime agreement.
 
 # The Three PPO Examples
 
-The examples are deliberately arranged to show three different environment interfaces with one PPO
+The examples are arranged to show three different environment interfaces with one PPO
 shape.
 
 | Path | Environment | What is checked |
@@ -326,7 +326,7 @@ lake exe torchlean ppo_pong_ram
 
 # Interpreting A TorchLean RL Claim
 
-When an RL demo succeeds, we try to be precise and fair about the claim:
+When an RL example succeeds, we try to be precise and fair about the claim:
 
 - The executable ran the PPO/autograd program and produced artifacts.
 - The rollout boundary checked shapes, actions, finite values, and configured ranges.

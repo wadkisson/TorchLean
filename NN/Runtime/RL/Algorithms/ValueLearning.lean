@@ -19,7 +19,7 @@ This module packages the core scalar objectives / targets behind common deep RL 
 - TD3 clipped double critics,
 - SAC entropy-regularized targets and actor objectives.
 
-The functions are intentionally small and typed. They expose the textbook math while leaving
+The functions are compact and typed. They expose the textbook math while leaving
 experience replay, target-network sync, and optimizer orchestration to higher-level code.
 
 Primary references:
@@ -76,13 +76,13 @@ def dqnResidual {nActions : Nat} (qPred : Tensor α (.dim nActions .scalar)) (ac
   let target := dqnTarget (α := α) reward gamma done nextQTarget
   target - chosenActionValue (α := α) qPred action
 
-/-- Squared TD loss for DQN. -/
+/-- Mean-square style temporal-difference loss for one DQN transition. -/
 def dqnMSELoss {nActions : Nat} (qPred : Tensor α (.dim nActions .scalar)) (action : Fin nActions)
     (reward gamma : α) (done : Bool) (nextQTarget : Tensor α (.dim nActions .scalar)) : α :=
   let target := dqnTarget (α := α) reward gamma done nextQTarget
   Core.squaredError (α := α) (chosenActionValue qPred action) target
 
-/-- Huber TD loss for DQN. -/
+/-- Huber temporal-difference loss for one DQN transition, with threshold `delta`. -/
 def dqnHuberLoss {nActions : Nat} (qPred : Tensor α (.dim nActions .scalar)) (action : Fin nActions)
     (reward gamma : α) (done : Bool) (nextQTarget : Tensor α (.dim nActions .scalar))
     (delta : α := 1) : α :=

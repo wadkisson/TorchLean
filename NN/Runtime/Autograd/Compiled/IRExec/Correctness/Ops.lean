@@ -27,11 +27,10 @@ Per-operator correctness lemmas for the IR → compiled runtime bridge.
 This module is an index. Import it when you want the checked compiler-step lemmas without the
 recursive semantic equivalence theorem.
 
-The imported files are intentionally split by operator family. A single all-in-one proof file would
-be hard to build and harder to review: Lean has to unfold compiler branches, normalize `Except`
-control flow, compare dependent shapes, and prove that the compiled `GraphData` node appends the
-same `DVal` as the IR evaluator. Keeping each family separate makes incremental builds and local
-debugging much more pleasant.
+The imported files follow the operator families used by the IR. Each proof has the same shape:
+unfold the compiler branch, normalize `Except` control flow, compare dependent shapes, and show that
+the compiled `GraphData` node appends the same `DVal` as the IR evaluator. Keeping these families
+separate makes the proof obligations local and keeps incremental builds predictable.
 
 The remaining proof engineering is to factor the repeated one-parent/two-parent boilerplate into
 reusable helper lemmas and keep individual branches focused on their semantic equation.

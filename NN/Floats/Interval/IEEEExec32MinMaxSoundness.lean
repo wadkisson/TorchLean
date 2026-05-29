@@ -61,8 +61,8 @@ theorem toReal_min4_eq_min_of_isFinite (a b c d : IEEE32Exec)
       toReal (minimum (minimum a b) (minimum c d)) =
         min (toReal (minimum a b)) (toReal (minimum c d)) :=
     toReal_minimum_eq_min_of_isFinite (x := minimum a b) (y := minimum c d) hfin_ab hfin_cd
-  -- Avoid `simp` rewriting `toReal` into its `toDyadic?` match form too early, which makes
-  -- rewriting with `hab`/`hcd` brittle.
+  -- Keep `toReal` abstract until the min lemmas have been applied; otherwise `simp` expands it to
+  -- the lower-level `toDyadic?` match form.
   have houter' :
       toReal (minimum (minimum a b) (minimum c d)) =
         min (min (toReal a) (toReal b)) (min (toReal c) (toReal d)) := by

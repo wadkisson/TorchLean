@@ -14,7 +14,7 @@ public import NN.Spec.Core.Tensor.Constructors
 This file collects small helper definitions used across the spec layer.
 
 The contents are intended to be broadly reusable: small constructors, shape-preserving maps, and
-lightweight conversion/pretty-printing helpers used by examples and by higher-level APIs.
+conversion and pretty-printing helpers used by examples and by higher-level APIs.
 
 Main definitions include:
 
@@ -33,7 +33,7 @@ User-facing constructors in the tensor API (for example `tensorND!`, `tensorF!`)
 namespace Spec
 
 /-
-Note: Most definitions in this file are kept lightweight, and we keep their
+Note: Most definitions in this file are intentionally direct, and we keep their
 typeclass assumptions local. That way the helpers stay usable both in "executable"
 backends (e.g. `Float`, `IEEE32Exec`) and in proof-level backends.
 -/
@@ -46,7 +46,7 @@ def mapTensor {α β : Type} : ∀ {s : Shape}, (α → β) → Tensor α s → 
   | .scalar, f, Tensor.scalar x => Tensor.scalar (f x)
   | .dim _ _, f, Tensor.dim g => Tensor.dim (fun i => mapTensor f (g i))
 
--- Tensor creation helpers
+-- Tensor constructors used by examples, specs, and small proof fixtures.
 
 /-! ### Small constructors -/
 
@@ -86,7 +86,7 @@ def zip {α : Type} {s : Shape} : Tensor α s → Tensor α s → Tensor (α × 
   | Tensor.dim xs, Tensor.dim ys =>
     Tensor.dim (fun i => zip (xs i) (ys i))
 
--- Tensor conversion utilities
+-- Conversions between dependent tensors and list/string representations.
 /-! ### Tensor ↔ list utilities -/
 
 /-- Convert a tensor into a flat list (row‑major by outermost dimension). -/
@@ -101,8 +101,7 @@ def pretty {α : Type} [ToString α] : ∀ {s}, Tensor α s → String
   | .dim n _, Tensor.dim f =>
       "[" ++ (String.intercalate ", " (List.finRange n |>.map (fun i => pretty (f i)))) ++ "]"
 
--- Advanced tensor operations
--- Use the first index of Fin n → α, given proof that n > 0
+-- Shape-manipulation helpers that are easiest to express directly at the spec layer.
 /-- Evaluate a `Fin n → α` at index 0, given a proof that `n > 0`. -/
 def useFin {n : Nat} {α : Type} (values : Fin n → α) (h : 0 < n) : α :=
   let i : Fin n := ⟨0, h⟩
@@ -118,7 +117,7 @@ def expandLastDim {α : Type} {n : Nat} (t : Tensor α (.dim n .scalar)) :
     match getAtSpec t i with
     | Tensor.scalar value => singleton value)
 
--- List conversion functions
+-- Checked constructors from flat Lean lists into shape-indexed tensors.
 /-- Build a vector tensor from a list.
 
 PyTorch analogy: `torch.tensor(xs)` producing a 1D tensor. -/

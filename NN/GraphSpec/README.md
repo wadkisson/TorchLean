@@ -118,7 +118,7 @@ For true multi-input operations, define a `DAG.PrimOp ins τ` directly in `DAG.l
 
 GraphSpec proofs usually compare the interpreter with an existing specification:
 
-1. choose a small model, such as an MLP or residual block;
+1. choose a compact model, such as an MLP or residual block;
 2. state equality between `Interp.spec` or `DAG.Term.eval` and the reference forward function;
 3. unfold the GraphSpec syntax and simplify with a focused simp set;
 4. use the model-specific tensor lemmas for the remaining arithmetic.

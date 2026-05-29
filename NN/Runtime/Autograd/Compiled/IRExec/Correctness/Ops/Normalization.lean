@@ -24,8 +24,8 @@ TorchLean’s LayerNorm proof stack has two layers:
 This file proves the forward-correctness lemma for that compilation step: when `buildFrom` succeeds
 at IR node position `i`, the IR evaluator and the compiled evaluator append the same output tensor.
 
-The proof is intentionally "shape-driven": it follows the same dependent matches and checks as the
-compiler, so failed preconditions discharge as contradictions.
+The proof is shape-driven: it follows the same dependent matches and checks as the compiler, so
+failed preconditions discharge as contradictions.
 
 References:
 * Jimmy Lei Ba, Jamie Ryan Kiros, Geoffrey E. Hinton, "Layer Normalization", arXiv:1607.06450.

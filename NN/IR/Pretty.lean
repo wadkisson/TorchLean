@@ -17,7 +17,7 @@ We use these functions when:
 
 - a compiler pass produces a malformed graph and we want a clear, compact dump,
 - a verifier rejects a graph and we want to see the exact node/parent structure,
-- we want a quick visualization of a graph in GraphViz.
+- we want a compact visualization of a graph in GraphViz.
 
 This module is intentionally **not** a stable serialization format. The IR itself evolves (new ops,
 new payload conventions, new invariants), and we want the freedom to change the pretty output

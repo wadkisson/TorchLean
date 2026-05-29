@@ -99,7 +99,7 @@ The full list is generated in the tensor reference, but the convention is simple
 
 TorchLean uses the scalar element type as the “dtype”. For example:
 
-- `Tensor Float s` is a runnable floating tensor (convenient for demos),
+- `Tensor Float s` is a runnable floating tensor (convenient for examples),
 - `Tensor ℚ s` is a rational tensor (useful for exact arithmetic),
 - `Tensor ℝ s` is a proof-side mathematical tensor,
 - `Tensor TorchLean.Floats.IEEE32Exec s` is an executable IEEE-754 binary32 tensor.
@@ -152,7 +152,7 @@ keeps later graph and verification code from inheriting a silent broadcasting co
 
 # Constructing Tensors (The Ergonomic Layer)
 
-For small examples, the most common constructors are:
+For compact examples, the most common constructors are:
 
 - `tensor1d` / `tensor2d` for lists of numbers,
 - `tensorND` for runtime dims plus a flat row-major list,
@@ -375,11 +375,11 @@ It demonstrates:
 - `tensor!` nesting + row-major flattening,
 - `tensorF321d` for executable float32,
 - `tensorND` / `tensorDynND` for runtime-shaped inputs,
-- and the fact that printing is intentionally disabled for proof-only scalar backends like `ℝ`.
+- and the fact that printing is disabled by design for proof-only scalar backends like `ℝ`.
 
 # What the Tensor Layer Gives You
 
-TorchLean’s tensor layer is not just a convenience wrapper. It is strong because the shape index is
+TorchLean’s tensor layer is part of the specification, not only an ergonomic layer. It is strong because the shape index is
 part of the tensor’s type, and the proof layer already knows how to move between typed views,
 flattened views, and algebraic laws.
 

@@ -1,0 +1,188 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.Verification.TorchLean.Proved.Correctness.Eval.Denote
+
+/-!
+# Compiled Forward Evaluation: Return Value Shape
+-/
+
+@[expose] public section
+
+namespace NN.Verification.TorchLean.Proved
+
+open _root_.Spec
+open _root_.Spec.Tensor
+open NN.IR
+
+namespace Correctness
+
+open NN.Verification.TorchLean
+
+  /-!
+  Helper functions for the final "compiled forward = DSL forward" theorem.
+
+  - `finalSs g` is the list of available value shapes at the point where `g` returns.
+    (It is the `ss` parameter of the `.ret` constructor reached by running through `.let1`.)
+  - `outIdx g` is the return index of `g`, but expressed at the `finalSs g` context.
+  -/
+
+  def finalSs
+      {α : Type} {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape} :
+      FGraph α paramShapes inShape ss out → List Shape
+    | .ret _y => ss
+    | .let1 _node gNext => finalSs gNext
+
+  /--
+  Return index of a forward let-chain, expressed in the *final* context.
+
+  As we traverse `.let1` nodes, the local context `ss` grows; this function returns the output index
+  at the end of the chain (`finalSs g`), so it can be used with the final `vals` array produced by
+  `evalFGraphVals`.
+  -/
+  def outIdx
+      {α : Type} {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape} :
+      (g : FGraph α paramShapes inShape ss out) → Idx (Ctx inShape (finalSs g)) out
+    | .ret y => y
+    | .let1 _node gNext => outIdx gNext
+
+  /--
+  The compiled graph's `outputId` agrees with the return index `outIdx` of the source let-chain.
+  The compiler records exactly the node index returned by the `.ret` case after threading through
+  the `.let1` chain.
+  -/
+  theorem compileFGraph_outputId_eq_outIdx_id
+      {α : Type} [Context α]
+      {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
+      (g : FGraph α paramShapes inShape ss out)
+      (params : Runtime.Autograd.Torch.TList α paramShapes)
+      (c : NN.Verification.TorchLean.CompiledIR α) :
+      (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
+        out)
+          g params c).outputId
+        =
+      (outIdx (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := out)
+        g).id := by
+    classical
+    induction g generalizing c with
+    | ret y =>
+        simp [compileFGraph, outIdx]
+        rfl
+    | @let1 ss₀ mid₀ out₀ node gNext ih =>
+        simp [compileFGraph, outIdx, ih]
+        rfl
+
+  /--
+  `evalFGraph` is `evalFGraphVals` followed by selecting the return index `outIdx`.
+
+  This isolates “evaluate all SSA values” from “pick the output tensor”, which is useful in the
+    final
+  correctness statement.
+  -/
+  theorem evalFGraph_eq_evalFGraphVals_outIdx
+      {α : Type} [Context α] [DecidableEq Shape]
+      {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
+      (g : FGraph α paramShapes inShape ss out)
+      (params : Runtime.Autograd.Torch.TList α paramShapes)
+      (vals : Array (DVal α)) :
+      evalFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := out)
+        g params vals
+        =
+      (do
+        let vals' ←
+          evalFGraphVals (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out
+            := out)
+            g params vals
+        let v : DVal α := vals'[(outIdx (α := α) (paramShapes := paramShapes) (inShape := inShape)
+          (ss := ss) (out := out) g).id]!
+        if h : v.shape = out then
+          pure (h ▸ v.tensor)
+        else
+          throw s!"TorchLeanVerified: expected shape {repr out}, got {repr v.shape}") := by
+    classical
+    induction g generalizing vals with
+    | ret y =>
+        -- Definitional: `evalFGraphVals (.ret _) = pure vals`.
+        rfl
+    | @let1 ss₀ mid₀ out₀ node gNext ih =>
+        cases hNode :
+            evalNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
+              mid₀)
+              node params vals with
+        | error e =>
+            -- Short-circuiting on `Except.error` makes both sides definitional.
+            simp [evalFGraph, evalFGraphVals, outIdx, hNode]
+            rfl
+        | ok vOut =>
+            have hIH := ih (vals := vals.push vOut)
+            -- Reduce the outer `evalNode` bind and then apply the IH on the extended `vals`.
+            simpa [evalFGraph, evalFGraphVals, outIdx, hNode, Pure.pure, Except.pure, Except.bind,
+              Except.instMonad]
+              using hIH
+
+  /--
+  Shape-invariant for `evalFGraphVals`.
+
+  If the input value array has shapes `Ctx inShape ss`, then the result array has shapes
+  `Ctx inShape (finalSs g)` at the return point.
+  -/
+  theorem evalFGraphVals_shapes_of_hShapes
+      {α : Type} [Context α] [DecidableEq Shape]
+      {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
+      (g : FGraph α paramShapes inShape ss out)
+      (params : Runtime.Autograd.Torch.TList α paramShapes)
+      (vals vals' : Array (DVal α))
+      (hShapes : shapesOfVals (α := α) vals = Ctx inShape ss)
+      (hOk :
+        evalFGraphVals (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
+          out) g params vals =
+          Except.ok vals') :
+      shapesOfVals (α := α) vals' = Ctx inShape (finalSs g) := by
+    classical
+    induction g generalizing vals vals' with
+    | ret y =>
+        simp [evalFGraphVals] at hOk
+        cases hOk
+        simpa [finalSs]
+    | @let1 ss₀ mid₀ out₀ node gNext ih =>
+        -- Unfold once and split on `evalNode`.
+        cases hNode :
+            evalNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
+              mid₀)
+              node params vals with
+        | error e =>
+            -- impossible: `hOk` claims the whole computation returned `ok`.
+            simp [evalFGraphVals, hNode] at hOk
+            cases hOk
+        | ok vOut =>
+            have hvOutShape : vOut.1 = mid₀ :=
+              evalNode_ok_shape_of_hShapes (α := α) (paramShapes := paramShapes) (inShape :=
+                inShape)
+                (ss := ss₀) (out := mid₀) node params vals hShapes (v := vOut) (by simp [hNode])
+            have hShapes' : shapesOfVals (α := α) (vals.push vOut) = Ctx inShape (ss₀ ++ [mid₀]) :=
+              by
+              calc
+                shapesOfVals (α := α) (vals.push vOut)
+                    = shapesOfVals (α := α) vals ++ [vOut.1] :=
+                      shapesOfVals_push (α := α) (vals := vals) (v := vOut)
+                _ = Ctx inShape ss₀ ++ [vOut.1] := by simp [hShapes]
+                _ = Ctx inShape (ss₀ ++ [mid₀]) := by simp [Ctx, hvOutShape, List.cons_append]
+            have hOk' :
+                evalFGraphVals (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀
+                  ++ [mid₀]) (out := out₀)
+                    gNext params (vals.push vOut)
+                  =
+                Except.ok vals' := by
+              simpa [evalFGraphVals, hNode] using hOk
+            -- Apply IH to the suffix.
+            simpa [finalSs, evalFGraphVals, hNode] using
+              ih (vals := vals.push vOut) (vals' := vals') (hShapes := hShapes') (hOk := hOk')
+end Correctness
+
+end NN.Verification.TorchLean.Proved
+

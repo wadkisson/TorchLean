@@ -15,7 +15,7 @@ These helpers manipulate *sequence tensors*, typically of shape:
 
 `Tensor α (.dim seqLen (.dim featureDim .scalar))`.
 
-They are intentionally simple (structural recursion on `Tensor.dim`) and are used by the
+They are kept simple (structural recursion on `Tensor.dim`) and are used by the
 RNN/LSTM/GRU specs.
 
 Why we have a dedicated "sequence" module:
@@ -24,7 +24,7 @@ Why we have a dedicated "sequence" module:
   These helpers let us express that directly, without constantly unpacking `Tensor.dim`.
 - Many proofs about RNN-style models want to reason step-by-step. Definitions that recurse
   structurally on `Tensor` tend to be easier to induct over than definitions that go through arrays
-  or ad-hoc lists.
+  or local list encodings.
 - We deliberately keep this file free of runtime concerns (no `IO`, no mutable state). When we care
   about performance, we use the runtime layer; here we care about "the clean mathematical meaning".
 

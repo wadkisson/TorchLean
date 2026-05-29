@@ -11,9 +11,9 @@ public import NN.API.Public
 /-!
 # API Canonical
 
-`NN.API.Canonical` re-exports TorchLean's PyTorch-like facade.
+`NN.API.Canonical` re-exports TorchLean's PyTorch-style public API.
 
-Prefer `import NN` for the full library, or `import NN.Entrypoint.API` for the narrow facade.
+Prefer `import NN` for the full library, or `import NN.Entrypoint.API` for the focused API entrypoint.
 -/
 
 @[expose] public section

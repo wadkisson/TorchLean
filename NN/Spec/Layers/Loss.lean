@@ -37,7 +37,7 @@ open Numbers
 
 variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
 
-/-- Enumeration of supported loss families (for lightweight configuration). -/
+/-- Enumeration of supported loss families used by configuration records. -/
 inductive LossType
 | mse                    -- Mean Squared Error
 | mae                    -- Mean Absolute Error
@@ -50,19 +50,19 @@ inductive LossType
 
 /-- Loss configuration record that names the selected loss family. -/
 structure Loss (α : Type) (n p : ℕ) where
-  /-- loss Type. -/
+  /-- Selected loss family for this configuration. -/
   lossType : LossType
   -- Note: regularization would be added here if needed
 
-/-- MSE loss configuration. -/
+/-- Configuration selecting mean-squared-error loss. -/
 def Loss.mse {α : Type} {n p : ℕ} : Loss α n p :=
   { lossType := LossType.mse }
 
-/-- MAE loss configuration. -/
+/-- Configuration selecting mean-absolute-error loss. -/
 def Loss.mae {α : Type} {n p : ℕ} : Loss α n p :=
   { lossType := LossType.mae }
 
-/-- Huber loss configuration. -/
+/-- Configuration selecting Huber loss. -/
 def Loss.huber {α : Type} {n p : ℕ} : Loss α n p :=
   { lossType := LossType.huber }
 
@@ -70,7 +70,7 @@ def Loss.huber {α : Type} {n p : ℕ} : Loss α n p :=
 def Loss.crossEntropy {α : Type} {n p : ℕ} : Loss α n p :=
   { lossType := LossType.crossEntropy }
 
-/-- Hinge loss configuration. -/
+/-- Configuration selecting hinge loss. -/
 def Loss.hinge {α : Type} {n p : ℕ} : Loss α n p :=
   { lossType := LossType.hinge }
 

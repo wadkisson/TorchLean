@@ -31,8 +31,8 @@ Like other widgets, this is meant for *examples* and *debugging*, not proof scri
 
 ## Implementation notes
 
-- We intentionally keep a single "inspect graph" panel: in practice this is the fastest way to
-  sanity-check graph structure during pass development.
+- We keep a single "inspect graph" panel: in practice this is the fastest way to
+  inspect graph structure during pass development.
 - DOT preview is clipped on large graphs because huge text blocks make infoview interaction slow.
 - Theme-aware badge styles are used so the panel remains readable in dark/light setups.
 

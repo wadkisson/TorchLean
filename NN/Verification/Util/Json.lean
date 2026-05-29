@@ -31,6 +31,7 @@ namespace NN.Verification.Json
 open Lean
 open Json
 
+/-- Turn an `Except String α` parser result into `IO`, preserving the parser's error text. -/
 def fromExcept {α : Type} (x : Except String α) : IO α := do
   match x with
   | .ok a => pure a
@@ -67,15 +68,15 @@ def optionalField? (j : Json) (k : String) (ctx : String) : IO (Option Json) := 
   let o ← fromExcept <| NN.API.Json.expectObjE ctx j
   pure <| Std.TreeMap.Raw.get? o k
 
-/-- Parse a JSON string. -/
+/-- Require a JSON string in an `IO` parser, preserving contextual error messages. -/
 def expectString (j : Json) (ctx : String) : IO String :=
   fromExcept <| NN.API.Json.expectStringE ctx j
 
-/-- Parse a JSON natural number. -/
+/-- Require a natural number, accepting either JSON numeric syntax or a decimal string. -/
 def expectNat (j : Json) (ctx : String) : IO Nat :=
   fromExcept <| NN.API.Json.expectNatE ctx j
 
-/-- Parse a JSON array. -/
+/-- Require a JSON array and return its entries. -/
 def expectArray (j : Json) (ctx : String) : IO (Array Json) :=
   fromExcept <| NN.API.Json.expectArrayE ctx j
 
@@ -95,19 +96,19 @@ def asFloat? (j : Json) : Option Float :=
       | _ => none
   | _ => none
 
-/-- Parse a JSON boolean. -/
+/-- Decode a JSON boolean if the value is exactly `true` or `false`. -/
 def parseBool? (j : Json) : Option Bool :=
   match j with
   | .bool b => some b
   | _ => none
 
-/-- Parse a JSON float. -/
+/-- Require a floating-point value, accepting JSON numbers and string-encoded numbers. -/
 def expectFloat (j : Json) (ctx : String) : IO Float := do
   match asFloat? j with
   | some x => pure x
   | none => throw <| IO.userError s!"{ctx}: expected float"
 
-/-- Parse a JSON boolean. -/
+/-- Require a JSON boolean and report `ctx` on mismatch. -/
 def expectBool (j : Json) (ctx : String) : IO Bool := do
   match parseBool? j with
   | some b => pure b

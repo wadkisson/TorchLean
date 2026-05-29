@@ -42,9 +42,9 @@ PyTorch analogy: the `weights` and `bias` fields correspond to `nn.Linear(inDim,
 `nn.Linear(inDim, 1).bias`, but with shapes tracked in the tensor type.
 -/
 structure LinearRegressionSpec (α : Type) (inDim : Nat) where
-  /-- weights. -/
+  /-- Regression coefficients, one per input feature. -/
   weights : Tensor α (.dim inDim .scalar)
-  /-- bias. -/
+  /-- Scalar intercept term. -/
   bias : Tensor α .scalar
 
 /-- Forward pass for linear regression: `y = wᵀ x + b`. -/
@@ -311,7 +311,7 @@ def elasticNetLossSpec {batch inDim : Nat}
 ## Polynomial features
 
 Polynomial regression can be expressed as linear regression on a fixed feature expansion
-`φ(x) = [x, x^2, ..., x^degree]` (per input coordinate). We keep this as a lightweight helper,
+`φ(x) = [x, x^2, ..., x^degree]` (per input coordinate). We keep this as a named helper,
 then reuse `linear_regression_forward_spec` on the expanded input.
 -/
 

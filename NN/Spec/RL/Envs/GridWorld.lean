@@ -58,16 +58,16 @@ abbrev GridAction : Type := Fin 4
 
 namespace GridAction
 
-/-- Move up. -/
+/-- Grid action that decreases the row coordinate. -/
 def up : GridAction := ⟨0, by decide⟩
 
-/-- Move down. -/
+/-- Grid action that increases the row coordinate. -/
 def down : GridAction := ⟨1, by decide⟩
 
-/-- Move left. -/
+/-- Grid action that decreases the column coordinate. -/
 def left : GridAction := ⟨2, by decide⟩
 
-/-- Move right. -/
+/-- Grid action that increases the column coordinate. -/
 def right : GridAction := ⟨3, by decide⟩
 
 end GridAction

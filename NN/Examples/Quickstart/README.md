@@ -34,7 +34,7 @@ start with `NN/Examples/Verification`; reusable checkers live under `NN/Verifica
 ## What About The CNN / ResNet Files?
 
 `SimpleCnnTrain.lean`, `MinibatchMlpTrain.lean`, and `ResnetBasicblockTrain.lean` are still useful
-follow up examples, but they are no longer the main quickstart path. They overlap with the model and
+follow up examples, but they are no longer the main introductory path. They overlap with the model and
 data tutorials, so new users should read them after the five files above.
 
 ## Scalar Constraints

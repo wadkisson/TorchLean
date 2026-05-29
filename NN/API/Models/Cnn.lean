@@ -34,24 +34,31 @@ structure CnnConfig where
   conv : nn.Conv := { outC := 16, kH := 3, kW := 3, stride := 2, padding := 1 }
   pool : nn.MaxPool := { kH := 2, kW := 2, stride := 2 }
 
+/-- Height after the convolution stage. -/
 def CnnConfig.outH1 (cfg : CnnConfig) : Nat :=
   (cfg.inH + 2 * cfg.conv.padding - cfg.conv.kH) / cfg.conv.stride + 1
 
+/-- Width after the convolution stage. -/
 def CnnConfig.outW1 (cfg : CnnConfig) : Nat :=
   (cfg.inW + 2 * cfg.conv.padding - cfg.conv.kW) / cfg.conv.stride + 1
 
+/-- Height after the pooling stage. -/
 def CnnConfig.outH2 (cfg : CnnConfig) : Nat :=
   (cfg.outH1 - cfg.pool.kH) / cfg.pool.stride + 1
 
+/-- Width after the pooling stage. -/
 def CnnConfig.outW2 (cfg : CnnConfig) : Nat :=
   (cfg.outW1 - cfg.pool.kW) / cfg.pool.stride + 1
 
+/-- Flattened feature size entering the classifier head. -/
 def CnnConfig.featSize (cfg : CnnConfig) : Nat :=
   Spec.Shape.size (NN.Tensor.Shape.CHW cfg.conv.outC cfg.outH2 cfg.outW2)
 
+/-- Batched image input shape for `cnn`. -/
 abbrev cnnInShape (cfg : CnnConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch cfg.inC cfg.inH cfg.inW
 
+/-- Batched logits output shape for `cnn`. -/
 abbrev cnnOutShape (cfg : CnnConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.outDim
 

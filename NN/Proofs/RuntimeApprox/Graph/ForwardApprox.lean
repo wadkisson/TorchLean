@@ -157,9 +157,7 @@ def get : {ss : List Shape} → EList ss → (i : Fin ss.length) → ℝ
 
 end EList
 
--- ---------------------------------------------------------------------------
--- Approximation predicates
--- ---------------------------------------------------------------------------
+-- Tensor and context approximation predicates for forward runtime graphs.
 
 variable {α : Type}
 
@@ -393,9 +391,9 @@ lemma approxCtx_unsnoc {toSpec : α → SpecScalar} {ss : List Shape} {τ : Shap
 
 /-- An index into a heterogeneous context, carrying a proof of the expected shape. -/
 structure Idx (Γ : List Shape) (s : Shape) where
-  /-- i. -/
+  /-- Position in the heterogeneous context. -/
   i : Fin Γ.length
-  /-- h. -/
+  /-- Proof that the selected context entry has shape `s`. -/
   h : Γ.get i = s
 
 /-- Typed lookup from a heterogeneous context `TList α Γ` using an index `Idx Γ s`. -/
@@ -443,13 +441,13 @@ Informally: if the whole input context is approximated (`approxCtx`), then this 
 approximated (`approxT`) with error at most `bound`.
 -/
 structure FwdNode (toSpec : α → SpecScalar) (Γ : List Shape) (τ : Shape) where
-  /-- forward Spec. -/
+  /-- Specification-level semantics of this node. -/
   forwardSpec : TList SpecScalar Γ → SpecTensor τ
-  /-- forward Runtime. -/
+  /-- Runtime semantics of this node. -/
   forwardRuntime : TList α Γ → Tensor α τ
-  /-- bound. -/
+  /-- Error bound computed from the current context bounds and runtime values. -/
   bound : EList Γ → TList α Γ → SpecScalar
-  /-- sound. -/
+  /-- Local approximation theorem for this node. -/
   sound : ∀ (xS : TList SpecScalar Γ) (xR : TList α Γ) (eps : EList Γ),
       approxCtx (α := α) toSpec xS xR eps →
         approxT (α := α) (toSpec := toSpec) (forwardSpec xS) (forwardRuntime xR) (bound eps xR)

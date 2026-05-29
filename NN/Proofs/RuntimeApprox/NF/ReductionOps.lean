@@ -194,9 +194,8 @@ theorem approxT_reduce_sum_axis1_2d
           -- Rewrite the component of `reduce_sum` at axis=1 to the row sum.
           have hEqS := reduce_sum_axis1_get (α := ℝ) (m := m) (n := n) (x := Tensor.dim xSf) hRed' i
           have hEqR := reduce_sum_axis1_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed' i
-          -- `rw` is brittle here (it does not match definitional equal implicit arguments).
-          -- `convert` produces equality side-goals for each argument and avoids the brittle
-          -- rewrite.
+          -- `convert` exposes the definitional-equality side conditions for the implicit arguments,
+          -- which is exactly what this componentwise approximation needs.
           convert hScalarApprox using 1
 
 -- ---------------------------------------------------------------------------

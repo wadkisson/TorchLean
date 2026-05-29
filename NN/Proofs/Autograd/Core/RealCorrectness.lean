@@ -139,9 +139,7 @@ private theorem dot_elemwise_adjoint {s : Shape}
   -- `mul_spec_assoc` is proved in `NN/Proofs/tensor.lean`.
   simp [mul_spec_assoc]
 
--- ---------------------------------------------------------------------------
--- Primitive ops
--- ---------------------------------------------------------------------------
+-- Primitive operation correctness lemmas for the real-valued autograd semantics.
 
 /--
 Correctness of ReLU’s backward rule.
@@ -234,7 +232,7 @@ Correctness of tanh-approximate GELU's VJP/JVP adjointness rule.
 This proves the linear-algebraic part of the `gelu` backward rule used by Transformer-style
 feed-forward blocks: multiplying the upstream cotangent by the local derivative mask is adjoint to
 multiplying the tangent by the same mask. The scalar calculus theorem for the full tanh
-approximation is intentionally separate because it depends on a longer chain-rule proof through
+approximation is separated because it depends on a longer chain-rule proof through
 `tanh`, `sqrt`, and the cubic inner polynomial.
 
 PyTorch analogue: `torch.nn.functional.gelu(..., approximate="tanh")`.

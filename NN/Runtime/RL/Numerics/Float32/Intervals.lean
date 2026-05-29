@@ -143,7 +143,7 @@ def discountedReturnsIntervals32 {n : Nat}
 /--
 Outward-rounded interval enclosure for fixed-horizon GAE(λ).
 
-This is useful as a coarse “numerical sanity” diagnostic alongside
+This is useful as a coarse numerical diagnostic alongside
 `generalizedAdvantageEstimationVecIEEE32ExecChecked`.
 
 Reference:

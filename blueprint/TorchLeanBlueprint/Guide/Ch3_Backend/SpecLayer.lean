@@ -151,7 +151,7 @@ inference-mode model.
 
 The scalar type `α` is the numerical world in which the model is interpreted. The same architecture
 can be read over real numbers for clean mathematics, over `IEEE32Exec` for executable binary32
-behavior, over intervals for enclosures, or over `Float` for quick runtime examples.
+behavior, over intervals for enclosures, or over `Float` for small runtime examples.
 
 Most TorchLean spec definitions are scalar-polymorphic: they work for any scalar type `α` that
 supports the operations a neural network definition needs.
@@ -171,7 +171,7 @@ This is what lets us reuse the exact same network code for:
 - proofs (`α := ℝ`),
 - executable float32 models (`α := IEEE32Exec`),
 - interval enclosures (verification backends),
-- and small runtime demos (`α := Float`).
+- and small runtime examples (`α := Float`).
 
 ## A Tiny Scalar-Polymorphic Definition
 
@@ -288,7 +288,7 @@ diffusion objectives, reinforcement-learning interfaces, and scientific-ML examp
 and runtime wrappers may choose different execution paths, but the spec files are where the
 mathematical forward maps and objectives are named.
 
-When a demo claims to implement a larger model, a good reading path is:
+When an example claims to implement a larger model, a good reading path is:
 
 1. Open the runnable example to see the user-facing workflow.
 2. Follow the import to the corresponding spec or GraphSpec model.

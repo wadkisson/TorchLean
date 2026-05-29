@@ -25,7 +25,7 @@ public import NN.Entrypoint.Widgets
 `NN.Library` is the curated umbrella import for TorchLean's broad reusable library surface area.
 
 It includes:
-- the public user facade (`NN.API.Public`),
+- the public user API (`NN.API.Public`),
 - subsystem entrypoints (`NN.Entrypoint.*`),
 - the shared op-tagged IR through `NN.Entrypoint.IR`,
 - ML-theory and tensor APIs,
@@ -33,12 +33,12 @@ It includes:
 - and proof-backed verification APIs through `NN.Entrypoint.Verification`.
 
 It excludes:
-- executables / demos that define `main`
+- executables / examples that define `main`
 - test suites and benchmark runners
 
 Trust-boundary documentation lives in `TRUST_BOUNDARIES.md`, where it can cover both Lean
 declarations and external CUDA / Python / Julia / Arb producers without treating those prose notes
-are part of the Lean API.
+as part of the Lean API.
 
 If you’re writing ordinary model/training code, prefer `import NN`. If you want to make the broad
 umbrella explicit in downstream code, use `import NN.Library`. For lighter imports, use

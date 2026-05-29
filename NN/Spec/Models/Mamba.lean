@@ -164,12 +164,12 @@ namespace SelectiveMambaBlockSpec
 variable {α : Type} [Context α]
 variable {inputDim innerDim stateDim outputDim convWidth : Nat}
 
-/-- Content path projection. -/
+/-- Projection feeding the content path before convolution and selective state updates. -/
 def projectX (m : SelectiveMambaBlockSpec α inputDim innerDim stateDim outputDim convWidth)
     (x : Tensor α (.dim inputDim .scalar)) : Tensor α (.dim innerDim .scalar) :=
   vecMatMulSpec x m.xProj
 
-/-- Gate path projection. -/
+/-- Projection feeding the multiplicative gate path in the selective state-space block. -/
 def projectZ (m : SelectiveMambaBlockSpec α inputDim innerDim stateDim outputDim convWidth)
     (x : Tensor α (.dim inputDim .scalar)) : Tensor α (.dim innerDim .scalar) :=
   vecMatMulSpec x m.zProj

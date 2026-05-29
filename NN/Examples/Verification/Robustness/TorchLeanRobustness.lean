@@ -57,7 +57,7 @@ def b1Shape : Shape := .dim hidDim .scalar
 def W2Shape : Shape := .dim outDim (.dim hidDim .scalar)
 /-- Second-layer bias shape. -/
 def b2Shape : Shape := .dim outDim .scalar
-/-- Input shape. -/
+/-- Shape of one input vector supplied to the certified two-layer network. -/
 def xShape : Shape := .dim inDim .scalar
 /-- Output/logit shape. -/
 def yShape : Shape := .dim outDim .scalar

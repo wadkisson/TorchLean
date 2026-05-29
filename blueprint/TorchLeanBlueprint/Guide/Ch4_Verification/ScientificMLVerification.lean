@@ -9,7 +9,7 @@ tag := "scientific-ml-verification"
 %%%
 
 TorchLean also has verification bridges for scientific ML artifacts: ODE enclosures, PINN residual
-certificates, and piecewise polynomial or spline certificates. These are not side demos. They show
+certificates, and piecewise polynomial or spline certificates. These are not side examples. They show
 the same producer/checker discipline when the artifact comes from numerical analysis, Julia,
 Python, or a scientific ML workflow rather than from a standard neural network classifier.
 

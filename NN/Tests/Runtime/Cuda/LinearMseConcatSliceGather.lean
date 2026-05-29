@@ -34,6 +34,7 @@ open Spec
 open Tensor
 open Runtime.Autograd
 
+/-- Run CUDA/CPU parity checks for linear, loss, concat, slice, and gather operators. -/
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: linear/mse/concat/slice/gather ==="
 

@@ -11,7 +11,7 @@ public import Init.Data.Rat
 public import NN.Floats.Interval.IEEEExec32ArbTrans
 
 /-!
-# Comparison helpers for executable interval demos
+# Comparison helpers for executable interval examples
 
 This module contains small, reusable baselines for numerical-audit examples:
 
@@ -46,7 +46,7 @@ namespace Float32Interval
 Closed interval with runtime `Float32` endpoints.
 
 This is a *baseline*, not the verified interval implementation. Operations use ordinary runtime
-`Float32` arithmetic and therefore do not provide outward-rounding guarantees. It is useful in demos
+`Float32` arithmetic and therefore do not provide outward-rounding guarantees. It is useful in examples
 because it shows exactly why `IEEE32Exec.Interval32` exists.
 -/
 structure IntervalF32 where
@@ -141,7 +141,7 @@ namespace RealInterval
 /--
 Closed interval with exact rational endpoints.
 
-This is a compact reference domain for examples. It is intentionally small: enough for corner-rule
+This is a compact reference domain for examples. It is compact: enough for corner-rule
 checks and containment comparisons, not a replacement for a full real-analysis interval library.
 -/
 structure IntervalRat where
@@ -217,8 +217,8 @@ def intervalF32ToRat? (I : Float32Interval.IntervalF32) : Option IntervalRat := 
 /--
 Endpoint-evaluate a unary function over an `IEEE32Exec` interval.
 
-This is intentionally not a sound transcendental interval rule in general; it is a comparison
-baseline for demos.
+This is not a sound transcendental interval rule in general; it is a comparison
+baseline for examples.
 -/
 def intervalUnaryEndpoints (f : IEEE32Exec → IEEE32Exec) (lo hi : IEEE32Exec) : Interval32 :=
   let a := f lo

@@ -14,7 +14,7 @@ public import NN.Runtime.PyTorch.Import
 
 TorchLean’s reusable PyTorch interoperability layer.
 
-This umbrella intentionally contains only bridge infrastructure:
+This umbrella contains the reusable bridge infrastructure:
 
 - export TorchLean IR / parameters to readable PyTorch source;
 - convert PyTorch `state_dict` checkpoints to Lean-readable JSON through a generated Python
@@ -23,7 +23,7 @@ This umbrella intentionally contains only bridge infrastructure:
 - parse those JSON artifacts into shape-checked TorchLean tensors, IR graphs, or verification
   parameter stores.
 
-Model demos and tutorial round-trips live under `NN.Examples.Interop.PyTorch.*`; keeping them there
+Model examples and tutorial round-trips live under `NN.Examples.Interop.PyTorch.*`; keeping them there
 prevents runtime imports from quietly depending on example-only shapes.
 -/
 

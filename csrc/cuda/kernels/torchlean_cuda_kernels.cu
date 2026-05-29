@@ -1960,7 +1960,7 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_broadcast_to(b_lean_ob
     lean_internal_panic("torchlean_cuda_buffer_broadcast_to: input size mismatch");
   }
 
-  // Sanity-check broadcast compatibility (proof-driven, but keep a runtime guard).
+  // Check broadcast compatibility at the FFI boundary before launching the kernel.
   for (size_t ax = 0; ax < rankOut; ++ax) {
     uint32_t mv = hMap[ax];
     if (mv == 0) continue;
@@ -2072,7 +2072,7 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_from_broadcast(
     lean_internal_panic("torchlean_cuda_buffer_reduce_from_broadcast: dOut size mismatch");
   }
 
-  // Sanity-check broadcast compatibility.
+  // Check the same broadcast contract used by the forward path.
   for (size_t ax = 0; ax < rankOut; ++ax) {
     uint32_t mv = hMap[ax];
     if (mv == 0) continue;

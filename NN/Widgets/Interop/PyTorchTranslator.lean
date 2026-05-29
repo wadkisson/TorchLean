@@ -22,7 +22,7 @@ The goal is deliberately modest and honest:
 - recognize common layer constructors by name;
 - emit a TorchLean skeleton using the public `nn.sequential!` style;
 - report the exact boundary between translated layers, layers that need extra shape information,
-  and Python code that is outside this lightweight supported-subset assistant.
+  and Python code that is outside this supported-subset assistant.
 
 This is **not** a verified Python parser and it is not a full PyTorch semantic import. For full
 graph capture, the right path is still the existing `torch.export` JSON bridge in
@@ -57,9 +57,9 @@ A layer shape recognized by the file-based PyTorch supported-subset analyzer.
 
 The constructors intentionally describe *semantic layer families*, not exact Python AST nodes. For
 example, `linear 784 128` can come from `nn.Linear(784, 128)` inside `nn.Sequential`, a field
-assignment such as `self.fc = nn.Linear(784, 128)`, or a compact documentation snippet. This is what
-makes the widget useful for quick editor feedback, while still keeping it honest: anything outside
-this small layer vocabulary is represented as `unsupported` and shown to the user as a boundary.
+assignment such as `self.fc = nn.Linear(784, 128)`, or a compact documentation snippet. The widget
+uses this vocabulary to give immediate editor feedback while still marking anything outside the
+supported subset as `unsupported`.
 -/
 inductive Layer where
   /-- Fully connected layer with numeric `in_features` and `out_features`. -/
@@ -113,7 +113,7 @@ structure Report where
 /--
 Small substring predicate used by the heuristic parser.
 
-Lean's core string API is enough for this lightweight assistant. A VS Code extension should use
+Lean's core string API is enough for this bounded-scope assistant. A VS Code extension should use
 `ast`, `torch.fx`, or `torch.export` on the Python side rather than substring matching.
 -/
 private def hasSubstr (s needle : String) : Bool :=
@@ -452,7 +452,7 @@ def html (snippet : String) : ProofWidgets.Html :=
       {if allSupported then okBadge "supported subset" else warnBadge "boundary report"}
     </div>
     <p style={json% {"margin": "0 0 10px 0"}}>
-      {.text "Lightweight supported-subset assistant for common PyTorch layer stacks. It generates a TorchLean skeleton and names the parts that still need shape contracts or the full torch.export path."}
+      {.text "Supported-subset assistant for common PyTorch layer stacks. It generates a TorchLean skeleton and names the parts that still need shape contracts or the full torch.export path."}
     </p>
     <details «open»={true}>
       <summary>{.text "Recognized layers"}</summary>

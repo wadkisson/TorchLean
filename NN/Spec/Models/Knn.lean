@@ -30,7 +30,7 @@ PyTorch / sklearn analogies:
 - In the Python ecosystem this is closest to `sklearn.neighbors.KNeighborsClassifier` /
   `sklearn.neighbors.KNeighborsRegressor`.
 - kNN is not typically an `nn.Module` in PyTorch, but it is a common baseline for "classic ML"
-  comparisons and for sanity checks.
+  comparisons and reference checks.
 -/
 
 public section
@@ -214,7 +214,7 @@ def predictWeighted (α : Type) (n : ℕ)
 
 /-! ## Helpers -/
 
-/-- Constructor helper (explicit arguments keep elaboration simple in demos). -/
+/-- Constructor helper (explicit arguments keep elaboration simple in examples). -/
 def KNN.fromData (α β : Type) (n : ℕ) (k : Nat)
     (data : List (Tensor α (.dim n .scalar) × β)) : KNN α β n :=
   { k := k, dataset := data }
@@ -254,7 +254,7 @@ def classifyWithDistance (α β : Type) (n : ℕ)
 /-- kNN classification plus a simple confidence score (`maxVotes / k`).
 
 This returns the winning label together with a scalar in `[0,1]` that measures what fraction of the
-neighbors agreed with the winner. This is a heuristic, but it is useful for demos and baselines.
+neighbors agreed with the winner. This is a heuristic, but it is useful for examples and baselines.
 -/
 def classifyWithConfidence (α β : Type) (n : ℕ)
   [Context α] [DecidableRel ((· > ·) : α → α → Prop)]

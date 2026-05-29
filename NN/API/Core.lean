@@ -31,7 +31,7 @@ This module holds the small foundational surface used by the higher-level API mo
 - tensor constructor re-exports
 
 Most end-user code should not import this file directly; it is re-exported through `NN.API.Public`
-and via the top-level `NN` facade.
+and the top-level `NN` import.
 
 ### PyTorch Mapping
 

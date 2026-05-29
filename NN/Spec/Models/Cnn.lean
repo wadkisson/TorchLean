@@ -222,10 +222,7 @@ def cnnWithReluSpec
     |>.composeRight flatten_module
     |>.composeRight linear_module
 
-/-- Run `cnn_spec` forward on a single input image.
-
-This is a convenience wrapper around `SpecChain.forward`.
--/
+/-- Run `cnn_spec` forward on a single input image through the assembled `SpecChain`. -/
 def cnnForward
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
   {inC outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolstride1 poolstride2 :

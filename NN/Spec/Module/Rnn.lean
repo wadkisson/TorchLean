@@ -98,7 +98,6 @@ def GRUModuleSpec {seqLen inputSize hiddenSize : Nat}
   }
 }
 
--- Bidirectional LSTM module
 /-- Bidirectional LSTM wrapper (concatenates forward/backward features). -/
 def BiLSTMModuleSpec {seqLen inputSize hiddenSize : Nat}
   (forward_lstm : LSTMSpec α inputSize hiddenSize)
@@ -201,7 +200,6 @@ def GRUCellModuleSpec {inputSize hiddenSize : Nat}
   }
 }
 
--- Bidirectional RNN module
 /-- Bidirectional RNN wrapper (concatenates forward/backward features).
 
 We run the RNNSpec forward over `x`, run it again over the reversed sequence, then reverse outputs

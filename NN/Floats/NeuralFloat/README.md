@@ -10,7 +10,7 @@ executable kernel.
 - `Rounding.lean`: rounding modes and `neural_round` validation classes.
 - `NF.lean`: `NF` ("neural float") as a rounded scalar type with `Context` instances.
 - `NNOps.lean`: a small library of rounded scalar functions used by NN specs, built on `neural_round`.
-- `Conversion.lean`: conversion helpers with lightweight error metadata.
+- `Conversion.lean`: conversion helpers with format and error metadata.
 - `ErrorBounds.lean`: small reusable error bound lemmas for composing proofs.
 
 For executable, bit-level IEEE-754 float32 behavior (NaN/Inf/signed zero), see `NN/Floats/IEEEExec/`.

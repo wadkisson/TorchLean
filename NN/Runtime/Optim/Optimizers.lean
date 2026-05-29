@@ -21,7 +21,7 @@ Why “pure functions”?
 
 In PyTorch, optimizers mutate parameters in-place and keep state in Python objects.
 In TorchLean, we want the update rule itself to be explicit and easy to reuse:
-- eager demos can call the update directly,
+- eager examples can call the update directly,
 - the runtime training engine can store state in maps keyed by parameter ids,
 - and proofs can refer to the same update equations.
 
@@ -34,7 +34,7 @@ Where this file sits in the stack:
 - `NN.Runtime.Autograd.TorchLean.Optim` lifts those equations to runtime parameter lists; and
 - `NN.API.Runtime` exposes ergonomic `optim.sgd`, `optim.adam`, and related configuration helpers.
 
-That separation is deliberate: the formula appears once, while runtime adapters and public API
+With this separation, the formula appears once while runtime adapters and public API
 configuration can evolve independently around it.
 
 Why each optimizer has its own `State` structure:
@@ -52,7 +52,7 @@ The generic abstraction lives one layer up:
 - `Runtime.Autograd.Train.OptimizerState` handles dynamic parameter groups and checkpoint-style
   maps for the training-loop API.
 
-So this file intentionally favors small canonical state records over an inheritance hierarchy.
+The result is a collection of canonical state records rather than an inheritance hierarchy.
 
 References (original algorithms / common variants):
 - AdaGrad (Duchi–Hazan–Singer, 2011): https://jmlr.org/papers/v12/duchi11a.html
@@ -556,7 +556,7 @@ A shape-safe gradient projector.
 
 GaLore-style training periodically builds a low-rank subspace for a large matrix parameter,
 projects the gradient into that subspace, runs a base optimizer there, and lifts the update back to
-the original parameter shape. This record is deliberately only the algebraic interface: the
+the original parameter shape. This record is the algebraic interface; the
 expensive policy that computes or refreshes the projector belongs to the runtime layer.
 -/
 structure Projector (α : Type) (full low : Shape) where
@@ -591,7 +591,7 @@ def projectedSGDUpdate {α : Type} [Context α] [DecidableRel ((· > ·) : α �
 /--
 With the identity projector, projected SGD is exactly ordinary SGD.
 
-This is the main sanity check for the GaLore extension point: adding a projection backend cannot
+This is the main invariant for the GaLore extension point: adding a projection backend cannot
 silently change the base optimizer when the backend is the identity.
 -/
 theorem projectedSGDUpdate_identity_eq_sgd {α : Type} [Context α]

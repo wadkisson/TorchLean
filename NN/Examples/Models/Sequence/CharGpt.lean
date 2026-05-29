@@ -113,7 +113,7 @@ namespace TrainOptions
 def steps (train : TrainOptions) : Nat :=
   train.base.train.steps
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used by the character-level language-model command. -/
 def lr (train : TrainOptions) : Float :=
   train.base.lr
 

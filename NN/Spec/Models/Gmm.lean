@@ -290,7 +290,7 @@ private def uniformWeights {nComponents : Nat} : Tensor α (.dim nComponents .sc
 
 /-- Default initialization for a GMM.
 
-This is intentionally simple and deterministic:
+This is kept simple and deterministic:
 
 - uniform weights,
 - zero means,

@@ -76,9 +76,7 @@ lemma le_foldl_max_of_mem {ι β : Type} [LinearOrder β] (l : List ι) (f : ι 
         simpa [List.foldl] using le_trans h1 h2
       · simpa [List.foldl] using ih (acc := max acc (f hd)) hiTail
 
--- ---------------------------------------------------------------------------
--- Addition folds
--- ---------------------------------------------------------------------------
+-- Left-fold addition lemmas used to normalize finite sums in later proofs.
 
 /--
 Turn `foldl (fun a x => a + f x) acc` into `acc + foldl (fun a x => a + f x) 0`.
@@ -105,4 +103,3 @@ lemma add_foldl_add0 {α β : Type} [AddMonoid β] (l : List α) (f : α → β)
   simpa using (foldl_add_init (l := l) (f := f) (acc := acc)).symm
 
 end List
-

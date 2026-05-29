@@ -327,8 +327,8 @@ theorem contractHolds_of_checkTransitionFin_eq_ok {obsShape : Spec.Shape} {nActi
                           (obs := nextObservation) (by simpa using hNextObs) }
 
 /--
-Convenience wrapper: run the executable checker and, on success, return the transition bundled
-with the Prop-level contract proof.
+Run the executable checker and, on success, return the transition bundled with the Prop-level
+contract proof.
 
 This is the “checked preconditions” interface for downstream proofs/programs:
 instead of assuming a contract, you explicitly *check* it and obtain a usable hypothesis.

@@ -2,7 +2,7 @@
 """
 TorchLean repo lints (project-specific).
 
-This linter stays lightweight and dependency-free so it can run in CI and locally.
+This linter stays dependency-free so it can run in CI and locally.
 
 Checks are split into:
   - errors: must be fixed (fail CI)
@@ -118,7 +118,7 @@ def _mask_lean_comments_and_strings(text: str) -> str:
 
     Notes:
       - Lean block comments `/- ... -/` nest; the scanner tracks nesting depth.
-      - The scanner remains lightweight (no full parser), but it avoids treating comment
+      - The scanner is lexical (no full parser), but it avoids treating comment
         markers inside strings as comments.
     """
 
@@ -320,8 +320,9 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
             # Only a coarse signal; report once per file.
             if re.search(r"set_option\s+linter\.[A-Za-z0-9_]+\s+false", masked):
                 rel_posix = path.relative_to(REPO_ROOT).as_posix()
-                # Examples/tests/tools are allowed to be a bit rough; keep the signal focused on
-                # library-facing code.
+                # Some executable examples, tests, and maintenance scripts scope linter options
+                # locally. Keep this warning focused on library-facing code where suppressions are
+                # part of the public proof surface.
                 if (
                     rel_posix in ALLOWED_LINTER_SUPPRESSION_FILES
                     or

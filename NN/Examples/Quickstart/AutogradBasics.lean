@@ -34,13 +34,13 @@ open NN.Tensor
 open NN.API
 
 /-!
-This file is a curated "autodiff API tour". It intentionally avoids:
+This file is a curated "autodiff API tour". It avoids:
 
 - low-level runtime tape/session code,
 - hand-written parameter-shape bookkeeping,
 - noisy `castTensor` helpers.
 
-Instead, it uses the public `API.autograd.*` facade and `tensorF! cast ...` to build deterministic
+Instead, it uses the public `API.autograd.*` surface and `tensorF! cast ...` to build deterministic
 constants for any runtime scalar `α`.
 -/
 

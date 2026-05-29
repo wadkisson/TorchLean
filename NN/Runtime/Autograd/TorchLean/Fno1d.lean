@@ -391,6 +391,7 @@ by examples and by CUDA parity checks.
 
 
 abbrev vec (n : Nat) : Shape := .dim n .scalar
+/-- Matrix shape abbreviation used by the real-valued FNO reference path. -/
 abbrev mat (m n : Nat) : Shape := .dim m (.dim n .scalar)
 
 /-- Cosine part of the DFT matrix (unnormalized). -/
@@ -572,6 +573,7 @@ def block
             _root_.Runtime.Autograd.Torch.relu (m := m) (α := α) (s := mat grid width) y)
   }
 
+/-- Build a sequence of FNO residual blocks with deterministic per-block seeds. -/
 def blocksSeq (grid width modes blocks : Nat) (seed : Nat) (hModes : 2 * modes ≤ grid) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq (mat grid width) (mat grid width) :=
   match blocks with

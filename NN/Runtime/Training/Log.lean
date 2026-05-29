@@ -14,7 +14,7 @@ public import Lean.Data.Json.Printer
 
 Pure training-log data plus the stable JSON codec used by examples, widgets, and CLI artifacts.
 
-The data structures in this file are deliberately small:
+The data structures in this file are compact:
 - `Series` is one named scalar metric, such as loss or accuracy;
 - `Curve` is the convenient builder for one metric over time;
 - `MetricHistory` is the convenient builder for several aligned metrics; and
@@ -40,8 +40,8 @@ open Json
 /-!
 ## Core Artifact Model
 
-TorchLean logs are intentionally local-first. The shape mirrors the small useful subset of hosted
-experiment trackers such as Weights & Biases:
+TorchLean logs are local artifacts with a schema that mirrors the useful scalar-metric subset of
+hosted experiment trackers such as Weights & Biases:
 - a run has project/name/id metadata,
 - config records hyperparameters and data choices,
 - metric history records scalar values over steps,
@@ -74,8 +74,8 @@ structure Artifact where
 /--
 Run metadata for a local experiment.
 
-This is deliberately close to the mental model of W&B (`project`, `name`, `group`, `tags`, config),
-but it remains a plain Lean value and does not perform network IO.
+The fields line up with the common tracker vocabulary (`project`, `name`, `group`, `tags`, config),
+but the value is plain Lean data and performs no network IO.
 -/
 structure RunInfo where
   /-- Project or collection name. Examples usually use `"torchlean"`. -/
@@ -142,7 +142,7 @@ end TrainLog
 Use this when a training routine records one scalar repeatedly, such as training loss, validation
 loss, learning rate, or reward. Convert it to `TrainLog` for JSON persistence and widgets.
 
-We intentionally store curves as `Array`s (not tensors):
+Curves use `Array`s rather than tensors:
 - curve lengths are runtime-dependent,
 - curves are persisted as JSON for widgets, and
 - typed tensors are reserved for fixed-shape model inputs/outputs.
@@ -325,7 +325,7 @@ Examples should make logging explicit. `LogDestination.disabled` is the local eq
 
 /-- Where a training routine should send its log artifact. -/
 inductive LogDestination where
-  /-- Do not write a log artifact. Useful for lightweight tests or CI runs. -/
+  /-- Do not write a log artifact. Useful for tests, CI, and runs where metrics are printed only. -/
   | disabled
   /-- Write a local JSON artifact to the given path. -/
   | json (path : System.FilePath)
@@ -373,13 +373,13 @@ end LogDestination
 ## JSON Codec
 
 Training logs are often produced by executable examples and then rendered later by widgets. The
-codec below is intentionally stable and human-readable:
+codec below is stable and human-readable:
 - finite floats are JSON numbers;
 - non-finite floats are string sentinels (`"NaN"`, `"Infinity"`, `"-Infinity"`);
 - missing optional fields fall back to the same defaults as the Lean structures.
 
-This is not intended to be a high-throughput experiment tracker. It is a small artifact format that
-keeps examples, tests, widgets, and external tooling speaking the same language.
+This artifact format keeps examples, tests, widgets, and external tooling speaking the same
+language.
 -/
 
 namespace JsonCodec
@@ -414,7 +414,7 @@ def floatOfJsonE (field : String) (j : Json) : Except String Float :=
         | _ => .error s!"Metric JSON: `{field}` expected a number, got string `{s}`."
   | _ => .error s!"Metric JSON: `{field}` expected a number."
 
-/-- Encode natural-number arrays used by logs and lightweight runtime artifacts. -/
+/-- Encode natural-number arrays used by logs and runtime artifacts. -/
 def natArrayToJson (xs : Array Nat) : Json :=
   .arr (xs.map (fun n => Json.num (JsonNumber.fromNat n)))
 
@@ -429,7 +429,7 @@ def natArrayOfJsonE (field : String) (j : Json) : Except String (Array Nat) := d
     | .ok n => pure n
     | .error e => throw s!"Metric/artifact JSON: `{field}` expected Nat entries: {e}")
 
-/-- Encode string-note arrays used by logs and lightweight runtime artifacts. -/
+/-- Encode string-note arrays used by logs and runtime artifacts. -/
 def stringArrayToJson (xs : Array String) : Json :=
   .arr (xs.map (fun s => .str s))
 

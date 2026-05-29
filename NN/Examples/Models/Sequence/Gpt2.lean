@@ -45,6 +45,14 @@ public import NN.Runtime.Autograd.TorchLean.NN
 public import NN.API.Runtime
 
 /-!
+GPT-2 style sequence model example.
+
+This file defines the runnable causal language-model architecture used by the example CLI,
+including training, generation, and infoview helpers that exercise the same runtime path as the
+command-line model.
+-/
+
+/-!
 # GPT-2-Style Causal Language Model Example
 
 Runnable `torchlean gpt2` example. It builds a compact GPT-2-style causal transformer over
@@ -230,7 +238,7 @@ namespace TrainOptions
 def steps (train : TrainOptions) : Nat :=
   train.base.train.steps
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used by the GPT-style training command. -/
 def lr (train : TrainOptions) : Float :=
   train.base.lr
 

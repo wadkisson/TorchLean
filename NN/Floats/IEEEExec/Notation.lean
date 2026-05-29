@@ -31,7 +31,7 @@ NaN₃₂      -- `IEEE32Exec.canonicalNaN`
 ⟦x⟧₃₂ᴱ     -- `IEEE32Exec.toEReal x`
 ```
 
-The notation here is kept small: it targets readability in docs/proofs, not a full DSL.
+The notation here is focused: it targets readability in docs/proofs, not a full DSL.
 -/
 
 @[expose] public section

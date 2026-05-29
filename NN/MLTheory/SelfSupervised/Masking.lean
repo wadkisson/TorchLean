@@ -11,7 +11,7 @@ import Mathlib.Data.List.Basic
 /-!
 # Masking primitives for self-supervised objectives
 
-This file gives a small finite-index vocabulary for masked prediction objectives.  It is deliberately
+This file gives a small finite-index vocabulary for masked prediction objectives. It stays
 independent of any particular image or transformer implementation: a patch/token collection is just
 `Fin n → α`, and a mask is a Boolean predicate on `Fin n`.
 
@@ -26,7 +26,7 @@ namespace NN.MLTheory.SelfSupervised
 /-- A finite mask over `n` patches/tokens. `true` means the index is selected. -/
 abbrev Mask (n : Nat) := Fin n → Bool
 
-/-- Predicate form of a mask. -/
+/-- Proposition stating that index `i` is selected by the Boolean mask `m`. -/
 def selected {n : Nat} (m : Mask n) (i : Fin n) : Prop :=
   m i = true
 
@@ -34,11 +34,11 @@ def selected {n : Nat} (m : Mask n) (i : Fin n) : Prop :=
 def allMask (n : Nat) : Mask n :=
   fun _ => true
 
-/-- The empty mask. -/
+/-- Mask selecting no positions. -/
 def emptyMask (n : Nat) : Mask n :=
   fun _ => false
 
-/-- Complement a mask. -/
+/-- Pointwise Boolean complement of a mask. -/
 def complement {n : Nat} (m : Mask n) : Mask n :=
   fun i => !(m i)
 

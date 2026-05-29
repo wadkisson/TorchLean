@@ -31,7 +31,7 @@ verified against the (trusted-for-this-theorem) IBP bounds.
 
 ## Background / citations
 
-This checker is deliberately narrow and certificate-friendly. Conceptually, β-phase
+This checker is kept narrow and certificate-friendly. Conceptually, β-phase
 information corresponds to the phase constraints used in branch-and-bound based verifiers
 (and in β-CROWN-style splitting), where additional information can turn unstable ReLUs into
 provably active/inactive ones.

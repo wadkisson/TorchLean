@@ -223,9 +223,7 @@ lemma toVecE_linear_spec {inDim outDim : Nat}
   classical
   simp [Spec.linearSpec, affine, toVecE_add_spec, toVecE_mat_vec_mul_spec]
 
--- ---------------------------------------------------------------------------
--- ReLU on Euclidean vectors
--- ---------------------------------------------------------------------------
+-- Coordinatewise ReLU on Euclidean vectors and its differentiability facts.
 
 /-- Coordinatewise ReLU on `Fin n → ℝ` (function-space representation). -/
 def reluFun {n : Nat} (x : Fin n → ℝ) : Fin n → ℝ :=

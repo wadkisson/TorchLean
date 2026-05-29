@@ -35,6 +35,7 @@ open Spec.Hopfield
 
 variable {n : Nat}
 
+/-- One full cyclic sweep of coordinate updates over `Fin n`. -/
 noncomputable def cycleUpdate (p : Params ℝ n) (s : State n) : State n :=
   (List.finRange n).foldl (fun s u => updateAt (α := ℝ) p s u) s
 

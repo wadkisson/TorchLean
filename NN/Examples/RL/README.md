@@ -26,7 +26,7 @@ The Python boundary helpers live under `scripts/rl/` so runtime code does not de
 
 ## Recommended Workflow
 
-1. Train or smoke test a Lean example:
+1. Train or runtime check a Lean example:
 
 ```bash
 lake exe torchlean ppo_gridworld --updates 200

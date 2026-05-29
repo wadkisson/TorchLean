@@ -19,7 +19,7 @@ module
 # Trusted CUDA Runtime Boundary
 
 This module contains the opaque CUDA buffer type and the single inhabitance axiom needed to make the
-external FFI type usable from Lean. It is intentionally compact: all declarations here are part of the
+external FFI type usable from Lean. It is kept compact: all declarations here are part of the
 TorchLean trusted computing base for CUDA execution.
 -/
 

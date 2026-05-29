@@ -96,7 +96,7 @@ namespace TrainOptions
 def steps (train : TrainOptions) : Nat :=
   train.base.train.steps
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used by the Mamba-style text command. -/
 def lr (train : TrainOptions) : Float :=
   train.base.lr
 

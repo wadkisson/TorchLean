@@ -13,7 +13,7 @@ public import NN.Runtime.Autograd.Train.IoLoader.Common
 
 Small CSV helpers for TorchLean examples and runtime regression tests.
 
-The parser is deliberately narrow: unquoted delimiter-separated numeric cells only. It does not
+The parser is kept narrow: unquoted delimiter-separated numeric cells only. It does not
 support quoted fields, escaped delimiters, locale-specific number formats, `NaN`, or `inf`.
 Keeping that grammar explicit is better than accidentally treating this as a production CSV
 library.
@@ -142,7 +142,7 @@ def parseCsvLine (tag : String) (opts : CsvOptions) (rowIdx : Nat) (line : Strin
 /--
 Read a CSV file into a list of float rows.
 
-This helper is intended for small example datasets and smoke tests, not a full CSV
+This helper is intended for compact example datasets and runtime checks, not a full CSV
 implementation.
 -/
 def readCsvFloatRows (path : System.FilePath) (opts : CsvOptions := {}) :

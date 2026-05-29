@@ -579,7 +579,7 @@ theorem div_sound (A B : Interval32) (hA : Valid A) (hB : Valid B) :
 ## Reciprocal as a special case of division
 
 `Interval32.inv B` is defined as `Interval32.div (point posOne) B`. To state its soundness in the
-expected mathematical form (`1 / y`), we need a small sanity lemma about the float constant
+expected mathematical form (`1 / y`), we need a small normalization lemma about the float constant
 `posOne`.
 -/
 

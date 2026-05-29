@@ -10,7 +10,7 @@ tag := "datasets-loaders"
 
 A model tutorial is only useful for a few minutes if it trains on one hard-coded tensor. This page
 explains how data enters TorchLean: as in-memory samples, file-backed tensors, deterministic
-loaders, and minibatches with shapes the model can see. The surface is intentionally close to
+loaders, and minibatches with shapes the model can see. The surface is close by design to
 `torch.utils.data`, but the samples carry Lean shapes.
 
 The reader model is:
@@ -57,7 +57,7 @@ let dataset :=
 ```
 
 This is the TorchLean analogue of a small PyTorch `TensorDataset`: a finite dataset whose elements
-are already tensors. It is excellent for quickstarts, tests, and examples where the point is the
+are already tensors. It is excellent for introductory examples, tests, and examples where the point is the
 model or proof interface rather than file IO.
 
 The image band dataset used by the CNN tutorial lives in
@@ -69,7 +69,7 @@ For real data, TorchLean uses small, predictable file contracts:
 
 - `.npy` for numeric tensors;
 - small numeric CSV for tabular examples;
-- text files for sequence demos;
+- text files for sequence examples;
 - conversion scripts for formats such as image folders, `.mat`, `.pt`, `.pth`, or `.npz`.
 
 The public source types are:

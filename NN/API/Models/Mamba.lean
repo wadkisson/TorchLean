@@ -135,6 +135,7 @@ def selectiveMambaFloat (cfg : MambaTextConfig) :
     outProj := mambaMatrixFloat
       (fun i j => mambaCenteredHash (i.val * 29 + j.val * 11 + 5) 53 / 3.0) }
 
+/-- Deterministic starting offsets for fixed-width language-model training windows. -/
 def mambaTrainingOffsets (tokenCount seqLen windows : Nat) : List Nat :=
   let usable := if tokenCount > seqLen + 1 then tokenCount - seqLen - 1 else 1
   let stride := Nat.max 1 (usable / Nat.max 1 windows)

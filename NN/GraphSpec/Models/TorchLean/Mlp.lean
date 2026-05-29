@@ -31,11 +31,11 @@ TorchLean exposes two related layers:
 2. `NN.GraphSpec.Models.TorchLean.*`: executable architecture constructors used by runtime
    training/evaluation utilities (with `.eager` / `.compiled` backends).
 
-In `NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivSmoke` we assert that (for the same
+In `NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivCheck` we assert that (for the same
 initialized parameters) TorchLean’s forward pass agrees with the Spec forward pass.
 
 For an **opt-in** executable that trains this MLP with `Torch.Options.fastKernels` and
-`useGpu` (GEMM path for every `linear`), run the demo executable:
+`useGpu` (GEMM path for every `linear`), run the example executable:
 
 - CPU: `lake exe torchlean mlp --cpu --steps 10`
 - CUDA: `lake build -R -K cuda=true && lake exe torchlean mlp --cuda --fast-kernels --steps 10`

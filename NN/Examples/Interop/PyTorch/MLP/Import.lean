@@ -47,7 +47,7 @@ open Json
 -- - sequential parameter style: `layers.0.weight`, `layers.0.bias`, `layers.2.weight`, `layers.2.bias`
 /-- Typed view of an MLP PyTorch `state_dict` (two linear layers).
 
-We keep the tensors as `Float` because these importers are meant for runtime demos: train in Python,
+We keep the tensors as `Float` because these importers are meant for runtime examples: train in Python,
 export to JSON, then run/verify in TorchLean.
 -/
 structure MlpStateDict (inDim hidDim outDim : Nat) where

@@ -255,9 +255,9 @@ An index into a heterogeneous context, carrying a proof of the expected shape.
 This lets us talk about “the `i`th saved tensor has shape `s`” without losing the shape invariant.
 -/
 structure Idx (Γ : List Shape) (s : Shape) where
-  /-- i. -/
+  /-- Position in the heterogeneous context. -/
   i : Fin Γ.length
-  /-- h. -/
+  /-- Proof that the selected context entry has shape `s`. -/
   h : Γ.get i = s
 
 /-- Read an element from a context using an index with an attached shape proof. -/

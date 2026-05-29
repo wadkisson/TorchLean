@@ -71,7 +71,7 @@ def tinyTrainLog : Runtime.Training.TrainLog :=
 /-!
 The commands below are ordinary Lean commands that render editor panels through ProofWidgets.
 They do not alter the definitions above and they are not part of any proof. This is why widgets are
-safe to keep in quickstarts: deleting the commands leaves the same tensors, graphs, logs, and Python
+safe to keep in introductory examples: deleting the commands leaves the same tensors, graphs, logs, and Python
 source files behind.
 -/
 
@@ -86,7 +86,7 @@ source files behind.
 #shape_infer_view addGraph
 
 /-!
-The translator widget is intentionally placed next to the IR/shape widgets. It is a lightweight
+The translator widget is placed next to the IR/shape widgets. It is a bounded-scope
 preview for "what would this PyTorch layer stack look like in TorchLean?" The checked graph-capture
 path is still the `torch.export` importer, which parses and validates explicit IR JSON.
 -/

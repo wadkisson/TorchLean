@@ -19,7 +19,7 @@ examples need:
 - C-order arrays directly, and Fortran-order arrays converted to C-order at load time;
 - typed 1D and 2D tensor views for vectors and matrices.
 
-The loader deliberately stays narrow. It is a runtime bridge for trusted experiment artifacts, not
+The loader stays narrow. It is a runtime bridge for trusted experiment artifacts, not
 a general NumPy parser and not part of the formal tensor semantics. Keeping it here, under
 `Runtime.Autograd.Train`, makes that boundary visible while still giving examples a convenient path
 from Python-produced arrays into TorchLean tensors.
@@ -261,15 +261,15 @@ This supports the common tutorial workflow where a large exported tensor is kept
 uses only the first `n` rows. The rank and trailing dimensions must match exactly; only dim 0 may be
 larger than requested.
 
-The implementation intentionally repeats the small NPY header checks instead of calling `parseNpy`
-and slicing afterwards.  `parseNpy` decodes the entire data payload; that is fine for small examples
-but wasteful when a command asks for a quick prefix of a real image or sequence dataset.  Here we
+The implementation repeats the compact NPY header checks instead of calling `parseNpy`
+and slicing afterwards.  `parseNpy` decodes the entire data payload; that is fine for compact examples
+but wasteful when a command asks for a small prefix of a real image or sequence dataset.  Here we
 read the header, validate that the file layout is compatible with the requested type-level shape,
 and then decode exactly `expectedShape.product` elements.
 
 Why C-order only?  In row-major NPY files, the first `n` rows are physically contiguous, so the
 prefix is exactly the first `n * trailingSize` elements.  In Fortran-order files the same logical
-prefix is interleaved across the payload, so a cheap prefix decode would be wrong.  Rather than
+prefix is interleaved across the payload, so prefix decoding would be unsound.  Rather than
 silently returning bad rows, we reject Fortran-order prefix loading and ask callers to convert the
 array to C-order first.
 -/

@@ -11,14 +11,13 @@ public import NN.Runtime.Autograd.Train.Core
 /-!
 # Dataset and data loader utilities
 
-This module defines a small in-memory dataset wrapper together with a deterministic (seeded) loader.
+This module defines an in-memory dataset wrapper together with a deterministic (seeded) loader.
 The shuffling logic is pure and reproducible.
 
 Design boundary:
-- this is not a replacement for high-throughput framework data loaders;
-- it is a small, auditable loader for examples, tests, and proof-adjacent training loops;
-- large or streaming datasets should sit above this layer and feed already-collated tensors into
-  the runtime.
+- this layer owns deterministic in-memory sampling and batching;
+- streaming datasets and framework-scale input pipelines can sit above it; and
+- once tensors are collated, the same training loops consume them through the runtime loader API.
 -/
 
 @[expose] public section
@@ -31,7 +30,7 @@ namespace Train
 /-!
 ## Dataset
 -/
-/-- A lightweight in-memory dataset wrapper backed by an `Array`. -/
+/-- In-memory dataset wrapper backed by an `Array`. -/
 structure Dataset (a : Type) where
   /-- Samples stored in insertion order. -/
   data : Array a
@@ -79,7 +78,7 @@ def get? (ds : Dataset a) (i : Nat) : Option a :=
 def map (f : a -> b) (ds : Dataset a) : Dataset b :=
   { data := ds.data.map f }
 
-/-- Append two datasets. -/
+/-- Concatenate two datasets while preserving sample order. -/
 def append (x y : Dataset a) : Dataset a :=
   { data := x.data ++ y.data }
 
@@ -159,7 +158,7 @@ end Dataset
 Deterministic data loader configuration.
 
 `epoch` threads the seed and (optionally) shuffles to produce a list of batches. This is a
-deliberately small, pure analogue of a PyTorch `DataLoader`.
+pure, local analogue of a PyTorch `DataLoader`.
 -/
 structure DataLoader (a : Type) where
   /-- Dataset to batch. The loader keeps this value pure and explicit. -/

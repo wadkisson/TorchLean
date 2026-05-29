@@ -18,7 +18,7 @@ the text-model and diffusion walkthroughs. For the clearest motivation, read Bug
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/ir-bounds.png' | relative_url }}" alt="TorchLean graph IR to interval bounds example"/>
     <span class="showcase-body">
       <span class="showcase-title">Graph IR and Bounds</span>
-      <span class="showcase-text">Follow a small model as it becomes an op-tagged graph, then use that graph for shape checks, execution traces, and interval bounds.</span>
+      <span class="showcase-text">Follow a compact model as it becomes an op-tagged graph, then use that graph for shape checks, execution traces, and interval bounds.</span>
       <span class="showcase-link">Open guide page</span>
     </span>
   </a>

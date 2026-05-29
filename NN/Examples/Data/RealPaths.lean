@@ -11,12 +11,12 @@ public import NN.API.Core
 /-!
 # Real Dataset Paths
 
-Small tutorial fixtures live in `NN.Examples.Data.ToyPaths`.
+Generated tutorial fixtures live in `NN.Examples.Data.SamplePaths`.
 
 This module names the default paths used by examples that train on externally
 downloaded datasets prepared by `scripts/datasets/download_example_data.py`.
 
-The files are intentionally not committed: CIFAR-10 and text corpora are real datasets with their
+The files are not committed: CIFAR-10 and text corpora are real datasets with their
 own licenses/citation expectations, and CI should not download hundreds of megabytes implicitly.
 -/
 
@@ -115,7 +115,7 @@ def textDir (dataDir : System.FilePath := defaultDataDir) : System.FilePath :=
 def tinyShakespeare (dataDir : System.FilePath := defaultDataDir) : System.FilePath :=
   textDir dataDir / "tiny_shakespeare.txt"
 
-/-- TinyStories validation split, useful for small local language-model smoke training. -/
+/-- TinyStories validation split, useful for small local language-model training checks. -/
 def tinyStoriesValid (dataDir : System.FilePath := defaultDataDir) : System.FilePath :=
   textDir dataDir / "tinystories_valid.txt"
 

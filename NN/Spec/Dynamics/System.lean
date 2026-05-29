@@ -35,7 +35,7 @@ All of these topics share the same shape: they are statements about *trajectorie
 repeatedly applying an update rule, not about a specific runtime implementation. That is why this
 file abstracts the core notion down to `step : SpecTensor s → SpecTensor s`.
 
-This file deliberately contains two kinds of objects:
+This file provides two complementary layers:
 
 - executable semantics (`iterate`, `trajectory`, `iterateWithInput`, and adapters such as
   `DrivenSystem.freeze`), and

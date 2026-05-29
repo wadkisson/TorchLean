@@ -50,6 +50,7 @@ section
 
 variable (p : Params ℝ n)
 
+/-- The full-sweep update map whose iterates define Hopfield cyclic dynamics. -/
 noncomputable def f : State n → State n := cycleUpdate (n := n) p
 
 private lemma energy_iterate_le

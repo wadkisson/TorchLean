@@ -23,7 +23,7 @@ PyTorch mental model:
 There are two "layers" in this file:
 
 - `LinearSVM`: the clean mathematical model + objective + backward pass (VJP-style gradients);
-- `fitLinearSVM`/`predict`: a small training + prediction wrapper used by smoke tests and demos.
+- `fitLinearSVM`/`predict`: a small training + prediction wrapper used by runtime checks and examples.
 
 Note on naming: classic SVM literature often uses a parameter `C` that weights the hinge term.
 In this file, `fitLinearSVM` takes a parameter named `C`, but we use it as the L2
@@ -177,7 +177,7 @@ def LinearSVM.backward
 ## A Small Training Wrapper (Gradient Descent)
 
 The `LinearSVM` definitions above are enough for "spec math".
-For demos/tests, it is convenient to package a trained parameter pair together with a simple
+For examples/tests, it is convenient to package a trained parameter pair together with a simple
 predictor, so we provide:
 
 - `SVM`: a small record holding `(weights, bias)` and a heuristic support-vector index tensor,
@@ -186,7 +186,7 @@ predictor, so we provide:
 -/
 
 /--
-Small trained SVM bundle for demos/tests.
+Small trained SVM bundle for examples/tests.
 
 This is not a full SMO-style solver; it is a deterministic gradient-descent baseline that is
 useful as a reference model in the TorchLean spec layer.
@@ -203,7 +203,7 @@ structure SVM (p n : ℕ) (α : Type) where
 Heuristic support-vector index extractor.
 
 We mark an example as a "support vector" if its margin is close to `1`. This is only meant for
-introspection and demos (it is not used by the optimizer).
+introspection and examples (it is not used by the optimizer).
 -/
 def findSupportVectorIndices {n p : Nat}
   (X : Tensor α (.dim n (.dim p .scalar)))
@@ -268,14 +268,11 @@ def predict {n p : ℕ} (model : SVM p n α) (X : Tensor α (.dim n (.dim p .sca
       -- Tie-breaking at `0` is arbitrary; we choose `-1` for determinism.
       Tensor.scalar (-(1 : α)))
 
--- Kernel functions
 namespace Kernel
-  -- Linear kernel: k(x, y) = x·y
 /-- Linear kernel: `k(x, y) = x·y`. -/
 def linear {p : ℕ} (x y : Tensor α (.dim p .scalar)) : α :=
   Tensor.dotSpec x y
 
--- Polynomial kernel: k(x, y) = (x·y + c)^d
 /-- Polynomial kernel: `k(x, y) = (x·y + c)^degree` (naive power for generic `α`). -/
 def polynomial {p : ℕ} (degree : Nat) (c : α) (x y : Tensor α (.dim p .scalar)) : α :=
   let dot := Tensor.dotSpec x y

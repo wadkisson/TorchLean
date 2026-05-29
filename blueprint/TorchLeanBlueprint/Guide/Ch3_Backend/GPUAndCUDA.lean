@@ -25,7 +25,7 @@ flags.
    CUDA toolkit. Building with `-K cuda=true` is an explicit decision to link native device code.
 2. *CUDA is a runtime backend, not a second semantics.* The Lean model, the spec layer, and the
    verifier IR keep their meaning. CUDA changes where supported float32 tensor work runs.
-3. *The backend is intentionally narrow.* The first target is float32 tensor work used by the model
+3. *The backend is focused.* The first target is float32 tensor work used by the model
    zoo: matmul, convolution, reductions, attention helpers, FFT/FNO kernels, and related VJP rules.
 4. *Runtime agreement is stated explicitly.* TorchLean documents which facts are proved in Lean,
    which behaviors are specified in Lean, and which native behaviors are validated by tests.
@@ -68,7 +68,7 @@ That flag samples the CUDA allocator every `N` optimizer updates. It reports liv
 allocation state and warns if the observed free-memory trend would exhaust the device before the
 requested run length. When a long CUDA run does not pass an explicit cadence, the public model
 examples choose a small default number of samples. This is part of the public runner interface, not
-a one-off benchmark script, so MLP, CNN, GPT-style, ResNet, ViT, and other model commands can report
+a separate benchmark script, so MLP, CNN, GPT-style, ResNet, ViT, and other model commands can report
 the same kind of long-run memory signal.
 
 If either piece is missing, TorchLean should fail loudly rather than silently claiming that GPU
@@ -76,7 +76,7 @@ execution happened.
 
 # What Lives In The CUDA Backend
 
-The native backend is deliberately small enough to audit:
+The native backend is bounded enough to audit:
 
 - [`tensor/`](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/tensor/)
   owns raw float32 buffers and elementwise tensor kernels;
@@ -272,7 +272,7 @@ FlashAttention implementation would require a separate native-kernel proof or co
 
 Read CUDA claims at the right level:
 
-- CUDA demo ran: the native path executed and produced values.
+- CUDA example ran: the native path executed and produced values.
 - CUDA parity test passed: the native path matched CPU, stub, or reference cases under the test
   conditions.
 - Lean spec theorem: the pure Lean specification has the stated property.
@@ -311,7 +311,7 @@ This is still an eager runtime backend. Verification passes consume the shared I
 The runtime is explicit about CUDA buffer ownership. During eager training, each forward/backward
 step creates tape values, gradient buffers, and local scratch buffers for kernels such as matmul,
 convolution, normalization, attention, and FNO spectral convolution. The values returned to the
-caller are kept; temporary buffers are released after their contribution has been consumed. This is
+caller are kept; transient buffers are released after their contribution has been consumed. This is
 the practical reason the examples include allocator telemetry: if a future kernel holds on to
 scratch state across steps, the terminal should show the trend before it becomes an allocation
 failure. The same ownership rule is used by the public step-based model runners, so a long command
@@ -319,12 +319,12 @@ does not keep old per-step tensors merely because the loader loop continued.
 
 In practice this gives TorchLean three related but distinct CUDA layers:
 
-- *training layer*: run larger demos in Lean without waiting forever;
+- *training layer*: run larger examples in Lean without waiting forever;
 - *testing layer*: compare CUDA kernels against CPU stubs and reference cases;
 - *proof layer*: state assumptions under which native float32 results can be transported back to the
   `IEEE32Exec` and `FP32` semantics defined in Lean.
 
-Keeping those three layers separate prevents a common mistake: treating "the CUDA demo trained" as
+Keeping those three layers separate prevents a common mistake: treating "the CUDA example trained" as
 "the CUDA implementation has been verified."
 
 # Runtime-Side Initialization
@@ -491,7 +491,7 @@ the theorem ends and the engineering validation begins.
 - *Collapsing every float32 path into one object.* `IEEE32Exec`, `FP32`, runtime `Float32`, and
   native CUDA `float` are related by named bridges and assumptions.
 
-# Sanity Checklist
+# CUDA Validation Checklist
 
 When changing CUDA code, run at least:
 

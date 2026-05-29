@@ -27,7 +27,7 @@ Scope (what this script does today)
 The oracle supports three "kinds" of queries:
 
   1) `unary` (default): a single unary function on a real interval `[lo, hi]`.
-     This is the fast path used by the current Lean demo wrappers.
+     This is the path used by the current Lean oracle interface.
 
   2) `expr`: evaluate a small, safe JSON expression language over *balls*.
      This is a stepping stone toward "arbitrary functions" without using `eval`.
@@ -279,7 +279,7 @@ def _eval_mlp(request: dict[str, Any], arb_ctor) -> list[Any]:
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description="Arb oracle (python-flint) for rigorous enclosures.")
 
-    # Compatibility flags: the existing Lean wrappers call this `unary` mode.
+    # Unary interval mode: one named function over one input interval.
     p.add_argument("--func", help="Unary function: tanh|exp|log|sqrt|sin|cos|sigmoid")
     p.add_argument("--lo", help="Lower endpoint (decimal string)")
     p.add_argument("--hi", help="Upper endpoint (decimal string)")

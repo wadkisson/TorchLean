@@ -38,10 +38,18 @@ open NN.Verification.PINN.ResidualAffine
 open _root_.Spec
 open _root_.Spec.Tensor
 
+/-- Coordinate axis used by the PDE residual language. -/
 inductive Axis where
 | X | Y
   deriving DecidableEq, Repr
 
+/--
+Expression language for scalar PDE residuals.
+
+The constructors refer to `u`, first partials, second partials, constants, and arithmetic
+combinators. Evaluation is interval-valued because the surrounding PINN checker works with bounds
+rather than single floating-point samples.
+-/
 inductive Expr where
 | const  (c : Float)
 | u                              -- u(x,y)
@@ -54,6 +62,7 @@ inductive Expr where
 | neg   (e : Expr)
   deriving Repr
 
+/-- Primitive interval bounds supplied to the PDE expression evaluator. -/
 structure Prims where
   /-- u. -/
   u    : Option (Float × Float)
@@ -121,6 +130,7 @@ def evalWithFuel (fuel : Nat) (p : Prims) (e : Expr) : Option (Float × Float) :
       | some a => some (ivalNeg a)
       | none => none
 
+/-- Evaluate a PDE expression with the default recursion budget. -/
 def eval (p : Prims) (e : Expr) : Option (Float × Float) :=
   evalWithFuel 256 p e
 

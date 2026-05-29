@@ -33,7 +33,7 @@ definitions at `α := ℂ`.
 
 Why this is not merged into `Fft.lean`: `Fft.lean` is pure Fourier algebra over mathlib matrices.
 This file imports the TorchLean runtime FFT definitions and therefore sits at the boundary between
-runtime code and the exact theorem. The separation keeps the core inversion theorem lightweight and
+runtime code and the exact theorem. The separation keeps the core inversion theorem focused and
 lets downstream proofs import only the pure DFT facts when they do not need runtime transport.
 -/
 

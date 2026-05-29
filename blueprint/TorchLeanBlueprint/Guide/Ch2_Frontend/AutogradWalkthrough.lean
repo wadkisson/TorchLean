@@ -36,7 +36,7 @@ def sumsq : autograd.fn1.Fn (Shape.Vec 2) Shape.scalar :=
     let y ← nn.functional.square x
     nn.functional.mean y
 
-def demo : IO Unit := do
+def example : IO Unit := do
   let x : Tensor Float (Shape.Vec 2) := tensorND! [2] [0.5, -1.2]
   let g ← autograd.fn1.grad (α := Float) sumsq x
   IO.println s!"grad = {Spec.pretty g}"

@@ -16,12 +16,12 @@ The main thing to remember is that TorchLean has more than one runtime artifact.
 produces a tape. Compiled execution produces a reusable graph-shaped object. Verification uses an
 operation-tagged IR. These artifacts are related, but they are not the same data structure.
 
-If a small model has not run all the way through yet, *Training From Scratch* is the best first
+If a compact model has not run all the way through yet, *Training From Scratch* is the best first
 stop; it makes the runtime layer much easier to ground.
 
 # PyTorch Mental Model
 
-PyTorch's default workflow is roughly:
+PyTorch's default workflow is approximately:
 
 1. create parameters and modules,
 2. run a forward pass,
@@ -67,7 +67,7 @@ TorchLean exposes one front end with two execution backends:
 - *Eager*: tape recording and reverse-mode backprop in the style familiar from PyTorch.
 - *Compiled*: a stable SSA/DAG-like artifact for repeated evaluation and proof alignment.
 
-Many curated demos accept `--backend eager|compiled`.
+Many curated examples accept `--backend eager|compiled`.
 
 ```
 lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 50 --dtype float --backend eager
@@ -129,8 +129,8 @@ The widgets make this visible:
 - `#tape_trace_view t, outId` shows the reverse traversal step by step;
 - `#runtime_ctx_view ctx` shows the value and gradient registries.
 
-The [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-contains small examples for these views.
+The [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+contains compact examples for these views.
 
 # Compiled Graphs
 
@@ -183,7 +183,7 @@ CUDA details have their own guide page. The runtime-level mental model is short:
 supported Float32 buffer operations, while Lean still owns the model structure, typed interfaces,
 logs, graph artifacts, and proof/checker statements.
 
-Use eager mode for stepping through small examples. Use compiled mode for repeated evaluation over a
+Use eager mode for stepping through compact examples. Use compiled mode for repeated evaluation over a
 stable graph-shaped artifact. Use CUDA when the supported Float32 runtime should place numeric work
 on device buffers.
 

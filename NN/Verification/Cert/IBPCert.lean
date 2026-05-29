@@ -104,10 +104,10 @@ def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol
         pure false
 
 /--
-Convenience wrapper for examples: run `check` and raise a readable error on mismatch.
+Run `check` and raise a readable error on mismatch.
 
-This keeps the verification examples focused on their fixture graphs and parameter stores rather
-than repeating the same “if !ok then throw” boilerplate everywhere.
+Verification examples use this entrypoint when the surrounding fixture should fail loudly rather
+than returning a Boolean that a caller might ignore.
 -/
 def checkOrThrow (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String)
     (tol : Float := 1e-5) : IO Unit := do

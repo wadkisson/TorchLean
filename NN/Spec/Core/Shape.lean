@@ -62,7 +62,6 @@ dimensions are positive”, which is useful when you want to rule out degenerate
 
 namespace Spec
 
--- Shape definition
 /-!
 We represent shapes as an inductive tree instead of a bare `List Nat` because:
 
@@ -223,7 +222,7 @@ def areEqual : Shape → Shape → Bool
 instance : BEq Shape where
   beq := areEqual
 
-/-- Default shape is scalar. -/
+/-- Default inhabitant for `Shape`, used only when Lean needs a canonical fallback value. -/
 instance : Inhabited Shape where
   default := .scalar
 
@@ -237,7 +236,7 @@ def isVector : Shape → Option Nat
   | .dim n .scalar => some n
   | _ => none
 
-/-- Check if shape is scalar. -/
+/-- Return whether the shape has no tensor dimensions. -/
 def isScalar : Shape → Bool
   | .scalar => true
   | _ => false
@@ -395,12 +394,10 @@ inductive valid_axis : Nat → Shape → Prop
 | valid_zero {n s} : valid_axis 0 (.dim (n+1) s)
 | valid_succ {n s k} (h : valid_axis k s) : valid_axis (k+1) (.dim (n+1) s)
 
--- Typeclass wrapper for valid_axis proof
 /-- Typeclass wrapper for `valid_axis` so common axis proofs can be inferred. -/
 class valid_axis_inst (axis : Nat) (s : Shape) where
   (proof : valid_axis axis s)
 
--- Instance for zero
 /-- Instance: axis `0` is valid for any positive outer dimension. -/
 instance validAxisInstZero {n s} : valid_axis_inst 0 (.dim (n+1) s) :=
   { proof := valid_axis.valid_zero }
@@ -408,13 +405,12 @@ instance validAxisInstZero {n s} : valid_axis_inst 0 (.dim (n+1) s) :=
 /--
 Instance: axis `0` is valid for a nonzero outer dimension `n`.
 
-This is a convenience wrapper that turns `n ≠ 0` into the `n+1` form expected by `valid_axis`.
+The proof converts `n ≠ 0` to the successor form used by the primitive `valid_axis` constructor.
 -/
 instance validAxisInstZeroAlt {n s} (h : n ≠ 0) : valid_axis_inst 0 (.dim n s) :=
   let ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero h
   { proof := by rw [hm]; exact valid_axis.valid_zero }
 
--- 1 is a valid axis if the inner shape has a valid 0
 /-- Instance: axis `1` is valid for a 2D shape when both outer dims are nonzero. -/
 instance validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
     valid_axis_inst 1 (.dim n1 (.dim n2 s)) :=
@@ -423,7 +419,6 @@ instance validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
       rw [hm]
       exact valid_axis.valid_succ (validAxisInstZeroAlt h₂).proof }
 
--- Instance for successor
 /-- Instance: if `k` is a valid axis for `s`, then `k+1` is a valid axis for `.dim (n+1) s`. -/
 instance validAxisInstSucc {n s k} [inst : valid_axis_inst k s] : valid_axis_inst (k+1) (.dim
   (n+1) s) :=

@@ -15,7 +15,7 @@ TorchLean examples are not only executable scripts. Many guarantees are ordinary
 shape round-trips, typed tensor construction, activation identities, and later full verification
 statements.
 
-This file is intentionally small. It shows the two proof styles a new user should recognize first:
+This file focuses on the core boundary. It shows the two proof styles a new user should recognize first:
 
 - compile-time guarantees from shape-indexed tensor types, and
 - ordinary mathematical lemmas about the public API.
@@ -47,7 +47,7 @@ def twoVector : Spec.Tensor Float (shape![2]) :=
 /--
 Runtime dimension lists can still be related back to static TorchLean shapes.
 
-This is the small theorem behind many JSON/CLI/data-loader paths: parse dimensions dynamically,
+This is the compact theorem behind many JSON/CLI/data-loader paths: parse dimensions dynamically,
 then recover the precise `Shape` used by the typed tensor API.
 -/
 theorem matrix_shape_roundtrip :
@@ -57,7 +57,7 @@ theorem matrix_shape_roundtrip :
 /--
 The host-side public ReLU agrees with the usual mathematical identity on nonnegative real inputs.
 
-This is deliberately a small theorem, but it has the same form as larger library facts: state the
+This is deliberately a compact theorem, but it has the same form as larger library facts: state the
 semantic contract once, prove it in Lean, and use it downstream without trusting comments or tests.
 -/
 theorem relu_eq_self_of_nonnegative (x : ℝ) (hx : 0 ≤ x) :

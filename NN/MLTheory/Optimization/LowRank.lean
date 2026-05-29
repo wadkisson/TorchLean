@@ -11,7 +11,7 @@ public import NN.MLTheory.Optimization.FirstOrder
 /-!
 # Low-rank and Orthogonalized Optimizer Facts
 
-This file records the sanity checks for the new optimizer extension points:
+This file records invariants for the optimizer extension points:
 
 - a GaLore-style projected gradient update reduces to SGD when the projector is identity;
 - a Muon-style orthogonalized momentum update reduces to momentum SGD when the orthogonalizer is

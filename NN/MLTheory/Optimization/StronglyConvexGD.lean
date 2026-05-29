@@ -36,7 +36,7 @@ For gradients, the usual instantiation is `g = ∇f`. When `f` is `μ`-strongly 
 one can prove (in calculus/convex-analysis land) that `∇f` is `μ`-strongly monotone and `L`-Lipschitz.
 This file focuses on the convergence argument itself, keeping the assumptions minimal and reusable.
 
-The final `ScalarGD` namespace keeps the one-dimensional quadratic facts as a compact sanity check:
+The final `ScalarGD` namespace keeps the one-dimensional quadratic facts as a compact reference case:
 they show the same contraction mechanism in the smallest possible setting and connect plain SGD,
 L2 regularization, and decoupled weight decay algebraically.
 -/
@@ -127,7 +127,7 @@ namespace ScalarGD
 /-!
 ## Scalar quadratic warm-up
 
-These facts are deliberately small but not merely definitional. They prove algebraic behavior of
+These facts are compact but not merely definitional. They prove algebraic behavior of
 gradient descent on the one-dimensional quadratic objective
 
 `L(x) = 1/2 * (x - target)^2`,

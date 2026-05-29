@@ -13,7 +13,7 @@ public import Std
 /-!
 # Floats Utils
 
-Shared helpers for the Float runtime smoke tests.
+Shared helpers for the Float runtime runtime checks.
 
 These helpers are intentionally small: they keep the curated test files focused on the actual
 regressions instead of re-declaring the same tensor accessors and approximate equality checks.
@@ -29,12 +29,12 @@ namespace Tests
 namespace Floats
 namespace Utils
 
-/-- Approximate equality for smoke tests over `Float`. -/
+/-- Approximate equality for runtime checks over `Float`. -/
 def assertApprox (msg : String) (x y : Float) (tol : Float := 1e-5) : IO Unit := do
   if Float.abs (x - y) > tol then
     throw <| IO.userError s!"{msg}: got {x}, expected {y} (tol={tol})"
 
-/-- Reject `NaN` and infinities in a smoke test. -/
+/-- Reject `NaN` and infinities in a runtime check. -/
 def assertFinite (msg : String) (x : Float) : IO Unit := do
   if x.isNaN || x.isInf then
     throw <| IO.userError s!"{msg}: expected finite, got {x}"

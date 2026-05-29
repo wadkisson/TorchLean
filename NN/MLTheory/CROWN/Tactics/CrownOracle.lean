@@ -100,7 +100,7 @@ def parseBoolFieldOr (o : Json) (key : String) (fallback : Bool) : Except String
   | .ok b => .ok b
   | .error _ => .ok fallback
 
-/-- Parse either the backward-compatible `input` block or the `region` block. -/
+/-- Parse the input-region block used by CROWN certificates. -/
 def parseInputRegion (j : Json) : Except String (Nat × Array Float × Array Float × Float) := do
   let inputLike ←
     match j.getObjVal? "input" with
@@ -231,7 +231,7 @@ The key insight: we construct native Lean proofs using the certificate values.
 For numeric goals, we construct Nat literals that can be checked by decide.
 -/
 
-/-- Convert a nonnegative `Float` into a fixed-scale natural number for lightweight diagnostics. -/
+/-- Convert a nonnegative `Float` into a fixed-scale natural number for diagnostics. -/
 def floatToScaledNat (f : Float) : Nat :=
   (f * 1000000).toUInt64.toNat
 
@@ -245,7 +245,7 @@ def floatLt (a b : Float) : Bool := a < b
 # The Main Tactic Implementation
 -/
 
-/-- `crown_oracle` tactic: load a certificate and try the registered lightweight closers.
+/-- `crown_oracle` tactic: load a certificate and try the registered goal closers.
 
 Usage:
   crown_oracle "path/to/cert.json"

@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN
-public import NN.Examples.Data.ToyPaths
+public import NN.Examples.Data.SamplePaths
 public import NN.API.Data.Transforms
 
 /-!
@@ -20,10 +20,10 @@ workflow where you:
 2. then train a model in TorchLean by loading those files.
 
 Generate small deterministic `.npy` files with
-`python3 NN/Examples/Data/generate_toy_data.py`:
+`python3 NN/Examples/Data/generate_small_data.py`:
 
-- `NN/Examples/Data/toy_regression_X.npy`  (shape 25×2, dtype float32)
-- `NN/Examples/Data/toy_regression_y.npy`  (shape 25×1, dtype float32)
+- `NN/Examples/Data/small_regression_X.npy`  (shape 25×2, dtype float32)
+- `NN/Examples/Data/small_regression_y.npy`  (shape 25×1, dtype float32)
 
 Build:
 
@@ -113,15 +113,15 @@ def main (args : List String) : IO Unit := do
   let args := API.CLI.dropDashDash args
 
   let label := "Data.Loaders.Npy"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.ToyPaths.takeDataDir args
+  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
   let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
   let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 20 5
 
   let (x?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "x"
   let (y?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "y"
 
-  let xPath := x?.getD (_root_.NN.Examples.Data.ToyPaths.regressionXNpy dataDir)
-  let yPath := y?.getD (_root_.NN.Examples.Data.ToyPaths.regressionYNpy dataDir)
+  let xPath := x?.getD (_root_.NN.Examples.Data.SamplePaths.regressionXNpy dataDir)
+  let yPath := y?.getD (_root_.NN.Examples.Data.SamplePaths.regressionYNpy dataDir)
   if eb.batch = 0 then
     throw <| IO.userError s!"{label}: --batch must be > 0"
 

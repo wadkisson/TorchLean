@@ -45,7 +45,7 @@ open Tensor
 
 variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
 
--- Gradient clipping functions
+-- Gradient clipping functions for shape-indexed tensors.
 
 /--
 Clip gradients by L2 norm (global norm over all elements).

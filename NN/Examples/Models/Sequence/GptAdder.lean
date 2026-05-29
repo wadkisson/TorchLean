@@ -60,7 +60,7 @@ open NN.API
 
 namespace NN.Examples.Models.Sequence.GptAdder
 
-/-- Runner subcommand name. -/
+/-- CLI subcommand label used by the shared model runner. -/
 def exeName : String := "torchlean gpt_adder"
 
 /-- Default JSON loss-curve path for this command. -/

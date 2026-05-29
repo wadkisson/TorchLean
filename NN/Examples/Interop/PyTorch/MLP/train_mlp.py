@@ -114,7 +114,7 @@ def main():
     save_mlp_to_json(model, str(out_path))
     print(f"Saved trained weights to {out_path}")
     
-    # 6. Print a fresh-init baseline so the exported file has an easy sanity check.
+    # 6. Print a fresh-init baseline so the exported file has a stable comparison point.
     test_model = TestMLP()
     init_deterministic_weights(test_model)
     original_output = test_model(x_train)

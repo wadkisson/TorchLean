@@ -33,6 +33,13 @@ public import NN.MLTheory.CROWN.Propagation.LinearSignsplit
 public import NN.Floats.NeuralFloat.ErrorBounds
 
 /-!
+Public entry point for machine-learning theory modules.
+
+The imports collected here expose optimization, robustness, generative-model, Lyapunov, and
+self-supervised results without requiring users to know the internal proof layout.
+-/
+
+/-!
 # `NN.MLTheory.API`
 
 This is the recommended entrypoint for TorchLean's formal “ML theory” layer.

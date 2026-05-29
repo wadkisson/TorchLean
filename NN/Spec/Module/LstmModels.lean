@@ -235,7 +235,6 @@ structure LSTMGenerator (α : Type) (vocabSize hiddenSize : Nat) where
   /-- output projection. -/
   output_projection : LinearSpec α hiddenSize vocabSize
 
--- Bidirectional LSTM model
 /--
 Bundle of parameters for a bidirectional LSTM model with an output head.
 
@@ -250,7 +249,6 @@ structure BiLSTMModel (α : Type) (inputSize hiddenSize outputSize : Nat) where
   /-- output layer. -/
   output_layer : LinearSpec α (hiddenSize + hiddenSize) outputSize
 
--- LSTM Language Model
 /--
 Bundle of parameters for a stacked LSTM language model with deterministic dropout.
 

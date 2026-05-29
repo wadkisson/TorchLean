@@ -11,7 +11,7 @@ public import NN.Examples.Models.Common.RealData
 /-!
 # Shared Model-Example Helpers
 
-Shared utilities for runnable model examples. This layer is intentionally small: it should hold
+Shared utilities for runnable model examples. This layer stays focused: it should hold
 data-path and loading helpers, not model architectures or training loops.
 -/
 

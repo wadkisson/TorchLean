@@ -15,7 +15,7 @@ public import NN.API.Samples.Bands
 This next-step file demonstrates the public `API.nn.blocks.resnetBasicBlock` builder on a small 4×4
 "band" dataset (vertical vs horizontal bars).
 
-It is intentionally not part of the first quickstart path. It is here as a compact bridge from the
+It is not part of the first introductory path. It is here as a compact bridge from the
 basic MLP/CNN tutorials to the maintained model-zoo ResNet example under `NN/Examples/Models`.
 
 Note: this particular example uses BatchNorm blocks, so the model is built for a fixed batch size.
@@ -33,7 +33,7 @@ For the maintained command-line ResNet trainer, use `NN/Examples/Models/Vision/R
 Optional flags:
 
 - `--epochs E`
-- `--quick` (skip expensive before/after evaluation reports; intended for CI/smoke runs)
+- `--check-only` (run the training loop with concise per-step loss reporting)
 
 Public API used here:
 
@@ -104,7 +104,7 @@ def mkModel (n : Nat) [NeZero n] :
 /--
 Run one training session on the small band-image dataset.
 
-This is intentionally separated from `main` so the tutorial keeps a clean “build task, choose
+This is separated from `main` so the tutorial keeps a clean “build task, choose
 backend, then train” structure.
 -/
 def runOnce {batch : Nat} (task : train.Task (Shape.Images batch 1 4 4) (shape![batch, 2]))
@@ -112,7 +112,7 @@ def runOnce {batch : Nat} (task : train.Task (Shape.Images batch 1 4 4) (shape![
   (runner : train.Runner α task)
   (epochs : Nat := 20)
     (seed : Nat := 0)
-    (quick : Bool := false) : IO Unit := do
+    (checkOnly : Bool := false) : IO Unit := do
   let samplesF := API.Samples.Bands.trainCHWFloat
   let probes := API.Samples.Bands.probesCHW (α := α) API.Runtime.ofFloat
   let dataset : Data.Dataset (TorchLean.TList α [Shape.CHW 1 4 4, Shape.Vec 2]) :=
@@ -125,7 +125,7 @@ def runOnce {batch : Nat} (task : train.Task (Shape.Images batch 1 4 4) (shape![
   let opt := optim.adam 0.03
   let cfg := { (train.epochs epochs (optimizer := opt)) with logEvery := 0 }
   let hooks : train.Callbacks α ←
-    if quick then
+    if checkOnly then
       pure <| train.logLossEvery (α := α) 1
     else
       let batchedDs ← API.Common.orThrow "ResNetBasicBlockTrain" <| Data.BatchLoader.batchDataset
@@ -154,8 +154,8 @@ def runOnce {batch : Nat} (task : train.Task (Shape.Images batch 1 4 4) (shape![
 def main (args : List String) : IO Unit := do
   IO.println "== Quickstart next step: ResNet BasicBlock training (small CHW) =="
   let args0 := API.CLI.dropDashDash args
-  let quick := args0.contains "--quick"
-  let args := args0.filter (fun a => a != "--quick")
+  let checkOnly := args0.contains "--check-only"
+  let args := args0.filter (fun a => a != "--check-only")
   let (seed, args) ← API.Common.orThrow "ResNetBasicBlockTrain" <| API.CLI.takeSeed args 0
   let (eb, args) ← API.Common.orThrow "ResNetBasicBlockTrain" <| API.CLI.takeEpochBatch args 20 2
   if h : eb.batch = 0 then
@@ -170,6 +170,6 @@ def main (args : List String) : IO Unit := do
     train.run task args (fun {α} _ _ _ _ runner rest => do
       API.Common.orThrow "ResNetBasicBlockTrain" <| API.CLI.requireNoArgs rest
       runOnce (batch := eb.batch) (task := task) (α := α) runner (epochs := eb.epochs) (seed :=
-        seed) (quick := quick))
+        seed) (checkOnly := checkOnly))
 
 end NN.Examples.Quickstart.ResNetBasicBlockTrain

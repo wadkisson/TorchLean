@@ -13,12 +13,12 @@ import NN.Examples.Interop.PyTorch.Import
 /-!
 # PyTorch Round-Trip Driver
 
-This module is the single source of truth for the state-dict round-trip demos.
+This module is the single source of truth for the state-dict round-trip examples.
 
-It intentionally does **not** re-implement model math. Instead it wires together the existing:
+It does **not** re-implement model math. Instead it wires together the existing:
 
-- PyTorch exporters beside the demo fixtures (`MLP/Export`, `CNN/Export`, `Transformer/Export`)
-- PyTorch JSON importers beside the demo fixtures (`MLP/Import`, `CNN/Import`, `Transformer/Import`)
+- PyTorch exporters beside the example fixtures (`MLP/Export`, `CNN/Export`, `Transformer/Export`)
+- PyTorch JSON importers beside the example fixtures (`MLP/Import`, `CNN/Import`, `Transformer/Import`)
 - Spec models (`NN/Spec/Models/*`) for running a small forward pass in Lean
 
 Run via the TorchLean example runner:
@@ -26,9 +26,9 @@ Run via the TorchLean example runner:
 `lake exe torchlean pytorch_roundtrip --model mlp|cnn|transformer --action export|import`
 
 Design goals:
-- keep paths/dimensions centralized (no duplicated constants across demos),
+- keep paths/dimensions centralized (no duplicated constants across examples),
 - keep the example output deterministic and readable,
-- keep this demo import-safe (no root-level `main` that collides with other executables).
+- keep this example import-safe (no root-level `main` that collides with other executables).
 -/
 
 namespace NN.Examples.Interop.PyTorch.Roundtrip
@@ -37,14 +37,14 @@ open Lean
 
 /-! ## CLI model/action selection -/
 
-/-- Which demo model the round-trip driver should export or import. -/
+/-- Which example model the round-trip driver should export or import. -/
 inductive Model where
   | mlp
   | cnn
   | transformer
   deriving Repr, DecidableEq
 
-/-- Parse the `--model` CLI flag accepted by the round-trip demo. -/
+/-- Parse the `--model` CLI flag accepted by the round-trip example. -/
 def Model.parse? (s : String) : Option Model :=
   match s.toLower with
   | "mlp" => some .mlp
@@ -52,13 +52,13 @@ def Model.parse? (s : String) : Option Model :=
   | "transformer" => some .transformer
   | _ => none
 
-/-- Which round-trip action to run for the selected demo model. -/
+/-- Which round-trip action to run for the selected example model. -/
 inductive Action where
   | export
   | import
   deriving Repr, DecidableEq
 
-/-- Parse the `--action` CLI flag accepted by the round-trip demo. -/
+/-- Parse the `--action` CLI flag accepted by the round-trip example. -/
 def Action.parse? (s : String) : Option Action :=
   match s.toLower with
   | "export" => some .export
@@ -67,7 +67,7 @@ def Action.parse? (s : String) : Option Action :=
 
 private def usage : String :=
   String.intercalate "\n"
-    [ "PyTorch round-trip demo (TorchLean)"
+    [ "PyTorch round-trip example (TorchLean)"
     , ""
     , "Usage:"
     , "  lake exe torchlean pytorch_roundtrip --model mlp|cnn|transformer --action export|import"
@@ -78,7 +78,7 @@ private def usage : String :=
       "`NN/Examples/Interop/PyTorch/<Model>/` and runs a Lean forward pass.")
     ]
 
-/-! ## Paths and fixed demo dimensions -/
+/-! ## Paths and fixed example dimensions -/
 
 private def dirOf : Model → System.FilePath
   | .mlp => "NN/Examples/Interop/PyTorch/MLP"
@@ -90,12 +90,12 @@ private def jsonOf : Model → System.FilePath
   | .cnn => "NN/Examples/Interop/PyTorch/CNN/cnn.json"
   | .transformer => "NN/Examples/Interop/PyTorch/Transformer/transformer_encoder.json"
 
--- MLP dims (matches `train_mlp.py` and `Import.MLPPyTorch` demo)
+-- MLP dims (matches `train_mlp.py` and `Import.MLPPyTorch` example)
 private def mlpInDim : Nat := 2
 private def mlpHidDim : Nat := 3
 private def mlpOutDim : Nat := 1
 
--- CNN dims/hparams (matches `train_cnn.py` and `Import.CNNPyTorch` demo)
+-- CNN dims/hparams (matches `train_cnn.py` and `Import.CNNPyTorch` example)
 private def cnnInC : Nat := 1
 private def cnnOutC : Nat := 2
 private def cnnInH : Nat := 8
@@ -116,7 +116,7 @@ private def cnnFlatSize : Nat :=
     cnnPadding2
     cnnPoolKH cnnPoolKW cnnPoolStride1 cnnPoolStride2
 
--- Transformer dims (matches `train_transformer.py` and `Import.TransformerPyTorch` demo)
+-- Transformer dims (matches `train_transformer.py` and `Import.TransformerPyTorch` example)
 private def trSeqLen : Nat := 1
 private def trEmbedDim : Nat := 2
 private def trHeadCount : Nat := 1
@@ -155,12 +155,28 @@ private def exportMLP : IO Unit := do
 
 private def exportCNN : IO Unit := do
   let dir := dirOf .cnn
-  let stub :=
-    Export.CNNPyTorch.generateCNNPyTorchClass
-      cnnInC cnnOutC cnnInH cnnInW cnnKH cnnKW
-      cnnStride1 cnnPadding1 cnnStride2 cnnPadding2
-      cnnPoolKH cnnPoolKW cnnPoolStride1 cnnPoolStride2 cnnFlatSize
-      "TestCNN"
+  let conv1 : Export.CNNPyTorch.Conv2dCfg :=
+    { inChannels := cnnInC, outChannels := cnnOutC, kernelH := cnnKH, kernelW := cnnKW
+      stride := cnnStride1, padding := cnnPadding1 }
+  let pool1 : Export.CNNPyTorch.MaxPool2dCfg :=
+    { kernelH := cnnPoolKH, kernelW := cnnPoolKW, stride := cnnPoolStride1 }
+  let conv2 : Export.CNNPyTorch.Conv2dCfg :=
+    { inChannels := cnnOutC, outChannels := cnnOutC, kernelH := cnnKH, kernelW := cnnKW
+      stride := cnnStride2, padding := cnnPadding2 }
+  let pool2 : Export.CNNPyTorch.MaxPool2dCfg :=
+    { kernelH := cnnPoolKH, kernelW := cnnPoolKW, stride := cnnPoolStride2 }
+  let cfg : Export.CNNPyTorch.Cnn2Cfg :=
+    { className := "TestCNN"
+      inputC := cnnInC
+      inputH := cnnInH
+      inputW := cnnInW
+      conv1 := conv1
+      pool1 := pool1
+      conv2 := conv2
+      pool2 := pool2
+      flatSize := cnnFlatSize
+      fcOut := cnnOutC }
+  let stub := Export.CNNPyTorch.generateCnn2PyTorchClass cfg
   writePy dir "TestCNN_PyTorch" stub
   -- If we have a JSON state_dict handy, also emit a runnable "with weights" helper.
   try
@@ -222,7 +238,7 @@ private def importMLP : IO Unit := do
   let x : _root_.Spec.Tensor Float (NN.Tensor.Shape.Vec mlpInDim) := tensor! [0.5, 0.8]
   let y := Import.MLPPyTorch.forward sd x
 
-  IO.println "== MLP import demo =="
+  IO.println "== MLP import example =="
   IO.println s!"Loaded: {jsonOf .mlp}"
   IO.println "Output (Lean, Float):"
   NN.Tensor.print y
@@ -268,7 +284,7 @@ private def importCNN : IO Unit := do
 
   let y := ModSpec.SpecChain.forward (α := Float) net x
 
-  IO.println "== CNN import demo =="
+  IO.println "== CNN import example =="
   IO.println s!"Loaded: {jsonOf .cnn}"
   IO.println "Output (Lean, Float):"
   NN.Tensor.print y
@@ -294,7 +310,7 @@ private def importTransformer : IO Unit := do
   let y := _root_.Spec.TransformerEncoder.forward (seqLen := trSeqLen) (embedDim := trEmbedDim)
     encoder x (by decide) (by decide)
 
-  IO.println "== Transformer import demo =="
+  IO.println "== Transformer import example =="
   IO.println s!"Loaded: {jsonOf .transformer}"
   IO.println "Output (Lean, Float):"
   NN.Tensor.print y

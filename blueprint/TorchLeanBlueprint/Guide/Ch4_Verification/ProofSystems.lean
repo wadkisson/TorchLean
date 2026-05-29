@@ -284,7 +284,7 @@ the expected shape/action/reward contract before treating it as evidence on a pa
 
 # Generative Models: Objectives, Samplers, And What Is Actually Proved
 
-TorchLean has generative model examples and theory declarations, with a deliberately narrow claim:
+TorchLean has generative model examples and theory declarations, with a kept narrow claim:
 the current formal layer does not prove that a trained diffusion model generates good images. It
 does provide exact specifications and theorem fragments for the mathematical pieces that these
 models use.
@@ -314,7 +314,7 @@ Executable examples:
 
 The precise wording is:
 
-> TorchLean can run small generative demos and prove selected objective/sampler facts. That is not a
+> TorchLean can run small generative examples and prove selected objective/sampler facts. That is not a
 > claim of full generative model quality, distributional convergence, or production sampler
 > correctness for every native kernel.
 
@@ -336,7 +336,7 @@ deterministic diagnostics without treating sampled attacks as certificates.
 
 This material is closer to mathematical ML theory than to runtime training. Definitions such as
 "DP is preserved under post processing" or "this Bellman operator is a contraction" belong in the
-theory layer, not buried inside model demos.
+theory layer, not buried inside model examples.
 
 # BugZoo: Real Bugs As Checked Contracts
 
@@ -392,7 +392,7 @@ otherwise be unreadable arrays, graph contexts, or certificate JSON.
 The model examples show breadth:
 
 - MLP, CNN, ResNet, ViT;
-- RNN, LSTM, Transformer, GPT demos, Mamba;
+- RNN, LSTM, Transformer, GPT examples, Mamba;
 - diffusion, VAE, VQ-VAE, GAN;
 - FNO/Burgers operator learning;
 - DQN and PPO examples.

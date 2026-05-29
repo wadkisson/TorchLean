@@ -259,7 +259,7 @@ These wrappers show how GraphSpec feeds the runtime-facing model zoo:
 
 # Model Zoo Landmarks
 
-For model definitions used in examples and demos, `NN.GraphSpec.Models` is the most convenient
+For model definitions used in examples and examples, `NN.GraphSpec.Models` is the most convenient
 single import surface.
 
 The current zoo intentionally includes both sequential and DAG-native models:

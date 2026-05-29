@@ -3,7 +3,7 @@
 
 Verso owns the main HTML generation. TorchLean adds a thin local layer for the
 public guide: responsive figures, readable code blocks, external-link behavior,
-copy buttons, route arrows, and a lightweight reading-progress indicator.
+copy buttons, route arrows, and a low-overhead reading-progress indicator.
 """
 
 from __future__ import annotations

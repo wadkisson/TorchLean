@@ -18,8 +18,8 @@ The implementations live under `NN.GraphSpec.Models.TorchLean.*`, because they a
 constructors. The runtime namespace stays focused on execution machinery: ops, backends, sessions,
 losses, optimizers, and training loops.
 
-We keep this short `NN.TorchLeanModels` facade so examples can write `TorchLeanModels.mlp` without
-threading a long namespace path everywhere.
+`NN.TorchLeanModels` is the short import surface for those constructors, so example code can refer
+to `TorchLeanModels.mlp` without exposing the internal GraphSpec module layout.
 -/
 
 @[expose] public section

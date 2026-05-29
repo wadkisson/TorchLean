@@ -12,7 +12,7 @@ Notes:
 - The tape is pure: we use `Except String` for errors (no `IO` exceptions).
 - Buffers are assumed to be contiguous float32 arrays of length `Shape.size s`.
 - Backprop here is "dense": it returns a gradient buffer for every node id (zeros for unused).
-- This module intentionally focuses on tape machinery; differentiable CUDA ops live in
+- This module contains tape machinery; differentiable CUDA ops live in
   `NN.Runtime.Autograd.Engine.Cuda.Ops`.
 -/
 

@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN
-public import NN.Examples.Data.ToyPaths
+public import NN.Examples.Data.SamplePaths
 public import NN.API.Data.Transforms
 
 /-!
@@ -21,9 +21,9 @@ This tutorial mirrors the "data first" workflow people expect from PyTorch:
 4. Train with a learning-rate scheduler.
 
 Generate a small deterministic regression dataset with
-`python3 NN/Examples/Data/generate_toy_data.py`:
+`python3 NN/Examples/Data/generate_small_data.py`:
 
-- `NN/Examples/Data/toy_regression.csv` with rows `x1,x2,y` (25 samples).
+- `NN/Examples/Data/small_regression.csv` with rows `x1,x2,y` (25 samples).
 
 Build:
 
@@ -103,12 +103,12 @@ def main (args : List String) : IO Unit := do
   let args := API.CLI.dropDashDash args
 
   let label := "Data.Loaders.Csv"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.ToyPaths.takeDataDir args
+  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
   let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
   let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 30 5
   let (csv?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "csv"
 
-  let csvPath := csv?.getD (_root_.NN.Examples.Data.ToyPaths.regressionCsv dataDir)
+  let csvPath := csv?.getD (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
   if eb.batch = 0 then
     throw <| IO.userError s!"{label}: --batch must be > 0"
 

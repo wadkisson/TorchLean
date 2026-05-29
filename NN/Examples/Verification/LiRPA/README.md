@@ -4,7 +4,7 @@ These files are compact offline fixtures for checking TorchLean's graph IBP cert
 checker. The reusable checker is `NN.Verification.Cert.IBPCert`; the Lean files here define small
 model fixtures and call that checker.
 
-The JSON files are intentionally small and reproducible:
+The JSON files are compact and reproducible:
 
 - `mlp_cert.json` from `export_mlp_cert.py`
 - `cnn_cert.json` from `export_cnn_cert.py`

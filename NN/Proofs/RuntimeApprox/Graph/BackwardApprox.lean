@@ -68,9 +68,7 @@ end EList
 
 variable {α : Type}
 
--- ---------------------------------------------------------------------------
--- Reverse nodes and graphs
--- ---------------------------------------------------------------------------
+-- Reverse-mode graph nodes carrying forward and VJP approximation data.
 
 /-- A node with both forward and VJP approximation data. -/
 structure RevNode (toSpec : α → SpecScalar) (Γ : List Shape) (τ : Shape) extends

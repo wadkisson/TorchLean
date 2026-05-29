@@ -16,7 +16,7 @@ Compact MLP autoencoder:
 
 `Linear(in→hid) → Tanh → Linear(hid→in)`
 
-This is a convenient “small-but-real” model for demos and tests:
+This is a convenient “small-but-real” model for examples and tests:
 - it has parameters,
 - it has a nonlinearity,
 - and it is still fast to run inside Lean.

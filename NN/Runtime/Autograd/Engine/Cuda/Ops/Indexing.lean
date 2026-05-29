@@ -1,0 +1,312 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.Runtime.Autograd.Engine.Cuda.Ops.Linear
+
+/-!
+# CUDA Tape Operations: Concatenation, Slicing, and Indexing
+-/
+
+@[expose] public section
+
+namespace Runtime
+namespace Autograd
+namespace Cuda
+
+open Spec
+open Tensor
+
+namespace Tape
+
+/-!
+## Concat / slice (1D)
+-/
+
+/-- Concatenate two 1D buffers. -/
+def concat1d {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let m32 ← u32 m
+  let σ₁ : Shape := .dim n .scalar
+  let σ₂ : Shape := .dim m .scalar
+  let τ : Shape := .dim (n + m) .scalar
+  let nm32 ← u32 (n + m)
+  let startN32 ← u32 n
+  binary (t := t) "concat1d" aId bId σ₁ σ₂ τ
+    (forward := fun a b => Buffer.concat1d a b n32 m32)
+    (backward := fun _a _b dLdy =>
+      let dA := Buffer.slice1d dLdy nm32 0 n32
+      let dB := Buffer.slice1d dLdy nm32 startN32 m32
+      (dA, dB))
+
+/-- Concatenate two 1D tensors (CPU tape name). -/
+def concatVectors {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let m32 ← u32 m
+  let nm32 ← u32 (n + m)
+  let startN32 ← u32 n
+  binary (t := t) "concat_vectors" aId bId (.dim n .scalar) (.dim m .scalar) (.dim (n + m) .scalar)
+    (forward := fun a b => Buffer.concat1d a b n32 m32)
+    (backward := fun _a _b dLdy =>
+      let dA := Buffer.slice1d dLdy nm32 0 n32
+      let dB := Buffer.slice1d dLdy nm32 startN32 m32
+      (dA, dB))
+
+/-- Slice `len` entries from a one-dimensional CUDA buffer starting at `start`. -/
+def slice1d {n start len : Nat} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
+  if start + len ≤ n then
+    let n32 ← u32 n
+    let start32 ← u32 start
+    let len32 ← u32 len
+    let outShape : Shape := .dim len .scalar
+    let x ← requireValue (t := t) xId (.dim n .scalar)
+    let y := Buffer.slice1d x n32 start32 len32
+    let node : Node :=
+      { name := some s!"slice1d[{start}:{start+len}]"
+        value := { s := outShape, buf := y }
+        requires_grad := true
+        parents := [xId]
+        backward := fun dLdyAny => do
+          let dLdy ← requireGrad dLdyAny outShape
+          let pre := Buffer.zeros start32
+          let postLen : Nat := n - start - len
+          let post32 ← u32 postLen
+          let post := Buffer.zeros post32
+          let tmp := Buffer.concat1d pre dLdy.buf start32 len32
+          let startLen32 ← u32 (start + len)
+          let dx := Buffer.releaseThen pre <|
+            Buffer.releaseThen post <|
+              Buffer.releaseThen tmp <|
+                Buffer.concat1d tmp post startLen32 post32
+          pure [(xId, { s := .dim n .scalar, buf := dx })] }
+    pure (t.addNode node)
+  else
+    throw "autograd: slice1d: start+len out of bounds"
+
+/-!
+## Concat / slice along dim 0
+-/
+
+/-- Concatenate along dim 0 for tensors with leading dimension (CPU tape name). -/
+def concatDim0 {n m : Nat} {s : Shape} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
+  let inner : Nat := Shape.size s
+  let nLen : Nat := n * inner
+  let mLen : Nat := m * inner
+  let nLen32 ← u32 nLen
+  let mLen32 ← u32 mLen
+  let nmLen32 ← u32 (nLen + mLen)
+  binary (t := t) "concat_dim0" aId bId (.dim n s) (.dim m s) (.dim (n + m) s)
+    (forward := fun a b => Buffer.concat1d a b nLen32 mLen32)
+    (backward := fun _a _b dLdy =>
+      let dA := Buffer.slice1d dLdy nmLen32 0 nLen32
+      let dB := Buffer.slice1d dLdy nmLen32 nLen32 mLen32
+      (dA, dB))
+
+/-- Slice along dim 0: `x[start:start+len]` (CPU tape name). -/
+def sliceRange0 {n : Nat} {s : Shape} (t : Tape) (xId : Nat) (start len : Nat)
+    (_h : len + start ≤ n) : Result (Tape × Nat) := do
+  let inner : Nat := Shape.size s
+  let nTot : Nat := n * inner
+  let startOff : Nat := start * inner
+  let lenTot : Nat := len * inner
+  let rightTot : Nat := nTot - (startOff + lenTot)
+  let nTot32 ← u32 nTot
+  let start32 ← u32 startOff
+  let len32 ← u32 lenTot
+  let right32 ← u32 rightTot
+  let midLen32 ← u32 (startOff + lenTot)
+  unary (t := t) "slice_range0" xId (.dim n s) (.dim len s)
+    (forward := fun x => Buffer.slice1d x nTot32 start32 len32)
+    (backward := fun _x dLdy =>
+      let left := Buffer.zeros start32
+      let right := Buffer.zeros right32
+      let tmp := Buffer.concat1d left dLdy start32 len32
+      Buffer.releaseThen left <|
+        Buffer.releaseThen right <|
+          Buffer.releaseThen tmp <|
+            Buffer.concat1d tmp right midLen32 right32)
+
+/-!
+## Gather / scatter (host Nat indices)
+
+Indices are non-differentiable and remain on the host. Kernels totalize out-of-bounds indices as
+documented in `NN.Runtime.Autograd.Engine.Cuda.Kernels`.
+-/
+
+/-- Gather a scalar from a 1D vector using a compile-time index. -/
+def gatherScalar {n : Nat} (t : Tape) (xId : Nat) (i : Fin n) : Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let one32 : UInt32 := 1
+  let indices : Array Nat := #[i.val]
+  let x ← requireValue (t := t) xId (.dim n .scalar)
+  let y := Buffer.gatherVec x n32 indices one32
+  let node : Node :=
+    { name := some s!"gather_scalar[{i.val}]"
+      value := { s := Shape.scalar, buf := y }
+      requires_grad := true
+      parents := [xId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny Shape.scalar
+        let zeros := Buffer.zeros n32
+        let dx := Buffer.releaseThen zeros <|
+          Buffer.scatterAdd zeros dLdy.buf n32 indices one32
+        pure [(xId, { s := .dim n .scalar, buf := dx })] }
+  pure (t.addNode node)
+
+/-- Gather a row from a 2D matrix using a compile-time index. -/
+def gatherRow {rows cols : Nat} (t : Tape) (xId : Nat) (i : Fin rows) : Result (Tape × Nat) := do
+  let rows32 ← u32 rows
+  let cols32 ← u32 cols
+  let one32 : UInt32 := 1
+  let i32 ← u32 i.val
+  let indices : Array Nat := #[i.val]
+  let x ← requireValue (t := t) xId (.dim rows (.dim cols .scalar))
+  let y := Buffer.gatherRows x rows32 cols32 indices one32
+  let node : Node :=
+    { name := some s!"gather_row[{i.val}]"
+      value := { s := .dim cols .scalar, buf := y }
+      requires_grad := true
+      parents := [xId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny (.dim cols .scalar)
+        let zerosLen ← u32 (rows * cols)
+        let zeros := Buffer.zeros zerosLen
+        let dx := Buffer.releaseThen zeros <|
+          Buffer.scatterAddRow zeros dLdy.buf rows32 cols32 i32
+        pure [(xId, { s := .dim rows (.dim cols .scalar), buf := dx })] }
+  pure (t.addNode node)
+
+/-- Gather a scalar from a 1D vector using a runtime `Nat` index (totalized by the kernel). -/
+def gatherScalarNat {n : Nat} (t : Tape) (xId : Nat) (i : Nat) : Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let one32 : UInt32 := 1
+  let indices : Array Nat := #[i]
+  let x ← requireValue (t := t) xId (.dim n .scalar)
+  let y := Buffer.gatherVec x n32 indices one32
+  let node : Node :=
+    { name := some s!"gather_scalar_nat[{i}]"
+      value := { s := Shape.scalar, buf := y }
+      requires_grad := true
+      parents := [xId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny Shape.scalar
+        let zeros := Buffer.zeros n32
+        let dx := Buffer.releaseThen zeros <|
+          Buffer.scatterAdd zeros dLdy.buf n32 indices one32
+        pure [(xId, { s := .dim n .scalar, buf := dx })] }
+  pure (t.addNode node)
+
+/-- Convert a length-`k` natural-number tensor into the index array expected by CUDA gather/scatter kernels. -/
+def natTensorToIndexArray {k : Nat} (idx : Tensor Nat (.dim k .scalar)) : Array Nat :=
+  match idx with
+  | .dim f =>
+      Array.ofFn (fun i : Fin k =>
+        match f i with
+        | .scalar n => n)
+
+/-- Gather `k` scalars from a length-`n` vector. -/
+def gatherVecNat {n k : Nat} (t : Tape) (xId : Nat) (idx : Tensor Nat (.dim k .scalar)) :
+    Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let k32 ← u32 k
+  let indices := natTensorToIndexArray (k := k) idx
+  let x ← requireValue (t := t) xId (.dim n .scalar)
+  let y := Buffer.gatherVec x n32 indices k32
+  let node : Node :=
+    { name := some "gather_vec_nat"
+      value := { s := .dim k .scalar, buf := y }
+      requires_grad := true
+      parents := [xId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny (.dim k .scalar)
+        -- Scatter-add the gathered gradient back into the length-`n` input.
+        let zeros := Buffer.zeros n32
+        let dx := Buffer.releaseThen zeros <|
+          Buffer.scatterAdd zeros dLdy.buf n32 indices k32
+        pure [(xId, { s := .dim n .scalar, buf := dx })] }
+  pure (t.addNode node)
+
+/-- Gather `k` rows from a `(rows, cols)` matrix (row-major). -/
+def gatherRowsNat {rows cols k : Nat} (t : Tape) (xId : Nat)
+    (idx : Tensor Nat (.dim k .scalar)) :
+    Result (Tape × Nat) := do
+  let rows32 ← u32 rows
+  let cols32 ← u32 cols
+  let k32 ← u32 k
+  let indices := natTensorToIndexArray (k := k) idx
+  let x ← requireValue (t := t) xId (.dim rows (.dim cols .scalar))
+  let y := Buffer.gatherRows x rows32 cols32 indices k32
+  let node : Node :=
+    { name := some "gather_rows_nat"
+      value := { s := .dim k (.dim cols .scalar), buf := y }
+      requires_grad := true
+      parents := [xId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny (.dim k (.dim cols .scalar))
+        -- Scatter-add the gathered row gradients back into the `(rows, cols)` input.
+        let zerosLen ← u32 (rows * cols)
+        let zeros := Buffer.zeros zerosLen
+        let dx := Buffer.releaseThen zeros <|
+          Buffer.scatterAddRows zeros dLdy.buf rows32 cols32 indices k32
+        pure [(xId, { s := .dim rows (.dim cols .scalar), buf := dx })] }
+  pure (t.addNode node)
+
+/-- Scatter-add into a vector: `out = x` with `out[i] += v`. -/
+def scatterAddVec {n : Nat} (t : Tape) (xId vId : Nat) (i : Fin n) : Result (Tape × Nat) := do
+  let n32 ← u32 n
+  let one32 : UInt32 := 1
+  let x ← requireValue (t := t) xId (.dim n .scalar)
+  let v ← requireValue (t := t) vId Shape.scalar
+  let indices : Array Nat := #[i.val]
+  let y := Buffer.scatterAdd x v n32 indices one32
+  let node : Node :=
+    { name := some s!"scatter_add_vec[{i.val}]"
+      value := { s := .dim n .scalar, buf := y }
+      requires_grad := true
+      parents := [xId, vId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny (.dim n .scalar)
+        let dv1 := Buffer.gatherVec dLdy.buf n32 indices one32
+        let dx := Buffer.copy dLdy.buf
+        -- `gatherVec` returns length-1; reinterpret as scalar (same numel).
+        pure [
+          (xId, { s := .dim n .scalar, buf := dx }),
+          (vId, { s := Shape.scalar, buf := dv1 })
+        ] }
+  pure (t.addNode node)
+
+/-- Scatter-add into a matrix row: `out = x` with `out[i,:] += v`. -/
+def scatterAddRow {rows cols : Nat} (t : Tape) (xId vId : Nat) (i : Fin rows) :
+    Result (Tape × Nat) := do
+  let rows32 ← u32 rows
+  let cols32 ← u32 cols
+  let one32 : UInt32 := 1
+  let i32 ← u32 i.val
+  let x ← requireValue (t := t) xId (.dim rows (.dim cols .scalar))
+  let v ← requireValue (t := t) vId (.dim cols .scalar)
+  let y := Buffer.scatterAddRow x v rows32 cols32 i32
+  let node : Node :=
+    { name := some s!"scatter_add_row[{i.val}]"
+      value := { s := .dim rows (.dim cols .scalar), buf := y }
+      requires_grad := true
+      parents := [xId, vId]
+      backward := fun dLdyAny => do
+        let dLdy ← requireGrad dLdyAny (.dim rows (.dim cols .scalar))
+        let indices : Array Nat := #[i.val]
+        let dv1 := Buffer.gatherRows dLdy.buf rows32 cols32 indices one32
+        let dx := Buffer.copy dLdy.buf
+        -- `gatherRows` returns (1,cols) laid out as length `cols`; reinterpret as vector.
+        pure [
+          (xId, { s := .dim rows (.dim cols .scalar), buf := dx }),
+          (vId, { s := .dim cols .scalar, buf := dv1 })
+        ] }
+  pure (t.addNode node)
+end Tape
+
+end Cuda
+end Autograd
+end Runtime

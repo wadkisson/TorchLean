@@ -37,7 +37,7 @@ Main command:
 - We compare by node id intentionally; for compiler/debug workflows this is usually the first
   question ("what changed at node i?").
 - We surface op/parents/out-shape signatures because those capture most semantic rewrite mistakes.
-- Keeping full "before" and "after" graph panels next to the diff table makes quick visual checks
+- Keeping full "before" and "after" graph panels next to the diff table makes compact visual checks
   easier than reading only textual diffs.
 
 ## References
