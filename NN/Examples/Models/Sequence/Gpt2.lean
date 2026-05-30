@@ -43,6 +43,7 @@ public import NN
 public import NN.API.Models.Gpt2
 public import NN.Runtime.Autograd.TorchLean.NN
 public import NN.API.Runtime
+public import LeanProfiler
 
 /-!
 GPT-2 style sequence model example.
@@ -514,6 +515,8 @@ The CUDA executable uses Lean `Float` tensors, so this branch can show actual pr
 target, and predicted text before and after training. The polymorphic path above is still used for
 non-Float dtype compatibility runs.
 -/
+#profiler.on
+
 def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
     (train : TrainOptions) : IO (Float × Float × String) := do
   nn.withModel mkModel fun model => do
@@ -576,6 +579,8 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       saveParamsIfRequested model m train
       pure (L0, L1, generated)
 
+#profiler.off
+
 /-- CLI entrypoint for byte-level GPT training, sampling, logging, and checkpointing. -/
 def main (args : List String) : IO UInt32 := do
   Common.runAnyOrFloat exeName args
@@ -594,6 +599,7 @@ def main (args : List String) : IO UInt32 := do
       let (input, rest) ← takeInputText rest
       let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train)
+      let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train
+      printSummary)
 
 end NN.Examples.Models.Sequence.Gpt2
