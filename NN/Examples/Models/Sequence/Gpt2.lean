@@ -511,6 +511,75 @@ def unitTrainSteps {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToStri
 #profiler.on
 
 /--
+Training body run inside `nn.withModel` after the model is built.
+
+Kept as a top-level `def` (not an inline `fun model => do`) so LeanProfiler can
+instrument call sites in this file; inline lambdas passed to `nn.withModel` still
+miss nested spans in the current macro.
+-/
+def unitTrainStepsFloatBody
+    (opts : Runtime.Autograd.Torch.Options) (input : String) (train : TrainOptions)
+    (model : nn.Sequential σ τ) : IO (Float × Float × String) := do
+  let samples := samplesFromCorpus input train.prompt train.windows
+  let reportSample := mkSample (α := Float) (input := train.prompt)
+  let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
+  let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+  match train.loadParams? with
+  | none => pure ()
+  | some path =>
+      TorchLean.ParamIO.loadModuleParamsBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ])
+        m path
+  let logits0 ← nn.eval1 (α := Float) opts model
+    m.trainer.params
+    (NN.API.sample.x reportSample)
+  printPredictionReport "before" train.prompt logits0
+  let L0 ← meanLossOnSamples model m samples
+
+  if train.steps = 0 then
+    IO.println s!"  steps=0 loss0={L0}"
+    if train.interactive then
+      interactiveLoopFloat opts model m train
+    let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
+      train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
+    let generated := text.escapeByteIdsForDisplay generatedIds
+    writeTrainLog opts train L0 L0 generated
+    saveParamsIfRequested model m train
+    pure (L0, L0, generated)
+  else
+    let opt := TorchLean.Optim.adam (α := Float)
+      (paramShapes := nn.paramShapes model)
+      (lr := train.lr)
+      (beta1 := 0.9)
+      (beta2 := 0.999)
+      (epsilon := 1e-8)
+    let optH ← TorchLean.Optim.handle (α := Float) m opt
+    let cudaMemWatch := Common.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
+    let mut memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps 0 none
+    for step in [0:train.steps] do
+      let sample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
+      optH.step sample
+      memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps (step + 1) memWatch?
+
+    let L1 ← meanLossOnSamples model m samples
+    let logits1 ← nn.eval1 (α := Float) opts model
+      m.trainer.params
+      (NN.API.sample.x reportSample)
+    printPredictionReport "after " train.prompt logits1
+    let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
+      train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
+    let generated := text.escapeByteIdsForDisplay generatedIds
+    IO.println s!"  generated={generated}"
+    IO.println s!"  corpus_bytes={input.toByteArray.size} windows={samples.size}"
+    IO.println s!"  steps={train.steps} lr={train.lr} loss0={L0} loss1={L1}"
+    IO.println s!"  sampling=top_k({train.topK}), temperature={train.temperature}, seed={train.seed}"
+    IO.println s!"  repetition_penalty={train.repeatPenalty} repeat_window={train.repeatWindow}"
+    if train.interactive then
+      interactiveLoopFloat opts model m train
+    writeTrainLog opts train L0 L1 generated (some cudaMemWatch)
+    saveParamsIfRequested model m train
+    pure (L0, L1, generated)
+
+/--
 Float-specialized training path with decoded prediction reports.
 
 The CUDA executable uses Lean `Float` tensors, so this branch can show actual prompt,
@@ -519,65 +588,7 @@ non-Float dtype compatibility runs.
 -/
 def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
     (train : TrainOptions) : IO (Float × Float × String) := do
-  nn.withModel mkModel fun model => do
-    let samples := samplesFromCorpus input train.prompt train.windows
-    let reportSample := mkSample (α := Float) (input := train.prompt)
-    let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-    let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-    match train.loadParams? with
-    | none => pure ()
-    | some path =>
-        TorchLean.ParamIO.loadModuleParamsBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ])
-          m path
-    let logits0 ← nn.eval1 (α := Float) opts model
-      m.trainer.params
-      (NN.API.sample.x reportSample)
-    printPredictionReport "before" train.prompt logits0
-    let L0 ← meanLossOnSamples model m samples
-
-    if train.steps = 0 then
-      IO.println s!"  steps=0 loss0={L0}"
-      if train.interactive then
-        interactiveLoopFloat opts model m train
-      let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
-        train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
-      let generated := text.escapeByteIdsForDisplay generatedIds
-      writeTrainLog opts train L0 L0 generated
-      saveParamsIfRequested model m train
-      pure (L0, L0, generated)
-    else
-      let opt := TorchLean.Optim.adam (α := Float)
-        (paramShapes := nn.paramShapes model)
-        (lr := train.lr)
-        (beta1 := 0.9)
-        (beta2 := 0.999)
-        (epsilon := 1e-8)
-      let optH ← TorchLean.Optim.handle (α := Float) m opt
-      let cudaMemWatch := Common.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
-      let mut memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps 0 none
-      for step in [0:train.steps] do
-        let sample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
-        optH.step sample
-        memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps (step + 1) memWatch?
-
-      let L1 ← meanLossOnSamples model m samples
-      let logits1 ← nn.eval1 (α := Float) opts model
-        m.trainer.params
-        (NN.API.sample.x reportSample)
-      printPredictionReport "after " train.prompt logits1
-      let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
-        train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
-      let generated := text.escapeByteIdsForDisplay generatedIds
-      IO.println s!"  generated={generated}"
-      IO.println s!"  corpus_bytes={input.toByteArray.size} windows={samples.size}"
-      IO.println s!"  steps={train.steps} lr={train.lr} loss0={L0} loss1={L1}"
-      IO.println s!"  sampling=top_k({train.topK}), temperature={train.temperature}, seed={train.seed}"
-      IO.println s!"  repetition_penalty={train.repeatPenalty} repeat_window={train.repeatWindow}"
-      if train.interactive then
-        interactiveLoopFloat opts model m train
-      writeTrainLog opts train L0 L1 generated (some cudaMemWatch)
-      saveParamsIfRequested model m train
-      pure (L0, L1, generated)
+  nn.withModel mkModel fun model => unitTrainStepsFloatBody opts input train model
 
 #profiler.off
 
