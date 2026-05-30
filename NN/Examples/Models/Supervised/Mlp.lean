@@ -93,6 +93,8 @@ The dataset-specific facts stay here: the default preparation script writes colu
 the first seven columns are inputs, the last column is the regression target, and we use full
 minibatches of size `batch`.  The generic CSV-to-loader mechanics live in `Data.tabularCsvLoader`.
 -/
+set_option profiler.instrument true
+
 def loadAutoMpg {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     (path : System.FilePath) (seed : Nat) : IO (Data.BatchLoader α batch (Shape.Vec inDim)
       (Shape.Vec outDim)) := do
@@ -126,6 +128,8 @@ def fitAutoMpg (opts : Runtime.Autograd.Torch.Options)
       "loss" flags.train.cudaMemWatch
     pure report
 
+set_option profiler.instrument false
+
 /-- CLI entrypoint for Auto MPG regression on CPU or CUDA. -/
 def main (args : List String) : IO UInt32 := do
   Common.runFloat exeName args
@@ -136,11 +140,7 @@ def main (args : List String) : IO UInt32 := do
         Common.parseCsvModelTrainFlags exeName rest
           _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let report ←
-        if leanProfilerEnabled then
-          withProfile "mlp.fitAutoMpg" (fitAutoMpg opts flags)
-        else
-          fitAutoMpg opts flags
+      let report ← fitAutoMpg opts flags
       if leanProfilerEnabled then do
         IO.println "=== LeanProfiler summary ==="
         printSummary

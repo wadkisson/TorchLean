@@ -75,6 +75,8 @@ def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) := do
   RealData.loadCifarLoader (α := α) exeName batch nRows seed xPath yPath
 
+set_option profiler.instrument true
+
 /--
 Train the CNN on the prepared CIFAR loader using the standard Float runtime training path.
 
@@ -101,6 +103,8 @@ def fitCifar (opts : Runtime.Autograd.Torch.Options)
       "loss" trainCfg.cudaMemWatch
     pure report
 
+set_option profiler.instrument false
+
 def main (args : List String) : IO UInt32 := do
   Common.runFloat exeName args
     (banner := fun opts =>
@@ -111,11 +115,7 @@ def main (args : List String) : IO UInt32 := do
       let (trainCfg, rest) ← Common.orThrow exeName <|
         Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let report ←
-        if leanProfilerEnabled then
-          withProfile "cnn.fitCifar" (fitCifar opts xPath yPath nRows seed trainCfg)
-        else
-          fitCifar opts xPath yPath nRows seed trainCfg
+      let report ← fitCifar opts xPath yPath nRows seed trainCfg
       if leanProfilerEnabled then do
         IO.println "=== LeanProfiler summary ==="
         printSummary

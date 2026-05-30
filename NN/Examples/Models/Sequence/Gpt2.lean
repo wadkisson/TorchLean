@@ -395,6 +395,8 @@ def firstSample (samples : Array (API.sample.Supervised Float σ τ)) :
     API.sample.Supervised Float σ τ :=
   samples.getD 0 (mkSampleFromTokenIds (α := Float) (List.replicate (seqLen + 1) 32))
 
+set_option profiler.instrument true
+
 /-- Mean loss over a bounded deterministic prefix of the training windows. -/
 def meanLossOnSamples
     (model : nn.Sequential σ τ)
@@ -577,6 +579,8 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       saveParamsIfRequested model m train
       pure (L0, L1, generated)
 
+set_option profiler.instrument false
+
 /-- CLI entrypoint for byte-level GPT training, sampling, logging, and checkpointing. -/
 def main (args : List String) : IO UInt32 := do
   Common.runAnyOrFloat exeName args
@@ -595,11 +599,7 @@ def main (args : List String) : IO UInt32 := do
       let (input, rest) ← takeInputText rest
       let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let (_L0, _L1, _generated) ←
-        if leanProfilerEnabled then
-          withProfile "gpt2.unitTrainStepsFloat" (unitTrainStepsFloat opts input train)
-        else
-          unitTrainStepsFloat opts input train
+      let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train
       if leanProfilerEnabled then do
         IO.println "=== LeanProfiler summary ==="
         printSummary
