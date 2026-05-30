@@ -52,9 +52,6 @@ def leanProfilerEnabled : Bool := true
 
 def profileOut : System.FilePath := "data/profiles/mlp.json"
 
-def profileIO {α : Type} (name : String) (act : IO α) : IO α :=
-  if leanProfilerEnabled then withProfile name act else act
-
 /-- CLI subcommand name used in terminal banners and error messages. -/
 def exeName : String := "torchlean mlp"
 
@@ -89,6 +86,8 @@ abbrev τ : Shape :=
 def mkModel : nn.M (nn.Sequential σ τ) :=
   nn.models.mlp1Relu cfg
 
+set_option profiler.instrument true
+
 /--
 Load the prepared Auto MPG CSV as a typed minibatch loader.
 
@@ -98,8 +97,7 @@ minibatches of size `batch`.  The generic CSV-to-loader mechanics live in `Data.
 -/
 def loadAutoMpg {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     (path : System.FilePath) (seed : Nat) : IO (Data.BatchLoader α batch (Shape.Vec inDim)
-      (Shape.Vec outDim)) :=
-  profileIO "loadAutoMpg" do
+      (Shape.Vec outDim)) := do
   unless (← path.pathExists) do
     throw <| IO.userError
       s!"{exeName}: missing CSV dataset: {path}\nRun: python3 scripts/datasets/download_example_data.py --auto-mpg"
@@ -114,8 +112,7 @@ training log if logging is enabled.
 CPU and CUDA both use the same Float runtime module; `opts` selects the device and backend.
 -/
 def fitAutoMpg (opts : Runtime.Autograd.Torch.Options)
-    (flags : Common.CsvModelTrainFlags) : IO (train.FitReport Float) :=
-  profileIO "fitAutoMpg" do
+    (flags : Common.CsvModelTrainFlags) : IO (train.FitReport Float) := do
   let loader ← loadAutoMpg (α := Float) flags.csvPath flags.seed
   nn.withModel mkModel fun model => do
     let modDef := nn.mseScalarModuleDef model
@@ -130,6 +127,8 @@ def fitAutoMpg (opts : Runtime.Autograd.Torch.Options)
         s!"cuda_mem_watch={cudaMemWatch}"]
       "loss" flags.train.cudaMemWatch
     pure report
+
+set_option profiler.instrument false
 
 /-- CLI entrypoint for Auto MPG regression on CPU or CUDA. -/
 def main (args : List String) : IO UInt32 := do

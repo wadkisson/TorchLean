@@ -48,9 +48,6 @@ def leanProfilerEnabled : Bool := true
 
 def profileOut : System.FilePath := "data/profiles/cnn.json"
 
-def profileIO {α : Type} (name : String) (act : IO α) : IO α :=
-  if leanProfilerEnabled then withProfile name act else act
-
 def exeName : String := "torchlean cnn"
 def defaultLogJson : System.FilePath := "data/model_zoo/cnn_trainlog.json"
 
@@ -73,10 +70,11 @@ abbrev τ : Shape :=
 def mkModel : nn.M (nn.Sequential σ τ) :=
   nn.models.cnn cfg
 
+set_option profiler.instrument true
+
 def loadCifarLoader {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     (xPath yPath : System.FilePath) (nRows seed : Nat) :
-    IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) :=
-  profileIO "loadCifarLoader" do
+    IO (Data.BatchLoader α batch RealData.CifarImage RealData.CifarTarget) := do
   RealData.loadCifarLoader (α := α) exeName batch nRows seed xPath yPath
 
 /--
@@ -89,8 +87,7 @@ before/after reports, optional CUDA telemetry, and TrainLog JSON -- are handled 
 -/
 def fitCifar (opts : Runtime.Autograd.Torch.Options)
     (xPath yPath : System.FilePath) (nRows seed : Nat) (trainCfg : Common.ModelTrainFlags) :
-    IO (train.FitReport Float) :=
-  profileIO "fitCifar" do
+    IO (train.FitReport Float) := do
   let loader ← loadCifarLoader (α := Float) xPath yPath nRows seed
   nn.withModel mkModel fun model => do
     let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
@@ -105,6 +102,8 @@ def fitCifar (opts : Runtime.Autograd.Torch.Options)
         s!"steps={trainCfg.train.steps}", s!"batch={batch}", s!"cuda_mem_watch={cudaMemWatch}"]
       "loss" trainCfg.cudaMemWatch
     pure report
+
+set_option profiler.instrument false
 
 def main (args : List String) : IO UInt32 := do
   Common.runFloat exeName args

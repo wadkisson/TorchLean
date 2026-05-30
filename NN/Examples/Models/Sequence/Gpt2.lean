@@ -76,9 +76,6 @@ def leanProfilerEnabled : Bool := true
 
 def profileOut : System.FilePath := "data/profiles/gpt2.json"
 
-def profileIO {α : Type} (name : String) (act : IO α) : IO α :=
-  if leanProfilerEnabled then withProfile name act else act
-
 /-- CLI subcommand name used in terminal banners and error messages. -/
 def exeName : String := "torchlean gpt2"
 
@@ -398,12 +395,13 @@ def firstSample (samples : Array (API.sample.Supervised Float σ τ)) :
     API.sample.Supervised Float σ τ :=
   samples.getD 0 (mkSampleFromTokenIds (α := Float) (List.replicate (seqLen + 1) 32))
 
+set_option profiler.instrument true
+
 /-- Mean loss over a bounded deterministic prefix of the training windows. -/
 def meanLossOnSamples
     (model : nn.Sequential σ τ)
     (m : TorchLean.Module.ScalarModule Float (nn.paramShapes model) [σ, τ])
-    (samples : Array (API.sample.Supervised Float σ τ)) : IO Float :=
-  profileIO "meanLossOnSamples" do
+    (samples : Array (API.sample.Supervised Float σ τ)) : IO Float := do
   -- Reporting loss over every training window would run a separate scalar forward for each window.
   -- A fixed evaluation prefix keeps logs stable without making evaluation dominate training.
   let evalCount := Nat.min samples.size 32
@@ -520,8 +518,7 @@ target, and predicted text before and after training. The polymorphic path above
 non-Float dtype compatibility runs.
 -/
 def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
-    (train : TrainOptions) : IO (Float × Float × String) :=
-  profileIO "unitTrainStepsFloat" do
+    (train : TrainOptions) : IO (Float × Float × String) := do
   nn.withModel mkModel fun model => do
     let samples := samplesFromCorpus input train.prompt train.windows
     let reportSample := mkSample (α := Float) (input := train.prompt)
@@ -581,6 +578,8 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       writeTrainLog opts train L0 L1 generated (some cudaMemWatch)
       saveParamsIfRequested model m train
       pure (L0, L1, generated)
+
+set_option profiler.instrument false
 
 /-- CLI entrypoint for byte-level GPT training, sampling, logging, and checkpointing. -/
 def main (args : List String) : IO UInt32 := do
