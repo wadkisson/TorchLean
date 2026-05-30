@@ -412,6 +412,8 @@ def meanLossOnSamples
     total := total + Tensor.toScalar loss
   pure (total / Float.ofNat (Nat.max 1 evalCount))
 
+set_option profiler.instrument false
+
 /--
 Interactive prompt loop for the in-memory Float model.
 
@@ -509,6 +511,8 @@ def unitTrainSteps {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToStri
       let L1 := Tensor.toScalar loss1
       IO.println s!"  steps={steps} loss0={L0} loss1={L1}"
       pure (L0, L1)
+
+set_option profiler.instrument true
 
 /--
 Float-specialized training path with decoded prediction reports.

@@ -15,7 +15,7 @@
    "type": "git",
    "subDir": null,
    "scope": "",
-   "rev": "d6c0972a0906b6ba93167770f0012b3a379bac08",
+   "rev": "8dc4944d999752784ef22e09e532019a1f06d486",
    "name": "LeanProfiler",
    "manifestFile": "lake-manifest.json",
    "inputRev": "test",
