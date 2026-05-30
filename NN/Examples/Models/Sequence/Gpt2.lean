@@ -72,7 +72,7 @@ open NN.API
 namespace NN.Examples.Models.Sequence.Gpt2
 
 /-- Set to `true` and rebuild to profile this example with LeanProfiler. -/
-def leanProfilerEnabled : Bool := false
+def leanProfilerEnabled : Bool := true
 
 def profileOut : System.FilePath := "data/profiles/gpt2.json"
 

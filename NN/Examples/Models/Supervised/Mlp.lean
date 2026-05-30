@@ -48,7 +48,7 @@ open NN.API
 namespace NN.Examples.Models.Supervised.Mlp
 
 /-- Set to `true` and rebuild to profile this example with LeanProfiler. -/
-def leanProfilerEnabled : Bool := false
+def leanProfilerEnabled : Bool := true
 
 def profileOut : System.FilePath := "data/profiles/mlp.json"
 
