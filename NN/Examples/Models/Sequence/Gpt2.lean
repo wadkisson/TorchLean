@@ -522,6 +522,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
   nn.withModel mkModel fun model => do
     let samples := samplesFromCorpus input train.prompt train.windows
     let reportSample := mkSample (α := Float) (input := train.prompt)
+    let evalInput := NN.API.sample.x reportSample
     let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
     let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
     match train.loadParams? with
@@ -531,7 +532,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
           m path
     let logits0 ← nn.eval1 (α := Float) opts model
       m.trainer.params
-      (NN.API.sample.x reportSample)
+      evalInput
     printPredictionReport "before" train.prompt logits0
     let L0 ← meanLossOnSamples model m samples
 
@@ -563,7 +564,7 @@ def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
       let L1 ← meanLossOnSamples model m samples
       let logits1 ← nn.eval1 (α := Float) opts model
         m.trainer.params
-        (NN.API.sample.x reportSample)
+        evalInput
       printPredictionReport "after " train.prompt logits1
       let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
         train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
