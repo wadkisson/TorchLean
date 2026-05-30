@@ -91,7 +91,7 @@ Output:
 
 `outH = (inH + 2*padding - kH) / stride + 1`  and similarly for `outW`.
 
-This is intentionally close to the underlying Spec/TorchLean op.
+This is close by design to the underlying Spec/TorchLean op.
 PyTorch analogy: `torch.nn.functional.conv2d` on an NCHW tensor, specialized here to CHW.
  -/
 def conv2d

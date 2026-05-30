@@ -22,7 +22,7 @@ This file focuses on training-loop ergonomics:
 
 Stateful optimizer loops live in `Runtime.Autograd.TorchLean`, because those depend on
 `TorchLean.Optim`. Keeping that dependency out of this low-level utility module prevents the
-session/ref layer from depending upward on the model/optimizer facade.
+session/ref layer from depending upward on the model/optimizer API surface.
 -/
 
 @[expose] public section
@@ -212,7 +212,7 @@ This is meant for training code where `tlist1`/`tlist2`/… becomes tedious.
 Example:
 
 ```lean
-def xs : TList Float [Shape.Vec 2, Shape.Vec 1] :=
+let xs : TList Float [Shape.Vec 2, Shape.Vec 1] :=
   tlist![x, y]
 ```
 -/

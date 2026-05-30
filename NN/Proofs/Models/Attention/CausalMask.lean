@@ -35,7 +35,7 @@ open Spec.Tensor
 /-!
 ## Pointwise access
 
-The definitions are deliberately simple lower/upper-triangular Boolean tensors, so the access lemmas
+The definitions are kept simple lower/upper-triangular Boolean tensors, so the access lemmas
 are definitional. Keeping them as named `[simp]` theorems lets larger attention proofs use the mask
 without unfolding the tensor constructors each time.
 -/

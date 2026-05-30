@@ -97,7 +97,7 @@ def unflattenFloat? {s : Shape} (a : FloatArray) : Option (Tensor Float s) :=
 /--
 Worker for `unflattenBoolMaskUnsafe`.
 
-The CUDA mask convention is deliberately simple: zero means `false`, any nonzero value means `true`.
+The CUDA mask convention is kept simple: zero means `false`, any nonzero value means `true`.
 -/
 def unflattenBoolMaskAux : {s : Shape} → FloatArray → (offset : Nat) → Tensor Bool s
   | .scalar, a, offset =>

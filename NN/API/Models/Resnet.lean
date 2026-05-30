@@ -45,18 +45,23 @@ structure ResnetConfig where
   numClasses : Nat
 deriving Repr
 
+/-- Channel count of the second ResNet stage. -/
 def ResnetConfig.stage2C (cfg : ResnetConfig) : Nat :=
   cfg.stemC * 2
 
+/-- Spatial height after the downsampling block. -/
 def ResnetConfig.h2 (cfg : ResnetConfig) : Nat :=
   nn.blocks.down2 cfg.inH
 
+/-- Spatial width after the downsampling block. -/
 def ResnetConfig.w2 (cfg : ResnetConfig) : Nat :=
   nn.blocks.down2 cfg.inW
 
+/-- Batched image input shape for the ResNet helper. -/
 abbrev resnetInShape (cfg : ResnetConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch cfg.inC cfg.inH cfg.inW
 
+/-- Batched classifier-logit output shape for the ResNet helper. -/
 abbrev resnetOutShape (cfg : ResnetConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.numClasses
 

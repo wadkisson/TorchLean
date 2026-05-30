@@ -55,7 +55,7 @@ def _load_mat(path: Path) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def _as_entry(x: float, t: float, u: float | None = None) -> Dict[str, Any]:
-    """Build one JSON point entry, including the `y := t` compatibility alias."""
+    """Build one JSON point entry with the coordinate names expected by the checker."""
     out: Dict[str, Any] = {"x": float(x), "t": float(t), "y": float(t)}
     if u is not None:
         out["u"] = float(u)

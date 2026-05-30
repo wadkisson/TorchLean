@@ -70,7 +70,7 @@ The key theorems are small but important: `maskedLoss_append`, `maskedLoss_rever
 `maskedLoss_eq_zero_of_all_zero`. They make sure that serialization details such as splitting or
 reversing the selected patch list do not silently change the algebra being proved.
 
-A toy example is enough to see why this matters. If a mask selects indices `[0, 2]`, then the masked
+A compact example is enough to see why this matters. If a mask selects indices `[0, 2]`, then the masked
 loss is `loss 0 + loss 2`. Reversing the selected list should not change the sum, and appending two
 disjoint chunks should give the same result as summing over the combined list. These are simple
 algebraic facts, but they are exactly the facts that catch bookkeeping mistakes in masked

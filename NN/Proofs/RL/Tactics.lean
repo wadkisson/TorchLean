@@ -15,12 +15,11 @@ public import NN.Spec.RL.Core
 
 This file defines a small set of proof-focused tactics/macros used across `NN/Proofs/RL`.
 
-Design goals:
+Design principles:
 
-* **Lightweight**: no heavyweight automation, just convenience wrappers.
+* **Predictable**: prefer local rewrites and simple normalization over broad automation.
 * **Stable**: avoid tactics that are fragile under small definitional changes.
-* **Local**: the API is intentionally small; add new helpers only when repeated boilerplate
-  has shown up in multiple RL proof files.
+* **Local**: add helpers only when repeated proof structure appears in multiple RL files.
 
 References:
 

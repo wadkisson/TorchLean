@@ -9,18 +9,18 @@ module
 public import NN.Spec.Core.Context
 
 /-!
-# Multinomial Naive Bayes (small baseline)
+# Multinomial Naive Bayes
 
-This file is intentionally "small and executable": it uses `String` features/labels and Lean's
-`HashMap` for counting. It is not a tensor‑indexed spec model like most of `NN/Spec/Models/*`,
-but it lives here as a simple baseline / example.
+This module gives a pure multinomial Naive Bayes classifier over `String` features and labels,
+using Lean's `HashMap` for the fitted count tables. It is not a tensor-indexed neural model like
+most of `NN/Spec/Models/*`; it is a non-neural baseline that keeps the training and prediction
+semantics explicit.
 
 Probabilities are computed in log space (via `MathFunctions.log`) to avoid underflow.
 
-PyTorch note:
+Ecosystem note:
 PyTorch does not provide a Naive Bayes classifier in `torch.nn`; the closest ecosystem analogue is
-scikit-learn’s `MultinomialNB`. TorchLean keeps this file mainly as a readable reference and a
-quick baseline for demos/tests.
+scikit-learn’s `MultinomialNB`.
 
 ## What "training" means here
 
@@ -176,7 +176,7 @@ Even though we don't optimize it with gradients (NB training is closed-form coun
 objective is useful for:
 - checking improvements (smoothing choices, feature engineering)
 - comparing NB against other baselines
-- unit tests / smoke tests
+- unit tests / runtime checks
 -/
 
 /-- Sum a list by left-folding with `+` (used by `logSumExp`). -/
@@ -206,19 +206,5 @@ def negLogLikelihood {α : Type} [Context α] (m : Model) (data : List Example) 
       let trueLogit := score (α := α) m ex.features ex.label
       acc + (logZ - trueLogit)
   ) 0
-
-/--
-Backwards-compatible "fit + predict" entrypoint.
-
-This re-fits the model on every call. For performance and clarity, prefer:
-`let m := fit data; predictModel m input α`.
--/
-def predict
-  (data : List Example)
-  (input : List String)  -- Change the type of input to List String
-  (α : Type) [Context α] : String :=
-  -- Compatibility "fit + predict" API; `fit` plus `predictModel` is clearer for new code.
-  let m := fit data
-  predictModel m input α
 
 end NaiveBayes

@@ -160,11 +160,11 @@ abbrev fftMat (n width : Nat) : LayerDef (mat n width) (mat n width) :=
 abbrev ifftMat (n width : Nat) : LayerDef (mat n width) (mat n width) :=
   ifftDim0 (n := n) (rest := .dim width .scalar)
 
-/-- FFT on vectors. -/
+/-- Vector FFT layer, implemented as a DFT along the only non-scalar axis. -/
 abbrev fftVec (n : Nat) : LayerDef (vec n) (vec n) :=
   fftDim0 (n := n) (rest := .scalar)
 
-/-- Inverse FFT on vectors. -/
+/-- Inverse vector FFT layer, implemented as an inverse DFT along the only non-scalar axis. -/
 abbrev ifftVec (n : Nat) : LayerDef (vec n) (vec n) :=
   ifftDim0 (n := n) (rest := .scalar)
 

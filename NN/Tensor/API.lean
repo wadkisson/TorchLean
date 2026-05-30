@@ -18,14 +18,14 @@ User-facing tensor API for TorchLean.
 
 This is the implementation leaf behind the public `NN.Tensor` umbrella. It is the ergonomic layer
 that sits on top of the spec-first tensor semantics in `NN.Spec.*`. It does not introduce new math;
-it provides constructors and syntax intended for examples, tests, small models, and quickstarts.
+it provides constructors and syntax intended for examples, tests, compact models, and introductory examples.
 
 Typical responsibilities here:
 
 - shape aliases such as `Shape.Vec` and `Shape.NCHW`,
 - friendly constructors from lists and literals,
 - small syntax helpers for examples/tests,
-- and lightweight printing support for runtime-friendly dtypes.
+- and printing support for runtime-friendly dtypes.
 
 Notation policy:
 - keep compact literal constructors (`shape!`, `tensor!`, `tensorND!`, `tensorF!`, `tensor32!`,
@@ -250,7 +250,7 @@ abbrev ImagesTensor (α : Type) (n c h w : Nat) := Tensor α (Shape.Images n c h
 
 Why this exists:
 - In the spec layer we usually *carry the shape in the type* (great for safety).
-- In “API land” we often start from lists (CLI args, JSON, small examples, …).
+- In “API land” we often start from lists (CLI args, JSON, compact examples, …).
 
 `shapeOfDims` is the bridge between those representations.
 -/
@@ -476,7 +476,7 @@ Example:
 `def x : Tensor ℚ (shape![2, 2]) := tensorND! (ty := ℚ) [2, 2] [1, 2, 3, 4]`
 
 Implementation note: we avoid reserving a common identifier as a syntax keyword (Lean would then
-treat it as a keyword in downstream files). Instead, we parse an `ident` and sanity-check it is
+treat it as a keyword in downstream files). Instead, we parse an `ident` and check that it is
 `ty`.
 -/
 macro "tensorND!" "(" name:ident ":=" elemTy:term ")" dims:term:max xs:term:max : term => do
@@ -604,7 +604,7 @@ macro "tensor!" xs:term:max : term => do
 Writing `⟨0, by decide⟩` everywhere is noisy.
 
 These macros are intended for examples/tests where the dimension is a literal or abbreviation, so
-`by decide` can close the bounds proof. They are deliberately not a replacement for carrying a real
+`by decide` can close the bounds proof. They are not a replacement for carrying a real
 `Fin n` in library code.
 
 Examples:
@@ -690,7 +690,7 @@ def tensorF322d (xss : List (List Float)) :
 
 /-- A compact “dtype name” class used by `NN.Tensor.print`.
 
-This is deliberately lightweight: it’s only meant for friendly IO output in examples/tests.
+The class only records the display name needed by human-facing tensor output.
 -/
 class DTypeName (α : Type) where
   name : String
@@ -730,13 +730,13 @@ class TensorPrintable (α : Type) where
 instance (priority := 10) {α : Type} [ToString α] : TensorPrintable α where
   pretty := fun {_s} t => .ok (Spec.pretty t)
 
-/-- Printing is intentionally disabled for proof-level `ℝ` tensors. -/
+/-- Printing is disabled by design for proof-level `ℝ` tensors. -/
 instance (priority := 100) : TensorPrintable ℝ where
   pretty := fun {_s} _ =>
     .error
       "Refusing to print `Tensor ℝ` (proof-level); cast to `Float`/`IEEE32Exec`/`ℚ` to display."
 
-/-- Printing is intentionally disabled for the proof-only rounding model `FP32`. -/
+/-- Printing is disabled by design for the proof-only rounding model `FP32`. -/
 instance (priority := 100) : TensorPrintable TorchLean.Floats.FP32 where
   pretty := fun {_s} _ =>
     .error

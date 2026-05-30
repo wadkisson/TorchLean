@@ -80,9 +80,9 @@ This is equivalent to the common split-parameter form:
 just packaged to reuse the same tensor primitives elsewhere in TorchLean.
 -/
 structure RNNSpec (α : Type) (inputSize hiddenSize : Nat) where
-  /-- weights. -/
+  /-- Combined input-to-hidden and hidden-to-hidden weight matrix. -/
   weights : WeightMatrix α hiddenSize (inputSize + hiddenSize)
-  /-- bias. -/
+  /-- Hidden-state bias vector. -/
   bias    : HiddenVector α hiddenSize
 
 /--
@@ -193,7 +193,7 @@ def rnnBatchedSpec {batchSize seqLen inputSize hiddenSize : Nat}
 /--
 Gradient w.r.t. weights from a full unroll, given per-step preactivation gradients.
 
-This is a lightweight helper for analyses that already have preactivation gradients. It assumes:
+This helper is for analyses that already have preactivation gradients. It assumes:
 - the initial hidden state is `0`, and
 - `grad_outputs[t]` is already `dL/dz_t` (preactivation gradient).
 

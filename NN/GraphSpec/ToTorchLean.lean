@@ -82,7 +82,7 @@ Public alias for TorchLean's sequential model type used as the lowering target.
 
 This keeps GraphSpec examples from exposing the lower-level
 `Runtime.Autograd.TorchLean.NN.Seq` path directly. It is definitionally the same type as
-`NN.API.nn.Sequential`, but avoids importing the full API facade back into GraphSpec.
+`NN.API.nn.Sequential`, but avoids importing the full public API back into GraphSpec.
 -/
 abbrev Sequential (σ τ : Shape) : Type 2 :=
   _root_.Runtime.Autograd.TorchLean.NN.Seq σ τ

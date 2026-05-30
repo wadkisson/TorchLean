@@ -43,7 +43,7 @@ of the denotation.
 
 # From Runtime Confidence To Theorem Obligations
 
-In PyTorch, the default runtime model is roughly:
+In PyTorch, the default runtime model is approximately:
 
 1. the eager engine records operations into a dynamic tape;
 2. each operation has a backward rule, either built in or registered by extension code;
@@ -107,7 +107,7 @@ accumulation is sound for every input context in the supported fragment.
 
 # From Dot Products To Frechet Derivatives
 
-The algebraic theorem is intentionally not the last word. A dot product VJP law is useful, but the
+The algebraic theorem is not the last word. A dot product VJP law is useful, but the
 guide should also say what function is being differentiated. The
 [Frechet derivative bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Core/FDeriv.lean) provides that link.
 
@@ -190,7 +190,7 @@ The [MLP/MSE derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN
 turns the abstract autograd theorem into a familiar training example: a small MLP followed by mean
 squared error.
 
-The definitions are intentionally close to what a reader would write on a whiteboard:
+The definitions are close by design to what a reader would write on a whiteboard:
 
 - `affineMat` for an affine layer;
 - `mlpVecMat` for a two layer MLP with a hidden nonlinearity;
@@ -250,7 +250,7 @@ For Transformer post-norm blocks, the post-norm API contains several theorem lay
 - `twoSublayerPostNormBlock_hasFDerivAt` for the analytic composition of two post-norm sublayers;
 - named interfaces for residual attention and residual feed-forward post-norm variants.
 
-The recurrent file is intentionally modest. `elmanCell_backpropVec_eq_adjoint_fderiv` proves the
+The recurrent file is kept modest. `elmanCell_backpropVec_eq_adjoint_fderiv` proves the
 reverse mode theorem for one Elman RNN cell, and `elmanTwoStep_hasFDerivAt` shows the
 shape of a short unrolled composition. Full BPTT over an arbitrary sequence length is the next
 induction over the unroll. The guide states that boundary explicitly so the current theorem scope is
@@ -273,7 +273,7 @@ Second, `step` defines the algebra behind a simple optimizer update:
 $$`\theta_{t+1} = \theta_t - \eta\,\nabla_\theta L(\theta_t)`
 
 The theorem `step_cons` says the head tensor of the parameter list is updated by exactly that
-formula, and `step_nil` handles the empty parameter list. These are small theorems, but they keep
+formula, and `step_nil` handles the empty parameter list. These are compact theorems, but they keep
 the training loop from becoming an opaque execution artifact. A realistic optimizer will add momentum,
 Adam statistics, clipping, or weight decay; this file gives the simple algebraic core that those
 extensions can refine.

@@ -28,7 +28,7 @@ when you want only the widget layer; `import NN` includes it as part of the broa
 umbrella.
 
 This is the only widget chapter in the guide. It starts with the semantic boundary for widgets,
-then gives small examples, then maps the widget families to the objects they inspect.
+then gives compact examples, then maps the widget families to the objects they inspect.
 
 Formal artifacts are hard to debug because they are often large, nested, and invisible: graph
 nodes, tensor shapes, interval boxes, affine forms, tape cotangents, Float32 bit patterns. Widgets
@@ -116,7 +116,7 @@ def mat2x4 : Tensor Int (shape![2, 4]) :=
 #tensor_view vecF32
 #tensor_view mat2x4
 
--- Quick numeric checks (small tensors):
+-- Numeric summaries for the small tensors above:
 #tensor_stats_view vecF64
 ```
 
@@ -137,7 +137,7 @@ def f2 (x y : Float) : Tensor Float (shape![2]) :=
     | ⟨0, _⟩ => Tensor.scalar x
     | ⟨_, _⟩ => Tensor.scalar y)
 
-def toyGraph : Graph :=
+def sampleGraph : Graph :=
   { nodes := #[
       { id := 0, parents := [], kind := .input
         outShape := (shape![2]) },
@@ -148,9 +148,9 @@ def toyGraph : Graph :=
         outShape := (shape![2]) }
     ] }
 
-def toyGraphSub : Graph :=
-  -- Same as `toyGraph`, but uses `sub` instead of `add`.
-  -- (Useful for rewrite/diff demos.)
+def sampleGraphSub : Graph :=
+  -- Same as `sampleGraph`, but uses `sub` instead of `add`.
+  -- (Useful for rewrite/diff examples.)
   { nodes := #[
       { id := 0, parents := [], kind := .input
         outShape := (shape![2]) },
@@ -161,29 +161,29 @@ def toyGraphSub : Graph :=
         outShape := (shape![2]) }
     ] }
 
-#ir_view toyGraph
+#ir_view sampleGraph
 
 -- 1) Invariant check:
 -- declared shape tags vs inferred shapes.
-#shape_infer_view toyGraph
+#shape_infer_view sampleGraph
 
 -- 2) Before/after view:
 -- handy for compiler/optimizer passes.
-#graph_rewrite_view toyGraph, toyGraphSub
+#graph_rewrite_view sampleGraph, sampleGraphSub
 
 -- 3) Evaluation trace: run the IR semantics step by step.
 -- For `.const` nodes, a small external payload is supplied.
-def toyInput : Runtime.AnyTensor Float :=
+def sampleInput : Runtime.AnyTensor Float :=
   { s := (shape![2]), t := f2 0.60 (-0.20) }
 
-def toyPayload : NN.IR.Payload Float :=
+def samplePayload : NN.IR.Payload Float :=
   { const? := fun id =>
       if id = 1 then
         some { n := 2, v := f2 0.25 0.25 }
       else
         none }
 
-#ir_exec_trace_view toyGraph, toyPayload, toyInput
+#ir_exec_trace_view sampleGraph, samplePayload, sampleInput
 ```
 
 # Float32 Bit Layout Viewer
@@ -219,7 +219,7 @@ bounds and whether shapes and flattened dimensions match the intended layout.
 open NN.IR
 open Spec
 
-def toyGraphCROWN : NN.IR.Graph :=
+def sampleGraphCROWN : NN.IR.Graph :=
   { nodes := #[
       { id := 0, parents := [], kind := .input
         outShape := (shape![2]) },
@@ -230,7 +230,7 @@ def toyGraphCROWN : NN.IR.Graph :=
         outShape := (shape![2]) }
     ] }
 
-def toyPropState :
+def samplePropState :
     NN.MLTheory.CROWN.Graph.PropState Float :=
   let bIn : NN.MLTheory.CROWN.FlatBox Float :=
     { dim := 2
@@ -258,11 +258,11 @@ def toyPropState :
         aff? := none }
     ] }
 
-#crown_view toyGraphCROWN, toyPropState
+#crown_view sampleGraphCROWN, samplePropState
 
 -- Interval widths (`hi - lo`) are a fast
 -- "where did bounds blow up?" diagnostic.
-#bounds_tightness_view toyGraphCROWN, toyPropState
+#bounds_tightness_view sampleGraphCROWN, samplePropState
 ```
 
 # Autograd (Tape + Gradients)
@@ -275,7 +275,7 @@ produced by scalar backprop (like `loss.backward()` in PyTorch).
 open Runtime.Autograd
 open Spec
 
-def toyTape : Tape Float :=
+def sampleTape : Tape Float :=
   let (t0, aId) :=
     Tape.leaf (α := Float) (t := Tape.empty)
       (value := Tensor.scalar 2.0) (name := some "a")
@@ -295,11 +295,11 @@ def toyTape : Tape Float :=
   let _ := outId
   t3
 
-#tape_grads_view toyTape, 3
+#tape_grads_view sampleTape, 3
 
 -- For a step by step explanation of why a grad exists (or is missing),
 -- use the step by step reverse pass trace:
-#tape_trace_view toyTape, 3
+#tape_trace_view sampleTape, 3
 ```
 
 # Training Dashboards
@@ -313,12 +313,12 @@ These logs are plain data structures, not a hidden runtime UI:
 - `Runtime.Training.ConfusionMatrix` is just a pure table of class counts,
 - the widget layer renders them without changing their meaning.
 
-That makes them suitable for pure Lean toy runs, runtime/autograd training loops, and imported
+That makes them suitable for pure Lean small runs, runtime/autograd training loops, and imported
 metrics from external experiments, all rendered through the same viewer.
 
 ```
-def toyTrainLog : _root_.Runtime.Training.TrainLog :=
-  { title := "Toy classifier run"
+def sampleTrainLog : _root_.Runtime.Training.TrainLog :=
+  { title := "Classifier training run"
     steps := #[0, 1, 2, 3, 4]
     series := #[
       { name := "loss", values := #[1.20, 0.84, 0.59, 0.41, 0.33], color := "#c44" }
@@ -328,20 +328,20 @@ def toyTrainLog : _root_.Runtime.Training.TrainLog :=
     notes := #[
       "optimizer: SGD"
     , "scheduler: StepLR(step_size=2, gamma=0.2)"
-    , "dataset: toy 3-class classifier"
+    , "dataset: synthetic 3-class classifier"
     ] }
 
-def toyLabels : Array String := #["cat", "dog", "owl"]
+def sampleLabels : Array String := #["cat", "dog", "owl"]
 
-def toyCM : _root_.Runtime.Training.ConfusionMatrix :=
+def sampleCM : _root_.Runtime.Training.ConfusionMatrix :=
   { counts := #[
       #[8, 1, 0]
     , #[2, 6, 1]
     , #[0, 1, 7]
     ] }
 
-#train_log_view toyTrainLog
-#confusion_view toyLabels, toyCM
+#train_log_view sampleTrainLog
+#confusion_view sampleLabels, sampleCM
 ```
 
 This widget family pairs particularly well with:
@@ -362,7 +362,7 @@ The runtime-context widget answers that question directly.
 def anyScalar (x : Float) : Runtime.AnyTensor Float :=
   { s := .scalar, t := Tensor.scalar x }
 
-def toyCtx : Runtime.RuntimeContext Float :=
+def sampleCtx : Runtime.RuntimeContext Float :=
   { var_registry := [
       ("w", anyScalar 3.0)
     , ("x", anyScalar 2.0)
@@ -374,12 +374,12 @@ def toyCtx : Runtime.RuntimeContext Float :=
     ]
     next_id := 3 }
 
-#runtime_ctx_view toyCtx
+#runtime_ctx_view sampleCtx
 ```
 
 This view is especially useful for comparing:
 
-- the public training facade,
+- the public training API,
 - the eager autograd tape,
 - and the actual runtime registry that stores values and accumulated gradients.
 
@@ -395,7 +395,7 @@ What they show:
 
 - small tensors as readable tables,
 - shape-erased runtime tensors,
-- min/max/mean/norm summaries for a quick numerical check.
+- min/max/mean/norm summaries for a compact numerical check.
 
 Open:
 
@@ -427,7 +427,7 @@ What it shows:
 
 - declared shapes versus inferred shapes,
 - the first node where a shape mismatch appears,
-- quick confirmation that a graph is well-formed.
+- fast confirmation that a graph is well-formed.
 
 Open:
 
@@ -447,8 +447,8 @@ What they show:
 
 Open:
 
-- [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-- [float32 modes demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Floats/Float32Modes.lean)
+- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+- [float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Floats/Float32Modes.lean)
 
 ## 5. Verification views
 
@@ -479,7 +479,7 @@ What they show:
 Open:
 
 - [autograd basics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
-- [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
 
 ## 7. Training dashboards
 
@@ -489,12 +489,12 @@ What they show:
 
 - loss, accuracy, and learning-rate curves,
 - a compact metric table over the most recent steps,
-- classwise confusion counts for quick classifier checks.
+- classwise confusion counts for compact classifier checks.
 
 Open:
 
-- [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-- [CSV loader demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
+- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+- [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
 - [ResNet basic block training](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/ResnetBasicblockTrain.lean)
 
 ## 8. Runtime context views
@@ -509,13 +509,13 @@ What it shows:
 
 Open:
 
-- [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
 - [runtime context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Context.lean)
 
 # A Good Starting File
 
-For more complete interactive demos (kept fast enough to elaborate in an editor), open:
+For more complete interactive examples (kept fast enough to elaborate in an editor), open:
 
-- [widgets demo](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
 
-The demo shows the same ideas with short inline explanations around each example.
+The example shows the same ideas with short inline explanations around each example.

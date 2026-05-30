@@ -49,14 +49,18 @@ namespace ParamIO
 
 open Spec
 
+/-- Format tag stored in Float parameter-pack JSON files. -/
 def formatTag : String := "torchlean_paramlist_bits_v1"
 
+/-- Encode a natural number as a JSON number. -/
 def jsonNat (n : Nat) : Lean.Json :=
   Lean.Json.num (Lean.JsonNumber.fromInt (Int.ofNat n))
 
+/-- Encode a Float by writing its exact IEEE bit pattern as a JSON natural number. -/
 def floatToJsonBits (x : Float) : Lean.Json :=
   jsonNat x.toBits.toNat
 
+/-- Decode a JSON natural number as the exact IEEE bit pattern of a Float. -/
 def jsonBitsToFloat (j : Lean.Json) : Except String Float := do
   let n ← Lean.Json.getNat? j
   let limit : Nat := (2 : Nat) ^ 64
@@ -65,6 +69,7 @@ def jsonBitsToFloat (j : Lean.Json) : Except String Float := do
   let bits : UInt64 := UInt64.ofNat n
   pure (Float.ofBits bits)
 
+/-- Rebuild a tensor from a flat list, rejecting length mismatches instead of padding/truncating. -/
 def tensorOfFlatListExact {α : Type} [Zero α] (tag : String) :
     (s : Shape) → (xs : List α) → Except String (Tensor α s)
   | .scalar, [x] => pure (Tensor.scalar x)
@@ -87,12 +92,14 @@ def tensorOfFlatListExact {α : Type} [Zero α] (tag : String) :
             Spec.zeros α rest
       pure <| Tensor.dim f
 
+/-- Encode one Float tensor as shape metadata plus exact IEEE bit-pattern values. -/
 def tensorToJsonBits (s : Shape) (t : Tensor Float s) : Lean.Json :=
   let dims : Lean.Json := Lean.Json.arr (Shape.toList s |>.toArray |>.map jsonNat)
   let values : Lean.Json :=
     Lean.Json.arr ((Spec.toList t).toArray.map floatToJsonBits)
   Lean.Json.mkObj [("shape", dims), ("values", values)]
 
+/-- Decode one shape-checked Float tensor from the bit-pattern parameter format. -/
 def tensorFromJsonBits (tag : String) (s : Shape) (j : Lean.Json) :
     Except String (Tensor Float s) := do
   let o ← Lean.Json.getObj? j
@@ -108,6 +115,7 @@ def tensorFromJsonBits (tag : String) (s : Shape) (j : Lean.Json) :
     valsArr.toList.mapM (fun v => jsonBitsToFloat v)
   tensorOfFlatListExact (tag := tag) s vals
 
+/-- Encode a shape-indexed parameter list as the JSON array stored under `params`. -/
 def tListToJsonBits {ss : List Shape} : Torch.TList Float ss → Lean.Json
   | .nil => Lean.Json.arr #[]
   | .cons (s := s) t ts =>
@@ -116,6 +124,7 @@ def tListToJsonBits {ss : List Shape} : Torch.TList Float ss → Lean.Json
           Lean.Json.arr (#[tensorToJsonBits s t] ++ xs)
       | _ => Lean.Json.arr #[]
 
+/-- Decode the `params` JSON array into the expected shape-indexed parameter list. -/
 def tListFromJsonBits (tag : String) :
     {ss : List Shape} → (j : Lean.Json) → Except String (Torch.TList Float ss)
   | [], _ => pure .nil
@@ -129,6 +138,7 @@ def tListFromJsonBits (tag : String) :
       let tail ← tListFromJsonBits (tag := tag) (ss := ss) tailJ
       pure (.cons head tail)
 
+/-- Write a Float parameter list using exact IEEE bit patterns rather than decimal floats. -/
 def writeTListBits (path : System.FilePath) {ss : List Shape}
     (ps : Torch.TList Float ss) (pretty : Bool := true) : IO Unit := do
   let top : Lean.Json :=
@@ -136,6 +146,7 @@ def writeTListBits (path : System.FilePath) {ss : List Shape}
   let s := if pretty then top.pretty else top.compress
   IO.FS.writeFile path s
 
+/-- Read a Float parameter list previously written by `writeTListBits`. -/
 def readTListBits (path : System.FilePath) {ss : List Shape} :
     IO (Except String (Torch.TList Float ss)) := do
   let s ← IO.FS.readFile path

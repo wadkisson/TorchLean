@@ -59,10 +59,10 @@ Open these files in an editor with the Lean infoview enabled:
 - `NN/Examples/RL/PPOGridWorldView.lean`
 - `NN/Examples/RL/PPOCartPoleView.lean`
 - `NN/Examples/RL/PPOPongRamView.lean`
-- `NN/Examples/Quickstart/Widgets.lean`, including `#pytorch_translate_file` for the lightweight
+- `NN/Examples/Quickstart/Widgets.lean`, including `#pytorch_translate_file` for the supported
   PyTorch-to-TorchLean assistant.
 
-The examples are intentionally small and editor friendly. File backed viewers render an error panel
+The examples are compact and editor friendly. File backed viewers render an error panel
 when an artifact is missing instead of making the Lean build fail.
 
 ## PyTorch Translator Widget
@@ -73,7 +73,7 @@ when an artifact is missing instead of making the Lean build fail.
 PyTorch file -> recognized layer report -> TorchLean skeleton -> trust-boundary notes
 ```
 
-It is a lightweight supported-subset assistant for common `nn.Sequential`-style models such as MLPs
+It is a supported-subset assistant for common `nn.Sequential`-style models such as MLPs
 and simple CNN blocks. It does not parse arbitrary Python and does not prove PyTorch execution
 correct. For real modules, use the existing `torch.export` JSON bridge and Lean graph importer; the
 widget helps users see whether their model is close to TorchLean's supported subset before they run

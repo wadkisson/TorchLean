@@ -64,7 +64,7 @@ structure NeuralConversionResult (α : Type) where
   target_phase : TrainingPhase := TrainingPhase.forward
 
 /--
-Convert a `NeuralFloat β` payload to its real semantics, returning lightweight metadata.
+Convert a `NeuralFloat β` payload to its real semantics, returning the associated format metadata.
 
 In words: the returned `value` is exactly `neural_to_real f`.
 The `error_bound` field is the *metadata* stored in the input record (it is not recomputed here).

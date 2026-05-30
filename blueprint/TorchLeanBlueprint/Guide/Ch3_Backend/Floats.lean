@@ -62,7 +62,7 @@ error, verifier-margin transfer, and paper statements such as "the rounded execu
 
 `IEEE32Exec` is the executable bit model. It stores raw binary32 bits and implements IEEE-style
 behavior for the core operations, including signed zero, infinities, NaNs, comparisons, and
-special-value propagation. This is the right level for widgets, demos, edge-case tests, and checking
+special-value propagation. This is the right level for widgets, examples, edge-case tests, and checking
 what a binary32-shaped computation actually does.
 
 The bridge theorems connect the two on the finite path. That means the inputs and result decode to

@@ -21,7 +21,7 @@ title: Dependency Maps
   <section class="dep-panel dep-summary">
     <h2>Repository Shape</h2>
     <p class="dep-panel-intro">
-      The longest chain counts the longest path through direct imports in this build. It is a rough
+      The longest chain counts the longest path through direct imports in this build. It is an approximate
       measure of layering depth, not a correctness result.
     </p>
     <div class="dep-stat-grid" id="dep-summary-cards">

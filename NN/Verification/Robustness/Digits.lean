@@ -79,7 +79,7 @@ structure DigitsOpts where
   dataset : String := "NN/Examples/Verification/Robustness/digits_test.json"
   /-- L∞ perturbation radius around each input example. -/
   eps     : Float  := 0.02
-  /-- Max number of examples to evaluate (for quick local checks). -/
+  /-- Max number of examples to evaluate (for local checks). -/
   max     : Nat    := 100
   deriving Repr
 
@@ -157,8 +157,8 @@ def argmaxFloat {n : Nat} (t : Tensor Float (.dim n .scalar)) : Nat :=
 /--
 Certify top-1 correctness from output bounds.
 
-Given elementwise bounds `lo <= y <= hi`, this returns `true` if the lower bound on the true
-class logit exceeds the upper bounds of all other logits.
+Given elementwise bounds `lo <= y <= hi`, this returns `true` if the lower bound on the true-label
+logit exceeds the upper bounds of all other logits.
 -/
 def certifiedTop1 {α : Type} [Context α]
     (lo hi : Tensor α yShape) (label : Nat) : Bool :=

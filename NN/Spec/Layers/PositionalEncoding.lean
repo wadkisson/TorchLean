@@ -23,7 +23,7 @@ Why learnable positional encodings show up a lot in practice:
 
 - they are easy to train and tend to work well for fixed-length settings (e.g. ViT with a chosen
   patch grid, or language models trained with a fixed max sequence length),
-- they keep the spec lightweight: there is no trigonometry, complex numbers, or special casing for
+- they keep the spec algebraic: there is no trigonometry, complex numbers, or special casing for
   even/odd dimensions.
 
 If you want sinusoidal encodings (Transformer) or RoPE/rotary encodings, those can be defined as
@@ -46,8 +46,8 @@ variable {α : Type} [Context α]
 /--
 Learnable positional encoding parameters for a fixed `(seqLen, embedDim)`.
 
-This is intentionally just a tensor of trainable parameters. Higher-level models decide how to
-initialize it and whether to share/resize it across different sequence lengths.
+This record stores the trainable positional table. Higher-level models decide how to initialize it
+and whether to share or resize it across different sequence lengths.
 -/
 structure PositionalEncodingSpec (seqLen embedDim : Nat) (α : Type) where
   /-- pos. -/
@@ -163,8 +163,8 @@ In most transformer implementations, RoPE is applied to query/key head vectors:
 - per head: `(seqLen, headDim)`
 - all heads: `(numHeads, seqLen, headDim)`
 
-This file intentionally provides only **pure** RoPE helpers; we do not integrate them into
-attention yet.
+This file provides **pure** RoPE helpers. Attention modules can apply these helpers before the
+query/key dot product.
 
 References:
 - Su et al. (2021), "RoFormer: Enhanced Transformer with Rotary Position Embedding".

@@ -29,7 +29,7 @@ Why generate a Python adapter instead of parsing PyTorch objects in Lean?
 - Lean should receive a small, explicit artifact and then validate it with TorchLean's own IR
   checkers.
 
-The generated adapter is intentionally conservative. It lowers only ops that already exist in
+The generated adapter is conservative by design. It lowers only ops that already exist in
 `NN.IR.OpKind`; unsupported operators fail with a clear message. This is exactly the behavior we
 want for verification: better to reject a model than silently erase semantics.
 
@@ -54,8 +54,9 @@ structure GraphBridgeOptions where
   preferTorchExport : Bool := true
   /-- If true, include raw PyTorch target strings in each node for debugging. -/
   includeDebugTargets : Bool := true
-  deriving Repr
+deriving Repr
 
+/-- Render a Lean `Bool` as the corresponding Python literal. -/
 def pyBool (b : Bool) : String :=
   if b then "True" else "False"
 

@@ -38,9 +38,11 @@ structure EpsConvNetConfig where
   /-- Hidden channel width. -/
   hiddenC : Nat := 32
 
+/-- Epsilon-predictor input shape, with one extra channel carrying the diffusion time. -/
 abbrev epsConvNetInShape (cfg : EpsConvNetConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch (cfg.dataC + 1) cfg.h cfg.w
 
+/-- Epsilon-predictor output shape matching the denoised data channels. -/
 abbrev epsConvNetOutShape (cfg : EpsConvNetConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch cfg.dataC cfg.h cfg.w
 
@@ -270,8 +272,7 @@ def ddimPrev {batch c h w : Nat}
 /--
 Write the first image in an RGB NCHW batch as an ASCII PPM.
 
-This dependency-free writer is for example artifacts and visual checks, not high-throughput image
-export.
+This dependency-free writer emits portable image artifacts for examples and rendered diagnostics.
 -/
 def writeFirstRgbNchwPpm {batch c h w : Nat}
     (path : System.FilePath) (x : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) : IO Unit := do

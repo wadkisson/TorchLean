@@ -23,7 +23,7 @@ artifacts and verification targets feel like ordinary model code.
 
 # A Minimal Complete Script
 
-The quickest way to get a feel for the public API is to run the focused MLP example:
+The shortest way to get a feel for the public API is to run the focused MLP example:
 
 - [NN.Examples.Quickstart.SimpleMlpTrain API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
 - [NN.Examples.Quickstart.SimpleCnnTrain API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
@@ -69,7 +69,7 @@ together, while keeping the end result purely functional.
 
 ## PyTorch Similarity
 
-The PyTorch training pattern and the TorchLean training pattern are intentionally close:
+The PyTorch training pattern and the TorchLean training pattern are close by design:
 
 ```
 import torch
@@ -121,7 +121,7 @@ A successful training run establishes that the model, data, loss, optimizer, and
 execute together and produce a report. It does not prove convergence, robustness, or correctness of
 the CUDA backend. Those claims need later checker or theorem support.
 
-For a slightly more advanced path after the MLP demo, try the data-backed training tutorials:
+For a slightly more advanced path after the MLP example, try the data-backed training tutorials:
 
 - [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
 - [NPY loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Npy.lean)
@@ -137,7 +137,7 @@ If you want more than an MLP:
 TorchLean’s differentiation is functional: tensors do not carry mutable `.grad` fields. Instead,
 TorchLean provides `autograd` primitives that transform functions.
 
-For the smallest autograd-only demo, see:
+For the smallest autograd-only example, see:
 
 - [NN.Examples.Quickstart.AutogradBasics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
 
@@ -167,7 +167,7 @@ external datasets or Python preprocessing:
 - `NN.API.Samples.imageCHWFloat` for parsing flat image buffers,
 - `NN.API.Samples.Runtime.*` and `NN.API.Samples.Lit.*` for runtime-cast and literal-driven variants.
 
-That keeps the quickstart tutorials focused on the training loop instead of on repetitive data setup.
+That keeps the introductory tutorials focused on the training loop instead of on repetitive data setup.
 
 ## A Direct Loop Comparison
 

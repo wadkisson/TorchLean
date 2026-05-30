@@ -124,7 +124,7 @@ def otherTools : List Tool :=
   [
     { name := "camera-box3d-cert"
       description := "3D camera-box projection certificate check"
-      defaultArg := some "NN/Verification/Geometry3D/smoke_box3d_camera_cert.json"
+      defaultArg := some "NN/Verification/Geometry3D/check_box3d_camera_cert.json"
       run := fun args =>
         NN.Verification.Geometry3D.CLI.main args }
   ,
@@ -268,7 +268,7 @@ entrypoint remains stable.
 /--
 `lake exe verify` entry point.
 
-This is a thin wrapper around the unified dispatcher `NN.Verification.CLI.dispatch`.
+This entry point delegates to the unified dispatcher `NN.Verification.CLI.dispatch`.
 -/
 def main (args : List String) : IO Unit :=
   NN.Verification.CLI.dispatch args

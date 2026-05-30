@@ -20,7 +20,7 @@ Notes:
   - pooling output: (inC, outSpatial...)
 - The "ND" entrypoints (`torchlean_cuda_conv_fwd`, etc.) take per-axis shape/stride/padding
   as `Array Nat`, with `rank ≤ 8`.
-- The `*2d*` entrypoints are concise rank-2 convenience wrappers with scalar stride/padding.
+- The `*2d*` entrypoints specialize the ND kernels to rank-2 scalar stride/padding.
 -/
 
 module

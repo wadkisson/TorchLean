@@ -112,14 +112,25 @@ def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox Float)) := do
       let hiT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor hiVec
       pure (some { dim := dim, lo := loT, hi := hiT })
 
-/-- Parse a flat vector from JSON, accepting `null` as an absent optional vector. -/
-def parseFlatVec? (dim : Nat) (j : Json) (ctx : String := "alpha[i]") :
+/--
+Parse an optional α vector for α-CROWN ReLU relaxations.
+
+The soundness theorem for the lower ReLU relaxation assumes every α component is in `[0, 1]`.
+We enforce that contract at the JSON boundary, so a malformed external certificate cannot be
+accepted by executable checking while relying on proof hypotheses that are false.
+-/
+def parseAlphaVec? (dim : Nat) (j : Json) (ctx : String := "alpha[i]") :
     IO (Option (FlatVec Float)) := do
   match j with
   | .null => pure none
   | _ =>
       let some v := parseFloatVec dim j
         | throw <| IO.userError s!"Invalid {ctx}: expected float array length {dim}"
+      for k in List.finRange dim do
+        let a := v k
+        if a < 0.0 || a > 1.0 then
+          throw <| IO.userError
+            s!"Invalid {ctx}[{k.val}]: α-CROWN requires 0 ≤ alpha ≤ 1, got {a}"
       let t : Tensor Float (.dim dim .scalar) := Spec.vectorTensor v
       pure (some { n := dim, v := t })
 
@@ -147,6 +158,65 @@ def parseAffineBounds? (inDim outDim : Nat) (j : Json) : IO (Option (FlatAffineB
         { A := Spec.matrixTensor hiA, c := Spec.vectorTensor hiC }
       pure (some { inDim := inDim, outDim := outDim, loAff := loAff, hiAff := hiAff })
 
+/--
+Shared in-memory representation for node-wise CROWN-style certificates.
+
+Plain α-CROWN uses these fields directly. α/β-CROWN extends the same core artifact with a β phase
+array, so parsing the common fields here keeps the two checkers from drifting apart.
+-/
+structure CROWNNodeCoreCertificate where
+  /-- Affine-propagation context, including the chosen input node and flattened input dimension. -/
+  ctx : AffineCtx
+  /-- Optional per-node interval bounds used by nonlinear CROWN steps. -/
+  ibp : Array (Option (FlatBox Float))
+  /-- Optional per-node affine lower/upper bounds. -/
+  crown : Array (Option (FlatAffineBounds Float))
+  /-- Optional per-node α values for ReLU lower relaxations. -/
+  alpha : Array (Option (FlatVec Float))
+
+/--
+Parse the fields shared by α-CROWN and α/β-CROWN node certificates.
+
+The producer may omit `"alpha"`; in that case we treat every node as having no custom α vector.
+Whenever α is present, `parseAlphaVec?` enforces the `[0,1]` side condition required by the ReLU
+relaxation proof.
+-/
+def parseCROWNNodeCoreCertificate (g : Graph) (topObj : Json) :
+    IO CROWNNodeCoreCertificate := do
+  let ctxObj ← expectFieldObj topObj "ctx" "top-level"
+  let inputId ← expectFieldNat ctxObj "inputId" "ctx"
+  let inputDim ← expectFieldNat ctxObj "inputDim" "ctx"
+  let ctx : AffineCtx := { inputId := inputId, inputDim := inputDim }
+
+  let ibpArr ← expectFieldArray topObj "ibp" "top-level"
+  let crownArr ← expectFieldArray topObj "crown" "top-level"
+  let alphaArr ←
+    match ← optionalField? topObj "alpha" "top-level" with
+    | none => pure (Array.replicate g.nodes.size Json.null)
+    | some alphaJ => expectArray alphaJ "top-level.alpha"
+
+  if ibpArr.size ≠ g.nodes.size then
+    throw <| IO.userError s!"ibp length {ibpArr.size} ≠ g.nodes.size {g.nodes.size}"
+  if crownArr.size ≠ g.nodes.size then
+    throw <| IO.userError s!"crown length {crownArr.size} ≠ g.nodes.size {g.nodes.size}"
+  if alphaArr.size ≠ g.nodes.size then
+    throw <| IO.userError s!"alpha length {alphaArr.size} ≠ g.nodes.size {g.nodes.size}"
+
+  let mut ibp : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
+  let mut crown : Array (Option (FlatAffineBounds Float)) := Array.mkEmpty g.nodes.size
+  let mut alpha : Array (Option (FlatVec Float)) := Array.mkEmpty g.nodes.size
+
+  for i in [0:g.nodes.size] do
+    let outDim := g.nodes[i]!.outShape.size
+    let ibpEntry ← parseFlatBox? outDim ibpArr[i]!
+    ibp := ibp.push ibpEntry
+    let crownEntry ← parseAffineBounds? ctx.inputDim outDim crownArr[i]!
+    crown := crown.push crownEntry
+    let alphaEntry ← parseAlphaVec? outDim alphaArr[i]!
+    alpha := alpha.push alphaEntry
+
+  pure { ctx := ctx, ibp := ibp, crown := crown, alpha := alpha }
+
 /-- Check that an optional per-node certificate array contains all parents of node `id`. -/
 def parentsOk {β : Type} (g : Graph) (cert : Array (Option β)) (id : Nat) : Bool :=
   let node := g.nodes[id]!
@@ -158,6 +228,56 @@ def parentsOk {β : Type} (g : Graph) (cert : Array (Option β)) (id : Nat) : Bo
     else
       false)
 
+/-- Safe lookup for optional flat boxes used by certificate-side shape checks. -/
+def getFlatBox? (cert : Array (Option (FlatBox Float))) (id : Nat) : Option (FlatBox Float) :=
+  if _h : id < cert.size then cert[id]! else none
+
+/--
+Check that binary elementwise parent boxes have the same flattened size as each other and as the
+node output. This closes the hole where a malformed certificate could make the runtime helper use
+the left box on a dimension mismatch.
+-/
+def binaryElementwiseBoxesMatchOutput
+    (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
+  let node := g.nodes[id]!
+  match node.parents with
+  | p1 :: p2 :: _ =>
+      match getFlatBox? cert p1, getFlatBox? cert p2 with
+      | some B1, some B2 =>
+          B1.dim == B2.dim && B1.dim == node.outShape.size
+      | _, _ => false
+  | _ => false
+
+/-- Check whether a flat box is entirely inside the positive domain needed by true `log`. -/
+def flatBoxStrictlyAbove (B : FlatBox Float) (eps : Float) : Bool :=
+  match B with
+  | ⟨n, lo, hi⟩ =>
+      let flo := getDimScalarFn (α := Float) lo
+      let fhi := getDimScalarFn (α := Float) hi
+      (List.finRange n).all (fun i =>
+        match flo i, fhi i with
+        | .scalar l, .scalar u => l > eps && u > eps)
+
+/--
+Domain and shape preconditions that must hold before a node-wise certificate checker replays a
+bound step. These are not proof shortcuts; they are the executable version of the side conditions
+that the mathematical rules need.
+-/
+def ibpNodePreconditionsOk
+    (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
+  let node := g.nodes[id]!
+  match node.kind with
+  | .add | .sub | .mul_elem | .maxElem | .minElem =>
+      binaryElementwiseBoxesMatchOutput g cert id
+  | .log =>
+      match node.parents with
+      | p1 :: _ =>
+          match getFlatBox? cert p1 with
+          | some B => flatBoxStrictlyAbove B Numbers.epsilon
+          | none => false
+      | _ => false
+  | _ => true
+
 /-- Pretty-printer for a flat box, used in certificate mismatch messages. -/
 def prettyFlatBox (B : FlatBox Float) : String :=
   s!"dim={B.dim}, lo={Spec.pretty B.lo}, hi={Spec.pretty B.hi}"
@@ -165,5 +285,61 @@ def prettyFlatBox (B : FlatBox Float) : String :=
 /-- Pretty-printer for affine bounds, used in certificate mismatch messages. -/
 def prettyAffineBounds (B : FlatAffineBounds Float) : String :=
   s!"inDim={B.inDim}, outDim={B.outDim}, loA={Spec.pretty B.loAff.A}, loC={Spec.pretty B.loAff.c}"
+
+/--
+Common node-level checker for CROWN-style affine certificates.
+
+The only difference between α-CROWN and α/β-CROWN is how the candidate affine bound is recomputed.
+Everything after that point is the same: parent availability, IBP side conditions, dimensions,
+approximate JSON equality, and diagnostic messages.
+-/
+def checkCROWNLikeNode
+    (label : String) (g : Graph)
+    (certIbp : Array (Option (FlatBox Float)))
+    (certCrown : Array (Option (FlatAffineBounds Float)))
+    (ctx : AffineCtx)
+    (id : Nat) (tol : Float)
+    (computed? : Option (FlatAffineBounds Float)) : IO Bool := do
+  let node := g.nodes[id]!
+  let needsParents :=
+    match node.kind with
+    | .input | .const _ => false
+    | _ => true
+  if needsParents && !(parentsOk g certCrown id) then
+    IO.eprintln s!"[{label}] node {id}: parent affine bounds missing or not topo"
+    return false
+  if !(ibpNodePreconditionsOk g certIbp id) then
+    IO.eprintln
+      s!"[{label}] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
+    return false
+
+  match certCrown[id]!, computed? with
+  | none, _ =>
+      IO.eprintln s!"[{label}] node {id}: certificate missing (null)"
+      pure false
+  | _, none =>
+      IO.eprintln s!"[{label}] node {id}: Lean propagation produced no affine bound"
+      pure false
+  | some certB, some leanB =>
+      if certB.inDim ≠ ctx.inputDim then
+        IO.eprintln s!"[{label}] node {id}: cert inDim {certB.inDim} ≠ ctx.inputDim {ctx.inputDim}"
+        pure false
+      else if certB.outDim ≠ node.outShape.size then
+        IO.eprintln
+          (s!"[{label}] node {id}: cert outDim {certB.outDim} ≠ " ++
+            s!"outShape.size {node.outShape.size}")
+        pure false
+      else if leanB.outDim ≠ node.outShape.size then
+        IO.eprintln
+          (s!"[{label}] node {id}: Lean outDim {leanB.outDim} ≠ " ++
+            s!"outShape.size {node.outShape.size}")
+        pure false
+      else if approxEqFlatAffineBounds certB leanB tol then
+        pure true
+      else
+        IO.eprintln s!"[{label}] mismatch at node {id} ({repr node.kind})"
+        IO.eprintln s!"  cert: {prettyAffineBounds certB}"
+        IO.eprintln s!"  lean: {prettyAffineBounds leanB}"
+        pure false
 
 end NN.Verification.Cert.Common

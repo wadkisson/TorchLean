@@ -13,7 +13,7 @@ public import NN.Runtime.Autograd.Train.Dataset
 # Training-facing TapeM helpers
 
 The core tape builder lives in `NN.Runtime.Autograd.Engine.TapeM`; that file owns the operation
-vocabulary and reverse-mode execution. This module is intentionally smaller: it contains the
+vocabulary and reverse-mode execution. This module is narrower: it contains the
 training conveniences that make loss construction read cleanly without defining a second tape API.
 
 The main helpers are:

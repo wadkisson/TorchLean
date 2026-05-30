@@ -46,14 +46,14 @@ structure Discriminator (α : Type) (obs : Shape) [Context α] where
   /-- Score an observation.  For LSGAN, scores are regressed toward `0` or `1`. -/
   forward : Tensor α obs → Tensor α .scalar
 
-/-- GAN model pair. -/
+/-- Pair of generator and discriminator components forming a GAN-style model. -/
 structure Model (α : Type) (latent obs : Shape) [Context α] where
   /-- Latent-to-observation generator. -/
   generator : Generator α latent obs
   /-- Observation-to-score discriminator. -/
   discriminator : Discriminator α obs
 
-/-- Generate a fake sample. -/
+/-- Run the generator on latent noise to produce a synthesized observation. -/
 def generate (model : Model α latent obs) (z : Tensor α latent) : Tensor α obs :=
   model.generator.forward z
 

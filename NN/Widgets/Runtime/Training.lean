@@ -41,8 +41,8 @@ Optional testing command:
 
 ## Implementation notes
 
-- Inline SVG sparklines are lightweight and render quickly in the infoview.
-- We intentionally avoid custom JavaScript so widget files stay easy to import and review.
+- Inline SVG sparklines render quickly in the infoview.
+- We avoid custom JavaScript so widget files stay easy to import and review.
 - For saved logs, we render an error panel instead of throwing hard failures; this keeps viewer
   files robust even when artifacts are missing.
 

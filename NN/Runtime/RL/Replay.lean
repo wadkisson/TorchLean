@@ -15,7 +15,7 @@ public import NN.Runtime.Autograd.TorchLean.Random
 This module provides the small typed replay-buffer layer used by value-learning algorithms such as
 DQN, Double DQN, DDPG, TD3, and SAC.
 
-The design is intentionally modest:
+The design is kept modest:
 
 - transitions are already typed (`Runtime.RL.Core.Transition`), so samples cannot mix observation
   shapes or action spaces;

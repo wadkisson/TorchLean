@@ -67,17 +67,17 @@ This is a small “record of facts” about the generated Python: shapes, dimens
 embedded weights for round-trip tests.
 -/
 structure MLPExportMetadata (α : Type) (inDim hidDim outDim : Nat) where
-  /-- model Name. -/
+  /-- Python class name used in the generated module. -/
   modelName : String
-  /-- input Dim. -/
+  /-- Input feature dimension. -/
   inputDim : Nat
-  /-- hidden Dim. -/
+  /-- Hidden layer dimension. -/
   hiddenDim : Nat
-  /-- output Dim. -/
+  /-- Output feature dimension. -/
   outputDim : Nat
-  /-- has Weights. -/
+  /-- Whether the generated Python should embed concrete weights. -/
   hasWeights : Bool
-  /-- weights. -/
+  /-- Optional two-layer MLP parameter payload: weights and biases for both linear layers. -/
   weights : Option (Tensor Float (.dim hidDim (.dim inDim .scalar)) ×
                    Tensor Float (.dim hidDim .scalar) ×
                    Tensor Float (.dim outDim (.dim hidDim .scalar)) ×
@@ -275,7 +275,6 @@ def generateMLPWithSoftmaxLines {inDim hidDim outDim : Nat} (className : String)
     indent4 "return [\"Linear\", \"ReLU\", \"Linear\", \"Softmax\"]"
   ]
 
--- Export MLP from SpecChain
 /--
 Export metadata for an MLP described as a `SpecChain`.
 
@@ -294,7 +293,6 @@ def exportMLPFromSpecChain {α : Type} {inDim hidDim outDim : Nat}
     weights := none
   }
 
--- Export MLP with weights
 /-- Like `exportMLPFromSpecChain`, but include explicit weights in the metadata record. -/
 def exportMLPWithWeights {α : Type} {inDim hidDim outDim : Nat}
   (_chain : SpecChain α (.dim inDim .scalar) (.dim outDim .scalar))
@@ -312,9 +310,8 @@ def exportMLPWithWeights {α : Type} {inDim hidDim outDim : Nat}
     weights := some (w1, b1, w2, b2)
   }
 
--- Generate complete MLP export
 /--
-Generate a complete Python script for MLP demos.
+Generate a complete Python script for MLP examples.
 
 This includes:
 - a base MLP class,

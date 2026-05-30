@@ -31,8 +31,8 @@ References:
 - Bellman, *Dynamic Programming* (1957)
 - Puterman, *Markov Decision Processes* (1994)
 - Sutton and Barto, *Reinforcement Learning: An Introduction*
-- Gymnasium and TorchRL are useful runtime reference points, but this file intentionally stays at
-  the pure finite-MDP semantics level rather than modeling replay buffers or collectors.
+- Gymnasium and TorchRL are useful runtime reference points, while this file defines the pure
+  finite-MDP semantics rather than modeling replay buffers or collectors.
 
 Naming note:
 

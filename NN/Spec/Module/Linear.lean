@@ -17,7 +17,7 @@ public import NN.Spec.Module.SpecModule
 This file provides `NNModuleSpec` wrappers so linear layers can be:
 
 - composed in a `SpecChain` with compile-time shape checking, and
-- annotated with lightweight export metadata (PyTorch pretty-printing).
+- annotated with export metadata (PyTorch pretty-printing).
 
 These wrappers are thin on purpose: the meaning is still the underlying `linear_spec`; the extra
 fields are just metadata.

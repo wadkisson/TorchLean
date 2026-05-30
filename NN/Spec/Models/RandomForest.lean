@@ -13,7 +13,7 @@ import Lean.Data.RBMap
 /-!
 # Random Forest
 
-This file defines a lightweight random-forest wrapper around a list of decision trees from
+This file defines a random-forest model as a list of decision trees from
 `NN.Spec.Module.DecisionTree`, plus a couple of standard aggregation strategies:
 
 - classification: majority vote
@@ -38,7 +38,6 @@ public section
 namespace random_forest
 open DecisionTree
 
--- Random Forest structure
 /-- Random-forest container: a list of trees.
 
 Aggregation (vote/average/etc.) is handled by `predict` so the container stays generic.
@@ -94,7 +93,7 @@ def average {α : Type} [Zero α] [Add α] [Div α] [Coe Nat α] (predictions : 
 
 The `RandomForest` above wraps the symbolic `DecisionTree` from `NN.Spec.Module.DecisionTree`, where
 splits are keyed by `String` feature names and an external `decisionFn : String → Bool` decides the
-branch. That is handy for demos, but it is not something we can “train” without providing
+branch. That is handy for examples, but it is not something we can “train” without providing
 feature-value semantics.
 
 For a more classical baseline, we also provide a *numeric* random forest built on the

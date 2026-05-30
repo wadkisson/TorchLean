@@ -36,13 +36,19 @@ public import NN.Spec.Module.SpecModule
 public import NN.Spec.Module.Svm
 
 /-!
+Module-level neural-network specifications.
+
+This file re-exports the layer and model building blocks that describe networks before they are
+lowered to runtime modules or verification graphs.
+-/
+
+/-!
 # Spec modules
 
 Umbrella import for PyTorch-style `NNModuleSpec` wrappers around pure layer/model specs.
 
-These wrappers add a uniform `forward` interface and lightweight export metadata, while preserving
+These wrappers add a uniform `forward` interface and export metadata, while preserving
 the underlying spec definitions as the source of mathematical meaning.
 -/
 
 @[expose] public section
-

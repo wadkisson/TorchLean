@@ -31,7 +31,7 @@ optimizers). This makes it easier to:
 
 - Eager tape engine (pure core):
   - `NN/Runtime/Autograd/Engine/Core.lean`
-  - `NN/Runtime/Autograd/Engine/TapeM.lean` (StateT convenience wrapper)
+  - `NN/Runtime/Autograd/Engine/TapeM.lean` (StateT tape layer)
   - `NN/Runtime/Autograd/Engine/FastKernels.lean` (optional runtime-only speedups)
 - Proof-compiled execution path:
   - `NN/Runtime/Autograd/Compiled.lean` (runtime umbrella)

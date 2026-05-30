@@ -14,8 +14,8 @@ public import NN.API.SelfSupervised
 /-!
 # API entrypoint
 
-This entrypoint exists mainly for symmetry with the other curated `NN.Entrypoint.*` umbrellas.
-It re-exports the primary user-facing facade `NN.API.Public`.
+This entrypoint re-exports the primary user-facing API surface, `NN.API.Public`, beside the other
+curated `NN.Entrypoint.*` imports.
 
 Most users should still prefer `import NN`; use this module when you want only the public
 PyTorch-shaped API without the broader library umbrella.

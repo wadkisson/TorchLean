@@ -13,14 +13,13 @@ public import NN.Spec.Module.Linear
 /-!
 # MLP (spec wiring example)
 
-This file defines a small 2-layer MLP by composing `SpecChain`s from module specs:
+This file defines a 2-layer MLP by composing `SpecChain`s from module specs:
 
 `Linear → ReLU → Linear` (optionally followed by a softmax head).
 
-This is intentionally written in a "wiring-first" style: instead of re-implementing matrix
-multiplications directly, we reuse the spec-layer definitions for `Linear` and `ReLU` and compose
-them through `NNModuleSpec` / `SpecChain`. This matches how most PyTorch users think about MLPs:
-define a few modules, then run a forward pass.
+The file is organized around module wiring rather than re-implementing matrix multiplications
+directly. `Linear` and `ReLU` come from the spec layer and are composed through `NNModuleSpec` /
+`SpecChain`, matching the usual PyTorch workflow: define a few modules, then run a forward pass.
 -/
 
 @[expose] public section
@@ -126,7 +125,7 @@ def mlpBackward
 Phase 1: Composition correctness (shape + functional) for the MLP SpecChain.
 This lemma states that evaluating the composed chain equals the sequential computation.
 -/
-/-- Sanity lemma: the composed `SpecChain` forward equals the hand-written `Linear → ReLU → Linear`
+/-- The composed `SpecChain` forward equals the hand-written `Linear → ReLU → Linear`
 computation. -/
 theorem mlp_spec_forward_eq
   {α : Type} [Context α]

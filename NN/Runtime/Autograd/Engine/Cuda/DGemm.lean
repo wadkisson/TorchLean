@@ -19,7 +19,7 @@ Foreign-function declaration for the host `FloatArray` FP64 matrix multiply path
 `cublasDgemm` when CUDA is enabled and by a CPU stub otherwise. The float32 buffer matmul path lives
 in `NN.Runtime.Autograd.Engine.Cuda.Kernels`.
 
-This intentionally stays in its own small module instead of `Cuda.Kernels`:
+This lives in its own small module instead of `Cuda.Kernels`:
 
 - `Cuda.Kernels` is the float32 `Cuda.Buffer` surface used by the CUDA eager tape.
 - `DGemm` is a host `FloatArray → FloatArray` bridge for Lean `Float` tensors and the

@@ -18,7 +18,7 @@ Deterministic RNG helpers.
 
 TorchLean treats randomness explicitly (via seeds/keys) so examples are reproducible.
 
-PyTorch mapping (rough):
+PyTorch mapping:
 - `torch.Generator` and seed management
 - `torch.rand` / Bernoulli masks for dropout
 -/
@@ -33,7 +33,7 @@ namespace rand
 export _root_.Runtime.Autograd.TorchLean.Random (keyOf nextSeed uniform mask)
 
 /-!
-Convenience wrappers for "PyTorch-like" dimension-first workflows.
+Dimension-first random tensor builders for PyTorch-style workflows.
 
 `uniform` / `mask` are shape-indexed (`Tensor α s`) and are best used when `s` is already inferred.
 When you start from a runtime dims list (e.g. CLI args), `uniformND`/`maskND` are the ergonomic

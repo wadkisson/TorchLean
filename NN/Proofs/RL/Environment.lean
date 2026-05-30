@@ -20,7 +20,7 @@ These theorems capture the first "guarantee layer" for TorchLean's Gym-style env
 
 References:
 - Gymnasium API design (reset/step, terminated vs truncated): https://gymnasium.farama.org/
-- This module’s `SafeEnv` invariants are a lightweight formal analogue of the “safety wrapper”
+- This module’s `SafeEnv` invariants are a finite-state formal analogue of the “safety wrapper”
   patterns used in practical RL systems.
 -/
 

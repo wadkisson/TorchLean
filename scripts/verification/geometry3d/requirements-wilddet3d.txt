@@ -1,10 +1,10 @@
 # Optional dependencies for the WildDet3D monocular 3D detector exporter.
 #
 # This file is separate from requirements-realworld.txt because WildDet3D is a much heavier
-# path than the DETR+Depth Anything smoke demo.
+# path than the DETR+Depth Anything example.
 # The public WildDet3D Space pins numpy<2 for its Python 3.11 image.  TorchLean's local dev
 # environment may already run Python 3.13 with numpy 2.x, where numpy 1.x wheels are unavailable.
-# Keep this unpinned here so installing the optional demo does not try to build old numpy from
+# Keep this unpinned here so installing the optional pipeline does not try to build old numpy from
 # source. If you run WildDet3D in a fresh Python 3.11 env, the Space's original `<2.0` pin is fine.
 numpy
 opencv-python-headless

@@ -10,16 +10,13 @@ public import NN.Spec.Layers.Activation
 public import NN.Spec.Layers.Gnn
 
 /-!
-# Gnn
+# Graph Neural Network Models
 
-GNN models (spec layer).
+Spec-layer graph neural-network model definitions.
 
-We provide a compact 2-layer GCN with a graph-level mean pooling readout.
-
-This file is intentionally "model glue": the actual message-passing math lives in
-`NN.Spec.Layers.Gnn` (in particular `Spec.GCNLayerSpec`, `Spec.gcn_layer_spec`,
-and `Spec.gcn_layer_backward_spec`).  Here we focus on wiring layers together and documenting
-the end-to-end shapes.
+The layer-level message-passing math lives in `NN.Spec.Layers.Gnn`, in particular
+`Spec.GCNLayerSpec`, `Spec.gcn_layer_spec`, and `Spec.gcn_layer_backward_spec`. This module wires
+those layers into a two-layer GCN with graph-level mean pooling and records the end-to-end shapes.
 
 Reference (GCN):
 

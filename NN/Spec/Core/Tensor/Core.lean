@@ -42,7 +42,6 @@ For long executable runs, repeated functional updates can create “closure chai
 
 namespace Spec
 
--- Tensor definition
 /--
 Shape-indexed tensor datatype for the spec layer.
 
@@ -288,14 +287,12 @@ def getSpec {α : Type} {s : Shape} (t : Tensor α s) : List Nat → Option α :
 
 attribute [grind =] get_spec_scalar_nil get_spec_scalar_cons get_spec_dim_nil get_spec_dim_cons
 
--- Get tensor at specific index
 /-- Extract the subtensor at index `i` along the outermost dimension. -/
 def getAtSpec {α : Type} {n s} (t : Tensor α (.dim n s)) (i : Fin n) : Tensor α s :=
   match t with
   | Tensor.dim f => f i
 
--- Access subtensor
-/-- Alias for `get_at_spec` (the standard spec-level indexing helper). -/
+/-- Standard spec-level indexing helper, equivalent to `getAtSpec`. -/
 def get {α : Type} {n s} (t : Tensor α (.dim n s)) (i : Fin n) : Tensor α s :=
   getAtSpec t i
 
@@ -319,7 +316,6 @@ def vecGet {α : Type} {n : Nat} (x : Tensor α (.dim n .scalar)) (i : Fin n) : 
 
 end Tensor
 
--- Matrix element access
 /-- Matrix element access: `get2 A i j` returns `A[i, j]` as a scalar. -/
 def get2 {α : Type} {m n : ℕ}
     (A : Tensor α (.dim m (.dim n .scalar))) (i : Fin m) (j : Fin n) : α :=
@@ -381,8 +377,7 @@ def getAtOrZero {α : Type} [Zero α] {s : Shape} (t : Tensor α s) : List Nat �
 attribute [grind =] get_at_or_zero_scalar_nil get_at_or_zero_scalar_cons get_at_or_zero_dim_nil
   get_at_or_zero_dim_cons
 
--- Create Fin zero with proof
-/-- Construct `Fin n` value `0` given a proof that `0 < n`. -/
+/-- Construct the first valid index of `Fin n` from an explicit nonempty proof. -/
 def finZero {n : Nat} (h : 0 < n) : Fin n :=
   ⟨0, h⟩
 

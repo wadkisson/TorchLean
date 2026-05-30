@@ -71,7 +71,7 @@ def derivNeg : α × α := (-Numbers.one, -Numbers.one)
 def abs (x : α) : α :=
   if x > Numbers.zero then x else -x
 
-/-- IBP for absolute value. -/
+/-- Interval propagation rule for scalar absolute value over `[l,u]`. -/
 def ibpAbsScalar (l u : α) : α × α :=
   if l > Numbers.zero then
     -- All positive: |x| = x
@@ -84,7 +84,7 @@ def ibpAbsScalar (l u : α) : α × α :=
     let absL := -l
     (Numbers.zero, if absL > u then absL else u)
 
-/-- IBP for absolute value on boxes. -/
+/-- Apply the scalar absolute-value interval rule coordinatewise to a vector box. -/
 def ibpAbs (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
@@ -322,7 +322,7 @@ def ibpClampScalar (x_lo x_hi clamp_lo clamp_hi : α) : α × α :=
   let out_hi := if x_hi < clamp_hi then x_hi else clamp_hi
   (out_lo, out_hi)
 
-/-- IBP for clamp. -/
+/-- Interval propagation for `clamp`, applied coordinatewise to a vector box. -/
 def ibpClamp (n : Nat) (B : Box α (.dim n .scalar)) (clamp_lo clamp_hi : α) : Box α (.dim n
   .scalar) :=
   match B.lo, B.hi with

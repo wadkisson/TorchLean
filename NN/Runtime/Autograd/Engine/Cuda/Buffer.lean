@@ -124,6 +124,7 @@ def allocatorStatsWithToken (token : UInt32) : IO AllocatorStats := do
 def allocatorStats : IO AllocatorStats :=
   allocatorStatsWithToken 0
 
+/-- Format a byte count as MiB for allocator progress messages. -/
 def mibString (bytes : UInt64) : String :=
   let mib := (Float.ofNat bytes.toNat) / (1024.0 * 1024.0)
   toString mib ++ " MiB"
@@ -248,7 +249,7 @@ opaque full (n : UInt32) (v : Float) : Buffer
 These are low-level building blocks used by TorchLean's seeded RNG ops (`rand_uniform`,
 `bernoulli_mask`) when running on the eager CUDA backend.
 
-They intentionally use the same SplitMix64-style mixing as `TorchLean.Random` so results are
+They use the same SplitMix64-style mixing as `TorchLean.Random` so results are
 deterministic given `(seed, counter)` and a row-major linear index.
 -/
 
@@ -260,7 +261,7 @@ opaque randUniform (n : UInt32) (key : UInt64) : Buffer
 @[extern "torchlean_cuda_buffer_bernoulli_mask"]
 opaque bernoulliMask (n : UInt32) (keepProb : Float) (key : UInt64) : Buffer
 
-/-- Unary ops. -/
+/-- Absolute value applied pointwise to a CUDA buffer. -/
 @[extern "torchlean_cuda_buffer_abs"]
 opaque abs (b : Buffer) : Buffer
 
@@ -301,7 +302,7 @@ Uses the TorchLean convention: derivative is `1` strictly inside `(lo, hi)`, els
 @[extern "torchlean_cuda_buffer_clamp_bwd"]
 opaque clampBwd (x dLdy : Buffer) (lo hi : Float) : Buffer
 
-/-- Binary elementwise ops (sizes must match). -/
+/-- Pointwise maximum of two equal-length CUDA buffers. -/
 @[extern "torchlean_cuda_buffer_max"]
 opaque max (a b : Buffer) : Buffer
 
@@ -324,11 +325,11 @@ Tie-breaking follows the spec: when `a = b`, split upstream gradient evenly (`0.
 @[extern "torchlean_cuda_buffer_min_bwd"]
 opaque minBwd (a b dLdy : Buffer) : Buffer × Buffer
 
-/-- Elementwise division. -/
+/-- Pointwise division of two equal-length CUDA buffers. -/
 @[extern "torchlean_cuda_buffer_div"]
 opaque div (a b : Buffer) : Buffer
 
-/-- Elementwise ReLU. -/
+/-- Pointwise ReLU activation on a CUDA buffer. -/
 @[extern "torchlean_cuda_buffer_relu"]
 opaque relu (b : Buffer) : Buffer
 

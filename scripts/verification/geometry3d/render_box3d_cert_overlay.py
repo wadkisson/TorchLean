@@ -33,7 +33,7 @@ from PIL import Image, ImageDraw, ImageFont
 from safe_image_io import load_local_rgb_image, load_remote_rgb_image
 
 
-DEFAULT_CERT = Path("NN/Verification/Geometry3D/smoke_box3d_camera_cert.json")
+DEFAULT_CERT = Path("NN/Verification/Geometry3D/check_box3d_camera_cert.json")
 DEFAULT_OUT_DIR = Path("_external/geometry3d/overlays")
 DEFAULT_BAD_GLOB = "_external/geometry3d/bad/*.json"
 DEFAULT_REAL_GLOB = "_external/geometry3d/realworld/*.json"

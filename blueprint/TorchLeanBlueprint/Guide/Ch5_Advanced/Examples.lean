@@ -8,7 +8,7 @@ open Verso.Genre Manual
 tag := "examples"
 %%%
 
-This page is a guided path through the examples. The repository has many demos, but the first pass
+This page is a guided path through the examples. The repository has many examples, but the first pass
 should be short: one tensor file, one training run, one autograd run, one graph/checker run, and one
 BugZoo card.
 
@@ -29,7 +29,7 @@ The tree is organized around questions:
 | first autograd example | `NN/Examples/Quickstart/AutogradBasics.lean` |
 | first graph example | `lake exe verify -- torchlean-ibp` |
 | first BugZoo example | `NN.Examples.BugZoo.All` |
-| first CUDA smoke test | `lake exe -K cuda=true torchlean mlp --cuda --steps 20` |
+| first CUDA runtime check | `lake exe -K cuda=true torchlean mlp --cuda --steps 20` |
 | first scientific ML example | `lake exe verify -- ode` or the PINN/FNO examples |
 
 - *Can I build and inspect small tensors?* Read [Quickstart](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Quickstart/).
@@ -37,17 +37,17 @@ The tree is organized around questions:
   [Data](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Data/).
 - *Can I cross the PyTorch boundary without losing shapes?* Read
   [PyTorch interop](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Interop/PyTorch/).
-- *Can I see the graph that a verifier sees?* Read [Advanced GraphSpec and IR demos](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Advanced/).
+- *Can I see the graph that a verifier sees?* Read [Advanced GraphSpec and IR examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Advanced/).
 - *Can I check a property or certificate?* Read the verification examples and fixtures.
 - *Can I see common ML bugs as checked Lean case studies?* Read [Bug Zoo](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/).
 
-Most model demos run through one executable:
+Most model examples run through one executable:
 
 ```
-lake exe torchlean <demo> [args...]
+lake exe torchlean <example> [args...]
 ```
 
-The source-level umbrella is `NN.Examples.Zoo`. Building it is the quick health check for the
+The source-level umbrella is `NN.Examples.Zoo`. Building it is the standard health check for the
 curated example surface:
 
 ```
@@ -56,7 +56,7 @@ lake build NN.Examples.Zoo
 
 # Three Walkthroughs To Read First
 
-## 1. A small model trains
+## 1. A compact model trains
 
 Start with the MLP and CNN examples. They show the basic pattern:
 
@@ -76,7 +76,7 @@ lake exe torchlean cnn --cpu --n-total 20 --steps 1
 
 ## 2. A graph is checked
 
-The verification examples start from the shared IR. A small model is lowered into `NN.IR.Graph`, a
+The verification examples start from the shared IR. A compact model is lowered into `NN.IR.Graph`, a
 payload supplies parameters, and a verifier pass computes a bound or checks a certificate.
 
 ```
@@ -89,7 +89,7 @@ described earlier in the book.
 
 ## 3. A real ML failure mode becomes a tiny Lean case study
 
-Bug Zoo examples are deliberately small. They are not meant to impress by scale; they are meant to
+Bug Zoo examples are compact. They are not meant to impress by scale; they are meant to
 name the failure mode precisely. Examples cover attention masks, KV caches and RoPE positions,
 tokenizer boundaries, normalization state, batch invariance, Float32 assumptions, and autograd
 boundaries.
@@ -134,7 +134,7 @@ The pattern is either equality with the spec, or membership in a safe enclosure 
 
 If the equality is proved, the fast path becomes an optimization. If it is checked only by tests, we
 say that plainly. If the kernel is external CUDA code, the CUDA chapter names the assumption instead
-of letting it disappear into the demo.
+of letting it disappear into the example.
 
 # How The Tree Is Organized
 
@@ -144,13 +144,13 @@ The examples are grouped so each subtree has a job:
   Typed-tensor warmups, autograd basics, and the smallest training tutorials.
 - [Model examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/)
   The main model zoo used by `lake exe torchlean`: MLP, CNN, ResNet, ViT, RNN/LSTM,
-  Transformer, GPT text demos, Mamba demos, diffusion, and RL examples.
+  Transformer, GPT text examples, Mamba examples, diffusion, and RL examples.
 - [Advanced examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Advanced/)
-  GraphSpec, float-mode, tensor-bridge, and TorchLean-to-PyTorch IR demos.
+  GraphSpec, float-mode, tensor-bridge, and TorchLean-to-PyTorch IR examples.
 - [PyTorch interop examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Interop/PyTorch/)
   PyTorch round-trip scripts and generated-code interop examples.
 - [Verification fixtures](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Verification/)
-  Small bundled certificate/checker demos used by `lake exe verify -- ...` (with external producers
+  Small bundled certificate/checker examples used by `lake exe verify -- ...` (with external producers
   under `scripts/verification/`).
 - [Widget gallery](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
   Infoview widgets used in the editor rather than through a long training run.
@@ -174,17 +174,17 @@ For one short pass that touches the main layers, use this order:
    `lake build`
 2. Build the curated examples umbrella:
    `lake build NN.Examples.Zoo`
-3. Typed tensor demo:
+3. Typed tensor example:
    `lake env lean --run NN/Examples/Quickstart/TensorBasics.lean`
-4. Float-backend comparison demo:
+4. Float-backend comparison example:
    `lake exe torchlean float32_modes`
-5. Widgets demo, opened in the editor:
+5. Widgets example, opened in the editor:
    open the [widgets example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-6. Autograd demo:
+6. Autograd example:
    `lake env lean --run NN/Examples/Quickstart/AutogradBasics.lean -- --dtype float`
-7. Model-zoo training demo:
+7. Model-zoo training example:
    `lake exe torchlean mlp --cpu --steps 10`
-8. Small complete verification demo:
+8. Small complete verification example:
    `lake exe verify -- torchlean-ibp`
 
 Read the output alongside this book: training-focused material starts with *Training From Scratch*
@@ -201,7 +201,7 @@ Expected outputs on a healthy run:
 - `autodiff_demo`: prints a value and a gradient, not only a successful build.
 - `lake exe torchlean mlp --cpu --steps 10`: prints a short loss trace trending downward.
 - `lake exe torchlean gpt_adder --steps 50 --cuda` (after `lake build -R -K cuda=true`): runs the minGPT
-  addition demo on GPU when the CUDA backend has been built.
+  addition example on GPU when the CUDA backend has been built.
 - `torchlean-ibp`: prints interval bounds for the output node, not raw graph internals.
 
 This framing distinguishes a meaningful semantic check from a command that merely exits with code
@@ -239,10 +239,10 @@ For debugging compilation to IR or verifier-style passes, `--backend compiled` i
 # Model zoo and real data
 
 The model surface is wide: classical feedforward and conv nets, ViT and ResNet blocks,
-recurrent and attention language models, state space and diffusion demos, and PPO RL
-environments, not only the original MLP/CNN tutorials. Model demos are driven by:
+recurrent and attention language models, state space and diffusion examples, and PPO RL
+environments, not only the original MLP/CNN tutorials. Model examples are driven by:
 
-`lake exe torchlean <demo> [flags...]`
+`lake exe torchlean <example> [flags...]`
 
 The [model examples API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/) contains the implementations, and the
 [example runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean) defines the public subcommand names.
@@ -255,7 +255,7 @@ First run:
 
 Use these as starting points; each module's header documents the full flag surface.
 
-- `mlp`: tabular/vector regression; synthetic or CSV data; a good first GPU smoke test after `cuda=true`.
+- `mlp`: tabular/vector regression; synthetic or CSV data; a good first GPU runtime check after `cuda=true`.
 - `cnn`: convolutional training on CIFAR-style tensors; prepare `data/real` with the download
   script for real data.
 - `resnet`: residual CNN block stack; the usual architecture anchor is He et al., ResNet (2015).
@@ -264,9 +264,9 @@ Use these as starting points; each module's header documents the full flag surfa
 - `rnn`, `lstm`: sequence modeling baselines over recurrent state.
 - `transformer`: encoder-style sequence model; pairs naturally with the attention chapters.
 - `gpt2`, `text_gpt2`: decoder-style language modeling; `text_gpt2` uses file-backed text.
-- `mamba`: selective state-space model demo.
+- `mamba`: selective state-space model example.
 - `diffusion`: generative diffusion training loop.
-- `ppo_*`: policy optimization in compact demonstration environments.
+- `ppo_*`: policy optimization in compact controlled environments.
 - `floats_arb_ieee_compare`: compares float semantics modes and pairs with *Floating-Point
   Semantics*.
 
@@ -292,8 +292,8 @@ The real data helper prepares the small public corpora and CIFAR shards used by 
 
 `python3 scripts/datasets/download_example_data.py --tiny-shakespeare --tinystories-valid --cifar10 --cifar10-limit-train 200 --cifar10-limit-test 50`
 
-Downloaded data is stored in `data/real` and is intentionally ignored by Git. Small checked-in toy
-data remains in the [example data API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Data/) so the repo can still run smoke
+Downloaded data is stored in `data/real` and is ignored by Git. Small checked-in synthetic
+data remains in the [example data API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Data/) so the repo can still run runtime-check
 tests without network access.
 
 These model examples matter because they show that TorchLean's public API is not limited to one
@@ -324,28 +324,28 @@ Those are worth calling out because they answer a common question from PyTorch u
 The answer is no. The examples cover CSV and `.npy` file readers, typed transforms,
 deterministic batching, callbacks, and scheduler-driven training loops.
 
-# GraphSpec And Export Demos
+# GraphSpec And Export Workflows
 
 Two examples highlight newer architecture and interop work beyond the smallest tutorials.
 
-## GraphSpec-authored training demo
+## GraphSpec-authored training example
 
-- Lean demo: [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/GraphSpec/Tutorial.lean)
+- Lean example: [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/GraphSpec/Tutorial.lean)
 - Command:
    `lake exe torchlean graphspec_mlp --backend compiled`
 
-This demo defines an MLP once in GraphSpec, lowers it to the TorchLean training surface, and then
+This example defines an MLP once in GraphSpec, lowers it to the TorchLean training surface, and then
 trains it with the ordinary public API. It is the fastest way to see GraphSpec as a real user
 workflow rather than as a research-only subdirectory.
 
 ## TorchLean, IR, and Emitted PyTorch Code
 
-- Lean demo: [Torch IR PyTorch export API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/TorchIRPyTorch.lean)
+- Lean example: [Torch IR PyTorch export API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/TorchIRPyTorch.lean)
 - Commands:
   `lake exe torchlean torch_ir_pytorch --arch mlp > exported_model.py`
   `lake exe torchlean torch_ir_pytorch --arch transformer > exported_model.py`
 
-This demo sits at an important boundary in the repo:
+This example sits at an important boundary in the repo:
 
 - TorchLean model, compiled IR, and generated PyTorch code.
 
@@ -403,10 +403,10 @@ follows.
 
 # Verification Application Workflows
 
-The verification side has also grown beyond one tiny IBP demo. The current example tree covers
+The verification side has also grown beyond one tiny IBP example. The current example tree covers
 several distinct application styles.
 
-## Core TorchLean To IR Demos
+## Core TorchLean To IR Workflows
 
 - `torchlean-ibp`
   Tiny MLP, compile to IR, seed an input box, read off output bounds.
@@ -418,9 +418,9 @@ several distinct application styles.
 ## Robustness and benchmark-style workflows
 
 - `torchlean-robustness`
-  Margin-certification demo over a TorchLean-authored model.
+  Margin-certification example over a TorchLean-authored model.
 - `digits`
-  Certified-accuracy style robustness demo.
+  Certified-accuracy style robustness example.
 - `vnncomp-mnistfc`
   A small VNN-COMP suite checker over exported JSON artifacts.
 
@@ -471,7 +471,7 @@ The full widget family includes several views; the short list cited most often i
 Start with the [widgets example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean), then return here for
 a compact map of each widget family.
 
-# Smoke Tests
+# Check Tests
 
 After edits, the fastest regression check for the public surface is:
 
@@ -482,13 +482,13 @@ After edits, the fastest regression check for the public surface is:
 Checklist for adding a new example to the curated zoo:
 
 - Put it in the right subtree:
-  `NN/Examples/Models` for model zoo demos, `NN/Examples/Quickstart` for small
-  tutorials, `NN/Examples/Advanced` for architecture/IR demos, and `NN/Examples/Verification` +
+  `NN/Examples/Models` for model zoo examples, `NN/Examples/Quickstart` for small
+  tutorials, `NN/Examples/Advanced` for architecture/IR examples, and `NN/Examples/Verification` +
   `scripts/verification` for verifier workflows.
 - If it belongs in the public runner, register it in the
   [model runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean) and make sure `NN.Examples.Zoo`
   imports it.
-- Use the public facade where appropriate:
+- Use the public API where appropriate:
   `open NN.API` and stick to `nn`, `Data`, `train`, and `optim` unless the example is explicitly
   advanced.
 - Add a short module docstring at the top with:
@@ -497,10 +497,10 @@ Checklist for adding a new example to the curated zoo:
 - Parse flags consistently:
   support `--seed` when randomness is involved, and use `train.run` to parse `--dtype` and
   `--backend`.
-- Keep it cheap by default:
-  small dataset, small model, few steps or epochs; heavier runs remain behind flags.
+- Keep the default run bounded:
+  small dataset, compact model, few steps or epochs; heavier runs remain behind flags.
 
-There is a central model runner for model demos (`lake exe torchlean ...`), while
+There is a central model runner for model examples (`lake exe torchlean ...`), while
 advanced/tutorial files can still be run directly with `lake env lean --run ...`.
 
 Command-line overview: *CLI Entry Points*. From examples into the verifier stack: *Graphs and IR*,

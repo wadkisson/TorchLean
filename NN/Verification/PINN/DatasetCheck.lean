@@ -17,9 +17,9 @@ import Lean.Data.Json
 /-!
 # PINN Dataset Check
 
-Dataset-backed PINN "sanity checker".
+Dataset-backed PINN certificate checker.
 
-This is intentionally lightweight: it reads a dataset JSON in the same schema
+This is small and explicit: it reads a dataset JSON in the same schema
 as `train_pinn_1d.py --dataset-json`, evaluates the network on the dataset's
 `initial`/`boundary`/`data` points, and reports whether the ground-truth `u`
 value is contained in the output interval (with a tolerance).
@@ -49,35 +49,39 @@ open Json
 open _root_.Spec
 open _root_.Spec.Tensor
 
-def JsonObj := Std.TreeMap.Raw String Json
+/-- JSON object representation used while reading dataset entries. -/
+abbrev JsonObj := Std.TreeMap.Raw String Json
 
 /-- CLI options for `pinn-dataset-check`. -/
 structure DatasetCheckOpts where
-  /-- weights. -/
+  /-- Optional JSON file containing exported PINN weights. -/
   weights : Option String := none
-  /-- dataset. -/
+  /-- Dataset JSON containing initial, boundary, residual, or data points to check. -/
   dataset : Option String := none
-  /-- eps. -/
+  /-- Radius used to seed the input interval around each dataset point. -/
   eps     : Float := 0.0
-  /-- tol. -/
+  /-- Allowed endpoint tolerance when checking that the reference value is enclosed. -/
   tol     : Float := 1e-3
-  /-- max Pts. -/
+  /-- Maximum number of points checked from each dataset section. -/
   maxPts  : Nat := 200
-  /-- strict. -/
+  /-- Treat any failed enclosure check as a command failure. -/
   strict  : Bool := false
   deriving Repr
 
+/-- Help text for the dataset-backed PINN checker. -/
 def usage : String :=
   "Usage:\n" ++
   ("  lake exe verify -- pinn-dataset-check --dataset=PATH.json " ++
     "[--weights=WEIGHTS.json] [--eps=0.0] [--tol=1e-3] [--max=200] " ++
     "[--strict]\n")
 
+/-- Parse a JSON-style numeric literal and require that the whole string was consumed. -/
 def parseFloatLit (s : String) : Option Float :=
   match parseNumber { s := s } with
   | .ok (v, st) => if st.i = s.rawEndPos then some v else none
   | .error _ => none
 
+/-- Parse command-line flags for `pinn-dataset-check`. -/
 def parseArgs : List String → Except String DatasetCheckOpts
   | [] => .ok {}
   | a :: rest =>
@@ -106,6 +110,7 @@ def parseArgs : List String → Except String DatasetCheckOpts
       else
         .error s!"unknown arg: {a}"
 
+/-- Read a numeric field from a dataset JSON object. -/
 def getFloat (o : JsonObj) (k : String) : Except String Float :=
   match o.get? k with
   | some (.num v) => .ok v.toFloat
@@ -116,11 +121,13 @@ def getFloat (o : JsonObj) (k : String) : Except String Float :=
   | some _ => .error s!"field '{k}' is not a number"
   | none => .error s!"missing field '{k}'"
 
+/-- Read the second coordinate, accepting either `y` for 2D data or `t` for 1D-in-time data. -/
 def getYorT (o : JsonObj) : Except String Float := do
   match o.get? "y" with
   | some _ => getFloat o "y"
   | none => getFloat o "t"
 
+/-- Read an optional array field from a dataset JSON object. Missing/null fields are empty. -/
 def getArrD (o : JsonObj) (k : String) : Except String (Array Json) :=
   match o.get? k with
   | none => .ok #[]
@@ -128,6 +135,7 @@ def getArrD (o : JsonObj) (k : String) : Except String (Array Json) :=
   | some (.arr a) => .ok a
   | some _ => .error s!"field '{k}' is not an array"
 
+/-- Parse one dataset point as `(x, y-or-t, u)`. -/
 def parseXYZ (j : Json) : Except String (Float × Float × Float) := do
   let o ← j.getObj?
   let x ← getFloat o "x"
@@ -135,6 +143,7 @@ def parseXYZ (j : Json) : Except String (Float × Float × Float) := do
   let u ← getFloat o "u"
   pure (x, y, u)
 
+/-- Load one named dataset section into the coordinate/value triples used by the checker. -/
 def loadDatasetXYZ (path : String) (sectionName : String) : IO (Array (Float × Float × Float)) := do
   let j ← NN.Verification.Json.readJsonFile path
   let o ← match j with
@@ -150,6 +159,7 @@ def loadDatasetXYZ (path : String) (sectionName : String) : IO (Array (Float × 
     | .error msg => throw <| IO.userError s!"Dataset.{sectionName}: {msg}"
   pure out
 
+/-- Load a PINN graph and parameters, using built-in seed parameters when no weights are supplied. -/
 def loadGraphAndParams (weightsPath? : Option String) : IO (Graph × ParamStore Float) := do
   match weightsPath? with
   | none =>
@@ -162,12 +172,15 @@ def loadGraphAndParams (weightsPath? : Option String) : IO (Graph × ParamStore 
     | none =>
       throw <| IO.userError "Weights JSON did not match expected shapes"
 
+/-- Check interval containment with a symmetric tolerance on the endpoints. -/
 def inInterval (u lo hi tol : Float) : Bool :=
   (u ≥ lo - tol) && (u ≤ hi + tol)
 
+/-- Absolute difference for the Float diagnostics printed by the checker. -/
 def absDiff (a b : Float) : Float :=
   if a ≥ b then a - b else b - a
 
+/-- Check one dataset section and return `(contained, missed, maxAbsMidpointError)`. -/
 def checkSection
     (g : Graph) (ps0 : ParamStore Float) (opts : DatasetCheckOpts)
     (sectionName : String) (pts : Array (Float × Float × Float)) : IO (Nat × Nat × Float) := do

@@ -22,7 +22,7 @@ update can be viewed as an affine map
 
 Affine maps compose associatively.  A recurrent scan can therefore be implemented either by a
 left-to-right recurrence or by a parallel prefix scan over affine summaries.  The scalar definitions
-below are intentionally compact so that `NN/MLTheory/Proofs/StateSpace/Scan.lean` can prove the algebra
+below are kept compact so that `NN/MLTheory/Proofs/StateSpace/Scan.lean` can prove the algebra
 without depending on a particular runtime backend.  The diagonal tensor definitions are the direct
 TorchLean spec analogue used by the model and CUDA contracts.
 

@@ -39,9 +39,7 @@ open Tensor
 
 variable {α : Type} [Context α]
 
--- ============================================================================
--- MATRIX OPERATIONS
--- ============================================================================
+-- Matrix operations used by classical model specifications.
 
 /--
 Helper lemma for minor/index computations.
@@ -57,7 +55,6 @@ lemma actual_index_lt {n : ℕ} (skip : ℕ) (i : Fin (n-1)) :
   · exact Nat.lt_of_lt_of_le i.isLt (Nat.pred_le n)
   · grind
 
--- Minor (delete row and col)
 /--
 Matrix minor: delete `row` and `col` from an `n × n` matrix, producing an `(n-1) × (n-1)` matrix.
 
@@ -80,8 +77,6 @@ def getMinorSpec {α : Type} {n : Nat}
   )
 
 
--- Matrix determinant (implemented using Laplace expansion)
--- Determinant using Laplace expansion along first row
 /--
 Determinant of an `n × n` matrix (spec-level reference implementation).
 
@@ -194,11 +189,8 @@ def eigendecompSpec {n : Nat}
   (eigenvalues, eigenvectors)
 
 
--- ============================================================================
--- DISTANCE FUNCTIONS
--- ============================================================================
+-- Distance functions used by nearest-neighbor, clustering, and metric-learning specs.
 
--- Euclidean distance between two points
 /--
 Euclidean (L2) distance between two feature vectors.
 
@@ -211,7 +203,6 @@ def euclideanDistanceSpec {nFeatures : Nat}
   let sum_squared := sumSpec squared_diff
   MathFunctions.sqrt sum_squared
 
--- Squared Euclidean distance (more efficient for comparisons)
 /-- Squared Euclidean distance (avoids the final square root). -/
 def squaredEuclideanDistanceSpec {nFeatures : Nat}
   (x y : Tensor α (.dim nFeatures .scalar)) : α :=
@@ -219,7 +210,6 @@ def squaredEuclideanDistanceSpec {nFeatures : Nat}
   let squared_diff := squareSpec diff
   sumSpec squared_diff
 
--- Manhattan distance between two points
 /-- Manhattan (L1) distance between two feature vectors. -/
 def manhattanDistanceSpec {nFeatures : Nat}
   (x y : Tensor α (.dim nFeatures .scalar)) : α :=
@@ -227,7 +217,6 @@ def manhattanDistanceSpec {nFeatures : Nat}
   let abs_diff := mapSpec MathFunctions.abs diff
   sumSpec abs_diff
 
--- Cosine distance between two points
 /--
 Cosine distance `1 - cos(theta)` between two feature vectors.
 
@@ -241,7 +230,6 @@ def cosineDistanceSpec {nFeatures : Nat}
   let denominator := norm_x * norm_y
   if denominator == 0 then 1 else 1 - (dot_product / denominator)
 
--- Minkowski distance (generalization of Euclidean and Manhattan)
 /--
 Minkowski distance of order `p` between two feature vectors.
 
@@ -256,11 +244,8 @@ def minkowskiDistanceSpec {nFeatures : Nat}
   let sum_powered := sumSpec powered
   sum_powered ^ (1 / p)
 
--- ============================================================================
--- NORMALIZATION AND UTILITY FUNCTIONS
--- ============================================================================
+-- Normalization and utility functions shared by model specifications.
 
--- Normalize a tensor to sum to 1 (probability distribution)
 /--
 Normalize a vector of (nonnegative) scores into a probability distribution.
 
@@ -279,7 +264,6 @@ def normalizeProbsSpec {n : Nat} (probs : Tensor α (.dim n .scalar)) :
   else
     Tensor.dim (fun _ => Tensor.scalar (1 / n))
 
--- Normalize a tensor to have unit L2 norm
 /--
 L2-normalize a vector.
 
@@ -296,7 +280,6 @@ def normalizeL2Spec {n : Nat} (vector : Tensor α (.dim n .scalar)) :
   else
     vector
 
--- Normalize a tensor to have zero mean and unit variance
 /--
 Z-score normalization: subtract mean and divide by standard deviation.
 
@@ -319,11 +302,8 @@ def normalizeZscoreSpec {n : Nat} (vector : Tensor α (.dim n .scalar)) :
   else
     centered
 
--- ============================================================================
--- SORTING AND INDEXING FUNCTIONS
--- ============================================================================
+-- Sorting and indexing helpers for specs that manipulate explicit feature lists.
 
--- Argsort in descending order (returns indices)
 /--
 Argsort in descending order (returns indices as a `Nat` tensor).
 
@@ -332,19 +312,17 @@ PyTorch analogue: `torch.argsort(values, descending=True)`.
 def argsortDescendingSpec {n : Nat}
   (values : Tensor α (.dim n .scalar)) :
   Tensor Nat (.dim n .scalar) :=
-  -- Create list of (index, value) pairs
+  -- Work through a list of `(index, value)` pairs so the ordering rule is visible in the spec.
   let indexed_values := (List.finRange n).map (fun i =>
     match get values i with
     | Tensor.scalar val => (i.val, val)
   )
-  -- Sort by value in descending order
+  -- Sort by value in descending order, matching `torch.argsort(..., descending=True)`.
   let sorted_indices := indexed_values.mergeSort (fun a b => a.2 > b.2)
-  -- Extract indices
+  -- Extract the ordered indices and rebuild the result as a tensor.
   let indices := sorted_indices.map (fun (idx, _) => idx)
-  -- Convert back to tensor
   Tensor.dim (fun i => Tensor.scalar (indices.getD i.val 0))
 
--- Gather values using indices
 /--
 Gather elements from a 1-D tensor using a 1-D tensor of indices.
 
@@ -365,7 +343,6 @@ def gatherSpec {n : Nat}
         Tensor.scalar (0 : α)
   )
 
--- Gather columns using indices
 /--
 Gather columns of an `m × n` matrix using a length-`n` index vector.
 

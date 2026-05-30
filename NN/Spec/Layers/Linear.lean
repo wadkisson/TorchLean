@@ -37,9 +37,9 @@ This is the spec-level analogue of PyTorch `torch.nn.Linear` / `torch.nn.functio
 - `bias` has shape `[outDim]`.
 -/
 structure LinearSpec (α : Type) (inDim outDim : Nat) where
-  /-- weights. -/
+  /-- Weight matrix with rows indexed by output features. -/
   weights : Tensor α (.dim outDim (.dim inDim .scalar))
-  /-- bias. -/
+  /-- Bias vector added to each output feature. -/
   bias    : Tensor α (.dim outDim .scalar)
 
 /--
@@ -111,7 +111,7 @@ def linearInputDerivSpec {inDim outDim : Nat}
 /--
 Batched derivatives `(∂L/∂W, ∂L/∂b, ∂L/∂x)` for a batch of size `batch + 1`.
 
-This is a convenience wrapper that uses matrix operations to compute:
+The equations are written in matrix form:
 - `d_weights = (grad_outputᵀ) · input`,
 - `d_bias = sum(grad_output)` over the batch axis,
 - `d_input = grad_output · weights`.

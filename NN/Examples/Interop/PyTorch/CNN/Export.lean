@@ -14,7 +14,7 @@ public import NN.Spec.Models.Cnn
 
 PyTorch exporter for the small 2-block ConvNet round-trip fixture.
 
-This exporter is meant to mirror the "classic demo CNN" shape that shows up in many TorchLean
+This exporter is meant to mirror the "reference CNN example" shape that shows up in many TorchLean
 examples: two `Conv2d + ReLU + MaxPool2d` blocks, then `Flatten`, then a single `Linear` head.
 
 Instead of taking a long positional list of naturals, we use small configuration records so call
@@ -139,39 +139,30 @@ def generateCnn2PyTorchClass (cfg : Cnn2Cfg) : String :=
     ]
     ++ generateGetModelInfoMethodLines className
 
-/-- Backwards-compatible wrapper for `generateCnn2PyTorchClass`.
-
-Call sites that pass a long positional list of naturals can use this adapter.
--/
-def generateCNNPyTorchClass
-    (inC outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1 poolStride2
-      flatSize : Nat)
-    (className : String := "CNN") : String :=
-  let cfg : Cnn2Cfg :=
-    { className := className
-      inputC := inC, inputH := inH, inputW := inW
-      conv1 := { inChannels := inC, outChannels := outC, kernelH := kH, kernelW := kW, stride :=
-        stride1, padding := padding1 }
-      pool1 := { kernelH := poolKH, kernelW := poolKW, stride := poolStride1 }
-      conv2 := { inChannels := outC, outChannels := outC, kernelH := kH, kernelW := kW, stride :=
-        stride2, padding := padding2 }
-      pool2 := { kernelH := poolKH, kernelW := poolKW, stride := poolStride2 }
-      flatSize := flatSize
-      fcOut := outC }
-  generateCnn2PyTorchClass cfg
-
 /-- Generate a Python CNN module plus a helper that loads explicit weights from string literals.
 
-This is mainly used for demos: you can paste JSON/Lean-rendered weight arrays into Python and run
+This is mainly used for examples: you can paste JSON/Lean-rendered weight arrays into Python and run
 the model without writing an extra serializer.
 -/
 def generateCNNWithWeights (convW1 convB1 convW2 convB2 linearW linearB : String)
     (inC outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolstride1 poolstride2
       flatSize : Nat)
     (className : String := "CNN") : String :=
+  let cfg : Cnn2Cfg :=
+    { className := className
+      inputC := inC
+      inputH := inH
+      inputW := inW
+      conv1 := { inChannels := inC, outChannels := outC, kernelH := kH, kernelW := kW, stride :=
+        stride1, padding := padding1 }
+      pool1 := { kernelH := poolKH, kernelW := poolKW, stride := poolstride1 }
+      conv2 := { inChannels := outC, outChannels := outC, kernelH := kH, kernelW := kW, stride :=
+        stride2, padding := padding2 }
+      pool2 := { kernelH := poolKH, kernelW := poolKW, stride := poolstride2 }
+      flatSize := flatSize
+      fcOut := outC }
   joinLines [
-    generateCNNPyTorchClass inC outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW
-      poolstride1 poolstride2 flatSize className,
+    generateCnn2PyTorchClass cfg,
     "",
     "# Weight initialization functions",
     "def get_cnn_state_dict():",

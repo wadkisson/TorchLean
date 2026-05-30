@@ -388,7 +388,7 @@ private lemma abs_sumXX_sub_replaceAt_le (S : Dataset (n + 1) (BoundedExample X 
 /-!
 Bound the magnitude of the fitted ridge weight.
 
-This is a quick, coarse bound of the form `|ŵ(S)| ≤ (X*Y)/λ`.
+This is a coarse bound of the form `|ŵ(S)| ≤ (X*Y)/λ`.
 -/
 private lemma abs_w_le (hlam : 0 < lam) (S : Dataset (n + 1) (BoundedExample X Y)) :
     |ridgeFit1D (n := n) (X := X) (Y := Y) lam S| ≤ (X * Y) / lam := by

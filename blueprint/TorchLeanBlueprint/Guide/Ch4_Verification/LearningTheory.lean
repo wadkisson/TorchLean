@@ -88,7 +88,7 @@ f\circ M\ \text{is}\ (\varepsilon,\delta)\text{-DP}.`
 
 # Robustness: Spec Versus Runtime
 
-Robustness is deliberately split into two files:
+Robustness is split by trust boundary into two files:
 
 - [Robustness.Spec](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Spec.lean) defines the mathematical
   predicates.
@@ -198,14 +198,14 @@ $$`|\ell(\hat w(S),z)-\ell(\hat w(S'),z)|
 \le
 \beta(N,\lambda,X,Y).`
 
-The worked theorem is deliberately small enough to inspect. The estimator is not a foreign function.
+The worked theorem is compact enough to inspect. The estimator is not a foreign function.
 The dataset is the same `Dataset` representation from the stability core. The boundedness
 assumptions are carried by types and hypotheses. The final statement is a Lean theorem, not a prose
 claim next to a Python implementation.
 
 # Runtime And Spec Splits
 
-The learning theory tree intentionally repeats a pattern: a spec predicate or theorem is kept
+The learning theory tree repeats a pattern: a spec predicate or theorem is kept
 separate from the executable runtime diagnostic, and an optional float32 or artifact bridge connects
 them only when the hypotheses have been stated.
 

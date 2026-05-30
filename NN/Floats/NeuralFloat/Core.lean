@@ -61,7 +61,7 @@ structure NeuralRadix where
 /-- Standard binary radix (`β = 2`). -/
 def binaryRadix : NeuralRadix := ⟨2, by norm_num⟩
 
-/-- Decimal radix (`β = 10`, useful for small examples and exact decimal inputs). -/
+/-- Decimal radix (`β = 10`, useful for compact examples and exact decimal inputs). -/
 def decimalRadix : NeuralRadix := ⟨10, by norm_num⟩
 
 namespace NeuralRadix
@@ -90,12 +90,12 @@ end NeuralRadix
 An abstract floating-point value (mantissa/exponent) plus analysis metadata.
 
 The core mathematical payload is `mantissa` and `exponent`. The other fields are there to support
-mixed precision and simple error-tracking experiments used in some TorchLean demos:
+mixed precision and simple error-tracking experiments used in some TorchLean examples:
 
 - `precision`: a named format (FP16/FP32/…); see `NeuralPrecision`.
 - `error_bound`: a conservative absolute error bound attached by a conversion/rounding pass.
 - `phase`: forward/backward/update/inference (see `TrainingPhase.requires_high_precision`).
-- `layer_id`/`batch_id`: lightweight tags used by “track where an error came from”
+- `layer_id`/`batch_id`: metadata tags used by “track where an error came from”
   utilities.
 -/
 structure NeuralFloat (β : NeuralRadix) where
@@ -109,9 +109,9 @@ structure NeuralFloat (β : NeuralRadix) where
   error_bound : ℝ
   /-- Training phase metadata (forward/backward/update/inference). -/
   phase : TrainingPhase
-  /-- Optional layer id tag (used in demos/experiments). -/
+  /-- Optional layer id tag (used in examples/experiments). -/
   layer_id : ℕ
-  /-- Optional batch id tag (used in demos/experiments). -/
+  /-- Optional batch id tag (used in examples/experiments). -/
   batch_id : ℕ
 
 namespace NeuralFloat

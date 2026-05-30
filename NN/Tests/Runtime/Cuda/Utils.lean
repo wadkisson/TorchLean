@@ -39,7 +39,7 @@ def okOrThrow {α : Type} : Except String α → IO α
   | .ok a => pure a
   | .error e => throw <| IO.userError e
 
-/-- Approximate equality for `Float` smoke tests. -/
+/-- Approximate equality for `Float` runtime checks. -/
 def assertApprox (msg : String) (x y : Float) (tol : Float := 1e-3) : IO Unit := do
   if Float.abs (x - y) > tol then
     throw <| IO.userError s!"{msg}: got {x}, expected {y} (tol={tol})"

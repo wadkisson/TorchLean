@@ -22,7 +22,7 @@ The split is intentional:
 - `Torch.LinkedSession` records the same style of imperative computation into the proved
   `GraphData` IR and exposes the theorem connecting compiled runtime backprop to proved graph
   backprop.
-- `Torch.Utils` contains small demo/training conveniences such as deterministic initializers,
+- `Torch.Utils` contains compact example/training conveniences such as deterministic initializers,
   small sample builders, and trainer loops.
 
 `TorchLean/*` builds the higher-level model/program API on top of this layer. So `Torch` is the

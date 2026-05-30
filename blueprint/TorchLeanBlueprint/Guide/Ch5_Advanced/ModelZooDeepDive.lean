@@ -30,7 +30,7 @@ Read each model along five axes:
 
 # Model Families And Stress Tests
 
-Most demos are dispatched by [NN.Examples.Models.Runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean):
+Most examples are dispatched by [NN.Examples.Models.Runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean):
 
 ```
 lake exe torchlean <example> [flags...]
@@ -44,27 +44,27 @@ The zoo is organized by stressor:
 
 - *GPT-2 style and CharGPT*: causal language model commands stress causal windows, tokenization,
   generation probes, save/load, and logs.
-- *Mamba*: the selective scan demo stresses sequence modeling without attention, recurrent state,
+- *Mamba*: the selective scan example stresses sequence modeling without attention, recurrent state,
   and CUDA paths for selective scan.
-- *RNN/LSTM/GRU style recurrence*: recurrent text and forecasting demos stress recurrent state,
+- *RNN/LSTM/GRU style recurrence*: recurrent text and forecasting examples stress recurrent state,
   gated cells, short text windows, and forecasting data.
 - *ResNet*: the residual vision classifier stresses residual wiring, convolution, batch data, and
   graph shape discipline.
 - *ViT*: the patch-token vision transformer stresses image patches, token sequences, and attention
   blocks.
-- *FNO*: the Burgers operator learning demo stresses scientific data, spectral kernels, and a CUDA
+- *FNO*: the Burgers operator learning example stresses scientific data, spectral kernels, and a CUDA
   primitive backed by cuFFT.
 - *Diffusion and latent generators*: the generative examples stress stochastic schedules,
   reconstruction targets, and generator/discriminator losses.
-- *RL demos*: PPO and replay examples stress trajectories, environment boundaries, replay, and
+- *RL examples*: PPO and replay examples stress trajectories, environment boundaries, replay, and
   policy/value losses.
 
 There is no separate GRU command in the runner. We still discuss GRU in this section as
 part of the gated recurrent design space: TorchLean's present runnable recurrent coverage is RNN,
-LSTM, and LSTM forecasting; a future GRU demo would stress the same typed recurrent state and
+LSTM, and LSTM forecasting; a future GRU example would stress the same typed recurrent state and
 runtime loop boundary with a smaller gate set.
 
-The common model zoo contract is that a demo should make the data boundary, model, loss, optimizer,
+The common model zoo contract is that an example should make the data boundary, model, loss, optimizer,
 and logs visible. It does not need to be large to be valuable.
 It needs to make clear what was run, what data entered, what state changed, and which semantic
 contract the example points back to.
@@ -93,7 +93,7 @@ The GPT-facing surfaces are:
 - [NN.Examples.Models.Sequence.Gpt2Saved API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Gpt2Saved.lean),
   which exercises saved parameter loading and prompting.
 - [NN.Examples.Models.Sequence.GptAdder API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/GptAdder.lean), a
-  minGPT style algorithmic addition task that is especially useful for CUDA smoke testing.
+  minGPT style algorithmic addition task that is especially useful for CUDA runtime checking.
 
 A typical small run is:
 
@@ -134,7 +134,7 @@ Unsupervised Multitask Learners" (OpenAI technical report, 2019,
 [PDF](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)),
 Vaswani et al., "Attention Is All You Need" (NeurIPS 2017, https://arxiv.org/abs/1706.03762), and
 Karpathy's minGPT educational implementation (https://github.com/karpathy/minGPT) for the compact
-training demo style.
+training example style.
 
 # Mamba
 
@@ -180,7 +180,7 @@ The current runnable recurrent examples are:
 - [NN.Examples.Models.Supervised.LstmRegression API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Supervised/LstmRegression.lean),
   a more natural LSTM forecasting tutorial over household power windows.
 
-The small text commands are intentionally short:
+The small text commands are short:
 
 ```
 lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
@@ -229,7 +229,7 @@ lake exe -K cuda=true torchlean resnet --cuda --n-total 20 --steps 1
 ```
 
 The spec side in [NN.Spec.Models.Resnet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Resnet.lean) is richer than a
-smoke command. It defines residual blocks with identity/projection shortcuts, proves well formedness
+runtime-check command. It defines residual blocks with identity/projection shortcuts, proves well formedness
 facts for ResNet style configs, records convolution output size facts, and gives forward/backward
 structure for a basic residual block.
 
@@ -337,7 +337,7 @@ These examples are not just "more MLPs." They force the API to express latent sh
 reconstruction targets, score targets, generator/discriminator pairs, patch masks, and image valued
 sampling outputs.
 
-# RL Demos
+# RL Workflows
 
 The RL examples are different from the supervised and generative zoo because the data is not just a
 static tensor file. It is produced by an environment boundary:
@@ -395,7 +395,7 @@ The model zoo is best read as five overlapping tests:
 - *Verification*: can examples point to specs used by theorems and make any remaining producer or
   runtime assumptions explicit?
 
-The answer is intentionally layered. MLP, CNN, ResNet, ViT, GPT, Mamba, FNO, diffusion, and RL
+The answer is layered. MLP, CNN, ResNet, ViT, GPT, Mamba, FNO, diffusion, and RL
 commands all exercise real runtime surfaces. Some model families also have dedicated spec or theory
 declarations with citeable theorem names. Not every command has full verification. Not every CUDA
 kernel has a fully proved equivalence to a high level spec. Not every external data source is

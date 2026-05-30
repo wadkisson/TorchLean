@@ -17,7 +17,7 @@ a check that this exported geometry claim follows from the tensors in the artifa
 
 ## What This Checks
 
-The checked claim is deliberately small and geometric:
+The checked claim is geometric:
 
 ```text
 camera_P : 3 x 4 projection matrix
@@ -74,7 +74,7 @@ geometric claim from that data.
 ## Run The Real Model Path
 
 The direct 3D detector route uses WildDet3D from Hugging Face. This path installs a real 3D
-detector stack, so it is best treated as an optional end-to-end demo rather than a first smoke test.
+detector stack, so it is best treated as an optional end-to-end example rather than a first runtime check.
 
 ```bash
 python3 -m pip install -r scripts/verification/geometry3d/requirements-wilddet3d.txt
@@ -96,7 +96,7 @@ _external/geometry3d/wilddet3d/
 ```
 
 The accepted overlay uses the projected 3D footprint as the claimed box. The strict diagnostic
-overlay uses WildDet3D's own 2D detection box. On the default demo image, Lean rejects the strict
+overlay uses WildDet3D's own 2D detection box. On the default example image, Lean rejects the strict
 claim because projected 3D corners fall outside that box.
 
 <div class="media-slab">
@@ -105,7 +105,7 @@ claim because projected 3D corners fall outside that box.
 
 ## What A JSON Artifact Looks Like
 
-The concrete JSON is deliberately plain so it is easy to produce from any detector, not just
+The concrete JSON is kept plain so it is easy to produce from any detector, not just
 WildDet3D.
 
 ```json
@@ -133,7 +133,7 @@ python3 scripts/verification/geometry3d/export_omni3d_box3d_cert.py \
 
 ## Negative Cases
 
-The demo also includes bad certificates motivated by real glue failures: swapped box layouts,
+The example also includes bad certificates motivated by real glue failures: swapped box layouts,
 negative depth, wrong projection matrix layout, and 2D boxes that do not enclose projected 3D
 corners.
 

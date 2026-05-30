@@ -10,15 +10,42 @@ and user-facing issues.
 
 For correctness assumptions and trusted boundaries, use
 [Trust Boundaries](https://github.com/lean-dojo/TorchLean/blob/main/TRUST_BOUNDARIES.md).
-For source-level provenance and release hygiene, use
+For source-level provenance and third-party notes, use
 [Third-Party Notices](https://github.com/lean-dojo/TorchLean/blob/main/THIRD_PARTY_NOTICES.md).
 
 ## Index
 
+- [May 2026: Repository Modularization and Comment Cleanup](#may-2026-repository-modularization-and-comment-cleanup)
 - [May 2026: Lean 4.30 and Runtime API Update](#may-2026-lean-430-and-runtime-api-update)
 - [May 2026: CUDA Training Stability Update](#may-2026-cuda-training-stability-update)
-- [May 2026: Quickstart Data Note](#may-2026-quickstart-data-note)
+- [May 2026: Introductory Data Note](#may-2026-introductory-data-note)
 - [May 2026: TorchLean Released](#may-2026-torchlean-released)
+
+## May 2026: Repository Modularization and Comment Cleanup
+
+TorchLean has had a large repository cleanup pass. The goal was simple: make
+the public source tree easier to read, easier to review, and easier to extend
+without changing the intended behavior of the library.
+
+This was made possible by having enough Codex-assisted development credits available
+to do the kind of careful refactor that is usually hard to justify in one
+sitting: split very large Lean files into smaller modules, update import
+surfaces, rebuild the generated documentation, and polish comments across the
+codebase. Overall to us it seems like it did a good job, we also manually reviewed many of the files.
+
+The pass is intentionally not a new technical feature. It is a source-structure
+and documentation-quality update:
+
+- large proof and runtime files were split along existing conceptual boundaries;
+- umbrella modules were kept only where they clarify the public import surface;
+- old import shells and example names were removed;
+- comments were rewritten in a more mathlib-style voice, explaining definitions
+  and trust boundaries as part of the maintained source; (Check Mathlib documentation style guide)
+- examples, API docs, the Verso guide, and website pages were rebuilt against the
+  new module layout.
+
+Finally we want to emphasize that this pass did not have any technical changes i.e., model
+semantics, verification claims, CUDA behavior, or trusted boundaries.
 
 ## May 2026: Lean 4.30 and Runtime API Update
 
@@ -47,7 +74,7 @@ CUDA memory ownership, and integer-token GPT training.
 Longer CUDA training runs exposed a practical bug in the eager runtime. A
 GPT-style example could train normally for thousands of updates and then stop
 with a CUDA allocation failure. The surprising part was that the same kind of
-problem could show up even on small examples if enough per-step CUDA objects
+problem could show up even on compact examples if enough per-step CUDA objects
 were kept alive.
 
 The issue was not that the model suddenly needed more parameters. It was that
@@ -89,11 +116,11 @@ values went down, and the CUDA allocator stayed bounded on the exercised runs.
 CUDA execution remains an implementation path; the mathematical trust boundary
 is still documented separately.
 
-## May 2026: Quickstart Data Note
+## May 2026: Introductory Data Note
 
 Some examples use real public datasets and do not download them during
 `lake build`. If a model reports a missing dataset, run the downloader it
-prints. For the README MLP quickstart:
+prints. For the README MLP example:
 
 ```bash
 python3 scripts/datasets/download_example_data.py --auto-mpg
@@ -125,5 +152,5 @@ of the project that are meant to be used as one system:
 - generated API docs, a guide, examples pages, third-party notices, and an AI
   assistance disclosure.
 
-Start with the README quickstart, then use the Guide and Examples pages for the
+Start with the README example, then use the Guide and Examples pages for the
 longer walkthroughs.

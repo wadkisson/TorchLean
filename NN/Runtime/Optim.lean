@@ -15,7 +15,7 @@ public import NN.Runtime.Optim.Schedulers
 
 `NN.Runtime.Optim` is the small umbrella for TorchLean's reusable optimizer math.
 
-This subsystem intentionally contains only pure, tensor-level pieces:
+This subsystem contains pure, tensor-level pieces:
 
 - `NN.Runtime.Optim.Optimizers` defines per-parameter update equations such as SGD, Adam,
   AdamW, AdaGrad, RMSProp, Adadelta, GaLore-style projected SGD, and Muon-style updates.
@@ -26,7 +26,7 @@ This subsystem intentionally contains only pure, tensor-level pieces:
 What this file does **not** contain:
 
 - heterogeneous parameter-list handling, optimizer handles, or training-loop mutation;
-- the public `optim.sgd` / `optim.adam` API facade; or
+- the public `optim.sgd` / `optim.adam` API; or
 - CUDA / PyTorch fused optimizer kernels.
 
 Those are separate on purpose. The high-level runtime bridge in

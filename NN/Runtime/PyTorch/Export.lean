@@ -16,7 +16,7 @@ public import NN.Runtime.PyTorch.Export.TorchExport
 
 Reusable PyTorch export/adaptation surface.
 
-Use this umbrella when you want the runtime bridge, not the demo models:
+Use this umbrella when you want the runtime bridge, not the example models:
 
 - `Export.Core` provides shared Python string-generation utilities.
 - `Export.IRPyTorch` lowers a TorchLean `NN.IR.Graph` plus parameters into readable PyTorch
@@ -26,7 +26,7 @@ Use this umbrella when you want the runtime bridge, not the demo models:
 - `Export.TorchExport` emits the Python graph-capture adapter for PyTorch `nn.Module` →
   TorchLean IR JSON.
 
-Demo-specific MLP/CNN/Transformer code lives beside its fixtures under
+Example-specific MLP/CNN/Transformer code lives beside its fixtures under
 `NN.Examples.Interop.PyTorch.{MLP,CNN,Transformer}.*`.
 -/
 

@@ -21,7 +21,7 @@ mode `rnd : ℝ → ℤ` that satisfies the usual “round-to-nearest” propert
 half-ULP bound for a single rounding step.
 
 Here we package that core lemma into a few helper theorems that come up frequently in proofs
-(e.g. the `fl(x) = x(1+δ)` factorization), and a lightweight mixed-precision estimate based on
+(e.g. the `fl(x) = x(1+δ)` factorization), and a compact mixed-precision estimate based on
 machine-epsilon style proxies.
 
 More ambitious Higham/Goldberg style results (dot products, matvec, backward stability, etc.)

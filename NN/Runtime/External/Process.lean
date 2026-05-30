@@ -23,7 +23,7 @@ This file centralizes utilities shared across wrappers:
 - availability checks with consistent optional-dependency error messages, and
 - “run and parse stdout as JSON” helpers with good error messages.
 
-It intentionally does **not** provide any claims of correctness about the external tool. It only
+It does **not** provide any claims of correctness about the external tool. It only
 keeps subprocess handling consistent and non-duplicated.
 -/
 
@@ -53,7 +53,7 @@ def resolveCmdFromEnv (envVar : String) (defaultCmd : String) : IO String := do
 -/
 
 /--
-Check whether a command is available by running it with lightweight version-style arguments.
+Check whether a command is available by running it with version-style arguments.
 
 Any exception (including “executable not found”) is treated as `false`. This helper is for optional
 dependencies; callers that require the command should use `ensureCmdAvailable` so users get a

@@ -73,7 +73,7 @@ why we built the pieces, how they fit, and what kind of guarantee each layer is 
 
 For a first pass, read Introduction → Building Models → Runtime and Interop → Semantics and Graphs.
 If you are here for verification, jump from there to Verification and Certificates. If you want
-concrete demos, skip ahead to Examples and Applications.
+concrete examples, skip ahead to Examples and Applications.
 
 If you are new to Lean, keep the official Lean material nearby:
 [*Functional Programming in Lean*](https://lean-lang.org/functional_programming_in_lean/),
@@ -89,7 +89,7 @@ question TorchLean answers: how can one codebase support neural network programs
 artifacts that tools can inspect, and mathematical claims that Lean can check?
 
 The introduction is meant to be read linearly. It first explains the motivation, then compares the
-TorchLean style with familiar PyTorch workflows, and finally follows a small classifier through the
+TorchLean style with familiar PyTorch workflows, and finally follows a compact classifier through the
 main representations that appear later in the book.
 
 {include 2 TorchLeanBlueprint.Guide.Ch1_Introduction.Overview}
@@ -110,7 +110,7 @@ main representations that appear later in the book.
 # Building Models
 
 These chapters start with the public surface: tensors, shapes, model builders, datasets, and small
-training loops. They are intentionally practical. They show how a TorchLean model is written and run
+training loops. They are practical. They show how a TorchLean model is written and run
 before asking you to care about the IR or proof machinery underneath it.
 
 {include 2 TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes}

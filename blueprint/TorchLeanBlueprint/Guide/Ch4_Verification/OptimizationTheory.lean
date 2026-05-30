@@ -40,7 +40,7 @@ optimizer is doing something useful; it is not itself a proof that the update ma
 The first object is a first order optimizer state: parameters, gradients, an optional buffer, and a
 time counter. The simplest theorem says that the named update exposes exactly the pieces we expect:
 the returned record contains the next parameters, the next optimizer buffer, and a time counter
-equal to `state.time + 1`. In Lean this is intentionally small algebra.
+equal to `state.time + 1`. In Lean this is direct algebra.
 
 The [FirstOrder optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/FirstOrder.lean) contains
 the corresponding projection theorems: `update_params_eq`, `update_buffer_eq`, and

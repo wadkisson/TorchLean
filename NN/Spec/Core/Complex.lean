@@ -69,7 +69,7 @@ instance [Neg α] : Neg (Complex α) := ⟨fun z => ⟨-z.re, -z.im⟩⟩
 instance [Add α] : Add (Complex α) := ⟨fun x y => ⟨x.re + y.re, x.im + y.im⟩⟩
 instance [Sub α] : Sub (Complex α) := ⟨fun x y => ⟨x.re - y.re, x.im - y.im⟩⟩
 
-/-- Complex multiplication. -/
+/-- Complex multiplication using the usual real/imaginary component formula. -/
 instance [Mul α] [Add α] [Sub α] : Mul (Complex α) :=
   ⟨fun x y =>
     ⟨x.re * y.re - x.im * y.im, x.re * y.im + x.im * y.re⟩⟩
@@ -92,7 +92,8 @@ instance [BEq α] : BEq (Complex α) :=
 Order is only used in TorchLean for branchy ops like ReLU/max/min. Complex numbers do not have a
 canonical order, so we pick a simple *real-part* order: compare `re` and ignore `im`.
 
-This keeps the instance lightweight and avoids polluting mathlib’s `ℂ` with ad-hoc orderings.
+This keeps the instance local to TorchLean’s branchy tensor operations and avoids changing
+mathlib’s `ℂ`.
 -/
 instance [LT α] : LT (Complex α) := ⟨fun x y => x.re < y.re⟩
 instance [LE α] : LE (Complex α) := ⟨fun x y => x.re ≤ y.re⟩

@@ -25,7 +25,7 @@ This is the maintained diffusion command. It supports two real-data modes:
 The command is one public entrypoint, but the implementation keeps separate typed branches because
 Lean tracks image height and width in the tensor type.
 
-## Why unconditional samples are still rough
+## Why unconditional samples are still modest
 
 The default epsilon predictor is a compact same-resolution residual CNN with a broadcast time channel.
 That is enough to validate real image loading, CUDA training, logging, reconstruction diagnostics,

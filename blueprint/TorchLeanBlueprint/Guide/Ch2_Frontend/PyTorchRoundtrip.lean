@@ -12,14 +12,14 @@ because the dataset, optimizer, or engineering environment belongs there. The qu
 TorchLean is what happens after that training run. Can the result come back into Lean as a checked
 artifact, with names, shapes, and parameter order made explicit?
 
-The round trip is deliberately narrow. TorchLean does not import arbitrary `nn.Module` objects. It
+The round trip is kept narrow. TorchLean does not import arbitrary `nn.Module` objects. It
 supports known model families with known layouts. That restriction is a feature: a small bridge can
 be audited, tested, and connected to later graph and verification work.
 
 For runnable examples around this boundary, see:
 
 - [NN.Examples.Interop.PyTorch.Roundtrip API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
-- [NN.Examples.Interop.PyTorch.TorchExportSmoke API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/TorchExportSmoke.lean)
+- [NN.Examples.Interop.PyTorch.TorchExportCheck API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/TorchExportCheck.lean)
 - [Torch IR and PyTorch example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/TorchIRPyTorch.lean)
 
 The main declarations for this boundary are
@@ -33,7 +33,7 @@ The main declarations for this boundary are
 The round trip has five steps:
 
 1. Lean defines the expected model family.
-2. Lean exports a matching PyTorch scaffold.
+2. Lean exports matching PyTorch code.
 3. Python trains or modifies the weights.
 4. Python writes a named tensor payload.
 5. Lean imports the payload and checks the family tag, parameter names, order, shapes, and scalar
@@ -92,7 +92,7 @@ is transport, not semantics.
 
 # Model Families
 
-The repository uses three family demos:
+The repository uses three family examples:
 
 - MLP: the smallest parameter and shape contract.
 - CNN: convolution weights and image layouts.

@@ -15,7 +15,7 @@ bug studies include tokenizer/config mismatch classes among real production fail
 
 https://arxiv.org/abs/2506.09713
 
-TorchLean's current contract is intentionally small: once tokens enter the verified fragment, token
+TorchLean's current contract is focused: once tokens enter the verified fragment, token
 IDs can be represented as `Fin vocabSize`, making out-of-vocabulary IDs unrepresentable.
 -/
 

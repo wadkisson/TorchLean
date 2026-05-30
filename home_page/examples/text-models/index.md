@@ -12,7 +12,7 @@ generation settings, and saved logs all appear as artifacts the reader can inspe
 
 ## Data: One Explicit Text File
 
-The text demos are intentionally built around a single UTF-8 text file. In the default setup, the
+The text examples are intentionally built around a single UTF-8 text file. In the default setup, the
 download script places Tiny Shakespeare under `data/real/text/`, and the Lean example fails loudly
 if the file is missing.
 
@@ -123,7 +123,7 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
   --sample-seed 11 --log data/model_zoo/gpt2_trainlog.json
 ```
 
-For a smoke test without CUDA:
+For a runtime check without CUDA:
 
 ```bash
 lake exe torchlean gpt2 --tiny-shakespeare --steps 1 --windows 2 --generate 32
@@ -131,7 +131,7 @@ lake exe torchlean gpt2 --tiny-shakespeare --steps 1 --windows 2 --generate 32
 
 ## Saving and Reloading Parameters
 
-TorchLean’s checkpoint format is intentionally simple: a model’s parameters are a shape-indexed
+TorchLean’s checkpoint format is kept simple: a model’s parameters are a shape-indexed
 pack, and the save/load helpers round-trip exact IEEE-754 bit patterns through JSON.
 
 That is why `gpt2_saved` is a separate example: it loads a parameter pack, checks that the shapes

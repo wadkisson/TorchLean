@@ -15,7 +15,7 @@ public import NN.Verification.Util.Json
 
 VNN-COMP-style mini-suite checker (MNIST-FC, VNN-COMP 2022 benchmark).
 
-This tool is intentionally compact:
+This tool is kept compact:
 - it consumes ONNX+VNNLIB instances via JSON artifacts, and
 - it runs TorchLean's IBP / (basic) CROWN bounds on the imported MLP, then checks the VNNLIB
   disjunction-of-conjunctions constraints using a sufficient condition on the output box.
@@ -52,7 +52,7 @@ structure MnistFCOpts where
   weights : String := "_external/vnncomp/mnist_fc/model_weights.json"
   /-- Path to exported instance suite (`suite.json`). -/
   suite   : String := "_external/vnncomp/mnist_fc/suite.json"
-  /-- Maximum number of instances to check (useful for quick local checks). -/
+  /-- Maximum number of instances to check (useful for local checks). -/
   max     : Nat := 30
   /--
   Bound propagation mode:

@@ -30,12 +30,12 @@ It has three pieces:
   forward execution.
 
 Correctness proofs for the IR bridge live under
-`NN.Runtime.Autograd.Compiled.IRExec.Correctness`. They are intentionally kept in their own
+`NN.Runtime.Autograd.Compiled.IRExec.Correctness`. They live in their own
 umbrella so ordinary runtime imports do not have to elaborate the full semantic-equivalence proof.
 
 ## Trust Boundary
 
-`IRExec` compiles **forward** semantics. Its generated node payloads intentionally use
+`IRExec` compiles **forward** semantics. Its generated node payloads use
 sentinel JVP/VJP implementations, so training-style gradients should continue to use the
 autograd-capable `GraphM` / TorchLean compiled backend rather than the shared-IR execution bridge.
 -/

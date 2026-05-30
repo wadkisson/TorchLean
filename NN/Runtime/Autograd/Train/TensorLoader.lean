@@ -17,7 +17,7 @@ This is the canonical runtime layer for shape-checked construction from lists/ar
 API re-exports these helpers from `NN.API.Data`; that is not a second implementation, just the
 user-facing namespace. Keeping the implementation here is useful because the CSV/NPY loaders and
 training examples can share the same `Result` error model and the same `Dataset` type without
-depending on the higher-level API facade.
+depending on the higher-level API.
 -/
 
 @[expose] public section

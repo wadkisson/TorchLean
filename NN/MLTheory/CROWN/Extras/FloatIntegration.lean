@@ -42,11 +42,11 @@ noncomputable def rFMA (a b acc : ℝ) : ℝ :=
   let p := neuralRound (β := β) (fexp := fexp) rnd (a * b)
   neuralRound (β := β) (fexp := fexp) rnd (acc + p)
 
-/-- Rounded add -/
+/-- Addition followed by the configured neural-float rounding operation. -/
 noncomputable def rAdd (x y : ℝ) : ℝ :=
   neuralRound (β := β) (fexp := fexp) rnd (x + y)
 
-/-- Rounded mul -/
+/-- Multiplication followed by the configured neural-float rounding operation. -/
 noncomputable def rMul (x y : ℝ) : ℝ :=
   neuralRound (β := β) (fexp := fexp) rnd (x * y)
 
@@ -301,7 +301,7 @@ noncomputable def crownMlp2BoundsFloatFull
   (boundIbpFloat (β := β) (fexp := fexp) rnd net xB,
    boundAffineFloat (β := β) (fexp := fexp) rnd net xB)
 
-/-- Rounded vector ReLU. -/
+/-- Coordinatewise ReLU where each output coordinate is rounded in the neural-float model. -/
 noncomputable def reluVecFloat {n : Nat}
   (x : Tensor ℝ (.dim n .scalar)) : Tensor ℝ (.dim n .scalar) :=
 match x with

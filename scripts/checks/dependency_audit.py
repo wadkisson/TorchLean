@@ -2,13 +2,13 @@
 """
 TorchLean dependency-graph audit.
 
-This is a lightweight adaptation of the methodology in:
+This is a repository-level adaptation of the methodology in:
 
   Xinze Li, Nanyun Peng, Simone Severini, Patrick Shafto,
   "The Network Structure of Mathlib", arXiv:2604.24797, 2026.
 
 Their work extracts Mathlib's module/declaration/namespace graphs at large scale.  This script is
-not a replacement for premise-level extraction; it is a lightweight repository audit that runs
+not a replacement for premise-level extraction; it is a repository audit that runs
 cheaply on TorchLean to keep the architecture map aligned with the import graph.
 
 The audit uses only the Python standard library.  It parses Lean import headers,
@@ -127,7 +127,7 @@ def module_name(root: pathlib.Path, path: pathlib.Path) -> str:
 def mask_comments_and_strings(text: str) -> str:
     """Replace Lean comments/docstrings/strings with spaces while preserving line numbers.
 
-    This is a lightweight scanner rather than a full Lean parser. It still tracks
+    This is a lexical scanner rather than a full Lean parser. It still tracks
     nested block comments and ordinary string escapes so dependency regexes do
     not fire on prose examples or URLs in documentation comments.
     """
@@ -169,7 +169,7 @@ def mask_comments_and_strings(text: str) -> str:
 
         if in_string:
             if ch == "\n":
-                # Lean strings should not span raw newlines in this lightweight scanner.
+                # Lean strings should not span raw newlines in this lexical scanner.
                 # Resetting here keeps a malformed string from masking the rest of the file.
                 in_string = False
                 i += 1
@@ -271,7 +271,7 @@ def parse_file(root: pathlib.Path, path: pathlib.Path) -> tuple[list[ImportEdge]
 def longest_path_len(nodes: set[str], edges: list[ImportEdge]) -> int | None:
     """Compute the longest direct-import chain, or `None` if the graph has a cycle.
 
-    The “critical path” reported by this script is a rough layering metric over
+    The “critical path” reported by this script is an approximate layering metric over
     direct imports. It is not a theorem-dependency graph and should not be read
     as a proof of semantic dependency between declarations.
     """
@@ -301,7 +301,7 @@ def longest_path_len(nodes: set[str], edges: list[ImportEdge]) -> int | None:
 
 
 def code_stats(root: pathlib.Path, files: list[pathlib.Path]) -> dict:
-    """Compute lightweight repository-size statistics for the public graph page.
+    """Compute repository-size statistics for the public graph page.
 
     The line counts use the same comment/string masking pass as the dependency parser.
     They are meant as stable repository-scale indicators, not as a semantic Lean
@@ -388,8 +388,8 @@ def audit(root: pathlib.Path) -> dict:
     for e in internal_edges:
         src_layer = layer_of(e.src)
         dst_layer = layer_of(e.dst)
-        # Hard architectural boundaries: specs should not depend on runtime code,
-        # and reusable runtime code should never depend on examples.
+        # Hard architectural boundaries: specs stay independent of runtime code,
+        # and reusable runtime code stays independent of examples.
         if src_layer == "NN.Spec" and dst_layer.startswith("NN.Runtime"):
             findings.append(
                 Finding(

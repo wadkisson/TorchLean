@@ -19,7 +19,7 @@ This file defines a small, reusable tolerance object for "close enough" reasonin
 - relative tolerance (dimensionless), and
 - a nonnegative slack factor to scale the budget.
 
-It is intentionally lightweight and independent of any specific backend (IBP/FP32/etc.).
+It is small and explicit and independent of any specific backend (IBP/FP32/etc.).
 
 ## PyTorch correspondence / citations
 PyTorch (and NumPy) commonly expose *absolute* + *relative* tolerances (often called `atol`/`rtol`)

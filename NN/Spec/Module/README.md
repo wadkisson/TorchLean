@@ -10,7 +10,7 @@ Here we package selected layer specs into a uniform interface that records input
 That lets us:
 
 - compose blocks with `ModSpec.SpecChain` (a shape safe `nn.Sequential` style chain), and
-- attach lightweight metadata (`kind`, `export_func`) for export and pretty printing tooling.
+- attach metadata (`kind`, `export_func`) for export and pretty printing tooling.
 
 Files:
 

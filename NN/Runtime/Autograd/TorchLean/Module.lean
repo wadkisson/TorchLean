@@ -336,10 +336,11 @@ def applyFloatPlan (opts : Torch.Options) :
       applyFloatPlan (opts := opts) (ss := ss) ps rest
 
 /--
-List-based compatibility wrapper around `applyFloatPlan`.
+Apply a runtime list of initializers after checking it against the parameter shapes.
 
-New code should prefer `Plan ss`, because it records the length agreement in the type.  This wrapper
-is still useful when initializers are loaded from JSON/checkpoints or CLI-controlled experiments.
+`Plan ss` is the typed form used by the initializer engine.  This entrypoint is for places where
+the initializer list comes from outside Lean's typechecker, such as a checkpoint, JSON file, or CLI
+experiment.
 -/
 def applyFloatInits (opts : Torch.Options) {ss : List Shape}
     (ps : Torch.ParamList Float ss) (inits : List FloatInit) : IO Unit := do
@@ -504,8 +505,8 @@ namespace ScalarModuleDef
 /--
 Instantiate a `ScalarModuleDef` by casting Float initializers to `α` and choosing Torch options.
 
-This is the most general constructor; `instantiate` is a convenience wrapper that just selects a
-backend.
+This is the most general constructor. The shorter `instantiate` entrypoint chooses standard runtime
+options before calling this function.
 -/
 def instantiateWith {α : Type} [Context α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
@@ -521,7 +522,7 @@ def instantiateWith {α : Type} [Context α] [DecidableEq Shape]
 Instantiate a Float module using runtime parameter initializers.
 
 This is the runtime-initialized sibling of `instantiateWith`.  Instead of first building every initial
-parameter as a full Lean tensor, it creates minimal zero host placeholders and then applies a
+parameter as a full Lean tensor, it creates minimal zero host tensors and then applies a
 shape-indexed runtime plan to the module parameters.  In CUDA mode those initializers allocate
 device buffers directly and mark the host copies stale; public parameter readback still
 synchronizes them through the existing CUDA mirror machinery.

@@ -27,8 +27,8 @@ does not prove the Arb computation itself.
 
 We expose two layers:
 - a *raw* layer returning `Lean.Json` (`runJson`, `runRequestJson`), and
-- a *typed* layer with small parsing functions (`parseResult`) and convenience wrappers (`run`,
-  `runExpr`, `runMLP`).
+- a *typed* layer with parsers and request-specific entrypoints (`parseResult`, `run`, `runExpr`,
+  `runMLP`).
 
 The raw layer is useful for debugging and for experimenting with new request schemas, while the
 typed layer is nicer for examples and "certificate-like" workflows.
@@ -42,10 +42,11 @@ namespace TorchLean.Floats.Arb
 open Lean
 
 /-!
-## Unary queries (compatibility)
+## Unary interval queries
 
-The original Lean integration called the oracle in “unary” mode via `--func`, `--lo`, `--hi`.
-This API remains because it is convenient for quick demos.
+Unary mode sends one function name and one input interval to Arb. It is the most direct interface
+when a proof or example needs a certified enclosure for `exp`, `log`, `tanh`, or a related scalar
+function.
 
 For more general evaluation (expression ASTs / small MLPs), use the request API further below.
 -/
@@ -58,7 +59,7 @@ the requested precision, and return a rigorous enclosure of the output.
 
 Why endpoints are strings:
 - we pass them straight through to Python/Arb without any intermediate parsing in Lean, and
-- it avoids accidental loss of precision from `Float` parsing when writing demos.
+- it avoids accidental loss of precision from `Float` parsing when writing examples.
 -/
 structure Query where
   /-- Unary function name (e.g. `"tanh"`, `"exp"`, `"log"`). -/
@@ -337,8 +338,6 @@ def parseResult (j : Json) : Except String Result := do
 /--
 Run a unary `Query` and parse the result.
 
-This is the convenience wrapper most demos should use.
-
 It respects `TORCHLEAN_ARB_PY` (if set) to choose the Python executable.
 -/
 def run (q : Query) (pythonCmd : String := "python3") : IO Result := do
@@ -369,7 +368,7 @@ def tryRemoveFile (path : System.FilePath) : IO Unit := do
     pure ()
 
 /--
-Generate a fresh temporary filepath for a request payload.
+Generate a fresh request filepath for an Arb oracle payload.
 
 In words: use the current monotone time in milliseconds plus a random suffix to reduce
 collisions across concurrent processes.
@@ -439,8 +438,6 @@ Run an `expr` request and parse the output interval.
 
 In words: evaluate an expression AST over a box of interval variables using Arb ball
 arithmetic, returning an enclosure of the result.
-
-This is a convenience wrapper around `runRequestJson` with `kind = "expr"`.
 -/
 def runExpr (vars : List (String × (String × String))) (expr : Json)
     (precBits : Nat := 200) (digits : Nat := 50) (pythonCmd : String := "python3") : IO ExprResult
@@ -464,8 +461,6 @@ Run an `mlp` request (box input + layers) and parse the output vector intervals.
 
 In words: run a small feedforward MLP using ball arithmetic, where the input is a box
 interval, and return per-output-coordinate enclosures.
-
-This is a convenience wrapper around `runRequestJson` with `kind = "mlp"`.
 -/
 def runMLP (req : Json) (precBits : Nat := 200) (digits : Nat := 50) (pythonCmd : String :=
   "python3") : IO MLPResult := do

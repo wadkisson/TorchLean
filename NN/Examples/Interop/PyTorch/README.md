@@ -1,15 +1,15 @@
 # PyTorch Interop Examples
 
 This folder contains PyTorch interop examples. The reusable bridge lives in
-`NN/Runtime/PyTorch`; the files here are small interop examples, smoke tests, and tutorial fixtures.
+`NN/Runtime/PyTorch`; the files here are small interop examples, runtime checks, and tutorial fixtures.
 
 ## Two Separate Paths
 
 ### 1. Model Agnostic Graph Capture
 
-- Lean entrypoint: `TorchExportSmoke.lean`
+- Lean entrypoint: `TorchExportCheck.lean`
 - Runtime bridge: `NN.Runtime.PyTorch.Export.TorchExport` and `NN.Runtime.PyTorch.Import.TorchExport`
-- Command: `lake exe torchlean pytorch_export_smoke`
+- Command: `lake exe torchlean pytorch_export_check`
 
 This path writes a generated Python adapter, captures small `nn.Module`s through `torch.export`/FX,
 emits `torchlean.ir.v1` JSON, and then asks Lean to parse and validate the graph. The importer has a
@@ -38,7 +38,7 @@ small architecture. For arbitrary checkpoints, prefer the general state dict ada
 
 ## Fixture folders
 
-- `MLP/`, `CNN/`, `Transformer/` contain the small model specific round trip fixtures: JSON
+- `MLP/`, `CNN/`, `Transformer/` contain the compact model specific round trip fixtures: JSON
   weights, compact Python producer scripts, and the Lean import/export helpers for that model.
 - Regenerate JSON weights with:
   - `python3 NN/Examples/Interop/PyTorch/MLP/train_mlp.py`
@@ -51,4 +51,4 @@ small architecture. For arbitrary checkpoints, prefer the general state dict ada
 - Verification checkpoint bridges belong under `NN/Verification/*`, not under examples.
 - Architecture specific verification loaders that are used outside examples should move to their
   owning verification package once they stop being example fixtures.
-- Generated temporary files from graph capture belong under `.lake/build`, not in this folder.
+- Per-run generated files from graph capture belong under `.lake/build`, not in this folder.

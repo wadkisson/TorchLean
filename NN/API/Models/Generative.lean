@@ -50,9 +50,11 @@ def compactImageConfig (batch : Nat := 4) (dataDim : Nat := 128)
     (hiddenDim : Nat := 64) (latentDim : Nat := 32) : VectorGenerativeConfig :=
   vectorGenerativeConfig batch dataDim hiddenDim latentDim
 
+/-- Batched data-vector shape shared by vector generative examples. -/
 abbrev vectorDataShape (cfg : VectorGenerativeConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.dataDim
 
+/-- Batched latent-vector shape shared by vector generative examples. -/
 abbrev vectorLatentShape (cfg : VectorGenerativeConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.latentDim
 

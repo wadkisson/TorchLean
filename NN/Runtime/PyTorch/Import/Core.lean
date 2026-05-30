@@ -14,14 +14,14 @@ public import NN.Spec.Core.Tensor
 PyTorch import core (JSON parsing).
 
 The Python side of TorchLean round-trips usually writes a JSON object containing nested arrays of
-floats (a lightweight, Lean-readable projection of a PyTorch `state_dict`). The model-agnostic
+floats (a Lean-readable projection of a PyTorch `state_dict`). The model-agnostic
 adapter emitted by `NN.Runtime.PyTorch.Export.StateDict` is the intended path from `.pt` / `.pth`
 checkpoints into this JSON format.
 
 Design note:
 
 In typical PyTorch workflows, weights are often serialized via `torch.save(model.state_dict(), ...)`
-or related checkpoint wrappers. TorchLean deliberately avoids parsing those PyTorch binary formats
+or related checkpoint wrappers. TorchLean avoids parsing those PyTorch binary formats
 directly in Lean. Instead, PyTorch loads the checkpoint and emits a small JSON representation that
 is easy to validate against a Lean `Shape` and easy to diff in tests.
 
@@ -224,8 +224,8 @@ Example: `parseIndexedKey "layers." ".weight" "layers.3.weight" = some 3`.
 -/
 def parseIndexedKey (pref suff key : String) : Option Nat :=
   if key.startsWith pref && key.endsWith suff then
-    -- In Lean 4.28+, `String.drop/take/trim...` produce `String.Slice`, and some slice APIs are
-    -- being phased out. Convert to `String` early so we can use the usual `String.length`.
+    -- Convert slices to owned strings before measuring them; the importer should not depend on
+    -- slice-specific API details.
     let core : String := (key.drop pref.length).toString
     let slice : String := (core.take (core.length - suff.length)).toString
     slice.toNat?

@@ -98,10 +98,10 @@ private lemma shiftRightCeilPow2_le_shiftRight_add1 (n shift : Nat) :
   have hor := shiftRightCeilPow2_eq_shiftRight_or_shiftRight_add1 (n := n) (shift := shift)
   rcases hor with hq | hq <;> simp [hq]
 
-/-! ### Working around `Nat.decLe` (Lean 4.26)
+/-! ### Normalizing the `Nat.decLe` branch
 
 `Nat.decLe` is implemented as a nested dependent `dite` over `Nat.ble`, and rewriting under the
-scrutinee of a `match` on `Decidable` is very brittle in Lean 4.26.
+scrutinee of a `match` on `Decidable` needs a dedicated helper.
 
 To keep our main proofs readable, we use a small lemma that reduces the *specific* `decLe`-match
 used in the binary32 subnormal “round up to the smallest normal” check.
@@ -1290,8 +1290,7 @@ theorem toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d : Dya
                 by_cases hkUnder : ((mant.log2 : Nat) : Int) + exp < (-150 : Int)
                 ·
                   simp (config := { zeta := true })
-                    [roundDyadicToIEEE32, dpos, hm', hkHiGuardGT, hkUnder, toEReal_posZero,
-                      toEReal_negZero]
+                    [roundDyadicToIEEE32, dpos, hm', hkHiGuardGT, hkUnder]
                 ·
                     by_cases hkSub : ((mant.log2 : Nat) : Int) + exp < (-126 : Int)
                     ·
@@ -1335,7 +1334,7 @@ theorem toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d : Dya
                             [roundDyadicToIEEE32, dpos, hmpos, hkHiGuardGT, hkUnder, hkSub]
                           intro hne
                           exact (hne hfracEq).elim
-                        simp [hnegOut, hposOut, toEReal_posZero, toEReal_negZero]
+                        simp [hnegOut, hposOut]
                       | false =>
                         have hzFracExp :
                             ((match exp + 149 with

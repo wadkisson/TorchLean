@@ -144,7 +144,7 @@ def collectRolloutCheckedSessionWith {obsShape : Shape} {nActions horizon : Nat}
 /--
 Collect a fixed-horizon rollout from a Gymnasium subprocess environment.
 
-This is a thin wrapper around `collectRolloutSessionWith` specialized to `Gymnasium.Session`.
+This specializes `collectRolloutSessionWith` to `Gymnasium.Session`.
 -/
 def collectRolloutWith {obsShape : Shape} {nActions horizon : Nat}
     [Fact (0 < horizon)] [Fact (0 < nActions)]

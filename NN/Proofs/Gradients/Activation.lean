@@ -262,7 +262,7 @@ theorem sigmoid_deriv_correct (x : ℝ) :
 /--
 Correctness of the derivative spec for `Activation.Math.logisticSpec`.
 
-This is the scalar logistic formula `exp x / (exp x + 1)`. It is intentionally not named
+This is the scalar logistic formula `exp x / (exp x + 1)`. It is not named
 `softmax`: a one-entry softmax is always `1`, while TorchLean's actual axis-normalizing softmax is
 the tensor-level `Activation.softmaxSpec` in `NN/Spec/Layers/Activation.lean`.
 -/

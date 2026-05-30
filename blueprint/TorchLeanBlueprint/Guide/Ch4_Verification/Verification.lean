@@ -255,7 +255,7 @@ Informally, IBP says:
 > if each parent value lies inside its parent box, then the node value lies inside the box produced
 > by the IBP transformer for that op.
 
-This makes IBP cheap and robust, but also conservative. Over sufficiently deep nonlinear
+This makes IBP inexpensive and robust, but also conservative. Over sufficiently deep nonlinear
 composition, intervals can widen quickly.
 
 The key linear layer rule is sign splitting. For a row `y_i = sum_j W_ij x_j + b_i`, positive
@@ -323,7 +323,7 @@ TorchLean API, compile its forward pass to the canonical IR with operation tags 
 input uncertainty set, run a verifier pass such as IBP, and then read off the output bounds at the
 output node id.
 
-The runnable demo is
+The runnable example is
 [TorchLean IBP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanIBP.lean), and the
 matching CLI entrypoint is `lake exe verify -- torchlean-ibp`.
 
@@ -400,7 +400,7 @@ lake exe verify -- torchlean-ibp
 
 In the broader ecosystem, CROWN is usually paired with stronger linear relaxations for nonlinear
 ops and with a backward pass that tightens the bound for a particular output margin. TorchLean has
-the same general shape, but the implementation is split between a Lean LiRPA engine
+the same general shape, but the checker combines a Lean LiRPA engine
 for a curated op set ([NN/MLTheory/CROWN](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/CROWN/)) and checkers that compare Lean
 recomputation to JSON artifacts exported from Python tooling
 ([NN/Verification/Cert](https://github.com/lean-dojo/TorchLean/tree/main/NN/Verification/Cert/)).
@@ -458,7 +458,7 @@ TorchLean.
 # More Worked Examples
 
 The fastest way to understand the verifier stack is to watch a few tiny networks go through the
-same logic used for larger graphs. These examples are intentionally small; their value is that every
+same logic used for larger graphs. These examples are compact; their value is that every
 production-scale claim is made of these same local steps plus induction over the graph.
 
 ## Example 1: IBP certifies a one-layer margin
@@ -638,7 +638,7 @@ without treating "imported JSON" as already a theorem.
 
 ## 5. Controller / Lyapunov two-stage workflows
 
-The Lyapunov and controller workflows are still more research-flavored than the smallest public demos,
+The Lyapunov and controller workflows are still more research-flavored than the smallest public examples,
 but they are important for understanding the paper's broader claim that the stack applies to
 dynamical systems as well as to classifier margins.
 
@@ -709,7 +709,7 @@ The authoritative statement of the current proved IBP fragment appears at the to
 [NN.MLTheory.CROWN.Proofs.GraphCertSoundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean).
 
 At present, the soundness development is centered on the core graph dialect used by the bundled
-TorchLean verification demos:
+TorchLean verification examples:
 
 - `.input`, `.const`, `.detach`
 - `.add`, `.sub`, `.mul_elem`, `.relu`
@@ -717,7 +717,7 @@ TorchLean verification demos:
 - `.tanh`, `.sigmoid`, `.sin`, `.cos`
 
 This list matters because it distinguishes a bound that is merely executable from one that is
-backed by the proof layer. Demos that use operators outside that fragment can still be run
+backed by the proof layer. Examples that use operators outside that fragment can still be run
 and inspected, but their outputs should not be treated as proof claims without extending the
 soundness development.
 
@@ -812,7 +812,7 @@ See *CLI Entry Points* for the exact invocation shape and for the tool-listing c
 
 First run: `torchlean-ibp`.
 
-What these runs do, roughly:
+What these runs do, approximately:
 
 1. Build or import a TorchLean model.
 2. Compile the forward pass to `NN.IR.Graph` plus a `ParamStore` (weights, consts, and seed boxes).
@@ -827,10 +827,10 @@ For the "Two-Stage" path, which covers α,β-CROWN integration, consult the *Cer
 All of the following are registered under the unified verification CLI; see
 the [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/CLI.lean) for the authoritative list and defaults:
 
-- TorchLean, IR, and IBP demo: `torchlean-ibp`
-- TorchLean, IR, and IBP plus CROWN demo (ops like softmax and `mse_loss`): `torchlean-crown-ops`
-- TorchLean "tiny transformer" demo: `torchlean-transformer-ibp`
-- Margin / robustness demos: `torchlean-robustness`, `digits`, `margin-cert`
+- TorchLean, IR, and IBP example: `torchlean-ibp`
+- TorchLean, IR, and IBP plus CROWN example (ops like softmax and `mse_loss`): `torchlean-crown-ops`
+- TorchLean "tiny transformer" example: `torchlean-transformer-ibp`
+- Margin / robustness examples: `torchlean-robustness`, `digits`, `margin-cert`
 - PINN workflows: `pinn-cert`, `pinn-cli`, `pinn-dataset-check`
 - IBP/LiRPA certificate checkers: `lirpa-mlp`, `lirpa-cnn`, `lirpa-attention`, `lirpa-gru`, `lirpa-encoder`
 - External artifact structural checks: `abcrown-leaf`
@@ -841,7 +841,7 @@ the [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/V
 
 ## Practical reading order
 
-Starting from a runtime demo, the suggested order is:
+Starting from a runtime example, the suggested order is:
 
 1. `Graphs and IR`
 2. `Floating-Point Semantics`
@@ -911,7 +911,7 @@ TorchLean marks three different kinds of claim explicitly:
 
 - IR evaluation ([NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean)) is executable.
 - IBP/CROWN passes are executable (compute boxes/affine forms).
-- Many demos run on an executable float backend (`IEEE32Exec` by default).
+- Many examples run on an executable float backend (`IEEE32Exec` by default).
 
 This tier is excellent for debugging and for checkable artifacts, but execution alone does not
 establish why a bound is sound.

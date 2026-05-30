@@ -18,7 +18,7 @@ In the spec layer, our transformer encoder parameters are explicit tensors (quer
 projections, feed-forward weights, and LayerNorm affine parameters). In PyTorch these are usually
 spread across multiple `nn.Linear` and `nn.LayerNorm` submodules.
 
-For round-trip demos we accept a *stable, explicit key format* in JSON:
+For round-trip examples we accept a *stable, explicit key format* in JSON:
 `Wq`, `Wk`, `Wv`, `Wo`, `W1`, `W2`, `b1`, `b2`, `norm1_gamma`, `norm1_beta`, `norm2_gamma`,
   `norm2_beta`.
 

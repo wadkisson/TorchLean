@@ -283,7 +283,7 @@ checked claim connected to rounded execution.
 
 # Proof Model Versus IEEE Execution
 
-The rounded-real `FP32` model is intentionally smaller and more reusable for analysis. The
+The rounded-real `FP32` model has a narrower, reusable analysis interface. The
 bit-level `IEEE32Exec` model handles NaN, infinity, signed zeros, and executable binary32 behavior.
 The bridge theorems connect the two on the finite path.
 

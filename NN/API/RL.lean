@@ -15,14 +15,14 @@ public import NN.Spec.RL.FiniteStochasticMDP
 public import NN.Runtime.Training.Log
 
 /-!
-# Public RL Facade
+# Public RL API
 
 This module exposes TorchLean's reinforcement-learning helper surface under the public
 `NN.API.rl.*` namespace.
 
 Design intent:
 - keep the public API smaller and easier to browse than the full runtime namespace,
-- mirror the existing `NN.API.*` facade pattern,
+- follow the same namespace shape as the rest of `NN.API.*`,
 - expose typed RL math while keeping environment/trainer integration separate.
 
 References (background and terminology):
@@ -197,7 +197,7 @@ export _root_.Runtime.RL.Boundary.Transition (done)
 ## Casting to Other Scalar Backends
 
 The trust-boundary checker (`Runtime.RL.Boundary`) validates rollouts in terms of host `Float`
-because that is what our lightweight JSON interchange format uses.
+because that is what the JSON interchange format uses.
 
 Most RL math in TorchLean is scalar-polymorphic (`[Context α]`), so it is often convenient to
 cast a validated `Float` rollout into the chosen runtime scalar backend:

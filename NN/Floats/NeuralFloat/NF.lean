@@ -123,7 +123,7 @@ noncomputable instance : Div (NF β fexp rnd) where
 Boolean equality on `NF` values (semantic equality of reals).
 
 This is *not* intended as a fast runtime check (it relies on classical decidability for `ℝ`), but
-it is convenient for specs that want a `BEq` instance for logging or small examples.
+it is convenient for specs that want a `BEq` instance for logging or compact examples.
 -/
 noncomputable instance : BEq (NF β fexp rnd) where
   beq a b := decide (a.val = b.val)

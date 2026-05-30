@@ -20,11 +20,11 @@ the original ODE while enclosed. It also contains the constant-extension theorem
 finite verified corridor into a global-time one under the paper's inward-pointing hypotheses.
 
 `EnclosureBackends` then restates those theorems for backend-valued trajectories by applying their
-`toReal` views. That file is only a view adapter; numeric soundness for FP32/IEEE evaluation must
+`toReal` views. Numeric soundness for FP32/IEEE evaluation must
 come from the floating-point or certificate checker layer.
 
 The numerical producers themselves (IBP/CROWN/certificate generation, CUDA execution, or external
-tools) are intentionally not proved here. This layer states the mathematical endpoint those
+tools) are not proved here. This layer states the mathematical endpoint those
 producers must justify.
 -/
 

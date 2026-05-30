@@ -24,7 +24,7 @@ This file starts with the diagonal/channelwise version because it is:
 - enough to express the formal affine-scan algebra,
 - and a useful educational baseline for examples.
 
-The definitions intentionally reuse `DynamicalSystem` / `DrivenSystem` from
+The definitions reuse `DynamicalSystem` / `DrivenSystem` from
 `NN/Spec/Dynamics/System.lean`, so existing notions such as `iterate`, `trajectory`,
 `IsFixedPoint`, and `isContractive` apply immediately.
 -/

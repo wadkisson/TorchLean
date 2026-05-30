@@ -195,7 +195,7 @@ theorem diagonalGaussianKlToStandardReal_nonneg
 
 /--
 The finite-dimensional diagonal-Gaussian KL is zero iff every coordinate has zero mean and
-zero log-variance.  This is the exact mathematical sanity check behind the VAE regularizer.
+zero log-variance.  This is the exact mathematical certificate behind the VAE regularizer.
 -/
 theorem diagonalGaussianKlToStandardReal_eq_zero_iff
     {n : Nat} (mu logvar : Fin n → ℝ) :

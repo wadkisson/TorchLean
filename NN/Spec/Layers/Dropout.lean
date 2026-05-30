@@ -31,8 +31,8 @@ How this differs from PyTorch:
   and becomes identity during evaluation (`y = x`).
 - The spec layer here avoids randomness. If you want something close to PyTorch *training*
   semantics,
-  use `dropout_masked_spec` and pass the mask explicitly. If you want a cheap deterministic effect,
-  use `dropout_inference_spec`.
+  use `dropout_masked_spec` and pass the mask explicitly. For evaluation semantics, use
+  `dropout_inference_spec`.
 
 Gradients:
 

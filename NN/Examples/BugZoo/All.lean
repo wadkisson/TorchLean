@@ -31,10 +31,10 @@ Each submodule follows the same pattern:
 - state the TorchLean boundary honestly (`prevents`, `detects`, or `requires external conformance`);
 - expose a small checked theorem or definition tied to the real spec/proof stack.
 
-This is intentionally not a separate theory fork. The examples re-export the actual TorchLean
+This is not a separate theory fork. The examples re-export the actual TorchLean
 semantics and proof theorems so the examples stay connected to the library.
 
-The writing style is deliberately plain: tell the reader what the bug is, state the contract in
+The writing style is kept plain: tell the reader what the bug is, state the contract in
 ordinary language, then show the small checked theorem.
 -/
 

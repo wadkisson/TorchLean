@@ -26,7 +26,7 @@ intended to be instantiated over multiple scalar backends (`Float`, intervals, p
 
 Note on `activation_type`:
 
-We keep a small string switch for demos and exporters. Most TorchLean code prefers choosing the
+We keep a small string switch for examples and exporters. Most TorchLean code prefers choosing the
 activation by composition (at the module level), but having the switch here makes the "one-file
 model" convenient for examples.
 -/
@@ -69,7 +69,7 @@ structure AutoencoderSpec (α : Type) (inputDim hiddenDim : Nat) where
 ## Forward
 -/
 
-/-- Apply the chosen activation (a small convenience wrapper around `Activation.*_spec`). -/
+/-- Apply the chosen activation using the corresponding `Activation.*_spec` operation. -/
 def autoencoderActivationSpec {n : Nat}
   (activation_type : String)
   (t : Tensor α (.dim n .scalar)) : Tensor α (.dim n .scalar) :=

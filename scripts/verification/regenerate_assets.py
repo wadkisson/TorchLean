@@ -239,7 +239,7 @@ COMMANDS: tuple[Command, ...] = (
     ),
     Command(
         group="geometry3d-visual",
-        kind="regression demo",
+        kind="regression artifact",
         description="Generate broken Geometry3D artifacts, then render good/bad visual overlays and a contact sheet.",
         argv=(
             "python3",
@@ -248,7 +248,7 @@ COMMANDS: tuple[Command, ...] = (
     ),
     Command(
         group="geometry3d-visual",
-        kind="regression demo",
+        kind="regression artifact",
         description="Render PNG overlays for the bundled good fixture and deliberately invalid certificates.",
         argv=(
             "python3",

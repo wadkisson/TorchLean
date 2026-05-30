@@ -14,16 +14,16 @@ public import NN.Spec.Core.Tensor
 The `NN/Spec/Layers/*` files define reference layer specs: usually a parameter record plus a pure
 `forward` (and sometimes explicit gradient formulas).
 
-This file packages those specs into a small, uniform *module* interface:
+This file packages those specs into a uniform *module* interface:
 
 `NNModuleSpec α inShape outShape`
 
-which is just a `forward` function plus lightweight metadata (`kind`, `export_func`)
+which is a `forward` function plus metadata (`kind`, `export_func`)
 used by tooling (export/extraction) and by the runtime/IR pipeline described in
 the TorchLean paper (`arXiv:2602.22631`).
 
-We keep that metadata separate from the semantics: changing `kind`/`toPyTorch` should never change
-what `forward` means.
+We keep that metadata separate from the semantics: `forward` is the mathematical meaning, while
+`kind` and `toPyTorch` describe tooling/export behavior.
 
 `SpecChain` is a dependent composition operator that enforces intermediate shape agreement at
 compile time, so you can build pipelines without runtime shape casts.
@@ -62,11 +62,11 @@ open Tensor
 
 /-- Export-related metadata carried alongside a spec module.
 
-This is intentionally informal (mostly strings). It is **not** part of the math we prove about a
- model. We use it for demos and for "roughly equivalent PyTorch" pretty-printing.
+This metadata is **not** part of the mathematical semantics of a model. It supports examples,
+exporters, and "approximately equivalent PyTorch" pretty-printing.
 -/
 structure ExportFunctions where
-  /-- A PyTorch-style rendering for docs/demos (metadata only). -/
+  /-- A PyTorch-style rendering for docs/examples (metadata only). -/
   toPyTorch : String
   /-- Extra integer metadata used by some exporters (interpretation depends on `kind`). -/
   dimensions : Nat × Nat

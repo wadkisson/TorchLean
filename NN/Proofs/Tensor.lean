@@ -14,7 +14,7 @@ public import NN.Proofs.Tensor.Basic
 
 Stable umbrella for TorchLean's tensor proof layer.
 
-The folder is split deliberately:
+The folder is split by role:
 
 - `NN.Proofs.Tensor.Algebra` contains backend-generic algebra over semirings. It is the right import
   for autograd soundness proofs that should not commit to `ℝ`.
@@ -22,7 +22,7 @@ The folder is split deliberately:
   Lipschitz, normalization, attention, and model-level proofs.
 
 Use this umbrella from public entrypoints and CI. Import the leaf modules directly only when a proof
-needs to keep the dependency surface intentionally small.
+keeps the dependency surface focused.
 -/
 
 @[expose] public section

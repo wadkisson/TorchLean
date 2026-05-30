@@ -16,7 +16,7 @@ import Mathlib.Algebra.Order.Algebra
 
 Dual numbers for forward-mode differentiation.
 
-This is a lightweight runtime-oriented `Dual α` scalar that can be used to compute:
+This runtime-oriented `Dual α` scalar can be used to compute:
 - Jacobian-vector products by running a function once with dual inputs, and
 - Hessian-vector products by running reverse-mode over dual scalars (forward-over-reverse).
 

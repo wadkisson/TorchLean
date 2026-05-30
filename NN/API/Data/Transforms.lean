@@ -55,7 +55,7 @@ def compose {a b c : Type} (g : b → c) (f : a → b) : a → c :=
 def onDataset {a b : Type} (f : a → b) (ds : API.Data.Dataset a) : API.Data.Dataset b :=
   _root_.Runtime.Autograd.Train.Dataset.map f ds
 
-/-- Map a tensor elementwise. -/
+/-- Apply a scalar function to every entry of a tensor while preserving its shape. -/
 def mapTensor {α : Type} {s : Spec.Shape} (f : α → α) (x : Spec.Tensor α s) : Spec.Tensor α s :=
   Spec.mapTensor f x
 

@@ -43,12 +43,12 @@ useful when building, training, importing, exporting, or checking runnable model
 - typed reinforcement-learning runtime helpers.
 
 For ordinary user code, prefer `import NN` or `import NN.API.Runtime`. Import this file when you
-intentionally want the full executable subsystem. If you only need pure tensor semantics and
+need the full executable subsystem. If you only need pure tensor semantics and
 theorems, prefer `NN.Entrypoint.Spec` or `NN.Entrypoint.Proofs`; those imports keep runtime bridge
 dependencies out of the build.
 
-The runtime entrypoint deliberately imports only reusable bridge infrastructure under
-`NN.Runtime.PyTorch.*`. Demo-only MLP/CNN/Transformer round-trip code lives under
+The runtime entrypoint imports reusable bridge infrastructure under
+`NN.Runtime.PyTorch.*`. Example-only MLP/CNN/Transformer round-trip code lives under
 `NN.Examples.Interop.PyTorch.*`, so ordinary runtime imports do not pull example modules into the
 library surface.
 

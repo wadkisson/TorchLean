@@ -118,9 +118,7 @@ def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
     Idx (Γ ++ ss ++ [τ]) τ :=
   _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
 
--- ---------------------------------------------------------------------------
--- BatchNorm graph
--- ---------------------------------------------------------------------------
+-- BatchNorm graph and saved-tensor layout used by the channel-first proof.
 
 /-!
 Informal computation (per channel, flattening spatial dims):

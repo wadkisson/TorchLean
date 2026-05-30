@@ -325,7 +325,7 @@ def bmmDecodeC (m p : Nat) (q : Nat) : Nat × Nat × Nat :=
 Pure row-major batched matrix multiplication spec.
 
 For each output element `C[b,i,j]`, this folds over `k = 0..n-1` using `IEEE32Exec.mul` followed by
-`IEEE32Exec.add`. This is intentionally a *specific* accumulation order. cuBLAS may use a different
+`IEEE32Exec.add`. This fixes a *specific* accumulation order. cuBLAS may use a different
 tree/FMA strategy, so bit-for-bit agreement with this spec is an explicit native contract, not a
 free theorem.
 -/
@@ -344,7 +344,7 @@ def bmmSpec (batch m n p : Nat)
 /--
 Agreement assumption for a native BMM implementation.
 
-The scalar result bits must match `bmmSpec` at every output element. This is intentionally stronger
+The scalar result bits must match `bmmSpec` at every output element. This is stronger
 than "numerically close": it is the bitwise contract needed to reuse exact `IEEE32Exec` proofs.
 
 For cuBLAS-backed kernels this assumption includes:

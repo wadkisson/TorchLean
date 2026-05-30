@@ -8,10 +8,6 @@ neural-network programs. It provides typed tensors and model APIs, a shared grap
 IR, runtime/autograd support, finite-precision semantics, certificate checkers,
 CUDA/runtime boundaries, and examples across modern ML and scientific ML.
 
-The detailed story lives in the project site, guide, API docs, and paper. This
-README is the quick entry point: build the repo, run the first examples, find the
-docs, and cite the project.
-
 ## Quickstart
 
 ```bash
@@ -29,7 +25,8 @@ lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000
 
 The first MLP command uses the executable IEEE-style Float32 path. The second
 uses Lean's builtin `Float` runtime path. The CUDA command uses the native GPU
-runtime path and is meant as a quick smoke test, not a trusted proof boundary.
+runtime path and checks that the CUDA backend is available; it is not a trusted
+proof boundary.
 
 TorchLean is pinned by `lean-toolchain` and currently builds with
 `leanprover/lean4:v4.30.0`.
@@ -112,7 +109,7 @@ require TorchLean from "../TorchLean"
   optimization theory, and related proof layers.
 - `NN/Verification`: certificate checkers and CLI workflows.
 - `NN/Examples`: quickstarts, model zoo commands, widgets, verification fixtures,
-  and interoperability demos.
+  and interoperability workflows.
 - `blueprint/TorchLeanBlueprint/Guide`: source for the public guide.
 - `home_page`: project website sources.
 

@@ -44,7 +44,7 @@ def expectFieldE (ctx key : String) (j : Lean.Json) : Except String Lean.Json :=
   | some v => pure v
   | none => fail s!"{ctx}: missing field `{key}`"
 
-/-- Parse a JSON string. -/
+/-- Require a JSON string and report `ctx` in the error message on mismatch. -/
 def expectStringE (ctx : String) (j : Lean.Json) : Except String String := do
   match Lean.Json.getStr? j with
   | .ok s => pure s
@@ -62,7 +62,7 @@ def expectNatE (ctx : String) (j : Lean.Json) : Except String Nat := do
           | none => fail s!"{ctx}: expected natural number"
       | _ => fail s!"{ctx}: expected natural number"
 
-/-- Parse a JSON array. -/
+/-- Require a JSON array and return its entries. -/
 def expectArrayE (ctx : String) (j : Lean.Json) : Except String (Array Lean.Json) := do
   match j with
   | .arr xs => pure xs

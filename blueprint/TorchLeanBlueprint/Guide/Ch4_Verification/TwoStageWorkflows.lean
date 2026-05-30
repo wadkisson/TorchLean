@@ -61,7 +61,7 @@ then Lean parses, replays, or structurally checks it. The current Two Stage chec
 leaf artifact JSON format exported from α,β-CROWN:
 `abcrown-leaf` (see the certificate guide for what this does and does not check).
 
-# Quick Run (From TorchLean)
+# Running the Checker From TorchLean
 
 The Two Stage checker is registered in the unified verification CLI, so the easiest place to
 start is:

@@ -174,7 +174,7 @@ def runSpectralConvFiniteDiff : IO Unit := do
 def runSpectralConvTapeNode : IO Unit := do
   IO.println "== spectralConv1dRfft CUDA tape node =="
 
-  -- This is the autograd-facing smoke test: the tape node should return the same forward value and
+  -- This is the autograd-facing runtime check: the tape node should return the same forward value and
   -- parent cotangents as the direct low-level fused VJP primitives.
   let xShape : Shape := .dim 4 (.dim 1 .scalar)
   let wShape : Shape := .dim 3 (.dim 1 (.dim 1 .scalar))

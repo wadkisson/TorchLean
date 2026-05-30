@@ -30,33 +30,6 @@ open Spec Tensor
 namespace nn
 namespace models
 
-/-!
-## Compatibility aliases
-
-These names preserve the model API while the model-independent path lives under `NN.API.ssl`.
--/
-
-def vectorMaeHiddenMask (cfg : VectorGenerativeConfig) (period offset : Nat) :
-    NN.MLTheory.SelfSupervised.Mask cfg.dataDim :=
-  _root_.NN.API.ssl.vectorMaeHiddenMask cfg.dataDim period offset
-
-def vectorMaeMask (cfg : VectorGenerativeConfig) (period offset : Nat)
-    (x : Spec.Tensor Float (vectorDataShape cfg)) :
-    Spec.Tensor Float (vectorDataShape cfg) :=
-  _root_.NN.API.ssl.vectorMaeMask cfg.batch cfg.dataDim period offset x
-
-def vectorMaeSample (cfg : VectorGenerativeConfig) (period offset : Nat)
-    (x : Spec.Tensor Float (vectorDataShape cfg)) :
-    sample.Supervised Float (vectorDataShape cfg) (vectorDataShape cfg) :=
-  _root_.NN.API.ssl.vectorMaeSample cfg.batch cfg.dataDim period offset x
-
-/-- Alias for `NN.API.ssl.tensorPrefixMaeSample`; prefer the `ssl` namespace in new code. -/
-def tensorPrefixMaeSample {source : Shape} (cfg : VectorGenerativeConfig)
-    (hData : cfg.dataDim ≤ Shape.size source) (period offset : Nat)
-    (x : Spec.Tensor Float (.dim cfg.batch source)) :
-    sample.Supervised Float (vectorDataShape cfg) (vectorDataShape cfg) :=
-  _root_.NN.API.ssl.tensorPrefixMaeSample cfg.batch cfg.dataDim hData period offset x
-
 /-! ## ViT-MAE -/
 
 /--
@@ -84,6 +57,7 @@ structure VitMaeConfig where
   ffnHidden : Nat
 deriving Repr
 
+/-- Convert a ViT-MAE configuration into the classifier-style ViT config used by the encoder. -/
 def VitMaeConfig.toVitConfig (cfg : VitMaeConfig) : VitConfig :=
   { batch := cfg.batch
     inC := cfg.inC
@@ -99,15 +73,19 @@ def VitMaeConfig.toVitConfig (cfg : VitMaeConfig) : VitConfig :=
     headDim := cfg.headDim
     ffnHidden := cfg.ffnHidden }
 
+/-- Batched masked-image input shape for the ViT-MAE helper. -/
 abbrev vitMaeInShape (cfg : VitMaeConfig) : Shape :=
   NN.Tensor.Shape.Images cfg.batch cfg.inC cfg.inH cfg.inW
 
+/-- Batched reconstruction-vector output shape for the ViT-MAE helper. -/
 abbrev vitMaeOutShape (cfg : VitMaeConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.reconDim
 
+/-- Number of patch tokens produced by the ViT-MAE patch embedding. -/
 def VitMaeConfig.seqLen (cfg : VitMaeConfig) : Nat :=
   cfg.toVitConfig.seqLen
 
+/-- Flattened encoded-token representation size before the MAE decoder head. -/
 def VitMaeConfig.flatDim (cfg : VitMaeConfig) : Nat :=
   cfg.toVitConfig.flatDim
 

@@ -17,7 +17,7 @@ public import NN.Examples.Quickstart.Proofs
 
 Curated first-tour examples for TorchLean.
 
-This umbrella is intentionally smaller than `NN.Examples.Zoo`. It teaches the primitives a new user
+This umbrella is narrower than `NN.Examples.Zoo`. It teaches the primitives a new user
 needs before opening the model zoo:
 
 - typed tensors and runtime scalar choices,

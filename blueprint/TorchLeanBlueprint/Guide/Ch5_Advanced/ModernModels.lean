@@ -38,10 +38,10 @@ for.
 
 # Start With The Runner
 
-Most model demos go through one command shape:
+Most model examples go through one command shape:
 
 ```
-lake exe torchlean <demo> [flags...]
+lake exe torchlean <example> [flags...]
 ```
 
 The subcommands are registered in the [model runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean), and
@@ -86,7 +86,7 @@ What these demonstrate:
 - model parameters are ordinary TorchLean parameters, not hidden Python objects;
 - the examples can use prepared real data under `data/real` when available.
 
-The commands above are intentionally small.  They are smoke runs, not leaderboard experiments.
+The commands above are compact.  They are runtime checks, not leaderboard experiments.
 
 The model code follows the same pattern as the running example:
 
@@ -131,10 +131,10 @@ through TorchLean's runtime.
 
 # GPT-Style Language Models
 
-TorchLean has two GPT-facing demos:
+TorchLean has two GPT-facing examples:
 
 - `gpt2`
-  a small GPT model suitable for smoke tests;
+  a small GPT model suitable for runtime checks;
 - `text_gpt2`
   a file-backed corpus trainer, including a path that can use GPT-2 BPE vocabulary and merges.
 
@@ -169,7 +169,7 @@ $$`\operatorname{logits}_t =
 \qquad
 L = -\sum_t \log p_\theta(tokens_t \mid tokens_{<t})`
 
-The small examples make token ids, causal windows, parameter files, and generation traces explicit
+The compact examples make token ids, causal windows, parameter files, and generation traces explicit
 objects so later correctness work has something concrete to talk about.
 
 The API supports two token representations. One-hot tokens are convenient for bounded examples and
@@ -195,7 +195,7 @@ boundary changes.
 
 # Mamba-Style State-Space Models
 
-The Mamba demo exercises selective-scan style computation:
+The Mamba example exercises selective-scan style computation:
 
 ```
 lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 25
@@ -216,7 +216,7 @@ that future tokens do not change prefix outputs for the supported scan definitio
 
 # Diffusion
 
-The diffusion demo is a compact denoising training loop:
+The diffusion example is a compact denoising training loop:
 
 ```
 lake exe torchlean diffusion --cpu --steps 5
@@ -285,7 +285,7 @@ lake exe torchlean ppo_gridworld --steps 100
 lake exe torchlean ppo_cartpole --cuda --steps 100
 ```
 
-The GridWorld demo is written in Lean and has proof hooks.  The Gymnasium examples cross a Python
+The GridWorld example is written in Lean and has proof hooks.  The Gymnasium examples cross a Python
 environment boundary and therefore use a runtime contract to check observations, actions, rewards,
 and termination flags before they enter the learner.
 
@@ -312,14 +312,14 @@ TorchLean examples should make the data source visible. If a file is generated, 
 converted, put the command beside the example or in the module header. Reproducibility starts before the
 first tensor is allocated.
 
-# Demo Scope
+# Scope Of The Example Runs
 
 A successful model zoo run establishes a concrete execution fact:
 
 - the code builds;
 - the selected runtime path executes;
 - the loss and optimizer connect correctly;
-- for training demos, the loss usually moves in the expected direction.
+- for training examples, the loss usually moves in the expected direction.
 
 Architectural optimality, GPU-kernel agreement, and mathematical model theorems are separate
 claims. Those belong in *Verification*, *Floating-Point Semantics*, and *GPU and CUDA*.

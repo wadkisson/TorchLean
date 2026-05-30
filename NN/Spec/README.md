@@ -24,7 +24,7 @@ building everything on top of the same core semantics. The public spec doorway i
   - `context.lean`: `Context α`, the numeric backend interface (arithmetic, order, exp/tanh/etc.).
 - `Layers/`: forward + backward specs for common NN layers (linear/conv/attention/etc.).
 - `Autograd/`: spec level reverse mode building blocks (`OpSpec`) used by runtime AD wrappers.
-- `Module/`: thin wrappers that package layer specs as modules with export metadata.
+- `Module/`: module records that package layer specs with export metadata.
 - `Models/`: model compositions (MLP/CNN/Transformer/ResNet/Seq2Seq/etc.).
 - `NN/Examples/`: executable examples that exercise the specs.
 

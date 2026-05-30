@@ -562,7 +562,7 @@ theorem compare_eq_none_of_isNaN_right (x y : IEEE32Exec) (hy : isNaN y = true) 
 IEEE-754 distinguishes two related families of min/max:
 
 - `minimum` / `maximum`, which propagate NaNs, and
-- `minNum` / `maxNum`, which (roughly) ignore quiet NaNs when the other operand is numeric.
+- `minNum` / `maxNum`, which (approximately) ignore quiet NaNs when the other operand is numeric.
 
 Our definitions in `Exec32.lean` follow this common convention, and the lemmas below let proofs
 reason about those branches directly.

@@ -18,7 +18,7 @@ The emphasis here is on *shape/structure* properties (mostly list lengths and tr
 behaviour). These facts are often used to justify that derived quantities (discounted returns,
 GAE advantages, etc.) align with the rollout data they came from.
 
-These are intentionally modest but useful:
+These are kept modest but useful:
 
 - discounted-return helpers preserve list length,
 - GAE preserves list length,

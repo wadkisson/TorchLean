@@ -14,7 +14,7 @@ public import NN.Tests.Runtime.Rationals.MlpTest
 
 Aggregates the rational runtime test modules.
 
-The rational suite is a lightweight semantic backstop: it exercises the same high-level model and
+The rational suite is a semantic backstop: it exercises the same high-level model and
 autograd code in a scalar setting that avoids floating-point roundoff, making regressions easier to
 localize.
 -/

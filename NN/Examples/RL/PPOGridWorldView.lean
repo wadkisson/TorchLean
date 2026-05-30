@@ -24,7 +24,7 @@ model.
 
 Tip:
 - For CUDA: `lake build -R -K cuda=true && lake exe torchlean ppo_gridworld --cuda`
-- For a quick run that still writes artifacts: add `--updates 200`
+- For a short run that still writes artifacts: add `--updates 200`
 
 The executable writes three JSON files by default:
 - `data/rl/ppo_gridworld_trainlog.json` (greedy-policy evaluation return curve)

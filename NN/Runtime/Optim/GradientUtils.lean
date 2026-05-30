@@ -21,7 +21,7 @@ This runtime file provides:
 - short names that read like optimizer code,
 - a place to attach PyTorch analogies and citations.
 
-So this file is intentionally a thin runtime vocabulary layer, not a second implementation of
+This file is a runtime vocabulary layer over the spec definitions, not a second implementation of
 gradient clipping. If the math changes, it should change in the spec layer first.
 
 PyTorch analogies:

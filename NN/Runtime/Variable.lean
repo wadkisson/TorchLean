@@ -125,7 +125,7 @@ def hasShape {α : Type} {s : Shape} (_v : Variable α s) (expected_shape : Shap
 /--
 Compute the L2 norm of the variable value (Euclidean norm).
 
-This is a small convenience helper for monitoring/debugging.
+Render the variable summary used by monitoring and diagnostics.
 -/
 def variableNorm {α : Type} [Context α] {s : Shape} (v : Variable α s) : α :=
   -- Calculate the L2 norm: sqrt(sum of squares)
@@ -165,7 +165,7 @@ def registerGradientInContext {α : Type} {s : Shape}
 /--
 Create a sentinel scalar variable used to thread error messages through some pipelines.
 
-This is mainly for demos / ergonomic error handling, not for proofs.
+This is mainly for examples / ergonomic error handling, not for proofs.
 -/
 def error {α : Type} [Zero α] (ctx : RuntimeContext α) (msg : String) : Variable α .scalar :=
   { id := ctx.next_id,

@@ -99,12 +99,6 @@ def crownUBoundsBackward (g : Graph) (ps : ParamStore Float)
         none
     | none => none
 
-/-- Backwards-compatible name used by the PINN CLI: treat "affine" u-bounds as objective-dependent
-  CROWN. -/
-def affineUBounds (g : Graph) (ps : ParamStore Float)
-  (ibp : Array (Option (FlatBox Float))) : Option (Float × Float) :=
-  crownUBoundsBackward g ps ibp
-
 /-- Scalar product upper envelope over rectangles using McCormick.
     Given u∈[lx,ux], v∈[ly,uy], returns an affine upper bound of the form
       uv ≤ ax*u + ay*v + c,

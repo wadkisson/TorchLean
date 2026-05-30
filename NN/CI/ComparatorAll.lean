@@ -18,7 +18,7 @@ import NN.CI.All
 For TorchLean we use this as a convenient “compile everything under `NN/`” target:
 `NN.CI.ComparatorAll` imports `NN.CI.All`, which in turn imports the full library plus examples.
 
-The marker theorem below is intentionally trivial; it just gives Comparator a stable declaration
+The marker theorem below is minimal; it just gives Comparator a stable declaration
 name to export once compilation finishes.
 -/
 

@@ -17,7 +17,7 @@ proofs and pure definitions, but it is not always the most convenient representa
 - interop with external tooling,
 - or performance-sensitive evaluation where you want explicit arrays.
 
-`TensorArray.Tensor` is a lightweight alternative:
+`TensorArray.Tensor` is a finite-function representation:
 
 - the shape is a runtime `List Nat`,
 - the data is a flat `Array α`,
@@ -283,7 +283,7 @@ def full {α : Type} (shape : List Nat) (val : α) : Tensor α shape :=
   { data := Array.replicate (shape.foldl (· * ·) 1) val
     shape_valid := by simp [Array.size_replicate] }
 
-/-- Elementwise addition. -/
+/-- Pointwise addition of two array-backed tensors with the same shape. -/
 def add {α : Type} [Add α] {shape : List Nat} (t₁ t₂ : Tensor α shape) : Tensor α shape :=
   map2 (· + ·) t₁ t₂
 

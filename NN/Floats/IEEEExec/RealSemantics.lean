@@ -51,7 +51,7 @@ noncomputable def toReal (x : IEEE32Exec) : ℝ :=
 /--
 Unfolding lemma for `toReal?`.
 
-This lemma is intentionally not `[simp]`: rewriting `toReal? x` into a `match` on `toDyadic? x`
+This lemma is not `[simp]`: rewriting `toReal? x` into a `match` on `toDyadic? x`
 is usually not the best first step.
 -/
 lemma toReal?_eq (x : IEEE32Exec) :

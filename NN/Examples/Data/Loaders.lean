@@ -19,7 +19,7 @@ This umbrella collects the Lean-side data tutorials:
 - `Npy`: NumPy/PyTorch `.npy` arrays, metadata inspection, transforms, and minibatching;
 - `Cifar10Images`: image-shaped NPY arrays, one-hot labels, train/test split, and CNN training.
 
-The reusable library code lives under `NN.API.Data`; these files are intentionally concrete and
+The reusable library code lives under `NN.API.Data`; these files are concrete and
 meant to be read and run.
 -/
 

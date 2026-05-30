@@ -33,7 +33,7 @@ This entrypoint imports the widget implementation modules directly. We avoid a s
 `NN.Widgets` alias so the root namespace stays focused on the library umbrella and subsystem
 entrypoints.
 
-The entrypoint is intentionally editor-facing:
+The entrypoint is editor-facing:
 
 - ordinary runtime/proof files should import the concrete library modules they need;
 - tutorial and inspection files can import this one module to get all widget commands;

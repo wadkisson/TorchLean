@@ -217,9 +217,7 @@ theorem tensor_linf_norm_le_tensor_l2_norm {n : Nat} (y : Tensor ℝ (.dim n .sc
     -- Unfold the `tensor_linf_norm` definition on vectors.
     simpa [NN.MLTheory.Robustness.Spec.tensorLinfNorm] using hfold
 
--- ====================================================================
--- BASIC NORM PROPERTIES
--- ====================================================================
+-- Basic norm properties used throughout the Lipschitz development.
 
 /--
 L2 norm is non-negative.
@@ -958,9 +956,7 @@ theorem relu_vector_lipschitz {n : Nat} (x y : Tensor ℝ (.dim n .scalar)) :
   tensorL2Dist (reluSpec x) (reluSpec y) ≤ tensorL2Dist x y := by
   simpa using (relu_lipschitz_general (s := .dim n .scalar) x y)
 
--- ====================================================================
--- LINEAR OPERATOR NORM BOUNDS
--- ====================================================================
+-- Linear-operator norm bounds for affine layers and matrix products.
 
 /--
 Tensor subtraction can be rewritten as addition of a `-1` scale.
@@ -1251,9 +1247,7 @@ theorem linear_op_norm_bound {m n : Nat}
   rw [← h_linear]
   exact matrix_spectral_norm_bound W (subSpec x y)
 
--- ====================================================================
--- COMPOSITION THEOREMS
--- ====================================================================
+-- Composition theorems for building network-level Lipschitz bounds.
 
 /--
 Composition of Lipschitz functions preserves Lipschitz property.

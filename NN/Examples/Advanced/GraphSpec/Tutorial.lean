@@ -106,7 +106,7 @@ def tutorialResidual :=
 /--
 The larger residual-family architecture available from the same model catalog.
 
-We bind it here as a compile-time smoke check: users can inspect its type in the editor, while the
+We bind it here as a compile-time shape check: users can inspect its type in the editor, while the
 runtime tutorial below stays small enough to run instantly.
 -/
 def tutorialResNet18 :=
@@ -139,7 +139,7 @@ def runMlpTrainingPath (args : List String) : IO Unit := do
       throw <| IO.userError s!"GraphSpec.ToTorchLean.toSeq failed: {msg}"
   | .ok seqR =>
       let seq : nn.Sequential xShape yShape := by
-        -- `API.nn.Sequential` is a facade alias for the same runtime `Seq` type.
+        -- `API.nn.Sequential` is the public API name for the same runtime `Seq` type.
         simpa using seqR
       let task := train.regression seq
 

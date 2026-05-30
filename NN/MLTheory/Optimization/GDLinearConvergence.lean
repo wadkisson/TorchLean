@@ -32,7 +32,7 @@ under two assumptions on `g` over a real inner product space:
 For gradients of `μ`-strongly convex and `L`-smooth functions, these are the standard operator-level
 properties that imply linear convergence of gradient descent with a suitable step size.
 
-This module deliberately avoids any heavy Fréchet-derivative setup: it is stated directly in terms
+This module avoids any heavy Fréchet-derivative setup: it is stated directly in terms
 of `g` so it can later be instantiated either by “`g = ∇f`” theorems or by verified gradients of
 concrete TorchLean models.
 -/

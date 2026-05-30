@@ -77,8 +77,7 @@ abbrev State (n : Nat) : Type := Fin n → Bool
 
 /-- Hopfield state as a vector tensor `Tensor Bool (.dim n .scalar)`.
 
-This is a convenience wrapper so Hopfield models can interoperate with the rest of TorchLean's
-tensor-shaped spec APIs.
+This representation connects the functional Hopfield state with TorchLean's tensor-shaped spec APIs.
 -/
 abbrev StateT (n : Nat) : Type := Tensor Bool (.dim n .scalar)
 

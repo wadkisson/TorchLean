@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN
-public import NN.Examples.Data.ToyPaths
+public import NN.Examples.Data.SamplePaths
 
 /-!
 # Minibatch MLP training (batching is implicit)
@@ -68,11 +68,11 @@ def loadDataset (csvPath : System.FilePath)
 def main (args : List String) : IO Unit := do
   let args := API.CLI.dropDashDash args
 
-  let (dataDir, args) ← API.Common.orThrow "MinibatchMLPTrain" <| _root_.NN.Examples.Data.ToyPaths.takeDataDir args
+  let (dataDir, args) ← API.Common.orThrow "MinibatchMLPTrain" <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
   let (seed, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takeSeed args 0
   let (eb, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takeEpochBatch args 30 5
   let (csv?, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takePathFlagOnce args "csv"
-  let csvPath := csv?.getD (_root_.NN.Examples.Data.ToyPaths.regressionCsv dataDir)
+  let csvPath := csv?.getD (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
   if eb.batch = 0 then
     throw <| IO.userError "MinibatchMLPTrain: --batch must be > 0"
 

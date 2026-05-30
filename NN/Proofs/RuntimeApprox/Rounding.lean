@@ -17,7 +17,7 @@ This layer reasons about a rounding model such as `neural_round`: one scalar ope
 by a rounded scalar operation, and the proof records the resulting `ulp`-style error budget. Tensor
 and graph modules lift these scalar facts to operators and end-to-end executions.
 
-The public vocabulary is intentionally small:
+The public vocabulary is focused:
 - `scalarApprox` is the absolute-error predicate for one real scalar;
 - `roundR` is one modeled rounding step;
 - `roundedAdd` and `roundedMul` are the rounded scalar operations used by NF semantics;

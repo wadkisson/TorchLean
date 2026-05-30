@@ -34,12 +34,15 @@ structure PPOActorCriticConfig where
   nActions : Nat
 deriving Repr
 
+/-- Actor input shape: observation vectors with a caller-chosen prefix shape. -/
 abbrev ppoActorInShape (cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
   pfx.appendDim cfg.obsDim
 
+/-- Actor output shape: action logits with the same prefix shape. -/
 abbrev ppoActorOutShape (cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
   pfx.appendDim cfg.nActions
 
+/-- Critic output shape: one scalar value per prefixed observation. -/
 abbrev ppoCriticOutShape (_cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
   pfx.appendDim 1
 

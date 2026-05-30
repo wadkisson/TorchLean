@@ -30,9 +30,7 @@ noncomputable section
 
 open scoped BigOperators
 
--- ---------------------------------------------------------------------------
--- Nodes
--- ---------------------------------------------------------------------------
+-- Shape-changing tape nodes and their saved-tensor bookkeeping.
 
 namespace TapeNodes
 

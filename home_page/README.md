@@ -5,7 +5,7 @@ public site:
 
 - API docs under `/docs/` (built by DocGen4)
 - Verso guide (built from the `blueprint/` Lake package) under `/blueprint/`
-- Curated runnable demos under `/examples/` (a maintained Jekyll page)
+- Curated runnable examples under `/examples/` (a maintained Jekyll page)
 
 ## Local preview
 
@@ -55,7 +55,7 @@ Native CUDA/C source notes are documented by the Lean module
 `DISABLE_EQUATIONS=1` is intentional for public site builds. It keeps DocGen from trying to render
 equation lemmas for every imported Lean and Mathlib definition, which otherwise produces many
 non-fatal timeout warnings. Clear `.lake/build/doc-data` first when switching to this mode because
-Lake can otherwise replay stale DocGen artifacts.
+Lake can otherwise replay old DocGen artifacts.
 
 ### Verso Guide (Blueprint Package)
 
@@ -72,7 +72,7 @@ cp -r _out/blueprint/html-multi/* home_page/blueprint/
 
 The `/graphs/` page uses a compact JSON audit generated from Lean imports. It is inspired by
 Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (arXiv:2604.24797), but keeps
-TorchLean's public site lightweight by starting at module/import granularity.
+TorchLean's public site manageable by starting at module/import granularity.
 
 ```bash
 cd ..

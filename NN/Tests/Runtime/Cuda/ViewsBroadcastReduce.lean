@@ -30,6 +30,7 @@ open Spec
 open Tensor
 open Runtime.Autograd
 
+/-- Assert that a raw FloatArray has the expected size and contains only zeros. -/
 def assertFloatArrayAllZero (msg : String) (a : FloatArray) (expectedSize : Nat) : IO Unit := do
   if a.size != expectedSize then
     throw <| IO.userError s!"{msg}: size mismatch ({a.size} vs {expectedSize})"

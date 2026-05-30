@@ -12,9 +12,9 @@ public import NN.Runtime.RL.Gymnasium.Session
 /-!
 # Gymnasium Bridge (Subprocess, JSON Lines)
 
-Umbrella import for TorchLean’s small Gymnasium subprocess bridge.
+Umbrella import for TorchLean’s Gymnasium subprocess bridge.
 
-The implementation is split into two focused submodules:
+The bridge has two layers:
 
 - `NN.Runtime.RL.Gymnasium.Client`: JSON-lines protocol, startup handshake, and low-level
   `reset`/`stepRaw` operations.

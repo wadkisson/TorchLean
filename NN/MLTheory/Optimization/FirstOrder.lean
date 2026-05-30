@@ -13,7 +13,7 @@ public import NN.Runtime.Optim.Optimizers
 
 Small executable theorems about TorchLean's optimizer equations.
 
-These are intentionally modest. They prove properties of the update rules that TorchLean actually
+These are kept modest. They prove properties of the update rules that TorchLean actually
 executes, rather than broad convergence claims that would require assumptions about convexity,
 smoothness, stochastic gradients, and floating-point error. Larger optimization theory can build on
 these equations.

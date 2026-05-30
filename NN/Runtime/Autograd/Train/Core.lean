@@ -13,7 +13,7 @@ public import NN.Runtime.Optim.Optimizers
 # Core training helpers
 
 These are small, reusable utilities that keep training scripts short and readable.
-They are lightweight and pure.
+They are pure and local.
 -/
 
 @[expose] public section
@@ -108,7 +108,7 @@ def sgdUpdateTensor {a : Type} [Sub a] [Mul a] {s : Shape}
   Tensor.subSpec param (Tensor.scaleSpec grad lr)
 
 /--
-The lightweight SGD helper is the same formula as the canonical pure optimizer.
+The SGD helper is the same formula as the canonical pure optimizer.
 
 We keep `sgdUpdateTensor` because it has a small algebraic signature (`Sub`/`Mul`) that is convenient
 in tests, but this theorem pins it to the canonical optimizer equation used by the runtime

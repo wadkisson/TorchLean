@@ -25,7 +25,7 @@ public import NN.Runtime.Autograd.Engine.Cuda.Trusted
 
 This umbrella collects the CUDA side of TorchLean's eager autograd engine.
 
-The modules here are deliberately split by trust boundary:
+The modules here are split by trust boundary by trust boundary:
 
 - `Trusted` and `Buffer` expose the opaque FFI buffer type and allocation/copy primitives.
 - `Kernels`, `ConvPool`, and `DGemm` declare native CUDA/CPU-stub kernel entrypoints.

@@ -7,7 +7,7 @@ data-prep helper: it uses the Hugging Face Dataset Viewer metadata to locate the
 parquet shards for `Salesforce/wikitext`, reads the `text` column, and writes a
 single newline-separated file under `data/real/text/`.
 
-Recommended quick run:
+Recommended small run:
 
     python3 scripts/datasets/download_wikitext.py \
       --config wikitext-2-raw-v1 \

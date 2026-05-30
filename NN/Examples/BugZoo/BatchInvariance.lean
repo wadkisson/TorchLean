@@ -32,7 +32,7 @@ namespace NN.Examples.BugZoo.BatchInvariance
 /--
 Lift a per-example model across a leading batch axis.
 
-This is the reference semantics for batched runtime behavior. It intentionally contains no
+This is the reference semantics for batched runtime behavior. It contains no
 cross-example communication, no dynamic batching heuristic, and no hidden state.
 -/
 def mapBatch {α : Type} {batch : Nat} {sIn sOut : Spec.Shape}
@@ -46,7 +46,7 @@ def mapBatch {α : Type} {batch : Nat} {sIn sOut : Spec.Shape}
 Batch-invariance for the reference batched semantics.
 
 This is the theorem a serving/runtime path should aim to preserve, modulo an explicit floating
-point tolerance if it deliberately changes reduction order.
+point tolerance if it changes by design reduction order.
 -/
 theorem mapBatch_select_eq_single {α : Type} {batch : Nat} {sIn sOut : Spec.Shape}
     (f : Spec.Tensor α sIn → Spec.Tensor α sOut)

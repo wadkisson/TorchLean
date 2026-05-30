@@ -34,7 +34,7 @@ This module is the user-facing wrapper around the lower-level runtime session im
 `Runtime.Autograd.Torch` remains available as the lower-level session layer used internally by
 TorchLean and by linked compiled sessions.
 
-This umbrella deliberately does **not** own model catalogs or RL objectives. Reusable architecture
+This umbrella does **not** own model catalogs or RL objectives. Reusable architecture
 specifications live under `NN.GraphSpec.Models.TorchLean`, while differentiable PPO / actor-critic
 loss helpers live under `NN.Runtime.RL.PolicyGradient.Autograd`. Keeping those out of the runtime
 core makes the dependency graph easier to audit: this folder should provide tensors, ops, modules,

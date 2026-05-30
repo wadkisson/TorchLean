@@ -12,7 +12,7 @@ public import NN.Spec.Layers.Normalization
 /-!
 # Transformer (spec model)
 
-This file defines a small Transformer-style model in a way that matches the usual PyTorch mental
+This file defines Transformer-style spec components in a way that matches the usual PyTorch mental
 model:
 
 - encoder layers (self-attention + FFN, each wrapped in residual + LayerNorm),
@@ -20,7 +20,7 @@ model:
   LayerNorm),
 - an encoder-decoder wrapper (`Transformer`),
 - spec-level backward passes for the encoder stack,
-- small utilities like sinusoidal positional encodings and causal masks.
+- utilities like sinusoidal positional encodings and causal masks.
 
 Shapes follow the common convention:
 - sequence tensors are `(seqLen × embedDim)`,
@@ -69,8 +69,9 @@ layer-norm wrappers, etc.). To make "model-zoo style" instantiations easier, we 
 small config record for the common hyperparameters together with a couple of canonical configs
 (Base/Big).
 
-The core definitions below still expose the hyperparameters as Nat parameters so the spec remains
-flexible; the config layer is a convenience wrapper, not a new abstraction boundary.
+The core definitions below still expose the hyperparameters as Nat parameters. The config layer is
+only a named packaging of those parameters, so the mathematical specification remains the
+parameterized transformer definition.
 -/
 
 /-- Common transformer layer hyperparameters. -/
@@ -145,7 +146,7 @@ we bundle parameter gradients into records that mirror the parameter records.
 /--
 Gradients for a `FeedForward` block (field-for-field).
 
-This is a lightweight container used by downstream models that want a readable backward pass.
+This container is used by downstream models that want a readable backward pass.
 -/
 structure FeedForwardGrads (embedDim hiddenDim : Nat) (α : Type) where
   /-- Gradient of `W1`. -/
@@ -309,8 +310,8 @@ def TransformerEncoder.forward {numLayers headCount embedDim hiddenDim seqLen : 
 /-!
 ### Config-indexed aliases
 
-These are small convenience abbreviations so downstream models can index transformer components
-by a config record rather than repeating the Nat parameters.
+These abbreviations let downstream models index transformer components by a config record rather
+than repeating the Nat parameters.
 -/
 
 /-- Encoder-layer gradients indexed by a `TransformerLayerConfig`. -/
@@ -489,7 +490,8 @@ def TransformerDecoder.forward {numLayers headCount embedDim hiddenDim seqLen : 
 End-to-end encoder-decoder Transformer (spec model).
 
 This is a seq2seq Transformer wrapper built out of the encoder and decoder stacks above.
-Compared to `torch.nn.Transformer`, it is intentionally simplified:
+It models the core tensor algebra of `torch.nn.Transformer` while making the proof-relevant choices
+explicit:
 - embeddings are modeled as explicit linear projections,
 - sequence length is shared between source and target streams,
 - we omit dropout, caching, and most configuration knobs.
@@ -772,7 +774,7 @@ def positionalEncoding {seqLen embedDim : Nat}
 /--
 Multi-head self-attention with an optional boolean mask.
 
-This is a thin wrapper around `MultiHeadAttention.forward` that:
+This helper prepares the proof obligations required by `MultiHeadAttention.forward`:
 - derives the required `seqLen ≠ 0` proof from `h1 : seqLen > 0`,
 - forwards the provided `mask` (typically a causal mask for autoregressive decoding).
 

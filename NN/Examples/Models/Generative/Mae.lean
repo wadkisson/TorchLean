@@ -73,7 +73,7 @@ def stride : Nat := 16
 /-- Zero padding around the image before patch extraction. -/
 def padding : Nat := 0
 
-/-- Transformer token width. -/
+/-- Width of each patch token after projection into the encoder stream. -/
 def dModel : Nat := 8
 
 /-- Number of self-attention heads in the compact ViT encoder. -/

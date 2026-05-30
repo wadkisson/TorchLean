@@ -32,7 +32,7 @@ lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- \
   --dtype float --backend compiled --steps 100
 ```
 
-With CUDA enabled, model demos that support device buffers add a device choice:
+With CUDA enabled, model examples that support device buffers add a device choice:
 
 ```
 lake exe torchlean mlp --cuda --steps 100

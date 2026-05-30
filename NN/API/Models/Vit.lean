@@ -56,29 +56,37 @@ structure VitConfig where
   ffnHidden : Nat
 deriving Repr
 
+/-- Patch-grid height after strided patch embedding. -/
 def VitConfig.outH (cfg : VitConfig) : Nat :=
   (cfg.inH + 2 * cfg.padding - cfg.patchH) / cfg.stride + 1
 
+/-- Patch-grid width after strided patch embedding. -/
 def VitConfig.outW (cfg : VitConfig) : Nat :=
   (cfg.inW + 2 * cfg.padding - cfg.patchW) / cfg.stride + 1
 
+/-- Number of patch tokens produced by the patch embedding. -/
 def VitConfig.seqLen (cfg : VitConfig) : Nat :=
   cfg.outH * cfg.outW
 
+/-- Flattened token representation size used before the classifier head. -/
 def VitConfig.flatDim (cfg : VitConfig) : Nat :=
   -- Keep this in the same “shape-size” form used by `nn.flattenBatch`, so the API-level
   -- constructor typechecks without requiring `simp` reductions on concrete numerals.
   Spec.Shape.size (NN.Tensor.Shape.Mat cfg.seqLen cfg.dModel)
 
+/-- Batched image input shape for the ViT helper. -/
 abbrev vitInShape (cfg : VitConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch cfg.inC cfg.inH cfg.inW
 
+/-- Batched classifier-logit output shape for the ViT helper. -/
 abbrev vitOutShape (cfg : VitConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.outDim
 
+/-- Convolutional patch-embedding output before tokenization. -/
 abbrev vitConvOutShape (cfg : VitConfig) : Shape :=
   NN.Tensor.Shape.NCHW cfg.batch cfg.dModel cfg.outH cfg.outW
 
+/-- Token sequence shape consumed by the Transformer block. -/
 abbrev vitTokensShape (cfg : VitConfig) : Shape :=
   shape![cfg.batch, cfg.seqLen, cfg.dModel]
 

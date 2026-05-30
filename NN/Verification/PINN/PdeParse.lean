@@ -37,10 +37,11 @@ namespace NN.Verification.PINN.PdeParse
 
 open NN.Verification.PINN.PdeAst
 
+/-- Parser state for the hand-written PDE expression parser. -/
 structure State where
-  /-- s. -/
+  /-- Input string being parsed. -/
   s : String
-  /-- i. -/
+  /-- Current raw byte position in `s`. -/
   i : String.Pos.Raw := 0
 
 @[inline] def eof (st : State) : Bool := st.i ≥ st.s.rawEndPos
@@ -56,9 +57,11 @@ structure State where
   let remaining := (st.s.rawEndPos.byteIdx - st.i.byteIdx) + 1
   16 + 8 * remaining
 
+/-- Whitespace predicate used by the PDE expression parser. -/
 def isWs (c : Char) : Bool :=
   c = ' ' || c = '\t' || c = '\n'
 
+/-- Skip whitespace with an explicit recursion budget. -/
 def skipWsFuel : Nat → State → State
   | 0, st => st
   | Nat.succ fuel, st =>
@@ -70,9 +73,11 @@ def skipWsFuel : Nat → State → State
         st
     | none => st
 
+/-- Skip whitespace from the current parser state. -/
 def skipWs (st : State) : State :=
   skipWsFuel (fuelOf st) st
 
+/-- Consume characters satisfying `p`, accumulating into `acc`, with explicit fuel. -/
 def takeWhileFuel (fuel : Nat) (p : Char → Bool) (acc : String) (st : State) : String × State :=
   match fuel with
   | 0 => (acc, st)
@@ -85,6 +90,7 @@ def takeWhileFuel (fuel : Nat) (p : Char → Bool) (acc : String) (st : State) :
         (acc, st)
     | none => (acc, st)
 
+/-- Consume characters satisfying `p`, accumulating into `acc`. -/
 def takeWhile (p : Char → Bool) (acc : String) (st : State) : String × State :=
   takeWhileFuel (fuelOf st) p acc st
 
@@ -117,6 +123,7 @@ def parseNumber (st : State) : Except String (Float × State) := do
     | _ => (0.0, st2)
   .ok (sgn * (intVal + fracVal), st3)
 
+/-- Parse a natural number at the current parser state. -/
 def parseNat (st : State) : Except String (Nat × State) := do
   let st0 := skipWs st
   let (txt, st1) := takeWhile (fun c => c.isDigit) "" st0
@@ -124,11 +131,13 @@ def parseNat (st : State) : Except String (Nat × State) := do
   let n : Nat := txt.toList.foldl (fun acc c => acc * 10 + (c.toNat - '0'.toNat)) 0
   .ok (n, st1)
 
+/-- Parse an identifier used for environment lookup. -/
 def parseIdent (st : State) : Except String (String × State) := do
   let (txt, st1) := takeWhile (fun c => c.isAlpha || c.isDigit || c = '_' ) "" st
   if txt = "" then .error "expected identifier" else .ok (txt, st1)
 
 mutual
+  /-- Parse an additive/subtractive expression with an explicit recursion budget. -/
   def parseExprCoreFuel (fuel : Nat) (env : String → Option Float) (st : State) : Except String
     (Expr × State) := do
     match fuel with
@@ -152,6 +161,7 @@ mutual
           | _ => .ok (acc, st')
       loop fuel t st1
 
+  /-- Parse a multiplicative term with an explicit recursion budget. -/
   def parseTermFuel (fuel : Nat) (env : String → Option Float) (st : State) : Except String (Expr ×
     State) := do
     match fuel with
@@ -171,6 +181,7 @@ mutual
           | _ => .ok (acc, st')
       loop fuel f st1
 
+  /-- Parse a primary expression plus an optional integer power. -/
   def parseFactorFuel (fuel : Nat) (env : String → Option Float) (st : State) : Except String (Expr
     × State) := do
     match fuel with
@@ -193,6 +204,7 @@ mutual
           .ok (powMul p (n - 1) p, st3)
       | _ => .ok (p, st1')
 
+  /-- Parse atoms: parenthesized expressions, `u`/derivative names, numerals, or environment identifiers. -/
   def parsePrimaryFuel (fuel : Nat) (env : String → Option Float) (st : State) : Except String (Expr
     × State) := do
     match fuel with
@@ -236,6 +248,7 @@ mutual
       | none => .error "unexpected end of input"
 end
 
+/-- Parse a full expression from the current parser state. -/
 def parseExprCore (env : String → Option Float) (st : State) : Except String (Expr × State) :=
   parseExprCoreFuel (fuelOf st) env st
 

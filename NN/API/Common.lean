@@ -18,8 +18,8 @@ import Mathlib.Algebra.Order.Algebra
 /-!
 # `NN.API.Common`
 
-Small, practical helpers used across TorchLean workflows and entrypoints: typed tensor constructors,
-casting between scalar backends, and `Except`/`IO` glue.
+Shared helpers used across TorchLean workflows and entrypoints: typed tensor constructors, casting
+between scalar backends, and `Except`/`IO` glue.
 -/
 
 @[expose] public section
@@ -32,7 +32,7 @@ namespace Common
 open Spec
 
 /-!
-## Common Helpers For Workflows And Small Programs
+## Common Helpers For Workflows And Entry Points
 
 This module contains helper functions that show up repeatedly in executable workflows.
 
@@ -50,8 +50,8 @@ What does *not* belong here:
 /-!
 ### PyTorch Mapping Notes
 
-If you're coming from PyTorch, this module plays the role of the small shared utility layer often
-written around:
+If you're coming from PyTorch, this module plays the role of the shared utility layer often written
+around:
 - `torch.tensor([...], dtype=..., device=...)`
 - choosing a dtype/backend based on CLI flags
 - `try/except` wrappers for dataset loading and runnable workflow code
@@ -77,7 +77,7 @@ def orThrow {α : Type} (tag : String := "Example") : Except String α → IO α
 /--
 Fail with a tagged `userError` if a boolean condition is false.
 
-This is a small convenience for examples that want short, readable checks:
+Executable workflows use this for named precondition checks such as
 `Common.check exeName "loss finite" (loss == loss)`.
 -/
 def check (tag msg : String) (b : Bool) : IO Unit :=
@@ -86,8 +86,8 @@ def check (tag msg : String) (b : Bool) : IO Unit :=
 /--
 Write a standard JSON training artifact for routines that record an initial and final loss.
 
-This is a convenience wrapper around `Runtime.Training.TrainLog.beforeAfterLoss` and the stable
-TrainLog JSON format. The output schema is independent of the model, dataset, and runtime backend.
+The function uses `Runtime.Training.TrainLog.beforeAfterLoss` and the stable TrainLog JSON format.
+The output schema is independent of the model, dataset, and runtime backend.
 -/
 def writeBeforeAfterLossLog (path : System.FilePath) (title : String) (steps : Nat)
     (loss0 loss1 : Float) (notes : Array String := #[]) : IO Unit := do
@@ -394,7 +394,7 @@ def tensorFGen! {α : Type} [Context α] (cast : Float → α) (dims : List Nat)
 Generate a tensor of a known shape `s` by calling `f` for each flat element index, then cast into
 the chosen backend.
 
-This is a convenience wrapper used in examples to avoid the common boilerplate:
+This packages the standard shape-cast pattern used when a tensor is generated from flat indices:
 
 ```lean
 let xDyn : Tensor α (shapeOfDims s.toList) := ...
@@ -487,7 +487,7 @@ def runWithRuntimeDType (title : String) (args : List String)
   | .ok () => pure ()
   | .error msg => throw <| IO.userError msg
 
-/-- Convenience wrapper for runnable binaries that need runtime float-literal injection. -/
+/-- Entry-point alias for runnable binaries that need runtime float-literal injection. -/
 abbrev mainWithRuntimeDType := runWithRuntimeDType
 
 end Common

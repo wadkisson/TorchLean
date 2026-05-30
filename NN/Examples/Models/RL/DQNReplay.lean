@@ -19,7 +19,7 @@ This example runs the runtime pieces used by an off-policy DQN-style update:
 3. sample a minibatch;
 4. evaluate a DQN minibatch loss from caller-provided online/target Q-functions.
 
-It is deliberately compact: the Q-functions are hand-written closures rather than neural networks. That
+It is kept compact: the Q-functions are hand-written closures rather than neural networks. That
 keeps the file focused on the replay/minibatch API. A full trainable DQN example can later swap those
 closures for compiled TorchLean models and an optimizer step.
 

@@ -51,7 +51,7 @@ abbrev ΓFFN (dModel : Nat) : List Shape := [FFNModelShape dModel]
 abbrev ssFFNResidual (dModel dFF : Nat) : List Shape :=
   [FFNHiddenShape dFF, FFNHiddenShape dFF, FFNModelShape dModel, FFNModelShape dModel]
 
-/-- Input vector index. -/
+/-- Index of the current token vector in the feed-forward network context. -/
 def ffnIdxX {dModel : Nat} {ss : List Shape} :
     Idx (ΓFFN dModel ++ ss) (FFNModelShape dModel) :=
   ⟨⟨0, by simp [ΓFFN]⟩, by simp [ΓFFN, FFNModelShape]⟩
@@ -192,7 +192,7 @@ def seqFfnIdxHiddenPre {seqLen dModel dFF : Nat} :
       (SeqFFNHiddenShape seqLen dFF) :=
   idxLast (Γ := ΓSeqFFN seqLen dModel) (ss := []) (τ := SeqFFNHiddenShape seqLen dFF)
 
-/-- GELU activation output. -/
+/-- Index of the saved sequence-shaped GELU activation output. -/
 def seqFfnIdxHiddenAct {seqLen dModel dFF : Nat} :
     Idx (ΓSeqFFN seqLen dModel ++ [SeqFFNHiddenShape seqLen dFF,
       SeqFFNHiddenShape seqLen dFF]) (SeqFFNHiddenShape seqLen dFF) :=

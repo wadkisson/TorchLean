@@ -32,7 +32,7 @@ python3 scripts/datasets/download_example_data.py --cifar10
 lake build -R -K cuda=true && lake exe torchlean resnet --cuda --n-total 200 --steps 1
 ```
 
-Tip: the defaults are set for a quick sanity run. For a longer run:
+Tip: the defaults are set for a short validation run. For a longer run:
 
 ```bash
 lake build -R -K cuda=true

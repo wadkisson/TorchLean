@@ -35,6 +35,7 @@ structure TransformerEncoderConfig where
   activation : nn.blocks.Activation := .gelu
 deriving Repr
 
+/-- Batched token-embedding shape used by the Transformer encoder helper. -/
 abbrev transformerEncoderShape (cfg : TransformerEncoderConfig) : Shape :=
   shape![cfg.batch, cfg.seqLen, cfg.dModel]
 
@@ -57,4 +58,3 @@ end nn
 
 end API
 end NN
-

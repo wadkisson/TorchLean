@@ -61,7 +61,7 @@ the modules needed by a command when you run that command.
 Generated tutorial fixtures are local and ignored by git:
 
 ```bash
-python3 NN/Examples/Data/generate_toy_data.py
+python3 NN/Examples/Data/generate_small_data.py
 ```
 
 Real-data examples use prepared files under `data/real`:
@@ -95,7 +95,7 @@ python3 scripts/datasets/plot_trainlog.py data/model_zoo/mlp_trainlog.json --out
 
 ## Public API Used By Examples
 
-Examples should prefer the facade modules:
+Examples should prefer the curated API modules:
 
 | Surface | Use |
 | --- | --- |

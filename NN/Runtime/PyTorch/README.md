@@ -52,7 +52,7 @@ Reading map:
 
 ## Examples live elsewhere
 
-Architecture specific loaders and demo round trips live under
+Architecture specific loaders and example round trips live under
 `NN/Examples/Interop/PyTorch/{Export,Import}`. Runtime should not own model-family modules; it
 should own the reusable bridge that examples, verification tools, and downstream projects can
 share.
@@ -65,7 +65,7 @@ share.
 - Load supported verification model families such as PINNs/FNOs through the example interop loaders.
 - Emit readable PyTorch code from a TorchLean `NN.IR.Graph` and `ParamStore`.
 
-What is deliberately not claimed: Lean does not prove PyTorch or CUDA kernels correct, and it does
+What is not claimed: Lean does not prove PyTorch or CUDA kernels correct, and it does
 not parse `.pt`/`.pth` pickle/zip checkpoints directly. PyTorch is the external loader for those
 files; TorchLean checks the JSON artifact it receives.
 

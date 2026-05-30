@@ -78,6 +78,10 @@ def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (Flat
   if needsParents && !(parentsOk g cert id) then
     IO.eprintln s!"[IBPNodeCert] node {id}: parent boxes missing or not topo"
     return false
+  if !(ibpNodePreconditionsOk g cert id) then
+    IO.eprintln
+      s!"[IBPNodeCert] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
+    return false
   let certBox? := cert[id]!
   let computed := propagateIBPNode (α := Float) g.nodes ps cert id
   let computedBox? := computed[id]!

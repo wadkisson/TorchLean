@@ -48,9 +48,8 @@ namespace NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineI.PythonOnly
 2. Import that generated file in a proof module and instantiate the theorems from
    `NN.MLTheory.CROWN.Lyapunov.Verification`.
 
-This file intentionally contains **no hardcoded numeric certificate**.
-The point of pipeline (i) is that the numbers come from the external verifier and are reified into
-Lean via generated code.
+This file contains **no hardcoded numeric certificate**. In pipeline (i), the numbers come from the
+external verifier and are reified into Lean via generated code.
 -/
 
 /-!

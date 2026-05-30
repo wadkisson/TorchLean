@@ -58,9 +58,8 @@ If you’re coming from PyTorch:
 
 ## Implementation notes
 
-- We intentionally focus this bridge on forward semantics first; this keeps the shared IR contract
-  clear between verification and runtime execution.
-- We set `jvp`/`vjp` sentinels in this layer because gradient compilation is a separate concern
+- This bridge covers forward semantics; gradient compilation is a separate contract.
+- `jvp`/`vjp` are sentinels in this layer because gradient compilation is a separate concern
   from proving forward semantic equivalence.
 - Lowering untyped numeric ids goes through typed indices (`Idx`) and explicit shape checks.
 

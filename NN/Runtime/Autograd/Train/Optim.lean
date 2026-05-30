@@ -97,7 +97,7 @@ namespace ParamTable
 
 variable {α : Type}
 
-/-- List of ids for quick membership checks. -/
+/-- List of ids for membership checks. -/
 def ids (ps : ParamTable α) : List Nat :=
   ps.map (·.id)
 
@@ -190,7 +190,7 @@ end LRScheduler
 /--
 Which optimizer update rule to apply.
 
-PyTorch analogy: these correspond roughly to `torch.optim.SGD`, `Adam`, `AdamW`, etc.
+PyTorch analogy: these correspond approximately to `torch.optim.SGD`, `Adam`, `AdamW`, etc.
 -/
 inductive OptimizerKind
   | sgd

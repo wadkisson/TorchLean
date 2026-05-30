@@ -18,7 +18,7 @@ This file defines the **sequential authoring surface** for GraphSpec.
 The important design decision is:
 
 - `DAG.Model` is the canonical general GraphSpec model representation.
-- `Graph ps σ τ` is lightweight syntax for the common special case where the model is just a chain
+- `Graph ps σ τ` is compact syntax for the common special case where the model is just a chain
   of layers.
 
 So `Graph` is not a competing graph IR. It is a pleasant way to write:
@@ -820,7 +820,7 @@ def Graph.detInitParamsAux
                     (α := Float) (ss₁ := ps₁) (ss₂ := ps₂) xs ys
                 , i'')
 
-/-- Convenience wrapper: start the occurrence index at `0` and discard its final value. -/
+/-- Deterministically initialize all graph parameters, starting the occurrence index at `0`. -/
 def Graph.detInitParams?
     {ps : List Shape} {σ τ : Shape}
     (g : Graph ps σ τ) :

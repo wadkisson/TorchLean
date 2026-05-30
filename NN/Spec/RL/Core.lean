@@ -31,7 +31,7 @@ Several helpers here operate on `List α` rather than `Tensor α (.dim n .scalar
 - A trajectory length is usually *data-dependent* (episode termination, truncation, variable rollout
   horizon), so a dependent tensor length is often the wrong abstraction.
 - TorchLean uses typed tensors heavily for *fixed-shape* objects (value tables, Q-tables, logits,
-  etc.). For variable-length traces, `List` is the lightweight, proof-friendly choice.
+  etc.). For variable-length traces, `List` is the proof-friendly finite-sequence choice.
 
 When you do have a fixed horizon `n`, it is reasonable to use `Fin n → α` or a vector tensor and
 define specialized “returns/GAE” helpers on top. We keep the core definitions here compact and

@@ -548,7 +548,7 @@ def greedyIndex (scores : Array Float) : Nat :=
   (topKIndices scores 1).head?.getD 0
 
 /--
-Apply a lightweight repetition penalty by subtracting `repeatPenalty * count(token)` for tokens
+Apply a repetition penalty by subtracting `repeatPenalty * count(token)` for tokens
 appearing in `recent`.
 
 This is a local sampling heuristic; it is not the same as the presence or frequency penalties used by

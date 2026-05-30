@@ -18,7 +18,7 @@ public import NN.Spec.Models.Transformer
 Encoder-decoder models for sequence generation.
 
 This file supports both:
-- discrete token id inputs (non‑differentiable lookup, good for runtime demos), and
+- discrete token id inputs (non‑differentiable lookup, good for runtime examples), and
 - one‑hot / token‑distribution inputs (differentiable embedding via a matrix multiply).
 
 PyTorch mental model:
@@ -27,7 +27,7 @@ PyTorch mental model:
 - decoder: `nn.RNN` over target embeddings (teacher forcing in training), then a final `nn.Linear`
   to vocabulary logits
 
-What we deliberately keep simple:
+Scope of this baseline:
 
 - the optional attention in `Seq2SeqDecoderSpec` is *self-attention over the decoder inputs* (a
   small variant you can toggle on/off); this file does not model encoder-decoder cross-attention
@@ -84,7 +84,7 @@ and reverse-mode gradients for the differentiable path:
 - gradients flow through embeddings, encoder RNN, decoder RNN, output projection, and (optionally)
   the decoder self-attention block.
 
-Token-id based training (`Tensor Nat`) is still useful for demos, but it is intentionally treated as
+Token-id based training (`Tensor Nat`) is still useful for examples, but it is intentionally treated as
 non-differentiable.
 -/
 
@@ -175,7 +175,7 @@ Output:
 - `y : (seqLen × embedDim)`, where each timestep selects a row of the embedding table.
 
 Out-of-range token ids map to a zero vector in this spec. We then apply
-`dropout_inference_spec` deterministically (no RNG), which is useful for runtime demos.
+`dropout_inference_spec` deterministically (no RNG), which is useful for runtime examples.
 
 PyTorch analogue: `nn.Embedding` on an integer tensor, followed by `nn.Dropout(p)` (but with
 randomness replaced by deterministic scaling; see `NN.Spec.Layers.Dropout`).
@@ -407,7 +407,7 @@ def Seq2SeqLSTMEncoderSpec.forward {embedDim hiddenDim seqLen : Nat}
 /--
 Transformer-based encoder specification for Seq2Seq.
 
-This is a lightweight wrapper around a list of `TransformerEncoderLayer`s from
+This wrapper applies a list of `TransformerEncoderLayer`s from
 `NN.Spec.Models.Transformer`, applied as a left-fold.
 
 PyTorch analogue: `nn.TransformerEncoder(nn.TransformerEncoderLayer(...), num_layers=...)`
@@ -767,8 +767,8 @@ Inputs:
 Output:
 - logits of shape `(tgtSeqLen × tgtVocabSize)`.
 
-This path is convenient for runtime demos but intentionally treated as non-differentiable
-(token-id embedding lookup is not modeled as a differentiable op).
+This path is for token-id inputs. The lookup is treated as a discrete operation, so gradients are
+not assigned to the token ids themselves.
 -/
 def Seq2SeqSpec.forwardTraining {srcVocabSize tgtVocabSize embedDim hiddenDim srcSeqLen tgtSeqLen :
   Nat}
@@ -980,9 +980,8 @@ This is a simple dot-product style attention:
 2. score each encoder hidden vector by an elementwise product + sum,
 3. normalize scores with `softmax` over the sequence axis.
 
-It is inspired by classic encoder-decoder attention mechanisms (Bahdanau-style), but is
-  intentionally
-kept compact in this spec.
+It is inspired by classic encoder-decoder attention mechanisms (Bahdanau-style), and this spec keeps
+the scoring rule compact.
 -/
 def computeAttentionWeightsSpec {α : Type} [Context α] {hiddenDim seqLen : Nat}
   (attention_weights : Tensor α (.dim hiddenDim (.dim hiddenDim .scalar)))

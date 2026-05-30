@@ -33,4 +33,4 @@ checkers.
 - `Extras/interval_lemmas.lean`: basic interval-arithmetic lemmas over `ℝ`.
 - `Extras/alpha_config.lean`: data structures for alpha optimized relaxations (alpha CROWN style).
 - `Extras/FloatIntegration.lean`: experiments integrating bound propagation with explicit rounding.
-- `Extras/fp32.lean`: convenience wrappers specializing the graph engine to `TorchLean.Floats.FP32`.
+- `Extras/fp32.lean`: FP32 specializations of the graph engine.

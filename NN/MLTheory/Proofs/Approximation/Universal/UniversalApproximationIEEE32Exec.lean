@@ -841,7 +841,7 @@ lie in the input interval `[a,b]`, then bounds the output perturbation using:
 - `relu_lipschitz` to control the sensitivity to perturbing `t`.
 -/
 
-/-- Real ReLU is nonnegative. -/
+/-- Nonnegativity of the real ReLU used in the compact-domain perturbation bound. -/
 private lemma relu_nonneg (u : ℝ) : 0 ≤ relu u := by
   -- `relu u = max u 0`.
   simp [relu, Activation.Math.reluSpec]

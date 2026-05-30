@@ -8,7 +8,7 @@ module
 
 public import NN
 public import NN.Examples.Data.RealPaths
-public import NN.Examples.Data.ToyPaths
+public import NN.Examples.Data.SamplePaths
 
 /-!
 # CIFAR10-style image loader tutorial (NPY, offline)
@@ -23,12 +23,12 @@ This tutorial mirrors a classic PyTorch recipe:
 To keep this runnable without network downloads, generate a small deterministic
 "CIFAR10-shaped" dataset locally:
 
-- `NN/Examples/Data/toy_cifar10like_X.npy`: shape `(200, 3, 32, 32)`, dtype `float32`
-- `NN/Examples/Data/toy_cifar10like_y.npy`: shape `(200,)`, dtype `float32` labels `0..9`
+- `NN/Examples/Data/small_cifar10like_X.npy`: shape `(200, 3, 32, 32)`, dtype `float32`
+- `NN/Examples/Data/small_cifar10like_y.npy`: shape `(200,)`, dtype `float32` labels `0..9`
 
 Generate it with:
 
-`python3 NN/Examples/Data/generate_toy_data.py`
+`python3 NN/Examples/Data/generate_small_data.py`
 
 Build:
 
@@ -50,7 +50,7 @@ Optional flags (tutorial-specific):
 - `--lr LR` (default: `0.001`)
 - `--log-every N` (default: `1`; pass `0` to silence per-step loss)
 - `--train-size N` (default: 160)
-- `--quick` (load/split smoke test; skip the expensive eager CPU CNN training loop)
+- `--check-only` (validate paths, tensor shapes, and dataset splitting without training)
 
 Why this tutorial matters:
 
@@ -117,12 +117,12 @@ def loadDataset (xPath yPath : System.FilePath) (n : Nat)
 
 def main (args : List String) : IO Unit := do
   let args0 := API.CLI.dropDashDash args
-  let quick := args0.contains "--quick"
+  let checkOnly := args0.contains "--check-only"
   let realCifar10 := args0.contains "--real-cifar10"
-  let args := args0.filter (fun a => a != "--quick" && a != "--real-cifar10")
+  let args := args0.filter (fun a => a != "--check-only" && a != "--real-cifar10")
 
   let label := "Data.Loaders.Cifar10Images"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.ToyPaths.takeDataDir
+  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir
     args
   let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
   let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 5 20
@@ -145,7 +145,7 @@ def main (args : List String) : IO Unit := do
         if realCifar10 then
           _root_.NN.Examples.Data.RealPaths.cifar10TrainX
         else
-          _root_.NN.Examples.Data.ToyPaths.cifar10likeXNpy dataDir
+          _root_.NN.Examples.Data.SamplePaths.cifar10likeXNpy dataDir
   let yPath :=
     match y? with
     | some p => p
@@ -153,9 +153,9 @@ def main (args : List String) : IO Unit := do
         if realCifar10 then
           _root_.NN.Examples.Data.RealPaths.cifar10TrainY
         else
-          _root_.NN.Examples.Data.ToyPaths.cifar10likeYNpy dataDir
+          _root_.NN.Examples.Data.SamplePaths.cifar10likeYNpy dataDir
   let nRows := nTotal?.getD nTotal
-  let trainSize := trainSize?.getD (if quick then Nat.min 16 nRows else Nat.min 160 nRows)
+  let trainSize := trainSize?.getD (if checkOnly then Nat.min 16 nRows else Nat.min 160 nRows)
   let lr := lr?.getD 0.001
   let logEvery := logEvery?.getD 1
 
@@ -173,8 +173,8 @@ def main (args : List String) : IO Unit := do
   IO.println <|
     (s!"train      = Adam(lr={lr}), epochs={eb.epochs}, " ++
       s!"batch_size={eb.batch}, shuffle=true, drop_last=true, log_every={logEvery}")
-  if quick then
-    IO.println "mode       = --quick (load/split smoke test; skip CNN training)"
+  if checkOnly then
+    IO.println "mode       = --check-only (validate paths, tensor shapes, and dataset split)"
   (← IO.getStdout).flush
 
   let _exitCode ← TorchLean.Module.run label args (.float (fun opts rest => do
@@ -190,10 +190,10 @@ def main (args : List String) : IO Unit := do
 
     let (_seed', (dsTrain, dsTest)) := Data.randomSplitAt (seed := seed) trainSize dsAll
 
-    if quick then
+    if checkOnly then
       IO.println s!"loaded     = {dsAll.size} image rows"
       IO.println s!"split      = train {dsTrain.size}, test {dsTest.size}"
-      IO.println "quick      = dataset shape/path smoke passed"
+      IO.println "check      = dataset shape/path runtime check passed"
       pure ()
     else
 

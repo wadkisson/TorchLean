@@ -54,9 +54,9 @@ def xShape : Shape := .dim batch (NN.Tensor.Shape.Mat n dModel)
 def wProjShape : Shape := NN.Tensor.Shape.Mat dModel (numHeads * headDim)
 /-- Output projection weight shape: `((numHeads*headDim) × dModel)`. -/
 def wOShape : Shape := NN.Tensor.Shape.Mat (numHeads * headDim) dModel
-/-- LayerNorm gamma shape. -/
+/-- LayerNorm scale parameter shape, matching the feature dimension. -/
 def gammaShape : Shape := NN.Tensor.Shape.Vec dModel
-/-- LayerNorm beta shape. -/
+/-- LayerNorm beta shape, matching the feature dimension. -/
 def betaShape : Shape := NN.Tensor.Shape.Vec dModel
 /-- MSE target shape (matches the model output shape). -/
 def targetShape : Shape := xShape
@@ -148,7 +148,7 @@ def main (args : List String) : IO Unit := do
       IO.println s!"[IBP] loss hi: {pretty outB.hi}"
 
       if !withCrown then
-        IO.println "[CROWN] skipped for the default smoke path; pass --with-crown for the heavier transformer CROWN run"
+        IO.println "[CROWN] skipped for the default runtime-check path; pass --with-crown for the heavier transformer CROWN run"
         return ()
 
       -- Basic CROWN forward bounds on the scalar loss (w.r.t. the input node).

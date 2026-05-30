@@ -16,7 +16,7 @@ This module contains the small pieces shared by the CSV and NPY loaders:
 - ASCII digit/sign parsing used by numeric CSV cells and NPY headers; and
 - small string helpers for parsing Python/NumPy-style header fragments.
 
-The helpers are intentionally modest. They support TorchLean examples and regression tests, not a
+The helpers are kept modest. They support TorchLean examples and regression tests, not a
 full data-ingestion framework.
 -/
 

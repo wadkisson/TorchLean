@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export per-example logit-margin certificates for robustness evaluation.
 
-This is a lightweight "certificate exporter" in the spirit of certified-accuracy
+This is a focused certificate exporter in the spirit of certified-accuracy
 benchmarks (AutoLiRPA / CROWN-style workflows): compute output logit bounds for an
 ℓ∞ input perturbation, then export the bounds so Lean can check the margin
 predicate and report certified accuracy.

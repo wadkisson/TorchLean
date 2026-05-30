@@ -25,7 +25,7 @@ It reads a Gymnasium-style rollout JSON file (typically produced by
 - number of valid/invalid transitions,
 - the first few error messages (with indices).
 
-This is intentionally separate from PPO-specific viewers: exported rollouts do not contain actor
+This is separate by design from PPO-specific viewers: exported rollouts do not contain actor
 log-probabilities or value predictions, so PPO loss inspection belongs in the training examples.
 -/
 

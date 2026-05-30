@@ -7,16 +7,15 @@ Authors: TorchLean Team
 module
 
 /-!
-# Decision Trees (Small Spec-Only Baseline)
+# Decision Trees
 
-This file is small on purpose: it provides a pure decision tree datatype and an evaluator.
-It is a standalone baseline and does not use the tensor/module APIs.
+Pure decision tree datatype and evaluator. This is a standalone non-neural baseline, so it does not
+use the tensor/module APIs.
 
 Why include it here?
 
-- It serves as a non-neural "sanity check" baseline for experiments (e.g. mixed pipelines).
-- The datatype is small enough to be convenient in proofs or examples without pulling in tensor
-  machinery.
+- It serves as a non-neural reference baseline for experiments (e.g. mixed pipelines).
+- The datatype is direct enough to use in proofs or examples without pulling in tensor machinery.
 
 If you're thinking in the Python ecosystem: this is not an `nn.Module`-style component. It is
 closer to a symbolic scikit-learn style decision tree, except we keep it fully pure and explicit.

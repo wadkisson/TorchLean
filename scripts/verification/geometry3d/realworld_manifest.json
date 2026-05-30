@@ -1,5 +1,5 @@
 {
-  "description": "Small COCO real-image smoke suite for TorchLean Geometry3D certificates.",
+  "description": "Small COCO real-image certificate suite for TorchLean Geometry3D.",
   "cases": [
     {
       "name": "coco_cats_depth_box",

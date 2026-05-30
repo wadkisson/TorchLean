@@ -32,8 +32,8 @@ The checkpoint format is compact and explicit:
 This is enough to checkpoint *any* TorchLean runtime model implemented as a
 `TorchLean.Module.ScalarModule` over `Float`, independent of architecture.
 
-If you need float32/complex checkpoints, that belongs in this module too. The initial JSON format is
-kept conservative so checkpoint compatibility is predictable.
+If you need float32/complex checkpoints, that belongs in this module too. The initial JSON format
+keeps loading rules explicit and predictable.
 -/
 
 @[expose] public section

@@ -15,7 +15,7 @@ public import NN.Spec.Module.SpecModule
 This file wraps a few attention blocks as `NNModuleSpec`s so we can:
 
 - compose them with `SpecChain` (shape-safe pipelines), and
-- attach simple export/pretty-print metadata for demos.
+- attach simple export/pretty-print metadata for examples.
 
 The wrapper below builds a self-attention context with `Q=K=V=x` and no mask, which matches the
 common "encoder block" usage. More specialized variants (cross-attention, causal masks, etc.) are
@@ -25,7 +25,7 @@ In PyTorch terms, the core computation is scaled dot-product self-attention:
 `softmax(QK^T / sqrt(d)) V`, and newer PyTorch exposes it as
 `torch.nn.functional.scaled_dot_product_attention`.
 
-This wrapper stays intentionally narrow: it is self-attention only (`Q=K=V=x`) with no causal mask.
+This wrapper stays focused: it is self-attention only (`Q=K=V=x`) with no causal mask.
 -/
 
 @[expose] public section

@@ -20,8 +20,8 @@ GridWorld defined in `NN.Spec.RL.Envs.GridWorld`:
 - the induced one-hot `FiniteStochastic.MDP` view satisfies the row-stochastic axioms
   (`transition_nonneg` and `transition_sums_to_one`).
 
-These are deliberately lightweight, but they are the kind of lemmas that let downstream RL
-algorithms state and prove properties without re-opening the environment definition each time.
+These lemmas expose the environment invariants needed by downstream RL algorithms, so later
+proofs can depend on a stable interface instead of re-opening the step function each time.
 
 References:
 

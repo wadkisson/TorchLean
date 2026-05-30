@@ -26,7 +26,7 @@ open NN.Verification.Geometry3D.Box3D
 
 /-- Default sample certificate used when no path is passed to `lake exe verify`. -/
 def defaultCertPath : String :=
-  "NN/Verification/Geometry3D/smoke_box3d_camera_cert.json"
+  "NN/Verification/Geometry3D/check_box3d_camera_cert.json"
 
 /-- Check an exported JSON camera-box certificate artifact. -/
 def verifyCert (path : String := defaultCertPath) : IO Unit :=

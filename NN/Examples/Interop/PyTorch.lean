@@ -9,16 +9,16 @@ module
 public import NN.Examples.Interop.PyTorch.Export
 public import NN.Examples.Interop.PyTorch.Import
 public import NN.Examples.Interop.PyTorch.Roundtrip
-public import NN.Examples.Interop.PyTorch.TorchExportSmoke
+public import NN.Examples.Interop.PyTorch.TorchExportCheck
 
 /-!
 # PyTorch Interop Examples
 
 Curated umbrella for PyTorch-facing examples.
 
-The folder has two intentionally separate paths:
+The folder has two paths:
 
-- `TorchExportSmoke`: model-agnostic `nn.Module` graph capture into `torchlean.ir.v1`, followed by
+- `TorchExportCheck`: model-agnostic `nn.Module` graph capture into `torchlean.ir.v1`, followed by
   Lean-side parsing, value-graph handling, and tensor-IR shape validation.
 - `Roundtrip`: small MLP/CNN/Transformer state-dict examples that generate/read JSON weights.
 

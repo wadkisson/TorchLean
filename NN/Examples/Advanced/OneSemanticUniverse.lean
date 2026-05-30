@@ -26,13 +26,13 @@ and then:
 1) evaluate it under multiple scalar semantics (`ℝ`, `FP32`, `IEEE32Exec`);
 2) run IBP under multiple interval semantics (endpoints in `ℝ`, `FP32`, `IEEE32Exec` with directed
   rounding);
-3) empirically sanity-check that `evalIEEE(G,x)` lies in the IBP output box for random `x ∈ B`;
+3) empirically check that `evalIEEE(G,x)` lies in the IBP output box for random `x ∈ B`;
 4) point to the Lean theorem that the Boolean checker is sound (`Box.containsDecBool_sound`).
 
 Notes:
 - `ℝ` and `FP32` instantiations are proof-oriented and noncomputable (they typecheck, but do not run
   as an executable).
-- `IEEE32Exec` is fully executable inside Lean, so we use it for the runnable sanity check.
+- `IEEE32Exec` is fully executable inside Lean, so we use it for the runnable consistency check.
 
 Run:
   `lake exe torchlean one_semantic_universe --samples 50`
@@ -225,7 +225,7 @@ def showIEEECheck (samples : Nat) : IO Unit := do
   IO.println s!"[IBP IEEE endpoints] lo = {Spec.pretty outBox.lo}"
   IO.println s!"[IBP IEEE endpoints] hi = {Spec.pretty outBox.hi}"
 
-  -- Empirical sanity: random x ∈ B, check eval(x) ∈ IBP(B).
+  -- Empirical consistency: random x ∈ B, check eval(x) ∈ IBP(B).
   let mut okCount : Nat := 0
   for k in [0:samples] do
     let x := sampleInBoxIEEE (seed := 12345) (idx := k) BIEEE
@@ -242,7 +242,7 @@ def showIEEECheck (samples : Nat) : IO Unit := do
           IO.println s!"[counterexample?] k={k}"
           IO.println s!"x = {Spec.pretty x}"
           IO.println s!"y = {Spec.pretty y}"
-  IO.println s!"sanity: {okCount}/{samples} samples satisfied evalIEEE(x) ∈ IBP(B)"
+  IO.println s!"consistency: {okCount}/{samples} samples satisfied evalIEEE(x) ∈ IBP(B)"
   IO.println "checker theorem: `NN.MLTheory.CROWN.Box.containsDecBool_sound`"
 
 def main (args : List String) : IO Unit := do

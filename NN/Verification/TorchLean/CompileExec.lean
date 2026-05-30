@@ -15,7 +15,7 @@ public import NN.Verification.TorchLean.Correctness
 
 TorchLean → IR → executable compiled graph.
 
-This is a small convenience wrapper that:
+This helper:
 1) compiles a TorchLean `Program` to `NN.IR.Graph` (plus a verifier-style `ParamStore`), then
 2) converts the `ParamStore` to an IR `Payload`, and
 3) compiles the IR graph to an executable `Runtime.Autograd.Compiled.ExecGraphData`.

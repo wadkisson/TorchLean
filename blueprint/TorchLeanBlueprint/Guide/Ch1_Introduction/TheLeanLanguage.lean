@@ -181,7 +181,7 @@ open NN.API
 ```
 
 For TorchLean, `#check` is often the fastest way to learn whether you are holding a tensor, a model
-builder, a graph, a theorem, or an executable command. It gives a lightweight tutorial loop: write a
+builder, a graph, a theorem, or an executable command. It gives a direct tutorial loop: write a
 small expression, ask Lean what it is, and refine the expression until the type says the contract you
 intended.
 

@@ -55,7 +55,7 @@ lake env lean --run NN/Examples/Quickstart/AutogradBasics.lean -- --dtype float
 lake exe torchlean mlp --cpu --steps 10
 ```
 
-Run verifier demos:
+Run verifier commands:
 
 ```bash
 lake exe verify -- list
@@ -147,7 +147,7 @@ instead of quietly slipping it into the shared semantics layer.
 Examples live under `NN/Examples/*`. Most model examples are runnable through:
 
 ```bash
-lake exe torchlean <demo> [args...]
+lake exe torchlean <example> [args...]
 ```
 
 Direct Lean examples usually look like:
@@ -173,7 +173,7 @@ Project conventions:
 - Prefer small modules with minimal imports.
 - Add docstrings for user-facing definitions, structures, and theorems.
 - Split expensive proofs into named lemmas instead of relying on huge `simp` or `aesop` calls.
-- Keep executable demos and proof code separate when they have different trust assumptions.
+- Keep executable examples and proof code separate when they have different trust assumptions.
 - Avoid introducing axioms. If one is unavoidable, quarantine and document it.
 
 ## Checking Untrusted Proofs

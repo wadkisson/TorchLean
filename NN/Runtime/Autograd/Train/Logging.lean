@@ -79,15 +79,15 @@ def stdout : Logger IO :=
 def logEntry {m : Type -> Type} (logger : Logger m) (entry : LogEntry) : m Unit :=
   logger.log entry.level entry.message
 
-/-- Convenience wrapper for an `.info` message. -/
+/-- Emit an informational log message. -/
 def info {m : Type -> Type} (logger : Logger m) (msg : String) : m Unit :=
   logger.log .info msg
 
-/-- Convenience wrapper for a `.warn` message. -/
+/-- Emit a warning log message. -/
 def warn {m : Type -> Type} (logger : Logger m) (msg : String) : m Unit :=
   logger.log .warn msg
 
-/-- Convenience wrapper for an `.error` message. -/
+/-- Emit an error log message. -/
 def error {m : Type -> Type} (logger : Logger m) (msg : String) : m Unit :=
   logger.log .error msg
 

@@ -8,7 +8,7 @@ open Verso.Genre Manual
 tag := "running-example"
 %%%
 
-The rest of the guide is easier if we keep one small model in view. The model is deliberately
+The rest of the guide is easier if we keep one compact model in view. The model is deliberately
 ordinary: a two-layer classifier. Its job is not to be impressive as a model. Its job is to let us
 watch the same computation appear as user code, parameters, a graph, a Float32 execution, and a
 verification problem.
@@ -178,7 +178,7 @@ def good := Spec.Tensor.addSpec a b
 def wrongShape : Tensor Float (shape![2, 1]) :=
   tensor! [[1.0], [2.0]]
 
--- This is deliberately not accepted:
+-- This is not accepted:
 -- def shapeMismatch := Spec.Tensor.addSpec a wrongShape
 ```
 

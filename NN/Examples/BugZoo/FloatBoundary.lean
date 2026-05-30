@@ -26,7 +26,7 @@ Lean kernel. So we expose the trust boundary as a typeclass: if the runtime `Flo
 matches the bit-level `IEEE32Exec` operation, we may rewrite runtime arithmetic into the executable
 IEEE-754 model and then use the internal floating-point theorems.
 
-This file is deliberately small because the important part is the boundary itself. The theorem below
+This file focuses on the boundary because the important part is the boundary itself. The theorem below
 says: once the runtime assumption is supplied, ordinary runtime addition is reduced to the explicit
 bit-level `IEEE32Exec.add` operation.
 -/

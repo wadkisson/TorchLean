@@ -33,7 +33,7 @@ open Export.PyTorch
 /-- Render a small Transformer encoder as a Python `nn.Module` class definition.
 
 This produces readable "reference PyTorch" code (MultiHeadAttention + residual + LayerNorm + FFN),
-useful for round-trip demos.
+useful for round-trip examples.
 -/
 def generateTransformerEncoderPyTorchClass (seqLen embedDim headCount hiddenDim numLayers : Nat)
   (className : String := "TransformerEncoder") : String :=
@@ -121,7 +121,7 @@ def generateTransformerEncoderPyTorchClass (seqLen embedDim headCount hiddenDim 
 /--
 Generate a single-layer Transformer encoder module with an embedded `state_dict` initializer.
 
-This is meant for round-trip demos where parameters are loaded from TorchLean tensors.
+This is meant for round-trip examples where parameters are loaded from TorchLean tensors.
 
 Important convention:
 `NN/Spec` transformer weights are stored in the mathematical `(in, out)` orientation because they

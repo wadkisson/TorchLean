@@ -17,7 +17,7 @@ This module formalizes the finite patch/token core of a masked autoencoder (MAE)
 - an encoder/decoder stack is abstracted to a reconstruction function;
 - the objective is a sum of per-patch losses over the masked indices.
 
-The formalization is intentionally small. It captures the semantics that examples and future model
+The formalization focuses on the semantic core. It captures the semantics that examples and future model
 helpers should preserve, while leaving ViT blocks, convolutional patch embeddings, and image IO in
 the executable API layer.
 

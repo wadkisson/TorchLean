@@ -41,7 +41,7 @@ We represent a decision tree as a small inductive datatype:
 - `leaf value` stores the prediction for that leaf
 - `split feature threshold left right` branches on a single feature
 
-This is deliberately compact: it is easy to interpret (forward pass) and easy to fit with a
+This is kept compact: it is easy to interpret (forward pass) and easy to fit with a
 simple greedy CART-style algorithm (implemented below).
 
 Note on comparisons:
@@ -592,7 +592,7 @@ Labels are supplied as a list of length `batch`.
 - If `y` is shorter than `batch`, missing entries use `default` (so the function remains total).
 - If `y` is longer than `batch`, extra labels are ignored.
 
-This “list-based labels” API is meant for demos and small experiments. If you have labels already
+This “list-based labels” API is meant for examples and small experiments. If you have labels already
 as a tensor or an index type, it is usually better to convert them to a list explicitly at the
 boundary of your program so the conversion is visible.
 -/

@@ -20,7 +20,7 @@ This file is the runnable entry point for the “external producer, Lean checker
 - Lean parses and checks the certificate exactly over `Rat` using
   `NN.Verification.Splines.PiecewisePolyCert`.
 
-This is intentionally small and dependency-free:
+This is dependency-free:
 - the Julia script uses only Julia Base (no packages),
 - the default `lake exe verify -- spline-cert` path checks a **bundled** JSON file and does not
   require Julia,

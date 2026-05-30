@@ -584,7 +584,7 @@ namespace {full_ns}
 These values were computed by IBP/CROWN verification.
 -/
 
--- State dimension
+-- Dimension of the state vector certified by the external CROWN run.
 def n : Nat := {n}
 
 -- Certificate with verified bounds
@@ -674,7 +674,7 @@ theorem lyapunov_stable :
     (∀ x, Box.contains lyapCert.region x → lyap.Vdot x < 0) :=
   Real.lyapunov_conditions lyap lyapCert lyapCertWitness lyapCert_V_positive lyapCert_Vdot_negative
 
--- Individual conditions
+-- Pointwise Lyapunov conditions derived from the accepted certificate.
 theorem V_positive (x : Tensor ℝ (.dim n .scalar))
     (hx : Box.contains lyapCert.region x) : lyap.V x > 0 :=
   Real.V_positive lyap lyapCert lyapCertWitness lyapCert_V_positive x hx

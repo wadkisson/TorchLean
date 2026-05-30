@@ -58,14 +58,14 @@ structure RuntimeContext (α : Type) where
   /--
   Registry of named variable values.
 
-  Implementation note: this is a simple list, so lookup uses the first match (most-recent wins).
+  The registry is ordered by shadowing priority: lookup returns the first matching name.
   -/
   var_registry : List (String × AnyTensor α)
   /--
   Registry of named gradients.
 
-  As with `var_registry`, this is a simple list; callers are responsible for deciding whether to
-  prepend new gradients or update/accumulate existing ones.
+  The gradient registry uses the same ordering convention as `var_registry`. Higher-level training
+  code decides whether a gradient should shadow, replace, or accumulate with an existing entry.
   -/
   gradients : List (String × AnyTensor α)
   /--
@@ -86,7 +86,6 @@ The value is wrapped as an `AnyTensor` so we can store it in a heterogeneous reg
 -/
 def registerVariable {α : Type} {s : Shape} (ctx : RuntimeContext α) (name : String) (value : Tensor
   α s) : RuntimeContext α :=
-  -- Store tensor with its shape information
   let any_tensor := { s := s, t := value }
   { ctx with
     var_registry := (name, any_tensor) :: ctx.var_registry,
@@ -104,7 +103,6 @@ def getVariable {α : Type} {s : Shape} [DecidableEq Shape]
   | none => none
   | some (_, any_tensor) =>
     if h : any_tensor.s = s then
-      -- cast Tensor α any_tensor.s to Tensor α s using the equality proof
       some (Eq.mp (congrArg (Tensor α) h) any_tensor.t)
     else
       none
@@ -112,11 +110,11 @@ def getVariable {α : Type} {s : Shape} [DecidableEq Shape]
 /--
 Update the value of an existing variable (or do nothing if the name is absent).
 
-This performs a simple list-map update of the registry.
+The registry order is preserved. Entries with the requested name receive the new shape-tagged
+tensor; other entries are left unchanged.
 -/
 def setVariable {α : Type} {s : Shape} (ctx : RuntimeContext α) (name : String) (value : Tensor α s)
   : RuntimeContext α :=
-  -- Store tensor with its shape information
   let any_tensor := { s := s, t := value }
   let updated_vars := ctx.var_registry.map (fun (n, v) => if n == name then (n, any_tensor) else (n,
     v))
@@ -130,29 +128,24 @@ calling this helper.
 -/
 def registerGradient {α : Type} {s : Shape} (ctx : RuntimeContext α) (name : String) (grad : Tensor
   α s) : RuntimeContext α :=
-  -- Store gradient tensor with its shape information
   let any_tensor := { s := s, t := grad }
   { ctx with gradients := (name, any_tensor) :: ctx.gradients }
 
-/-- Lookup a gradient by name and requested shape (with the same casting trick as `get_variable`).
-  -/
+/-- Lookup a gradient by name and requested shape. -/
 def getGradient {α : Type} {s : Shape} [DecidableEq Shape] (ctx : RuntimeContext α) (name : String)
   : Option (Tensor α s) :=
-  -- Get gradient tensor from context and check shape compatibility
   match ctx.gradients.find? (fun (n, _) => n == name) |>.map (fun (_, any_tensor) => any_tensor)
     with
   | none => none
   | some any_tensor =>
-    -- Check if the stored shape matches the requested shape
     if h : any_tensor.s = s then
       some (Eq.mp (congrArg (Tensor α) h) any_tensor.t)
     else
-      none  -- Shape mismatch
+      none
 
-/-- Update a gradient entry in the context (simple list-map update). -/
+/-- Update gradient entries with a matching name while preserving registry order. -/
 def setGradient {α : Type} {s : Shape} (ctx : RuntimeContext α) (name : String) (grad : Tensor α s)
   : RuntimeContext α :=
-  -- Store gradient tensor with its shape information
   let any_tensor := { s := s, t := grad }
   let updated_grads := ctx.gradients.map (fun (n, g) => if n == name then (n, any_tensor) else (n,
     g))
@@ -185,10 +178,9 @@ def gradientCount {α : Type} (ctx : RuntimeContext α) : Nat :=
 /--
 Check a simple invariant: every gradient entry refers to an existing variable name.
 
-This does *not* check shapes; it only checks name presence.
+This invariant checks name presence. Shape agreement is checked by the typed lookup functions.
 -/
 def isValidContext {α : Type} (ctx : RuntimeContext α) : Bool :=
-  -- Check that all gradients correspond to existing variables
   ctx.gradients.all (fun (name, _) => hasVariable ctx name)
 
 /-- Render the context contents as a string (for debugging). -/

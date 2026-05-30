@@ -111,7 +111,7 @@ used.
 
 # Reading An IR Node
 
-An IR node is intentionally small. The important fields are:
+An IR node has a compact shape. The important fields are:
 
 - `id`: the node number, also expected to be its array index,
 - `parents`: the ids of earlier nodes this node reads from,
@@ -162,7 +162,7 @@ The IR account is built from three closely related groups of declarations:
 
 - [NN.IR.Infer API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Infer.lean) / [NN.IR.Check API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean)
   - `checkInferredShapes` recomputes every declared output shape from parent shapes and op tags.
-  - `checkShapes` is the public compatibility name for the same inferred-shape contract.
+  - `checkShapes` is the public alias for the same inferred-shape contract.
   - These checks are meant for compiler and backend consistency checks.
 
 - [NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean)
@@ -235,7 +235,7 @@ defined in [NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/mai
 
 This split is deliberate, for at least three reasons:
 
-1. It keeps the graph small and shareable (diffs, pretty-printing, and rewrites stay lightweight
+1. It keeps the graph small and shareable (diffs, pretty-printing, and rewrites stay local
    without dragging around huge tensors).
 2. It matches the real world (ONNX initializers, PyTorch `state_dict` / `nn.Module` parameters).
 3. It is verification-friendly (verifiers want to attach extra metadata to parameters).

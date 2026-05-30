@@ -21,7 +21,7 @@ whose results depend on hidden runtime state. For TorchLean, that is a poor fit:
 
 - it breaks the “one semantics” contract for compilation/verification (graphs stop being a pure
   mathematical object unless you model the RNG state explicitly),
-- it makes replays / certificate checking brittle (you want reproducible runs),
+- it makes replays and certificate checking depend on hidden runtime state,
 - it complicates the proof-linked compilation path (effects and mixed dtypes).
 
 Instead we use a deterministic pseudorandom generator and treat “randomness” as
@@ -111,7 +111,7 @@ def uniformAux {α : Type} [Context α] (key : UInt64) :
       Tensor.dim (fun i =>
         uniformAux (α := α) key (s := rest) (linearOffset + i.1 * block))
 
-/-- Convenience wrapper: build a uniform tensor starting at offset `0`. -/
+/-- Build a uniform tensor over the whole shape, starting the deterministic stream at offset `0`. -/
 def uniform {α : Type} [Context α] (key : UInt64) {s : Shape} : Tensor α s :=
   uniformAux (α := α) key (s := s) 0
 
@@ -136,7 +136,7 @@ def maskAux {α : Type} [Context α] (key : UInt64) (keepProb : α) :
       Tensor.dim (fun i =>
         maskAux (α := α) key keepProb (s := rest) (linearOffset + i.1 * block))
 
-/-- Convenience wrapper: build a mask starting at offset `0`. -/
+/-- Build a dropout-style mask over the whole shape, starting the stream at offset `0`. -/
 def mask {α : Type} [Context α] (key : UInt64) (keepProb : α) {s : Shape} : Tensor α s :=
   maskAux (α := α) key keepProb (s := s) 0
 
@@ -191,7 +191,7 @@ def normalAux {α : Type} [Context α] (key : UInt64) :
       Tensor.dim (fun i =>
         normalAux (α := α) key (s := rest) (linearOffset + i.1 * block))
 
-/-- Convenience wrapper: build a standard normal tensor starting at offset `0`. -/
+/-- Build a standard-normal tensor over the whole shape, starting the stream at offset `0`. -/
 def normal {α : Type} [Context α] (key : UInt64) {s : Shape} : Tensor α s :=
   normalAux (α := α) key (s := s) 0
 

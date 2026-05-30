@@ -90,11 +90,7 @@ macro_rules (kind := seqLit)
       let f := mkGlobalIdent `NN.API.TorchLean.NN.compAny
       `($f $a (seq! $b, $rest,*))
 
-/--
-Build a `TorchLean.TList` from comma-separated tensors (avoids `.cons ... .nil` boilerplate).
-
-This stays compact: it is just a syntactic convenience for examples and small programs.
--/
+/-- Build a `TorchLean.TList` from comma-separated tensors. -/
 syntax (name := tlistLit) "tlist!" term,+ : term
 
 

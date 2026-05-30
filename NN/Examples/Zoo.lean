@@ -36,8 +36,8 @@ public import NN.Examples.BugZoo.All
 
 Single umbrella for TorchLean examples.
 
-The examples directory intentionally keeps only one root Lean entrypoint. Import this module when
-you want to compile every maintained example module, including quickstarts, model examples,
+The examples directory has one root Lean entrypoint. Import this module when you want to compile
+every maintained example module, including introductory examples, model examples,
 interop examples, widgets, advanced tutorials, and verification examples.
 
 Typical usage:
@@ -45,7 +45,7 @@ Typical usage:
 * Build the full example surface: `lake build NN.Examples.Zoo`
 * Run model examples through the CLI:
   `lake exe torchlean mlp -- --steps 10`
-* Run standalone executables directly when they intentionally define their own root `main`
+* Run standalone executables directly when they define their own root `main`
   (for example `lake exe torchlean gpt_adder --steps 1000`).
 
 The heavier examples remain in their subdirectories so users can still build or run one example at a

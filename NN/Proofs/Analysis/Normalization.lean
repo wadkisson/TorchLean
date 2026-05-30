@@ -22,7 +22,7 @@ Current focus:
 
 That fact matters because inference-time BatchNorm can be folded into a preceding/following affine
 layer for verification, bound propagation, and simplification. Training-mode BatchNorm has
-batch-dependent statistics and is intentionally not claimed by this theorem.
+batch-dependent statistics and is not claimed by this theorem.
 -/
 
 @[expose] public section

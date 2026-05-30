@@ -14,7 +14,7 @@ public import NN.Verification.Util.Json
 Alpha-beta-CROWN (AbCrown) leaf-certificate checker.
 
 This module checks a small JSON certificate format (`abcrown_leaf_cert_v0_1`) exported by a Python
-verification pipeline. It does **not** run bound propagation itself; instead it sanity-checks that:
+verification pipeline. It does **not** run bound propagation itself; instead it validates that:
 - each leaf input box is nested inside the declared root input box, and
 - each leaf contains a witness that refutes the unsafe threshold (`lb[i] > threshold[i]` for some
   `i`).

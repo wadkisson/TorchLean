@@ -13,7 +13,7 @@ public import NN.API.Models.PPO
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
-# PPO on Gymnasium CartPole (Executable Demo)
+# PPO on Gymnasium CartPole (Executable Example)
 
 This example is intentionally “small but complete”:
 
@@ -113,7 +113,7 @@ def gamma : Float := 0.99
 /-- GAE(λ) parameter controlling the bias/variance tradeoff of advantage estimates. -/
 def lam : Float := 0.95
 
-/-- Adam learning rate. -/
+/-- Adam learning rate used for the CartPole actor-critic update. -/
 def lr : Float := 3e-4
 
 /-- Number of PPO optimization epochs per collected rollout batch. -/
@@ -150,7 +150,7 @@ def sValue1 : Shape := Shape.scalar.appendDim 1
 /-!
 ## Model (Actor + Critic)
 
-We use the public `API.nn` facade, which provides "prefix-shape preserving" layers:
+We use the public `API.nn` surface, which provides "prefix-shape preserving" layers:
 if `x` has shape `[..., inDim]`, `nn.linear inDim outDim (pfx := ...)` maps it to `[..., outDim]`.
 -/
 
@@ -239,7 +239,7 @@ def main (args : List String) : IO UInt32 := do
         let mut rngCounter : Nat := 0
 
         -- Training curve: greedy-policy evaluation return before training, then at each
-        -- `evalEvery` checkpoint. We keep this as a lightweight `Curve` (arrays) because it is
+        -- `evalEvery` checkpoint. We keep this as a compact `Curve` (arrays) because it is
         -- destined for JSON/widget display; the actual learning data is stored as typed tensors.
         let mut curve : rl.train.Curve := {}
 

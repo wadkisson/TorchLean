@@ -19,7 +19,7 @@ Compares CPU eager tape vs CUDA eager tape for `conv_transpose`:
 - a non-2D case (`d = 3`).
 
 Both cases check forward output and gradients (including `dInput`) via `backwardDenseAll`.
-Inputs are kept small so stub-mode runs quickly and float64/float32 roundoff differences stay limited.
+Inputs are compact so stub-mode runs quickly and float64/float32 roundoff differences stay limited.
 -/
 
 @[expose] public section
@@ -36,6 +36,7 @@ open Runtime.Autograd
 ## 2D case (d = 2)
 -/
 
+/-- Spatial rank for the 2D transposed-convolution coverage case. -/
 abbrev d2 : Nat := 2
 
 abbrev inC2 : Nat := 1

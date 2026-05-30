@@ -12,7 +12,7 @@ public import NN.Runtime.Autograd.Train.Core
 # Trainer API with metrics and logging
 
 This module defines a small, higher-level training API on top of a step function.
-It stays lightweight (no global state), while making it easy to:
+It stays local (no global state), while making it easy to:
 
 * return a structured report per step (loss + metrics)
 * render reports into human-readable logs
@@ -48,7 +48,7 @@ def Metric.render {a : Type} [ToString a] (m : Metric a) : String :=
 /--
 Per-step training report.
 
-This is a lightweight record: a single scalar loss (to drive optimization) plus optional metrics
+This is a compact record: a single scalar loss (to drive optimization) plus optional metrics
 for logging/monitoring.
 -/
 structure StepReport (a : Type) where
@@ -120,11 +120,7 @@ structure Trainer (m : Type -> Type) (state : Type) (a : Type) where
 
 namespace Trainer
 
-/--
-Construct a `Trainer` with a no-op logger.
-
-This is a convenient default for experiments that just want to collect reports.
--/
+/-- Construct a `Trainer` with a no-op logger and collected step reports. -/
 def noLog {m : Type -> Type} [Monad m] {state a : Type}
   (init : state) (step : state -> m (Prod state (StepReport a))) :
   Trainer m state a :=
@@ -144,7 +140,7 @@ def run {m : Type -> Type} [Monad m] {state a : Type}
         go n (stepIdx + 1) s' (report :: acc)
   exact go steps 0 t.init []
 
-/-- Run a trainer and project out just the per-step losses. -/
+/-- Run a trainer and project the report stream to per-step losses. -/
 def runLosses {m : Type -> Type} [Monad m] {state a : Type}
   (steps : Nat) (t : Trainer m state a) :
   m (Prod state (List a)) := do

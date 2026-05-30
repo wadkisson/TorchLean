@@ -93,7 +93,7 @@ def model : nn.Sequential (NN.Tensor.Shape.Vec 2) (NN.Tensor.Shape.Vec 1) :=
   -- A compact 2-layer MLP with ReLU:
   --   Linear(2 -> 3) -> ReLU -> Linear(3 -> 1)
   --
-  -- This uses the public `API.nn` facade (PyTorch-like layer stacking and named configs).
+  -- This uses the public `API.nn` surface (PyTorch-like layer stacking and named configs).
   --
   -- Note: this tutorial supplies *explicit* parameter tensors below, so the init seeds are irrelevant
   -- here.

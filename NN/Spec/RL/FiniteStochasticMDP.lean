@@ -17,7 +17,7 @@ public import NN.Spec.RL.MDP
 This module extends TorchLean's finite deterministic MDP layer with finite-state stochastic
 transitions.
 
-We stay in a deliberately small setting:
+We work in a finite setting:
 
 - finitely many states and actions,
 - real-valued rewards and discount factor,

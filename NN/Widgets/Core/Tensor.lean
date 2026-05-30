@@ -298,7 +298,7 @@ def anyTensorHtml {α : Type} [ToString α] (v : Runtime.AnyTensor α)
 /-!
 ## Stats
 
-For small tensors, it is often helpful to quickly sanity-check numeric ranges without expanding
+For small tensors, it is often helpful to inspect numeric ranges without expanding
 every element. This widget computes simple scalar summaries (min/max/mean/norms).
 
 Main command:

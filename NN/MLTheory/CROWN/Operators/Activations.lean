@@ -163,7 +163,7 @@ def elu (scale : α) (x : α) : α :=
   if x > Numbers.zero then x
   else scale * (expApprox x - Numbers.one)
 
-/-- IBP for ELU on scalars. -/
+/-- Scalar interval rule for ELU over an input interval `[l,u]`. -/
 def ibpEluScalar (scale : α) (l u : α) : α × α :=
   if l > Numbers.zero then
     -- Pure positive region
@@ -176,7 +176,7 @@ def ibpEluScalar (scale : α) (l u : α) : α × α :=
     let negMin := scale * (expApprox l - Numbers.one)
     (negMin, u)
 
-/-- IBP for ELU on boxes. -/
+/-- Interval propagation for ELU on a vector box. -/
 def ibpElu (n : Nat) (scale : α) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
@@ -270,7 +270,7 @@ def ibpSiluScalar (l u : α) : α × α :=
     -- Spans minimum
     (critVal, if fl > fu then fl else fu)
 
-/-- IBP for SiLU on boxes. -/
+/-- Apply the scalar SiLU interval rule coordinatewise to a vector box. -/
 def ibpSilu (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
@@ -304,7 +304,7 @@ def ibpMishScalar (l u : α) : α × α :=
   else
     (critVal, if fl > fu then fl else fu)
 
-/-- IBP for Mish on boxes. -/
+/-- Apply the scalar Mish interval rule coordinatewise to a vector box. -/
 def ibpMish (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
@@ -325,7 +325,7 @@ theorem leaky_relu_def (negSlope x : α) :
     leakyRelu negSlope x = if x > Numbers.zero then x else negSlope * x := by
   rfl
 
-/-- ELU definition structure. -/
+/-- Definitional unfolding lemma for the ELU scalar approximation used by CROWN operators. -/
 theorem elu_def (scale x : α) :
     elu scale x = if x > Numbers.zero then x else scale * (expApprox x - Numbers.one) := by
   rfl

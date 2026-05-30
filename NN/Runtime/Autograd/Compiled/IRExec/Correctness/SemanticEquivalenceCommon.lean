@@ -22,7 +22,7 @@ Reading map:
 * `denoteAllState_nil`: base case table lemma for the empty compiled prefix.
 * `permuteDVal_eq_applySwapsTensor` (+ helper): connects IR permutation semantics to the runtime
   swap-based implementation.
-* `buildFrom_denoteAllFrom_{unary,binary}_exact`: convenience wrappers that package the standard
+* `buildFrom_denoteAllFrom_{unary,binary}_exact`: named lemmas that package the standard
   semantic equivalence proof pattern once a `nodeData` closure has been constructed.
 
 These helpers exist because the main correctness proof is expensive to elaborate. They keep the

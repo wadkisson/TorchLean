@@ -26,7 +26,7 @@ Everything runs *inside Lean*:
 - Stage 2: for each round, run a small PGD loop on the input `x` to find “counterexample-ish”
   points, then train on them (CEGIS flavor).
 - Final: compile the same TorchLean loss program to the shared verifier IR and run in-repo IBP/CROWN
-  bound propagation to sanity-check the loss on a small box around the origin.
+  bound propagation to check the loss on a small box around the origin.
 
 Notes:
 - This workflow uses the in-repo IBP/CROWN engine, so its bounds are meant to exercise TorchLean's
@@ -198,7 +198,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
   let cLoss ← TorchLean.Autodiff.compileLoss
     (α := α) (paramShapes := paramShapes width) (inputShapes := [xShape]) (lossProg width)
 
-  -- Stage 1: quick warmup on random x in [-rad, rad]^2
+  -- Stage 1: initialization pass on random x in [-rad, rad]^2
   let mut seed : UInt64 := 1
   for i in [0:stage1Steps] do
     let (seed', x) := sampleVec2 seed rad

@@ -603,7 +603,7 @@ def loadBpeTokenizerForDemo (vocabPath mergesPath : System.FilePath) :
          idMap := text.Gpt2Bpe.idMapOf vocab
          mergeMap := text.Gpt2Bpe.mergeMapOf merges }
 
-/-- Print the first BPE training window for sanity. -/
+/-- Print the first BPE training window for inspecting tokenization and windowing. -/
 def printBpeCorpusPreview (tok : text.Gpt2Bpe.Tokenizer) (lv : LocalBpeVocab)
     (tokens : Array Nat) : IO Unit := do
   let first := text.Corpus.tokenArrayWindow tokens (BpeGpt2.seqLen + 1) 0

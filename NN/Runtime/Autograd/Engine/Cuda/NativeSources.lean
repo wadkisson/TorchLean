@@ -60,7 +60,7 @@ agrees with CPU stubs and reference cases on the supported path.
   Environment-variable parser for deterministic CUDA reduction mode.
 
 - `csrc/cuda/common/torchlean_cuda_rng_common.h`
-  Shared SplitMix64 stream used by CUDA kernels and CPU stubs. The contract intentionally fixes the
+  Shared SplitMix64 stream used by CUDA kernels and CPU stubs. The contract fixes the
   low 32 bits of `splitmix64(key + i)` so seeded CPU-stub and CUDA runs match.
 
 - `csrc/cuda/tensor/torchlean_cuda_tensor.cu`
@@ -115,7 +115,7 @@ namespace NN.Runtime.Autograd.Engine.Cuda.NativeSources
 /--
 DocGen anchor for the CUDA native-source map.
 
-The value is intentionally small; the module documentation above is the useful content. Keeping a
+The value is compact; the module documentation above is the useful content. Keeping a
 public declaration here ensures DocGen emits a navigable page for this map alongside the Lean CUDA
 FFI modules.
 -/

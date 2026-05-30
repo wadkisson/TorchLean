@@ -79,6 +79,7 @@ structure AdamState where
   /-- Cached `beta2^step` for bias correction (starts at 1). -/
   beta2Pow : Float := 1.0
 
+/-- Allocate a zero-filled `FloatArray` of length `n`. -/
 def zerosArray (n : Nat) : FloatArray :=
   FloatArray.mk (Array.mk (List.replicate n 0.0))
 

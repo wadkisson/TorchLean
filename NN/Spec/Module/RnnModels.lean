@@ -301,11 +301,11 @@ def birnnForward {seqLen inputSize hiddenSize outputSize : Nat}
   -- Apply output layer
   mapSequenceSpec (linearSpec model.output_layer) combined_states
 
--- One-step helper used by some small examples (single cell update + output projection).
+-- One-step helper used by some compact examples (single cell update + output projection).
 /--
 One-step helper: run a single RNN cell update and apply an output projection.
 
-This is used by some small examples that do not build a full `SpecChain` or multi-layer bundle.
+This is used by some compact examples that do not build a full `SpecChain` or multi-layer bundle.
 -/
 def multilayerRnnForwardSingle {inputSize hiddenSize outputSize : Nat}
   (layers : RNNSpec α inputSize hiddenSize)
@@ -354,12 +354,11 @@ def simpleRnnBackward {seqLen inputSize hiddenSize outputSize : Nat}
 
   (grad_rnn_weights, grad_rnn_bias, grad_output_weights, grad_output_bias, grad_inputs)
 
--- Training utilities
--- Apply a binary function returning a scalar to corresponding elements in two sequences
+-- Training utilities for sequence-level losses and gradients.
 /--
 Map a scalar-valued function over two aligned sequences, producing a sequence of scalars.
 
-This is a lightweight helper used in the example loss definitions below.
+This helper lifts a scalar comparison over aligned sequence elements.
 -/
 def map2SequenceSpec {seqLen dim1 dim2 : Nat}
   (f : Tensor α (.dim dim1 .scalar) → Tensor α (.dim dim2 .scalar) → α)

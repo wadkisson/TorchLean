@@ -206,7 +206,7 @@ def pgdStepCompiled
 Final post-check: compile the TorchLean loss to the shared verifier IR, then run IBP and CROWN
 over a small box around the origin.
 
-This is a *sanity check* that the training objective is provably small on that box; it is not
+This check proves that the training objective is small on that box; it is not
 claimed to match α/β-CROWN tightness.
 -/
 def checkBox (width : Nat) (params : TorchLean.TList α (paramShapes width)) (eps : α :=

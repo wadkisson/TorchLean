@@ -99,7 +99,7 @@ def timeOfIndex (t : Fin (T + 1)) : α :=
 /-!
 ## Simple constructors
 
-These are convenience constructors for examples and demos.
+These are convenience constructors for examples and examples.
 We intentionally keep them small and deterministic; large-scale training pipelines usually want
 explicit control over schedules.
 -/

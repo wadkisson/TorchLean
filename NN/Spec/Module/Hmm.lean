@@ -14,7 +14,7 @@ public import NN.Spec.Module.SpecModule
 
 The HMM spec model (`NN/Spec/Models/Hmm.lean`) uses discrete observations (`Fin nObservations`).
 
-For composition and demos, it is sometimes convenient to accept a tensor of scores/probabilities
+For composition and examples, it is sometimes convenient to accept a tensor of scores/probabilities
 over the observation alphabet and decode each timestep via `argmax`. The wrappers in this file
 provide that bridge and package the resulting behavior as `NNModuleSpec`s.
 -/

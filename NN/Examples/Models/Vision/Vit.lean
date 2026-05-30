@@ -37,7 +37,7 @@ python3 scripts/datasets/download_example_data.py --cifar10
 lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 200 --steps 1
 ```
 
-Tip: the defaults are set for a quick sanity run. For a longer run, bump `--steps` and
+Tip: the defaults are set for a short validation run. For a longer run, bump `--steps` and
 `--n-total`, and enable CUDA fused kernels:
 
 ```bash

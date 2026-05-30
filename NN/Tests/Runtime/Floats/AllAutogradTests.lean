@@ -337,7 +337,7 @@ end Tests
 /-! ## autograd_train_test.lean -/
 
 /-!
-End-to-end training smoke test using the dynamic autograd tape.
+End-to-end training runtime check using the dynamic autograd tape.
 
 This mirrors the hand-written SGD loop in `mlp_test.lean`, but gradients are produced
 via the dynamic tape (`Runtime.Autograd.Tape.backwardScalar`).
@@ -440,7 +440,7 @@ def train (epochs : Nat) (lr : Float := 0.1) :
 def run : IO Unit := do
   match train 6 0.1 with
   | .ok losses =>
-    IO.println "=== Autograd train smoke test (Float) ==="
+    IO.println "=== Autograd train runtime check (Float) ==="
     IO.println s!"losses: {losses}"
   | .error msg => throw <| IO.userError s!"autograd_train_test (Float): {msg}"
 
@@ -451,7 +451,7 @@ end Tests
 /-! ## autograd_layernorm_test.lean -/
 
 /-!
-Small layer norm gradient smoke test using the dynamic tape.
+Small layer norm gradient runtime check using the dynamic tape.
 -/
 
 open _root_.Spec
@@ -505,7 +505,7 @@ def run : IO Unit := do
   match checkLayerNormGrads with
   | .error msg => throw <| IO.userError s!"autograd_layernorm_test (Float): {msg}"
   | .ok (lossStr, dGammaStr, dBetaStr) =>
-    IO.println "=== Autograd layer norm grad smoke test (Float) ==="
+    IO.println "=== Autograd layer norm grad runtime check (Float) ==="
     IO.println lossStr
     IO.println s!"dGamma: {dGammaStr}"
     IO.println s!"dBeta: {dBetaStr}"
@@ -517,7 +517,7 @@ end Tests
 /-! ## autograd_conv2d_test.lean -/
 
 /-!
-Conv2D gradient smoke test using the dynamic tape.
+Conv2D gradient runtime check using the dynamic tape.
 -/
 
 open _root_.Spec
@@ -580,7 +580,7 @@ def run : IO Unit := do
   match checkConv2dGrads with
   | .error msg => throw <| IO.userError s!"autograd_conv2d_test (Float): {msg}"
   | .ok (dKStr, dBStr) =>
-    IO.println "=== Autograd conv2d grad smoke test (Float) ==="
+    IO.println "=== Autograd conv2d grad runtime check (Float) ==="
     IO.println s!"dK: {dKStr}"
     IO.println s!"dB: {dBStr}"
 

@@ -139,7 +139,7 @@ structure Conv2DParams (α : Type) [Context α] where
 /--
 External parameter payloads keyed by IR node id.
 
-This is deliberately small; different backends may store parameters differently.
+This is focused; different backends may store parameters differently.
 -/
 structure Payload (α : Type) [Context α] where
   -- Each lookup is keyed by the *node id*.

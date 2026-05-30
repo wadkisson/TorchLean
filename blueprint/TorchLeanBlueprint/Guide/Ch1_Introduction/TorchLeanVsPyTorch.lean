@@ -125,7 +125,7 @@ PyTorch's autograd is mature, broad, and deeply optimized. TorchLean's advantage
 for supported fragments, the backward pass can be related to a Lean specification and the resulting
 artifacts can be inspected inside the same formal environment.
 
-For the public training surface, see the [public API facade](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) and the
+For the public training surface, see the [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) and the
 [training runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train.lean).
 
 # Graphs And Verification
@@ -152,7 +152,7 @@ proofs and checkers can cite.
 
 PyTorch remains valuable at the boundary. It has the ecosystem for large datasets, pretrained
 checkpoints, distributed training, debugging tools, and deployment practices. TorchLean therefore
-supports interop, but it keeps the contract deliberately small.
+supports interop, but it keeps the contract focused.
 
 The supported round-trip is family based:
 
