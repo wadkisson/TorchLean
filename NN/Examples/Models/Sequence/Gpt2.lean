@@ -511,10 +511,8 @@ def unitTrainSteps {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToStri
 /--
 Training body run inside `nn.withModel` after the model is built.
 
-Kept as a top-level `def` (not an inline `fun model => do`) so LeanProfiler can
-instrument the call from `unitTrainStepsFloat`; the body itself stays outside
-`#profiler.on` because auto `let :=` wrapping breaks on pure helpers like
-`samplesFromCorpus` (returns `Array`, not `IO`).
+Uses explicit `profileIO` spans because LeanProfiler auto-instrument breaks on pure
+`let :=` bindings and on callbacks passed to `nn.withModel`.
 -/
 def unitTrainStepsFloatBody
     (opts : Runtime.Autograd.Torch.Options) (input : String) (train : TrainOptions)
@@ -522,24 +520,28 @@ def unitTrainStepsFloatBody
   let samples := samplesFromCorpus input train.prompt train.windows
   let reportSample := mkSample (α := Float) (input := train.prompt)
   let modDef := nn.crossEntropyOneHotScalarModuleDef model (reduction := .mean)
-  let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+  let m ← profileIO "gpt2/instantiate" <|
+    TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
   match train.loadParams? with
   | none => pure ()
   | some path =>
-      TorchLean.ParamIO.loadModuleParamsBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ])
-        m path
-  let logits0 ← nn.eval1 (α := Float) opts model
-    m.trainer.params
-    (NN.API.sample.x reportSample)
+      profileIO "gpt2/load_params" <|
+        TorchLean.ParamIO.loadModuleParamsBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ])
+          m path
+  let logits0 ← profileIO "gpt2/eval1" <|
+    nn.eval1 (α := Float) opts model
+      m.trainer.params
+      (NN.API.sample.x reportSample)
   printPredictionReport "before" train.prompt logits0
-  let L0 ← meanLossOnSamples model m samples
+  let L0 ← profileIO "gpt2/mean_loss" <| meanLossOnSamples model m samples
 
   if train.steps = 0 then
     IO.println s!"  steps=0 loss0={L0}"
     if train.interactive then
       interactiveLoopFloat opts model m train
-    let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
-      train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
+    let generatedIds ← profileIO "gpt2/generate" <|
+      generateSampled opts model m.trainer.params train.prompt train.generate
+        train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
     let generated := text.escapeByteIdsForDisplay generatedIds
     writeTrainLog opts train L0 L0 generated
     saveParamsIfRequested model m train
@@ -551,21 +553,23 @@ def unitTrainStepsFloatBody
       (beta1 := 0.9)
       (beta2 := 0.999)
       (epsilon := 1e-8)
-    let optH ← TorchLean.Optim.handle (α := Float) m opt
+    let optH ← profileIO "gpt2/optim_handle" <| TorchLean.Optim.handle (α := Float) m opt
     let cudaMemWatch := Common.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
     let mut memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps 0 none
     for step in [0:train.steps] do
       let batchSample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
-      optH.step batchSample
+      let _ ← profileIO "gpt2/train_step" <| optH.step batchSample
       memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps (step + 1) memWatch?
 
-    let L1 ← meanLossOnSamples model m samples
-    let logits1 ← nn.eval1 (α := Float) opts model
-      m.trainer.params
-      (NN.API.sample.x reportSample)
+    let L1 ← profileIO "gpt2/mean_loss" <| meanLossOnSamples model m samples
+    let logits1 ← profileIO "gpt2/eval1" <|
+      nn.eval1 (α := Float) opts model
+        m.trainer.params
+        (NN.API.sample.x reportSample)
     printPredictionReport "after " train.prompt logits1
-    let generatedIds ← generateSampled opts model m.trainer.params train.prompt train.generate
-      train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
+    let generatedIds ← profileIO "gpt2/generate" <|
+      generateSampled opts model m.trainer.params train.prompt train.generate
+        train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
     let generated := text.escapeByteIdsForDisplay generatedIds
     IO.println s!"  generated={generated}"
     IO.println s!"  corpus_bytes={input.toByteArray.size} windows={samples.size}"
@@ -578,8 +582,6 @@ def unitTrainStepsFloatBody
     saveParamsIfRequested model m train
     pure (L0, L1, generated)
 
-#profiler.on
-
 /--
 Float-specialized training path with decoded prediction reports.
 
@@ -588,10 +590,9 @@ target, and predicted text before and after training. The polymorphic path above
 non-Float dtype compatibility runs.
 -/
 def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
-    (train : TrainOptions) : IO (Float × Float × String) := do
-  nn.withModel mkModel fun model => unitTrainStepsFloatBody opts input train model
-
-#profiler.off
+    (train : TrainOptions) : IO (Float × Float × String) :=
+  profileIO "gpt2/unit_train" <|
+    nn.withModel mkModel fun model => unitTrainStepsFloatBody opts input train model
 
 /-- CLI entrypoint for byte-level GPT training, sampling, logging, and checkpointing. -/
 def main (args : List String) : IO UInt32 := do
