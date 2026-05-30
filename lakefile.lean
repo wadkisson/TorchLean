@@ -195,7 +195,7 @@ require Comparator from git
   "https://github.com/leanprover/comparator" @ "10033e381ff7f2146859e21ab99ce01f9ed61c36"
 
 require LeanProfiler from git
-  "https://github.com/wadkisson/LeanProfiler" @ "79e615d5577daa498b9a7e9f98504d30a076ab35"
+  "https://github.com/wadkisson/LeanProfiler" @ "caa620ea1f51c59377efe8da012241f5549d399f"
 
 -- Keep `mathlib` last so Mathlib’s dependency versions win, which is required for cache tooling.
 require mathlib from git
