@@ -508,14 +508,13 @@ def unitTrainSteps {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToStri
       IO.println s!"  steps={steps} loss0={L0} loss1={L1}"
       pure (L0, L1)
 
-#profiler.on
-
 /--
 Training body run inside `nn.withModel` after the model is built.
 
 Kept as a top-level `def` (not an inline `fun model => do`) so LeanProfiler can
-instrument call sites in this file; inline lambdas passed to `nn.withModel` still
-miss nested spans in the current macro.
+instrument the call from `unitTrainStepsFloat`; the body itself stays outside
+`#profiler.on` because auto `let :=` wrapping breaks on pure helpers like
+`samplesFromCorpus` (returns `Array`, not `IO`).
 -/
 def unitTrainStepsFloatBody
     (opts : Runtime.Autograd.Torch.Options) (input : String) (train : TrainOptions)
@@ -556,8 +555,8 @@ def unitTrainStepsFloatBody
     let cudaMemWatch := Common.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
     let mut memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps 0 none
     for step in [0:train.steps] do
-      let sample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
-      optH.step sample
+      let batchSample := samples.getD (step % Nat.max 1 samples.size) (firstSample samples)
+      optH.step batchSample
       memWatch? ← Common.reportCudaMemWatch opts cudaMemWatch train.steps (step + 1) memWatch?
 
     let L1 ← meanLossOnSamples model m samples
@@ -578,6 +577,8 @@ def unitTrainStepsFloatBody
     writeTrainLog opts train L0 L1 generated (some cudaMemWatch)
     saveParamsIfRequested model m train
     pure (L0, L1, generated)
+
+#profiler.on
 
 /--
 Float-specialized training path with decoded prediction reports.
