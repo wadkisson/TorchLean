@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # TorchLean vs PyTorch benchmarks on CUDA (1000, 10000, 100000 steps).
+#
+# LeanProfiler (TorchLean only): set `leanProfilerEnabled := true` at the top of
+#   NN/Examples/Models/Supervised/Mlp.lean
+#   NN/Examples/Models/Vision/Cnn.lean
+#   NN/Examples/Models/Sequence/Gpt2.lean
+# then `lake build -K cuda=true` before running. Profiles: data/profiles/{mlp,cnn,gpt2}.json
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

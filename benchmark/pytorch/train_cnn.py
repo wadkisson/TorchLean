@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Train the CIFAR CNN benchmark (PyTorch mirror of `torchlean cnn`)."""
+"""Train the CIFAR CNN benchmark (PyTorch mirror of `torchlean cnn`).
+
+LeanProfiler applies to the TorchLean runner only — see `Cnn.lean` (`leanProfilerEnabled`).
+"""
 
 from __future__ import annotations
 

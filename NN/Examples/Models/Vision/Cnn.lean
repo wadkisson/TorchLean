@@ -15,6 +15,7 @@ module
 public import NN
 public import NN.API.Models.Cnn
 public import NN.Examples.Models.Common.RealData
+public import LeanProfiler
 
 /-!
 # CNN Training Example
@@ -28,7 +29,10 @@ TrainLog artifact writing.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
-lake build -R -K cuda=true && lake exe torchlean cnn --cuda --steps 1
+  lake build -R -K cuda=true && lake exe torchlean cnn --cuda --steps 1
+
+LeanProfiler: set `leanProfilerEnabled := true` below, rebuild, then run a short job.
+Profile output: `data/profiles/cnn.json` (open at ui.perfetto.dev).
 ```
 -/
 
@@ -38,6 +42,11 @@ open Spec Tensor
 open NN.API
 
 namespace NN.Examples.Models.Vision.Cnn
+
+/-- Set to `true` and rebuild to profile this example with LeanProfiler. -/
+def leanProfilerEnabled : Bool := false
+
+def profileOut : System.FilePath := "data/profiles/cnn.json"
 
 def exeName : String := "torchlean cnn"
 def defaultLogJson : System.FilePath := "data/model_zoo/cnn_trainlog.json"
@@ -102,7 +111,16 @@ def main (args : List String) : IO UInt32 := do
       let (trainCfg, rest) ← Common.orThrow exeName <|
         Common.parseModelTrainFlags exeName rest defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let report ← fitCifar opts xPath yPath nRows seed trainCfg
+      let report ←
+        if leanProfilerEnabled then
+          withProfile "cnn.fitCifar" (fitCifar opts xPath yPath nRows seed trainCfg)
+        else
+          fitCifar opts xPath yPath nRows seed trainCfg
+      if leanProfilerEnabled then do
+        IO.println "=== LeanProfiler summary ==="
+        printSummary
+        exportProfile profileOut
+        IO.println s!"  wrote profile: {profileOut}"
       IO.println s!"  steps={trainCfg.train.steps} loss0={report.before} loss1={report.after}")
 
 end NN.Examples.Models.Vision.Cnn

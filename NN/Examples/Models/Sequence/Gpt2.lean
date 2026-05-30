@@ -34,6 +34,9 @@ After a run that writes `--log <path>`, you can view the prompt and sampled cont
 infoview via:
 
 `#gpt2_train_log_file_view "<path>"`
+
+LeanProfiler: set `leanProfilerEnabled := true` below, rebuild, then run a short job.
+Profile output: `data/profiles/gpt2.json` (open at ui.perfetto.dev).
 -/
 
 module
@@ -43,6 +46,7 @@ public import NN
 public import NN.API.Models.Gpt2
 public import NN.Runtime.Autograd.TorchLean.NN
 public import NN.API.Runtime
+public import LeanProfiler
 
 /-!
 # GPT-2-Style Causal Language Model Example
@@ -66,6 +70,11 @@ open Spec Tensor
 open NN.API
 
 namespace NN.Examples.Models.Sequence.Gpt2
+
+/-- Set to `true` and rebuild to profile this example with LeanProfiler. -/
+def leanProfilerEnabled : Bool := false
+
+def profileOut : System.FilePath := "data/profiles/gpt2.json"
 
 /-- CLI subcommand name used in terminal banners and error messages. -/
 def exeName : String := "torchlean gpt2"
@@ -586,6 +595,16 @@ def main (args : List String) : IO UInt32 := do
       let (input, rest) ← takeInputText rest
       let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train)
+      let (_L0, _L1, _generated) ←
+        if leanProfilerEnabled then
+          withProfile "gpt2.unitTrainStepsFloat" (unitTrainStepsFloat opts input train)
+        else
+          unitTrainStepsFloat opts input train
+      if leanProfilerEnabled then do
+        IO.println "=== LeanProfiler summary ==="
+        printSummary
+        exportProfile profileOut
+        IO.println s!"  wrote profile: {profileOut}"
+      pure ())
 
 end NN.Examples.Models.Sequence.Gpt2

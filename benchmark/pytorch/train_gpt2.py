@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Train the byte-level GPT benchmark (PyTorch mirror of `torchlean gpt2`)."""
+"""Train the byte-level GPT benchmark (PyTorch mirror of `torchlean gpt2`).
+
+LeanProfiler applies to the TorchLean runner only — see `Gpt2.lean` (`leanProfilerEnabled`).
+"""
 
 from __future__ import annotations
 

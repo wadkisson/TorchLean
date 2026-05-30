@@ -7,6 +7,9 @@ Device-agnostic real-data example:
   python3 scripts/datasets/download_example_data.py --auto-mpg
   lake exe torchlean mlp --cpu
   lake build -R -K cuda=true && lake exe torchlean mlp --cuda
+
+LeanProfiler: set `leanProfilerEnabled := true` below, rebuild, then run a short job.
+Profile output: `data/profiles/mlp.json` (open at ui.perfetto.dev).
 -/
 
 module
@@ -15,6 +18,7 @@ module
 public import NN
 public import NN.API.Models.Mlp
 public import NN.Examples.Data.RealPaths
+public import LeanProfiler
 
 /-!
 # MLP Tabular Regression
@@ -42,6 +46,11 @@ open Spec Tensor
 open NN.API
 
 namespace NN.Examples.Models.Supervised.Mlp
+
+/-- Set to `true` and rebuild to profile this example with LeanProfiler. -/
+def leanProfilerEnabled : Bool := false
+
+def profileOut : System.FilePath := "data/profiles/mlp.json"
 
 /-- CLI subcommand name used in terminal banners and error messages. -/
 def exeName : String := "torchlean mlp"
@@ -127,7 +136,16 @@ def main (args : List String) : IO UInt32 := do
         Common.parseCsvModelTrainFlags exeName rest
           _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
       Common.orThrow exeName <| CLI.requireNoArgs rest
-      let report ← fitAutoMpg opts flags
+      let report ←
+        if leanProfilerEnabled then
+          withProfile "mlp.fitAutoMpg" (fitAutoMpg opts flags)
+        else
+          fitAutoMpg opts flags
+      if leanProfilerEnabled then do
+        IO.println "=== LeanProfiler summary ==="
+        printSummary
+        exportProfile profileOut
+        IO.println s!"  wrote profile: {profileOut}"
       IO.println s!"  steps={flags.train.train.steps} loss0={report.before} loss1={report.after}")
 
 end NN.Examples.Models.Supervised.Mlp

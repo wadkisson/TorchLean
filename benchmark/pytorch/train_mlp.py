@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Train the Auto MPG MLP benchmark (PyTorch mirror of `torchlean mlp`)."""
+"""Train the Auto MPG MLP benchmark (PyTorch mirror of `torchlean mlp`).
+
+LeanProfiler applies to the TorchLean runner only — see `Mlp.lean` (`leanProfilerEnabled`).
+"""
 
 from __future__ import annotations
 
