@@ -508,6 +508,8 @@ def unitTrainSteps {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToStri
       IO.println s!"  steps={steps} loss0={L0} loss1={L1}"
       pure (L0, L1)
 
+#profiler.on
+
 /--
 Float-specialized training path with decoded prediction reports.
 
@@ -515,8 +517,6 @@ The CUDA executable uses Lean `Float` tensors, so this branch can show actual pr
 target, and predicted text before and after training. The polymorphic path above is still used for
 non-Float dtype compatibility runs.
 -/
-#profiler.on
-
 def unitTrainStepsFloat (opts : Runtime.Autograd.Torch.Options) (input : String)
     (train : TrainOptions) : IO (Float × Float × String) := do
   nn.withModel mkModel fun model => do
