@@ -601,6 +601,7 @@ def main (args : List String) : IO UInt32 := do
       let (train, rest) ← Common.orThrow exeName <| parseTrainOptions opts rest
       Common.orThrow exeName <| CLI.requireNoArgs rest
       let (_L0, _L1, _generated) ← unitTrainStepsFloat opts input train
+      exportProfile "build/gpt2_trace.json"
       printSummary)
 
 end NN.Examples.Models.Sequence.Gpt2
