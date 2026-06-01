@@ -27,11 +27,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Free runner disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean
+          rm -rf ~/.cache/mathlib
+          df -h
+
       - name: Install elan
         run: curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
 
       - name: Get Mathlib cache
-        run: ~/.elan/bin/lake exe cache get || true
+        run: |
+          ~/.elan/bin/lake exe cache get || true
+          rm -f ~/.cache/mathlib/*.ltar || true
 
       - name: Repo lint (TorchLean policies)
         run: ~/.elan/bin/lake lint
@@ -73,6 +83,7 @@ jobs:
         run: |
           cd blueprint
           ~/.elan/bin/lake exe cache get || true
+          rm -f ~/.cache/mathlib/*.ltar || true
           ~/.elan/bin/lake exe blueprint-gen --output ../_out/blueprint
           cd ..
           if [ -d blueprint/TorchLeanBlueprint/Guide/Assets ]; then
