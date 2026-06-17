@@ -29,7 +29,7 @@ mathematical argument is independent of the neural-network producer:
 
 The proof is deliberately stated over exact `ℝ` functions. Floating-point or executable backends
 must first justify these real hypotheses; `EnclosureBackends.lean` only reuses this theorem through
-backend `toReal` views. This keeps the trust boundary sharp.
+backend `toReal` views. The trust boundary is at that `toReal` bridge.
 -/
 
 @[expose] public section
@@ -143,11 +143,14 @@ theorem localEnclosure_fromClampedDynamics
     have hB_der : ∀ t ∈ Ico 0 T, HasDerivWithinAt B (B' t) (Ici t) t := by
       intro t ht
       have : HasDerivWithinAt (fun t => ε * (1 + t)) ε (Ici t) t := by
+        change HasDerivWithinAt ((fun _ : ℝ => ε) * ((fun _ : ℝ => (1 : ℝ)) + id)) ε
+          (Ici t) t
         simpa [one_mul] using
           (hasDerivWithinAt_const (c := ε) (s := Ici t) (x := t)).mul
             ((hasDerivWithinAt_const (c := (1 : ℝ)) (s := Ici t) (x := t)).add
               (hasDerivWithinAt_id t (Ici t)))
-      simpa [B, B', add_assoc, add_left_comm, add_comm] using (hU_der t ht).add this
+      change HasDerivWithinAt (uU + fun t : ℝ => ε * (1 + t)) (B' t) (Ici t) t
+      simpa [B', add_assoc, add_left_comm, add_comm] using (hU_der t ht).add this
     have h0 : u 0 ≤ B 0 := by
       -- `u(0)=a ≤ uU(0) ≤ uU(0) + ε`
       have : u 0 ≤ uU 0 := by simpa [hu0] using hU0
@@ -191,19 +194,24 @@ theorem localEnclosure_fromClampedDynamics
     have hF_cont : ContinuousOn F (Icc 0 T) := hu_cont.neg
     have hF_der : ∀ t ∈ Ico 0 T, HasDerivWithinAt F (F' t) (Ici t) t := by
       intro t ht
-      simpa [F, F'] using (hu_der t ht).neg
+      change HasDerivWithinAt (-u) (F' t) (Ici t) t
+      simpa [F'] using (hu_der t ht).neg
     have hB_cont : ContinuousOn B (Icc 0 T) :=
       hL_cont.neg.add (continuousOn_const.mul (continuousOn_const.add continuousOn_id))
     have hB_der : ∀ t ∈ Ico 0 T, HasDerivWithinAt B (B' t) (Ici t) t := by
       intro t ht
       have : HasDerivWithinAt (fun t => ε * (1 + t)) ε (Ici t) t := by
+        change HasDerivWithinAt ((fun _ : ℝ => ε) * ((fun _ : ℝ => (1 : ℝ)) + id)) ε
+          (Ici t) t
         simpa [one_mul] using
           (hasDerivWithinAt_const (c := ε) (s := Ici t) (x := t)).mul
             ((hasDerivWithinAt_const (c := (1 : ℝ)) (s := Ici t) (x := t)).add
               (hasDerivWithinAt_id t (Ici t)))
       have hsum :
           HasDerivWithinAt (fun x => ε * (1 + x) + (-uL x)) (ε + (-uL' t)) (Ici t) t := by
-        simpa using this.add (hL_der t ht).neg
+        change HasDerivWithinAt ((fun x : ℝ => ε * (1 + x)) + -uL)
+          (ε + (-uL' t)) (Ici t) t
+        exact this.add (hL_der t ht).neg
       -- Commute the sum to match `B`.
       exact hsum.congr_of_mem (s := Ici t)
         (fun x _ => by simp [B, add_comm]) (Set.self_mem_Ici)
@@ -456,9 +464,9 @@ theorem extendedSolutionEnclosed_fromClampedDynamics
       have haT : a ∈ ({T} : Set ℝ) := (frontier_Iic_subset (α := ℝ) T) haFront
       have : a = T := by simpa using haT
       simp [this]
-    simpa [uLext, constantExtensionAfter] using
-      (ContinuousOn.if (s := Icc 0 τ) (p := fun t : ℝ => t ≤ T) (f := uL) (g := fun _ => uL T)
-        hp h1 h2)
+    change ContinuousOn (fun a : ℝ => if a ≤ T then uL a else uL T) (Icc 0 τ)
+    exact ContinuousOn.if (s := Icc 0 τ) (p := fun t : ℝ => t ≤ T) (f := uL)
+      (g := fun _ => uL T) hp h1 h2
 
   have hUext_cont : ContinuousOn uUext (Icc 0 τ) := by
     classical
@@ -482,9 +490,9 @@ theorem extendedSolutionEnclosed_fromClampedDynamics
       have haT : a ∈ ({T} : Set ℝ) := (frontier_Iic_subset (α := ℝ) T) haFront
       have : a = T := by simpa using haT
       simp [this]
-    simpa [uUext, constantExtensionAfter] using
-      (ContinuousOn.if (s := Icc 0 τ) (p := fun t : ℝ => t ≤ T) (f := uU) (g := fun _ => uU T)
-        hp h1 h2)
+    change ContinuousOn (fun a : ℝ => if a ≤ T then uU a else uU T) (Icc 0 τ)
+    exact ContinuousOn.if (s := Icc 0 τ) (p := fun t : ℝ => t ≤ T) (f := uU)
+      (g := fun _ => uU T) hp h1 h2
 
   have hLext_der : ∀ t ∈ Ico 0 τ, HasDerivWithinAt uLext (uLext' t) (Ici t) t := by
     intro t ht

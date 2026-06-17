@@ -9,9 +9,9 @@ The public site serves the rendered output under `/blueprint/`; the source of tr
 - `TorchLeanBlueprint/Guide/**/*.lean` contains the narrative guide chapters.
 - `TorchLeanBlueprintMain.lean` is the HTML generator executable.
 
-The book is organized as a guide rather than a raw module dump. The generated API docs and import
-graph provide declaration-level lookup; this guide explains the main concepts, workflows, examples,
-and verification boundaries.
+The book is organized as a guide. The generated API docs and import graph provide
+declaration-level lookup; this guide explains the main concepts, workflows, examples, and
+verification boundaries.
 
 Local build:
 

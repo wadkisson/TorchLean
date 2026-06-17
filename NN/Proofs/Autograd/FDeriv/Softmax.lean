@@ -131,8 +131,7 @@ theorem softmaxJvp_eq_deriv {n : Nat} (x dx : Vec n) :
         simp [softmaxDerivCLM, euclideanEquiv]
       rw [hR]
       simp [softmaxJvp, softmaxDerivCoord, dotCLM_apply, evalCLM_apply,
-        ContinuousLinearMap.add_apply, ContinuousLinearMap.smulRight_apply,
-        sub_eq_add_neg, mul_add, mul_comm]
+        ContinuousLinearMap.smulRight_apply, sub_eq_add_neg, mul_add, mul_comm]
 
 /--
 Self-adjointness identity for the softmax Jacobian in this inner-product encoding.
@@ -253,7 +252,9 @@ theorem hasFDerivAt_softmaxVec {n : Nat} (x : Vec n) :
       have hD : softmaxDerivCLM (n := 0) x = (1 : (Vec 0) →L[ℝ] (Vec 0)) := by
         ext dx i
         exact i.elim0
-      simpa [softmaxVec, hD] using ((1 : (Vec 0) →L[ℝ] (Vec 0)).hasFDerivAt (x := x))
+      rw [hD]
+      change HasFDerivAt (fun x : Vec 0 => x) (1 : (Vec 0) →L[ℝ] (Vec 0)) x
+      exact ((1 : (Vec 0) →L[ℝ] (Vec 0)).hasFDerivAt (x := x))
   | succ n =>
       -- Coordinatewise proof: `softmaxVec x i = exp(x i) * (sumExp x)⁻¹`.
       have hsum_ne : sumExp (n := Nat.succ n) x ≠ 0 := by
@@ -282,7 +283,7 @@ theorem hasFDerivAt_softmaxVec {n : Nat} (x : Vec n) :
             hexp.hasFDerivAt
           have happly :
               HasFDerivAt (fun x : Vec (Nat.succ n) => x j) (evalCLM (n := Nat.succ n) j) x := by
-            simpa using ((evalCLM (n := Nat.succ n) j).hasFDerivAt (x := x))
+            exact ((evalCLM (n := Nat.succ n) j).hasFDerivAt (x := x))
           have hcomp := hexpF.comp x happly
           -- simplify the composed CLM
           have hlin :
@@ -343,7 +344,7 @@ theorem hasFDerivAt_softmaxVec {n : Nat} (x : Vec n) :
             hexp.hasFDerivAt
           have happly :
               HasFDerivAt (fun x : Vec (Nat.succ n) => x i) (evalCLM (n := Nat.succ n) i) x := by
-            simpa using ((evalCLM (n := Nat.succ n) i).hasFDerivAt (x := x))
+            exact ((evalCLM (n := Nat.succ n) i).hasFDerivAt (x := x))
           have hcomp := hexpF.comp x happly
           have hlin :
               (ContinuousLinearMap.smulRight (M₁ := ℝ) (M₂ := ℝ) (R := ℝ) (S := ℝ)
@@ -377,8 +378,7 @@ theorem hasFDerivAt_softmaxVec {n : Nat} (x : Vec n) :
           -- expand everything and keep powers factored (`inv_pow` avoids expanding squares)
           simp [softmaxDerivCoord, dotCLM, softmaxVec, sumExp, u, v, u', v', sumDeriv,
             B, ContinuousLinearMap.mul_apply', ContinuousLinearMap.precompR_apply,
-            ContinuousLinearMap.precompL_apply, ContinuousLinearMap.add_apply,
-            ContinuousLinearMap.comp_apply,
+            ContinuousLinearMap.precompL_apply, ContinuousLinearMap.comp_apply,
             ContinuousLinearMap.smulRight_apply, evalCLM_apply, div_eq_mul_inv,
             mul_assoc, mul_left_comm, mul_comm, add_comm,
             sub_eq_add_neg]
@@ -469,6 +469,12 @@ theorem hasFDerivAt_softmaxVec {n : Nat} (x : Vec n) :
           x i)).comp x hpi)
 
       -- Finally, simplify the LHS to `softmaxVec` and the derivative to `softmaxDerivCLM`.
+      change HasFDerivAt
+        (fun x : Vec (Nat.succ n) => WithLp.toLp 2 fun i : Fin (Nat.succ n) =>
+          Real.exp (x.ofLp i) / sumExp x)
+        ((euclideanEquiv (Nat.succ n)).symm.toContinuousLinearMap.comp
+          (ContinuousLinearMap.pi (fun i : Fin (Nat.succ n) => softmaxDerivCoord (n := Nat.succ n) x
+            i))) x
       simpa [softmaxVec, softmaxDerivCLM, softmaxVecOfFun, euclideanEquiv] using hcomp
 
 end

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -116,7 +115,7 @@ $$`x_{0:k}=x'_{0:k}
 y_{0:k}=y'_{0:k}.`
 
 The [Mamba causality API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/StateSpace/MambaCausality.lean) specializes that
-idea to Mamba style computations. The theorem names are intentionally direct:
+idea to Mamba style computations. The theorem names stay direct:
 `diagonalS4_runList_append_outputs_prefix`, `compactMamba_runList_append_outputs_prefix`,
 `selectiveMamba_runListAux_append_outputs_prefix`, and
 `selectiveMamba_runList_append_outputs_prefix`.

@@ -67,8 +67,8 @@ noncomputable def mlpEvalNdIeee32exec {n hidDim : Nat}
 Shape-preserving map over TorchLean specification tensors.
 
 Lean's dependent tensor shape is part of the type, so the map is recursive over shapes rather than
-implemented as a runtime loop. This keeps coercions such as `tensorToReal` definitionally
-transparent in downstream proofs.
+implemented as a runtime loop. Coercions such as `tensorToReal` stay definitionally transparent in
+downstream proofs.
 -/
 noncomputable def tensorMap {α β : Type} (f : α → β) : {s : Shape} → Tensor α s → Tensor β s
   | .scalar, .scalar x => .scalar (f x)

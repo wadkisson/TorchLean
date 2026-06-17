@@ -91,19 +91,19 @@ def generateCnn2PyTorchClass (cfg : Cnn2Cfg) : String :=
       indent2 "",
       indent2 "def __init__(self):",
       indent4 "super().__init__()",
-      (s!"self.conv1 = nn.Conv2d({cfg.conv1.inChannels}, " ++
+      indent4 (s!"self.conv1 = nn.Conv2d({cfg.conv1.inChannels}, " ++
         s!"{cfg.conv1.outChannels}, kernel_size=({cfg.conv1.kernelH}, " ++
         s!"{cfg.conv1.kernelW}), stride={cfg.conv1.stride}, " ++
         s!"padding={cfg.conv1.padding})"),
       indent4 "self.relu1 = nn.ReLU()",
-      (s!"self.pool1 = nn.MaxPool2d(kernel_size=({cfg.pool1.kernelH}, " ++
+      indent4 (s!"self.pool1 = nn.MaxPool2d(kernel_size=({cfg.pool1.kernelH}, " ++
         s!"{cfg.pool1.kernelW}), stride={cfg.pool1.stride})"),
-      (s!"self.conv2 = nn.Conv2d({cfg.conv2.inChannels}, " ++
+      indent4 (s!"self.conv2 = nn.Conv2d({cfg.conv2.inChannels}, " ++
         s!"{cfg.conv2.outChannels}, kernel_size=({cfg.conv2.kernelH}, " ++
         s!"{cfg.conv2.kernelW}), stride={cfg.conv2.stride}, " ++
         s!"padding={cfg.conv2.padding})"),
       indent4 "self.relu2 = nn.ReLU()",
-      (s!"self.pool2 = nn.MaxPool2d(kernel_size=({cfg.pool2.kernelH}, " ++
+      indent4 (s!"self.pool2 = nn.MaxPool2d(kernel_size=({cfg.pool2.kernelH}, " ++
         s!"{cfg.pool2.kernelW}), stride={cfg.pool2.stride})"),
       indent4 "self.flatten = nn.Flatten()",
       indent4 s!"self.fc = nn.Linear({cfg.flatSize}, {cfg.fcOut})",
@@ -133,7 +133,7 @@ def generateCnn2PyTorchClass (cfg : Cnn2Cfg) : String :=
       indent2 "",
       indent2 "@property",
       indent2 "def operation_types(self):",
-      ("return [\"Conv2D\", \"ReLU\", \"MaxPool2D\", \"Conv2D\", \"ReLU\", " ++
+      indent4 ("return [\"Conv2D\", \"ReLU\", \"MaxPool2D\", \"Conv2D\", \"ReLU\", " ++
         "\"MaxPool2D\", \"Flatten\", \"Linear\"]"),
       indent2 ""
     ]

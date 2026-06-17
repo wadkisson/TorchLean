@@ -65,7 +65,6 @@ This is the generator side of Mao et al.'s least-squares objective: the generato
 the discriminator's "fake" target; it tries to move generated samples onto the real-score target.
 -/
 @[simp] theorem generatorLoss_eq_mse_fake_real
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α latent obs) (z : Tensor α latent) :
     generatorLoss model z =
       Spec.mseSpec (s := .scalar) (fakeScore model z) (realTarget (α := α)) := by
@@ -79,7 +78,6 @@ as a named theorem gives downstream examples and proof files a stable reference 
 semantics, instead of requiring them to unfold the spec directly.
 -/
 @[simp] theorem discriminatorLoss_eq_real_fake_terms
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α latent obs) (xReal : Tensor α obs) (z : Tensor α latent) :
     discriminatorLoss model xReal z =
       Spec.mseSpec (s := .scalar) (realScore model xReal) (realTarget (α := α)) +

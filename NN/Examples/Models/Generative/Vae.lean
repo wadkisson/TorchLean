@@ -5,14 +5,12 @@ Authors: TorchLean Team
 
 Run:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe -K cuda=true torchlean vae --cuda --steps 10
+  lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1
 -/
 
 module
 
 public import NN
-public import NN.API.Models.Generative
-public import NN.API.Models.TrainFixed
 public import NN.Examples.Models.Common.RealData
 public import NN.Spec.Models.Vae
 public import NN.MLTheory.Generative.Latent.VAE
@@ -29,8 +27,7 @@ reconstruct the image while keeping latent mean/log-variance proxy channels near
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Generative.Vae
 
@@ -38,7 +35,7 @@ namespace NN.Examples.Models.Generative.Vae
 def exeName : String := "torchlean vae"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "vae"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "vae"
 
 /--
 Shared vector-image configuration.
@@ -49,10 +46,10 @@ commands, while the VAE-specific output shape adds latent mean/log-variance prox
 def cfg : nn.models.VectorGenerativeConfig := nn.models.compactImageConfig
 
 /-- Input shape: a batch of flattened CIFAR image vectors. -/
-abbrev σ : Shape := nn.models.vectorDataShape cfg
+abbrev σ := nn.models.vectorDataShape cfg
 
 /-- Output shape: reconstruction plus latent regularization proxy channels. -/
-abbrev τ : Shape := nn.models.vectorVaeOutShape cfg
+abbrev τ := nn.models.vectorVaeOutShape cfg
 
 /--
 Trainable VAE-style vector model.
@@ -60,26 +57,43 @@ Trainable VAE-style vector model.
 The executable target is still an MSE-style supervised sample; the imported spec/theory files state
 the theorem-facing VAE objective separately.
 -/
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.vectorVae cfg
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.VectorVAE cfg
+
+/-- Public singleton dataset for compact CIFAR reconstruction plus latent-stat targets. -/
+def data (flags : RealData.CifarModelTrainFlags) : Trainer.Dataset σ τ :=
+  RealData.cifarVectorDataset cfg (by decide) exeName (nn.models.vaeSample cfg)
+    flags.xPath flags.yPath flags.nRows flags.seed
+
+/-- Train the compact VAE-style model with the public `Trainer` surface. -/
+def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
+    IO (Trainer.TrainResult σ τ) := do
+  Data.requirePairedFiles exeName
+    "CIFAR-10 images" flags.xPath
+    "CIFAR-10 labels" flags.yPath
+    RealData.missingCifarHint
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := flags.lr } })
+        .regression
+        (seed := flags.seed)
+  trainer.train
+    (data flags)
+    (ModelZoo.TrainFlags.trainOptions flags.toModelTrainFlags
+      (title := "VAE-style CIFAR reconstruction")
+      (notes := RealData.cifarClassifierNotes cfg.batch flags #[s!"latentDim={cfg.latentDim}"]))
 
 /--
 Executable entrypoint for the compact VAE-style run.
 
 The command loads CIFAR vectors, constructs the reconstruction/latent-proxy target, trains with
-Adam, and writes a standard loss curve.
+Adam, and writes the standard TorchLean training summary/log.
 -/
-def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
-      let flags ← Common.orThrow exeName <|
-        RealData.parseCifarLoggedTrainFlags exeName rest defaultLogJson 10
-      let _curve ← RealData.fitCifarVectorCurve cfg (by decide) exeName
-        "VAE-style CIFAR reconstruction" mkModel (nn.models.vaeSample cfg)
-        opts flags #[s!"latentDim={cfg.latentDim}"]
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: CIFAR beta-VAE-style training (device={if opts.useGpu then "cuda" else "cpu"})")
-      printOk := true }
+def main (args : List String) : IO UInt32 :=
+  Trainer.Command.regressionNpy exeName args
+    (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 10 1e-3)
+    (ModelZoo.bannerWithDevice exeName "CIFAR beta-VAE-style training")
+    train
 
 end NN.Examples.Models.Generative.Vae

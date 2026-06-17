@@ -129,11 +129,6 @@ def idxWo {n dModel numHeads headDim : Nat} {ss : List Shape} :
     Idx (ΓMHA n dModel numHeads headDim ++ ss) (WoShape dModel numHeads headDim) :=
   ⟨⟨4, by simp [ΓMHA]⟩, by simp [ΓMHA]⟩
 
-/-- Index of the most-recently appended tensor in a `DGraph` context. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 lemma size_big_to_heads (n numHeads headDim : Nat) :
     Shape.size (BigShape n numHeads headDim) = Shape.size (HeadsShape n numHeads headDim) := by
   -- `Shape.size` multiplies dimension sizes; the remaining goal is a commutative-monoid identity.
@@ -187,7 +182,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
   let idxQbig :
       Idx (ΓMHA n dModel numHeads headDim ++ [BigShape n numHeads headDim]) (BigShape n numHeads
         headDim) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim) (ss := []) (τ := BigShape n numHeads headDim)
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim) (ss := []) (τ := BigShape n numHeads headDim)
   let nodeQheads :
       Node (ΓMHA n dModel numHeads headDim ++ [BigShape n numHeads headDim]) (HeadsShape n numHeads
         headDim) :=
@@ -230,7 +225,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
         (ΓMHA n dModel numHeads headDim ++
           [BigShape n numHeads headDim, HeadsShape n numHeads headDim, BigShape n numHeads headDim])
         (BigShape n numHeads headDim) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim)
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim)
       (ss := [BigShape n numHeads headDim, HeadsShape n numHeads headDim]) (τ := BigShape n numHeads
         headDim)
   let nodeKheads :
@@ -257,7 +252,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
           [BigShape n numHeads headDim, HeadsShape n numHeads headDim, BigShape n numHeads headDim,
             HeadsShape n numHeads headDim])
         (HeadsShape n numHeads headDim) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim)
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim)
       (ss := [BigShape n numHeads headDim, HeadsShape n numHeads headDim, BigShape n numHeads
         headDim])
       (τ := HeadsShape n numHeads headDim)
@@ -340,7 +335,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
           , BigShape n numHeads headDim
           ])
         (BigShape n numHeads headDim) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss :=
         [ BigShape n numHeads headDim, HeadsShape n numHeads headDim
@@ -392,7 +387,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
       Idx (ΓMHA n dModel numHeads headDim ++ [BigShape n numHeads headDim, HeadsShape n numHeads
         headDim])
         (HeadsShape n numHeads headDim) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim) (ss := [BigShape n numHeads headDim])
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim) (ss := [BigShape n numHeads headDim])
       (τ := HeadsShape n numHeads headDim)
   let idxQheads7 :
       Idx (ΓMHA n dModel numHeads headDim ++ ss7) (HeadsShape n numHeads headDim) :=
@@ -411,7 +406,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
           , .dim numHeads (.dim headDim (.dim n .scalar))
           ])
         (.dim numHeads (.dim headDim (.dim n .scalar))) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss := [ BigShape n numHeads headDim, HeadsShape n numHeads headDim
              , BigShape n numHeads headDim, HeadsShape n numHeads headDim ])
@@ -443,7 +438,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
   let idxScores :
       Idx (ΓMHA n dModel numHeads headDim ++ ss7 ++ [.dim numHeads (.dim n (.dim n .scalar))])
         (.dim numHeads (.dim n (.dim n .scalar))) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim) (ss := ss7) (τ := .dim numHeads (.dim n (.dim n
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim) (ss := ss7) (τ := .dim numHeads (.dim n (.dim n
       .scalar)))
   let nodeScaled :
       Node (ΓMHA n dModel numHeads headDim ++ ss7 ++ [.dim numHeads (.dim n (.dim n .scalar))])
@@ -463,7 +458,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
         (ΓMHA n dModel numHeads headDim ++ ss7 ++
           [.dim numHeads (.dim n (.dim n .scalar)), .dim numHeads (.dim n (.dim n .scalar))])
         (.dim numHeads (.dim n (.dim n .scalar))) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss := ss7 ++ [.dim numHeads (.dim n (.dim n .scalar))])
       (τ := .dim numHeads (.dim n (.dim n .scalar)))
@@ -490,7 +485,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
       , .dim numHeads (.dim n (.dim n .scalar))]      -- probs
   let idxVheads0 :
       Idx (ΓMHA n dModel numHeads headDim ++ ss7) (HeadsShape n numHeads headDim) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss :=
         [ BigShape n numHeads headDim
@@ -512,7 +507,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
         , .dim numHeads (.dim n (.dim n .scalar))])
   let idxProbs :
       Idx (ΓMHA n dModel numHeads headDim ++ ss10) (.dim numHeads (.dim n (.dim n .scalar))) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss := ss7 ++
         [.dim numHeads (.dim n (.dim n .scalar)), .dim numHeads (.dim n (.dim n .scalar))])
@@ -534,7 +529,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
   let idxHeadOut :
       Idx (ΓMHA n dModel numHeads headDim ++ ss10 ++ [HeadsShape n numHeads headDim])
         (HeadsShape n numHeads headDim) :=
-    idxLast (Γ := ΓMHA n dModel numHeads headDim) (ss := ss10) (τ := HeadsShape n numHeads headDim)
+    Idx.last (Γ := ΓMHA n dModel numHeads headDim) (ss := ss10) (τ := HeadsShape n numHeads headDim)
   let nodeSwapped :
       Node (ΓMHA n dModel numHeads headDim ++ ss10 ++ [HeadsShape n numHeads headDim])
         (.dim n (.dim numHeads (.dim headDim .scalar))) :=
@@ -553,7 +548,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
         (ΓMHA n dModel numHeads headDim ++ ss10 ++
           [HeadsShape n numHeads headDim, .dim n (.dim numHeads (.dim headDim .scalar))])
         (.dim n (.dim numHeads (.dim headDim .scalar))) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss := ss10 ++ [HeadsShape n numHeads headDim])
       (τ := .dim n (.dim numHeads (.dim headDim .scalar)))
@@ -585,7 +580,7 @@ def mhaDGraph {n dModel numHeads headDim : Nat} (c : ℝ) :
         , BigShape n numHeads headDim
         ])
         (BigShape n numHeads headDim) :=
-    idxLast
+    Idx.last
       (Γ := ΓMHA n dModel numHeads headDim)
       (ss := ss10 ++ [HeadsShape n numHeads headDim, .dim n (.dim numHeads (.dim headDim .scalar))])
       (τ := BigShape n numHeads headDim)

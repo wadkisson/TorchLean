@@ -3,75 +3,54 @@ Copyright (c) 2026 TorchLean
 Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 -/
-
 module
-
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness
 public import NN.Floats.IEEEExec.Exec32
 public import NN.Floats.IEEEExec.MkBitsToReal
 public import NN.Floats.IEEEExec.NatLemmas
 public import NN.Floats.IEEEExec.RoundShiftRightEven
-
 public import Mathlib.Data.EReal.Basic
 public import Mathlib.Data.Nat.Log
 public import Mathlib.Data.Real.Basic
-
 /-!
 # `roundDyadicToIEEE32` is sandwiched by directed rounding (the “full IEEE” bridge)
-
 Our codebase has **two** floating-point execution models for binary32:
-
 1. `roundDyadicToIEEE32` (in `NN/Floats/IEEEExec/Exec32.lean`)
    - models IEEE-754 **round-to-nearest, ties-to-even** when rounding an *exact* dyadic
      `(-1)^sign * mant * 2^exp` back to float32.
 2. `roundDyadicDown` / `roundDyadicUp`
    - implement **directed rounding** toward `-∞` / `+∞`.
    - these are the primitives used by interval arithmetic endpoints (`addDown/addUp`, etc.).
-
 To justify “IBP/CROWN bounds are sound w.r.t. full IEEE execution”, we need a bridge that relates
 these two rounding policies.
-
 The key fact is:
-
 > For every exact dyadic `d`, nearest-even rounding lies between the directed endpoints:
 >
 > `roundDyadicDown d ≤ roundDyadicToIEEE32 d ≤ roundDyadicUp d`
 >
 > (with the order taken in `EReal` via `toEReal` so that `±∞` behavior remains well-defined).
-
 Intuition:
 - Directed rounding computes the **lower / upper neighbor** of the exact real value on the binary32
   grid (“floor” / “ceil” on the float lattice).
 - Nearest-even rounding must choose **one of these two neighbors**.
-
 So the proof splits into:
 1. a *nonnegative* lemma showing the nearest-even implementation returns either the directed `down`
    result or the directed `up` result, and
 2. a sign-flip lemma for `toEReal` allowing us to lift the result to signed dyadics.
-
 We keep the argument executable-model-specific but mathematically elementary:
 the only “real math” we use is that `Nat.log2` controls the bit-length, and that shifting right is
 division by a power of two.
 -/
-
 @[expose] public section
-
-
 namespace TorchLean.Floats.IEEE754
 namespace IEEE32Exec
-
 open TorchLean.Floats
-
 noncomputable section
-
 /-! ## Small Nat helpers -/
-
 private lemma shiftRight_eq_div_pow (n k : Nat) : Nat.shiftRight n k = n / 2 ^ k := by
   simp [Nat.shiftRight_eq_div_pow]
-
 /--
 `shiftRightCeilPow2 n shift` is always either `n >>> shift` or `(n >>> shift) + 1`.
-
 This is the “two-point” characterization of the ceil-quotient; it complements
 `roundShiftRightEven_eq_shiftRight_or_shiftRight_add1` for nearest-even rounding.
 -/
@@ -92,21 +71,16 @@ private lemma shiftRightCeilPow2_eq_shiftRight_or_shiftRight_add1 (n shift : Nat
     by_cases hrem : rem == 0
     · left; simp [hdef, hrem, q]
     · right; simp [hdef, hrem, q]
-
 private lemma shiftRightCeilPow2_le_shiftRight_add1 (n shift : Nat) :
     shiftRightCeilPow2 n shift ≤ Nat.shiftRight n shift + 1 := by
   have hor := shiftRightCeilPow2_eq_shiftRight_or_shiftRight_add1 (n := n) (shift := shift)
   rcases hor with hq | hq <;> simp [hq]
-
 /-! ### Normalizing the `Nat.decLe` branch
-
 `Nat.decLe` is implemented as a nested dependent `dite` over `Nat.ble`, and rewriting under the
 scrutinee of a `match` on `Decidable` needs a dedicated helper.
-
 To keep our main proofs readable, we use a small lemma that reduces the *specific* `decLe`-match
 used in the binary32 subnormal “round up to the smallest normal” check.
 -/
-
 private lemma match_pow2_23_decLe_isFalse (x : Nat) (h : ¬ pow2 23 ≤ x) :
     (match (pow2 23).decLe x with
     | isTrue _ => ofBits (mkBits false 1 0)
@@ -119,7 +93,6 @@ private lemma match_pow2_23_decLe_isFalse (x : Nat) (h : ¬ pow2 23 ≤ x) :
       (eq_iff_iff.mp (Nat.ble_eq (x := pow2 23) (y := x))).1 hEq
     exact h hxle
   simp [Nat.decLe, hcond]
-
 private lemma match_pow2_23_decLe_isFalse_const1 (x : Nat) (h : ¬ pow2 23 ≤ x) :
     (match (pow2 23).decLe x with
     | isTrue _ => ofBits (mkBits false 1 0)
@@ -132,21 +105,15 @@ private lemma match_pow2_23_decLe_isFalse_const1 (x : Nat) (h : ¬ pow2 23 ≤ x
       (eq_iff_iff.mp (Nat.ble_eq (x := pow2 23) (y := x))).1 hEq
     exact h hxle
   simp [Nat.decLe, hcond]
-
 /-!
 ## Bit-length bounds used to rule out impossible carries
-
 In the normal regime, `roundDyadicToIEEE32` computes a 24-bit mantissa `m24`.
-
 If `m24 = 2^24` we carry into the exponent (this is the IEEE rule when rounding pushes us across a
 power-of-two boundary).
-
 However, the **floor quotient** produced by `Nat.shiftRight` can never be `2^24` in that regime: it
 always fits strictly below `2^24`.
-
 We prove the corresponding statement as a reusable lemma.
 -/
-
 private lemma shiftRight_lt_pow2_of_lt_pow (n k t : Nat) (hn : n < 2 ^ (k + t)) :
     Nat.shiftRight n k < 2 ^ t := by
   -- `n >>> k = n / 2^k`, and `2^(k+t) = 2^k * 2^t`.
@@ -154,7 +121,6 @@ private lemma shiftRight_lt_pow2_of_lt_pow (n k t : Nat) (hn : n < 2 ^ (k + t)) 
     simpa [Nat.pow_add, Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm] using hn
   have hdiv : n / 2 ^ k < 2 ^ t := Nat.div_lt_of_lt_mul hn'
   simpa [Nat.shiftRight_eq_div_pow] using hdiv
-
 private lemma shiftRight_log2_sub_lt_pow2_24 (mant : Nat) (_hm : mant ≠ 0) (hlog : 23 ≤ mant.log2) :
     Nat.shiftRight mant (mant.log2 - 23) < pow2 24 := by
   -- Use the generic `lt_pow_succ_log_self` bound with base 2.
@@ -178,7 +144,6 @@ private lemma shiftRight_log2_sub_lt_pow2_24 (mant : Nat) (_hm : mant ≠ 0) (hl
   have hq : Nat.shiftRight mant (mant.log2 - 23) < 2 ^ 24 :=
     shiftRight_lt_pow2_of_lt_pow (n := mant) (k := mant.log2 - 23) (t := 24) hpow
   simpa [pow2_eq_two_pow] using hq
-
 private lemma shiftLeft_lt_pow2_24_of_log2_lt (mant : Nat) (_hm : mant ≠ 0) (hlog : mant.log2 < 23)
   :
     Nat.shiftLeft mant (23 - mant.log2) < pow2 24 := by
@@ -218,24 +183,18 @@ private lemma shiftLeft_lt_pow2_24_of_log2_lt (mant : Nat) (_hm : mant ≠ 0) (h
       simpa [hsimp] using hltmul
     simpa [Nat.shiftLeft_eq] using this
   simpa [pow2_eq_two_pow] using this
-
 /-!
 ## Nonnegative case: nearest-even picks `down` or `up`
-
 For `sign = false`, `roundDyadicDown` and `roundDyadicUp` reduce to the positive kernels
 `roundDyadicPosDown` / `roundDyadicPosUp`.
-
 In each magnitude regime, the only difference between the three rounders is the choice of Nat
 quotient when shifting right:
-
 - floor quotient: `Nat.shiftRight`
 - nearest-even:  `roundShiftRightEven`
 - ceil quotient: `shiftRightCeilPow2`
-
 Since each of these returns either `q` or `q+1`, nearest-even must coincide with one of the
 directed candidates.
 -/
-
 private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (mant : Nat) (exp : Int)
   :
     let d : Dyadic := { sign := false, mant := mant, exp := exp }
@@ -249,7 +208,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
     have hmbeq : (mant == 0) = false := (beq_eq_false_iff_ne).2 hm
     let log2m : Nat := Nat.log2 mant
     let k : Int := (Int.ofNat log2m) + exp
-
     -- We run the same case split as the executable code, but we keep `k` explicit.
     by_cases hkHi : k > 127
     · -- overflow: nearest and `up` both return `+∞`.
@@ -311,7 +269,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
           have hkHiExp : ¬ ((Int.ofNat log2m) + exp > 127) := by simpa [k] using hkHi'
           have hkUnderExp : ¬ ((Int.ofNat log2m) + exp < -150) := by simpa [k] using hkUnder'
           have hkSubExp : (Int.ofNat log2m) + exp < -126 := by simpa [k] using hkSub
-
           cases hsh : (exp + 149) with
           | ofNat sh =>
               -- Left-shift case: all three compute the same `fracNat = mant <<< sh`.
@@ -366,7 +323,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                 have : Nat.shiftLeft mant sh < 2 ^ 23 := by
                   simpa [Nat.shiftLeft_eq] using hmul''
                 simpa [pow2_eq_two_pow] using this
-
               -- With these bounds, all three rounders produce the same subnormal `mkBits false 0
               -- frac`.
               left
@@ -381,7 +337,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
               have hzFrac : (frac == 0) = false := (beq_eq_false_iff_ne).2 hfrac_ne0'
               have hdecFrac : ¬ pow2 23 ≤ frac := Nat.not_le_of_lt hfrac_lt'
               have hmodFrac : frac % pow2 23 = frac := Nat.mod_eq_of_lt hfrac_lt'
-
               -- The magnitude guards that force both rounders into the same subnormal branch.
               have hkHiGuardFalse : ¬ (127 : Int) < ((mant.log2 : Nat) : Int) + exp := by
                 have : ¬ (127 : Int) < (Int.ofNat log2m) + exp := by
@@ -413,7 +368,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                     simpa using hk149nonneg
                   exact (Int.add_le_add_iff_right 149).1 this
                 exact not_lt_of_ge hkge
-
               have hnear' : roundDyadicToIEEE32 d = ofBits (mkBits false 0 frac) := by
                 -- Unfold to the subnormal branch and split on the *actual* `decLe` in the code.
                 -- (Split on `mant <<< sh` rather than `frac` to avoid `simp`-mismatch
@@ -436,17 +390,15 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                     | Int.ofNat sh => mant <<< sh
                     | Int.negSucc sh => roundShiftRightEven mant (sh + 1)) = mant <<< sh := by
                   simp [hsh]
-                have hEq :=
-                  match_pow2_23_decLe_isFalse
-                    (x :=
-                      (match exp + 149 with
-                      | Int.ofNat sh => mant <<< sh
-                      | Int.negSucc sh => roundShiftRightEven mant (sh + 1)))
-                    hdec
-                -- Rewrite the `x` occurrences to `mant <<< sh` and fold back to `frac`.
-                simpa [hx, frac]
-                  using hEq
-
+                have hdecMant : ¬ pow2 23 ≤ mant <<< sh := by
+                  simpa [frac] using hdecFrac
+                rw [hsh]
+                have hcond : ¬ Eq (Nat.ble (pow2 23) (mant <<< sh)) true := by
+                  intro hEq
+                  have hxle : pow2 23 ≤ mant <<< sh :=
+                    (eq_iff_iff.mp (Nat.ble_eq (x := pow2 23) (y := mant <<< sh))).1 hEq
+                  exact hdecMant hxle
+                simp [Nat.decLe, hcond, frac]
               have hdown' : roundDyadicDown d = ofBits (mkBits false 0 frac) := by
                 -- Directed-down uses the same `fracNat = mant <<< sh`, then masks by `% 2^23`.
                 -- Here the mask is a no-op because `frac < 2^23`.
@@ -455,23 +407,19 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                 simp (config := { zeta := true })
                   [d, roundDyadicDown, roundDyadicPosDown, hmbeq, hkHiGuardFalse, hkUnder149False,
                     hkSubGuardTrue, hsh, hzFrac, frac, hmod']
-
               simp [hnear', hdown']
           | negSucc sh =>
               -- Right-shift case: nearest-even chooses `q` or `q+1`.
               set shift : Nat := sh + 1
               set q : Nat := Nat.shiftRight mant shift
-
               have hkHiExp : ¬ ((Int.ofNat log2m) + exp > 127) := by simpa [k] using hkHi'
               have hkUnderExp : ¬ ((Int.ofNat log2m) + exp < -150) := by simpa [k] using hkUnder'
               have hkSubExp : (Int.ofNat log2m) + exp < -126 := by simpa [k] using hkSub
-
               have hnear_cases :
                   roundShiftRightEven mant shift = q ∨ roundShiftRightEven mant shift = q + 1 := by
                 simpa [q] using
                   (roundShiftRightEven_eq_shiftRight_or_shiftRight_add1 (n := mant) (shift :=
                     shift))
-
               -- A small bound: in the subnormal branch, the *exact* scaled fraction is `< 2^23`,
               -- hence the floor quotient `q` is `< 2^23`.
               have hq_lt : q < pow2 23 := by
@@ -523,7 +471,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                   have hpow : mant < 2 ^ (shift + 23) := by simpa [this] using hlt''
                   exact shiftRight_lt_pow2_of_lt_pow (n := mant) (k := shift) (t := 23) hpow
                 simpa [q, pow2_eq_two_pow] using this
-
               -- Case split on the nearest-even quotient.
               rcases hnear_cases with hqNear | hqNear
               · -- nearest chose `q` (the floor quotient), so it matches directed-down.
@@ -533,7 +480,7 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                 -- already know `¬k < -150`).
                 by_cases hkUnder149 : k < -149
                 · have hkGe : (-150 : Int) ≤ k := by
-                    exact le_of_not_gt (by simpa [gt_iff_lt] using hkUnderExp)
+                      exact le_of_not_gt (by simpa [k, gt_iff_lt] using hkUnderExp)
                   have hkLe : k ≤ (-150 : Int) := by
                     have : k < (-150 : Int) + 1 := by
                       simpa using hkUnder149
@@ -640,7 +587,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                       simpa [k, log2m] using hkUnder149
                     have hdec : ¬ pow2 23 ≤ q := Nat.not_le_of_lt hq_lt
                     have hmod : q % pow2 23 = q := Nat.mod_eq_of_lt hq_lt
-
                     have hnear' : roundDyadicToIEEE32 d = ofBits (mkBits false 0 q) := by
                       -- In this branch `fracNat = roundShiftRightEven mant (sh+1) = q`,
                       -- and `q < 2^23`, so the `decLe` match takes the `isFalse` branch.
@@ -667,17 +613,16 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                             (match exp + 149 with
                             | Int.ofNat sh => mant <<< sh
                             | Int.negSucc sh => roundShiftRightEven mant (sh + 1)) := hx.symm
-                      have hEq :=
-                        match_pow2_23_decLe_isFalse
-                          (x :=
-                            (match exp + 149 with
-                            | Int.ofNat sh => mant <<< sh
-                            | Int.negSucc sh => roundShiftRightEven mant (sh + 1)))
-                          hdecx
-                      -- The goal uses `q` in the payload position; rewrite it to `fracNat` using
-                      -- `hx'`.
-                      simpa [hx'] using hEq
-
+                      rw [hsh]
+                      have hdecRS : ¬ pow2 23 ≤ roundShiftRightEven mant (sh + 1) := by
+                        simpa [hq'] using hdec
+                      have hcond : ¬ Eq (Nat.ble (pow2 23) (roundShiftRightEven mant (sh + 1))) true := by
+                        intro hEq
+                        have hxle : pow2 23 ≤ roundShiftRightEven mant (sh + 1) :=
+                          (eq_iff_iff.mp (Nat.ble_eq
+                            (x := pow2 23) (y := roundShiftRightEven mant (sh + 1)))).1 hEq
+                        exact hdecRS hxle
+                      simp [Nat.decLe, hdec, hq']
                     have hdown' : roundDyadicDown d = ofBits (mkBits false 0 q) := by
                       -- Directed-down uses the exact floor quotient `q = mant >>> (sh+1)` and then
                       -- masks.
@@ -693,7 +638,6 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                       intro hqEq
                       -- If the quotient is 0, the masked fraction is 0, hence the result is `+0`.
                       simp [hqEq, posZero, mkBits]
-
                     simp [hnear', hdown']
               · -- nearest chose `q+1`, so it must match directed-up (ceil quotient).
                 right
@@ -708,13 +652,11 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                   have := shiftRightCeilPow2_le_shiftRight_add1 (n := mant) (shift := shift)
                   simpa [q] using this
                 have hceil : shiftRightCeilPow2 mant shift = q + 1 := le_antisymm hceil_le hceil_ge
-
                 -- We also have the bound `q < 2^23`, so `q+1 ≤ 2^23`.
                 have hq1_le : q + 1 ≤ pow2 23 := by
                   have : q + 1 ≤ 2 ^ 23 := Nat.succ_le_of_lt (by simpa [pow2_eq_two_pow] using
                     hq_lt)
                   simpa [pow2_eq_two_pow] using this
-
                 -- As in the floor case, handle the `k < -149` guard in directed-up explicitly.
                 by_cases hkUnder149 : k < -149
                 ·
@@ -722,7 +664,7 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                 -- yields
                   -- the minimum subnormal (`frac = 1`), matching the `k < -149` branch of `up`.
                   have hkGe : (-150 : Int) ≤ k := by
-                    exact le_of_not_gt (by simpa [gt_iff_lt] using hkUnderExp)
+                      exact le_of_not_gt (by simpa [k, gt_iff_lt] using hkUnderExp)
                   have hkLe : k ≤ (-150 : Int) := by
                     have : k < (-150 : Int) + 1 := by
                       simpa using hkUnder149
@@ -773,37 +715,34 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                     simpa [log2m] using hkSubExp
                   have hxRS : roundShiftRightEven mant (sh + 1) = 1 := by
                     simpa [shift] using hqNear1
+                  have hdecRS : ¬ pow2 23 ≤ roundShiftRightEven mant (sh + 1) := by
+                    simpa [hxRS] using hdec1
                   have hdecMatch1 :
                       (match (pow2 23).decLe (roundShiftRightEven mant (sh + 1)) with
                       | isTrue _ => ofBits (mkBits false 1 0)
                       | isFalse _ =>
                         ofBits (mkBits false 0 (roundShiftRightEven mant (sh + 1)))) =
                         ofBits (mkBits false 0 1) := by
-                    have hdecRS : ¬ pow2 23 ≤ roundShiftRightEven mant (sh + 1) := by
-                      simpa [hxRS] using hdec1
-                    cases h :
-                        (pow2 23).decLe (roundShiftRightEven mant (sh + 1)) with
-                    | isTrue hle' =>
-                        exact False.elim (hdecRS hle')
-                    | isFalse _ =>
-                        simp [hxRS]
+                    have hcond : ¬ Eq (Nat.ble (pow2 23) (roundShiftRightEven mant (sh + 1))) true := by
+                      intro hEq
+                      have hxle : pow2 23 ≤ roundShiftRightEven mant (sh + 1) :=
+                        (eq_iff_iff.mp (Nat.ble_eq
+                          (x := pow2 23) (y := roundShiftRightEven mant (sh + 1)))).1 hEq
+                      exact hdecRS hxle
+                    simp [Nat.decLe, hdec1, hxRS]
                   have hnear1 : roundDyadicToIEEE32 d = ofBits (mkBits false 0 1) := by
-                    -- Unfold to the subnormal branch, then reduce the remaining `decLe` match.
                     simp (config := { zeta := true })
                       [d, roundDyadicToIEEE32, hmbeq,
                         hkHiGuardFalse, hkUnderGuardFalse, hkSubGuardTrue,
                         hsh, hxRS]
-                    -- Remaining goal: the `decLe` match must take the `isFalse` branch.
-                    let fracNat : Nat :=
-                      (match exp + 149 with
-                      | Int.ofNat sh => mant <<< sh
-                      | Int.negSucc sh => roundShiftRightEven mant (sh + 1))
-                    have hfrac : fracNat = 1 := by
-                      simp [fracNat, hsh, hxRS]
-                    have hdecFrac : ¬ pow2 23 ≤ fracNat := by
-                      simpa [hfrac] using hdec1
-                    simpa [fracNat] using
-                      (match_pow2_23_decLe_isFalse_const1 (x := fracNat) hdecFrac)
+                    rw [hsh]
+                    have hcond : ¬ Eq (Nat.ble (pow2 23) (roundShiftRightEven mant (sh + 1))) true := by
+                      intro hEq
+                      have hxle : pow2 23 ≤ roundShiftRightEven mant (sh + 1) :=
+                        (eq_iff_iff.mp (Nat.ble_eq
+                          (x := pow2 23) (y := roundShiftRightEven mant (sh + 1)))).1 hEq
+                      exact hdecRS hxle
+                    simp [Nat.decLe, hdec1, hxRS]
                   have hup1 : roundDyadicUp d = posMinSubnormal := by
                     have hkUnder149GuardTrue : ((mant.log2 : Nat) : Int) + exp < (-149 : Int) := by
                       -- In this branch we have `k = -150`, hence certainly `k < -149`.
@@ -817,7 +756,8 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                         hkHiGuardFalse, hkUnder149GuardTrue]
                   -- `posMinSubnormal` is exactly `ofBits (mkBits false 0 1)`.
                   have hnear1' : roundDyadicToIEEE32 d = posMinSubnormal := by
-                    simpa [posMinSubnormal] using hnear1
+                    have hbits : mkBits false 0 1 = 0x00000001 := by decide
+                    simpa [posMinSubnormal, hbits] using hnear1
                   simp [hnear1', hup1]
                 ·
                 -- Proper subnormal regime (`¬k < -149`): both are computed from the ceil quotient
@@ -921,21 +861,17 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
             intro hk
             have h149 : (-149 : Int) < (-126 : Int) := by decide
             exact hkSubGuardFalse (lt_trans hk h149)
-
           by_cases hlog : 23 ≤ log2m
           · -- shift-right case (mantissa shrink).
             have hlogM : 23 ≤ mant.log2 := by simpa [log2m] using hlog
             set shift : Nat := log2m - 23
             set q : Nat := Nat.shiftRight mant shift
-
             have hq_lt : q < pow2 24 :=
               shiftRight_log2_sub_lt_pow2_24 (mant := mant) (_hm := hm) (hlog := hlog)
-
             have hnear_cases :
                 roundShiftRightEven mant shift = q ∨ roundShiftRightEven mant shift = q + 1 := by
               simpa [q] using
                 (roundShiftRightEven_eq_shiftRight_or_shiftRight_add1 (n := mant) (shift := shift))
-
             rcases hnear_cases with hqNear | hqNear
             · -- nearest chose floor quotient `q`, so it matches directed-down.
               left
@@ -1058,13 +994,10 @@ private theorem roundDyadicToIEEE32_eq_roundDyadicDown_or_roundDyadicUp_pos (man
                       hkHiGuardFalse, hkUnder149GuardFalse, hkSubGuardFalse, hlog, m24, hmod']
                 simpa [k, log2m, Int.toNat] using htmp
               simp [hnear, hdown]
-
 /-! ## Main theorem: nearest-even lies between directed endpoints (in `EReal`) -/
-
 private lemma toEReal_roundDyadicDown_le_roundDyadicUp (d : Dyadic) :
     toEReal (roundDyadicDown d) ≤ toEReal (roundDyadicUp d) := by
   exact le_trans (toEReal_roundDyadicDown_le (d := d)) (toEReal_roundDyadicUp_ge (d := d))
-
 @[simp] private lemma toEReal_posZero : toEReal (posZero : IEEE32Exec) = (0 : EReal) := by
   have hexp : (0 : Nat) < 255 := by decide
   have hfrac : (0 : Nat) < 2 ^ 23 := by decide
@@ -1088,15 +1021,15 @@ private lemma toEReal_roundDyadicDown_le_roundDyadicUp (d : Dyadic) :
     -- `toReal` follows the `toDyadic?` decode.
     simp [toReal_eq, hdy, dyadicToReal]
   simp [hE, hto]
-
 @[simp] private lemma toEReal_negZero : toEReal (negZero : IEEE32Exec) = (0 : EReal) := by
   have hexp : (0 : Nat) < 255 := by decide
   have hfrac : (0 : Nat) < 2 ^ 23 := by decide
   have hdy :
       toDyadic? (negZero : IEEE32Exec) = some { sign := true, mant := 0, exp := (0 : Int) } := by
     -- `negZero = ofBits signMask = ofBits (mkBits true 0 0)`.
-    simpa [negZero, signMask, mkBits] using
-      (toDyadic?_ofBits_mkBits_fin (sign := true) (exp := 0) (frac := 0) hexp hfrac)
+      have hbits : mkBits true 0 0 = signMask := by decide
+      simpa [negZero, hbits] using
+        (toDyadic?_ofBits_mkBits_fin (sign := true) (exp := 0) (frac := 0) hexp hfrac)
   have hnan : isNaN (negZero : IEEE32Exec) = false := by
     simpa [negZero, mkBits] using (isNaN_eq_false_of_toDyadic?_some (hx := hdy))
   have hinf : isInf (negZero : IEEE32Exec) = false := by
@@ -1110,7 +1043,6 @@ private lemma toEReal_roundDyadicDown_le_roundDyadicUp (d : Dyadic) :
   have hto : toReal (negZero : IEEE32Exec) = 0 := by
     simp [toReal_eq, hdy, dyadicToReal]
   simp [hE, hto]
-
 private lemma toEReal_ofBits_mkBits_fin_eq_toReal (sign : Bool) (exp frac : Nat)
     (hexp : exp < 255) (hfrac : frac < 2 ^ 23) :
     toEReal (ofBits (mkBits sign exp frac) : IEEE32Exec) =
@@ -1140,7 +1072,6 @@ private lemma toEReal_ofBits_mkBits_fin_eq_toReal (sign : Bool) (exp frac : Nat)
   have hE? : toEReal? x = some (toReal x : EReal) :=
     toEReal?_eq_some_toReal_of_isFinite_eq_true (x := x) hfin
   simpa [toEReal, x] using (toEReal_of_toEReal? hE?)
-
 private lemma toReal_ofBits_mkBits_fin_signFlip (exp frac : Nat) (hexp : exp < 255) (hfrac : frac <
   2 ^ 23) :
     toReal (ofBits (mkBits true exp frac) : IEEE32Exec) =
@@ -1150,7 +1081,6 @@ private lemma toReal_ofBits_mkBits_fin_signFlip (exp frac : Nat) (hexp : exp < 2
   rw [htTrue, htFalse]
   by_cases hexp0 : exp = 0 <;> by_cases hfrac0 : frac = 0 <;>
     simp [hexp0, hfrac0]
-
 private lemma toEReal_ofBits_mkBits_fin_signFlip (exp frac : Nat) (hexp : exp < 255) (hfrac : frac <
   2 ^ 23) :
     toEReal (ofBits (mkBits true exp frac) : IEEE32Exec) =
@@ -1173,10 +1103,8 @@ private lemma toEReal_ofBits_mkBits_fin_signFlip (exp frac : Nat) (hexp : exp < 
     (toReal (ofBits (mkBits true exp frac) : IEEE32Exec) : EReal) =
         ((-toReal (ofBits (mkBits false exp frac) : IEEE32Exec)) : EReal) := htoRealE
     _ = -(toReal (ofBits (mkBits false exp frac) : IEEE32Exec) : EReal) := by simp
-
 /--
 Nearest-even rounding is sandwiched between directed roundings (in `EReal`).
-
 Informal: rounding a dyadic to float32 using round-to-nearest-even yields a value that lies between
 rounding down and rounding up.
 -/
@@ -1663,7 +1591,7 @@ theorem toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d : Dya
                               have : m24' - pow2 23 < pow2 23 :=
                                 Nat.sub_lt_left_of_lt_add hge hlt
                               simpa [fracNat] using this
-                          simpa [pow2_eq_two_pow] using hfrac_lt'
+                          simpa [fracNat, pow2_eq_two_pow] using hfrac_lt'
                         have hflip :
                             toEReal (ofBits (mkBits true expNat fracNat) : IEEE32Exec) =
                               -toEReal (ofBits (mkBits false expNat fracNat) : IEEE32Exec) :=
@@ -1687,17 +1615,14 @@ theorem toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d : Dya
                 simpa using (EReal.neg_le_neg_iff).2 hpos.1
               simpa [hnegNear, hnegUp] using hneg
             exact ⟨hlo, hhi⟩
-
 /-- Lower bound half of `toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp`. -/
 theorem toEReal_roundDyadicDown_le_roundDyadicToIEEE32 (d : Dyadic) :
     toEReal (roundDyadicDown d) ≤ toEReal (roundDyadicToIEEE32 d) :=
   (toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d := d)).1
-
 /-- Upper bound half of `toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp`. -/
 theorem toEReal_roundDyadicToIEEE32_le_roundDyadicUp (d : Dyadic) :
     toEReal (roundDyadicToIEEE32 d) ≤ toEReal (roundDyadicUp d) :=
   (toEReal_roundDyadicDown_le_roundDyadicToIEEE32_le_roundDyadicUp (d := d)).2
-
 end
 end IEEE32Exec
 end TorchLean.Floats.IEEE754

@@ -22,9 +22,9 @@ piecewise-linear approximation; see Pinkus for the approximation-theory backgrou
 for quantitative ReLU-network rates.
 
 Second, it states the FP32 lifting layer: once a real construction is fixed, explicit
-rounding-error bounds turn it into an `FP32` approximation theorem.  This keeps the architecture
-clean: real approximation, parameter rounding, and executable IEEE semantics are proved in
-separate modules, matching the numerical-analysis separation used in Goldberg and Higham.
+rounding-error bounds turn it into an `FP32` approximation theorem. Real approximation, parameter
+rounding, and executable IEEE semantics are proved in separate modules, matching the
+numerical-analysis separation used in Goldberg and Higham.
 -/
 
 @[expose] public section
@@ -298,15 +298,17 @@ noncomputable def mlpEval1dFp32 (hidDim : ℕ)
       change (0 : FP32).val ≤ x.val
       simpa [fp32_zero_val] using hx0
     -- Reduce to `x.val = x.val ⊔ 0`.
-    simpa [reluFp32, relu, Activation.Math.reluSpec, Max.max, hx0', fp32_zero_val] using
-      (sup_of_le_left (a := x.val) (b := (0 : ℝ)) hx0).symm
+    simp [reluFp32, relu, Activation.Math.reluSpec, Max.max, hx0']
+    change x.val = x.val ⊔ 0
+    exact (sup_of_le_left (a := x.val) (b := (0 : ℝ)) hx0).symm
   · have hx0' : ¬(0 : FP32) ≤ x := by
       change ¬((0 : FP32).val ≤ x.val)
       simpa [fp32_zero_val] using hx0
     have hxle : x.val ≤ 0 := le_of_lt (lt_of_not_ge hx0)
     -- Reduce to `0 = x.val ⊔ 0`.
-    simpa [reluFp32, relu, Activation.Math.reluSpec, Max.max, hx0', fp32_zero_val] using
-      (sup_of_le_right (a := x.val) (b := (0 : ℝ)) hxle).symm
+    simp [reluFp32, relu, Activation.Math.reluSpec, Max.max, hx0', fp32_zero_val]
+    change (0 : ℝ) = x.val ⊔ 0
+    exact (sup_of_le_right (a := x.val) (b := (0 : ℝ)) hxle).symm
 
 /--
 Real ReLU is 1-Lipschitz.
@@ -403,7 +405,8 @@ rounding term propagated through the 1-Lipschitz ReLU and scaled by `|cᵢ|`.
         ≤ |term32.val - ((c i).val * r32.val)| +
             |(c i).val * r32.val - (c i).val * relu (x.val - (t i).val)| := by
               -- use `abs_sub_le` directly
-              simpa [termR] using (abs_sub_le (term32.val) ((c i).val * r32.val) termR)
+              simpa [termR, hingeTermReal] using
+                (abs_sub_le (term32.val) ((c i).val * r32.val) termR)
     _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) TrainingPhase.forward / 2 +
           (|(c i).val| * |r32.val - relu (x.val - (t i).val)|) := by
           -- Apply the two bounds.

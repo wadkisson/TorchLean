@@ -12,9 +12,9 @@
 // Shared CUDA helpers (header-only).
 //
 // Native CUDA failures are treated as boundary failures, not as ordinary recoverable Lean values.
-// This keeps the FFI surface simple and makes backend bugs fail loudly during tests. Host-side
-// wrappers should perform deterministic validation (shape, rank, index arrays) before launching
-// kernels; `checkCuda` is only for CUDA runtime/driver errors.
+// Backend bugs should fail loudly during tests. Host-side wrappers should perform deterministic
+// validation (shape, rank, index arrays) before launching kernels; `checkCuda` is only for CUDA
+// runtime/driver errors.
 
 static inline void checkCuda(cudaError_t e, const char* msg) {
   if (e != cudaSuccess) {

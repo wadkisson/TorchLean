@@ -141,6 +141,14 @@ by
       hasFDerivAt_elemwiseVec (n := n) (x := CtxVec.get (Γ := Γ) (s := s) idx xV) (f := f) (f' :=
         f') hf
     have hcomp := helem.comp xV hget
+    have hforward :
+        (elemwiseVec (n := n) f ∘ fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) idx x)
+          =
+        (fun xV : CtxVec Γ => vecOfFun fun i => f ((CtxVec.get (Γ := Γ) (s := s) idx xV).ofLp i)) := by
+      funext x
+      ext i
+      simp [elemwiseVec, vecOfFun]
+    rw [hforward] at hcomp
     -- rewrite the forward function to match `elemwiseVec ∘ get`
     simpa [elemwise, Node.forwardVec_ofVec, elemwiseVec, n, ContinuousLinearMap.comp_apply] using
       hcomp
@@ -183,6 +191,14 @@ by
       hasFDerivAt_elemwiseVec_at (n := n) (x := CtxVec.get (Γ := Γ) (s := s) idx xV) (f := f) (f' :=
         f') hf
     have hcomp := helem.comp xV hget
+    have hforward :
+        (elemwiseVec (n := n) f ∘ fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) idx x)
+          =
+        (fun xV : CtxVec Γ => vecOfFun fun i => f ((CtxVec.get (Γ := Γ) (s := s) idx xV).ofLp i)) := by
+      funext x
+      ext i
+      simp [elemwiseVec, vecOfFun]
+    rw [hforward] at hcomp
     simpa [elemwise, Node.forwardVec_ofVec, elemwiseVec, n, ContinuousLinearMap.comp_apply] using
       hcomp
   · intro dxV
@@ -241,10 +257,8 @@ lemma hasDerivAt_sqrt_clamp_of_pos {x : ℝ} (hx : 0 < x) :
     HasDerivAt (fun y : ℝ => Real.sqrt (max y 0)) (1 / (2 * Real.sqrt x)) x := by
   have hpos : ∀ᶠ y in nhds x, 0 < y := by
     -- `Ioi 0` is an open neighborhood of any positive `x`.
-    have hmem : Set.Ioi (0 : ℝ) ∈ nhds x := isOpen_Ioi.mem_nhds hx
-    have hpos' : ∀ᶠ y in nhds x, y ∈ Set.Ioi (0 : ℝ) := by
-      simpa using hmem
-    simpa [Set.mem_Ioi] using hpos'
+    filter_upwards [isOpen_Ioi.mem_nhds hx] with y hy
+    exact hy
   have heq :
       (fun y : ℝ => Real.sqrt (max y 0)) =ᶠ[nhds x] fun y : ℝ => Real.sqrt y := by
     filter_upwards [hpos] with y hy
@@ -532,7 +546,8 @@ def unaryOpFderiv {Γ : List Shape} {inDim outDim : Nat}
           (getVecCLM (Γ := Γ) (n := inDim) idx) xV := by
       exact (getVecCLM (Γ := Γ) (n := inDim) idx).hasFDerivAt (x := xV)
     have hC :
-        HasFDerivAt (C.forwardVec) (C.deriv ((getVecCLM (Γ := Γ) (n := inDim) idx) xV))
+        HasFDerivAt (fun x : Vec inDim => C.forwardVec x)
+          (C.deriv ((getVecCLM (Γ := Γ) (n := inDim) idx) xV))
           ((getVecCLM (Γ := Γ) (n := inDim) idx) xV) := by
       simpa [OpSpecFDerivCorrect.forwardVec] using (C.hasFDerivAt ((getVecCLM (Γ := Γ) (n := inDim)
         idx) xV))
@@ -549,7 +564,14 @@ def unaryOpFderiv {Γ : List Shape} {inDim outDim : Nat}
         ((getVecCLM (Γ := Γ) (n := inDim) idx) xV)))
     have hfinal := hcast.comp xV hcomp
     -- `unaryOp.forwardVec` is definitional to this composition (after unfolding casts).
-    simpa [unaryOp, getVecCLM_apply, getVec, Graph.castCLM, hOut] using hfinal
+    have htarget :
+        (unaryOp (Γ := Γ) (inDim := inDim) (outDim := outDim) idx C).forwardVec =
+          (fun ctxV : CtxVec Γ =>
+            castVec hOut.symm (C.forwardVec ((getVecCLM (Γ := Γ) (n := inDim) idx) ctxV))) := by
+      funext ctxV
+      simp [unaryOp, Node.forwardVec_ofVec]
+    rw [htarget]
+    simpa [Function.comp_def] using hfinal
   jvp_eq := by
     intro xV dxV
     let hOut : Shape.size (.dim outDim .scalar) = outDim := by simp [Shape.size]

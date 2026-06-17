@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -50,7 +49,7 @@ proofs can cite the actual algebra instead of relying on a prose description of 
 Low rank optimizer facts follow the same pattern. The
 [low rank optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/LowRank.lean) records equations such as
 "with the identity projection, projected SGD is ordinary SGD" and "identity low rank state agrees
-with the corresponding momentum update." These are algebraic compatibility facts, not global
+with the corresponding momentum update." These are algebraic agreement facts, not global
 optimality claims for every low rank method.
 
 # Gradient Descent As A Contractive Map

@@ -313,7 +313,7 @@ def tensor2d? (α : Type := Float) [Inhabited α] (xss : List (List α)) :
       :=
   Spec.fromList2d xss
 
-/-- 2-D tensor from nested lists, with a human-readable error message on failure. -/
+/-- 2-D tensor from nested lists, with a clear error message on failure. -/
 def tensor2d (α : Type := Float) [Inhabited α] (xss : List (List α)) :
     Except String (Tensor α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length)
       .scalar))) :=

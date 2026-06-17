@@ -1,0 +1,144 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.Verification.Util.Json
+
+/-!
+# VNNLIB-style output specifications
+
+This module contains the benchmark-independent part of the VNN-COMP artifact boundary:
+
+- an input box plus a disjunction-of-conjunctions output spec,
+- a JSON loader for the compact `vnnlib_suite_v0_1` export format,
+- the interval-box refutation check used by VNN-COMP style safety certificates.
+
+Model-specific checkers, such as MNIST-FC, build a graph and output bounds. The arithmetic for
+interpreting the VNNLIB rows lives here.
+-/
+
+@[expose] public section
+
+namespace NN.Verification.VNNComp.VNNLib
+
+open Lean
+open Json
+open NN.Verification.Json
+
+/-- One conjunction term `mat * y <= rhs` in a VNNLIB disjunction. -/
+abbrev Term := Array (Array Float) × Array Float
+
+/-- A VNNLIB-style unsafe-region spec: a disjunction of conjunction terms. -/
+abbrev Spec := Array Term
+
+/--
+One exported VNN-COMP instance.
+
+`spec` is a disjunction-of-conjunctions: each term is a conjunction `mat * y <= rhs` over the
+network output vector `y`.
+-/
+structure Instance where
+  /-- Instance id copied from the exported suite JSON. -/
+  id : Nat
+  /-- Lower bound for the input box. -/
+  inputLo : Array Float
+  /-- Upper bound for the input box. -/
+  inputHi : Array Float
+  /-- Unsafe output-region specification. -/
+  spec : Spec
+
+/--
+Load the compact VNNLIB suite JSON format used by TorchLean checkers.
+
+Expected top-level format: `vnnlib_suite_v0_1`.
+-/
+def loadSuite (path : String) : IO (Array Instance) := do
+  let top ← readJsonObjectFile path
+  expectFormat top "vnnlib_suite_v0_1"
+  let instArr ← expectFieldArray top "instances" "top-level"
+  let mut out : Array Instance := #[]
+  for ex in instArr do
+    let exo ← expectObj ex "instance"
+    let id ← expectFieldNat exo "id" "instance"
+    let lo ← expectFieldFloatArray exo "input_lo" "instance"
+    let hi ← expectFieldFloatArray exo "input_hi" "instance"
+    let specArr ← expectFieldArray exo "spec" "instance"
+    let mut specOut : Spec := #[]
+    for t in specArr do
+      let termObj ← expectObj t "spec term"
+      let matJ ← expectField termObj "mat" "spec term"
+      let mat ← expectFloatMatrix matJ "spec term.mat"
+      let rhs ← expectFieldFloatArray termObj "rhs" "spec term"
+      specOut := specOut.push (mat, rhs)
+    out := out.push { id := id, inputLo := lo, inputHi := hi, spec := specOut }
+  pure out
+
+/--
+Lower-bound one linear row over an output interval box.
+
+For each coefficient `a_j`, the minimum of `a_j * y_j` over `y_j ∈ [lo_j, hi_j]` is the smaller of
+the endpoint products.
+-/
+def rowLowerBoundOnBox? (row yLo yHi : Array Float) : Option Float :=
+  if hLo : yLo.size = row.size then
+    if hHi : yHi.size = row.size then
+      some <| (List.finRange row.size).foldl (fun (acc : Float) (j : Fin row.size) =>
+        let a := row[j.1]'j.2
+        let lo :=
+          have h : j.1 < yLo.size := by
+            simp [hLo, j.2]
+          yLo[j.1]'h
+        let hi :=
+          have h : j.1 < yHi.size := by
+            simp [hHi, j.2]
+          yHi[j.1]'h
+        acc + min (a * lo) (a * hi)) 0.0
+    else
+      none
+  else
+    none
+
+/--
+Lower-bound one linear row, returning `0` when the row and interval dimensions do not match.
+
+Use `rowLowerBoundOnBox?` at checker boundaries when mismatch must be reported explicitly.
+-/
+def rowLowerBoundOnBox (row yLo yHi : Array Float) : Float :=
+  (rowLowerBoundOnBox? row yLo yHi).getD 0.0
+
+/-- Check whether a conjunction term is refuted by the output interval box. -/
+def termRefutedByOutputBox (yLo yHi : Array Float) (term : Term) : Bool :=
+  let outDim := yLo.size
+  let mat := term.fst
+  let rhs := term.snd
+  if hHi : yHi.size = outDim then
+  if hRhs : rhs.size = mat.size then
+    (List.finRange mat.size).any (fun (i : Fin mat.size) =>
+      let row := mat[i.1]'i.2
+      match rowLowerBoundOnBox? row yLo yHi with
+      | some lb =>
+          let rhsI :=
+            have h : i.1 < rhs.size := by
+              simp [hRhs, i.2]
+            rhs[i.1]'h
+          lb > rhsI
+      | none => false)
+  else
+    false
+  else
+    false
+
+/--
+Check whether an unsafe VNNLIB spec is refuted by an output interval box.
+
+The spec is a disjunction of conjunctions. To prove the unsafe region is empty, every disjunct must
+be refuted. For a conjunction, it is enough for one row lower bound to exceed its right-hand side.
+-/
+def refutedByOutputBox (yLo yHi : Array Float) (spec : Spec) : Bool :=
+  spec.all (termRefutedByOutputBox yLo yHi)
+
+end NN.Verification.VNNComp.VNNLib

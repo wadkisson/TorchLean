@@ -253,8 +253,7 @@ This is a fully explicit reverse-mode spec (no meta-autograd):
 - mean pooling over tokens: broadcast + scale by `1/tokN`,
 - classifier head: `linear_backward_spec`.
 
-We recompute intermediates locally; this keeps the spec self-contained and avoids adding a global
-"tape" type for every model.
+We recompute intermediates locally instead of adding a global "tape" type for every model.
 -/
 
 /-- Fully explicit reverse-mode backward pass for `ViTSpec.forward`. -/

@@ -215,7 +215,7 @@ private lemma toVecT_get3
                   (hmpos := hmposSc) (f := fW) (p := (j, k0)))
             have hjidx : finProdFinEquiv (j, k0) = j' := by
               apply Fin.ext
-              simp [j', k0, Shape.size, finProdFinEquiv]
+              simp [j', k0, finProdFinEquiv]
             -- rewrite the last axis using `hinner` and `hjidx`
             have hlast :
                 toVecT (t := (Tensor.dim fW : Tensor ℝ (.dim (Nat.succ W) Shape.scalar))) j' =
@@ -368,7 +368,7 @@ private lemma toVecT_get4
                       (hmpos := hmposSc) (f := fKW) (p := (dj, k0)))
                 have hjidx : finProdFinEquiv (dj, k0) = dj' := by
                   apply Fin.ext
-                  simp [dj', k0, Shape.size, finProdFinEquiv]
+                  simp [dj', k0, finProdFinEquiv]
                 have hlast :
                     toVecT (t := (Tensor.dim fKW : Tensor ℝ (.dim (Nat.succ KW) Shape.scalar))) dj'
                       =
@@ -665,7 +665,7 @@ private def convBilin
       map_smul' := by
         intro r k
         ext x ip
-        simp [convCLMRight, convNoBiasVec, Pi.smul_apply, smul_eq_mul, Finset.mul_sum, mul_assoc] }
+        simp [convCLMRight, convNoBiasVec, smul_eq_mul, Finset.mul_sum, mul_assoc] }
   refine ⟨fLin, ?_⟩
   exact LinearMap.continuous_of_finiteDimensional (f := fLin)
 
@@ -1228,7 +1228,6 @@ private def convBilin
                           simp [projBCLM, dbRaw, projB, ContinuousLinearMap.comp_apply]
                         -- Now unfold `deriv0`/`derivCLM` and evaluate at `dx`.
                         simp [deriv0, derivCLM, OH, OW, ContinuousLinearMap.comp_apply,
-                          ContinuousLinearMap.add_apply,
                           ContinuousLinearMap.precompL_apply, hKCLM, hXCLM, hBCLM, add_assoc]
                         -- Normalize the remaining `castVec`/associativity/commutativity and rewrite
                         -- the forward projections.
@@ -1737,8 +1736,19 @@ private def convBilin
         have hcomp := hcast.comp xV hadd
 
         -- Rewrite in terms of the node's `forwardVec`.
-        simpa [node, Node.forwardVec_ofVec, forwardVec, deriv0, derivCLM, projK, projB, projX, Bmul,
-          Bbias] using hcomp
+        have hfun :
+            ((fun y : Vec (OC * (OH * OW)) => castVec (size_sY OC OH OW).symm y) ∘
+              ((fun x =>
+                Bmul0 (projK (Γ := Γ) (OC := OC) (IC := IC) (KH := KH) (KW := KW) kernelIdx x)
+                  (projX (Γ := Γ) (IC := IC) (IH := IH) (IW := IW) inputIdx x)) +
+                fun x => (Bbias (OC := OC) (OH := OH) (OW := OW))
+                  (projB (Γ := Γ) (OC := OC) biasIdx x))) =
+              (node (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW) (stride := stride)
+                (padding := padding) (IH := IH) (IW := IW) kernelIdx biasIdx inputIdx).forwardVec := by
+          funext x
+          simp [node, Node.forwardVec_ofVec, forwardVec, OH, OW, projK, projB, projX,
+            Bmul, Bmul0, convBilin, Bbias, Function.comp_apply]
+        exact hcomp.congr_of_eventuallyEq hfun.symm.eventuallyEq
       · intro xV dxV
         -- `jvpVec` is definitional to applying `deriv0 xV`.
         simp [node, Node.jvpVec_ofVec, deriv0]
@@ -1775,14 +1785,20 @@ private def convBilin
           (nodeFderiv (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW) (stride := stride)
             (padding := padding)
             (IH := IH) (IW := IW) kernelIdx biasIdx inputIdx).hasFDerivAt xV
-        have h' :
-            HasFDerivAt
-              (forwardVec (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW) (stride := stride)
-                (padding := padding)
-                (IH := IH) (IW := IW) kernelIdx biasIdx inputIdx)
-              (deriv0 xV) xV := by
-          simpa [node, Node.forwardVec_ofVec, deriv0] using h
-        simpa [nodeSpecBackward, Node.forwardVec_ofVec, deriv0] using h'
+        have hfun :
+            (node (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW) (stride := stride)
+              (padding := padding) (IH := IH) (IW := IW) kernelIdx biasIdx inputIdx).forwardVec =
+            (nodeSpecBackward (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW)
+              (stride := stride) (padding := padding) (IH := IH) (IW := IW) (h1 := h1) (h2 := h2)
+              (h3 := h3) kernelIdx biasIdx inputIdx).forwardVec := by
+          funext x
+          simp [node, nodeSpecBackward, Node.forwardVec_ofVec, forwardVec]
+        have hderiv :
+            (nodeFderiv (Γ := Γ) (IC := IC) (OC := OC) (KH := KH) (KW := KW) (stride := stride)
+              (padding := padding) (IH := IH) (IW := IW) kernelIdx biasIdx inputIdx).deriv xV =
+              deriv0 xV := rfl
+        rw [hderiv] at h
+        exact h.congr_of_eventuallyEq hfun.eventuallyEq
       · intro xV dxV
         simp [nodeSpecBackward, Node.jvpVec_ofVec, deriv0]
 

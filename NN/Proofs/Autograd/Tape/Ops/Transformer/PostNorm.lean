@@ -337,7 +337,7 @@ def idxSeqFfnPostNormBeta {seqLen dModel : Nat} {ss : List Shape} :
 def idxSeqFfnResidualForPostNorm {seqLen dModel dFF : Nat} :
     Idx (ΓSeqFFNWithNorm seqLen dModel ++ ssSeqFFNResidual seqLen dModel dFF)
       (LayerNorm.MatShape seqLen dModel) :=
-  idxLast (Γ := ΓSeqFFNWithNorm seqLen dModel)
+  Idx.last (Γ := ΓSeqFFNWithNorm seqLen dModel)
     (ss := [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF,
       SeqFFNModelShape seqLen dModel])
     (τ := SeqFFNModelShape seqLen dModel)

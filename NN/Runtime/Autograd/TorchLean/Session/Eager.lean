@@ -540,7 +540,7 @@ def reduceSum {α : Type} (s : EagerSession α) [Add α] [Zero α] [Inhabited α
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.reduceSum (α := α) (sh := sh) s.inner axis x
 
 /-- Reduce-mean along an axis (eager backend). -/
-def reduceMean {α : Type} (s : EagerSession α) [Context α] [Inhabited α] [DecidableEq Shape]
+def reduceMean {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
   {sh : Shape} (axis : Nat) [valid : Shape.valid_axis_inst axis sh] [wf : Shape.WellFormed sh]
   (x : _root_.Runtime.Autograd.Torch.TensorRef α sh) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α (shapeAfterSum sh axis)) :=

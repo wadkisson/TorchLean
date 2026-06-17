@@ -36,7 +36,7 @@ Important scope note:
 - If `shortcut_conv = none`, we still define a total shortcut by falling back to identity / channel
   padding / channel slicing.
 
-Torchvision compatibility note:
+Torchvision comparison note:
 
 - In standard ResNet (as implemented in `torchvision.models.resnet*`), whenever input/output
   channels differ, the shortcut path is a learnable **1×1 projection** (typically with BatchNorm).
@@ -165,7 +165,7 @@ theorem resnet18Config_wf : resnet18Config.WF := by
 /--
 `resnet18Config`, but with torchvision-style projection shortcuts enabled for stage transitions.
 
-This keeps the same block counts and widths, but changes the *default* shortcut used by
+The block counts and widths are unchanged. The difference is the *default* shortcut used by
 `ResNetSpec.zeroInit` when channel counts change:
 - `useProjectionShortcuts = false`: pad/slice fallback when `shortcut_conv = none` (default).
 - `useProjectionShortcuts = true`: build a learned `1×1` shortcut conv (and shortcut BN params).
@@ -631,7 +631,8 @@ structure ResNetLayerGrads (inChannels outChannels : Nat) (α : Type) where
 /-- Backward/VJP for a ResNet layer.
 
 Implementation note: the `rest` blocks are a list, so we explicitly reconstruct the intermediate
-inputs needed for each block's backward pass. This keeps the spec self-contained (no global tape).
+inputs needed for each block's backward pass. The spec is self-contained and does not use a global
+tape.
 -/
 def ResNetLayerSpec.backward {inChannels outChannels blockCount inH inW : Nat}
   (h1 : inChannels ≠ 0) (h2 : outChannels ≠ 0)

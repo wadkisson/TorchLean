@@ -74,9 +74,9 @@ def run : IO Unit := do
     (inputShapes := [xShape]) (τ := yShape)
     (fun {β} _ _ => Runtime.Autograd.TorchLean.NN.Seq.program (model := model) (α := β))
 
-  let args : TorchLean.TList Float (Runtime.Autograd.TorchLean.NN.Seq.paramShapes model ++ [xShape])
+  let args : TorchLean.TensorPack Float (Runtime.Autograd.TorchLean.NN.Seq.paramShapes model ++ [xShape])
     :=
-    .cons w1 (.cons b1 (.cons w2 (.cons b2 (.cons x .nil))))
+    tensorpack! w1, b1, w2, b2, x
 
   let yTorch : Tensor Float yShape :=
     _root_.Runtime.Autograd.Torch.CompiledOut.forward compiled args

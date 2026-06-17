@@ -213,8 +213,6 @@ def approxCtx (toSpec : α → SpecScalar) : {ss : List Shape} →
 /--
 Scoped notation for `approxCtx`.
 
-This keeps end-to-end forward-soundness theorems readable:
-
 ```lean
 open scoped RuntimeApprox
 -- `ΓS` is an approximate view of `ΓR` with per-entry bounds `eps`:
@@ -300,7 +298,8 @@ lemma approxCtx_get {toSpec : α → SpecScalar} {Γ : List Shape}
                   | mk iVal hiVal =>
                       cases iVal with
                       | zero =>
-                          simpa [TList.get, EList.get] using h.1
+                          change approxT toSpec xSh xRh eh
+                          exact h.1
                       | succ j =>
                           have := ih (xS := xSt) (xR := xRt) (eps := et) h.2
                             ⟨j, Nat.lt_of_succ_lt_succ hiVal⟩

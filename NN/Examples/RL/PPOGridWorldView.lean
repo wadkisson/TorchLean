@@ -23,8 +23,8 @@ executable can both train and emit artifacts, while the proof layer can reason a
 model.
 
 Tip:
-- For CUDA: `lake build -R -K cuda=true && lake exe torchlean ppo_gridworld --cuda`
-- For a short run that still writes artifacts: add `--updates 200`
+- For a short run that writes artifacts:
+  `lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`
 
 The executable writes three JSON files by default:
 - `data/rl/ppo_gridworld_trainlog.json` (greedy-policy evaluation return curve)

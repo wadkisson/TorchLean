@@ -64,7 +64,6 @@ variable {obs latent : Shape}
 
 /-- The β-VAE objective is a reconstruction term plus β-weighted KL regularization. -/
 @[simp] theorem betaVae_loss_decomposition
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α obs latent) (beta : α) (x : Tensor α obs) (eps : Tensor α latent) :
     loss model beta x eps = reconstructionLoss model x eps + beta * klLoss model x := by
   rfl
@@ -247,7 +246,9 @@ theorem scalar_reparameterization_law
       (gaussianReal mu (varianceOfScale sigma)) P := by
   have hmul := gaussianReal_const_mul (μ := 0) (v := 1) (P := P) hε sigma
   have hadd := gaussianReal_const_add (P := P) hmul mu
-  simpa [varianceOfScale, add_comm, add_left_comm, add_assoc] using hadd
+  change HasLaw (fun ω => mu + sigma * eps ω)
+    (gaussianReal mu (NNReal.mk (sigma ^ 2) (sq_nonneg sigma))) P
+  simpa [add_comm, add_left_comm, add_assoc] using hadd
 
 /--
 Coordinatewise diagonal VAE reparameterization law.

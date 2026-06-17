@@ -26,8 +26,7 @@ If the phase vector is present and consistent, the propagated affine bounds use 
 ReLU behavior for active/inactive neurons (slope 1 / slope 0), and the usual α-CROWN / CROWN
 relaxations for unstable neurons.
 
-This keeps the checker’s trust boundary small: β is treated as additional *evidence* that is
-verified against the (trusted-for-this-theorem) IBP bounds.
+Trust boundary: β is additional *evidence* verified against the trusted-for-this-theorem IBP bounds.
 
 ## Background / citations
 

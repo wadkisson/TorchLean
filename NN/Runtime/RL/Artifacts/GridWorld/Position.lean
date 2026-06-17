@@ -12,7 +12,7 @@ public import NN.Runtime.Training.Log
 # GridWorld Artifact Positions
 
 Shared JSON encoding for GridWorld coordinates used by policy/path visualization artifacts. Positions
-are stored as `[row, col]` pairs because that format is compact, human-readable, and easy for the
+are stored as `[row, col]` pairs because that format is compact, readable, and easy for the
 widgets to consume.
 -/
 

@@ -285,8 +285,8 @@ theorem ddimStepSystem_contracts_of_step_contracts
 /--
 A contractive PF-ODE Euler update remains contractive after packaging it as a `DynamicalSystem`.
 
-This keeps the verification-facing statement compositional: prove the Euler map contracts under the
-chosen norm, then reuse the dynamics API for iterated sampler trajectories.
+Prove the Euler map contracts under the chosen norm, then reuse the dynamics API for iterated
+sampler trajectories.
 -/
 theorem pfOdeEulerSystem_contracts_of_step_contracts
     (sch : VPLinearSchedule SpecScalar) (model : EpsModel SpecScalar s) (t dt : SpecScalar)

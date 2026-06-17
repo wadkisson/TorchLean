@@ -8,17 +8,15 @@ module
 
 public import NN
 public import NN.Examples.Data.SamplePaths
-public import NN.API.Data.Transforms
 
 /-!
-# CSV loader tutorial (transforms + minibatches + scheduler)
+# CSV loader tutorial
 
 This tutorial mirrors the "data first" workflow people expect from PyTorch:
 
 1. Load a dataset from disk (CSV).
-2. Build a transform pipeline (`Data.Transforms.Compose`).
-3. Wrap the per-sample dataset in a minibatch loader (`Data.batchLoader`).
-4. Train with a learning-rate scheduler.
+2. Turn it into a fixed-size batched dataset.
+3. Train through the public `Trainer` API.
 
 Generate a small deterministic regression dataset with
 `python3 NN/Examples/Data/generate_small_data.py`:
@@ -38,15 +36,15 @@ Optional flags (tutorial-specific):
 - `--csv PATH` (override the CSV file)
 - `--seed S` (controls shuffling and model initialization)
 - `--batch N`
-- `--epochs E`
+- `--steps N`
 
 Public API used here:
 
-- `Data.fromCsvSupervised`
-- `Data.Transforms.Compose`
-- `Data.batchLoader`
-- `train.fitLoaderWith`
-- `train.stepEpochLR`
+- `Data.tabularCsvDataset`
+- `Trainer.new`
+- `Trainer.RunConfig`
+- `Trainer.TrainOptions`
+- `trainer.train`
 -/
 
 @[expose] public section
@@ -54,103 +52,76 @@ Public API used here:
 
 namespace NN.Examples.Data.Loaders.Csv
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
+
+def missingCsvHint : String :=
+  "Generate the small regression CSV with:\n" ++
+  "  python3 NN/Examples/Data/generate_small_data.py"
 
 def inDim : Nat := 2
 def outDim : Nat := 1
 
-/-- A small 2-layer MLP `2 -> 8 -> 1`. -/
-def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.Mat batch inDim) (Shape.Mat batch outDim)) :=
-  nn.sequential![
-    nn.linear inDim 8 (pfx := NN.Tensor.Shape.Vec batch),
-    nn.relu,
-    nn.linear 8 outDim (pfx := NN.Tensor.Shape.Vec batch)
-  ]
+/-- A small 2-layer batched MLP `2 -> 8 -> 1`. -/
+def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
+  nn.models.Mlp1ReLU
+    { batch := batch, inDim := inDim, hidDim := 8, outDim := outDim }
 
-/--
-Load the CSV dataset, then apply a small input transform pipeline.
-
-The transform pipeline is written once for the chosen scalar type `α`:
-
-- normalize (here: mean=0, std=1, so it is an easy-to-read "template"), then
-- scale inputs by `0.5`.
--/
-def loadDataset (csvPath : System.FilePath)
-    {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] :
-    IO (Except String (Data.Dataset (sample.Supervised α (Shape.Vec inDim) (Shape.Vec outDim)))) :=
-      do
-  let opts : Data.CsvOptions := { skipHeader := true }
-  let ds0 ← Data.fromCsvSupervised (α := α) csvPath inDim outDim (opts := opts)
-
-  let xShape : Spec.Shape := Shape.Vec inDim
-  let yShape : Spec.Shape := Shape.Vec outDim
-
-  let xTransform : Spec.Tensor α xShape → Spec.Tensor α xShape :=
-    Data.Transforms.Compose
-      [ Data.Transforms.Lambda (Data.Transforms.normalizeTensorF (α := α) (s := xShape) 0.0 1.0)
-      , Data.Transforms.Lambda (Data.Transforms.mapTensor (α := α) (s := xShape)
-          (fun v => v * Runtime.ofFloat (α := α) 0.5))
-      ]
-
-  pure <|
-    ds0.map (fun ds =>
-      Data.Transforms.onSupervisedDatasetInput (α := α) (σ := xShape) (τ := yShape) xTransform ds)
+/-- Command-line help for the CSV loader tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean CSV loader tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean data_csv [options]"
+    , ""
+    , "Options:"
+    , "  --data-dir PATH"
+    , "  --csv PATH"
+    , "  --seed N"
+    , "  --batch N"
+    , "  --steps N"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    ]
 
 def main (args : List String) : IO Unit := do
-  let args := API.CLI.dropDashDash args
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
 
   let label := "Data.Loaders.Csv"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
-  let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
-  let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 30 5
-  let (csv?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "csv"
+  let (dataDir, args) ← CLI.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
+  let (seed, args) ← CLI.orThrow label <| CLI.takeSeed args 0
+  let (steps, args) ← CLI.orThrow label <| CLI.takeStepsFlagDefault args 30
+  let (batch, args) ← CLI.orThrow label <| CLI.takePositiveNatFlagDefault args label "batch" 5
+  let (csvPath, args) ← CLI.orThrow label <|
+    CLI.takePathFlagDefault args "csv" (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
 
-  let csvPath := csv?.getD (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
-  if eb.batch = 0 then
-    throw <| IO.userError s!"{label}: --batch must be > 0"
-
-  -- Train with a batched task: the model is written directly over `batch × Vec inDim` tensors.
-  let task : train.Task (shape![eb.batch, inDim]) (shape![eb.batch, outDim]) :=
-    train.regression (nn.build seed (mkModel (batch := eb.batch)))
+  let model := mkModel (batch := batch)
+  let run ← Trainer.RunConfig.parseRuntimeArgsOrThrow label args
+    { optimizer := optim.adam { lr := 0.05 } }
+  let trainer := Trainer.new model <|
+    Trainer.Config.fromRunConfig run .regression (seed := seed)
 
   IO.println "== CSV loader training tutorial =="
+  trainer.printInfo
   IO.println s!"data_dir = {dataDir}"
   IO.println s!"csv_path  = {csvPath}"
   IO.println s!"seed      = {seed}"
-  IO.println s!"model     = MLP(2 -> 8 -> 1)"
-  IO.println (s!"train     = Adam(lr=0.05), epochs={eb.epochs}, batch_size={eb.batch}, " ++
+  IO.println (s!"train     = Adam(lr=0.05), steps={steps}, batch_size={batch}, " ++
     s!"shuffle=true, drop_last=true")
-  IO.println "scheduler = StepLR(step_size=10, gamma=0.5)"
 
-  let _exitCode ← TorchLean.Module.run label args (.float (fun opts rest => do
-    API.Common.orThrow label <| API.CLI.requireNoArgs rest
-    let runner ← train.instantiateWithOptions (task := task) (α := Float) opts
-
-    let dsE ← loadDataset (csvPath := csvPath) (α := Float)
-    let ds ← API.Common.orThrow label dsE
-
-    let loader := Data.batchLoader ds eb.batch (shuffle := true) (seed := seed) (dropLast := true)
-    let batchedDs ← API.Common.orThrow label <| Data.BatchLoader.batchDataset loader
-
-    let opt := optim.adam 0.05
-    let cfg0 : train.LoaderFitConfig := { (train.epochs eb.epochs (optimizer := opt)) with logEvery
-      := 0 }
-    let cfg := train.stepEpochLR cfg0 (base := 0.05) (stepSize := 10) (gamma := 0.5)
-
-    let hooks : train.Callbacks Float :=
-      (train.onTrainStart do
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "before")
-      ++ train.logLossEvery 5
-      ++ (train.onTrainEnd (fun _ =>
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "after"))
-
-    let (_report, _loader') ← train.fitLoaderWith (task := task) runner cfg loader hooks
-    pure ())) { printOk := false }
-  pure ()
+  let csvOptions : Data.CsvOptions := { skipHeader := true }
+  let data :=
+    Data.tabularCsvDataset csvPath batch inDim outDim
+      (csvOptions := csvOptions) (shuffle := true) (seed := seed)
+  Data.requireFile label "CSV dataset" csvPath missingCsvHint
+  let trained ← trainer.train data { steps := steps }
+  trained.printSummary
+  let heldout : Tensor.T Float (Shape.mat batch inDim) :=
+    Tensor.fill 0.25 (Shape.mat batch inDim)
+  trained.printPrediction "predict(batch=heldout)" heldout
 
 end NN.Examples.Data.Loaders.Csv

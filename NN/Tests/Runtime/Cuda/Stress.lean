@@ -24,7 +24,7 @@ Low-level stress coverage that goes beyond the small eager-tape tests:
 - extra cuBLAS matmul parity checks on rectangular inputs.
 
 These still run without a GPU because the CUDA externs fall back to the CPU stub under the default
-build, but when built with `-K cuda=true` they exercise the actual CUDA runtime paths.
+build. With `-K cuda=true`, the same tests hit the real CUDA runtime paths.
 -/
 
 @[expose] public section

@@ -74,7 +74,8 @@ def toReal : ℝ := r.base
 /-- The radix base is positive when viewed as a real number. -/
 lemma pos : 0 < r.toReal := by
   have hb : 0 < r.base := lt_of_lt_of_le (by norm_num) r.base_valid
-  simpa [toReal] using (Nat.cast_pos.mpr hb)
+  have hbR : (0 : ℝ) < (r.base : ℝ) := by exact_mod_cast hb
+  simpa [toReal] using hbR
 
 /-- The radix base is nonzero when viewed as a real number. -/
 lemma ne_zero : r.toReal ≠ 0 := ne_of_gt (pos r)

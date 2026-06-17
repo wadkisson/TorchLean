@@ -90,12 +90,12 @@ def causalTransformerFromEmbeddings (cfg : CausalOneHotConfig)
     { layers := cfg.layers
       block := { numHeads := cfg.numHeads, headDim := cfg.headDim, ffnHidden := cfg.ffnHidden }
       seedStride := cfg.seedStride }
-  nn.sequential![
+  nn.Sequential![
     nn.learnedPositionalEmbedding (batch := cfg.batch) (seqLen := cfg.seqLen) (embedDim := dModel),
     nn.transformerEncoderStack (batch := cfg.batch) (n := cfg.seqLen) (dModel := dModel) encCfg
       (mask := some (text.causalMask cfg.seqLen)),
     nn.layerNorm (batch := cfg.batch) (seqLen := cfg.seqLen) (embedDim := dModel),
-    nn.linear dModel cfg.vocab (pfx := NN.Tensor.Shape.Mat cfg.batch cfg.seqLen)
+    Linear dModel cfg.vocab (pfx := NN.Tensor.Shape.Mat cfg.batch cfg.seqLen)
   ]
 
 /--

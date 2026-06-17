@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -8,13 +7,14 @@ open Verso.Genre Manual
 tag := "modern-models"
 %%%
 
-The model zoo is the point where TorchLean stops being a clean semantic story and starts being an
-ML system. A two-layer MLP is enough to explain typed tensors and autograd. It is not enough to test
-whether the framework can handle the shapes that modern ML actually uses.
+The model zoo is where the typed API meets the messier parts of ML systems: image patches,
+attention masks, scan state, stochastic schedules, spectral kernels, and environment rollouts. A
+two-layer MLP is enough to explain typed tensors and autograd. It is not enough to test whether the
+framework handles the shapes that modern ML actually uses.
 
 The examples in this section are best read as semantic stress tests. Each model family exercises a
-different part of the stack: residual branches, patch tokens, causal masks, scan state, diffusion
-schedules, spectral kernels, RL trajectories, and CUDA runtime paths.
+different part of the stack: KAN-style edge-basis expansion, residual branches, patch tokens, causal
+masks, scan state, diffusion schedules, spectral kernels, RL trajectories, and CUDA runtime paths.
 
 # What Each Family Stresses
 
@@ -22,8 +22,8 @@ The examples are compact, but each one touches a real source of ML complexity:
 
 | Model family | What it stresses |
 |---|---|
-| MLP / CNN | typed tensors, losses, optimizers, data loaders |
-| ResNet | residual shape agreement and branch joins |
+| MLP / KAN / CNN | typed tensors, edge bases, losses, optimizers, data loaders |
+| Residual / ResNet specs | residual shape agreement and branch joins |
 | ViT | image patches, token dimensions, attention blocks |
 | GPT-style models | causal windows, token ids, masks, save/load |
 | Mamba | recurrent state, selective scan, prefix causality |
@@ -31,10 +31,15 @@ The examples are compact, but each one touches a real source of ML complexity:
 | FNO | spectral convolution, scientific data, cuFFT boundary |
 | PPO / RL | trajectories, environment boundary, policy/value losses |
 
+KANs are included as a model family rather than a task wrapper: the model supplies learned
+one-dimensional edge functions, while the public trainer still chooses regression, classification,
+or a custom loss. The current built-in basis is triangular and piecewise linear; future spline
+families should fit the same edge-family slot instead of adding task-specific KAN constructors.
+
 A formal ML library that only works for one MLP is easy to make look clean. The harder test is
-whether the same ideas survive residual sharing, attention masks, token windows, recurrent state,
-stochastic sampling, spectral transforms, and external environments. That is what the model zoo is
-for.
+whether the same ideas survive edge-basis models, residual sharing, attention masks, token windows,
+recurrent state, stochastic sampling, spectral transforms, and external environments. That is what
+the model zoo is for.
 
 # Start With The Runner
 
@@ -65,7 +70,7 @@ lake build -R -K cuda=true
 lake exe -K cuda=true torchlean mlp --cuda --steps 20
 ```
 
-That one command already exercises the public API, the eager tape, the optimizer, and the selected
+That one command runs through the public API, the eager tape, the optimizer, and the selected
 runtime backend. The rest of the zoo grows from that same shape.
 
 # Feedforward, Convolutional, And Vision Models
@@ -74,9 +79,8 @@ The classical supervised examples are useful because their expected behavior is 
 
 ```
 lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean cnn --cpu --n-total 20 --steps 1
-lake exe -K cuda=true torchlean resnet --cuda --n-total 20 --steps 1
-lake exe -K cuda=true torchlean vit --cuda --n-total 20 --steps 1
+lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 ```
 
 What these demonstrate:
@@ -93,20 +97,19 @@ The model code follows the same pattern as the running example:
 ```
 import NN
 
-open Spec
-open NN.Tensor
-open NN.API
+open TorchLean
 
-def smallVisionHead : nn.M (nn.Sequential (Shape.Vec 64) (Shape.Vec 10)) :=
-  nn.sequential![
-    nn.linear 64 32 (pfx := Shape.scalar),
-    nn.relu,
-    nn.linear 32 10 (pfx := Shape.scalar)
+def smallVisionHead : nn.M (nn.Sequential (Shape.vec 64) (Shape.vec 10)) :=
+  nn.Sequential![
+    nn.Linear 64 32,
+    nn.ReLU,
+    nn.Linear 32 10
   ]
 ```
 
-The larger CNN, ResNet, and ViT examples replace this small head with convolution, residual, or
-patch/attention blocks, but the training surface is the same.
+The larger CNN and ViT commands replace this small head with convolution or patch/attention blocks.
+Residual blocks use the same typed model-building surface, even though the maintained model-zoo
+runtime command set currently keeps vision training to CNN and ViT.
 
 For residual models, the semantic shape is:
 
@@ -122,7 +125,7 @@ The sequence examples give a gentle path from recurrent state to attention:
 ```
 lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
 lake exe -K cuda=true torchlean lstm --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean transformer --cuda --tiny-stories --steps 1
+lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
 ```
 
 A one-step run does not learn language. The useful fact is that the full data path exists:
@@ -143,7 +146,7 @@ Typical commands:
 ```
 lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
 lake exe -K cuda=true torchlean text_gpt2 --cuda \
-  --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 100 --log-every 10
+  --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 100
 ```
 
 The `text_gpt2` example is explicit about scale. It is a TorchLean-native miniature
@@ -198,7 +201,7 @@ boundary changes.
 The Mamba example exercises selective-scan style computation:
 
 ```
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 25
+lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 Under the CUDA backend, TorchLean includes native selective-scan kernels for the float32 path.  The
@@ -219,7 +222,7 @@ that future tokens do not change prefix outputs for the supported scan definitio
 The diffusion example is a compact denoising training loop:
 
 ```
-lake exe torchlean diffusion --cpu --steps 5
+lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 Diffusion is included because it stresses a different style of ML program: a stochastic-noise
@@ -281,8 +284,8 @@ interop while still using the same typed tensor and runtime layer.
 The PPO examples show that TorchLean is not limited to supervised losses:
 
 ```
-lake exe torchlean ppo_gridworld --steps 100
-lake exe torchlean ppo_cartpole --cuda --steps 100
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 The GridWorld example is written in Lean and has proof hooks.  The Gymnasium examples cross a Python

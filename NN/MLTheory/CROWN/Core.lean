@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.MLTheory.CROWN.BoundOps
+public import NN.MLTheory.CROWN.Flatbox
 public import NN.Runtime.Context
 public import NN.Spec.Core.Tensor.Linalg
 public import NN.Spec.Core.TensorOps
@@ -145,6 +146,28 @@ def point (t : Tensor α s) : Box α s := { lo := t, hi := t }
 
 end Box
 
+namespace FlatBox
+
+/-- Cast the lower endpoint to a checked vector dimension. -/
+def loAsDim (B : FlatBox α) {m : Nat} (h : B.dim = m) : Tensor α (.dim m .scalar) :=
+  Tensor.castVecDim (α := α) (n := B.dim) (m := m) h B.lo
+
+/-- Cast the upper endpoint to a checked vector dimension. -/
+def hiAsDim (B : FlatBox α) {m : Nat} (h : B.dim = m) : Tensor α (.dim m .scalar) :=
+  Tensor.castVecDim (α := α) (n := B.dim) (m := m) h B.hi
+
+/--
+View a flattened interval box as a shape-indexed vector box after checking the dimension.
+
+Most CROWN affine evaluators expect a `Box α (.dim m .scalar)`, while graph propagation stores
+runtime-shaped `FlatBox` values. This helper keeps the dependent casts in one place.
+-/
+def toVecBox (B : FlatBox α) {m : Nat} (h : B.dim = m) : Box α (.dim m .scalar) :=
+  { lo := B.loAsDim h
+    hi := B.hiAsDim h }
+
+end FlatBox
+
 /-! We primarily target vector inputs/outputs for CROWN in this initial
 integration. To avoid over-generalizing shapes, we use a specialized
 variant for 1D (flat) vectors. -/
@@ -211,6 +234,16 @@ def evalOnBox (aff : AffineVec α inDim outDim) (B : Box α (.dim inDim .scalar)
           match cvec i, s with
           | .scalar ci, .scalar sv => Tensor.scalar (BoundOps.addUp sv ci))
     { lo := outLo, hi := outHi }
+
+/--
+Evaluate an affine form on a flattened graph box after checking the input dimension.
+
+Graph-level CROWN stores boxes as `FlatBox`; affine evaluation works over vector-shaped boxes. This
+helper keeps that cast at the CROWN boundary instead of repeating it in verifier workflows.
+-/
+def evalOnFlatBox (aff : AffineVec α inDim outDim) (B : FlatBox α) (h : B.dim = inDim) :
+    Box α (.dim outDim .scalar) :=
+  aff.evalOnBox (B.toVecBox h)
 
 -- Compose two affine bounds: aff2 ∘ aff1 where aff1 maps R^{n}→R^{h}, aff2 maps R^{h}→R^{m}
 /-- Compose two affine forms: `(aff2 ∘ aff1)(x) = aff2(aff1(x))`. -/

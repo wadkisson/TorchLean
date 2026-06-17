@@ -88,23 +88,23 @@ def onLabels {a : Type} (f : Nat → Nat) (ds : API.Data.Dataset (a × Nat)) : A
   Nat) :=
   onDataset (fun (x, y) => (x, f y)) ds
 
-/-- Transform the input component of a supervised TorchLean sample `TList α [σ, τ]`. -/
+/-- Transform the input component of a supervised TorchLean sample `TensorPack α [σ, τ]`. -/
 def onSupervisedInput {α : Type} {σ τ : Spec.Shape}
     (f : Spec.Tensor α σ → Spec.Tensor α σ) :
-    API.sample.Supervised α σ τ → API.sample.Supervised α σ τ :=
+    API.SupervisedSample α σ τ → API.SupervisedSample α σ τ :=
   API.sample.mapX (α := α) (σ := σ) (τ := τ) f
 
-/-- Transform the target component of a supervised TorchLean sample `TList α [σ, τ]`. -/
+/-- Transform the target component of a supervised TorchLean sample `TensorPack α [σ, τ]`. -/
 def onSupervisedTarget {α : Type} {σ τ : Spec.Shape}
     (f : Spec.Tensor α τ → Spec.Tensor α τ) :
-    API.sample.Supervised α σ τ → API.sample.Supervised α σ τ :=
+    API.SupervisedSample α σ τ → API.SupervisedSample α σ τ :=
   API.sample.mapY (α := α) (σ := σ) (τ := τ) f
 
 /-- Apply an input transform over a supervised TorchLean dataset. -/
 def onSupervisedDatasetInput {α : Type} {σ τ : Spec.Shape}
     (f : Spec.Tensor α σ → Spec.Tensor α σ)
-    (ds : API.Data.Dataset (API.sample.Supervised α σ τ)) :
-    API.Data.Dataset (API.sample.Supervised α σ τ) :=
+    (ds : API.Data.Dataset (API.SupervisedSample α σ τ)) :
+    API.Data.Dataset (API.SupervisedSample α σ τ) :=
   onDataset (onSupervisedInput (α := α) (σ := σ) (τ := τ) f) ds
 
 end Transforms

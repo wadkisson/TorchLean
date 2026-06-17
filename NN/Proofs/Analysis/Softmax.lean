@@ -50,11 +50,11 @@ open Activation
 Local helper definitions expose scalar coordinates to the proof without adding public API.
 -/
 
+set_option linter.auxLemma false in
 /--
 Eliminate a scalar tensor using the same matcher as `Activation.softmaxVecSpec`.
 
-This keeps the proof aligned with the generated matcher that Lean creates for the spec definition,
-which avoids fragile pattern-matching rewrites later in the file.
+Using Lean's generated matcher avoids fragile pattern-matching rewrites later in the file.
 -/
 private abbrev scalarElim {β : Sort _} (t : Tensor ℝ .scalar) (k : ℝ → β) : β :=
   Activation.softmaxVecSpec.match_1 (motive := fun _ => β) t k
@@ -189,7 +189,8 @@ theorem sum_spec_softmax_spec_row {nQ nK : Nat}
   cases maskedScores with
   | dim rows =>
       -- `softmax_spec` on a matrix is rowwise, and `get` picks a row.
-      simpa [Activation.softmaxSpec] using (sum_spec_softmax_vec_spec (t := rows i))
+      simpa [Activation.softmaxSpec, Spec.Tensor.get, Spec.Tensor.getAtSpec] using
+        (sum_spec_softmax_vec_spec (t := rows i))
 
 /-!
 Convenience row-sum theorem when the key dimension is written as an arbitrary `nK` plus a proof

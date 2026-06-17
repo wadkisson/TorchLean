@@ -68,7 +68,7 @@ That flag samples the CUDA allocator every `N` optimizer updates. It reports liv
 allocation state and warns if the observed free-memory trend would exhaust the device before the
 requested run length. When a long CUDA run does not pass an explicit cadence, the public model
 examples choose a small default number of samples. This is part of the public runner interface, not
-a separate benchmark script, so MLP, CNN, GPT-style, ResNet, ViT, and other model commands can report
+a separate benchmark script, so MLP, CNN, GPT-style, ViT, and other model commands can report
 the same kind of long-run memory signal.
 
 If either piece is missing, TorchLean should fail loudly rather than silently claiming that GPU
@@ -124,7 +124,7 @@ The main implemented pieces are:
 - *selective scan / Mamba support*: lower layer scan kernels support the Mamba recurrent path,
   while the higher layer keeps a pure CPU/CUDA compatible definition at the model API;
 - *FFT and FNO kernels*: the FNO path uses cuFFT plus fused spectral multiplication and explicit
-  backward kernels, with a dense CPU DFT reference kept for comparison;
+  backward kernels, with a dense CPU DFT reference for comparison;
 - *sanitizer and parity harnesses*: the CUDA suite compares native kernels, stubs, finite-difference
   gradients, deterministic replay, and model-level examples.
 
@@ -299,7 +299,7 @@ Runtime.Autograd.Cuda.Tape.spectralConv1dRfft
 The public training API usually hides those names.  A model zoo command such as
 
 ```
-lake exe -K cuda=true torchlean resnet --cuda --n-total 20 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 ```
 
 still looks like an ordinary TorchLean run.  Under the hood, tensors are stored in CUDA buffers and

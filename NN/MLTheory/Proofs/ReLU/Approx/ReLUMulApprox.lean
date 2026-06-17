@@ -238,7 +238,7 @@ lemma mat_vec_mul_spec_oneRow {n : Nat} (A : Tensor ℝ (.dim 1 (.dim n .scalar)
         simp [vfun, vecGet, Tensor.toScalar, hvj]
   -- Rewrite and apply the general lemma.
   rw [hA, hv]
-  simpa [c, vfun] using
+  simpa [c, vfun, mat1_get_matrixMN, vecGet, Tensor.toScalar] using
     (mat_vec_mul_spec_matrixMN_vector (m := 1) (n := n) (c := c) (v := vfun))
 
 /--
@@ -286,7 +286,7 @@ lemma mlp_eval_nd_eq_bias_sum
                   (Tensor.map2Spec (fun x1 x2 ↦ x1 + x2) (Spec.matVecMulSpec l1.weights x)
                     l1.bias))
                 j)) := by
-      simpa [Spec.linearSpec] using hmv
+      simpa [Spec.linearSpec, Spec.Tensor.addSpec, Spec.Tensor.map2Spec] using hmv
     -- Use the mat-vec sum form, then compute the single coordinate.
     cases hfb0 : fb 0 with
     | scalar b0 =>

@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Verification.Cert
+public import NN.Verification.Geometry3D
 public import NN.Verification.ODE
 public import NN.Verification.PINN
 public import NN.Verification.Robustness
@@ -15,6 +16,7 @@ public import NN.Verification.TorchLean.Compile
 public import NN.Verification.TorchLean.CompileExec
 public import NN.Verification.TorchLean.Verified
 public import NN.Verification.Util.Json
+public import NN.Verification.VNNComp
 public import NN.MLTheory.CROWN.Proofs.Overview
 
 /-!

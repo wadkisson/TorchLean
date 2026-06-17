@@ -71,10 +71,7 @@ private lemma neural_bpow_ofNat_div (k : Nat) :
 
 private lemma neural_bpow_neg_ofNat_div (k : Nat) :
     neuralBpow binaryRadix (-(Int.ofNat k)) = ((2 : ℝ) ^ k)⁻¹ := by
-  -- `bpow (-k) = (bpow k)⁻¹`.
-  have hneg := neuralBpow.neg_exp binaryRadix (Int.ofNat k)
-  -- Rewrite `bpow (Int.ofNat k)` to `(2:ℝ)^k`.
-  simpa [neural_bpow_ofNat_div] using hneg
+  rw [neuralBpow.neg_exp, neural_bpow_ofNat_div]
 
 
 /-! ## Natural ceil helper used by `roundRatUp` -/
@@ -265,7 +262,7 @@ theorem toEReal_roundRatDown_le (sign : Bool) (num den : Nat) (hden : den ≠ 0)
       -- Chain the bounds.
       have : toEReal (roundDyadicDown { sign := false, mant := loMant, exp := exp }) ≤
           ((num : ℝ) / (den : ℝ) : EReal) := le_trans hrd hlo
-      simpa using this
+      simpa [exp] using this
     · -- negative: `num/den ≤ hiMant / 2^K`, so `-(hiMant/2^K) ≤ -(num/den)`
       set hiMant : Nat := ratUpperMant num den
       set exp : Int := -(Int.ofNat ratApproxShift)
@@ -295,7 +292,7 @@ theorem toEReal_roundRatDown_le (sign : Bool) (num den : Nat) (hden : den ≠ 0)
         toEReal_roundDyadicDown_le (d := { sign := true, mant := hiMant, exp := exp })
       have : toEReal (roundDyadicDown { sign := true, mant := hiMant, exp := exp }) ≤
           ((-((num : ℝ) / (den : ℝ))) : EReal) := le_trans hrd hhi
-      simpa using this
+      simpa [exp] using this
 
 /--
 Soundness of `roundRatUp`: the exact rational is below (or equal to) the computed upper endpoint.
@@ -341,7 +338,7 @@ theorem toEReal_roundRatUp_ge (sign : Bool) (num den : Nat) (hden : den ≠ 0) :
       have : ((num : ℝ) / (den : ℝ) : EReal) ≤
           toEReal (roundDyadicUp { sign := false, mant := hiMant, exp := exp }) :=
         le_trans hhi hru
-      simpa using this
+      simpa [exp] using this
     · -- negative: `loMant / 2^K ≤ num/den`, so `-(num/den) ≤ -(loMant/2^K)`
       set loMant : Nat := ratLowerMant num den
       set exp : Int := -(Int.ofNat ratApproxShift)
@@ -372,7 +369,7 @@ theorem toEReal_roundRatUp_ge (sign : Bool) (num den : Nat) (hden : den ≠ 0) :
       have : ((-((num : ℝ) / (den : ℝ))) : EReal) ≤
           toEReal (roundDyadicUp { sign := true, mant := loMant, exp := exp }) :=
         le_trans hlo hru
-      simpa using this
+      simpa [exp] using this
 
 /-! ## Expressing dyadic division as the same signed rational used by `divDown/divUp`
 

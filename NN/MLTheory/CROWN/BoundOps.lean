@@ -72,9 +72,7 @@ class BoundOps (α : Type) [Context α] where
   mulUp   : α → α → α
 
 /-!
-Default implementation: no directed rounding (use the scalar’s own arithmetic).
-
-This keeps existing Float/ℝ/Interval instantiations working without extra adapters.
+Default implementation: no directed rounding. The scalar’s own arithmetic supplies the operations.
 -/
 instance (priority := 10) instBoundOpsDefault (α : Type) [Context α] : BoundOps α where
   addDown := (· + ·)

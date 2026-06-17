@@ -28,7 +28,7 @@ discharge the assumptions that the runtime `Float32` primitives match the execut
 3) reuse the internal refinement theorems (`BridgeFP32.lean` / `BridgeFP32Expr.lean`) to connect
    execution to the `FP32` rounding-on-`ℝ` model on finite/no-overflow inputs.
 
-This keeps the trust boundary explicit: the only unproved part is the external/runtime correctness
+The trust boundary is explicit: the only unproved part is the external/runtime correctness
 assumption, which is unavoidable in a pure Lean development.
 
 Background:
@@ -128,35 +128,35 @@ private theorem bits_inj {x y : IEEE32Exec} (h : x.bits = y.bits) : x = y := by
 -- downstream code is written; the assumptions are stated in terms of `Float32.add`, etc.
 /-- Rewrite runtime float32 addition into executable `IEEE32Exec.add`. -/
 theorem toIEEE32Exec_add (a b : F32) :
-    toIEEE32Exec (a + b) = IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b) := by
+    toIEEE32Exec (Float32.add a b) = IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b) := by
   apply bits_inj
   simpa [toIEEE32Exec, IEEE32Exec.ofBits] using
     (RuntimeFloat32MatchesIEEE32Exec.add_bits (a := a) (b := b))
 
 /-- Rewrite runtime float32 subtraction into executable `IEEE32Exec.sub` (value-level form). -/
 theorem toIEEE32Exec_sub (a b : F32) :
-    toIEEE32Exec (a - b) = IEEE32Exec.sub (toIEEE32Exec a) (toIEEE32Exec b) := by
+    toIEEE32Exec (Float32.sub a b) = IEEE32Exec.sub (toIEEE32Exec a) (toIEEE32Exec b) := by
   apply bits_inj
   simpa [toIEEE32Exec, IEEE32Exec.ofBits] using
     (RuntimeFloat32MatchesIEEE32Exec.sub_bits (a := a) (b := b))
 
 /-- Rewrite runtime float32 multiplication into executable `IEEE32Exec.mul` (value-level form). -/
 theorem toIEEE32Exec_mul (a b : F32) :
-    toIEEE32Exec (a * b) = IEEE32Exec.mul (toIEEE32Exec a) (toIEEE32Exec b) := by
+    toIEEE32Exec (Float32.mul a b) = IEEE32Exec.mul (toIEEE32Exec a) (toIEEE32Exec b) := by
   apply bits_inj
   simpa [toIEEE32Exec, IEEE32Exec.ofBits] using
     (RuntimeFloat32MatchesIEEE32Exec.mul_bits (a := a) (b := b))
 
 /-- Rewrite runtime float32 division into executable `IEEE32Exec.div` (value-level form). -/
 theorem toIEEE32Exec_div (a b : F32) :
-    toIEEE32Exec (a / b) = IEEE32Exec.div (toIEEE32Exec a) (toIEEE32Exec b) := by
+    toIEEE32Exec (Float32.div a b) = IEEE32Exec.div (toIEEE32Exec a) (toIEEE32Exec b) := by
   apply bits_inj
   simpa [toIEEE32Exec, IEEE32Exec.ofBits] using
     (RuntimeFloat32MatchesIEEE32Exec.div_bits (a := a) (b := b))
 
 /-- Rewrite runtime float32 negation into executable `IEEE32Exec.neg` (value-level form). -/
 theorem toIEEE32Exec_neg (a : F32) :
-    toIEEE32Exec (-a) = IEEE32Exec.neg (toIEEE32Exec a) := by
+    toIEEE32Exec (Float32.neg a) = IEEE32Exec.neg (toIEEE32Exec a) := by
   apply bits_inj
   simpa [toIEEE32Exec, IEEE32Exec.ofBits] using
     (RuntimeFloat32MatchesIEEE32Exec.neg_bits (a := a))

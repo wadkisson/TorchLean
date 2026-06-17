@@ -30,13 +30,13 @@ That is why this folder is not a duplicate of `NN.Spec.Models` or `NN.Examples.M
 This tutorial does two things:
 
 1. It runs the smallest complete lowering path: `GraphSpec.Models.mlp → ToTorchLean.toSeq →
-   train.run`.
+  Trainer.new → trainer.train`.
 2. It typechecks and explains the broader GraphSpec model ladder: MLP, CNN, residual linear block,
    and ResNet18.
 
 Only the MLP is trained here because it is the compact check path for `Seq` lowering. The larger
 models are still GraphSpec models; they are deliberately kept as architecture terms so graph passes,
-exporters, and proofs can consume them without turning this tutorial into a slow vision benchmark.
+exporters, and proofs can consume them without making this tutorial a slow vision benchmark.
 
 Run:
 
@@ -45,8 +45,8 @@ lake exe torchlean graphspec --backend eager
 lake exe torchlean graphspec --backend compiled
 ```
 
-You can also pass the standard scalar/runtime flags accepted by `train.run`, such as
-`--dtype ieee32`.
+You can also pass the standard TorchLean runtime flags such as `--dtype ieee32`, `--backend eager`,
+or `--backend compiled`.
 -/
 
 @[expose] public section
@@ -57,7 +57,21 @@ namespace NN.Examples.Advanced.GraphSpec.Tutorial
 open Spec
 open Tensor
 open NN.Tensor
-open NN.API
+open _root_.TorchLean
+
+/-- Command-line help for the GraphSpec tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean GraphSpec tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean graphspec [options]"
+    , ""
+    , "Options:"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    ]
 
 /-! ## Small architecture terms that should typecheck -/
 
@@ -69,9 +83,9 @@ Parameter ABI:
 -/
 def tutorialMlp :
     NN.GraphSpec.Graph
-      [ Shape.Mat 3 2, Shape.Vec 3
-      , Shape.Mat 1 3, Shape.Vec 1 ]
-      (Shape.Vec 2) (Shape.Vec 1) :=
+      [ Shape.mat 3 2, Shape.vec 3
+      , Shape.mat 1 3, Shape.vec 1 ]
+      (Shape.vec 2) (Shape.vec 1) :=
   NN.GraphSpec.Models.mlp (inDim := 2) (hidDim := 3) (outDim := 1)
 
 /--
@@ -97,8 +111,8 @@ The minimal DAG-native skip-connection example:
 
 `x ↦ relu((W x + b) + x)`.
 
-This cannot be honestly represented as a plain chain without either duplicating the input path or
-hiding sharing in a special layer. That is the pedagogical reason `GraphSpec.DAG` exists.
+This is not a plain chain: representing it that way would either duplicate the input path or hide
+sharing in a special layer. That is the pedagogical reason `GraphSpec.DAG` exists.
 -/
 def tutorialResidual :=
   NN.GraphSpec.Models.residualLinear (d := 4)
@@ -121,14 +135,22 @@ def printCatalog : IO Unit := do
   IO.println "  4. ResNet18: larger DAG-style residual architecture."
   IO.println ""
 
+/-- Tiny one-sample dataset for the lowered GraphSpec MLP training path. -/
+def tutorialDataset : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+  let xF : Spec.Tensor Float (Shape.vec 2) := tensorF! id [2] [0.5, 0.8]
+  let yF : Spec.Tensor Float (Shape.vec 1) := tensorF! id [1] [1.0]
+  let XFloat : Spec.Tensor Float (shape![1, 2]) := Spec.Tensor.dim (fun _ => xF)
+  let YFloat : Spec.Tensor Float (shape![1, 1]) := Spec.Tensor.dim (fun _ => yF)
+  Data.tensorDataset XFloat YFloat
+
 /-- Run the compact MLP lowering/training path. -/
 def runMlpTrainingPath (args : List String) : IO Unit := do
   let inDim : Nat := 2
   let hidDim : Nat := 3
   let outDim : Nat := 1
 
-  let xShape : Spec.Shape := NN.Tensor.Shape.Vec inDim
-  let yShape : Spec.Shape := NN.Tensor.Shape.Vec outDim
+  let xShape : Shape := Shape.vec inDim
+  let yShape : Shape := Shape.vec outDim
 
   -- GraphSpec is the source architecture. This exact graph also has pure semantics and an
   -- executable program view; here we ask for the additional `nn.Sequential` training view.
@@ -139,50 +161,23 @@ def runMlpTrainingPath (args : List String) : IO Unit := do
       throw <| IO.userError s!"GraphSpec.ToTorchLean.toSeq failed: {msg}"
   | .ok seqR =>
       let seq : nn.Sequential xShape yShape := by
-        -- `API.nn.Sequential` is the public API name for the same runtime `Seq` type.
+        -- `nn.Sequential` is the public API name for the same runtime `Seq` type.
         simpa using seqR
-      let task := train.regression seq
-
-      -- `train.run` is the canonical entrypoint: it parses `--dtype ...` and `--backend ...`,
-      -- instantiates the runner, and passes leftover args to the callback.
-      train.run task
+      let run ← Trainer.RunConfig.parseRuntimeArgsOrThrow "GraphSpecTutorial"
         (CLI.dropDashDash args)
-        (fun {α} _ _ _ _ runner rest => do
-          Common.orThrow "GraphSpecTutorial" <| CLI.requireNoArgs rest
-          let cast : Float → α := Runtime.ofFloat
-
-          -- Build constants from Float literals, then cast into the chosen runtime scalar `α`.
-          let xF : Spec.Tensor Float xShape := tensorF! id [inDim] [0.5, 0.8]
-          let sampleYF : Spec.Tensor Float yShape := tensorF! id [outDim] [1.0]
-          let x : Spec.Tensor α xShape := Spec.mapTensor cast xF
-
-          -- PyTorch analogue:
-          --
-          -- ```python
-          -- dataset = TensorDataset(X, Y)
-          -- y = model(x)
-          -- loss.backward()
-          -- optimizer.step()
-          -- ```
-          --
-          -- TorchLean keeps the shapes in the tensor type. `supervisedDim0F` says the leading
-          -- dimension is the dataset axis, so this is a one-example regression dataset.
-          let XFloat : Spec.Tensor Float (shape![1, inDim]) := Spec.Tensor.dim (fun _ => xF)
-          let YFloat : Spec.Tensor Float (shape![1, outDim]) := Spec.Tensor.dim (fun _ => sampleYF)
-          let dataset := Data.supervisedDim0F (α := α) XFloat YFloat
-
-          let _yTorchLean : Spec.Tensor α yShape := ← train.predict runner x
-          IO.println "forward: GraphSpec MLP lowered to TorchLean and executed"
-
-          let loss0 ← train.meanLossDataset runner dataset
-          IO.println s!"loss(before)={loss0}"
-          let _report ← train.fitDataset runner (train.steps 3 (optim.sgd 0.1) (logEvery := 1))
-            dataset
-          train.evalMode runner
-          let loss1 ← train.meanLossDataset runner dataset
-          IO.println s!"loss(after)={loss1}")
+        { optimizer := optim.sgd { lr := 0.1 } }
+      let trainer := Trainer.new seq <|
+        Trainer.Config.fromRunConfig run .regression
+      trainer.printInfo
+      let trained ← trainer.train tutorialDataset { steps := 3, title := "GraphSpec tutorial" }
+      IO.println "forward: GraphSpec MLP lowered to TorchLean and executed"
+      trained.printSummary
 
 def main (args : List String) : IO Unit := do
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
   IO.println "== GraphSpec tutorial =="
   printCatalog
   runMlpTrainingPath args

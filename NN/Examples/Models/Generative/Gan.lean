@@ -5,15 +5,15 @@ Authors: TorchLean Team
 
 Run:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe -K cuda=true torchlean gan --cuda --steps 10
+  lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1
 -/
 
 module
 
 public import NN
-public import NN.API.Models.Generative
 public import NN.Examples.Models.Common.RealData
 public import NN.Spec.Models.Gan
+public import NN.Spec.Layers.Loss
 public import NN.MLTheory.Generative.Latent.GAN
 
 /-!
@@ -32,8 +32,7 @@ generator/discriminator constructors and data path.
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Generative.Gan
 
@@ -41,7 +40,7 @@ namespace NN.Examples.Models.Generative.Gan
 def exeName : String := "torchlean gan"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "gan"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "gan"
 
 /--
 Shared vector-image configuration.
@@ -52,21 +51,45 @@ record, so shape changes stay centralized.
 def cfg : nn.models.VectorGenerativeConfig := nn.models.compactImageConfig
 
 /-- Latent-noise batch shape for the generator input. -/
-abbrev Z : Shape := nn.models.vectorLatentShape cfg
+abbrev Z := nn.models.vectorLatentShape cfg
 
 /-- Flattened CIFAR image-vector batch shape. -/
-abbrev X : Shape := nn.models.vectorDataShape cfg
+abbrev X := nn.models.vectorDataShape cfg
 
 /-- Discriminator score shape: one scalar score per batch row. -/
-abbrev S : Shape := NN.Tensor.Shape.Mat cfg.batch 1
+abbrev S := Shape.mat cfg.batch 1
 
 /-- Generator network mapping latent vectors to flattened image vectors. -/
 def mkGenerator : nn.M (nn.Sequential Z X) :=
-  nn.models.vectorGanGenerator cfg
+  nn.models.VectorGANGenerator cfg
 
 /-- Discriminator network mapping flattened image vectors to scalar real/fake scores. -/
 def mkDiscriminator : nn.M (nn.Sequential X S) :=
-  nn.models.vectorGanDiscriminator cfg
+  nn.models.VectorGANDiscriminator cfg
+
+/-- Mean-squared error for one supervised sample evaluated through a public prediction closure. -/
+def sampleMse {σ τ : Shape}
+    (predict : Tensor.T Float σ → IO (Tensor.T Float τ))
+    (sample : SupervisedSample Float σ τ) : IO Float := do
+  let yhat ← predict (Sample.x sample)
+  pure (_root_.Spec.mseSpec yhat (Sample.y sample))
+
+/--
+Aggregate generator and discriminator scalar losses for one LSGAN reporting step.
+
+The metric receives public prediction functions rather than raw modules.  That is the whole point of
+this example after the trainer cleanup: the GAN-specific code still defines the task objective, but
+the model state, optimizer stepping, and backend details stay inside `trainer.trainPairStreamFloat`.
+-/
+def totalLoss
+    (predictGen : Tensor.T Float Z → IO (Tensor.T Float X))
+    (predictDisc : Tensor.T Float X → IO (Tensor.T Float S))
+    (genSample : SupervisedSample Float Z X)
+    (discReal discFake : SupervisedSample Float X S) : IO Float := do
+  let g ← sampleMse predictGen genSample
+  let dr ← sampleMse predictDisc discReal
+  let df ← sampleMse predictDisc discFake
+  pure (g + dr + df)
 
 /--
 Train the compact LSGAN-style pair and return a total-loss curve.
@@ -76,48 +99,38 @@ minibatch, while the discriminator separates that minibatch from deterministic n
 The imported spec/theory modules carry the adversarial objective statements; this runtime path
 checks that both networks, optimizers, CUDA memory reporting, and real-data loading work together.
 -/
-def trainCurve (opts : TorchLean.Options) (xPath yPath : System.FilePath)
-    (nRows seed steps cudaMemWatch : Nat) : IO _root_.Runtime.Training.Curve := do
-  nn.withModel mkGenerator fun gen => do
-  nn.withModel mkDiscriminator fun disc => do
-    let genDef := nn.mseScalarModuleDef gen
-    let discDef := nn.mseScalarModuleDef disc
-    let genM ← TorchLean.Module.instantiateWithOptions (α := Float) genDef id opts
-    let discM ← TorchLean.Module.instantiateWithOptions (α := Float) discDef id opts
-    let realX ← RealData.loadCifarVectorBatch cfg (by decide) exeName xPath yPath nRows seed
-    let z := nn.models.latentNoise cfg seed
-    let noiseX := nn.models.dataNoise cfg (seed + 17)
-    let genSample : API.sample.Supervised Float Z X := API.sample.mk z realX
-    let discReal : API.sample.Supervised Float X S := API.sample.mk realX (nn.models.onesScore cfg)
-    let discFake : API.sample.Supervised Float X S := API.sample.mk noiseX (nn.models.zerosScore cfg)
-    let genOpt :=
-      TorchLean.Optim.adam (α := Float) (paramShapes := nn.paramShapes gen)
-        (lr := 1e-3) (beta1 := 0.9) (beta2 := 0.999) (epsilon := 1e-8)
-    let discOpt :=
-      TorchLean.Optim.adam (α := Float) (paramShapes := nn.paramShapes disc)
-        (lr := 1e-3) (beta1 := 0.9) (beta2 := 0.999) (epsilon := 1e-8)
-    let genH ← TorchLean.Optim.handle (α := Float) genM genOpt
-    let discH ← TorchLean.Optim.handle (α := Float) discM discOpt
-    let mut curve : _root_.Runtime.Training.Curve := {}
-    let g0 ← TorchLean.Module.forward (α := Float) genM genSample
-    let d0r ← TorchLean.Module.forward (α := Float) discM discReal
-    let d0f ← TorchLean.Module.forward (α := Float) discM discFake
-    let mut last := Tensor.toScalar g0 + Tensor.toScalar d0r + Tensor.toScalar d0f
-    curve := curve.push 0 last
-    let watchEvery := Common.effectiveCudaMemWatch opts steps cudaMemWatch
-    let mut memWatch? ← Common.reportCudaMemWatch opts watchEvery steps 0 none
-    for step in [0:steps] do
-      genH.step genSample
-      discH.step discReal
-      discH.step discFake
-      memWatch? ← Common.reportCudaMemWatch opts watchEvery steps (step + 1) memWatch?
-      let g ← TorchLean.Module.forward (α := Float) genM genSample
-      let dr ← TorchLean.Module.forward (α := Float) discM discReal
-      let df ← TorchLean.Module.forward (α := Float) discM discFake
-      last := Tensor.toScalar g + Tensor.toScalar dr + Tensor.toScalar df
-      curve := curve.push (step + 1) last
-    IO.println s!"  steps={steps} totalLoss0={Tensor.toScalar g0 + Tensor.toScalar d0r + Tensor.toScalar d0f} totalLoss{steps}={last}"
-    pure curve
+def trainCurve (opts : Options) (xPath yPath : System.FilePath)
+    (nRows seed steps cudaMemWatch : Nat) : IO Training.Curve := do
+  let realX ← RealData.loadCifarVectorBatch cfg (by decide) exeName xPath yPath nRows seed
+  let z := nn.models.latentNoise cfg seed
+  let noiseX := nn.models.dataNoise cfg (seed + 17)
+  let genSample : SupervisedSample Float Z X := Sample.mk z realX
+  let discReal : SupervisedSample Float X S := Sample.mk realX (nn.models.onesScore cfg)
+  let discFake : SupervisedSample Float X S := Sample.mk noiseX (nn.models.zerosScore cfg)
+  let genTrainer :=
+    Trainer.new mkGenerator <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := 1e-3 } })
+        .regression
+        (seed := seed)
+  let discTrainer :=
+    Trainer.new mkDiscriminator <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := 1e-3 } })
+        .regression
+        (seed := seed + 1)
+  genTrainer.printInfoAs "generator"
+  discTrainer.printInfoAs "discriminator"
+  let trained ← genTrainer.trainPairStreamFloat discTrainer opts
+    (fun _ => genSample)
+    (fun _ => [discReal, discFake])
+    (fun predictGen predictDisc =>
+      totalLoss predictGen predictDisc genSample discReal discFake)
+    { steps := steps, log := .disabled }
+    (curveEvery := 1)
+    (cudaMemWatch := cudaMemWatch)
+  trained.printCurveSummary "totalLoss"
+  pure trained.curve
 
 /--
 Executable entrypoint for the compact GAN-style run.
@@ -126,17 +139,12 @@ The command loads CIFAR vectors, trains generator and discriminator updates for 
 the combined loss curve to the requested logging destination.
 -/
 def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
-      let flags ← Common.orThrow exeName <|
-        RealData.parseCifarLoggedTrainFlags exeName rest defaultLogJson 10
-      let curve ← trainCurve opts flags.xPath flags.yPath flags.nRows flags.seed
-        flags.train.steps flags.train.cudaMemWatch
-      Common.writeCurveLogTo flags.train.log "GAN-style CIFAR training" curve "total_loss"
-        (RealData.cifarTrainNotes opts flags #[s!"latentDim={cfg.latentDim}"])
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: CIFAR LSGAN-style training (device={if opts.useGpu then "cuda" else "cpu"})")
-      printOk := true }
+  RealData.cifarCurve exeName args defaultLogJson 10
+    (banner := ModelZoo.bannerWithDevice exeName "CIFAR LSGAN-style training")
+    (seriesName := "total_loss")
+    (title := "GAN-style CIFAR training")
+    (extraNotes := fun _ _ => #[s!"latentDim={cfg.latentDim}"])
+    (train := fun opts flags =>
+      trainCurve opts flags.xPath flags.yPath flags.nRows flags.seed flags.steps flags.cudaMemWatch)
 
 end NN.Examples.Models.Generative.Gan

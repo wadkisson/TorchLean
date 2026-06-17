@@ -103,7 +103,7 @@ abbrev F32 (mode : Float32Mode := .ieee754Exec) : Type := Float32 mode
 
 /-! ## CLI and Example Logging -/
 
-/-- Human-readable summary of the selected float32 semantics. -/
+/-- Short summary of the selected Float32 semantics. -/
 def float32ModeSummary : Float32Mode → String
   | .fp32 =>
       "FP32: proof semantics (round-on-ℝ), finite-only; no NaN/Inf"

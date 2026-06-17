@@ -20,8 +20,7 @@ This helper:
 2) converts the `ParamStore` to an IR `Payload`, and
 3) compiles the IR graph to an executable `Runtime.Autograd.Compiled.ExecGraphData`.
 
-This keeps the shared IR boundary explicit: the same IR artifact can be used both for verification
-and for execution.
+The same IR artifact can be used both for verification and for execution.
 -/
 
 @[expose] public section
@@ -36,7 +35,7 @@ open NN.IR
 /-- Compile a TorchLean forward model (single distinguished input) to both IR and executable SSA
   graph. -/
 def compileForward1Exec
-    {α : Type} [Context α] [DecidableEq Shape] [Inhabited α]
+    {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :

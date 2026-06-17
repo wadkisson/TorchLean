@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -67,7 +66,7 @@ The float32 and `IEEE32Exec` variants express the same conceptual theorem after 
 network is tied to a concrete scalar model. The clean real theorem and the executable bridge are
 related, but they are not the same statement.
 
-The float versions are intentionally explicit about their extra obligations:
+The float versions spell out their extra obligations:
 
 $$`\text{real approximation error}
 + \text{dyadic parameter quantization error}

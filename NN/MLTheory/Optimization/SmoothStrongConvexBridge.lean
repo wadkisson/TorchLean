@@ -122,7 +122,8 @@ theorem firstOrderStrongConvexAt_of_strongConvexOn_univ (μ : ℝ) {f : E → �
       have hq : DifferentiableAt ℝ (fun z : E => (μ / 2) * ‖z‖ ^ 2) x := by
         simpa [mul_assoc, mul_left_comm, mul_comm] using hq0.const_mul (μ / 2)
       -- Combine.
-      simpa [g] using hdx.sub hq
+      change DifferentiableAt ℝ (f - fun z : E => (μ / 2) * ‖z‖ ^ 2) x
+      exact hdx.sub hq
     exact HasFDerivAt.comp_hasDerivAt_of_eq (𝕜 := ℝ) (l := g)
       (l' := fderiv ℝ g x) (y := x) (f := fun t => h t)
       (f' := y - x) (x := (0 : ℝ)) hgx.hasFDerivAt hh (by simp [h])
@@ -161,7 +162,7 @@ theorem firstOrderStrongConvexAt_of_strongConvexOn_univ (μ : ℝ) {f : E → �
     have hq : DifferentiableAt ℝ q x := by
       simpa [q, mul_assoc, mul_comm, mul_left_comm] using hq0.const_mul (μ / 2)
     have hf_apply : (fderiv ℝ f x) (y - x) = ⟪(∇ f) x, y - x⟫ := by
-      simp [inner_gradient_left (f := f) (x := x) (y := y - x) hdx]
+      exact (inner_gradient_left (f := f) (x := x) (y := y - x)).symm
     have hq_apply : (fderiv ℝ (fun z : E => (μ / 2) * ‖z‖ ^ 2) x) (y - x) = μ * ⟪x, y - x⟫ := by
       have hfderiv :
           fderiv ℝ q x = (μ / 2) • fderiv ℝ (fun z : E => ‖z‖ ^ 2) x := by
@@ -193,7 +194,7 @@ theorem firstOrderStrongConvexAt_of_strongConvexOn_univ (μ : ℝ) {f : E → �
       _ = (fderiv ℝ f x) (y - x) - (fderiv ℝ q x) (y - x) := by
               rfl
       _ = ⟪(∇ f) x, y - x⟫ - μ * ⟪x, y - x⟫ := by
-              simp [hf_apply, hq_apply, q]
+              rw [hf_apply, hq_apply]
   -- Expand the `g` inequality back into `f`.
   -- Use `‖y‖^2 - ‖x‖^2` expansion:
   -- `‖y‖^2 = ‖x + (y-x)‖^2 = ‖x‖^2 + 2⟪x, y-x⟫ + ‖y-x‖^2`.
@@ -273,14 +274,14 @@ theorem strongMonotone_gradient_of_firstOrderStrongConvex (μ : ℝ) {f : E → 
     calc
       ⟪(∇ f) x, y - x⟫ + ⟪(∇ f) y, x - y⟫
           = ⟪y - x, (∇ f) x⟫ + ⟪x - y, (∇ f) y⟫ := by
-              simp [real_inner_comm]
+              simp
       _ = -⟪x - y, (∇ f) x⟫ + ⟪x - y, (∇ f) y⟫ := by
               -- `y - x = -(x - y)`, then `⟪-u, v⟫ = -⟪u, v⟫`.
               have hsub : y - x = -(x - y) := by
                 abel
               rw [hsub]
               -- `inner_neg_left` gives `⟪-(x-y), ∇f x⟫ = -⟪x-y, ∇f x⟫`.
-              simpa using (inner_neg_left (x := x - y) (y := (∇ f) x))
+              simp
       _ = - ⟪x - y, (∇ f) x - (∇ f) y⟫ := by
               -- Rewrite subtraction as `a + -b` and use bilinearity in the right argument.
               simp [sub_eq_add_neg, inner_add_right, inner_neg_right, add_comm]
@@ -295,16 +296,9 @@ theorem strongMonotone_gradient_of_firstOrderStrongConvex (μ : ℝ) {f : E → 
     -- From `hadd` we get:
     --   0 ≥ -(inner) + μ‖x-y‖²
     -- so `inner ≥ μ‖x-y‖²`.
-    have hadd' :
-        0 ≥ -⟪x - y, (∇ f) x - (∇ f) y⟫ + (μ / 2) * ‖x - y‖ ^ 2 + (μ / 2) * ‖x - y‖ ^ 2 := by
-      -- Replace the inner-product sum and rewrite both norms to `‖x-y‖`.
-      -- `simp` handles the `μ/2 + μ/2` arithmetic.
-      simpa [hinner, hnorm, add_assoc, add_left_comm, add_comm, mul_assoc]
-        using hadd
-    -- Combine the two `μ/2` terms into `μ`.
-    have : μ * ‖x - y‖ ^ 2 ≤ ⟪x - y, (∇ f) x - (∇ f) y⟫ := by
-      linarith [hadd']
-    exact this
+    have hadd' := hadd
+    rw [hinner, hnorm] at hadd'
+    nlinarith
   exact hmono0
 
 end GD

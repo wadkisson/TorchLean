@@ -102,7 +102,7 @@ theorem approxT_abs_spec {s : Shape} :
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         -- `MathFunctions.abs` is definitional `abs` on `ℝ`.
-        simpa using
+        simpa [MathFunctions.abs] using
           (approx_abs_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR := xR) (eps := eps) hx))
   simpa [absSpec, absBoundTensor] using h
 
@@ -127,7 +127,7 @@ theorem approxT_exp_spec {s : Shape} :
         Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) TrainingPhase.forward / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
-        simpa using
+        simpa [Proofs.mathfunc_exp_eq_rexp] using
           (approx_exp_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR := xR) (eps := eps) hx))
   simpa [expSpec, expBoundTensor] using h
 
@@ -152,7 +152,7 @@ theorem approxT_tanh_spec {s : Shape} :
       (bnd := fun a _eps => (2 : ℝ) + neuralUlp β fexp (Real.tanh a) TrainingPhase.forward / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
-        simpa using
+        simpa [Proofs.mathfunc_tanh_eq_rtanh] using
           (approx_tanh_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR := xR) (eps := eps) hx))
   simpa [tanhBoundTensor] using h
 
@@ -248,7 +248,7 @@ theorem approxT_relu_spec {s : Shape} :
                 refine le_trans htriangle ?_
                 simpa [reluBoundTensor, tensorToSpec, Spec.mapTensor, mapSpec, linfNorm,
                   RuntimeApprox.linfNorm,
-                  tensorLinfNorm, xhat] using
+                  tensorLinfNorm, MathFunctions.abs, xhat] using
                   (le_abs_self (eps + neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2))
               exact
                 (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -324,9 +324,19 @@ theorem approxT_relu_spec {s : Shape} :
                     (Tensor.dim fun i => mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) (xRf
                       i)))
                 ≤ B := by
-                simpa [tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                  linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                    Spec.mapTensor] using hfold
+                simp [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec,
+                  Spec.mapTensor]
+                change
+                  List.foldl
+                    (fun a i =>
+                      max a
+                        (tensorLinfNorm
+                          ((mapSpec (fun x => max x 0) (xSf i)).subSpec
+                            (mapTensor (toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                              (mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) (xRf i))))))
+                    0 (List.finRange n) ≤ B
+                simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec,
+                  MathFunctions.abs, Spec.mapTensor] using hfold
               simpa [approxT, approxWith, B, mapSpec] using this
 
 

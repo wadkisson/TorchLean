@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Restricted expression evaluator for PINN training helpers.
 

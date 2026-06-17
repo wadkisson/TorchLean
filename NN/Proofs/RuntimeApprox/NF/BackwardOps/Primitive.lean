@@ -402,7 +402,7 @@ by
         (mapSpec (s := s) MathFunctions.exp (getIdx (α := R) ctxR a))
         (linfNorm (expBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a))) := by
-    simpa using
+    simpa [Spec.Tensor.expSpec] using
       (approxT_exp_spec (β := β) (fexp := fexp) (rnd := rnd)
         (s := s)
         (xS := getIdx (α := SpecScalar) ctxS a)

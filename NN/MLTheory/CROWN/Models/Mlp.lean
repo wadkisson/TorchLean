@@ -529,6 +529,7 @@ theorem relu_relax_vector_pointwise_upper_real {n : Nat}
                 relu_relax_scalar_upper_real (l:=li_) (u:=ui_) (x:=xi_) hlx hxu
 
 /- Pure IBP soundness for the 2-layer MLP. -/
+set_option linter.auxLemma false in
 /--
 Soundness of `IBP.linear` over `ℝ`.
 
@@ -654,13 +655,15 @@ theorem ibp_linear_sound_real {m n : Nat}
                                     have : BoundOps.min2 p1 p2 ≤ aij * xj :=
                                       le_trans (min2_le_left p1 p2) h1
                                     simpa
-                                      [lower, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO]
+                                      [lower, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO,
+                                        BoundOps.mulDown]
                                       using this
                                   ·
                                     have : aij * xj ≤ BoundOps.max2 p1 p2 :=
                                       le_trans h2 (le_max2_right p1 p2)
                                     simpa
-                                      [upper, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO]
+                                      [upper, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO,
+                                        BoundOps.mulUp]
                                       using this
                                 ·
                                   have hsign' : aij ≤ 0 := le_of_not_ge hsign
@@ -673,13 +676,15 @@ theorem ibp_linear_sound_real {m n : Nat}
                                     have : BoundOps.min2 p1 p2 ≤ aij * xj :=
                                       le_trans (min2_le_right p1 p2) h1
                                     simpa
-                                      [lower, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO]
+                                      [lower, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO,
+                                        BoundOps.mulDown]
                                       using this
                                   ·
                                     have : aij * xj ≤ BoundOps.max2 p1 p2 :=
                                       le_trans h2 (le_max2_left p1 p2)
                                     simpa
-                                      [upper, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO]
+                                      [upper, mid, hcol, hxlo, hxhi, hxv, p1, p2, instBO,
+                                        BoundOps.mulUp]
                                       using this
                       -- Fold monotonicity lemmas
                       have fold_lower_mid : ∀ (l : List (Fin n)) (acc1 acc2 : ℝ), acc1 ≤ acc2 →
@@ -789,7 +794,8 @@ theorem ibp_linear_sound_real {m n : Nat}
                                     cases hxhi : xhi j with
                                     | scalar xhi_j =>
                                       simp [Tensor.toScalar, List.foldl, lower, hcol, hxlo, hxhi]
-                                      simpa [lower, hcol, hxlo, hxhi, instBO] using
+                                      simpa [Tensor.toScalar, lower, hcol, hxlo, hxhi, instBO,
+                                        BoundOps.addDown, BoundOps.mulDown] using
                                         ih (acc + BoundOps.min2 (aij * xlo_j) (aij * xhi_j))
                             have toScalar_fold_upper :
                                 ∀ (l : List (Fin n)) (acc : ℝ),
@@ -820,7 +826,8 @@ theorem ibp_linear_sound_real {m n : Nat}
                                     cases hxhi : xhi j with
                                     | scalar xhi_j =>
                                       simp [Tensor.toScalar, List.foldl, upper, hcol, hxlo, hxhi]
-                                      simpa [upper, hcol, hxlo, hxhi, instBO] using
+                                      simpa [Tensor.toScalar, upper, hcol, hxlo, hxhi, instBO,
+                                        BoundOps.addUp, BoundOps.mulUp] using
                                         ih (acc + BoundOps.max2 (aij * xlo_j) (aij * xhi_j))
                             have toScalar_fold_mid :
                                 ∀ (l : List (Fin n)) (acc : ℝ),
@@ -846,7 +853,7 @@ theorem ibp_linear_sound_real {m n : Nat}
                                   cases hxv : xv j with
                                   | scalar xj =>
                                     simp [Tensor.toScalar, List.foldl, mid, hcol, hxv]
-                                    simpa using ih (acc + aij * xj)
+                                    simpa [Tensor.toScalar, mid, hcol, hxv] using ih (acc + aij * xj)
 
                             -- Identify sumL/sumU/sumM with the corresponding numeric folds.
                             have sumL_def :
@@ -960,9 +967,9 @@ theorem ibp_linear_sound_real {m n : Nat}
                               have := hUsum
                               simpa [sumM_def, sumU_def] using this
                             have h1 : BoundOps.addDown sumL bi_lo ≤ sumM + bi := by
-                              simpa [instBO] using (add_le_add hsumL hbiL)
+                              simpa [instBO, BoundOps.addDown] using (add_le_add hsumL hbiL)
                             have h2 : sumM + bi ≤ BoundOps.addUp sumU bi_hi := by
-                              simpa [instBO] using (add_le_add hsumU hbiU)
+                              simpa [instBO, BoundOps.addUp] using (add_le_add hsumU hbiU)
                             -- Rewrite the goal into the scalar conjunction and finish with
                             -- `h1`/`h2`.
                             -- First, simplify the row/bias matches.
@@ -1031,11 +1038,11 @@ theorem ibp_linear_sound_real {m n : Nat}
                               -- Rewrite `h1` into the exact scalar goal.
                               have h1' := h1
                               rw [← hLoS, ← hValS] at h1'
-                              simpa [instBO] using h1'
+                              simpa [Tensor.toScalar] using h1'
                             · -- upper bound
                               have h2' := h2
                               rw [← hValS, ← hHiS] at h2'
-                              simpa [instBO] using h2'
+                              simpa [Tensor.toScalar] using h2'
 
 /- Helper: soundness of IBP.relu over ℝ -/
 private theorem ibp_relu_sound_real {n : Nat}

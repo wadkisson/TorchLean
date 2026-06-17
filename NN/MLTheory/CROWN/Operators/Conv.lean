@@ -23,8 +23,8 @@ Design notes:
   to 1D vectors when evaluating affine forms. This reuses AffineVec and its safe
   evaluation on input boxes.
 - The conv linear operator is explicitly materialized as a matrix Wconv whose rows
-  correspond to output positions and columns to input positions. This keeps the verifier simple and
-  deterministic for the tensor sizes targeted by the CROWN operator layer.
+  correspond to output positions and columns to input positions. The verifier stays deterministic
+  for the tensor sizes targeted by the CROWN operator layer.
 -/
 
 @[expose] public section
@@ -37,7 +37,7 @@ open _root_.Spec.Tensor
 variable {α : Type} [Context α]
 
 /-- Flatten a `Box` to a 1D box by flattening both endpoints. -/
-def flattenBox {s : Shape} (B : Box α s) [Inhabited α] : Box α (.dim (Shape.size s) .scalar) :=
+def flattenBox {s : Shape} (B : Box α s) : Box α (.dim (Shape.size s) .scalar) :=
   { lo := Tensor.flattenSpec B.lo, hi := Tensor.flattenSpec B.hi }
 
 /--
@@ -188,7 +188,7 @@ def matRowScaleSpec {m n : Nat}
           | Tensor.scalar aij => Tensor.scalar (vi * aij)))
 
 /-- Broadcast a per-channel bias vector across spatial positions, as a flattened output vector. -/
-def conv2dBiasBroadcast [Zero α]
+def conv2dBiasBroadcast
   {outC inH inW kH kW stride padding : ℕ}
   (bias : Tensor α (.dim outC .scalar)) :
   let outH := (inH + 2 * padding - kH) / stride + 1
@@ -211,7 +211,6 @@ on an input box can then be performed with `AffineVec.eval_on_box`.
 def crownConv2dAffineForm
   {inC outC kH kW stride padding inH inW : ℕ}
   {h1 : inC ≠ 0} {h2 : kH ≠ 0} {h3 : kW ≠ 0}
-  [Inhabited α]
   (layer : Spec.Conv2DSpec inC outC kH kW stride padding α h1 h2 h3)
   (xB : Box α (.dim inC (.dim inH (.dim inW .scalar)))) :
   AffineVec α (Shape.size (Shape.dim inC (Shape.dim inH (Shape.dim inW Shape.scalar))))
@@ -273,7 +272,6 @@ Returns a `Box` over the flattened conv output dimension.
 def crownConv2dAffineFlat
   {inC outC kH kW stride padding inH inW : ℕ}
   {h1 : inC ≠ 0} {h2 : kH ≠ 0} {h3 : kW ≠ 0}
-  [Inhabited α]
   (layer : Spec.Conv2DSpec inC outC kH kW stride padding α h1 h2 h3)
   (xB : Box α (.dim inC (.dim inH (.dim inW .scalar)))) :
   Box α (.dim (outC * ((inH + 2 * padding - kH) / stride + 1) * ((inW + 2 * padding - kW) / stride +

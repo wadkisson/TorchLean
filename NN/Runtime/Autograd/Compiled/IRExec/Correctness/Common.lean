@@ -194,7 +194,7 @@ Indexing `dValsOfCtx` agrees with indexing the underlying `TList` context.
 This is the main bridge between the typed runtime context and the untyped IR value table.
 -/
 theorem dValsOfCtx_getElem!
-    {α : Type} [Context α] [Inhabited α] {ss : List Shape}
+    {α : Type} [Context α] {ss : List Shape}
     (ctx : Proofs.Autograd.Algebra.TList α ss) (i : Fin ss.length) :
     (dValsOfCtx (α := α) (ss := ss) ctx)[i.1]! =
       NN.IR.DVal.mk (α := α) (ss.get i)
@@ -268,7 +268,7 @@ Indexing `dValsOfCtx` by a typed `Idx` agrees with `getIdx` on the underlying `T
 This packages `dValsOfCtx_getElem!` into the repository’s `Idx` wrapper.
 -/
 theorem dValsOfCtx_getIdx
-    {α : Type} [Context α] [Inhabited α] {ss : List Shape} {s : Shape}
+    {α : Type} [Context α] {ss : List Shape} {s : Shape}
     (ctx : Proofs.Autograd.Algebra.TList α ss) (idx : Idx ss s) :
     (dValsOfCtx (α := α) (ss := ss) ctx)[idx.i.1]! =
       NN.IR.DVal.mk (α := α) s (getIdx (α := α) (xs := ctx) idx) := by
@@ -304,7 +304,7 @@ This is a proof-only helper that records the exact `Spec.mat_mul_spec` term prod
 in the well-typed success case.
 -/
 theorem evalAt_matmul_mm_ok
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : NN.IR.Graph) (payload : Payload α) (input : NN.IR.DVal α) (vals : Array (NN.IR.DVal α))
     (i : Nat) (n : NN.IR.Node) (aId bId : Nat) (m nDim p : Nat)
     (aT : Tensor α (.dim m (.dim nDim .scalar)))
@@ -317,7 +317,8 @@ theorem evalAt_matmul_mm_ok
       i) =
       .ok (NN.IR.DVal.mk (α := α) n.outShape
         (hOut ▸ Spec.matMulSpec (α := α) (m := m) (n := nDim) (p := p) aT bT)) := by
-    simp [NN.IR.Graph.evalAt, hN, hk, hp, hGetA, hGetB, hOut, throw_eq_error]
+  simp [NN.IR.Graph.evalAt, hN, hk, hp, hGetA, hGetB, hOut, throw_eq_error,
+    NN.IR.DVal.mk, NN.IR.DVal.shape, NN.IR.DVal.tensor]
 
 /--
 `NN.IR.Graph.evalAt` for a `.matmul` node specialized to batched matmul (`bmm`).
@@ -326,7 +327,7 @@ Like `evalAt_matmul_mm_ok`, this is used to relate the IR evaluator’s result t
 `forward` closure during the semantic equivalence correctness proof.
 -/
 theorem evalAt_matmul_bmm_ok
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : NN.IR.Graph) (payload : Payload α) (input : NN.IR.DVal α) (vals : Array (NN.IR.DVal α))
     (i : Nat) (n : NN.IR.Node) (aId bId : Nat) (batch m nDim p : Nat)
     (aT : Tensor α (.dim batch (.dim m (.dim nDim .scalar))))
@@ -344,7 +345,8 @@ theorem evalAt_matmul_bmm_ok
       .ok (NN.IR.DVal.mk (α := α) n.outShape
         (hOut ▸ Tensor.bmmSpec (α := α) (batch := batch) (m := m) (n := nDim) (p := p) aT bT)) :=
           by
-    simp [NN.IR.Graph.evalAt, hN, hk, hp, hGetA, hGetB, hOut, throw_eq_error]
+    simp [NN.IR.Graph.evalAt, hN, hk, hp, hGetA, hGetB, hOut, throw_eq_error,
+      NN.IR.DVal.mk, NN.IR.DVal.shape, NN.IR.DVal.tensor]
 
 /--
 `NN.IR.Graph.evalAt` for a `.reduceSum axis` node, specialized to a well-typed success case.
@@ -357,7 +359,7 @@ This helper records the exact `Tensor.reduceSum` term produced by the IR evaluat
 The final cast to `n.outShape` comes from the `evalAt` "shape-tag normalization" step.
 -/
 theorem evalAt_reduceSum_ok
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : NN.IR.Graph) (payload : Payload α) (input : NN.IR.DVal α) (vals : Array (NN.IR.DVal α))
     (i : Nat) (n : NN.IR.Node) (pId : Nat) (axis : Nat)
     (s : Shape) (pT : Tensor α s) (hAxisPf : PLift (Shape.valid_axis axis s))
@@ -370,17 +372,16 @@ theorem evalAt_reduceSum_ok
       .ok (NN.IR.DVal.mk (α := α) n.outShape
         (hOut ▸ Tensor.reduceSum (α := α) (s := s) axis pT
           (Shape.proveReducibleAlong axis s hAxisPf.down))) := by
-  have hGetSigma : vals[pId]! = (⟨s, pT⟩ : NN.IR.DVal α) := by
-    simpa [NN.IR.DVal.mk] using hGet
-  have hFst : vals[pId]!.fst = s := by
-    simpa using congrArg Sigma.fst hGetSigma
-  have hSndHeq : HEq vals[pId]!.snd pT := by
-    rw [hGetSigma]
-  cases hFst
-  have hSnd : vals[pId]!.snd = pT := by
-    exact eq_of_heq hSndHeq
+  have hShape : vals[pId]!.fst = s := by
+    simpa [NN.IR.DVal.mk] using congrArg Sigma.fst hGet
+  have hTensorHeq : HEq vals[pId]!.snd pT := by
+    rw [hGet]
+    simp [NN.IR.DVal.mk]
+  cases hShape
+  have hTensor : vals[pId]!.snd = pT := eq_of_heq hTensorHeq
   -- Unfold to the `.reduceSum` branch and discharge the runtime checks (axis validity + outShape).
-  simp [NN.IR.Graph.evalAt, hN, hk, hp, throw_eq_error, hAxis, hOut, hSnd, Pure.pure, Except.pure]
+  simp [NN.IR.Graph.evalAt, hN, hk, hp, throw_eq_error, hAxis, hOut, hTensor,
+    Pure.pure, Except.pure]
 
 /--
 `NN.IR.Graph.evalAt` for a `.reduceMean axis` node, specialized to a well-typed success case.
@@ -388,7 +389,7 @@ theorem evalAt_reduceSum_ok
 This is the mean analogue of `evalAt_reduceSum_ok`.
 -/
 theorem evalAt_reduceMean_ok
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : NN.IR.Graph) (payload : Payload α) (input : NN.IR.DVal α) (vals : Array (NN.IR.DVal α))
     (i : Nat) (n : NN.IR.Node) (pId : Nat) (axis : Nat)
     (s : Shape) (pT : Tensor α s) (hAxisPf : PLift (Shape.valid_axis axis s))
@@ -401,16 +402,15 @@ theorem evalAt_reduceMean_ok
       .ok (NN.IR.DVal.mk (α := α) n.outShape
         (hOut ▸ Tensor.reduceMean (α := α) (s := s) axis pT
           (Shape.proveReducibleAlong axis s hAxisPf.down))) := by
-  have hGetSigma : vals[pId]! = (⟨s, pT⟩ : NN.IR.DVal α) := by
-    simpa [NN.IR.DVal.mk] using hGet
-  have hFst : vals[pId]!.fst = s := by
-    simpa using congrArg Sigma.fst hGetSigma
-  have hSndHeq : HEq vals[pId]!.snd pT := by
-    rw [hGetSigma]
-  cases hFst
-  have hSnd : vals[pId]!.snd = pT := by
-    exact eq_of_heq hSndHeq
-  simp [NN.IR.Graph.evalAt, hN, hk, hp, throw_eq_error, hAxis, hOut, hSnd, Pure.pure, Except.pure]
+  have hShape : vals[pId]!.fst = s := by
+    simpa [NN.IR.DVal.mk] using congrArg Sigma.fst hGet
+  have hTensorHeq : HEq vals[pId]!.snd pT := by
+    rw [hGet]
+    simp [NN.IR.DVal.mk]
+  cases hShape
+  have hTensor : vals[pId]!.snd = pT := eq_of_heq hTensorHeq
+  simp [NN.IR.Graph.evalAt, hN, hk, hp, throw_eq_error, hAxis, hOut, hTensor,
+    Pure.pure, Except.pure]
 
 /-- Repackage a compiled `State` as an `ExecGraphData` so we can call its evaluator helpers. -/
 def execOfState {α : Type} (inShape : Shape) (st : State α inShape) : ExecGraphData α :=
@@ -498,10 +498,18 @@ IR into typed indices into the compiled context.
   -- Unfold `denoteAllState` to `dValsOfCtx (GraphData.eval ...)`, then use `dValsOfCtx_getIdx`.
   have hPid : pid = idx.i.1 :=
     (mkIdx_ok_i_eq (inShape := inShape) (ss := ss) (id := pid) (s := s) (idx := idx) hIdx).symm
-  simp [denoteAllState, execOfState, ExecGraphData.denoteAll, ExecGraphData.eval, dValsOfCtx, hPid]
-  simpa using (dValsOfCtx_getIdx (α := α)
+  rw [hPid]
+  change
+    (dValsOfCtx (α := α) (ss := [inShape] ++ ss)
+      (GraphData.eval (α := α) (Δ := Unit) (Γ := [inShape]) (ss := ss) gd (.cons x .nil)
+        ()))[idx.i.1]! =
+      NN.IR.DVal.mk (α := α) s
+        (getIdx (α := α)
+          (xs := GraphData.eval (α := α) (Δ := Unit) (Γ := [inShape]) (ss := ss) gd
+            (.cons x .nil) ()) idx)
+  exact dValsOfCtx_getIdx (α := α)
     (ctx := GraphData.eval (α := α) (Δ := Unit) (Γ := [inShape]) (ss := ss) gd (.cons x .nil) ())
-      idx)
+      idx
 
 /--
 One-step finishing lemma for the `buildFrom`/`denoteAllFrom` semantic equivalence proof.

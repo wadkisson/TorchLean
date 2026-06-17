@@ -213,7 +213,7 @@ def maxParents? : OpKind → Option Nat
   | .concat .. => none
   | k => some (minParents k)
 
-/-- A short human-readable tag for error messages and debugging output. -/
+/-- A short tag for error messages and debugging output. -/
 def tag : OpKind → String
   | .input => "input"
   | .const .. => "const"

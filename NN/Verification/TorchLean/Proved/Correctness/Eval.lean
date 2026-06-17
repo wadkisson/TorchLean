@@ -19,7 +19,7 @@ TorchLean graphs back to their specification semantics.
 
 Current bridge coverage includes:
 - common elementwise arithmetic and activations emitted by PyTorch/ONNX import paths;
-- shape-changing plumbing such as reshape, flatten, broadcast, scalar sum, leading-axis concat,
+- shape-changing operations such as reshape, flatten, broadcast, scalar sum, leading-axis concat,
   axis permutation, supported transpose forms, and axis reductions;
 - rank-2 and rank-3 `matmul`;
 - last-axis softmax and the evaluator's permutation path for non-last-axis softmax;
@@ -27,7 +27,7 @@ Current bridge coverage includes:
 - payload-backed constants;
 - CHW max/average pooling, including padded variants;
 - `layernorm axis` through the reshape-to-2D spec LayerNorm path;
-- graph plumbing nodes such as `input` and `detach`, plus scalar MSE loss;
+- graph-structural nodes such as `input` and `detach`, plus scalar MSE loss;
 - eval-mode NCHW BatchNorm with payload-backed running statistics.
 - exact `ParamStore` to IR `Payload` forwarding facts for every payload-backed op.
 - compiler insertion facts for the payload-backed nodes in the proved forward fragment.

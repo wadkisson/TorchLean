@@ -33,8 +33,7 @@ or statistical properties of MSE; it simply connects the IR semantics to the com
 ## Implementation notes
 
 - We keep this theorem in a dedicated file because it is heavier than most per-op steps.
-- The proof structure follows the compiler's guard sequence; this keeps dependent shape checks
-  aligned with compiler guards.
+- The proof structure follows the compiler's guard sequence, including the dependent shape checks.
 - This file can build slowly because MSE touches two parents, a scalar output shape, and a sequence
   of compiler guards. Repeated guard eliminations belong in focused helper lemmas, leaving the
   theorem focused on the loss equation itself.

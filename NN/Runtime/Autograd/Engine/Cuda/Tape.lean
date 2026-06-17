@@ -117,9 +117,8 @@ structure Node where
   /--
   Forward workspace buffers retained only because this node's backward closure may need them.
 
-  The eager runtime releases these buffers explicitly after backprop consumes the tape. This keeps
-  long CUDA training loops from waiting on Lean external-object finalizers for large intermediate
-  allocations.
+  The eager runtime releases these buffers explicitly after backprop consumes the tape, so long CUDA
+  training loops do not wait on Lean external-object finalizers for large intermediate allocations.
   -/
   cleanup : List Buffer := []
   /--

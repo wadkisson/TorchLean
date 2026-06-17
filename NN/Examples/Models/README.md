@@ -1,8 +1,8 @@
 # Model Examples
 
-This directory contains TorchLean model examples. The files are meant to be read like ordinary
-training scripts: instantiate a model, prepare a loader or token stream, fit for several updates or
-epochs, and optionally write a training curve.
+This directory contains the maintained TorchLean model commands. The files are meant to read like
+ordinary training scripts: instantiate a model, prepare a dataset or token stream, train for several
+optimizer updates, and optionally write a training curve.
 
 For the narrative walkthrough, use the website guide. This page is the local command map.
 
@@ -10,18 +10,18 @@ For the narrative walkthrough, use the website guide. This page is the local com
 
 | Directory | Contents |
 | --- | --- |
-| `Common/` | shared real-data helpers used by several examples |
-| `Supervised/` | MLP tabular regression and LSTM forecasting |
-| `Vision/` | CNN, ResNet, and ViT image classifiers |
+| `Common/` | shared real-data loading code used by several examples |
+| `Supervised/` | MLP and KAN tabular regression, plus LSTM forecasting |
+| `Vision/` | CNN and ViT image classifiers |
 | `Sequence/` | RNN/LSTM checks, Transformer blocks, GPT-style models, Mamba, GPT-adder |
 | `Generative/` | autoencoder, MAE, VAE, VQ-VAE, GAN, and diffusion examples |
 | `Operators/` | FNO and operator-learning examples |
 | `RL/` | DQN and PPO examples |
-| `Runner.lean` | shared `lake exe torchlean ...` dispatcher |
+| `Runner.lean` | shared `lake exe torchlean ...` command dispatcher |
 
 ## Data Preparation
 
-Most examples use datasets prepared outside Lean and loaded through `NN.API.Data`.
+Most examples use datasets prepared outside Lean and loaded through `TorchLean.Data`.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --auto-mpg --cifar10 --tiny-shakespeare
@@ -40,40 +40,50 @@ values, and run metadata. Plot saved logs with:
 python3 scripts/datasets/plot_trainlog.py data/model_zoo/*.json --out-dir plots/model_zoo
 ```
 
-These logs are the right source for website plots. Samples and printed predictions are useful
+These logs are the right source for website plots. Samples and printed predictions are still useful
 qualitative checks, but claims about learning should point to the loss or accuracy curve.
 
 ## Supervised And Vision Runs
 
-The tabular and vision examples use the same loader path: a dataset source is loaded, wrapped in a
-typed minibatch loader, shuffled by epoch, and passed through the shared training loop. Here,
-`--epochs` means passes over minibatches, not repeated updates on one fixed batch.
+The tabular and vision examples use the same public training path: load a dataset, choose a
+`Trainer.RunConfig` plus `Trainer.TrainOptions`, let the command shuffle minibatches, and run the
+shared trainer loop. These model-zoo commands are step-based: `--steps` counts optimizer updates,
+not full passes over the dataset.
+
+Use CPU for the small tabular checks. Use CUDA for the image models: even compact CNN/ViT
+commands do real convolution/attention work and are not good CPU quickchecks.
+
+The goal is not to hide TorchLean's verification/runtime personality. When an example is about a
+normal supervised model, it should look like `Trainer.new ...; trainer.train ...`. When an
+example is about generated streams, PPO rollouts, CUDA/profiling, or certificate-style verification,
+it may use advanced runtime hooks. Those cases should be explicit in the file comments rather
+than leaking into the ordinary training path by accident.
 
 ```bash
-lake exe -K cuda=true torchlean mlp --cuda --epochs 100 --lr 0.003 \
+lake exe -K cuda=true torchlean mlp --cuda --steps 100 --lr 0.003 \
   --log data/model_zoo/mlp_trainlog.json
 
-lake exe -K cuda=true torchlean cnn --cuda --fast-kernels --n-total 2000 \
-  --epochs 25 --lr 0.001 --log data/model_zoo/cnn_trainlog.json
+lake exe torchlean kan --cpu --steps 50 --lr 0.01 \
+  --log data/model_zoo/kan_trainlog.json
 
-lake exe -K cuda=true torchlean resnet --cuda --fast-kernels --n-total 2000 \
-  --epochs 15 --lr 0.001 --log data/model_zoo/resnet_trainlog.json
+lake exe -K cuda=true torchlean cnn --cuda --fast-kernels --n-total 1 \
+  --steps 1 --lr 0.001 --log data/model_zoo/cnn_trainlog.json
 
-lake exe -K cuda=true torchlean vit --cuda --fast-kernels --n-total 2000 \
-  --epochs 10 --lr 0.001 --log data/model_zoo/vit_trainlog.json
+lake exe -K cuda=true torchlean vit --cuda --fast-kernels --n-total 1 \
+  --steps 1 --lr 0.001 --log data/model_zoo/vit_trainlog.json
 ```
 
 The LSTM regression example trains on household-power windows and prints before/after forecast rows:
 
 ```bash
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96 \
+lake exe -K cuda=true torchlean lstm_regression --cuda --steps 1 --windows 4 \
   --log data/model_zoo/lstm_regression_trainlog.json
 ```
 
 ## Text Runs
 
-Text models read a corpus, tokenize it, and build causal language-model windows with shifted targets.
-The shared helpers live in `NN.API.Text`.
+Text models read a corpus, tokenize it, and build causal language-model windows with shifted
+targets. The shared token APIs live in `TorchLean.text`.
 
 ```bash
 lake exe -K cuda=true torchlean mamba --cuda --fast-kernels --tiny-shakespeare \
@@ -88,6 +98,8 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
 ```
 
 `gpt2` here is a compact GPT-style causal Transformer, not a pretrained OpenAI checkpoint.
+`chargpt` is a character-tokenizer teaching path and should stay a 1-step quick check; use `gpt2` or
+`text_gpt2` for the compact 10-step GPT-style runtime check.
 
 ## Generative, Operator, And RL Runs
 
@@ -99,9 +111,9 @@ lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
 lake exe -K cuda=true torchlean fno1d_burgers --cuda --steps 200 \
   --log data/model_zoo/fno1d_burgers_trainlog.json
 
-lake exe torchlean mae --steps 25
-lake exe torchlean gpt_adder --steps 1000 --a 7 --b 8
-lake exe torchlean ppo_gridworld --updates 200
+lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
+lake exe torchlean gpt_adder --steps 1 --a 7 --b 8
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 For 3D detector verification, use the verification examples rather than this model-training

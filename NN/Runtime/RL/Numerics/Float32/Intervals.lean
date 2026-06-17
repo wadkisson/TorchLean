@@ -81,8 +81,8 @@ def tdResidualInterval32
 Outward-rounded interval enclosure for the PPO clipped surrogate objective from a precomputed ratio.
 
 This is a **conservative hull enclosure**: it encloses both of the candidate products
-`ratio * A` and `clippedRatio * A`, then returns their interval hull. This keeps the definition
-simple while still providing a useful non-finite/divergence detector for the PPO objective.
+`ratio * A` and `clippedRatio * A`, then returns their interval hull. The definition is simple and
+still provides a useful non-finite/divergence detector for the PPO objective.
 
 Reference:
 - Schulman et al., "Proximal Policy Optimization Algorithms" (2017): https://arxiv.org/abs/1707.06347

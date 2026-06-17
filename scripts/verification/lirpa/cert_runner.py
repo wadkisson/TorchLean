@@ -6,11 +6,12 @@ can write JSON artifacts and then invoke `lake exe verify` for the selected
 workflow.
 """
 import argparse
-import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+from common import write_json
 
 # Wrapper that computes the IBP cert in Python and optionally verifies in Lean.
 # Supports multiple certificate workflows via --model: transformer (default), mlp, attention, cnn, gru, pinn.
@@ -94,14 +95,10 @@ class Model:
         """Run the selected Python exporter and write the certificate JSON."""
         cert = self.exporter.run_ibp()
         # Write to user-specified path
-        self.cert_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.cert_path, "w") as f:
-            json.dump(cert, f, indent=2)
+        write_json(self.cert_path, cert)
         # Also write to the model-expected path for Lean verifiers
         if self.cert_path.resolve() != self.expected_cert.resolve():
-            self.expected_cert.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.expected_cert, "w") as f:
-                json.dump(cert, f, indent=2)
+            write_json(self.expected_cert, cert)
         return cert
 
     def verify_in_lean(self, quiet: bool = False) -> int:

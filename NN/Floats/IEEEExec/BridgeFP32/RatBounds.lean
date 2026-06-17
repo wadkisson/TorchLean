@@ -301,11 +301,15 @@ lemma rat_bounds_k0 (num den : Nat) (hnum : num ≠ 0) (hden : den ≠ 0) :
   · have : neuralBpow binaryRadix (k0 - 1) ≤ (num : ℝ) / (den : ℝ) := by
       rw [hbpow_lo]
       exact hlo_pow
-    simpa using this
+    have hk : k0 - 1 = Int.ofNat ln - Int.ofNat ld - 1 := by
+      simp [k0, sub_eq_add_neg, add_assoc]
+    simpa [hk] using this
   · have : (num : ℝ) / (den : ℝ) < neuralBpow binaryRadix (k0 + 1) := by
       rw [hbpow_hi]
       exact hhi_pow
-    simpa using this
+    have hk : k0 + 1 = Int.ofNat ln - Int.ofNat ld + 1 := by
+      simp [k0, sub_eq_add_neg, add_assoc]
+    simpa [hk] using this
 
 lemma floorLog2Rat_bounds (num den : Nat) (hnum : num ≠ 0) (hden : den ≠ 0) :
     let k : Int := floorLog2Rat num den
@@ -450,7 +454,7 @@ theorem abs_dyadicToReal_lt_bpow_succ_log2 (d : Dyadic) :
           = (2 : ℝ) ^ (Int.ofNat l.succ) := by
               simp [TorchLean.Floats.neuralBpow, binaryRadix, NeuralRadix.toReal]
       _ = (2 : ℝ) ^ (l.succ : Nat) := by
-              simpa using (zpow_ofNat (2 : ℝ) l.succ)
+              exact zpow_natCast (2 : ℝ) l.succ
       _ = ((2 ^ l.succ : Nat) : ℝ) := by
               simp
   -- `abs (dyadicToReal d) = mant * 2^exp`.
@@ -474,4 +478,3 @@ theorem abs_dyadicToReal_lt_bpow_succ_log2 (d : Dyadic) :
 end IEEE32Exec
 
 end TorchLean.Floats.IEEE754
-

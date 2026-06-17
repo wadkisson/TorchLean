@@ -60,8 +60,6 @@ A regression-tree node for the typed GBDT specification.
 - `leaf value` stores the prediction for that leaf.
 - `split feature threshold left right` branches on a single feature using the rule
   `goRight := (x_feature > threshold)`.
-
-This keeps the representation small and easy to interpret.
 -/
 inductive TreeNode (α : Type) where
   | leaf (value : α) : TreeNode α
@@ -292,8 +290,7 @@ def splitScore {nFeatures : Nat}
   (xs : List (RegressionExample (α := α) nFeatures)) : Option (α × List (RegressionExample (α := α)
     nFeatures) × List (RegressionExample (α := α) nFeatures)) :=
   let (l, r) := partitionBySplit (α := α) feature threshold xs
-  -- Disallow degenerate splits (one side empty). This keeps trees from “splitting” without
-  -- learning.
+  -- Disallow degenerate splits: a tree should not split when one side is empty.
   if l.isEmpty || r.isEmpty then
     none
   else

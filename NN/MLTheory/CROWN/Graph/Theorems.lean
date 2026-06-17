@@ -109,8 +109,6 @@ lemma box_sub_on_eq (n : Nat)
 
 namespace Semantics
 
-variable [LE α]
-
 /-- `encloses B x` means vector `x` lies componentwise between `B.lo` and `B.hi`. -/
 @[expose] public def encloses (B : FlatBox α) (x : Tensor α (.dim B.dim .scalar)) : Prop :=
   let fx := getDimScalarFn (α:=α) x
@@ -170,7 +168,7 @@ theorem box_add_sound (n : Nat)
                             simpa [hL1, hU1, hX] using hx_i
                           have hy' : l2 ≤ yv ∧ yv ≤ u2 := by
                             simpa [hL2, hU2, hY] using hy_i
-                          simpa [hL1, hU1, hX, hL2, hU2, hY] using
+                          simpa [Tensor.map2Spec, hL1, hU1, hX, hL2, hU2, hY] using
                             And.intro (add_mono hx'.1 hy'.1) (add_mono hx'.2 hy'.2)
 
 omit [BoundOps α] in
@@ -223,7 +221,7 @@ theorem box_sub_sound (n : Nat)
                             simpa [hL2, hU2, hY] using hy_i
                           have hlo : l1 - u2 ≤ xv - yv := sub_mono hx'.1 hy'.2
                           have hhi : xv - yv ≤ u1 - l2 := sub_mono hx'.2 hy'.1
-                          simpa [hL1, hU1, hX, hL2, hU2, hY] using And.intro hlo hhi
+                          simpa [Tensor.map2Spec, hL1, hU1, hX, hL2, hU2, hY] using And.intro hlo hhi
 
 omit [BoundOps α] in
 /-- Enclosure for `box_relu`: if x ∈ B then ReLU(x) ∈ box_relu B. -/
@@ -262,7 +260,7 @@ theorem box_relu_sound (n : Nat)
                 relu_mono hx'.1
               have hhi : Activation.Math.reluSpec (α:=α) v ≤ Activation.Math.reluSpec (α:=α) u :=
                 relu_mono hx'.2
-              simpa [Activation.Math.reluSpec, hL, hU, hX] using And.intro hlo hhi
+              simpa [Tensor.mapSpec, Activation.Math.reluSpec, hL, hU, hX] using And.intro hlo hhi
 
 /- Enclosure for `box_square`: if x ∈ B then x ⊙ x ∈ box_square B. -/
 

@@ -79,66 +79,9 @@ private def matGetS {m n : Nat} (A : SpecTensor (.dim m (.dim n .scalar))) (i : 
       match rows i with
       | Tensor.dim cols => Tensor.toScalar (cols j)
 
-/-- `toScalar` is definitional on scalar tensors. -/
-private lemma toScalar_scalar {α : Type} (x : α) :
-    (Tensor.scalar x : Tensor α .scalar).toScalar = x := by
-  rfl
-
 -- ---------------------------------------------------------------------------
 -- Exact shape ops preserve approximation (`expand_to_col`, `transpose`)
 -- ---------------------------------------------------------------------------
-
-omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
-/--
-Componentwise lifting for `approxT` on `Tensor.dim`.
-
-In words: if every component `xSf i` approximates `xRf i` within `eps`, then the whole
-dimensioned tensor `Tensor.dim xSf` approximates `Tensor.dim xRf` within `eps` (with the same
-  `eps`).
--/
-private lemma approxT_dim_mk {n : Nat} {s : Shape}
-    (xSf : Fin n → SpecTensor s) (xRf : Fin n → Tensor R s) {eps : ℝ}
-    (heps : 0 ≤ eps)
-    (h : ∀ i : Fin n,
-      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xSf i) (xRf i) eps)
-        :
-    approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-      (Tensor.dim xSf) (Tensor.dim xRf) eps := by
-  classical
-  cases n with
-  | zero =>
-      -- Empty tensor: distance is `0`.
-      simpa [approxT, approxWith, tensorDistance,
-        NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-        linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec, Spec.mapTensor] using
-          heps
-  | succ n =>
-      have hf :
-          ∀ i ∈ List.finRange (Nat.succ n),
-            tensorDistance (α := SpecScalar) linfNorm (xSf i)
-                (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-                  (xRf i))
-              ≤ eps := by
-        intro i _hi
-        simpa [approxT, approxWith] using (h i)
-
-      have hfold :=
-        List.foldl_max_le_of_le (List.finRange (Nat.succ n))
-          (fun i =>
-            tensorDistance (α := SpecScalar) linfNorm (xSf i)
-              (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xRf
-                i)))
-          (acc := (0 : ℝ)) (eps := eps) heps hf
-
-      have :
-          tensorDistance (α := SpecScalar) linfNorm (Tensor.dim xSf)
-              (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-                (Tensor.dim xRf))
-            ≤ eps := by
-        simpa [tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-          linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec, Spec.mapTensor]
-            using hfold
-      simpa [approxT, approxWith] using this
 
 omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
 /--
@@ -174,8 +117,8 @@ lemma approxT_expand_to_col_spec {n : Nat} {s : Shape}
           -- Unfold `expand_to_col_spec` so the goal is pointwise on rows.
           simp [Tensor.expandToColSpec]
           refine
-            approxT_dim_mk (β := β) (fexp := fexp) (rnd := rnd)
-              (n := n) (s := .dim 1 s) _ _ heps ?_
+            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+              heps ?_
           intro i
           have hrow :
               approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -184,9 +127,8 @@ lemma approxT_expand_to_col_spec {n : Nat} {s : Shape}
               (n := n) (s := s) (xS := Tensor.dim xSf) (xR := Tensor.dim xRf) (eps := eps) hx i
           -- Build the singleton-column tensor by reusing the row approximation.
           refine
-            approxT_dim_mk (β := β) (fexp := fexp) (rnd := rnd)
-              (n := 1) (s := s) (xSf := fun _j : Fin 1 => xSf i) (xRf := fun _j : Fin 1 => xRf i)
-              (eps := eps) heps (by intro _j; simpa using hrow)
+            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+              heps (by intro _j; simpa [getAtSpec] using hrow)
 
 omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
 /--
@@ -222,12 +164,12 @@ lemma approxT_matrix_transpose_spec {m n : Nat}
           -- Unfold transpose so the goal is pointwise on rows/entries.
           simp [Tensor.matrixTransposeSpec]
           refine
-            approxT_dim_mk (β := β) (fexp := fexp) (rnd := rnd)
-              (n := n) (s := .dim m .scalar) _ _ heps ?_
+            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+              heps ?_
           intro j
           refine
-            approxT_dim_mk (β := β) (fexp := fexp) (rnd := rnd)
-              (n := m) (s := Shape.scalar) _ _ heps ?_
+            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+              heps ?_
           intro i
 
           have hrow :
@@ -301,44 +243,13 @@ def dotBound {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
 /--
 Public-facing alias of `dot_bound`.
 
-This keeps exported tensor-bound constructors from depending directly on the local helper name that
-Lean treats as non-exportable in this file.
+Exported tensor-bound constructors use this name instead of the local helper that Lean treats as
+non-exportable in this file.
 -/
 def dotBoundExport {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
   let initEps : ℝ := neuralUlp β fexp 0 TrainingPhase.forward / 2
   ((List.finRange n).foldl (dotStep (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR)
       ((0 : R), initEps)).2
-
-/--
-Helper lemma: rewriting a fold that pattern-matches scalar tensors into a fold on raw scalars.
-
-This is used to relate `Spec.mat_vec_mul_spec` (defined by folding tensor scalars) to a more
-familiar scalar `∑`/`foldl` expression.
--/
-private lemma foldl_tensorScalar_mulAdd {α : Type} [Add α] [Mul α] {n : Nat}
-    (cols : Fin n → Tensor α .scalar) (vals : Fin n → Tensor α .scalar) (l : List (Fin n)) (acc : α)
-      :
-    List.foldl
-        (fun acc k =>
-          match acc, cols k, vals k with
-          | Tensor.scalar s, Tensor.scalar ak, Tensor.scalar vk => Tensor.scalar (s + ak * vk))
-        (Tensor.scalar acc) l =
-      Tensor.scalar
-        (List.foldl
-          (fun acc k =>
-            acc +
-              (match cols k with | Tensor.scalar x => x) *
-                (match vals k with | Tensor.scalar x => x))
-          acc l) := by
-  induction l generalizing acc with
-  | nil =>
-      simp
-  | cons k tl ih =>
-      cases hcols : cols k with
-      | scalar ak =>
-          cases hvals : vals k with
-          | scalar vk =>
-              simpa [List.foldl, hcols, hvals] using ih (acc := acc + ak * vk)
 
 omit [NeuralValidRndToNearest rnd] in
 /-- The `i`-th output entry of `Spec.mat_vec_mul_spec` is the dot-product of row `i` with `v`. -/
@@ -358,8 +269,8 @@ private lemma vec_get_mat_vec_mul_spec {m n : Nat}
           | dim colsA =>
               simp [Spec.matVecMulSpec, vecGet, matGet, hRow]
               have h :=
-                foldl_tensorScalar_mulAdd (cols := colsA) (vals := valsV) (l := List.finRange n)
-                  (acc := (0 : R))
+                Spec.foldl_tensorScalar_mulAdd
+                  (cols := colsA) (vals := valsV) (l := List.finRange n) (acc := (0 : R))
               have hto := congrArg Tensor.toScalar h
               exact hto
 
@@ -380,7 +291,8 @@ private lemma vec_getS_mat_vec_mul_spec {m n : Nat}
           | dim colsA =>
               simp [Spec.matVecMulSpec, vecGetS, matGetS, hRow]
               have h :=
-                foldl_tensorScalar_mulAdd (cols := colsA) (vals := valsV) (l := List.finRange n)
+                Spec.foldl_tensorScalar_mulAdd
+                  (cols := colsA) (vals := valsV) (l := List.finRange n)
                   (acc := (0 : SpecScalar))
               have hto := congrArg Tensor.toScalar h
               exact hto
@@ -486,15 +398,16 @@ private theorem approx_dot_finRange {n : Nat}
             ((List.finRange n).foldl (fun acc k => acc + aR k * bR k) (0 : R)) -
           (List.finRange n).foldl (fun acc k => acc + aS k * bS k) (0 : SpecScalar)) ≤
       dotBound (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR := by
-  -- base approximation for the initial accumulator `0`
+    -- base approximation for the initial accumulator `0`
   have h0 :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) - (0 : SpecScalar)) ≤
         neuralUlp β fexp 0 TrainingPhase.forward / 2 := by
     -- `toSpec 0 = roundR 0`, then apply the rounding abs-error bound.
-    simpa [toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.ofReal,
-      TorchLean.Floats.NF.roundR,
-      Proofs.RuntimeRoundingApprox.roundR] using
-        (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ))
+    convert
+      (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ))
+      using 1
+    · simp [toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR]
+      exact congrArg abs (show (0 : R).val = neuralRound (β := β) (fexp := fexp) rnd 0 from rfl)
   simpa [dotBound] using
     (approx_dot_list (β := β) (fexp := fexp) (rnd := rnd) (n := n) (l := List.finRange n)
       (aS := aS) (bS := bS) (aR := aR) (bR := bR)
@@ -691,8 +604,8 @@ theorem approxT_mat_vec_mul_spec {m n : Nat} :
                           B := by
                       have :=
                         linf_norm_le_get_dim (t := bnd) i
-                      simpa [bnd, matVecMulBoundTensor, B, linfNorm, RuntimeApprox.linfNorm,
-                        tensorLinfNorm] using
+                      simpa [bnd, matVecMulBoundTensor, dotBoundExport, dotBound, B, linfNorm,
+                        RuntimeApprox.linfNorm, tensorLinfNorm, MathFunctions.abs, SpecScalar] using
                         this
 
                     have hB_ge :
@@ -772,10 +685,9 @@ theorem approxT_mat_vec_mul_spec {m n : Nat} :
                                     (rnd := rnd))
                                     (Tensor.dim yRf))
                                 ≤ B := by
-                            simpa [tensorDistance,
-                              NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                              linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                                Spec.mapTensor] using hfold
+                                simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm,
+                                  tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec,
+                                  tensorToSpec, Spec.mapTensor] using hfold
 
                           simpa [approxT, approxWith, B, bnd] using this
 
@@ -819,7 +731,7 @@ private lemma mat_get_mat_mul_spec {m n p : Nat}
           | dim colsA =>
               -- Unfold spec matmul and matrix indexing; then rewrite the fold using scalar
               -- extraction.
-              simp [Spec.matMulSpec, matGet, hRow, toScalar_scalar]
+              simp [Spec.matMulSpec, matGet, hRow]
               refine
                 foldl_congr (l := List.finRange n) (f := _) (g := _) (init := (0 : R)) ?_
               intro sum k
@@ -829,7 +741,7 @@ private lemma mat_get_mat_mul_spec {m n p : Nat}
                   | scalar a =>
                       cases hBj : colsB j with
                       | scalar b =>
-                          simp [hA, hBj, toScalar_scalar]
+                          simp [hA, hBj]
 
 /-- Spec (real) version of `mat_get_mat_mul_spec`. -/
 private lemma mat_getS_mat_mul_spec {m n p : Nat}
@@ -847,7 +759,7 @@ private lemma mat_getS_mat_mul_spec {m n p : Nat}
       | dim rowsB =>
           cases hRow : rowsA i with
           | dim colsA =>
-              simp [Spec.matMulSpec, matGetS, hRow, toScalar_scalar]
+              simp [Spec.matMulSpec, matGetS, hRow]
               refine
                 foldl_congr (l := List.finRange n) (f := _) (g := _) (init := (0 : SpecScalar)) ?_
               intro sum k
@@ -857,7 +769,7 @@ private lemma mat_getS_mat_mul_spec {m n p : Nat}
                   | scalar a =>
                       cases hBj : colsB j with
                       | scalar b =>
-                          simp [hA, hBj, toScalar_scalar]
+                          simp [hA, hBj]
 
 /--
 Forward approximation bound for matrix-matrix multiplication.
@@ -1014,10 +926,12 @@ theorem approxT_mat_mul_spec {m n p : Nat} :
                           (match match bnd with
                             | Tensor.dim f => f i with
                             | Tensor.dim g => g j) ≤ B := by
-                        exact le_trans hCol (by simpa [B] using hRow)
+                        have hRowB : linfNorm (match bnd with | Tensor.dim f => f i) ≤ B := by
+                          exact hRow
+                        exact le_trans hCol hRowB
                       -- scalar entry simplifies to `abs (dot_bound ..)`
-                      simpa [bnd, matMulBoundTensor, B, linfNorm, RuntimeApprox.linfNorm,
-                        tensorLinfNorm] using this
+                      simpa [bnd, matMulBoundTensor, dotBoundExport, dotBound, B, linfNorm,
+                        RuntimeApprox.linfNorm, tensorLinfNorm, MathFunctions.abs, SpecScalar] using this
 
                     have hBound :
                         dotBound (β := β) (fexp := fexp) (rnd := rnd) (n := n) epsA epsB
@@ -1114,10 +1028,9 @@ theorem approxT_mat_mul_spec {m n p : Nat} :
                                                 rnd))
                                               (Tensor.dim yRrow))
                                           ≤ B := by
-                                      simpa [tensorDistance,
-                                        NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                                        linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm,
-                                          tensorToSpec, Spec.mapTensor] using hfold
+                                          simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm,
+                                            tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec,
+                                            tensorToSpec, Spec.mapTensor] using hfold
 
                                     simpa [hYSrow, hYRrow] using this
 
@@ -1136,10 +1049,9 @@ theorem approxT_mat_mul_spec {m n p : Nat} :
                                     (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
                                     (Tensor.dim yRf))
                                 ≤ B := by
-                            simpa [tensorDistance,
-                              NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                              linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                                Spec.mapTensor] using hfold
+                                simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm,
+                                  tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec,
+                                  tensorToSpec, Spec.mapTensor] using hfold
 
                           simpa [approxT, approxWith, B, bnd] using this
 

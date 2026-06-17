@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -25,9 +24,9 @@ A typical workflow looks like this:
 4. import or export a named artifact when Python belongs in the workflow,
 5. state a claim about the resulting model and check the artifact that supports it.
 
-The [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) is the default entry point for this path. The
-lower-layer pages become relevant when a chapter asks a more precise question about tensors,
-runtime execution, import/export, floating point, or verification.
+The public entry point for this path is `import NN`. The lower-layer pages become relevant
+when a chapter asks a more precise question about tensors, runtime execution, import/export,
+floating point, or verification.
 
 Here is the map:
 
@@ -46,13 +45,12 @@ type `Tensor Float (shape![32])`; a reshape, squeeze, or different loss must be 
 ```
 import NN
 
-open NN.Tensor
-open NN.API
+open TorchLean
 
-def logits : Tensor Float (shape![32, 1]) :=
+def logits : Tensor.T Float (shape![32, 1]) :=
   tensorND! [32, 1] (List.replicate 32 0.0)
 
-def labels : Tensor Float (shape![32]) :=
+def labels : Tensor.T Float (shape![32]) :=
   tensorND! [32] (List.replicate 32 0.0)
 
 -- A loss expecting matching shapes cannot silently reinterpret `labels`.
@@ -67,16 +65,16 @@ The same shape discipline appears at the model level. A compact classifier state
 shapes before it ever runs:
 
 ```
-def classifier : nn.M (nn.Sequential (Shape.Vec 16) (Shape.Vec 4)) :=
-  nn.sequential![
-    nn.linear 16 32 (pfx := Shape.scalar),
-    nn.gelu,
-    nn.linear 32 4 (pfx := Shape.scalar)
+def classifier : nn.M (nn.Sequential (Shape.vec 16) (Shape.vec 4)) :=
+  nn.Sequential![
+    nn.Linear 16 32,
+    nn.GELU,
+    nn.Linear 32 4
   ]
 ```
 
-For tensor constructors and literals, see the [tensor API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Tensor/API.lean). For the model
-builder surface used above, start with the [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean).
+For tensor constructors, literals, and model builders, start with the root
+[`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean) umbrella.
 
 # Building And Training
 
@@ -85,7 +83,7 @@ initial parameter payload, but it does not make those parameters hidden fields o
 
 ```
 def task (seed : Nat) :=
-  train.classificationOneHot (nn.build seed classifier)
+  Trainer.new classifier { task := .classification, seed := seed }
 ```
 
 That small separation is what later chapters rely on. A training step can be read as an explicit
@@ -102,11 +100,14 @@ loaded, displayed, or mentioned in a theorem statement.
 
 The training surface deliberately looks familiar:
 
-- `train.fitDataset` and `train.fitLoaderWith` cover full fitting,
-- `train.stepper` and `train.step` support manual loops familiar from PyTorch,
+- `Trainer.new model { task := ... }` chooses the task,
+- the trainer config carries optimizer, dtype, backend, and device,
+- `Trainer.TrainOptions` carries per-training choices such as steps and logging,
+- `trainer.train data trainOptions` is the normal training entrypoint,
 - `optim.sgd`, `optim.adam`, and `optim.adamw` construct optimizer configurations.
 
-Those names live behind the same public API, with implementation details in the
+Manual callbacks and step-by-step loops live under `Trainer.Advanced`; ordinary tutorials should not
+need them. Those names live behind the same public API, with implementation details in the
 [training runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train.lean) and the
 [runtime optimizer definitions](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Optim.lean).
 

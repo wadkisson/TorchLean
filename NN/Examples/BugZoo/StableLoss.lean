@@ -75,13 +75,12 @@ open Spec.Tensor
 /--
 The logits cross-entropy spec is literally the log-softmax form.
 
-This compact theorem is useful as a public “contract card”: if a model uses
-`crossEntropyLogitsSpec`, the intended decomposition is stable-logits first, then target weighting
-and mean reduction. That is the TorchLean answer to the TensorFuzz-style broken-cross-entropy class
-inside the verified fragment.
+This compact theorem is useful as a public contract: if a model uses `crossEntropyLogitsSpec`, the
+intended decomposition is stable-logits first, then target weighting and mean reduction. That is the
+TorchLean answer to the TensorFuzz-style broken-cross-entropy class inside the verified fragment.
 -/
 theorem crossEntropyLogits_uses_logSoftmax {s : Spec.Shape}
-    {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+    {α : Type} [Context α]
     (logits target : Spec.Tensor α s) :
     Spec.crossEntropyLogitsSpec logits target =
       let logp := Activation.logSoftmaxSpec (α := α) (s := s) logits
@@ -114,7 +113,7 @@ what the caller has: logits should use `crossEntropyLogitsSpec`; already-normali
 should use the clipped probability form below.
 -/
 theorem crossEntropyProbabilities_clips_before_log {s : Spec.Shape}
-    {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+    {α : Type} [Context α]
     (predicted target : Spec.Tensor α s) (epsilon : α) :
     Spec.crossEntropySpec predicted target epsilon =
       let clamp01 := fun x : α =>
@@ -124,7 +123,7 @@ theorem crossEntropyProbabilities_clips_before_log {s : Spec.Shape}
       let logq := Spec.Tensor.logSpec q
       let total := Spec.Tensor.sumSpec (Spec.Tensor.mulSpec target logq)
       Spec.meanOver (s := s) (-total) := by
-  rfl
+  simp [Spec.crossEntropySpec]
 
 /-- Epsilon-protected division is a separate named tensor operation, not a hidden rewrite. -/
 theorem safeDivSpec_unfold {s : Spec.Shape}

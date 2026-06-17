@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Proofs.Autograd.Tape.Nodes.Softmax
+public import NN.Proofs.Autograd.Tape.Nodes.Shape
 
 /-!
 # Reduction and shape tape nodes
@@ -449,13 +450,6 @@ by
 -- Concat (binary specializations used by the runtime engine)
 -- ---------------------------------------------------------------------------
 
-/-- `castVec` does not depend on the particular proof of `n = m` (proof irrelevance). -/
-lemma castVec_proof_irrel {n m : Nat} (h₁ h₂ : n = m) (v : Vec n) :
-    castVec h₁ v = castVec h₂ v := by
-  have : h₁ = h₂ := Subsingleton.elim _ _
-  cases this
-  rfl
-
 /-- Take the left `m` entries of a length `m+n` vector. -/
 def takeLeftVec {m n : Nat} (v : Vec (m + n)) : Vec m :=
   vecOfFun (n := m) fun i : Fin m => v (Fin.castAdd n i)
@@ -736,13 +730,13 @@ def concatDim0Fderiv {Γ : List Shape} {n m : Nat} {s : Shape}
       -- Unfold and normalize casts/append.
       simp [concatDim0, Node.forwardVec_ofVec, D, Dcast, Dapp, Dpair,
         Graph.castCLM, ContinuousLinearMap.comp_apply, ContinuousLinearMap.prod_apply,
-        CtxVec.getCLM_apply, hsz, szA, szB, castVec_proof_irrel]
+        CtxVec.getCLM_apply, hsz, szA, szB, ShapeOps.castVec_proof_irrel]
     exact hD.congr_of_eventuallyEq hEq.eventuallyEq
   · intro xV dxV
     -- `concat_dim0` is linear, so its JVP matches the (constant) derivative.
     simp [concatDim0, Node.jvpVec_ofVec, D, Dcast, Dapp, Dpair,
       Graph.castCLM, ContinuousLinearMap.comp_apply, ContinuousLinearMap.prod_apply,
-      CtxVec.getCLM_apply, hsz, szA, szB, castVec_proof_irrel]
+      CtxVec.getCLM_apply, hsz, szA, szB, ShapeOps.castVec_proof_irrel]
 
 
 end TapeNodes

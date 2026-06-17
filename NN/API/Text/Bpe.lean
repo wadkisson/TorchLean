@@ -502,6 +502,14 @@ def idMapOf (vocab : Array VocabEntry) : Std.HashMap Nat String :=
 def mergeMapOf (merges : Array MergeRank) : Std.HashMap (String × String) Nat :=
   merges.foldl (fun acc m => acc.insert (m.left, m.right) m.rank) Std.HashMap.emptyWithCapacity
 
+/-- Assemble a tokenizer and its lookup maps from parsed GPT-2 vocabulary and merge tables. -/
+def mkTokenizer (vocab : Array VocabEntry) (merges : Array MergeRank) : Tokenizer :=
+  { vocab := vocab
+    merges := merges
+    vocabMap := vocabMapOf vocab
+    idMap := idMapOf vocab
+    mergeMap := mergeMapOf merges }
+
 /-- Parse one non-comment `merges.txt` line with its rank. -/
 def parseMergeLine? (rank : Nat) (line : String) : Option MergeRank :=
   let s := line.trimAscii.toString
@@ -529,13 +537,86 @@ def load (vocabJson mergesTxt : System.FilePath) : IO Tokenizer := do
     | .ok v => pure v
     | .error e => throw <| IO.userError e
   let merges ← parseMerges <$> IO.FS.readFile mergesTxt
-  pure { vocab := vocab
-         merges := merges
-         vocabMap := vocabMapOf vocab
-         idMap := idMapOf vocab
-         mergeMap := mergeMapOf merges }
+  pure <| mkTokenizer vocab merges
+
+/-- Load GPT-2 BPE files while printing progress for larger `vocab.json` / `merges.txt` assets. -/
+def loadWithProgress (tag : String) (vocabJson mergesTxt : System.FilePath) : IO Tokenizer := do
+  IO.eprintln s!"{tag}: loading BPE tokenizer vocab={vocabJson} merges={mergesTxt}"
+  IO.eprintln s!"{tag}: reading BPE vocab.json"
+  let vocabText ← IO.FS.readFile vocabJson
+  IO.eprintln s!"{tag}: parsing BPE vocab.json chars={vocabText.length}"
+  let vocab ←
+    match parseVocabText vocabText with
+    | .ok v => pure v
+    | .error e => throw <| IO.userError e
+  IO.eprintln s!"{tag}: parsed BPE vocab entries={vocab.size}"
+  IO.eprintln s!"{tag}: reading BPE merges.txt"
+  let mergesText ← IO.FS.readFile mergesTxt
+  let merges := parseMerges mergesText
+  IO.eprintln s!"{tag}: parsed BPE merges={merges.size}"
+  IO.eprintln s!"{tag}: building BPE lookup maps"
+  let tok := mkTokenizer vocab merges
+  IO.eprintln s!"{tag}: loaded BPE tokenizer vocab={tok.vocab.size} merges={tok.merges.size}"
+  pure tok
 
 end Gpt2Bpe
+
+/-! ## Compact vocabulary projections -/
+
+/--
+Projection from original tokenizer ids to a compact working vocabulary.
+
+Small runnable language-model examples can keep a real tokenizer while restricting the model head to
+ids observed in the local corpus or prompt.
+-/
+structure LocalBpeVocab where
+  /-- Original tokenizer id for each local id. -/
+  originals : Array Nat
+  /-- Reverse lookup from original tokenizer id to local id. -/
+  toLocalMap : Std.HashMap Nat Nat
+
+namespace LocalBpeVocab
+
+/-- Number of live entries in a compact BPE projection. -/
+def size (lv : LocalBpeVocab) : Nat :=
+  lv.originals.size
+
+/-- Map an original tokenizer id into the compact local vocabulary, using local id `0` as OOV. -/
+def toLocal (lv : LocalBpeVocab) (id : Nat) : Nat :=
+  (lv.toLocalMap[id]?).getD 0
+
+/-- Map a compact local id back to its original tokenizer id. -/
+def toOriginal (lv : LocalBpeVocab) (localId : Nat) : Nat :=
+  lv.originals.getD localId (lv.originals.getD 0 0)
+
+end LocalBpeVocab
+
+/-- Build a compact working vocabulary from corpus ids and prompt ids. -/
+def buildLocalBpeVocab (maxVocab : Nat) (corpusIds promptIds : Array Nat) : LocalBpeVocab :=
+  Id.run do
+    let mut originals : Array Nat := #[0]
+    let mut map : Std.HashMap Nat Nat := (Std.HashMap.emptyWithCapacity).insert 0 0
+    let addId (originals : Array Nat) (map : Std.HashMap Nat Nat) (id : Nat) :
+        Array Nat × Std.HashMap Nat Nat :=
+      if map.contains id || originals.size ≥ maxVocab then
+        (originals, map)
+      else
+        let localId := originals.size
+        (originals.push id, map.insert id localId)
+    for id in corpusIds do
+      let p := addId originals map id
+      originals := p.1
+      map := p.2
+    for id in promptIds do
+      let p := addId originals map id
+      originals := p.1
+      map := p.2
+    return { originals := originals, toLocalMap := map }
+
+/-- Apply a compact BPE projection to an array of original tokenizer ids. -/
+def localizeBpeTokens (lv : LocalBpeVocab) (tokens : Array Nat) : Array Nat :=
+  tokens.map (fun id => lv.toLocal id)
+
 end text
 end API
 end NN

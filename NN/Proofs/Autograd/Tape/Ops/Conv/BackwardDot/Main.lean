@@ -76,8 +76,8 @@ theorem conv2d_backward_spec_dot
         =
       dot dBias (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layer) (input := input)
         (grad_output := δ)) := by
-    simpa using (dot_biasBroadcast_eq_dot_bias_deriv (layer := layer) (input := input) (db := dBias)
-      (δ := δ))
+    exact dot_biasBroadcast_eq_dot_bias_deriv (layer := layer) (input := input) (db := dBias)
+      (δ := δ)
   have hX :
       dot (Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput) δ
         =
@@ -117,26 +117,26 @@ theorem conv2d_backward_spec_dot
                 (Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput))
               δ := by
                 -- Apply the dot-add lemma once (don’t rewrite the RHS further).
-                simpa using
-                  (dot_add_left
+                exact
+                  dot_add_left
                     (a := Spec.conv2dSpec (α := ℝ) (layer := layerK) input)
                     (b :=
                       (biasBroadcast (outC := outC) (outH := outH inH kH stride padding)
                         (outW := outW inW kW stride padding) dBias).addSpec
                         (Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput))
-                    (c := δ))
+                    (c := δ)
       _ =
         dot (Spec.conv2dSpec (α := ℝ) (layer := layerK) input) δ +
           (dot (biasBroadcast (outC := outC) (outH := outH inH kH stride padding) (outW := outW inW
             kW stride padding) dBias) δ +
             dot (Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput) δ) := by
               -- Use the dot-add lemma directly for the inner sum.
-              simpa using
-                (dot_add_left
+              rw [dot_add_left
                   (a := biasBroadcast (outC := outC) (outH := outH inH kH stride padding) (outW :=
                     outW inW kW stride padding) dBias)
                   (b := Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput)
-                  (c := δ))
+                  (c := δ)]
+              rfl
       _ =
         dot (Spec.conv2dSpec (α := ℝ) (layer := layerK) input) δ +
           dot (biasBroadcast (outC := outC) (outH := outH inH kH stride padding) (outW := outW inW

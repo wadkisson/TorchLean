@@ -249,7 +249,7 @@ with learnable scale/shift parameters `gamma` and `beta`.
 PyTorch analogue: `torch.nn.LayerNorm(embedDim)` applied to a tensor of shape
 `(batch, seqLen, embedDim)`.
 
-Most users should call `nn.layerNorm`, which uses `NeZero` to discharge the positivity proofs.
+Call `nn.layerNorm` when `NeZero` can discharge the positivity proofs automatically.
 -/
 def layerNormWith {batch seqLen embedDim : Nat} (cfg : LayerNorm)
     (hSeq : seqLen > 0) (hEmbed : embedDim > 0) :
@@ -296,7 +296,7 @@ This is like LayerNorm but without mean subtraction: we scale by the root-mean-s
 PyTorch analogue: many libraries provide an `RMSNorm(embedDim)` module; conceptually it is applied
 to tensors shaped `(batch, seqLen, embedDim)`.
 
-Most users should call `nn.rmsNorm`, which uses `NeZero` to discharge the positivity proofs.
+Call `nn.rmsNorm` when `NeZero` can discharge the positivity proofs automatically.
 -/
 def rmsNormWith {batch seqLen embedDim : Nat} (cfg : RMSNorm)
     (hSeq : seqLen > 0) (hEmbed : embedDim > 0) :

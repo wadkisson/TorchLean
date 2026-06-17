@@ -75,7 +75,7 @@ local notation "R" => TorchLean.Floats.NF β fexp rnd
 set_option maxHeartbeats 12000000
 
 -- ---------------------------------------------------------------------------
--- Fold helper: turn `acc + foldl (· + f _) 0` into a fold with init `acc`.
+-- Fold helper: turn nested zero-start folds into threaded accumulator folds.
 -- ---------------------------------------------------------------------------
 
 lemma specFold5_eq_threadFold5
@@ -127,7 +127,7 @@ lemma specFold5_eq_threadFold5
     fun out_ch =>
       (List.finRange out_h).foldl (fun acc out_i => acc + sumW0 out_ch out_i) 0
 
-  -- Rewrite the spec fold into the threaded fold by repeatedly using `add_foldl_add0`.
+  -- Rewrite the spec fold into the threaded fold by repeatedly pushing the accumulator inward.
   have hC :
       (List.finRange outC).foldl (fun acc out_ch => acc + sumH0 out_ch) 0 =
         (List.finRange outC).foldl (fun accC out_ch =>
@@ -159,10 +159,9 @@ lemma specFold5_eq_threadFold5
     have hPushH :
         accC + sumH0 out_ch =
           (List.finRange out_h).foldl (fun accH out_i => accH + sumW0 out_ch out_i) accC := by
-      -- `sumH0 out_ch` is a fold from 0, so use `add_foldl_add0`.
       simpa [sumH0, add_assoc] using
-        (List.add_foldl_add0 (l := List.finRange out_h) (f := fun out_i => sumW0 out_ch out_i) (acc
-          := accC))
+        (Spec.add_finRange_foldl_add_zero
+          (n := out_h) (f := fun out_i => sumW0 out_ch out_i) (acc := accC))
     -- Now rewrite the out_h fold body to the threaded out_w fold.
     have hH :
         (List.finRange out_h).foldl (fun accH out_i => accH + sumW0 out_ch out_i) accC =
@@ -192,8 +191,8 @@ lemma specFold5_eq_threadFold5
             (List.finRange out_w).foldl (fun accW out_j => accW + sumKH0 out_ch out_i out_j) accH :=
               by
         simpa [sumW0, add_assoc] using
-          (List.add_foldl_add0 (l := List.finRange out_w) (f := fun out_j => sumKH0 out_ch out_i
-            out_j) (acc := accH))
+          (Spec.add_finRange_foldl_add_zero
+            (n := out_w) (f := fun out_j => sumKH0 out_ch out_i out_j) (acc := accH))
       -- Convert the out_w fold body to the threaded kH/kW fold.
       have hW :
           (List.finRange out_w).foldl (fun accW out_j => accW + sumKH0 out_ch out_i out_j) accH =
@@ -219,8 +218,8 @@ lemma specFold5_eq_threadFold5
               (List.finRange kH).foldl (fun accKH di => accKH + sumKW0 out_ch out_i out_j di) accW
                 := by
           simpa [sumKH0, add_assoc] using
-            (List.add_foldl_add0 (l := List.finRange kH) (f := fun di => sumKW0 out_ch out_i out_j
-              di) (acc := accW))
+            (Spec.add_finRange_foldl_add_zero
+              (n := kH) (f := fun di => sumKW0 out_ch out_i out_j di) (acc := accW))
         have hKH :
             (List.finRange kH).foldl (fun accKH di => accKH + sumKW0 out_ch out_i out_j di) accW =
               (List.finRange kH).foldl (fun accKH di =>
@@ -235,10 +234,9 @@ lemma specFold5_eq_threadFold5
                 accKH)
             (init := accW) ?_
           intro accKH di
-          -- Push `accKH` into the kW fold.
           simpa [sumKW0, add_assoc] using
-            (List.add_foldl_add0 (l := List.finRange kW) (f := fun dj => term out_ch out_i out_j di
-              dj) (acc := accKH))
+            (Spec.add_finRange_foldl_add_zero
+              (n := kW) (f := fun dj => term out_ch out_i out_j di dj) (acc := accKH))
         exact hPushKH.trans hKH
       exact hPushW.trans hW
     exact hPushH.trans hH

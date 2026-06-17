@@ -1,7 +1,8 @@
 # TorchLean BugZoo
 
 BugZoo is a collection of small checked case studies for common neural-network failure modes. Each
-card starts from a real class of bugs, then asks what the corresponding TorchLean contract should be.
+example starts from a real class of bugs, then asks what the corresponding TorchLean contract should
+be.
 
 Many ML bugs are not crashes. The code still returns tensors, logits, losses, or tokens, but the
 computation no longer means what the user intended. BugZoo turns those cases into small artifacts: a
@@ -46,7 +47,7 @@ They are semantic bugs: the code runs, but it is no longer the math people think
 
 Scope: this BugZoo pass does not verify distributed training
 setups, NCCL/collective semantics, paged attention allocators, mixed quantization, or arbitrary CUDA
-kernels. Those can be separate boundary cards, but they are not part of the checked TorchLean scope
+kernels. Those can be separate boundary examples, but they are not part of the checked TorchLean scope
 shown here.
 
 ## Source Trail

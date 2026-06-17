@@ -43,7 +43,8 @@ def layerNorm
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
     seedBeta)
-  { paramShapes := [gammaShape, betaShape]
+  { kind := "LayerNorm"
+    paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlist2 gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -72,7 +73,8 @@ def rmsNorm
   let gammaShape : Shape := NN.Tensor.Shape.Vec embedDim
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
-  { paramShapes := [gammaShape]
+  { kind := "RMSNorm"
+    paramShapes := [gammaShape]
     initParams := Torch.tlist1 gamma0
     paramRequiresGrad := [true]
     forward := fun _ {α} _ _ =>
@@ -104,7 +106,8 @@ def batchnormChannelFirst
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
     seedBeta)
-  { paramShapes := [gammaShape, betaShape]
+  { kind := "BatchNorm2d"
+    paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlist2 gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -141,7 +144,8 @@ def batchnormChannelFirstEval
     seedMean)
   let var0 : Tensor Float varShape := Torch.Init.tensor (s := varShape) (sch := .ones) (seed :=
     seedVar)
-  { paramShapes := [gammaShape, betaShape, meanShape, varShape]
+  { kind := "BatchNorm2d(eval)"
+    paramShapes := [gammaShape, betaShape, meanShape, varShape]
     initParams := Torch.tlist4 gamma0 beta0 mean0 var0
     paramRequiresGrad := [true, true, false, false]
     forward := fun _ {α} _ _ =>
@@ -183,7 +187,8 @@ def batchnormChannelFirstMode
   let var0 : Tensor Float varShape := Torch.Init.tensor (s := varShape) (sch := .ones) (seed :=
     seedVar)
   let momentum0 : Tensor Float momentumShape := Tensor.scalar momentum
-  { paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
+  { kind := "BatchNorm2d"
+    paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
     initParams := .cons gamma0 (.cons beta0 (.cons mean0 (.cons var0 (.cons momentum0 .nil))))
     paramRequiresGrad := [true, true, false, false, false]
     updateBuffers := some (fun mode {_α} _ _ ps x => do
@@ -230,7 +235,8 @@ def instanceNorm2dNchw
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
     seedBeta)
-  { paramShapes := [gammaShape, betaShape]
+  { kind := "InstanceNorm2d"
+    paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlist2 gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -262,7 +268,8 @@ def groupNorm2dNchw
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
     seedBeta)
-  { paramShapes := [gammaShape, betaShape]
+  { kind := s!"GroupNorm2d(groups={groups})"
+    paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlist2 gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -293,7 +300,8 @@ def batchNorm2dNchw
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
     seedBeta)
-  { paramShapes := [gammaShape, betaShape]
+  { kind := "BatchNorm2d"
+    paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlist2 gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -334,7 +342,8 @@ def batchNorm2dNchwMode
   let var0 : Tensor Float varShape := Torch.Init.tensor (s := varShape) (sch := .ones) (seed :=
     seedVar)
   let momentum0 : Tensor Float momentumShape := Tensor.scalar momentum
-  { paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
+  { kind := "BatchNorm2d"
+    paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
     initParams := .cons gamma0 (.cons beta0 (.cons mean0 (.cons var0 (.cons momentum0 .nil))))
     paramRequiresGrad := [true, true, false, false, false]
     updateBuffers := some (fun mode {_α} _ _ ps x => do
@@ -368,4 +377,3 @@ end NN
 end TorchLean
 end Autograd
 end Runtime
-

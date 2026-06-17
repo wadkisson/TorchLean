@@ -5,25 +5,22 @@ Authors: TorchLean Team
 
 CUDA-only minGPT-style addition walkthrough:
   lake build -R -K cuda=true
-  lake exe torchlean gpt_adder --steps 500 --log-every 100 --optim adam --lr 0.005 --a 7 --b 8
-  lake exe torchlean gpt_adder --steps 500 --log-every 100 --optim sgd --lr 0.05 --a 7 --b 8
+  lake exe torchlean gpt_adder --steps 1 --optim adam --lr 0.005 --a 7 --b 8
+  lake exe torchlean gpt_adder --steps 1 --optim sgd --lr 0.05 --a 7 --b 8
 
 Interactive addition REPL:
-  lake exe torchlean gpt_adder --steps 1000 --interactive
+  lake exe torchlean gpt_adder --steps 1 --interactive
 -/
 
 module
 
 public import NN
-public import NN.API.Models.Gpt2
-public import NN.Runtime.Autograd.Torch.Core
-public import NN.Runtime.Autograd.TorchLean.NN
 
 /-!
 # minGPT-Style Addition Example
 
-This file is a TorchLean-native version of the spirit of Karpathy's `minGPT/projects/adder`
-experiment.  The original minGPT adder trains a compact GPT to complete digit strings of the form
+This is a TorchLean-native version of the spirit of Karpathy's `minGPT/projects/adder`
+experiment. The original minGPT adder trains a compact GPT to complete digit strings of the form
 
 `digits(a) ++ digits(b) ++ reverseDigits(a+b)`.
 
@@ -43,20 +40,18 @@ loop:
 Performance note: this uses the eager CUDA runtime, not a persistent CUDA graph.
 The heavy tensor operations run on the GPU, including fused attention when `--fast-kernels` is on,
 but each step still records a fresh autograd tape and synchronizes parameter refs through the
-scalar-trainer API. This is the correctness-facing example; full PyTorch-style throughput requires
-persistent device parameters plus compiled/fused graph
-execution.
+current scalar training bridge. This is the correctness-facing example; full PyTorch-style
+throughput requires persistent device parameters plus compiled/fused graph execution.
 
-The GPT-shaped architecture is constructed using the shared API helper in `NN.API.Models.Gpt2`
-(`nn.models.causalTransformerOneHot`), so this file can stay focused on the adder task mechanics.
+The GPT-shaped architecture is constructed through the public TorchLean model constructor
+`nn.models.CausalTransformerOneHot`, so the example can stay focused on the adder task mechanics.
 
 Reference: <https://github.com/karpathy/minGPT/tree/master/projects/adder>.
 -/
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Sequence.GptAdder
 
@@ -64,7 +59,7 @@ namespace NN.Examples.Models.Sequence.GptAdder
 def exeName : String := "torchlean gpt_adder"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "gpt_adder"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "gpt_adder"
 
 /--
 Number of input digits per operand.
@@ -163,26 +158,17 @@ abbrev τ : Shape :=
   σ
 
 /-- Compact GPT-style causal Transformer for digit addition. -/
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.causalTransformerOneHot cfg
-
-/-- Number of trainable scalar parameters in the current compile-time adder model. -/
-def modelParamCount : Nat :=
-  paramCountShapes (nn.paramShapes (nn.build 0 mkModel))
-
-/-- Number of parameter tensors in the current compile-time adder model. -/
-def modelParamTensorCount : Nat :=
-  (nn.paramShapes (nn.build 0 mkModel)).length
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.CausalTransformerOneHot cfg
 
 /-- Cross-entropy summed over non-ignored adder targets, normalized like minGPT `ignore_index`. -/
-def adderLoss {α : Type} [Context α] [DecidableEq Shape]
-    {m : Type → Type} [Monad m] [_root_.Runtime.Autograd.Torch.Ops (m := m) (α := α)]
-    (logits targetOneHot :
-      _root_.Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) τ) :
-    m (_root_.Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) Shape.scalar) := do
-  let summed ← _root_.Runtime.Autograd.TorchLean.Loss.crossEntropyOneHot
+def adderLoss {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape]
+    {m : Type → Type} [Monad m] [Runtime.Ops (m := m) (α := α)]
+    (logits targetOneHot : Runtime.RefTy (m := m) (α := α) τ) :
+    m (Runtime.RefTy (m := m) (α := α) Shape.scalar) := do
+  let summed ← Loss.crossEntropyOneHot
     (m := m) (α := α) (s := τ) logits targetOneHot (reduction := .sum)
-  _root_.Runtime.Autograd.Torch.Ops.scale (m := m) (α := α) (s := Shape.scalar)
+  Ops.scale (m := m) (α := α) (s := Shape.scalar)
     summed ((1 : α) / (activeTargetCount : α))
 
 /--
@@ -193,12 +179,11 @@ contribute exactly zero to one-hot cross entropy.  We divide the summed loss by 
 active target positions, matching minGPT's `ignore_index`-style normalization rather than averaging
 over ignored prefix rows.
 -/
-def adderScalarModuleDef (model : nn.Sequential σ τ) :
-    TorchLean.Module.ScalarModuleDef (nn.paramShapes model) [σ, τ] :=
-  nn.scalarModuleDef model (loss := fun {α} _ _ =>
-    fun {m} _ _ =>
-      fun logits targetOneHot =>
-        adderLoss (m := m) (α := α) logits targetOneHot)
+def adderLossProgram {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape] :
+    Runtime.Program α [τ, τ] Shape.scalar :=
+  fun {m} _ _ =>
+    fun logits targetOneHot =>
+      adderLoss (m := m) (α := α) logits targetOneHot
 
 /-- Render `n` as exactly `width` base-10 digits, most-significant first. -/
 def fixedDigits (width n : Nat) : List Nat :=
@@ -229,25 +214,30 @@ def keepTargetPosition (t : Nat) : Bool :=
 
 /-- Apply the minGPT adder loss mask to a shifted one-hot target matrix. -/
 def maskAdderTargets {α : Type} [Zero α]
-    (y : Tensor α (NN.Tensor.Shape.Mat seqLen vocab)) :
-    Tensor α (NN.Tensor.Shape.Mat seqLen vocab) :=
-  Tensor.dim (fun t =>
+    (y : Tensor.T α (Shape.mat seqLen vocab)) :
+    Tensor.T α (Shape.mat seqLen vocab) :=
+  Spec.Tensor.dim (fun t =>
     if keepTargetPosition t.val then
       match y with
-      | Tensor.dim rows => rows t
+      | Spec.Tensor.dim rows => rows t
     else
       Tensor.fill 0 (shape![vocab]))
 
+/--
+Build one unbatched one-hot causal-LM sample for an addition row, then apply the minGPT-style
+ignored-prefix mask to its target matrix.
+-/
+def mkRowSample (a b : Nat) :
+    SupervisedSample Float (Shape.mat seqLen vocab) (Shape.mat seqLen vocab) :=
+  Sample.mapY maskAdderTargets <|
+    Data.causalLmOneHotMatSample (α := Float) seqLen vocab (renderExample a b)
+
 /-- Build one supervised next-digit sample from an addition problem. -/
-def mkSample {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
-    (a b : Nat) : sample.Supervised α σ τ :=
-  let (x2DF, y2DF) := text.causalLmXYOneHotMatFloat (seqLen := seqLen) (vocab := vocab)
-    (renderExample a b)
-  let x2D : Tensor α (NN.Tensor.Shape.Mat seqLen vocab) :=
-    Common.castTensor Runtime.ofFloat x2DF
-  let y2D : Tensor α (NN.Tensor.Shape.Mat seqLen vocab) :=
-    maskAdderTargets (Common.castTensor Runtime.ofFloat y2DF)
-  sample.mk (Tensor.dim (fun _ => x2D)) (Tensor.dim (fun _ => y2D))
+def mkSample (a b : Nat) : SupervisedSample Float σ τ :=
+  let row := mkRowSample a b
+  let x2D := Sample.x row
+  let y2D := Sample.y row
+  Sample.mk (Spec.Tensor.dim (fun _ => x2D)) (Spec.Tensor.dim (fun _ => y2D))
 
 /-- Deterministic exhaustive one-digit dataset order. -/
 def pairAt (i : Nat) : Nat × Nat :=
@@ -283,58 +273,40 @@ def parseProbeList (s : String) : Except String (List (Nat × Nat)) := do
   pure out
 
 /-- Build a batched supervised sample with one row per one-digit addition problem. -/
-def mkTrainSample {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] (trainSplit : Bool) :
-    sample.Supervised α σ τ :=
-  let row (bi : Fin batch) : Tensor α (NN.Tensor.Shape.Mat seqLen vocab) :=
+def mkTrainSample (trainSplit : Bool) : SupervisedSample Float σ τ :=
+  let row (bi : Fin batch) : Tensor.T Float (Shape.mat seqLen vocab) :=
     let (a, b) := trainPairAt trainSplit bi.val
-    let (x2DF, _) := text.causalLmXYOneHotMatFloat (seqLen := seqLen) (vocab := vocab)
-      (renderExample a b)
-    Common.castTensor Runtime.ofFloat x2DF
-  let target (bi : Fin batch) : Tensor α (NN.Tensor.Shape.Mat seqLen vocab) :=
+    Sample.x <| mkRowSample a b
+  let target (bi : Fin batch) : Tensor.T Float (Shape.mat seqLen vocab) :=
     let (a, b) := trainPairAt trainSplit bi.val
-    let (_, y2DF) := text.causalLmXYOneHotMatFloat (seqLen := seqLen) (vocab := vocab)
-      (renderExample a b)
-    maskAdderTargets (Common.castTensor Runtime.ofFloat y2DF)
-  sample.mk (Tensor.dim row) (Tensor.dim target)
+    Sample.y <| mkRowSample a b
+  Sample.mk (Spec.Tensor.dim row) (Spec.Tensor.dim target)
 
 /-- Decode reversed generated result digits back into a natural number. -/
 def decodeResult (revDigits : List Nat) : Nat :=
   revDigits.reverse.foldl (fun acc d => acc * 10 + d) 0
 
 /-- Argmax token id at sequence position `pos`. -/
-def argmaxAt (logits : Tensor Float τ) (pos : Nat) : Nat :=
+def argmaxAt (logits : Tensor.T Float τ) (pos : Nat) : Nat :=
   let ids := text.argmaxTokenIdsFromBatchLogits (α := Float) (batchIdx := ⟨0, by decide⟩) logits
   ids.getD pos 0
 
 /-- Argmax token id at a sequence position for a chosen batch row. -/
-def argmaxAtBatch (logits : Tensor Float τ) (bi : Fin batch) (pos : Nat) : Nat :=
+def argmaxAtBatch (logits : Tensor.T Float τ) (bi : Fin batch) (pos : Nat) : Nat :=
   let ids := text.argmaxTokenIdsFromBatchLogits (α := Float) (batchIdx := bi) logits
   ids.getD pos 0
 
 /-- Build a model input tensor from the current generated digit prefix. -/
-def inputFromDigits (digits : List Nat) : Tensor Float σ :=
+def inputFromDigits (digits : List Nat) : Tensor.T Float σ :=
   text.causalLmXOneHotBatch (α := Float) batch seqLen vocab digits
 
 /-- Build a batched model input from one digit prefix per row. -/
-def inputFromRows (rows : Fin batch → List Nat) : Tensor Float σ :=
-  let row (bi : Fin batch) : Tensor Float (NN.Tensor.Shape.Mat seqLen vocab) :=
-    let x2DF : Tensor Float (NN.Tensor.Shape.Mat seqLen vocab) :=
-      Tensor.dim (fun t => text.oneHotTokenFloat vocab ((rows bi).getD t.val 0))
-    x2DF
-  Tensor.dim row
+def inputFromRows (rows : Fin batch → List Nat) : Tensor.T Float σ :=
+  text.causalLmXOneHotBatchRows (α := Float) batch seqLen vocab rows
 
-/--
-Run a model forward through the eager runtime and return logits.
-
-We keep this helper local instead of importing the larger GPT-2 example module. That keeps the
-adder executable focused on the task-specific data and evaluation path.
--/
-def runtimePredictFloat {σ τ : Shape}
-    (opts : Runtime.Autograd.Torch.Options) (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ])
-    (x : Tensor Float σ) : IO (Tensor Float τ) := do
-  nn.eval1
-    (α := Float) opts model m.trainer.params x
+/-- Fitted adder predictor returned by the public trainer handle. -/
+abbrev Predictor :=
+  Tensor.T Float σ → IO (Tensor.T Float τ)
 
 /--
 Greedily complete `ndigit + 1` result digits from the operand digits.
@@ -343,39 +315,30 @@ The key detail is that when the current prefix has length `k`, the next-token pr
 position `k - 1`, not always at the final padded position.
 -/
 def generateResultDigits
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ])
+    (predict : Predictor)
     (a b : Nat) : IO (List Nat) := do
   let mut digits := fixedDigits ndigit a ++ fixedDigits ndigit b
   let mut out : List Nat := []
   for _ in [0:ndigit + 1] do
     let pos := if digits.length = 0 then 0 else Nat.min (digits.length - 1) (seqLen - 1)
-    let logits ← runtimePredictFloat opts model m (inputFromDigits digits)
+    let logits ← predict (inputFromDigits digits)
     let next := argmaxAt logits pos
     digits := digits ++ [next]
     out := out ++ [next]
   pure out
 
 /-- Predict `a + b` by greedy decoding and reversing the minGPT result digits. -/
-def predictSum
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ])
-    (a b : Nat) : IO Nat := do
-  let revDigits ← generateResultDigits opts model m a b
+def predictSum (predict : Predictor) (a b : Nat) : IO Nat := do
+  let revDigits ← generateResultDigits predict a b
   pure (decodeResult revDigits)
 
 /-- Evaluate all 100 one-digit additions. -/
-def evalAllSlow
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ]) :
+def evalAllSlow (predict : Predictor) :
     IO Nat := do
   let mut correct := 0
   for i in [0:100] do
     let (a, b) := pairAt i
-    let pred ← predictSum opts model m a b
+    let pred ← predictSum predict a b
     if pred = a + b then
       correct := correct + 1
   pure correct
@@ -397,17 +360,15 @@ For one-digit operands, generation needs two result digits.  We first predict th
 rows `[a,b]`, append it, and then predict the carry/tens digit from rows `[a,b,pred₀]`.
 -/
 def evalBatched
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ]) :
+    (predict : Predictor) :
     IO EvalScore := do
   let operandRows : Fin batch → List Nat := fun bi =>
     let (a, b) := pairAt bi.val
     fixedDigits ndigit a ++ fixedDigits ndigit b
-  let logits0 ← runtimePredictFloat opts model m (inputFromRows operandRows)
+  let logits0 ← predict (inputFromRows operandRows)
   let firstDigit : Fin batch → Nat := fun bi => argmaxAtBatch logits0 bi (2 * ndigit - 1)
   let withFirst : Fin batch → List Nat := fun bi => operandRows bi ++ [firstDigit bi]
-  let logits1 ← runtimePredictFloat opts model m (inputFromRows withFirst)
+  let logits1 ← predict (inputFromRows withFirst)
   let secondDigit : Fin batch → Nat := fun bi => argmaxAtBatch logits1 bi (2 * ndigit)
   let mut trainCorrect := 0
   let mut testCorrect := 0
@@ -426,64 +387,25 @@ def evalBatched
   pure { trainCorrect := trainCorrect, testCorrect := testCorrect, allCorrect := allCorrect }
 
 /-- Batched exact-match score over all one-digit additions. -/
-def evalAllBatched
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ]) :
+def evalAllBatched (predict : Predictor) :
     IO Nat := do
-  pure (← evalBatched opts model m).allCorrect
+  pure (← evalBatched predict).allCorrect
 
 /-- Print one addition check in the same digit convention used for training. -/
-def printProbe
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ])
-    (a b : Nat) : IO Unit := do
-  let revDigits ← generateResultDigits opts model m a b
+def printProbe (predict : Predictor) (a b : Nat) : IO Unit := do
+  let revDigits ← generateResultDigits predict a b
   let pred := decodeResult revDigits
   IO.println s!"  check {a}+{b}: reversed-digits={revDigits}, pred={pred}, target={a + b}"
 
-/-- Optimizer choice for this addition run. -/
-inductive OptimKind where
-  | sgd
-  | adam
-  | adamw
-deriving DecidableEq, Repr
-
-/-- Parse an optimizer name accepted by `--optim`. -/
-def OptimKind.parse (s : String) : Except String OptimKind :=
-  if s == "sgd" then
-    pure .sgd
-  else if s == "adam" then
-    pure .adam
-  else if s == "adamw" then
-    pure .adamw
-  else
-    throw s!"bad --optim {s}; expected sgd, adam, or adamw"
-
-/-- Human-readable optimizer name for logs. -/
-def OptimKind.name : OptimKind → String
-  | .sgd => "SGD"
-  | .adam => "Adam"
-  | .adamw => "AdamW"
-
-/-- Local options for the adder runner. -/
-structure TrainOptions where
-  /-- Number of optimizer steps. -/
-  steps : Nat
-  /-- Print loss every `logEvery` steps. -/
-  logEvery : Nat
-  /-- JSON training log artifact path. -/
-  logPath : System.FilePath
+/-- Adder-specific CLI options layered on top of the shared interactive text training flags. -/
+structure AdderOptions extends text.InteractiveTrainOptions where
   /--
   Optimizer.
 
-  `adamw` is closest to minGPT's adder recipe.  `adam` and `sgd` are kept for debugging and
+  `adamw` is closest to minGPT's adder recipe. `adam` and `sgd` are useful for debugging and
   comparisons.
   -/
-  optim : OptimKind
-  /-- Learning rate. -/
-  lr : Float
+  optim : optim.Kind
   /-- Operand `a` used by the highlighted addition check. -/
   a : Nat
   /-- Operand `b` used by the highlighted addition check. -/
@@ -494,72 +416,117 @@ structure TrainOptions where
   trainSplit : Bool
   /-- Train only the selected pair, useful for checking that the CUDA GPT can overfit one addition. -/
   overfitProbe : Bool
-  /-- Keep the trained CUDA model alive and read `a+b` prompts from stdin. -/
-  interactive : Bool
 deriving Repr
 
+namespace AdderOptions
+
+/-- Default extra addition checks shown after training when `--probes` is omitted. -/
+def defaultProbes : List (Nat × Nat) :=
+  [(0, 0), (1, 2), (4, 5), (7, 8), (9, 9)]
+
 /-- Parse adder-specific CLI options. -/
-def parseTrainOptions (args : List String) : Except String (TrainOptions × List String) := do
-  let (steps, args) ← CLI.takeStepsOrEpochs args 1000
-  let (logEvery?, args) ← CLI.takeNatFlagOnce args "log-every"
-  let (logPath?, args) ← CLI.takePathFlagOnce args "log"
-  let (optim?, args) ← CLI.takeFlagValueOnce args "optim"
-  let (lr?, args) ← CLI.takeFloatFlagOnce args "lr"
-  let (a?, args) ← CLI.takeNatFlagOnce args "a"
-  let (b?, args) ← CLI.takeNatFlagOnce args "b"
+def parse (args : List String) : Except String (AdderOptions × List String) := do
+  let (base, args) ←
+    text.InteractiveTrainOptions.parse exeName args defaultLogJson 1000 5e-4
+  let (optim, args) ← CLI.takeParsedFlagDefault args "optim" "adamw" optim.Kind.parse
+  let (a, args) ← CLI.takeNatFlagDefault args "a" 7
+  let (b, args) ← CLI.takeNatFlagDefault args "b" 8
   let (probes?, args) ← CLI.takeFlagValueOnce args "probes"
   let (trainSplit, args) ← CLI.takeBoolFlagOnce args "train-split"
   let (overfitProbe, args) ← CLI.takeBoolFlagOnce args "overfit-probe"
-  let (interactive, args) ← CLI.takeBoolFlagOnce args "interactive"
-  let lr ←
-    match lr? with
-    | some v => pure v
-    | none => pure 5e-4
-  let optim ←
-    match optim? with
-    | some s => OptimKind.parse s
-    | none => pure .adamw
-  let a := a?.getD 7
-  let b := b?.getD 8
   if a ≥ 10 || b ≥ 10 then
     throw "--a and --b must be one-digit numbers in 0..9"
   let probes ←
     match probes? with
     | some s => parseProbeList s
-    | none => pure [(0, 0), (1, 2), (4, 5), (7, 8), (9, 9)]
-  pure ({ steps := steps
-          logEvery := logEvery?.getD 100
-          logPath := logPath?.getD defaultLogJson
+    | none => pure defaultProbes
+  pure ({ toInteractiveTrainOptions := base
           optim := optim
-          lr := lr
           a := a
           b := b
           probes := probes
           trainSplit := trainSplit
-          overfitProbe := overfitProbe
-          interactive := interactive }, args)
+          overfitProbe := overfitProbe }, args)
 
-/-- Force CUDA and fused kernels, because this example is meant to exercise the GPU path. -/
-def forceCudaArgs (args : List String) : Except String (List String) := do
-  if args.contains "--cpu" then
-    throw "gpt_adder is CUDA-only; remove --cpu"
-  if args.contains "--backend=compiled" then
-    throw "gpt_adder requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
-  let rec hasCompiledBackend : List String → Bool
-    | "--backend" :: "compiled" :: _ => true
-    | _ :: rest => hasCompiledBackend rest
-    | [] => false
-  if hasCompiledBackend args then
-    throw "gpt_adder requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
-  let args := if args.contains "--cuda" then args else "--cuda" :: args
-  let args := if args.contains "--fast-kernels" then args else "--fast-kernels" :: args
-  pure args
+/-- Standard TrainLog notes for the adder training loop. -/
+def logNotes (cfg : AdderOptions) (opts : Options) : Array String :=
+  #[s!"optimizer={cfg.optim.name}", s!"lr={cfg.lr}", ModelZoo.deviceNote opts]
+
+end AdderOptions
+
+/-- Training/evaluation curriculum used by the adder runner. -/
+inductive CurriculumMode where
+  | overfitPair
+  | trainSplit
+  | fullTable
+deriving DecidableEq, Repr
+
+namespace CurriculumMode
+
+/-- Decide which curriculum the current adder options request. -/
+def ofOptions (cfg : AdderOptions) : CurriculumMode :=
+  if cfg.overfitProbe then
+    .overfitPair
+  else if cfg.trainSplit then
+    .trainSplit
+  else
+    .fullTable
+
+/-- Startup note for the selected curriculum. -/
+def intro (mode : CurriculumMode) (cfg : AdderOptions) : String :=
+  match mode with
+  | .overfitPair =>
+      s!"  curriculum=overfit-pair pair={cfg.a}+{cfg.b}"
+  | .trainSplit =>
+      s!"  curriculum=train/test split ({trainCount} train / {testCount} test; train rows repeat to fill batch={batch})"
+  | .fullTable =>
+      "  curriculum=all 100 one-digit addition pairs"
+
+/-- Training sample corresponding to the selected curriculum. -/
+def sample (mode : CurriculumMode) (cfg : AdderOptions) : SupervisedSample Float σ τ :=
+  match mode with
+  | .overfitPair => mkSample cfg.a cfg.b
+  | .trainSplit => mkTrainSample true
+  | .fullTable => mkTrainSample false
+
+/-- Per-step progress line for the selected curriculum. -/
+def progressLine
+    (mode : CurriculumMode)
+    (predict : Predictor)
+    (cfg : AdderOptions)
+    (done : Nat)
+    (lossVal : Float) : IO String := do
+  match mode with
+  | .overfitPair =>
+      let pred ← predictSum predict cfg.a cfg.b
+      pure s!"  step={done} loss={lossVal} pairPred={pred} target={cfg.a + cfg.b}"
+  | .trainSplit =>
+      let score ← evalBatched predict
+      pure s!"  step={done} loss={lossVal} train={score.trainCorrect}/{trainCount} test={score.testCorrect}/{testCount} all={score.allCorrect}/100"
+  | .fullTable =>
+      let score ← evalAllBatched predict
+      pure s!"  step={done} loss={lossVal} exact={score}/100"
+
+/-- Final evaluation line for the selected curriculum, if any. -/
+def finalLine?
+    (mode : CurriculumMode)
+    (predict : Predictor) :
+    IO (Option String) := do
+  match mode with
+  | .overfitPair =>
+      pure none
+  | .trainSplit =>
+      let score ← evalBatched predict
+      pure <| some
+        s!"  final train={score.trainCorrect}/{trainCount} test={score.testCorrect}/{testCount} all={score.allCorrect}/100"
+  | .fullTable =>
+      let score ← evalAllBatched predict
+      pure <| some s!"  final exact={score}/100"
+
+end CurriculumMode
 
 /-- Simple terminal REPL for the trained CUDA model. -/
-partial def interactiveLoop
-    (opts : Runtime.Autograd.Torch.Options)
-    (model : nn.Sequential σ τ)
-    (m : TorchLean.Module.ScalarModule Float (TorchLean.NN.Seq.paramShapes model) [σ, τ]) :
+partial def interactiveLoop (predict : Predictor) :
     IO Unit := do
   IO.println "  interactive: enter one-digit prompts like 7+8; empty line or :q exits"
   let stdin ← IO.getStdin
@@ -575,130 +542,62 @@ partial def interactiveLoop
           IO.println "  expected one-digit prompt like 7+8"
           loop
       | some (a, b) =>
-          printProbe opts model m a b
+          printProbe predict a b
           loop
   loop
 
 /-- Train the minGPT-style adder from scratch and report exact addition accuracy. -/
-def trainAdderFloat (opts : Runtime.Autograd.Torch.Options) (trainOpts : TrainOptions) :
+def trainAdderFloat (opts : Options) (trainOpts : AdderOptions) :
     IO Unit := do
-  nn.withModel mkModel fun model => do
-    let modDef := adderScalarModuleDef model
-    let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-    let sample0 := mkSample (α := Float) 0 0
-    let loss0 ← TorchLean.Module.forward (α := Float) m sample0
-    IO.println s!"  mode=adder ndigit={ndigit} vocab={vocab} seqLen={seqLen} steps={trainOpts.steps}"
-    IO.println s!"  model layers={layers} heads={numHeads} headDim={headDim} dModel={dModel} ffnHidden={ffnHidden}"
-    IO.println s!"  parameters={modelParamCount} tensors={modelParamTensorCount} activeTargets/step={activeTargetCount}"
-    IO.println s!"  optimizer={trainOpts.optim.name} lr={trainOpts.lr}"
-    IO.println s!"  initial loss={Tensor.toScalar loss0}"
-    IO.println s!"  minGPT encoding example 8+7 -> {renderExample 8 7} (sum digits reversed)"
-    if trainOpts.overfitProbe then
-      IO.println s!"  curriculum=overfit-pair pair={trainOpts.a}+{trainOpts.b}"
-    else if trainOpts.trainSplit then
-      IO.println s!"  curriculum=train/test split ({trainCount} train / {testCount} test; train rows repeat to fill batch={batch})"
-    else
-      IO.println "  curriculum=all 100 one-digit addition pairs"
+  let mode := CurriculumMode.ofOptions trainOpts
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := trainOpts.optim.toOptimizer trainOpts.lr })
+        (.custom adderLossProgram)
+  IO.println s!"  mode=adder ndigit={ndigit} vocab={vocab} seqLen={seqLen} steps={trainOpts.steps}"
+  trainer.printInfo
+  IO.println s!"  heads={numHeads} headDim={headDim} dModel={dModel} ffnHidden={ffnHidden} activeTargets/step={activeTargetCount}"
+  IO.println s!"  optimizer={trainOpts.optim.name} lr={trainOpts.lr}"
+  IO.println s!"  minGPT encoding example 8+7 -> {renderExample 8 7} (sum digits reversed)"
+  IO.println <| CurriculumMode.intro mode trainOpts
 
-    /-
-    The one-digit adder dataset is static, so build the supervised batch once.
-
-    This matters for runtime measurements: constructing a `Tensor.dim` tree in Lean every optimizer
-    step can dominate scalar-sized GPU experiments and obscure the cost of the CUDA kernels. Real
-    data loaders should still stream/minibatch; this finite full-table task trains against the same
-    batch each step because the dataset is exactly the one-digit addition table.
-    -/
-    let trainSample : sample.Supervised Float σ τ :=
-      if trainOpts.overfitProbe then
-        mkSample (α := Float) trainOpts.a trainOpts.b
-      else
-        mkTrainSample (α := Float) trainOpts.trainSplit
-    let trainLoss0 ← TorchLean.Module.forward (α := Float) m trainSample
-    let trainLoss0Val := Tensor.toScalar trainLoss0
-
-    let stepSample : sample.Supervised Float σ τ → IO Unit ←
-      match trainOpts.optim with
-      | .sgd =>
-          let opt := TorchLean.Optim.sgd (α := Float)
-            (paramShapes := nn.paramShapes model) trainOpts.lr
-          let optH ← TorchLean.Optim.handle (α := Float) m opt
-          pure optH.step
-      | .adam =>
-          let opt := TorchLean.Optim.adam (α := Float)
-            (paramShapes := nn.paramShapes model)
-            (lr := trainOpts.lr)
-            (beta1 := 0.9)
-            (beta2 := 0.95)
-            (epsilon := 1e-8)
-          let optH ← TorchLean.Optim.handle (α := Float) m opt
-          pure optH.step
-      | .adamw =>
-          let opt := TorchLean.Optim.adamw (α := Float)
-            (paramShapes := nn.paramShapes model)
-            (lr := trainOpts.lr)
-            (weightDecay := 0.1)
-            (beta1 := 0.9)
-            (beta2 := 0.95)
-            (epsilon := 1e-8)
-          let optH ← TorchLean.Optim.handle (α := Float) m opt
-          pure optH.step
-
-    for step in [0:trainOpts.steps] do
-      stepSample trainSample
-      let done := step + 1
-      if Common.shouldLogStep trainOpts.logEvery done then
-        let loss ← TorchLean.Module.forward (α := Float) m trainSample
-        let lossVal := Tensor.toScalar loss
-        Common.check exeName s!"non-finite training loss at step {done}" (lossVal == lossVal)
-        if trainOpts.overfitProbe then
-          let pred ← predictSum opts model m trainOpts.a trainOpts.b
-          IO.println s!"  step={done} loss={lossVal} pairPred={pred} target={trainOpts.a + trainOpts.b}"
-        else if trainOpts.trainSplit then
-          let score ← evalBatched opts model m
-          IO.println s!"  step={done} loss={lossVal} train={score.trainCorrect}/{trainCount} test={score.testCorrect}/{testCount} all={score.allCorrect}/100"
-        else
-          let score ← evalAllBatched opts model m
-          IO.println s!"  step={done} loss={lossVal} exact={score}/100"
-
-    if trainOpts.overfitProbe then
-      pure ()
-    else
-      if trainOpts.trainSplit then
-        let score ← evalBatched opts model m
-        IO.println s!"  final train={score.trainCorrect}/{trainCount} test={score.testCorrect}/{testCount} all={score.allCorrect}/100"
-      else
-        let score ← evalAllBatched opts model m
-        IO.println s!"  final exact={score}/100"
-    let trainLoss1 ← TorchLean.Module.forward (α := Float) m trainSample
-    let trainLoss1Val := Tensor.toScalar trainLoss1
-    Common.writeBeforeAfterLossLog trainOpts.logPath "GPT adder training" trainOpts.steps
-      trainLoss0Val trainLoss1Val
-      #[s!"optimizer={trainOpts.optim.name}", s!"lr={trainOpts.lr}",
-        s!"device={if opts.useGpu then "cuda" else "cpu"}"]
-    printProbe opts model m trainOpts.a trainOpts.b
-    if !trainOpts.probes.isEmpty then
-      IO.println "  extra checks:"
-      for (a, b) in trainOpts.probes do
-        printProbe opts model m a b
-    if trainOpts.interactive then
-      interactiveLoop opts model m
+  /-
+  The one-digit adder has a finite training batch, so the public custom trainer sees a dataset with
+  exactly one supervised sample: that sample is either the full table, the repeated train split, or
+  the selected overfit pair.  The custom loss `adderLossProgram` preserves the minGPT-style
+  ignore-prefix normalization while still moving the optimizer loop behind `trainer.train`.
+  -/
+  let trainSample : SupervisedSample Float σ τ :=
+    CurriculumMode.sample mode trainOpts
+  let trained ← trainer.train
+    (Data.floatSamples [trainSample])
+    { steps := trainOpts.steps
+      log := trainOpts.toInteractiveTrainOptions.toModelTrainFlags.log
+      logEvery := Nat.max 1 (trainOpts.steps / 10)
+      title := "GPT adder training"
+      notes := trainOpts.logNotes opts }
+  trained.printSummary
+  match (← CurriculumMode.finalLine? mode trained.eval) with
+  | some line => IO.println line
+  | none => pure ()
+  printProbe trained.eval trainOpts.a trainOpts.b
+  if !trainOpts.probes.isEmpty then
+    IO.println "  extra checks:"
+    for (a, b) in trainOpts.probes do
+      printProbe trained.eval a b
+  if trainOpts.interactive then
+    interactiveLoop trained.eval
 
 /-- CLI entrypoint for the CUDA GPT adder command. -/
 def main (args : List String) : IO UInt32 := do
-  match forceCudaArgs args with
-  | .error e =>
-      IO.eprintln s!"{exeName}: {e}"
-      pure 1
-  | .ok args =>
-      TorchLean.Module.run exeName args
-        (.float (fun opts rest => do
-          if !opts.useGpu then
-            throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
-          let (trainOpts, rest) ← Common.orThrow exeName <| parseTrainOptions rest
-          Common.orThrow exeName <| CLI.requireNoArgs rest
-          trainAdderFloat opts trainOpts))
-        { banner? := some (fun opts =>
-            s!"{exeName}: minGPT-style addition training (device={if opts.useGpu then "cuda" else "cpu"})")
-          printOk := true }
+  ModelZoo.runGpuEagerFloat exeName args
+    (banner := ModelZoo.bannerWithDevice exeName "minGPT-style addition training")
+    (k := fun opts rest => do
+      if !opts.useGpu then
+        throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
+      let (trainOpts, rest) ← ModelZoo.orThrow exeName <| AdderOptions.parse rest
+      CLI.requireNoArgs exeName rest
+      trainAdderFloat opts trainOpts)
 
 end NN.Examples.Models.Sequence.GptAdder

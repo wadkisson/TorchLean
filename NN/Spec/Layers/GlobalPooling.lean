@@ -175,7 +175,7 @@ def globalMaxPool2dSpec {α : Type} [Numbers α] [Max α] [Zero α] {inC inH inW
     input
 
 /-- Global average pooling (flattened): `(C,H,W) -> (C)`. -/
-def globalAvgPool2dFlatSpec {α : Type} [Coe Nat α] [Div α] [Zero α] [Add α] [Zero α] [One α]
+def globalAvgPool2dFlatSpec {α : Type} [Coe Nat α] [Div α] [Zero α] [Add α] [One α]
   {inC inH inW : ℕ} (_h1 : inH ≠ 0) (_h2 : inW ≠ 0)
   (_layer : GlobalAvgPool2DSpec)
   (input : MultiChannelImage inC inH inW α) :

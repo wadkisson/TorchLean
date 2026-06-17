@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -59,7 +58,7 @@ neighboring records. The definition of `(ε, δ)`-DP is the standard event inequ
 adjacent pair and measurable event `S`, the probability of `M a` landing in `S` is at most
 `exp ε` times the corresponding probability for `M a'`, plus `δ`.
 
-The definition returns a `ProbabilityMeasure`. This keeps it general enough for discrete mechanisms,
+The definition returns a `ProbabilityMeasure`, which is general enough for discrete mechanisms,
 continuous mechanisms, and randomized training procedures.
 The mechanism does not have to be a particular optimizer or sampler; the definition says what any
 privacy proof must establish.

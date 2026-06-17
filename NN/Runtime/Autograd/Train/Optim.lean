@@ -69,7 +69,7 @@ identifier explicit (`id : Nat`) so we can key gradients and optimizer state in 
 structure ParamEntry (α : Type) where
   /-- Stable identifier used to key gradients and optimizer state. -/
   id : Nat
-  /-- Optional human-readable name (e.g. module path); used only for reporting/debugging. -/
+  /-- Optional label, such as a module path; used only for reporting and debugging. -/
   name : Option String := none
   /-- The parameter value, stored as an `AnyTensor` (shape erased). -/
   value : Runtime.AnyTensor α

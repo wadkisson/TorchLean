@@ -45,7 +45,7 @@ def LogLevel.render : LogLevel -> String
 structure LogEntry where
   /-- Severity level for filtering or rendering. -/
   level : LogLevel
-  /-- Human-readable message payload. -/
+  /-- Message payload written to the training log. -/
   message : String
 
 /-- Render a `LogEntry` as `[level] msg`. -/

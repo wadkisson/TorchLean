@@ -74,7 +74,7 @@ Lower (under-approx) relaxation for ReLU.
 For crossing bounds `l < 0 < u`, basic CROWN/DeepPoly chooses either:
 - `y ≥ 0` (slope 0), or
 - `y ≥ x` (slope 1),
-based on which side of 0 is “wider”. This keeps the relaxation sound without α-optimization.
+based on which side of 0 is “wider”. This is the non-α-optimized lower relaxation.
 -/
 def relaxScalarLower (l u : α) : ReLURelax α :=
   if u > 0 then

@@ -347,7 +347,7 @@ def generatePyTorchHelperModules : String :=
     indent4 "return torch.matmul(attn, x)",
     "",
     "class SimpleRNN(nn.Module):",
-    ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
     indent4 "super().__init__()",
     indent4
@@ -359,7 +359,7 @@ def generatePyTorchHelperModules : String :=
     indent4 "return self.fc(y)",
     "",
     "class SimpleGRU(nn.Module):",
-    ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
     indent4 "super().__init__()",
     indent4
@@ -371,7 +371,7 @@ def generatePyTorchHelperModules : String :=
     indent4 "return self.fc(y)",
     "",
     "class SimpleLSTM(nn.Module):",
-    ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
     indent4 "super().__init__()",
     indent4
@@ -394,7 +394,7 @@ def generatePyTorchHelperModules : String :=
     indent4 "return self.proj(y)",
     "",
     "class Seq2SeqInference(nn.Module):",
-    ("def __init__(self, src_vocab_size: int, tgt_vocab_size: int, " ++
+    indent2 ("def __init__(self, src_vocab_size: int, tgt_vocab_size: int, " ++
       "embed_dim: int, hidden_dim: int, max_tgt_len: int, start_token: int = " ++
       "0):"),
     indent4 "super().__init__()",

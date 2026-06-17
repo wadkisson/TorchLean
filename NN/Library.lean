@@ -40,8 +40,7 @@ Trust-boundary documentation lives in `TRUST_BOUNDARIES.md`, where it can cover 
 declarations and external CUDA / Python / Julia / Arb producers without treating those prose notes
 as part of the Lean API.
 
-If you’re writing ordinary model/training code, prefer `import NN`. If you want to make the broad
-umbrella explicit in downstream code, use `import NN.Library`. For lighter imports, use
+If you are writing ordinary model/training code, use `import NN`. For lighter imports, use
 `NN.Entrypoint.API`, `NN.Entrypoint.Tensor`, `NN.Entrypoint.IR`, or another subsystem entrypoint.
 -/
 

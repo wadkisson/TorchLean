@@ -60,11 +60,6 @@ def idxK {m d : Nat} {ss : List Shape} : Idx (ΓQKV m d ++ ss) (QKVShape m d) :=
 def idxV {m d : Nat} {ss : List Shape} : Idx (ΓQKV m d ++ ss) (QKVShape m d) :=
   ⟨⟨2, by simp [ΓQKV]⟩, by simp [ΓQKV]⟩
 
-/-- Index of the most-recently appended tensor in a `DGraph` context. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 /--
 Scaled dot-product attention as a proved-correct `DGraph`.
 
@@ -93,7 +88,7 @@ def scaledDotProductDGraph {m d : Nat} (c : ℝ) :
 
   -- 2) logits := Q * Kᵀ
   let idxKt : Idx (ΓQKV m d ++ [.dim d (.dim m .scalar)]) (.dim d (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d) (ss := []) (τ := .dim d (.dim m .scalar))
+    Idx.last (Γ := ΓQKV m d) (ss := []) (τ := .dim d (.dim m .scalar))
   let nodeLogits :
       Node (ΓQKV m d ++ [.dim d (.dim m .scalar)]) (.dim m (.dim m .scalar)) :=
     TapeNodes.matmul (Γ := ΓQKV m d ++ [.dim d (.dim m .scalar)])
@@ -111,7 +106,7 @@ def scaledDotProductDGraph {m d : Nat} (c : ℝ) :
   let idxLogits :
       Idx (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar)]) (.dim m (.dim m .scalar))
         :=
-    idxLast (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar)]) (τ := .dim m (.dim m .scalar))
+    Idx.last (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar)]) (τ := .dim m (.dim m .scalar))
   let nodeScaled :
       Node (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar)]) (.dim m (.dim m
         .scalar)) :=
@@ -127,7 +122,7 @@ def scaledDotProductDGraph {m d : Nat} (c : ℝ) :
   let idxScaled :
       Idx (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar), .dim m (.dim m .scalar)]) (τ := .dim m
+    Idx.last (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar), .dim m (.dim m .scalar)]) (τ := .dim m
       (.dim m .scalar))
   let nodeProbs :
       Node (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
@@ -149,7 +144,7 @@ def scaledDotProductDGraph {m d : Nat} (c : ℝ) :
           [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m
             .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d)
+    Idx.last (Γ := ΓQKV m d)
       (ss := [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
       (τ := .dim m (.dim m .scalar))
   let nodeOut :

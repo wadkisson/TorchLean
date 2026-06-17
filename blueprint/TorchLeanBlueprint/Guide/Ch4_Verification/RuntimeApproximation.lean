@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -144,9 +143,9 @@ The bridge file
 [NN.Proofs.RuntimeApprox.Graph.LinkAutogradAlgebra API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/LinkAutogradAlgebra.lean)
 connects the runtime approximation graph shape back to the autograd algebra graph.
 
-This bridge is intentionally structural. `Proofs.RuntimeApprox.TList` is an abbreviation for the
-same heterogeneous context type used by the autograd algebra layer, so the conversion is not a
-semantic reinterpretation. The file defines `toNodeData` and `toGraphData`, then proves:
+This bridge is structural. The runtime approximation layer uses the same
+shape-indexed tensor-context idea that the public API exposes as `TensorPack`, so the conversion is
+not a semantic reinterpretation. The file defines `toNodeData` and `toGraphData`, then proves:
 
 - `evalRuntime_of_toGraphData`;
 - `backpropRuntime_of_toGraphData`.

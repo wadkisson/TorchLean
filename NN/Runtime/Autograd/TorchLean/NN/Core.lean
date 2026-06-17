@@ -96,6 +96,8 @@ PyTorch analogy: a small `nn.Module`, where:
 - `updateBuffers` corresponds to updating things like `running_mean`/`running_var` in BatchNorm.
 -/
 structure LayerDef (σ τ : Shape) where
+  /-- Layer label used by public model summaries. -/
+  kind : String := "Layer"
   /-- Shapes of the layer's parameter tensors, in the order expected by `forward`. -/
   paramShapes : List Shape
   /-- Initial parameter values (stored as `Float` tensors for convenient seeding/init schemes). -/
@@ -300,4 +302,3 @@ end NN
 end TorchLean
 end Autograd
 end Runtime
-

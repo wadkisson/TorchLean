@@ -138,7 +138,12 @@ theorem inner_getRaw_singleRaw :
         ext j
         have := congrArg (fun f : Fin (Shape.size s + ctxSize ss) → ℝ => f j)
           (Fin.append_castAdd_natAdd (f := x) (m := Shape.size s) (n := ctxSize ss))
-        simpa [appendVec, head, tail] using this
+        change
+          Fin.append
+              (fun j : Fin (Shape.size s) => x.ofLp (Fin.castAdd (ctxSize ss) j))
+              (fun j : Fin (ctxSize ss) => x.ofLp (Fin.natAdd (Shape.size s) j)) j =
+            x.ofLp j
+        simpa using this
       cases i using Fin.cases with
       | zero =>
           have hinner :=
@@ -150,8 +155,24 @@ theorem inner_getRaw_singleRaw :
             ctxSize ss) fun _ => (0 : ℝ))) =
               inner ℝ head v := by
             -- rewrite `x` as an append and simplify away the tail/zero inner product
-            simpa [hx, htail0, add_assoc] using hinner
-          simpa [CtxVec.singleRaw, CtxVec.getRaw, head, hx] using h'
+            calc
+              inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss) v
+                  (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ)))
+                  =
+                inner ℝ (appendVec (m := Shape.size s) (n := ctxSize ss) head tail)
+                  (appendVec (m := Shape.size s) (n := ctxSize ss) v
+                    (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ))) := by
+                    rw [← hx]
+                    rfl
+              _ = inner ℝ head v + inner ℝ tail (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ)) :=
+                    hinner
+              _ = inner ℝ head v := by
+                    rw [htail0, add_zero]
+          change
+            inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss) v
+              (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ))) =
+              inner ℝ head v
+          exact h'
       | succ k =>
           have hinner :=
             inner_append (m := Shape.size s) (n := ctxSize ss)
@@ -167,9 +188,25 @@ theorem inner_getRaw_singleRaw :
                 =
               inner ℝ (getRaw (Γ := ss) k tail) v := by
             -- start from `inner_append`, drop the head/zero term, then apply IH
-            simpa [hx, hhead0, htail, add_assoc, add_left_comm, add_comm] using hinner
+            calc
+              inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss)
+                  (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v))
+                  =
+                inner ℝ (appendVec (m := Shape.size s) (n := ctxSize ss) head tail)
+                  (appendVec (m := Shape.size s) (n := ctxSize ss)
+                    (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) := by
+                    rw [← hx]
+                    rfl
+              _ = inner ℝ head (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) +
+                    inner ℝ tail (singleRaw (Γ := ss) k v) := hinner
+              _ = inner ℝ (getRaw (Γ := ss) k tail) v := by
+                    rw [hhead0, zero_add, htail]
           -- `getRaw`/`singleRaw` at `succ` are definitional on the tail
-          simpa [CtxVec.singleRaw, CtxVec.getRaw, tail, hx] using h'
+          change
+            inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss)
+              (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) =
+              inner ℝ (getRaw (Γ := ss) k tail) v
+          exact h'
 
 /-- Project the block specified by `idx : Idx Γ s` out of a vectorized context. -/
 def get {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (x : CtxVec Γ) : Vec (Shape.size s) :=
@@ -276,6 +313,11 @@ def getCLMRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ →L[ℝ
               have hrec := ih (i := iTail) (x := tailCLM (s := s) (ss := ss) x)
               ext j
               have := congrArg (fun v : Vec (Shape.size (ss.get iTail)) => v j) hrec
+              change
+                ((getCLMRaw (Γ := ss) iTail)
+                    (tailCLM (s := s) (ss := ss) x)).ofLp j =
+                  (getRaw (Γ := ss) iTail
+                    (vecOfFun (n := ctxSize ss) fun j => x.ofLp (Fin.natAdd (Shape.size s) j))).ofLp j
               simpa [getCLMRaw, getRaw, tailCLM, tailCLM_apply, iTail] using this
 
 /-- `get` packaged as a continuous linear map. -/

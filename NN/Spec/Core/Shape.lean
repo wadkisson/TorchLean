@@ -407,12 +407,12 @@ Instance: axis `0` is valid for a nonzero outer dimension `n`.
 
 The proof converts `n ≠ 0` to the successor form used by the primitive `valid_axis` constructor.
 -/
-instance validAxisInstZeroAlt {n s} (h : n ≠ 0) : valid_axis_inst 0 (.dim n s) :=
+@[reducible] def validAxisInstZeroAlt {n s} (h : n ≠ 0) : valid_axis_inst 0 (.dim n s) :=
   let ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero h
   { proof := by rw [hm]; exact valid_axis.valid_zero }
 
 /-- Instance: axis `1` is valid for a 2D shape when both outer dims are nonzero. -/
-instance validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
+@[reducible] def validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
     valid_axis_inst 1 (.dim n1 (.dim n2 s)) :=
   let ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero h₁
   { proof := by
@@ -426,7 +426,7 @@ instance validAxisInstSucc {n s k} [inst : valid_axis_inst k s] : valid_axis_ins
 
 -- If a caller already has `n > 0`, this instance packages it as `n ≠ 0`.
 /-- Instance: axis `0` is valid if you have a positivity proof `n > 0` (converted to `n ≠ 0`). -/
-instance validAxisInstZeroAlt2 {n s} (h : n > 0) : valid_axis_inst 0 (.dim n s) :=
+@[reducible] def validAxisInstZeroAlt2 {n s} (h : n > 0) : valid_axis_inst 0 (.dim n s) :=
   validAxisInstZeroAlt (n := n) (s := s) (Nat.ne_of_gt h)
 
 -- Small lemma used at many call sites: positivity implies nonzero.
@@ -451,7 +451,7 @@ Why this matters (and why we designed it this way):
   case-heavy. When we need zero-dimension tensors, we introduce them with explicit
   semantics instead of relying on incidental behavior.
 
-This is a pragmatic "make the common case pleasant" choice: proofs and specs are shorter, and
+This is a pragmatic choice: proofs and specs are shorter, and
 runtime checks can still handle edge cases separately.
 -/
 -- Well-formed shapes have positive dimensions.
@@ -483,7 +483,7 @@ If `rank s > 0` and `s` is well-formed, then the last axis `rank s - 1` is valid
 
 This powers many "reduce over last dimension" specs where the axis is computed as `rank s - 1`.
 -/
-instance validAxisLastInst {s : Shape} (h : Shape.rank s > 0) (hw : s.wellFormed) :
+@[reducible] def validAxisLastInst {s : Shape} (h : Shape.rank s > 0) (hw : s.wellFormed) :
   valid_axis_inst (Shape.rank s - 1) s := {
   proof := by
     -- We'll prove this using strong induction on the rank
@@ -549,7 +549,7 @@ instance : WellFormed .scalar where
 
 -- If the inner shape is well-formed and the new dimension is positive, the result is well-formed.
 /-- If `s` is well-formed and `n > 0`, then `.dim n s` is well-formed. -/
-instance {n s} [WellFormed s] (h : n > 0) : WellFormed (.dim n s) where
+@[reducible] def wellFormedDimOfPos {n s} [WellFormed s] (h : n > 0) : WellFormed (.dim n s) where
   proof := ⟨h, WellFormed.proof⟩
 
 -- Helper to create well-formedness for positive literals
@@ -583,7 +583,7 @@ In PyTorch this is `dim=-1` (after normalization). Here we stay in `Nat`, so the
 -/
 /-- Convenience instance: infer `valid_axis_inst (rank s - 1) s` from `WellFormed s` and `rank s >
   0`. -/
-instance validAxisLastAuto {s : Shape} [h_wf : WellFormed s] (h : Shape.rank s > 0) :
+@[reducible] def validAxisLastAuto {s : Shape} [h_wf : WellFormed s] (h : Shape.rank s > 0) :
   Shape.valid_axis_inst (Shape.rank s - 1) s :=
   validAxisLastInst h h_wf.proof
 

@@ -230,7 +230,7 @@ theorem payloadOfParamStore_batchNorm2dNchwEval?_none
 
 /-- `Graph.evalConst` reads flat constants through the `ParamStore` bridge at any node id. -/
 theorem evalConst_from_paramStore
-    {α : Type} [Context α] [Inhabited α]
+    {α : Type} [Context α]
     (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (id : Nat) (s : Shape)
     (v : Tensor α (.dim (Shape.size s) .scalar))
@@ -248,7 +248,7 @@ theorem evalConst_from_paramStore
 
 /-- Missing `ParamStore.constVals` entries are rejected by `Graph.evalConst` at any node id. -/
 theorem evalConst_missing_from_paramStore
-    {α : Type} [Context α] [Inhabited α]
+    {α : Type} [Context α]
     (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (id : Nat) (s : Shape)
     (hMissing : ps.constVals.get? id = none) :
@@ -393,7 +393,7 @@ theorem evalBatchNorm2DNchwEval_missing_from_paramStore
 
 /-- A `const` node in any graph reads its value from the matching `ParamStore.constVals` entry. -/
 theorem evalAt_const_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id : Nat) (s inputShape : Shape)
     (input : Tensor α inputShape)
@@ -416,7 +416,7 @@ theorem evalAt_const_from_paramStore_of_getNode
 
 /-- Missing `ParamStore.constVals` entries are rejected at any `const` node id. -/
 theorem evalAt_const_missing_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id : Nat) (s inputShape : Shape)
     (input : Tensor α inputShape)
@@ -436,7 +436,7 @@ theorem evalAt_const_missing_from_paramStore_of_getNode
 
 /-- A `linear` node in any graph reads weights and bias from its `ParamStore.linearWB` entry. -/
 theorem evalAt_linear_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId outDim inDim : Nat)
     (inputShape : Shape)
@@ -473,7 +473,7 @@ theorem evalAt_linear_from_paramStore_of_getNode
 
 /-- Missing `ParamStore.linearWB` entries are rejected at any `linear` node id. -/
 theorem evalAt_linear_missing_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId outDim : Nat)
     (inputShape : Shape)
@@ -492,10 +492,11 @@ theorem evalAt_linear_missing_from_paramStore_of_getNode
   simp [Graph.evalAt, hNode, Graph.evalLinear,
     payloadOfParamStore_linear?_none (ps := ps) (id := id) hMissing,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
+  rfl
 
 /-- A `conv2d` node in any graph reads its convolution payload from `ParamStore.conv2dCfg`. -/
 theorem evalAt_conv2d_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId : Nat)
     (cfg : NN.MLTheory.CROWN.Graph.Conv2DParams α)
@@ -537,7 +538,7 @@ theorem evalAt_conv2d_from_paramStore_of_getNode
 
 /-- Missing `ParamStore.conv2dCfg` entries are rejected at any `conv2d` node id. -/
 theorem evalAt_conv2d_missing_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId : Nat)
     (cfg : NN.MLTheory.CROWN.Graph.Conv2DParams α)
@@ -562,10 +563,11 @@ theorem evalAt_conv2d_missing_from_paramStore_of_getNode
   simp [Graph.evalAt, hNode, Graph.evalConv2D,
     payloadOfParamStore_conv2d?_none (ps := ps) (id := id) hMissing,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
+  rfl
 
 /-- A BatchNorm node in any graph reads eval-mode NCHW parameters from its ParamStore entry. -/
 theorem evalAt_batchNorm2dNchwEval_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId n c h w : Nat)
     (inputShape : Shape)
@@ -611,7 +613,7 @@ theorem evalAt_batchNorm2dNchwEval_from_paramStore_of_getNode
 
 /-- Missing BatchNorm ParamStore entries are rejected at any eval-mode NCHW BatchNorm node id. -/
 theorem evalAt_batchNorm2dNchwEval_missing_from_paramStore_of_getNode
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
     (i id pId n c h w : Nat)
     (inputShape : Shape)
@@ -630,6 +632,7 @@ theorem evalAt_batchNorm2dNchwEval_missing_from_paramStore_of_getNode
   simp [Graph.evalAt, hNode, Graph.evalBatchNorm2DNchwEval,
     payloadOfParamStore_batchNorm2dNchwEval?_none (ps := ps) (id := id) hMissing,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
+  rfl
 
 end IRStep
 

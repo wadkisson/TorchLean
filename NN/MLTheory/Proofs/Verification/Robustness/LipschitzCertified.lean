@@ -113,7 +113,8 @@ private lemma abs_vecGet_le_tensor_linf_norm {n : Nat} (y : Tensor ℝ (.dim n .
       cases hfi : f i with
       | scalar v =>
           -- Unfold `vecGet` at index `i`, and `tensor_linf_norm` on scalars/vectors.
-          simpa [Tensor.vecGet, Spec.get, Spec.getAtSpec, tensorLinfNorm, hfi] using hle
+          simpa [Tensor.vecGet, Spec.get, Spec.getAtSpec, tensorLinfNorm, MathFunctions.abs, hfi]
+            using hle
 
 private lemma abs_vecGet_sub_le_of_linf_distance
     {n : Nat} {y₀ y : Tensor ℝ (.dim n .scalar)} {δ : ℝ} (i : Fin n)

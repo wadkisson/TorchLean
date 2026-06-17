@@ -68,7 +68,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
         (A := idxK (m := m) (d := d)))
 
   let idxKt : Idx (ΓQKV m d ++ [.dim d (.dim m .scalar)]) (.dim d (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d) (ss := []) (τ := .dim d (.dim m .scalar))
+    Idx.last (Γ := ΓQKV m d) (ss := []) (τ := .dim d (.dim m .scalar))
   let nodeLogits :
       Node (ΓQKV m d ++ [.dim d (.dim m .scalar)]) (.dim m (.dim m .scalar)) :=
     TapeNodes.matmul (Γ := ΓQKV m d ++ [.dim d (.dim m .scalar)])
@@ -85,7 +85,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
   let idxLogits :
       Idx (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar)])
+    Idx.last (Γ := ΓQKV m d) (ss := [.dim d (.dim m .scalar)])
       (τ := .dim m (.dim m .scalar))
   let nodeScaled :
       Node (ΓQKV m d ++ [.dim d (.dim m .scalar), .dim m (.dim m .scalar)])
@@ -104,7 +104,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
         (ΓQKV m d ++
           [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d)
+    Idx.last (Γ := ΓQKV m d)
       (ss := [.dim d (.dim m .scalar), .dim m (.dim m .scalar)])
       (τ := .dim m (.dim m .scalar))
   let nodeMasked :
@@ -133,7 +133,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
           [ .dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)
           , .dim m (.dim m .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d)
+    Idx.last (Γ := ΓQKV m d)
       (ss := [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
       (τ := .dim m (.dim m .scalar))
   let nodeProbs :
@@ -161,7 +161,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
           [ .dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)
           , .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
         (.dim m (.dim m .scalar)) :=
-    idxLast (Γ := ΓQKV m d)
+    Idx.last (Γ := ΓQKV m d)
       (ss :=
         [ .dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)
         , .dim m (.dim m .scalar)])

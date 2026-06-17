@@ -247,32 +247,6 @@ private def tensorMax : ∀ {s : Shape}, Tensor ℝ s → ℝ
   | .dim n _, .dim values =>
       ((List.finRange n).map (fun j => tensorMax (values j))).foldl max 0
 
-/-- The fold accumulator `init` is always `≤ foldl max init l`. -/
-private lemma le_foldl_max_init (init : ℝ) (l : List ℝ) : init ≤ l.foldl max init := by
-  induction l generalizing init with
-  | nil =>
-    simp
-  | cons a tl ih =>
-    simp [List.foldl]
-    exact le_trans (le_max_left init a) (ih (init := max init a))
-
-/-- Any element of a list is `≤ foldl max init l`. -/
-private lemma le_foldl_max_of_mem {init x : ℝ} {l : List ℝ} (hx : x ∈ l) : x ≤ l.foldl max init :=
-  by
-  induction l generalizing init with
-  | nil =>
-    cases hx
-  | cons a tl ih =>
-    simp [List.mem_cons] at hx
-    -- foldl max init (a :: tl) = foldl max (max init a) tl
-    simp [List.foldl]
-    cases hx with
-    | inl hxa =>
-      subst x
-      exact le_trans (le_max_right init a) (le_foldl_max_init (init := max init a) tl)
-    | inr hx' =>
-      exact ih (init := max init a) hx'
-
 /-- Each slice maximum is bounded by the tensor maximum of a `.dim` tensor. -/
 private lemma tensorMax_le_dim {n : Nat} {inner : Shape} (values : Fin n → Tensor ℝ inner) (j : Fin
   n) :
@@ -284,8 +258,9 @@ private lemma tensorMax_le_dim {n : Nat} {inner : Shape} (values : Fin n → Ten
     List.mem_map_of_mem (f := fun k => tensorMax (values k)) hj
   -- Use the generic list bound lemma.
   simpa [tensorMax] using
-    (le_foldl_max_of_mem (init := 0) (x := tensorMax (values j))
-      (l := (List.finRange n).map (fun k => tensorMax (values k))) hmem)
+    (List.le_foldl_max_of_mem
+      (l := (List.finRange n).map (fun k => tensorMax (values k))) (f := id)
+      (acc := 0) (i := tensorMax (values j)) hmem)
 
 /-- Monotonicity: if `tensorAllLE b₁ t` and `b₁ ≤ b₂`, then `tensorAllLE b₂ t`. -/
 private lemma tensorAllLE_mono {bnd₁ bnd₂ : ℝ} :

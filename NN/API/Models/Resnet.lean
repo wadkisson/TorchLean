@@ -20,9 +20,9 @@ standard ResNet pattern:
 - global average pooling
 - linear classifier head
 
-Our goal is to keep the runnable `torchlean resnet` example focused on data loading, optimizer
-choice, and reporting. The positivity proofs below are Lean's way of recording that pooling axes
-are nonempty; callers should normally just use `nn.models.resnet cfg`.
+The positivity proofs below are Lean's way of recording that pooling axes are nonempty. The public
+constructor is `nn.models.resnet cfg`; executable examples can decide separately whether this
+heavier residual path belongs in their runtime budget.
 -/
 
 @[expose] public section
@@ -102,7 +102,7 @@ def resnet (cfg : ResnetConfig)
     nn.globalAvgPoolNCHW cfg.batch cfg.stage2C cfg.h2 cfg.w2
       (hN := hb) (hC := hc) (hH := hh2) (hW := hw2)
 
-  nn.sequential![
+  nn.Sequential![
     -- Use the ResNet helper conv so the output shape is definitionally `H×W` (not a conv-formula
     -- expression), while still allocating seeds from the `nn.M` seed stream.
     withSeeds2 (fun seedK seedB =>
@@ -110,7 +110,7 @@ def resnet (cfg : ResnetConfig)
         (h := cfg.inH) (w := cfg.inW) (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
     nn.batchNorm,
-    nn.relu,
+    ReLU,
     nn.resnetBasicBlock
       { outC := cfg.stemC, downsample := false, activation := .relu },
     nn.resnetBasicBlock
@@ -118,7 +118,7 @@ def resnet (cfg : ResnetConfig)
     nn.resnetBasicBlock
       { outC := cfg.stage2C, downsample := false, activation := .relu },
     nn.lift pool,
-    nn.linear cfg.stage2C cfg.numClasses (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    Linear cfg.stage2C cfg.numClasses (pfx := NN.Tensor.Shape.Vec cfg.batch)
   ]
 
 end models

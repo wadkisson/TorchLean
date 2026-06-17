@@ -86,7 +86,7 @@ theorem evalAt_softmax_permuted_axis_eq
                 (s!"IR eval: shape mismatch: expected {repr s}, got {repr yBack.1}") :
                 Except String (Tensor α s))) =
             Except.ok y := by
-        simpa [Graph.expectShape] using hYShape
+        exact hYShape
       rw [hYShape']
 
 end IRStep

@@ -42,8 +42,8 @@ open TorchLean.Floats.IEEE754.Float32Bridge
 Runtime `Float32` addition rewrites to the explicit bit-level IEEE executor only under the named
 runtime-conformance assumption.
 
-That is the honest TorchLean claim: floating-point deployment semantics are not silently smuggled
-into proofs; they are either modeled by `IEEE32Exec` or isolated as a trust obligation.
+Floating-point deployment semantics are either modeled by `IEEE32Exec` or isolated as a trust
+obligation.
 -/
 theorem runtimeFloat32_add_rewrites_to_ieee32
     [RuntimeFloat32MatchesIEEE32Exec] (a b : F32) :
@@ -59,4 +59,3 @@ theorem runtimeFloat32_div_rewrites_to_ieee32
   RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_div a b
 
 end NN.Examples.BugZoo.FloatBoundary
-

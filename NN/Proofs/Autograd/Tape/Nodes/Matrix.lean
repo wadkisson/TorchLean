@@ -59,122 +59,122 @@ abbrev vecSize (n : Nat) : Nat :=
   private lemma toVecT_get2 {m n : Nat} (A : Tensor ℝ (.dim m (.dim n .scalar))) (i : Fin m) (j :
     Fin n) :
       toVecT (t := A) (idxMN (m := m) (n := n) i j) = Spec.get2 A i j := by
-  cases n with
-  | zero =>
-      exact (Fin.elim0 j)
-  | succ n =>
-      cases A with
-      | dim rows =>
-          let hn : vecSize (Nat.succ n) = Nat.succ n := by simp [vecSize, Shape.size]
-          let j' : Fin (vecSize (Nat.succ n)) := Fin.cast hn.symm j
-          have hmpos : 0 < vecSize (Nat.succ n) := by simp [vecSize, Shape.size]
-          have houter :=
-            toVecT_dim_apply (n := m) (s := .dim (Nat.succ n) .scalar) (hmpos := hmpos) (f := rows)
-              (p := (i, j'))
-          cases hrow : rows i with
-          | dim cols =>
-              let k0 : Fin 1 := 0
-              have hinnerPos : 0 < Shape.size Shape.scalar := by simp [Shape.size]
-              have hinner :=
-                toVecT_dim_apply (n := Nat.succ n) (s := Shape.scalar) (hmpos := hinnerPos) (f :=
-                  cols)
-                  (p := (j, k0))
-              have hjidx : finProdFinEquiv (j, k0) = j' := by
-                apply Fin.ext
-                simp [j', k0, Shape.size, finProdFinEquiv]
-              cases hx : cols j with
-              | scalar x =>
-                  have hscalar : toVecT (t := (Tensor.scalar x : Tensor ℝ Shape.scalar)) k0 = x :=
-                    by
-                    simpa [toVecT, toVecE, flattenSpec, Shape.size, Spec.toVec, k0] using
-                      (euclideanEquiv_symm_ofLp
-                        (n := Shape.size Shape.scalar)
-                        (f := fun _ : Fin (Shape.size Shape.scalar) => x)
-                        (i := k0))
-                  have hidx : idxMN (m := m) (n := Nat.succ n) i j = finProdFinEquiv (i, j') := by
-                    apply Fin.ext
-                    simp [idxMN, j', hn]
-                  have houter' :
-                      toVecT (t := Tensor.dim rows) (idxMN (m := m) (n := Nat.succ n) i j) =
-                        toVecT (t := rows i) j' := by
-                    simpa [hidx] using houter
-                  have hrowCoord : toVecT (t := rows i) j' = x := by
-                    have hconv :
-                        toVecT (t := Tensor.dim cols) (finProdFinEquiv (j, k0)) =
-                          toVecT (t := Tensor.dim cols) j' :=
-                      congrArg (fun z => toVecT (t := Tensor.dim cols) z) hjidx
-                    have hinner' : toVecT (t := Tensor.dim cols) j' = toVecT (t := cols j) k0 :=
-                      hconv.symm.trans hinner
-                    have hinner'' :
-                        toVecT (t := Tensor.dim cols) j' = toVecT (t := (Tensor.scalar x : Tensor ℝ
-                          Shape.scalar)) k0 := by
-                      simpa [hx] using hinner'
-                    simpa [hrow] using (hinner''.trans hscalar)
-                  -- `get2` picks out exactly this scalar entry.
-                  simpa [Spec.get2, Spec.get, Spec.getAtSpec, hrow, hx, houter', hrowCoord]
-                    using (houter'.trans hrowCoord)
+    cases n with
+    | zero =>
+        exact (Fin.elim0 j)
+    | succ n =>
+        cases A with
+        | dim rows =>
+            let hn : vecSize (Nat.succ n) = Nat.succ n := by simp [vecSize, Shape.size]
+            let j' : Fin (vecSize (Nat.succ n)) := Fin.cast hn.symm j
+            have hmpos : 0 < vecSize (Nat.succ n) := by simp [vecSize, Shape.size]
+            have houter :=
+              toVecT_dim_apply (n := m) (s := .dim (Nat.succ n) .scalar) (hmpos := hmpos) (f := rows)
+                (p := (i, j'))
+            cases hrow : rows i with
+            | dim cols =>
+                let k0 : Fin 1 := 0
+                have hinnerPos : 0 < Shape.size Shape.scalar := by simp [Shape.size]
+                have hinner :=
+                  toVecT_dim_apply (n := Nat.succ n) (s := Shape.scalar) (hmpos := hinnerPos) (f :=
+                    cols)
+                    (p := (j, k0))
+                have hjidx : finProdFinEquiv (j, k0) = j' := by
+                  apply Fin.ext
+                  simp [j', k0, finProdFinEquiv]
+                cases hx : cols j with
+                | scalar x =>
+                    have hscalar : toVecT (t := (Tensor.scalar x : Tensor ℝ Shape.scalar)) k0 = x :=
+                      by
+                      simpa [toVecT, toVecE, flattenSpec, Shape.size, Spec.toVec, k0] using
+                        (euclideanEquiv_symm_ofLp
+                          (n := Shape.size Shape.scalar)
+                          (f := fun _ : Fin (Shape.size Shape.scalar) => x)
+                          (i := k0))
+                    have hidx : idxMN (m := m) (n := Nat.succ n) i j = finProdFinEquiv (i, j') := by
+                      apply Fin.ext
+                      simp [idxMN, j', hn]
+                    have houter' :
+                        toVecT (t := Tensor.dim rows) (idxMN (m := m) (n := Nat.succ n) i j) =
+                          toVecT (t := rows i) j' := by
+                      simpa [hidx] using houter
+                    have hrowCoord : toVecT (t := rows i) j' = x := by
+                      have hconv :
+                          toVecT (t := Tensor.dim cols) (finProdFinEquiv (j, k0)) =
+                            toVecT (t := Tensor.dim cols) j' :=
+                        congrArg (fun z => toVecT (t := Tensor.dim cols) z) hjidx
+                      have hinner' : toVecT (t := Tensor.dim cols) j' = toVecT (t := cols j) k0 :=
+                        hconv.symm.trans hinner
+                      have hinner'' :
+                          toVecT (t := Tensor.dim cols) j' = toVecT (t := (Tensor.scalar x : Tensor ℝ
+                            Shape.scalar)) k0 := by
+                        simpa [hx] using hinner'
+                      simpa [hrow] using (hinner''.trans hscalar)
+                    -- `get2` picks out exactly this scalar entry.
+                    simpa [Spec.get2, Spec.get, Spec.getAtSpec, hrow, hx, houter', hrowCoord]
+                      using (houter'.trans hrowCoord)
 
   /-- `Spec.get2` of an `ofVecT`-constructed matrix reads back the corresponding flattened entry. -/
   private lemma get2_ofVecT {m n : Nat} (v : Vec (matSize m n)) (i : Fin m) (j : Fin n) :
       Spec.get2 (ofVecT (s := .dim m (.dim n .scalar)) v) i j = v (idxMN (m := m) (n := n) i j) :=
         by
-  have htv :
-      toVecT (t := ofVecT (s := .dim m (.dim n .scalar)) v) (idxMN (m := m) (n := n) i j) = v (idxMN
-        (m := m) (n := n) i j) := by
-    simp
-  exact (toVecT_get2 (A := ofVecT (s := .dim m (.dim n .scalar)) v) i j).symm.trans htv
+    have htv :
+        toVecT (t := ofVecT (s := .dim m (.dim n .scalar)) v) (idxMN (m := m) (n := n) i j) = v (idxMN
+          (m := m) (n := n) i j) := by
+      simp
+    exact (toVecT_get2 (A := ofVecT (s := .dim m (.dim n .scalar)) v) i j).symm.trans htv
 
   /-- Entrywise formula for matrix addition: `(A + B)[i,j] = A[i,j] + B[i,j]`. -/
   private lemma get2_add_spec {m n : Nat} (A B : Tensor ℝ (.dim m (.dim n .scalar))) (i : Fin m) (j
     : Fin n) :
       Spec.get2 (addSpec A B) i j = Spec.get2 A i j + Spec.get2 B i j := by
-  cases A with
-  | dim rowsA =>
-      cases B with
-      | dim rowsB =>
-          cases hrowA : rowsA i with
-          | dim colsA =>
-              cases hrowB : rowsB i with
-              | dim colsB =>
-                  cases hA : colsA j with
-                  | scalar a =>
-                      cases hB : colsB j with
-                      | scalar b =>
-                          simp [addSpec, Spec.Tensor.addSpec, Spec.Tensor.map2Spec, Spec.get2,
-                            Spec.get, Spec.getAtSpec,
-                            hrowA, hrowB, hA, hB]
+    cases A with
+    | dim rowsA =>
+        cases B with
+        | dim rowsB =>
+            cases hrowA : rowsA i with
+            | dim colsA =>
+                cases hrowB : rowsB i with
+                | dim colsB =>
+                    cases hA : colsA j with
+                    | scalar a =>
+                        cases hB : colsB j with
+                        | scalar b =>
+                            simp [addSpec, Spec.Tensor.addSpec, Spec.Tensor.map2Spec, Spec.get2,
+                              Spec.get, Spec.getAtSpec,
+                              hrowA, hrowB, hA, hB]
 
   /-- Vectorization commutes with matrix addition: `toVecT (A + B) = toVecT A + toVecT B`. -/
   lemma toVecT_add_spec_mat {m n : Nat} (A B : Tensor ℝ (.dim m (.dim n .scalar))) :
       toVecT (t := addSpec A B) = toVecT (t := A) + toVecT (t := B) := by
-  classical
-  ext ip
-  let hp : vecSize n = n := by simp [vecSize, Shape.size]
-  let i : Fin m := (ip.divNat (m := m) (n := vecSize n))
-  let j' : Fin (vecSize n) := (ip.modNat (m := m) (n := vecSize n))
-  let j : Fin n := Fin.cast hp j'
-  have hip : idxMN (m := m) (n := n) i j = ip := by
-    have hbase : finProdFinEquiv (i, j') = ip := by
-      simpa [i, j'] using
-        (Equiv.apply_symm_apply (e := (finProdFinEquiv : Fin m × Fin (vecSize n) ≃ Fin (m * vecSize
-          n))) ip)
-    simpa [idxMN, j, hp] using hbase
-  -- Convert the LHS via `get2`, use elementwise addition, then convert back.
-  have hgetL : toVecT (t := addSpec A B) ip = Spec.get2 (addSpec A B) i j := by
-    -- rewrite the index to match `toVecT_get2`
-    rw [←hip]
-    exact toVecT_get2 (A := addSpec A B) i j
-  have hgetA : toVecT (t := A) ip = Spec.get2 A i j := by
-    rw [←hip]
-    exact toVecT_get2 (A := A) i j
-  have hgetB : toVecT (t := B) ip = Spec.get2 B i j := by
-    rw [←hip]
-    exact toVecT_get2 (A := B) i j
-  calc
-    toVecT (t := addSpec A B) ip
-        = Spec.get2 (addSpec A B) i j := hgetL
-    _ = Spec.get2 A i j + Spec.get2 B i j := get2_add_spec (A := A) (B := B) i j
-    _ = toVecT (t := A) ip + toVecT (t := B) ip := by simp [hgetA, hgetB]
+    classical
+    ext ip
+    let hp : vecSize n = n := by simp [vecSize, Shape.size]
+    let i : Fin m := (ip.divNat (m := m) (n := vecSize n))
+    let j' : Fin (vecSize n) := (ip.modNat (m := m) (n := vecSize n))
+    let j : Fin n := Fin.cast hp j'
+    have hip : idxMN (m := m) (n := n) i j = ip := by
+      have hbase : finProdFinEquiv (i, j') = ip := by
+        simpa [i, j'] using
+          (Equiv.apply_symm_apply (e := (finProdFinEquiv : Fin m × Fin (vecSize n) ≃ Fin (m * vecSize
+            n))) ip)
+      simpa [idxMN, j, hp, matSize, vecSize, Shape.size] using hbase
+    -- Convert the LHS via `get2`, use elementwise addition, then convert back.
+    have hgetL : toVecT (t := addSpec A B) ip = Spec.get2 (addSpec A B) i j := by
+      -- rewrite the index to match `toVecT_get2`
+      rw [←hip]
+      exact toVecT_get2 (A := addSpec A B) i j
+    have hgetA : toVecT (t := A) ip = Spec.get2 A i j := by
+      rw [←hip]
+      exact toVecT_get2 (A := A) i j
+    have hgetB : toVecT (t := B) ip = Spec.get2 B i j := by
+      rw [←hip]
+      exact toVecT_get2 (A := B) i j
+    calc
+      toVecT (t := addSpec A B) ip
+          = Spec.get2 (addSpec A B) i j := hgetL
+      _ = Spec.get2 A i j + Spec.get2 B i j := get2_add_spec (A := A) (B := B) i j
+      _ = toVecT (t := A) ip + toVecT (t := B) ip := by simp [hgetA, hgetB]
 
 /-- A bilinear map on flattened matrices: `(m×n) × (n×p) → (m×p)` on `Vec (Shape.size ...)`. -/
 def matmulVec {m n p : Nat} (a : Vec (matSize m n)) (b : Vec (matSize n p)) : Vec (matSize m p) :=
@@ -435,7 +435,7 @@ lemma forward_eq_matmulVec {m n p : Nat} (aV : Vec (matSize m n)) (bV : Vec (mat
         simpa [i, k'] using
           (Equiv.apply_symm_apply (e := (finProdFinEquiv : Fin m × Fin (vecSize p) ≃ Fin (m *
             vecSize p))) ip)
-      simpa [idxMN, k, hp] using hbase
+      simpa [idxMN, k, hp, matSize, vecSize, Shape.size] using hbase
     rw [←hip]
     exact toVecT_get2
       (A := Spec.matMulSpec (ofVecT (s := .dim m (.dim n .scalar)) aV)
@@ -841,7 +841,7 @@ by
     ext ip
     -- After expanding, the two bilinear terms may appear in the opposite order.
     simp [matmul, Node.jvpVec_ofVec, fA, fB, Bmul, Matmul.toVecT_add_spec_mat,
-      Matmul.forward_eq_matmulVec, ContinuousLinearMap.add_apply, ContinuousLinearMap.comp_apply,
+      Matmul.forward_eq_matmulVec, ContinuousLinearMap.comp_apply,
       CtxVec.getCLM_apply, add_comm]
 
 -- ---------------------------------------------------------------------------

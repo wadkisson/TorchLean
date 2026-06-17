@@ -13,7 +13,7 @@ define it once, then reuse the same definition for execution and verification.
 This layout mirrors the TorchLean paper (`arXiv:2602.22631`): we separate the focused
 `NN.Spec.*` modules, runtime entrypoints, and verification entrypoints, but we keep them aligned by
 building everything on top of the same core semantics. The public spec doorway is
-`NN.Entrypoint.Spec` (or `import NN` / `import NN.Library` for downstream users).
+`NN.Entrypoint.Spec`; ordinary model/training code should start from `import NN`.
 
 ## How to navigate
 

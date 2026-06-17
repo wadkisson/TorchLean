@@ -52,6 +52,20 @@ lemma foldl_congr {α β : Type} (l : List β) (f g : α → β → α) (init : 
   | cons b tl ih =>
       simp [List.foldl, h, ih]
 
+/--
+`foldl` over `flatMap` is the same as the corresponding nested `foldl`.
+
+Convolution proofs use this to align flat index enumerations with nested channel/spatial loops, but
+the statement is list-generic and belongs with the other NF fold utilities.
+-/
+lemma foldl_flatMap {α β γ : Type} (l : List α) (g : α → List β) (f : γ → β → γ) (init : γ) :
+    (l.flatMap g).foldl f init = l.foldl (fun acc a => (g a).foldl f acc) init := by
+  induction l generalizing init with
+  | nil =>
+      simp
+  | cons a tl ih =>
+      simp [List.flatMap_cons, List.foldl_append, ih]
+
 /-!
 ## Generic facts about `approxT`
 
@@ -102,10 +116,18 @@ lemma approxT_dim_of_forall {n : Nat} {s : Shape}
               (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xRf
                 i)))
           (acc := (0 : ℝ)) (eps := eps) hε hf
-      simpa [approxT, approxWith, tensorDistance,
-        NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-        linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec, Spec.mapTensor] using
-          hfold
+      simp [approxT, approxWith, tensorDistance,
+        linfNorm, RuntimeApprox.linfNorm, tensorToSpec, Spec.mapTensor]
+      change
+        List.foldl
+          (fun a i =>
+            max a
+              (tensorLinfNorm
+                ((xSf i).subSpec
+                  (mapTensor (toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xRf i)))))
+          0 (List.finRange n) ≤ eps
+      simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec, MathFunctions.abs,
+        Spec.mapTensor] using hfold
 
 end NFBackend
 

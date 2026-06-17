@@ -94,7 +94,7 @@ def FLXExp (prec : ℤ) : ℤ → ℤ := fun e => e - prec
 
 The side-condition `0 < prec` matches the standard assumption that “precision is positive”.
 -/
-instance flxValidExp (prec : ℤ) (h : 0 < prec) : NeuralValidExp (FLXExp prec) where
+@[reducible] def flxValidExp (prec : ℤ) (h : 0 < prec) : NeuralValidExp (FLXExp prec) where
   flocq_valid := by
     intro k
     constructor
@@ -133,7 +133,7 @@ def FLTExp (emin prec : ℤ) : ℤ → ℤ := fun e => max (e - prec) emin
 This is where most format-bridge lemmas live when connecting proofs to float32-style bounds
 (e.g. via `NN/Floats/FP32`).
 -/
-instance fltValidExp (emin prec : ℤ) (h : 0 < prec) : NeuralValidExp (FLTExp emin prec) where
+@[reducible] def fltValidExp (emin prec : ℤ) (h : 0 < prec) : NeuralValidExp (FLTExp emin prec) where
   flocq_valid := by
     intro k
     constructor

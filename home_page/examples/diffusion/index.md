@@ -16,10 +16,10 @@ is represented, what the denoiser predicts, and what gets saved after a run.
 
 ## Run It First
 
-For a short CPU runtime check, run a bounded number of steps:
+For a short runtime check, use the CUDA path with a tiny model:
 
 ```bash
-lake exe torchlean diffusion --dataset cifar10 --n-total 32 --steps 1 --hidden-c 4
+lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 For a more useful local run, use CUDA if you have it. This writes a JSON loss log and a PPM image
@@ -121,12 +121,12 @@ theory can rewrite it safely.
 ## The Runtime Layer: The Model That Runs
 
 The runnable diffusion command does not work directly with `EpsModel`. It instantiates a concrete
-neural network and then uses the API helpers to build training samples.
+neural network and then uses the public data API to build training samples.
 
 Two choices matter in the example:
 
 1. The epsilon predictor is a residual CNN that preserves resolution
-   (`epsResidualConvNet`). This keeps the training, sampling, and visualization path easy to run
+   (`epsResidualConvNet`). The training, sampling, and visualization path stays easy to run
    on a local checkout.
 2. Time is fed to the model as an extra channel: the input has `(data channels + 1)` channels,
    where the last channel is the normalized timestep broadcast across spatial positions.
@@ -170,7 +170,7 @@ Training is classic DDPM-style ε-prediction. Each step:
 4. build a supervised pair `(appendTimeChannel x_t tNorm, ε)`,
 5. take an optimizer step on MSE.
 
-TorchLean makes the supervised pair explicit as a `sample.Supervised` value. The helper that
+TorchLean makes the supervised pair explicit as a `SupervisedSample` value. The operation that
 constructs `x_t` from `x0` and `ε` is `NN.API.diffusion.noisedSampleFromEps`; it is the runtime
 version of the same formula used by `qSample` in the spec layer.
 
@@ -181,13 +181,13 @@ keeps the actual tensor transformation:
 def noisedSampleFromEps
     (alphaBars : Array Float) (T : Nat)
     (x0 eps : Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (step : Nat) :
-    sample.Supervised Float
+    SupervisedSample Float
       (NN.Tensor.Shape.NCHW batch (c + 1) h w)
       (NN.Tensor.Shape.NCHW batch c h w) :=
   let x_t :=
     Spec.Tensor.scaleSpec x0 sqrtAb +
     Spec.Tensor.scaleSpec eps sqrtOneMinusAb
-  sample.mk (appendTimeChannel x_t tNorm) eps
+  Sample.mk (appendTimeChannel x_t tNorm) eps
 ```
 
 ## Sampling: DDIM Replay In Lean

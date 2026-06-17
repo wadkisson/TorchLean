@@ -123,7 +123,7 @@ lemma reluDerivCLM_adjoint_apply {n : Nat} (x δ : Vec n) :
       simpa [sub_eq_zero] using congrArg (fun t => t - inner ℝ (u - v) v) hEq
     have hinnerSub :
         inner ℝ (u - v) (u - v) = inner ℝ (u - v) u - inner ℝ (u - v) v := by
-      simpa using (inner_sub_right (x := u - v) (y := u) (z := v))
+      rw [inner_sub_right]
     exact hinnerSub.trans this
   have huv : u - v = 0 := (inner_self_eq_zero (𝕜 := ℝ) (x := (u - v))).1 h0
   have : u = v := sub_eq_zero.mp huv
@@ -191,7 +191,7 @@ lemma toVecE_linear_input_deriv_spec_eq_adjoint
       simpa [sub_eq_zero] using congrArg (fun t => t - inner ℝ (u - v) v) hEq
     have hinnerSub :
         inner ℝ (u - v) (u - v) = inner ℝ (u - v) u - inner ℝ (u - v) v := by
-      simpa using (inner_sub_right (x := u - v) (y := u) (z := v))
+      rw [inner_sub_right]
     exact hinnerSub.trans this
   have huv : u - v = 0 := (inner_self_eq_zero (𝕜 := ℝ) (x := (u - v))).1 h0
   have : u = v := sub_eq_zero.mp huv
@@ -241,14 +241,29 @@ def mseGrad {n : Nat} (y t : Vec n) : Vec n :=
 lemma hasFDerivAt_mse {n : Nat} (t y : Vec n) :
     HasFDerivAt (mse (n := n) t) ((2 / (n : ℝ)) • (innerSL ℝ (y - t))) y := by
   have hsub : HasFDerivAt (fun y : Vec n => y - t) (1 : Vec n →L[ℝ] Vec n) y := by
-    simpa using (hasFDerivAt_id y).sub_const t
+    change HasFDerivAt (fun y : Vec n => y - t) (ContinuousLinearMap.id ℝ (Vec n)) y
+    exact (hasFDerivAt_id y).sub_const t
   have hnorm : HasFDerivAt (fun z : Vec n => ‖z‖ ^ 2) (2 • innerSL ℝ (y - t)) (y - t) := by
     simpa using (hasStrictFDerivAt_norm_sq (x := (y - t)) (F := Vec n)).hasFDerivAt
   have hcomp : HasFDerivAt (fun y : Vec n => ‖y - t‖ ^ 2) (2 • innerSL ℝ (y - t)) y := by
-    simpa using (hnorm.comp y hsub)
+    have hcomp0 := hnorm.comp y hsub
+    have hcomp0' :
+        HasFDerivAt (fun y : Vec n => ‖y - t‖ ^ 2)
+          (2 • (((innerSL ℝ) y).comp (1 : Vec n →L[ℝ] Vec n) -
+            ((innerSL ℝ) t).comp (1 : Vec n →L[ℝ] Vec n))) y := by
+      simpa [Function.comp_def, sub_eq_add_neg] using hcomp0
+    have hlin :
+        (2 • (((innerSL ℝ) y).comp (1 : Vec n →L[ℝ] Vec n) -
+            ((innerSL ℝ) t).comp (1 : Vec n →L[ℝ] Vec n))) =
+          (2 • innerSL ℝ (y - t)) := by
+      ext z
+      simp
+    exact hcomp0'.congr_fderiv hlin
   have hscaled :
       HasFDerivAt (mse (n := n) t) (((n : ℝ)⁻¹) • (2 • innerSL ℝ (y - t))) y := by
-    simpa [mse, mul_assoc] using (hcomp.const_mul ((n : ℝ)⁻¹))
+    change HasFDerivAt (fun y : Vec n => ((n : ℝ)⁻¹) * ‖y - t‖ ^ 2)
+      (((n : ℝ)⁻¹) • (2 • innerSL ℝ (y - t))) y
+    exact hcomp.const_mul ((n : ℝ)⁻¹)
   have hcoef :
       (((n : ℝ)⁻¹) • (2 • innerSL ℝ (y - t))) = ((2 / (n : ℝ)) • innerSL ℝ (y - t)) := by
     ext z
@@ -428,6 +443,11 @@ lemma grad_b2_mse :
     -- `b2 ↦ (W2 a1) + b2` is affine with derivative `1`.
     dsimp [f, mlpVecMat, z1, affineMat, affine]
     -- Remaining `let`-binders are constant in `b2`.
+    change HasFDerivAt
+      (fun b2 : Vec outDim =>
+        (matCLM (m := outDim) (n := hidDim) (toMatrix W2))
+          (reluVec (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x)) + b2)
+      (ContinuousLinearMap.id ℝ (Vec outDim)) b2
     simpa using (HasFDerivAt.const_add (c := (matCLM (m := outDim) (n := hidDim) (toMatrix W2))
         (reluVec (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x))) (hasFDerivAt_id
           b2))
@@ -473,6 +493,9 @@ lemma hasFDerivAt_mlp_wrt_b1 (hx : ∀ i : Fin hidDim, (z1 (inDim := inDim) (hid
         (1 : Vec hidDim →L[ℝ] Vec hidDim) b1 := by
     -- `b1 ↦ const + b1`
     dsimp [affineMat, affine, z1]
+    change HasFDerivAt
+      (fun b1 : Vec hidDim => (matCLM (m := hidDim) (n := inDim) (toMatrix W1)) x + b1)
+      (ContinuousLinearMap.id ℝ (Vec hidDim)) b1
     simpa using (HasFDerivAt.const_add (c := (matCLM (m := hidDim) (n := inDim) (toMatrix W1)) x)
       (hasFDerivAt_id b1))
   have hrelu :
@@ -487,7 +510,24 @@ lemma hasFDerivAt_mlp_wrt_b1 (hx : ∀ i : Fin hidDim, (z1 (inDim := inDim) (hid
       reluVec z1V)
   have hcomp1 := hrelu.comp b1 hlin
   have hcomp2 := hlin2.comp b1 hcomp1
-  simpa [mlpVecMat, affineMat, z1V] using hcomp2
+  have hlinId :
+      (matCLM (m := outDim) (n := hidDim) (toMatrix W2) ∘SL
+          reluDerivCLM (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x) ∘SL
+            (1 : Vec hidDim →L[ℝ] Vec hidDim)) =
+        (matCLM (m := outDim) (n := hidDim) (toMatrix W2) ∘SL
+          reluDerivCLM (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x)) := by
+    ext db1
+    simp [ContinuousLinearMap.comp_apply]
+  change HasFDerivAt
+    (fun b1 : Vec hidDim =>
+      affine (inDim := hidDim) (outDim := outDim) (toMatrix W2) b2
+        (reluVec (n := hidDim)
+          (affine (inDim := inDim) (outDim := hidDim) (toMatrix W1) b1 x)))
+    ((matCLM (m := outDim) (n := hidDim) (toMatrix W2)).comp
+      (reluDerivCLM (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x))) b1
+  exact (by
+    simpa [mlpVecMat, affineMat, z1V, z1, Function.comp_def, ContinuousLinearMap.comp_assoc]
+      using hcomp2.congr_fderiv hlinId)
 
 /--
 Closed-form gradient of the scalar loss with respect to the first-layer bias `b1`
@@ -569,7 +609,16 @@ lemma hasFDerivAt_mlp_wrt_x (hx : ∀ i : Fin hidDim, (z1 (inDim := inDim) (hidD
       reluVec z1V)
   have hcomp1 := hrelu.comp x hlin1
   have hcomp2 := hlin2.comp x hcomp1
-  simpa [mlpVecMat, affineMat, z1V, ContinuousLinearMap.comp_assoc] using hcomp2
+  change HasFDerivAt
+    (fun x : Vec inDim =>
+      affine (inDim := hidDim) (outDim := outDim) (toMatrix W2) b2
+        (reluVec (n := hidDim)
+          (affine (inDim := inDim) (outDim := hidDim) (toMatrix W1) b1 x)))
+    ((matCLM (m := outDim) (n := hidDim) (toMatrix W2)).comp
+      ((reluDerivCLM (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x)).comp
+        (matCLM (m := hidDim) (n := inDim) (toMatrix W1)))) x
+  simpa [mlpVecMat, affineMat, z1V, z1, Function.comp_def, ContinuousLinearMap.comp_assoc] using
+    hcomp2
 
 /--
 Closed-form gradient of the scalar loss with respect to the input `x`,
@@ -654,7 +703,16 @@ lemma hasFDerivAt_mlp_wrt_W1 (hx : ∀ i : Fin hidDim, (z1 (inDim := inDim) (hid
       reluVec z1V)
   have hcomp1 := hrelu.comp W1 hlin
   have hcomp2 := hlin2.comp W1 hcomp1
-  simpa [mlpVecMat, affineMat, z1V, z1] using hcomp2
+  change HasFDerivAt
+    (fun W1 : Mat hidDim inDim =>
+      affine (inDim := hidDim) (outDim := outDim) (toMatrix W2) b2
+        (reluVec (n := hidDim)
+          ((matApplyLin (m := hidDim) (n := inDim) x) W1 + b1)))
+    ((matCLM (m := outDim) (n := hidDim) (toMatrix W2)).comp
+      ((reluDerivCLM (n := hidDim) (z1 (inDim := inDim) (hidDim := hidDim) W1 b1 x)).comp
+        (matApplyLin (m := hidDim) (n := inDim) x))) W1
+  simpa [mlpVecMat, affineMat, z1V, z1, Function.comp_def, ContinuousLinearMap.comp_assoc] using
+    hcomp2
 
 /--
 Closed-form gradient of the scalar loss with respect to `W1`

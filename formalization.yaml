@@ -1,0 +1,156 @@
+project:
+  name: TorchLean
+  title: "TorchLean: Formalizing Neural Networks in Lean"
+  short_description: >
+    A Lean 4 framework for writing, running, inspecting, and verifying
+    neural-network programs, with typed tensors, graph semantics, executable
+    runtime/autograd support, finite-precision models, verification checkers,
+    and explicit CUDA/runtime trust boundaries.
+  homepage: "https://lean-dojo.github.io/TorchLean/"
+  repository: "https://github.com/lean-dojo/TorchLean"
+  license: MIT
+
+toolchain:
+  lean: "leanprover/lean4:v4.31.0"
+  package_manager: Lake
+  primary_package_file: lakefile.lean
+  documentation_package: blueprint/lakefile.toml
+
+paper:
+  title: "TorchLean: Formalizing Neural Networks in Lean"
+  arxiv: "2602.22631"
+  url: "https://arxiv.org/abs/2602.22631"
+
+authors:
+  - Robert Joseph George
+  - Jennifer Cruden
+  - Will Adkisson
+  - Xiangru Zhong
+  - Huan Zhang
+  - Anima Anandkumar
+
+scope:
+  includes:
+    - Shape-indexed tensor and layer specifications.
+    - Neural-network model APIs and reusable model constructors.
+    - Graph IR, graph denotations, and verified graph/spec bridges.
+    - Executable autograd, optimizers, training loops, and model examples.
+    - IEEE-style finite-precision semantics and floating-point bridge contracts.
+    - Robustness, IBP/CROWN, spline, and certificate-checking workflows.
+    - Native CPU/CUDA runtime entrypoints with documented FFI assumptions.
+  excludes:
+    - A proof of CUDA, cuBLAS, cuFFT, compiler, driver, or GPU hardware correctness.
+    - A proof that external Python, Julia, PyTorch, Arb, or CROWN producers are correct.
+    - A claim that every runnable model-zoo command is fully verified end to end.
+
+status:
+  formalization_stage: active
+  lean_kernel_checked: true
+  sorry_free: true
+  notes:
+    - The repository currently has no Lean `sorry` or `admit` declarations outside dependencies.
+    - Native runtime and oracle boundaries are documented explicitly rather than hidden behind proof names.
+    - Public claims should be read together with TRUST_BOUNDARIES.md.
+
+build_and_validation:
+  standard_build:
+    command: "lake build"
+  ci_surface:
+    command: "lake build NN.CI.All"
+  cuda_build:
+    command: "lake build -R -K cuda=true"
+    note: >
+      Builds native CUDA sources when the CUDA toolkit is available. Executing
+      CUDA examples additionally requires a working NVIDIA driver and GPU.
+  non_cuda_build:
+    command: "lake build -R -K cuda=false"
+  documentation_build:
+    working_directory: blueprint
+    command: "lake build"
+  repository_checks:
+    - "python3 scripts/checks/repo_lint.py"
+    - "git diff --check"
+
+main_components:
+  public_api:
+    files:
+      - NN.lean
+      - NN/API
+    description: >
+      Public facade for model, tensor, data, runtime, and training workflows.
+  specifications:
+    files:
+      - NN/Spec
+    description: >
+      Mathematical tensor, layer, model, and dynamical-system definitions.
+  graph_semantics:
+    files:
+      - NN/IR
+      - NN/GraphSpec
+    description: >
+      Graph representations, denotational semantics, and graph/spec bridge layers.
+  proofs:
+    files:
+      - NN/Proofs
+      - NN/Verification
+      - NN/MLTheory
+    description: >
+      Tensor algebra, autograd correctness, runtime approximation, robustness,
+      CROWN/LiRPA, and certificate-checking proof layers.
+  runtime:
+    files:
+      - NN/Runtime
+      - csrc
+    description: >
+      Executable autograd, training loops, PyTorch import/export, native CPU/CUDA
+      entrypoints, and external-runtime boundaries.
+  examples:
+    files:
+      - NN/Examples
+    description: >
+      Quickstarts, model-zoo commands, interoperability demos, and verification examples.
+  manual:
+    files:
+      - blueprint/TorchLeanBlueprint/Guide
+    description: >
+      Lean-native Verso guide for the public documentation site.
+
+trust_boundaries:
+  source_of_truth: TRUST_BOUNDARIES.md
+  lean_axioms:
+    - name: Runtime.Autograd.Cuda.instNonemptyBuffer
+      purpose: >
+        Provides the nonemptiness witness Lean needs for opaque extern
+        declarations returning the CUDA buffer type; real buffers still come
+        from explicit FFI constructors/copy operations.
+    - name: NN.MLTheory.CROWN.Lyapunov.crown_oracle
+      purpose: >
+        Assumes an external CROWN oracle witness establishes the stated
+        Lyapunov certificate bounds.
+  opaque_runtime_declarations:
+    description: >
+      CUDA buffers, kernel entrypoints, external oracles, and selected executable
+      wrappers are opaque Lean declarations. They are treated as trust boundaries
+      and audited through TRUST_BOUNDARIES.md and scripts/checks/repo_lint.py.
+  external_producers:
+    - PyTorch import/export and training scripts
+    - Julia spline or PINN certificate producers
+    - Arb / python-flint interval subprocesses
+    - alpha-beta-CROWN and related external certificate tools
+  native_runtime:
+    description: >
+      Lean checks shapes and contracts around native calls, but memory safety,
+      launch behavior, compiler behavior, and floating-point behavior of native
+      CUDA/C/C++ code are outside Lean's proof kernel.
+
+references:
+  documentation:
+    - "https://lean-dojo.github.io/TorchLean/"
+    - "https://lean-dojo.github.io/TorchLean/blueprint/"
+    - "https://lean-dojo.github.io/TorchLean/docs/"
+  source_files:
+    - README.md
+    - TRUST_BOUNDARIES.md
+    - AI_USAGE.md
+    - THIRD_PARTY_NOTICES.md
+    - CONTRIBUTING.md

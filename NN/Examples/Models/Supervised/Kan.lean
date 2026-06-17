@@ -1,0 +1,101 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+
+Device-agnostic real-data example:
+  python3 scripts/datasets/download_example_data.py --auto-mpg
+  lake exe torchlean kan --cpu --steps 20
+  lake build -R -K cuda=true && lake exe torchlean kan --cuda --steps 20
+-/
+
+module
+
+public import NN
+public import NN.Examples.Models.Common
+
+/-!
+# KAN Regression
+
+This example trains a small Kolmogorov-Arnold Network on the prepared Auto MPG tabular-regression
+CSV. The downloader normalizes the columns to `[0, 1]`, so the piecewise-linear KAN basis uses
+`inputScale = gridSize - 1` to spread its knots across the data interval.
+
+`KAN` is a model constructor. The task is chosen by the general trainer surface:
+
+```lean
+let trainer := Trainer.new model { task := .regression, optimizer := optim.adam { lr := 1e-3 } }
+```
+
+The edge basis is a normal config field. This example uses triangular piecewise-linear hats; a
+spline, polynomial, or rational edge family would plug in through the same
+`nn.models.KANEdgeFamily` slot, while the trainer continues to choose the task.
+-/
+
+@[expose] public section
+
+open TorchLean
+
+namespace NN.Examples.Models.Supervised.Kan
+
+/-- CLI subcommand name used in terminal banners and error messages. -/
+def exeName : String := "torchlean kan"
+
+/-- Default JSON loss-curve path for this command. -/
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "kan"
+
+/-- Static minibatch size for the Auto MPG tabular loader. -/
+def batch : Nat := 5
+
+/-- Auto MPG has seven normalized numeric predictors after dropping the car name. -/
+def inDim : Nat := 7
+
+/-- Scalar regression target. -/
+def outDim : Nat := 1
+
+/-- KAN configuration using triangular edge bases over normalized tabular features. -/
+def cfg : nn.models.KANConfig :=
+  { batch := batch
+    inDim := inDim
+    hidden := []
+    outDim := outDim
+    edge := nn.models.KANPiecewiseLinear.edgeFamily { gridSize := 4, inputScale := 3 }
+    seedBase := 10 }
+
+abbrev σ := nn.models.kanInShape cfg
+abbrev τ := nn.models.kanOutShape cfg
+
+/-- Generic KAN model. Regression/classification is selected by `Trainer`, not by the model name. -/
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.KAN cfg
+
+/-- Prepared Auto MPG CSV as a public trainer dataset. -/
+def data (path : System.FilePath) (seed : Nat) : Trainer.Dataset σ τ :=
+  Data.tabularCsvDataset path batch inDim outDim
+    (csvOptions := { skipHeader := true }) (shuffle := true) (seed := seed)
+
+/-- Train the Auto MPG KAN with the public `Trainer` surface. -/
+def train (opts : Options) (flags : ModelZoo.CsvTrainFlags) :
+    IO (Trainer.TrainResult σ τ) := do
+  Data.requireFile exeName "CSV dataset" flags.csvPath RealData.missingAutoMpgHint
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := flags.lr } })
+        .regression
+        (seed := flags.seed)
+  trainer.train
+    (data flags.csvPath flags.seed)
+    (ModelZoo.TrainFlags.trainOptions flags.toModelTrainFlags
+      (title := "KAN Auto MPG regression")
+      (notes := #[ModelZoo.deviceNote opts, s!"data={flags.csvPath}", s!"lr={flags.lr}",
+        s!"steps={flags.steps}", s!"batch={batch}", s!"edge={cfg.edge.name}"]))
+
+/-- CLI entrypoint for Auto MPG regression with a KAN model. -/
+def main (args : List String) : IO UInt32 :=
+  Trainer.Command.regressionCsv exeName args
+    _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 20 1e-2
+    (ModelZoo.bannerWithDevice exeName "Auto MPG KAN regression")
+    train
+
+end NN.Examples.Models.Supervised.Kan

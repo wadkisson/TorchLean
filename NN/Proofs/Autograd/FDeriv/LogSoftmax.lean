@@ -116,7 +116,6 @@ theorem logSoftmaxJvp_eq_deriv {n : Nat} (x dx : Vec n) :
         simp [logSoftmaxDerivCLM, logSoftmaxDerivCoord, euclideanEquiv]
       rw [hR]
       simp [logSoftmaxJvp, logSoftmaxDerivCoord, dotCLM_apply, evalCLM_apply,
-        ContinuousLinearMap.add_apply,
         sub_eq_add_neg, mul_comm]
 
 /--
@@ -218,7 +217,9 @@ theorem hasFDerivAt_logSoftmaxVec {n : Nat} (x : Vec n) :
   cases n with
   | zero =>
       have hD : logSoftmaxDerivCLM (n := 0) x = (1 : (Vec 0) →L[ℝ] (Vec 0)) := rfl
-      simpa [logSoftmaxVec, hD] using ((1 : (Vec 0) →L[ℝ] (Vec 0)).hasFDerivAt (x := x))
+      rw [hD]
+      change HasFDerivAt (fun x : Vec 0 => x) (1 : (Vec 0) →L[ℝ] (Vec 0)) x
+      exact ((1 : (Vec 0) →L[ℝ] (Vec 0)).hasFDerivAt (x := x))
   | succ n =>
       -- Derivative of `sumExp`.
       let sumDeriv : Vec (Nat.succ n) →L[ℝ] ℝ :=
@@ -237,7 +238,7 @@ theorem hasFDerivAt_logSoftmaxVec {n : Nat} (x : Vec n) :
             hexp.hasFDerivAt
           have happly :
               HasFDerivAt (fun x : Vec (Nat.succ n) => x j) (evalCLM (n := Nat.succ n) j) x := by
-            simpa using ((evalCLM (n := Nat.succ n) j).hasFDerivAt (x := x))
+            exact ((evalCLM (n := Nat.succ n) j).hasFDerivAt (x := x))
           have hcomp := hexpF.comp x happly
           have hlin :
               (ContinuousLinearMap.smulRight (M₁ := ℝ) (M₂ := ℝ) (R := ℝ) (S := ℝ)
@@ -301,30 +302,32 @@ theorem hasFDerivAt_logSoftmaxVec {n : Nat} (x : Vec n) :
       -- Assemble coordinatewise via `hasFDerivAt_pi`, then transport through `euclideanEquiv`.
       have hcoord :
           ∀ i : Fin (Nat.succ n),
-            HasFDerivAt (fun x : Vec (Nat.succ n) => logSoftmaxVec (n := Nat.succ n) x i)
+            HasFDerivAt (fun x : Vec (Nat.succ n) => (logSoftmaxVec (n := Nat.succ n) x).ofLp i)
               (logSoftmaxDerivCoord (n := n) x i) x := by
         intro i
         have hid : HasFDerivAt (fun x : Vec (Nat.succ n) => x i) (evalCLM (n := Nat.succ n) i) x :=
           by
-          simpa using ((evalCLM (n := Nat.succ n) i).hasFDerivAt (x := x))
+          exact ((evalCLM (n := Nat.succ n) i).hasFDerivAt (x := x))
         have hsub := hid.sub hlog
         have hfun :
-            (fun x : Vec (Nat.succ n) => x i - Real.log (sumExp (n := Nat.succ n) x))
+            ((fun x : Vec (Nat.succ n) => x.ofLp i) -
+              fun x : Vec (Nat.succ n) => Real.log (sumExp (n := Nat.succ n) x))
               =
-            (fun x : Vec (Nat.succ n) => logSoftmaxVec (n := Nat.succ n) x i) := by
+            (fun x : Vec (Nat.succ n) => (logSoftmaxVec (n := Nat.succ n) x).ofLp i) := by
           funext x'
           simp [logSoftmaxVec, softmaxVecOfFun]
         -- derivative already matches by definition
-        simpa [logSoftmaxDerivCoord, hfun] using hsub
+        rw [hfun] at hsub
+        simpa [logSoftmaxDerivCoord, logDeriv, y] using hsub
 
       have hFun :
-          HasFDerivAt (fun x : Vec (Nat.succ n) => fun i : Fin (Nat.succ n) => logSoftmaxVec (n :=
-            Nat.succ n) x i)
+          HasFDerivAt (fun x : Vec (Nat.succ n) => fun i : Fin (Nat.succ n) =>
+            (logSoftmaxVec (n := Nat.succ n) x).ofLp i)
             (ContinuousLinearMap.pi (fun i : Fin (Nat.succ n) => logSoftmaxDerivCoord (n := n) x i))
               x := by
         refine (hasFDerivAt_pi (𝕜 := ℝ)
-          (φ := fun i : Fin (Nat.succ n) => fun x : Vec (Nat.succ n) => logSoftmaxVec (n := Nat.succ
-            n) x i)
+          (φ := fun i : Fin (Nat.succ n) => fun x : Vec (Nat.succ n) =>
+            (logSoftmaxVec (n := Nat.succ n) x).ofLp i)
           (φ' := fun i : Fin (Nat.succ n) => logSoftmaxDerivCoord (n := n) x i)
           (x := x)).2 ?_
         intro i
@@ -332,10 +335,17 @@ theorem hasFDerivAt_logSoftmaxVec {n : Nat} (x : Vec n) :
       have he' :
           HasFDerivAt (fun g : Fin (Nat.succ n) → ℝ => (euclideanEquiv (Nat.succ n)).symm g)
             ((euclideanEquiv (Nat.succ n)).symm.toContinuousLinearMap)
-            (fun i : Fin (Nat.succ n) => logSoftmaxVec (n := Nat.succ n) x i) :=
+            (fun i : Fin (Nat.succ n) => (logSoftmaxVec (n := Nat.succ n) x).ofLp i) :=
         (ContinuousLinearMap.hasFDerivAt ((euclideanEquiv (Nat.succ n)).symm.toContinuousLinearMap))
       have hcomp := he'.comp x hFun
-      simpa [logSoftmaxVec, logSoftmaxDerivCLM, euclideanEquiv, ContinuousLinearMap.comp_apply]
+      change HasFDerivAt
+        (fun x : Vec (Nat.succ n) => WithLp.toLp 2 fun i : Fin (Nat.succ n) =>
+          x.ofLp i - Real.log (sumExp (n := Nat.succ n) x))
+        ((euclideanEquiv (Nat.succ n)).symm.toContinuousLinearMap.comp
+          (ContinuousLinearMap.pi (fun i : Fin (Nat.succ n) => logSoftmaxDerivCoord (n := n) x i)))
+        x
+      simpa [logSoftmaxVec, logSoftmaxDerivCLM, euclideanEquiv, Function.comp_def,
+        ContinuousLinearMap.comp_apply]
         using hcomp
 
 end

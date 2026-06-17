@@ -202,6 +202,14 @@ abbrev Program (α : Type) (paramShapes : List Shape) (inShape outShape : Shape)
 
 /-! ## Evaluation -/
 
+/-- Read a dynamic value from the executable context with a user-facing bounds error. -/
+def getDVal? {α : Type} [Context α] (vals : Array (DVal α)) (idx : Nat) :
+    Except String (DVal α) :=
+  match vals[idx]? with
+  | some v => .ok v
+  | none =>
+      .error s!"TorchLeanVerified: value index {idx} out of bounds for context of size {vals.size}"
+
 /--
 Read a previously computed dynamic value and cast it back to the statically expected shape.
 
@@ -212,7 +220,7 @@ discipline.
 def getVal {α : Type} [Context α] [DecidableEq Shape]
     {inShape : Shape} {ss : List Shape} {s : Shape}
     (vals : Array (DVal α)) (idx : Idx (Ctx inShape ss) s) : Except String (Tensor α s) := do
-  let v : DVal α := vals[idx.id]!
+  let v : DVal α ← getDVal? vals idx.id
   if h : v.shape = s then
     pure (h ▸ v.tensor)
   else
@@ -329,8 +337,8 @@ def evalNode
       -- Mirror the IR semantics: `mse_loss` is dynamically shape-checked (both parents must have
       -- equal shape),
       -- then reduces to a scalar by averaging the squared error.
-      let yV : DVal α := vals[yhat.id]!
-      let tV : DVal α := vals[target.id]!
+      let yV : DVal α ← getDVal? vals yhat.id
+      let tV : DVal α ← getDVal? vals target.id
       if h : yV.shape = tV.shape then
         let yT : Tensor α yV.shape := yV.tensor
         let tT : Tensor α yV.shape := h.symm ▸ tV.tensor
@@ -358,7 +366,7 @@ def evalFGraph
     (vals : Array (DVal α)) : Except String (Tensor α out) := do
   match g with
   | .ret y =>
-      let v : DVal α := vals[y.id]!
+      let v : DVal α ← getDVal? vals y.id
       if h : v.shape = out then
         pure (h ▸ v.tensor)
       else

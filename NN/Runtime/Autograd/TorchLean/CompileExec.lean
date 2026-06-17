@@ -61,7 +61,7 @@ Compile a TorchLean forward model (single distinguished input) to:
 - and an executable forward SSA graph (`ExecGraphData`).
 -/
 def compileForward1IRExec
-    {α : Type} [Context α] [DecidableEq Shape] [Inhabited α]
+    {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :

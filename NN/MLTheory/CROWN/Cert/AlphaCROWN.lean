@@ -242,9 +242,9 @@ This step function handles the verifier core of the IR:
 - `.reshape`, `.flatten` (shape-only, guarded by dimensional consistency)
 
 All other node kinds fall back to a conservative **constant** affine enclosure derived from the
-IBP box at the same node id (if present). This keeps the checker total over graphs that contain
-operators outside this affine-transfer subset; end-to-end theorems then account for those nodes
-through the soundness assumptions attached to their IBP boxes.
+IBP box at the same node id (if present). The checker remains total over graphs that contain
+operators outside this affine-transfer subset; end-to-end theorems account for those nodes through
+the soundness assumptions attached to their IBP boxes.
 -/
 def alphaCrownStepNode?
     (nodes : Array Node) (ps : ParamStore α)

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -103,7 +102,7 @@ The proof is large because it recursively mirrors the compiler. The workhorse le
 IR value table and compiled context stay aligned. Each operator branch proves one local
 preservation fact, then the recursive theorem stitches the branch into the whole graph.
 
-The current proof is intentionally split for auditability:
+The current proof is split for auditability:
 
 - The [IRExec common API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/IRExec/Correctness/Common.lean) contains shared
   infrastructure for dynamic values, compiled contexts, and finishing a node step.
@@ -344,7 +343,7 @@ BugZoo is one of the most teachable parts of TorchLean because it connects forma
 ML engineers already recognize.
 
 The [BugZoo API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/) and
-[BugZoo overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/README.md) map each card to real bug families.
+[BugZoo overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/README.md) map each example to real bug families.
 
 - *Attention mask*: causal or future positions receive exactly zero attention weight under hard
   mask semantics.
@@ -370,7 +369,7 @@ This gives a concrete comparison to ordinary frameworks:
 Widgets are not proofs, but they matter because proof engineering and verifier debugging are
 painful without visual feedback.
 
-The [widgets API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives human-readable views of proof and runtime artifacts:
+The [widgets API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives readable views of proof and runtime artifacts:
 
 - IR graph views show node ids, shapes, op kinds, and execution traces.
 - Runtime autograd widgets show tapes, gradients, and reverse traversal.
@@ -391,15 +390,16 @@ otherwise be unreadable arrays, graph contexts, or certificate JSON.
 
 The model examples show breadth:
 
-- MLP, CNN, ResNet, ViT;
+- MLP, CNN, ViT, plus residual/ResNet block specs;
 - RNN, LSTM, Transformer, GPT examples, Mamba;
 - diffusion, VAE, VQ-VAE, GAN;
 - FNO/Burgers operator learning;
 - DQN and PPO examples.
 
-Not every model has a full correctness theorem. The examples exercise the same API, runtime, graph,
-CUDA, data, and verification boundaries that theorem files use. They are where the formal
-abstractions meet realistic ML shapes.
+Not every model has a full correctness theorem. The examples share the same API, runtime, graph,
+CUDA, data, and verification boundaries as the theorem files. That is the bridge we want: the
+formal abstractions are tested against realistic ML shapes instead of living only in small proof
+snippets.
 
 # Where To Go Next
 
@@ -412,7 +412,7 @@ The detailed follow-up chapters cover the major proof layers:
   float32 diagnostics.
 - *Generative Models* explains diffusion, VAE, VQ-VAE, GAN, and sampler facts.
 - *Learning Theory* covers differential privacy, stability, robustness, and ridge regression.
-- *BugZoo Catalog* gives the real bug cards and their checked TorchLean boundaries.
+- *BugZoo Catalog* gives the real bug case studies and their checked TorchLean boundaries.
 - widget documentation that pairs each widget with the Lean object it visualizes.
 
 # References

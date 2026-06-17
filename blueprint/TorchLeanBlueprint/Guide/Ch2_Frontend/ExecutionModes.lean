@@ -35,8 +35,8 @@ lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- \
 With CUDA enabled, model examples that support device buffers add a device choice:
 
 ```
-lake exe torchlean mlp --cuda --steps 100
-lake exe torchlean mlp --cuda --steps 1000 --cuda-mem-watch 100
+lake exe -K cuda=true torchlean mlp --cuda --steps 100
+lake exe -K cuda=true torchlean mlp --cuda --steps 1000 --cuda-mem-watch 100
 ```
 
 The flags change how the model is evaluated. They do not change the layer structure or parameter
@@ -60,39 +60,33 @@ The runtime choices are easiest to read this way:
 - Mode choice: train/eval mode changes runtime behavior for mode-sensitive layers such as dropout
   or normalization. The declared model and parameter payload stay visible.
 
-# What A Runner Owns
+# What The Public Runtime Owns
 
-The public training examples usually enter the runtime through `train.run`:
+Most tutorial code does not instantiate a runner manually. It builds one trainer with a public
+`Trainer.Config`, then lets `trainer.train data trainOptions` run with those scalar/backend/device
+settings.
 
-```
-train.run task args (fun {α} _ _ _ _ runner rest => do
-  ...
-)
-```
+That public runtime path still creates one executable runtime object under the hood. The useful mental
+model is:
 
-Read this callback as:
+- the declared model stays the same,
+- the runtime layer chooses the scalar/backend/device interpretation,
+- the instantiated runtime object owns parameters, buffers, mode, and compiled executable artifacts.
 
-- `α` is the concrete scalar type selected by the command line, such as `Float` or `Float32`.
-- `runner` is the instantiated runtime object for the task.
-- `rest` contains the remaining command line arguments after the common runtime flags have been
-  parsed.
+If the model definition is the recipe, the runtime object is the instantiated kitchen: it has the
+ingredients, backend, and mode needed to actually run the recipe.
 
-A runner is the object that turns a task into repeated executable steps. If the model definition is
-the recipe, the runner is the instantiated kitchen: it has the ingredients, backend, and mode needed
-to actually run the recipe.
+The quickstart API surface is:
 
-The runner owns the pieces a training loop needs:
+- `Trainer.Config`
+- `Trainer.TrainOptions`
+- `Trainer.new`
+- `trainer.train data trainOptions`
+- `trained.eval ...` / `trained.printPrediction ...`
 
-- initialized parameters and buffers,
-- compiled predictors for train and eval mode,
-- compiled losses for train and eval mode,
-- the current mode flag,
-- update helpers used by optimizers and fitting loops.
-
-The main API surface is:
-
-- [NN.API.Runtime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime.lean)
-- [NN.API.Public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean)
+The advanced runner API still exists, but it sits under
+`Trainer.Advanced`.  Use that path when you really need manual callbacks, explicit mode changes, or
+custom runtime loops.
 
 # Eager Mode
 
@@ -130,7 +124,7 @@ many batches.
 
 # Train Mode and Eval Mode
 
-Some layers behave differently while fitting than they do while evaluating. Dropout and batch
+Some layers behave differently during training than they do while evaluating. Dropout and batch
 normalization are the common examples. TorchLean keeps this state in the runner, rather than
 pretending that every layer is purely stateless at runtime.
 
@@ -139,18 +133,19 @@ of the explicit runtime object.
 
 # Loaders and Epochs
 
-Fitting helpers call the same runner repeatedly over datasets or loaders. The runtime choice is
+Training calls run the same runner repeatedly over datasets or loaders. The runtime choice is
 independent of whether examples arrive as one batch or many minibatches.
 
-The declarations to open when reading the code are:
+The public declarations to read first are:
 
-- `train.FitConfig`
-- `train.LoaderFitConfig`
-- `train.fitDataset`
-- `train.fitLoader`
+- `Trainer.Config`
+- `Trainer.TrainOptions`
+- `Trainer.new`
+- `trainer.train data trainOptions`
 
-Those live in [NN.API.Runtime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime.lean), with public re-exports in
-[NN.API.Public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean).
+Lower-level dataset and loader loops still exist for custom runtime code, but ordinary examples
+should keep dtype, backend, device, and optimizer in the config passed to `Trainer.new`, and
+per-training steps/logging in `Trainer.TrainOptions`.
 
 # Same Architecture, Different Artifact
 

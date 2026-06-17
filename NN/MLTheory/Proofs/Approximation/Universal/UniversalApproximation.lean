@@ -185,6 +185,7 @@ lemma finRange_foldl_add_scalar (n : ℕ) (f : Fin n → ℝ) :
   congr 1
   simpa using (finRange_foldl_add n f)
 
+set_option linter.auxLemma false in
 /-- Matrix-vector multiply for a one-row matrix is the expected finite dot product. -/
 lemma mat_vec_mul_spec_matrixMN_vector (n : ℕ) (c v : Fin n → ℝ) :
     matVecMulSpec (matrixMN 1 n (fun _ j => c j))
@@ -329,7 +330,12 @@ then represent the interpolant as a finite linear combination of hinges `relu(x 
       have hleft : (L * (b - a)) * (1 / ((n : ℝ) + 1)) = (L * (b - a)) / ((n : ℝ) + 1) := by
         simpa using (mul_one_div (L * (b - a)) ((n : ℝ) + 1))
       have hmesh' : L * (b - a) / ((n : ℝ) + 1) < ε / 2 := by
-        simpa [hleft, hright] using hn'
+        calc
+          L * (b - a) / ((n : ℝ) + 1)
+              = L * (b - a) * (1 / ((n : ℝ) + 1)) := by
+                rw [← hleft]
+          _ < L * (b - a) * ((ε / 2) / (L * (b - a))) := hn'
+          _ = ε / 2 := hright
       have hmesh'' : L * (b - a) / (N : ℝ) < ε / 2 := by
         simpa [N, Nat.cast_add, Nat.cast_one] using hmesh'
       simpa [δ, mul_div_assoc'] using hmesh''

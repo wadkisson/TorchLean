@@ -134,10 +134,11 @@ theorem hasFDerivAt_forwardMN {m n : Nat} (x : Vec (MNSize m n)) :
     intro i
     have hsoft : HasFDerivAt (softmaxVec (n := n)) (softmaxDerivCLM (n := n) (r0 i)) (r0 i) :=
       hasFDerivAt_softmaxVec (n := n) (r0 i)
-    have happly :
-        HasFDerivAt (fun r : (Fin m → Vec n) => r i) (ContinuousLinearMap.proj (R := ℝ) i) r0 := by
-      simpa using ((ContinuousLinearMap.proj (R := ℝ) i).hasFDerivAt (x := r0))
-    exact hsoft.comp r0 happly
+    have hproj :
+        HasFDerivAt (⇑(ContinuousLinearMap.proj (R := ℝ) i))
+          (ContinuousLinearMap.proj (R := ℝ) i) r0 :=
+      (ContinuousLinearMap.proj (R := ℝ) i).hasFDerivAt (x := r0)
+    simpa [Function.comp_def, ContinuousLinearMap.proj_apply] using hsoft.comp r0 hproj
 
   -- chain with the linear reshapes
   have hrows : HasFDerivAt (rowsCLM (m := m) (n := n)) (rowsCLM (m := m) (n := n)) x := by
@@ -150,8 +151,15 @@ theorem hasFDerivAt_forwardMN {m n : Nat} (x : Vec (MNSize m n)) :
         (DG.comp (rowsCLM (m := m) (n := n))) x := by
     exact hG.comp x hrows
   have hcomp := hunrows.comp x hmid
-  -- rewrite to `forwardMN`/`derivMN`
-  simpa [forwardMN, derivMN, G, r0, DG] using hcomp
+  have hcomp' :
+      HasFDerivAt
+        (fun z : Vec (MNSize m n) =>
+          (unrowsCLM (m := m) (n := n)) (G ((rowsCLM (m := m) (n := n)) z)))
+        (derivMN (m := m) (n := n) x) x := by
+    simpa [derivMN, G, r0, DG, Function.comp_def] using hcomp
+  refine hcomp'.congr_of_eventuallyEq ?_
+  exact Filter.Eventually.of_forall fun z => by
+    simp [forwardMN, G, rowsCLM, unrowsCLM]
 
 /-- JVP computed by `jvpMN` agrees with applying the derivative `derivMN`. -/
 theorem jvpMN_eq_derivMN {m n : Nat} (x dx : Vec (MNSize m n)) :
@@ -359,10 +367,11 @@ theorem hasFDerivAt_forwardMN {m n : Nat} (x : Vec (MNSize m n)) :
     have hlog :
         HasFDerivAt (logSoftmaxVec (n := n)) (logSoftmaxDerivCLM (n := n) (r0 i)) (r0 i) :=
       hasFDerivAt_logSoftmaxVec (n := n) (r0 i)
-    have happly :
-        HasFDerivAt (fun r : (Fin m → Vec n) => r i) (ContinuousLinearMap.proj (R := ℝ) i) r0 := by
-      simpa using ((ContinuousLinearMap.proj (R := ℝ) i).hasFDerivAt (x := r0))
-    exact hlog.comp r0 happly
+    have hproj :
+        HasFDerivAt (⇑(ContinuousLinearMap.proj (R := ℝ) i))
+          (ContinuousLinearMap.proj (R := ℝ) i) r0 :=
+      (ContinuousLinearMap.proj (R := ℝ) i).hasFDerivAt (x := r0)
+    simpa [Function.comp_def, ContinuousLinearMap.proj_apply] using hlog.comp r0 hproj
 
   have hrows :
       HasFDerivAt (SoftmaxLastAxis.rowsCLM (m := m) (n := n)) (SoftmaxLastAxis.rowsCLM (m := m) (n
@@ -377,7 +386,16 @@ theorem hasFDerivAt_forwardMN {m n : Nat} (x : Vec (MNSize m n)) :
         (DG.comp (SoftmaxLastAxis.rowsCLM (m := m) (n := n))) x := by
     exact hG.comp x hrows
   have hcomp := hunrows.comp x hmid
-  simpa [forwardMN, derivMN, G, r0, DG] using hcomp
+  have hcomp' :
+      HasFDerivAt
+        (fun z : Vec (MNSize m n) =>
+          (SoftmaxLastAxis.unrowsCLM (m := m) (n := n))
+            (G ((SoftmaxLastAxis.rowsCLM (m := m) (n := n)) z)))
+        (derivMN (m := m) (n := n) x) x := by
+    simpa [derivMN, G, r0, DG, Function.comp_def] using hcomp
+  refine hcomp'.congr_of_eventuallyEq ?_
+  exact Filter.Eventually.of_forall fun z => by
+    simp [forwardMN, G, SoftmaxLastAxis.rowsCLM, SoftmaxLastAxis.unrowsCLM]
 
 /-- JVP computed by `jvpMN` agrees with applying the derivative `derivMN`. -/
 theorem jvpMN_eq_derivMN {m n : Nat} (x dx : Vec (MNSize m n)) :

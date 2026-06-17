@@ -7,13 +7,22 @@ Authors: TorchLean Team
 module
 
 public import NN.Verification.Cert.AbCrownLeafCert
-public import NN.Examples.Verification
 public import NN.Verification.Geometry3D.CLI
+public import NN.Verification.LiRPA
 public import NN.Verification.PINN.CLI
 public import NN.Verification.PINN.Certificate
 public import NN.Verification.PINN.DatasetCheck
 public import NN.Verification.ODE.Verify
+public import NN.Verification.TorchLean.IBPWorkflow
+public import NN.Verification.TorchLean.CrownOpsWorkflow
+public import NN.Verification.TorchLean.TransformerIBPWorkflow
+public import NN.Verification.TorchLean.MlpTrainVerifyWorkflow
 public import NN.Verification.Robustness.Digits
+public import NN.Verification.Robustness.MarginCert
+public import NN.Verification.Robustness.MarginCertCLI
+public import NN.Verification.Robustness.TorchLean
+public import NN.Verification.Splines.PiecewiseLinearCLI
+public import NN.Verification.VNNComp.MnistFC
 
 /-!
 # CLI
@@ -88,12 +97,12 @@ def usage (tools : List Tool) : String :=
     ]
   header ++ "\n" ++ String.intercalate "\n" (tools.map toolUsage)
 
-/-- Extract a path argument if present; otherwise fall back to a default path. -/
-def getPathOrDefault (args : List String) (defaultPath : String) : String :=
-  match args with
-  | [] => defaultPath
-  | "--" :: rest => rest.getD 0 defaultPath
-  | a :: _ => a
+/-- Extract a single optional path argument, falling back to a default path. -/
+def getPathOrDefault (args : List String) (defaultPath : String) : Except String String := do
+  let args := NN.API.CLI.dropDashDash args
+  let (path, rest) ← NN.API.CLI.takePositionalDefault args defaultPath
+  NN.API.CLI.requireNoArgs rest
+  pure path
 
 /-- Tool group: LiRPA-style bound propagation and certificate checking. -/
 def lirpaTools : List Tool :=
@@ -101,23 +110,25 @@ def lirpaTools : List Tool :=
     { name := name
       description := desc
       defaultArg := some defaultPath
-      run := fun args => k (getPathOrDefault args defaultPath) }
+      run := fun args => do
+        let path ← NN.API.CLI.orThrow <| getPathOrDefault args defaultPath
+        k path }
   [
     mk "lirpa-mlp" "IBP cert: feed-forward MLP"
       "NN/Examples/Verification/LiRPA/mlp_cert.json"
-      NN.Examples.Verification.LiRPA.MlpVerify.verifyCert
+      NN.Verification.LiRPA.Mlp.verifyCert
   , mk "lirpa-cnn" "IBP cert: CNN conv→head"
       "NN/Examples/Verification/LiRPA/cnn_cert.json"
-      NN.Examples.Verification.LiRPA.CnnVerify.verifyCert
+      NN.Verification.LiRPA.Cnn.verifyCert
   , mk "lirpa-attention" "IBP cert: attention softmax block"
     "NN/Examples/Verification/LiRPA/attention_softmax_cert.json"
-      NN.Examples.Verification.LiRPA.AttentionVerify.verifyCert
+      NN.Verification.LiRPA.Attention.verifyCert
   , mk "lirpa-gru" "IBP cert: GRU gate"
       "NN/Examples/Verification/LiRPA/gru_gate_cert.json"
-      NN.Examples.Verification.LiRPA.GruVerify.verifyCert
+      NN.Verification.LiRPA.Gru.verifyCert
   , mk "lirpa-encoder" "IBP cert: transformer encoder block"
     "NN/Examples/Verification/LiRPA/transformer_encoder_cert.json"
-      NN.Examples.Verification.LiRPA.TransformerEncoderVerify.verifyCert
+      NN.Verification.LiRPA.TransformerEncoder.verifyCert
   ]
 
 /-- Tool group: other verification-related utilities. -/
@@ -125,21 +136,22 @@ def otherTools : List Tool :=
   [
     { name := "camera-box3d-cert"
       description := "3D camera-box projection certificate check"
-      defaultArg := some "NN/Verification/Geometry3D/check_box3d_camera_cert.json"
+      defaultArg := some NN.Verification.Geometry3D.CLI.defaultCertPath
       run := fun args =>
         NN.Verification.Geometry3D.CLI.main args }
   ,
     { name := "pinn-cert"
       description := "PINN certificate recomputation check"
-      defaultArg := some "NN/Examples/Verification/PINN/pinn_cert.json"
-      run := fun args =>
-        NN.Verification.PINN.Certificate.verifyCert
-          (getPathOrDefault args "NN/Examples/Verification/PINN/pinn_cert.json") }
+      defaultArg := some NN.Verification.PINN.Certificate.defaultCertPath
+      run := fun args => do
+        let path ← NN.API.CLI.orThrow <|
+          getPathOrDefault args NN.Verification.PINN.Certificate.defaultCertPath
+        NN.Verification.PINN.Certificate.verifyCert path }
   , { name := "spline-cert"
       description := "piecewise-polynomial certificate checker (optional Julia regen)"
-      defaultArg := some "NN/Examples/Verification/Splines/piecewise_linear_cert.json"
+      defaultArg := some NN.Verification.Splines.PiecewiseLinearCLI.defaultCertPath
       run := fun args =>
-        NN.Examples.Verification.Splines.PiecewiseLinearVerify.main args }
+        NN.Verification.Splines.PiecewiseLinearCLI.main args }
   , { name := "pinn-cli"
       description := "interactive PINN residual-bounding CLI"
       includeInAll := false
@@ -147,51 +159,43 @@ def otherTools : List Tool :=
         NN.Verification.PINN.CLI.main args }
   , { name := "abcrown-leaf"
       description := "α,β-CROWN leaf artifact structural check"
-      defaultArg := some "NN/Examples/Verification/AbCrown/sample_abcrown_leaf_cert_v0_1.json"
+      defaultArg := some NN.Verification.Cert.AbCrownLeafCert.defaultCertPath
       run := fun args => NN.Verification.Cert.AbCrownLeafCert.run args }
   , { name := "margin-cert"
       description := "logit-margin certificate check (bounds ⇒ certified label)"
-      defaultArg := some "NN/Examples/Verification/Robustness/digits_linear_margin_cert.json"
-      run := fun args => NN.Examples.Verification.Robustness.VerifyMarginCert.run args }
+      defaultArg := some NN.Verification.Robustness.MarginCertCLI.defaultPath
+      run := fun args =>
+        NN.Verification.Robustness.MarginCertCLI.run args }
   , { name := "torchlean-robustness"
       description := "TorchLean → IR margin certification workflow"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.Robustness.TorchLeanRobustness.main args }
+        NN.Verification.Robustness.TorchLean.main args }
   , { name := "torchlean-ibp"
       description := "TorchLean → IR → IBP workflow (MLP)"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.TorchLean.TorchLeanIBP.main args }
+        NN.Verification.TorchLean.IBPWorkflow.main args }
   , { name := "torchlean-transformer-ibp"
       description := "TorchLean → IR → IBP workflow (attention/encoder; optional --with-crown)"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.TorchLean.TorchLeanTransformerIBP.main args }
+        NN.Verification.TorchLean.TransformerIBPWorkflow.main args }
   , { name := "torchlean-crown-ops"
       description := "TorchLean → IR → IBP+CROWN workflow (softmax/mse_loss ops)"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.TorchLean.TorchLeanCrownOps.main args }
+        NN.Verification.TorchLean.CrownOpsWorkflow.main args }
   , { name := "torchlean-mlp-workflow"
       description := "TorchLean MLP: train with compiled backend, then run IBP+CROWN"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.TorchLean.TorchLeanMlpWorkflow.main args }
+        NN.Verification.TorchLean.MlpTrainVerifyWorkflow.main args }
   , { name := "pinn-dataset-check"
       description := "PINN dataset pointwise interval containment check"
-      defaultArg := some "NN/Examples/Verification/PINN/sample_dataset_1d.json"
+      defaultArg := some NN.Verification.PINN.DatasetCheck.defaultDatasetPath
       includeInAll := false
       run := fun args =>
-        let defaultPath := "NN/Examples/Verification/PINN/sample_dataset_1d.json"
-        let args :=
-          match args with
-          | [] => [s!"--dataset={defaultPath}"]
-          | a :: rest =>
-              if a.startsWith "--" then
-                a :: rest
-              else
-                s!"--dataset={a}" :: rest
         NN.Verification.PINN.DatasetCheck.main args }
   , { name := "ode"
       description := "ODE enclosure verification (sub/super NN bounds)"
@@ -212,7 +216,7 @@ def otherTools : List Tool :=
       description := "VNN-COMP-style suite: MNIST-FC (vnncomp2022) via exported JSON"
       includeInAll := false
       run := fun args =>
-        NN.Examples.Verification.VNNComp.MnistFcVerify.main args }
+        NN.Verification.VNNComp.MnistFC.main args }
   ]
 
 /-- The full list of registered verification tools (LiRPA plus other workflows/checkers). -/

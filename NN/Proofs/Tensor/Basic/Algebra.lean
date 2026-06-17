@@ -261,11 +261,6 @@ Useful for automated proof tactics.
 theorem get_dim_scalar {n : Nat} (f : Fin n → Tensor ℝ .scalar) (i : Fin n) :
   get (Tensor.dim f) i = f i := by rfl
 
-/-- `toScalar` is the identity on scalar tensors. -/
-@[simp]
-theorem toScalar_scalar (x : ℝ) :
-  toScalar (Tensor.scalar x) = x := by rfl
-
 /-- Mapping `0 + ·` over an `Option` is the identity. -/
 lemma option_zero_add (o : Option ℝ) : o.map (fun x => 0 + x) = o := by
   cases o

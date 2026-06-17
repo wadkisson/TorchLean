@@ -115,7 +115,7 @@ def addFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
         xV))
   jvp_eq := by
     intro xV dxV
-    simp [add, Node.jvpVec_ofVec, ContinuousLinearMap.add_apply, CtxVec.getCLM_apply] }
+    simp [add, Node.jvpVec_ofVec, CtxVec.getCLM_apply] }
 
 /-- Subtract two same-shaped context entries. -/
 def sub {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
@@ -150,7 +150,7 @@ def subFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
         xV))
   jvp_eq := by
     intro xV dxV
-    simp [sub, Node.jvpVec_ofVec, ContinuousLinearMap.sub_apply, CtxVec.getCLM_apply] }
+    simp [sub, Node.jvpVec_ofVec, CtxVec.getCLM_apply] }
 
 /-- Scale a context entry by a constant scalar. -/
 def scale {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (c : ℝ) : Node Γ s :=
@@ -359,7 +359,9 @@ def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
     -- prove coordinatewise and assemble with `hasFDerivAt_pi`
     have hcoord :
         ∀ i : Fin n,
-          HasFDerivAt (fun x : CtxVec Γ => (aFun x i) * (bFun x i))
+          HasFDerivAt
+            ((fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) a x i) *
+              (fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) b x i))
             ((aFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) b)) +
               (bFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) a))) xV :=
                 by
@@ -400,14 +402,18 @@ def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
       simpa [aCLM, bCLM, aFun, bFun] using hmul
     have hpi :
         HasFDerivAt
-          (fun x : CtxVec Γ => fun i : Fin n => (aFun x i) * (bFun x i))
+          (fun x : CtxVec Γ => fun i : Fin n =>
+            (((fun y : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) a y i) *
+              (fun y : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) b y i)) x))
           (ContinuousLinearMap.pi (fun i : Fin n =>
             (aFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) b)) +
               (bFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) a))))
           xV := by
       -- `hasFDerivAt_pi` packages the coordinate statements
       refine (hasFDerivAt_pi (𝕜 := ℝ)
-        (φ := fun i : Fin n => fun x : CtxVec Γ => (aFun x i) * (bFun x i))
+        (φ := fun i : Fin n =>
+          (fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) a x i) *
+            (fun x : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) b x i))
         (φ' := fun i : Fin n =>
           (aFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) b)) +
             (bFun xV i) • ((evalCLM (n := n) i).comp (CtxVec.getCLM (Γ := Γ) (s := s) a)))
@@ -418,7 +424,9 @@ def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
     have he' :
         HasFDerivAt (fun g : Fin n → ℝ => (euclideanEquiv n).symm g) ((euclideanEquiv
           n).symm.toContinuousLinearMap)
-          (fun i : Fin n => (aFun xV i) * (bFun xV i)) :=
+          (fun i : Fin n =>
+            (((fun y : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) a y i) *
+              (fun y : CtxVec Γ => CtxVec.get (Γ := Γ) (s := s) b y i)) xV)) :=
       (ContinuousLinearMap.hasFDerivAt (euclideanEquiv n).symm.toContinuousLinearMap)
     have hcomp := he'.comp xV hpi
     have hEq :
@@ -435,7 +443,6 @@ def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
     ext i
     -- Expand the JVP, then evaluate the `pi`-assembled derivative in coordinate `i`.
     simp [mul, Node.jvpVec_ofVec, vecOfFun, ContinuousLinearMap.comp_apply,
-      ContinuousLinearMap.add_apply, ContinuousLinearMap.smul_apply, ContinuousLinearMap.comp_apply,
       evalCLM_apply, CtxVec.getCLM_apply]
 }
 

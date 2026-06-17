@@ -42,7 +42,8 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := outDim) (inDim := inDim) (seed :=
     seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [WShape, bShape]
+  { kind := s!"Linear({inDim}, {outDim})"
+    paramShapes := [WShape, bShape]
     initParams := Torch.tlist2 w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -65,7 +66,8 @@ def linear2d (batch inDim outDim : Nat) (seedW seedB : Nat := 0) :
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := outDim) (inDim := inDim) (seed :=
     seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [WShape, bShape]
+  { kind := s!"Linear2d({inDim}, {outDim})"
+    paramShapes := [WShape, bShape]
     initParams := Torch.tlist2 w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -96,7 +98,8 @@ def rnn (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := hiddenSize) (inDim := inputSize +
     hiddenSize) (seed := seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [WShape, bShape]
+  { kind := s!"RNN({inputSize}, {hiddenSize})"
+    paramShapes := [WShape, bShape]
     initParams := Torch.tlist2 w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -150,7 +153,8 @@ def gru (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     hiddenSize) (seed := seedW + 2)
   let bNew0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed :=
     seedB + 2)
-  { paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape]
+  { kind := s!"GRU({inputSize}, {hiddenSize})"
+    paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape]
     initParams := .cons wReset0 (.cons bReset0 (.cons wUpdate0 (.cons bUpdate0 (.cons wNew0 (.cons bNew0 .nil)))))
     paramRequiresGrad := [true, true, true, true, true, true]
     forward := fun _ {α} _ _ =>
@@ -233,7 +237,8 @@ def mamba (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     (outDim := hiddenSize) (inDim := inputSize) (seed := seedW + 2)
   let bGate0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros)
     (seed := seedB + 2)
-  { paramShapes := [WInShape, bShape, WDeltaShape, bShape, WInShape, bShape]
+  { kind := s!"Mamba({inputSize}, {hiddenSize})"
+    paramShapes := [WInShape, bShape, WDeltaShape, bShape, WInShape, bShape]
     initParams := .cons wIn0 (.cons bIn0 (.cons wDelta0 (.cons bDelta0
       (.cons wGate0 (.cons bGate0 .nil)))))
     paramRequiresGrad := [true, true, true, true, true, true]
@@ -309,7 +314,8 @@ def lstm (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
   let wO0 : Tensor Float WShape := Torch.Init.xavierW (outDim := hiddenSize) (inDim := inputSize +
     hiddenSize) (seed := seedW + 3)
   let bO0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB + 3)
-  { paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape, WShape, bShape]
+  { kind := s!"LSTM({inputSize}, {hiddenSize})"
+    paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape, WShape, bShape]
     initParams :=
       .cons wF0 (.cons bF0 (.cons wI0 (.cons bI0 (.cons wC0 (.cons bC0 (.cons wO0 (.cons bO0 .nil)))))))
     paramRequiresGrad := [true, true, true, true, true, true, true, true]
@@ -361,4 +367,3 @@ end NN
 end TorchLean
 end Autograd
 end Runtime
-

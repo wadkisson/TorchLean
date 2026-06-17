@@ -67,25 +67,25 @@ def epsConvNet (cfg : EpsConvNetConfig)
   letI : NeZero cfg.h := ⟨h_h⟩
   letI : NeZero cfg.w := ⟨h_w⟩
   letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
-  nn.sequential![
+  nn.Sequential![
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
-    nn.relu,
+    ReLU,
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
-    nn.relu,
+    ReLU,
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
-    nn.relu,
+    ReLU,
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
@@ -120,22 +120,22 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
   letI : NeZero cfg.h := ⟨h_h⟩
   letI : NeZero cfg.w := ⟨h_w⟩
   letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
-  nn.sequential![
+  nn.Sequential![
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
-    nn.relu,
+    ReLU,
     (do
       let block ←
-        nn.sequential![
+        nn.Sequential![
           withSeeds2 (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
               (kInit := .uniform (-0.1) 0.1)),
-          nn.relu,
+          ReLU,
           withSeeds2 (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
@@ -143,16 +143,16 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
               (kInit := .uniform (-0.1) 0.1))
         ]
       pure (nn.pure.blocks.residual block)),
-    nn.relu,
+    ReLU,
     (do
       let block ←
-        nn.sequential![
+        nn.Sequential![
           withSeeds2 (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
               (kInit := .uniform (-0.1) 0.1)),
-          nn.relu,
+          ReLU,
           withSeeds2 (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
@@ -160,7 +160,7 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
               (kInit := .uniform (-0.1) 0.1))
         ]
       pure (nn.pure.blocks.residual block)),
-    nn.relu,
+    ReLU,
     withSeeds2 (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
@@ -172,6 +172,24 @@ end models
 end nn
 
 namespace diffusion
+
+/-- Map image tensors from `[0,1]` into the standard diffusion training range `[-1,1]`. -/
+def toMinusOneOne {batch c h w : Nat}
+    (x01 : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) :
+    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+  Spec.Tensor.mapSpec (fun x => 2.0 * x - 1.0) x01
+
+/--
+Deterministic Gaussian epsilon tensor for an NCHW diffusion shape.
+
+The `(seed, step)` pair is turned into the runtime RNG key, so examples and artifact generation can
+reproduce the same noising path without ambient randomness.
+-/
+def randomEps {batch c h w : Nat} (seed step : Nat) :
+    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+  let key : UInt64 := _root_.Runtime.Autograd.TorchLean.Random.keyOf (seed := seed) (counter := step)
+  _root_.Runtime.Autograd.TorchLean.Random.normal
+    (α := Float) key (s := NN.Tensor.Shape.NCHW batch c h w)
 
 /-- Linear beta schedule value at timestep `t`. -/
 def linearBeta (T : Nat) (betaStart betaEnd : Float) (t : Nat) : Float :=
@@ -226,7 +244,7 @@ makes the transformation reusable:
 def noisedSampleFromEps {batch c h w : Nat}
     (alphaBars : Array Float) (T : Nat)
     (x0 eps : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (step : Nat) :
-    sample.Supervised Float
+    SupervisedSample Float
       (NN.Tensor.Shape.NCHW batch (c + 1) h w)
       (NN.Tensor.Shape.NCHW batch c h w) :=
   let tIdx : Nat := if T = 0 then 0 else step % T
@@ -238,7 +256,22 @@ def noisedSampleFromEps {batch c h w : Nat}
       (Spec.Tensor.scaleSpec x0 sqrtAb)
       (Spec.Tensor.scaleSpec eps sqrtOneMinusAb)
   let tNorm : Float := if T <= 1 then 0.0 else Float.ofNat tIdx / Float.ofNat (T - 1)
-  sample.mk (appendTimeChannel x_t tNorm) eps
+  Sample.mk (appendTimeChannel x_t tNorm) eps
+
+/--
+Build a deterministic epsilon-prediction training sample.
+
+This is the common DDPM training step used by examples: draw reproducible Gaussian noise from
+`(seed, step)`, corrupt `x₀`, and use that same noise as the target.
+-/
+def noisedSample {batch c h w : Nat}
+    (alphaBars : Array Float) (T : Nat)
+    (x0 : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (seed step : Nat) :
+    SupervisedSample Float
+      (NN.Tensor.Shape.NCHW batch (c + 1) h w)
+      (NN.Tensor.Shape.NCHW batch c h w) :=
+  noisedSampleFromEps alphaBars T x0
+    (randomEps (batch := batch) (c := c) (h := h) (w := w) seed step) (seed + step)
 
 /--
 One deterministic DDIM reverse update (`η = 0`).

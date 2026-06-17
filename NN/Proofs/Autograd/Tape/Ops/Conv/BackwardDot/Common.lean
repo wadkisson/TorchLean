@@ -424,19 +424,6 @@ lemma dot4_eq_sum
   -- Rewrite those reads to 4D indices using `get_at_or_zero_get_outer3`.
   simpa [get_at_or_zero_get_outer3] using hs
 
--- ---------------------------------------------------------------------------
--- Fold-to-sum helper for the Conv2D specs
--- ---------------------------------------------------------------------------
-
-lemma finRange_foldl_add_acc {n : Nat} (f : Fin n → ℝ) (acc : ℝ) :
-    (List.finRange n).foldl (fun s i => s + f i) acc = acc + ∑ i : Fin n, f i := by
-  -- Use `foldl_add_init` to peel off the accumulator, then convert the `0`-fold to a sum.
-  have h1 :=
-    List.foldl_add_init (l := List.finRange n) (f := f) (acc := acc)
-  have h2 : (List.finRange n).foldl (fun s i => s + f i) 0 = ∑ i : Fin n, f i := by
-    simpa using Spec.finRange_foldl_add_eq_finset_sum (f := f)
-  simpa [h2] using h1
-
 lemma sum_mul {ι : Type} [Fintype ι] (f : ι → ℝ) (a : ℝ) :
     (∑ i : ι, f i) * a = ∑ i : ι, f i * a := by
   classical
@@ -711,7 +698,7 @@ lemma conv2d_spec_noBias_get
   classical
   unfold Spec.conv2dSpec
   -- Peel the requested output entry and convert the nested `finRange` folds into `Finset` sums.
-  simp [layerK, fill, getAtOrZero, oc.isLt, finRange_foldl_add_acc]
+  simp [layerK, fill, getAtOrZero, oc.isLt, Spec.finRange_foldl_add_acc]
   -- Discharge the bounds checks introduced by `getAtOrZero` (these follow from `i.isLt` / `j.isLt`).
   have hi : (i : Nat) ≤ (inH + 2 * padding - kH) / stride := by
     simpa [outH] using (Nat.lt_succ_iff.mp i.isLt)
@@ -774,7 +761,7 @@ lemma conv2d_kernel_deriv_get
   classical
   unfold Spec.conv2dKernelDerivSpec
   simp (config := { maxSteps := 2000000 })
-    [finRange_foldl_add_acc, outH, outW]
+    [Spec.finRange_foldl_add_acc, outH, outW]
   apply Finset.sum_congr
   · rfl
   intro i _
@@ -812,7 +799,7 @@ lemma conv2d_input_deriv_get
   classical
   unfold Spec.conv2dInputDerivSpec
   simp (config := { maxSteps := 2000000 })
-    [outH, outW, ic.isLt, i.isLt, j.isLt, finRange_foldl_add_acc, add_comm, mul_comm]
+    [outH, outW, ic.isLt, i.isLt, j.isLt, Spec.finRange_foldl_add_acc, add_comm, mul_comm]
   rfl
 
 

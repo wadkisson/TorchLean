@@ -560,7 +560,7 @@ def reduceSum {α : Type} (s : EagerSession α) [Add α] [Zero α] [Inhabited α
   dispatchCudaOpt (α := α) s "reduce_sum" cpu cuda
 
 /-- Mean-reduce along `axis`. PyTorch: `torch.mean(x, dim=axis)`. -/
-def reduceMean {α : Type} (s : EagerSession α) [Context α] [Inhabited α] [DecidableEq Shape]
+def reduceMean {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
   {sh : Shape} (axis : Nat) [valid : Shape.valid_axis_inst axis sh] [wf : Shape.WellFormed sh]
   (x : TensorRef α sh) : IO (TensorRef α (shapeAfterSum sh axis)) := do
   let cpu := do

@@ -23,8 +23,8 @@ composed with other modules in a `SpecChain`.
 Design choices:
 
 - These wrappers are **stateless** modules: they pick a canonical initial hidden/state (all zeros).
-  This keeps `NNModuleSpec` simple (pure `forward`), and makes the semantics explicit. More
-  stateful variants can always be built at the layer-spec level if needed.
+  `NNModuleSpec` remains a pure `forward`; more stateful variants can be built at the layer-spec
+  level if needed.
 - The exported `forward` returns the *full output sequence* (not just the final hidden state),
   matching common encoder usage.
 

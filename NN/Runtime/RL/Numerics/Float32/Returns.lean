@@ -48,7 +48,7 @@ def requireFinite (label : String) (x : Float32Exec) : Except String Unit :=
 ## Checked IEEE32Exec primitives
 
 The checked RL helpers below are intentionally written in terms of a few small “checked primitive”
-combinators (`checkedAdd`, `checkedMul`, …). This keeps larger routines (GAE, PPO objectives, …)
+combinators (`checkedAdd`, `checkedMul`, …). Larger routines (GAE, PPO objectives, …) remain
 readable while still producing *precise* error locations when non-finite values occur.
 -/
 

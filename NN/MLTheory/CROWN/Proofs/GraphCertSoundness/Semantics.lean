@@ -62,9 +62,6 @@ The semantics is defined as a *safe* `Option` evaluator:
 
 * If required parameters are missing, it returns `none`.
 * If parents are missing (not yet evaluated) or dimensions mismatch, it returns `none`.
-
-This keeps the semantic definition total, and avoids the partial `get!` used in the runtime
-propagation code.
 -/
 
 /-- Safe lookup of a previously computed parent value. -/

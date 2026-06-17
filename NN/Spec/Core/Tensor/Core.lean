@@ -49,8 +49,7 @@ This is a *functional* representation:
 - a scalar tensor is just an `α`,
 - an `n`-dimensional tensor is a function `Fin n → Tensor α s`.
 
-This keeps proofs and shape-safe programming simple, and avoids committing to a concrete memory
-layout in the spec layer.
+The spec layer does not commit to a concrete memory layout.
 -/
 inductive Tensor (α : Type) : Shape → Type where
   | scalar : α → Tensor α .scalar
@@ -126,6 +125,11 @@ def Tensor.ofScalar {α : Type} (x : α) : Tensor α .scalar := .scalar x
 @[simp]
 lemma Tensor.toScalar_ofScalar {α : Type} (x : α) :
     Tensor.toScalar (Tensor.ofScalar x) = x := rfl
+
+/-- `toScalar` is the identity on the scalar tensor constructor. -/
+@[simp]
+lemma Tensor.toScalar_scalar {α : Type} (x : α) :
+    Tensor.toScalar (Tensor.scalar x) = x := rfl
 
 /-- `ofScalar (toScalar t) = t` for scalar tensors. -/
 @[simp]

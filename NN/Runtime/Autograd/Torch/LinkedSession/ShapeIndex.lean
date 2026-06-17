@@ -307,7 +307,7 @@ def swapAdjacentAtDepth {α : Type} (s : SessionIR α) [Context α] [DecidableEq
 /--
 Broadcast a tensor to a larger shape.
 
-The witness `cb : Shape.CanBroadcastTo sh1 sh2` encodes the broadcasting compatibility proof.
+The witness `cb : Shape.CanBroadcastTo sh1 sh2` encodes the broadcasting proof.
 PyTorch comparison: `x.expand(...)` / implicit broadcasting.
 -/
 def broadcastTo {α : Type} (s : SessionIR α) [Inhabited α] [Add α] [Zero α] [DecidableEq Shape]
@@ -343,7 +343,7 @@ Mean-reduce along `axis`.
 
 PyTorch comparison: `torch.mean(x, dim=axis)`.
 -/
-def reduceMean {α : Type} (s : SessionIR α) [Context α] [Inhabited α] [DecidableEq Shape]
+def reduceMean {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
   {sh : Shape} (axis : Nat) [valid : Shape.valid_axis_inst axis sh] [wf : Shape.WellFormed sh]
   (x : TensorRef α sh) : IO (TensorRef α (shapeAfterSum sh axis)) :=
   commitGraphM (α := α) s (β := TensorRef α (shapeAfterSum sh axis)) (fun {Γ} {ss} xv nat g => do
@@ -689,4 +689,3 @@ end Internal
 end Torch
 end Autograd
 end Runtime
-

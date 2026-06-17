@@ -155,7 +155,9 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
           (fun x : CtxVec Γ =>
             (CtxVec.get (Γ := Γ) (s := s) yhat x) - (CtxVec.get (Γ := Γ) (s := s) target x))
           diffDeriv xV := by
-      simpa [diffDeriv] using hgetY.sub hgetT
+      have hsub := hgetY.sub hgetT
+      refine hsub.congr_of_eventuallyEq ?_
+      exact Filter.Eventually.of_forall fun _ => rfl
     -- `‖diff ·‖^2` and scale by `c`.
     have hsq :
         HasFDerivAt
@@ -186,20 +188,16 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
       funext x
       ext i
       fin_cases i
-      let k0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
-      -- Reduce to `r = (vecScalarCLM r).ofLp 0`, then close by `vecScalarCLM_ofLp`.
-      have hbase :
+      calc
+        ((Node.forwardVec (Γ := Γ) (τ := Shape.scalar)
+              (mseLoss (Γ := Γ) (s := s) yhat target)) x).ofLp ⟨0, by simp [Shape.size]⟩
+            =
           (↑(Shape.size s))⁻¹ *
-              ‖CtxVec.get (Γ := Γ) (s := s) yhat x - CtxVec.get (Γ := Γ) (s := s) target x‖ ^ 2 =
-            (vecScalarCLM
-                  ((↑(Shape.size s))⁻¹ *
-                    ‖CtxVec.get (Γ := Γ) (s := s) yhat x - CtxVec.get (Γ := Γ) (s := s) target x‖ ^
-                      2)).ofLp
-              k0 := by
-        simp
-      -- Now unfold both sides to this canonical scalar.
-      simpa [mseLoss, Node.forwardVec_ofVec, g, c, n, Shape.size, smul_eq_mul, div_eq_mul_inv]
-        using hbase
+            ‖CtxVec.get (Γ := Γ) (s := s) yhat x -
+              CtxVec.get (Γ := Γ) (s := s) target x‖ ^ 2 := by
+            simp [mseLoss, Node.forwardVec_ofVec, Shape.size, div_eq_mul_inv]
+        _ = (vecScalarCLM (g x)).ofLp ⟨0, by simp [Shape.size]⟩ := by
+            simp [g, c, n, smul_eq_mul, div_eq_mul_inv]
     exact hwrap.congr_of_eventuallyEq hEq.eventuallyEq
   · intro xV dxV
     let diffV : Vec (Shape.size s) :=
@@ -209,13 +207,12 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
     let ddiffV : Vec (Shape.size s) :=
       (CtxVec.get (Γ := Γ) (s := s) yhat dxV) - (CtxVec.get (Γ := Γ) (s := s) target dxV)
     have hdiffDeriv : diffDeriv dxV = ddiffV := by
-      simp [diffDeriv, ddiffV, CtxVec.getCLM_apply, ContinuousLinearMap.sub_apply]
+      simp [diffDeriv, ddiffV, CtxVec.getCLM_apply]
     -- Avoid expanding `inner` on differences; both sides are the same scalar packaged into `Vec 1`.
     have hD0 :
         D0 dxV = c * (2 * inner ℝ diffV ddiffV) := by
       -- `innerSL` is `y ↦ ⟪diffV,y⟫`
       simp [D0, hdiffDeriv, innerSL_apply_apply, ContinuousLinearMap.comp_apply,
-        ContinuousLinearMap.smul_apply,
         smul_eq_mul, mul_left_comm]
     -- Finish by extensionality on `Vec 1`.
     ext i

@@ -10,6 +10,7 @@ public import NN.API.Adapters
 public import NN.API.Common
 public import NN.API.Data
 public import NN.API.Macros
+public import NN.API.Public.TensorPack
 public import NN.API.Rand
 public import NN.API.RL
 public import NN.API.Runtime
@@ -45,8 +46,8 @@ abbrev LayerDef := TorchLean.NN.LayerDef
 /-!
 Re-export common `Seq` helpers under `API.nn.*` so examples can use the stable public API.
 
-The names mirror the TorchLean runtime layer so users can move between the high-level and lower-level
-APIs without learning a second vocabulary.
+The names mirror the TorchLean runtime layer so users can move between the public API and
+runtime-facing code without learning a second vocabulary.
 -/
 export TorchLean.NN.Seq
   (paramShapes paramRequiresGrad initParams updateBuffers
@@ -75,7 +76,7 @@ Linear layer on the last axis (prefix-shape preserving).
 PyTorch analogue: `torch.nn.Linear`.
 See `https://pytorch.org/docs/stable/generated/torch.nn.Linear.html`.
 
-Unlike the lower-level TorchLean layer constructor (which is vector-only),
+Unlike the runtime TorchLean layer constructor (which is vector-only),
 this public layer constructor follows PyTorch’s convention:
 
 - if `x` has shape `[..., inDim]`, `linear inDim outDim` returns a model of shape `[..., outDim]`.
@@ -95,8 +96,9 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
     (s := bShape) (sch := .zeros) (seed := seedB)
   let batch : Nat := Spec.Shape.size pfx
   of
-    { paramShapes := [WShape, bShape]
-      initParams := TorchLean.tlist2 w0 b0
+    { kind := s!"Linear({inDim}, {outDim})"
+      paramShapes := [WShape, bShape]
+      initParams := tensorpack! w0, b0
       paramRequiresGrad := [true, true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -221,8 +223,9 @@ def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape :
     _root_.Runtime.Autograd.Torch.Init.tensor (s := WShape) (sch := cfg.wInit) (seed := cfg.seedW)
   let batch : Nat := Spec.Shape.size pfx
   of
-    { paramShapes := [WShape]
-      initParams := TorchLean.tlist1 w0
+    { kind := s!"Embedding({vocab}, {embedDim})"
+      paramShapes := [WShape]
+      initParams := tensorpack! w0
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -276,8 +279,9 @@ def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPosit
   let pos0 : Spec.Tensor Float posShape :=
     _root_.Runtime.Autograd.Torch.Init.tensor (s := posShape) (sch := cfg.posInit) (seed := cfg.seedPos)
   of
-    { paramShapes := [posShape]
-      initParams := TorchLean.tlist1 pos0
+    { kind := "LearnedPositionalEmbedding"
+      paramShapes := [posShape]
+      initParams := tensorpack! pos0
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -313,8 +317,9 @@ def sinusoidalPositionalEncoding {batch seqLen embedDim : Nat}
   let pe0 : Spec.Tensor Float peShape :=
     Spec.sinusoidalPositionalEncodingSpec (α := Float) seqLen embedDim cfg.startPos
   of
-    { paramShapes := [peShape]
-      initParams := TorchLean.tlist1 pe0
+    { kind := "SinusoidalPositionalEncoding"
+      paramShapes := [peShape]
+      initParams := tensorpack! pe0
       paramRequiresGrad := [false]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -374,8 +379,9 @@ def rope {batch numHeads seqLen headDim : Nat} (cfg : RoPE := {}) :
       Spec.Tensor.scalar out)
 
   of
-    { paramShapes := [csShape, csShape]
-      initParams := TorchLean.tlist2 cos0 sin0
+    { kind := "RoPE"
+      paramShapes := [csShape, csShape]
+      initParams := tensorpack! cos0, sin0
       paramRequiresGrad := [false, false]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -466,7 +472,8 @@ PyTorch analogue: `torch.flatten(x, start_dim=1)`.
 def flattenBatch {n : Nat} {s : Spec.Shape} :
     Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s)) :=
   of
-    { paramShapes := []
+    { kind := "FlattenBatch"
+      paramShapes := []
       initParams := .nil
       paramRequiresGrad := []
       forward := fun _ {α} _ _ =>

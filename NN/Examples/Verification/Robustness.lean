@@ -6,8 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.Robustness.TorchLeanRobustness
-public import NN.Examples.Verification.Robustness.VerifyMarginCert
+public import NN.Verification.Robustness.MarginCertCLI
+public import NN.Verification.Robustness.TorchLean
 
 /-!
 # Robustness Verification Examples

@@ -69,8 +69,7 @@ Compute `ᾱ_t` for `t : Fin (T+1)` with the convention:
 - `ᾱ_0 = 1`,
 - `ᾱ_{t+1} = ᾱ_t * α_t`.
 
-Implementation note: we define an auxiliary recursion on `Nat` and then package it as a `Fin`
-function; this keeps the definition total and easy to evaluate.
+Implementation note: define an auxiliary recursion on `Nat`, then package it as a `Fin` function.
 -/
 def alphaBar (sched : VPSchedule α T) (t : Fin (T + 1)) : α :=
   let rec go : (k : Nat) → k < T + 1 → α

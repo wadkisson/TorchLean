@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -284,7 +283,7 @@ training/path artifacts so we can inspect behavior in the editor.
 Run:
 
 ```
-lake exe torchlean ppo_gridworld
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 ## Gymnasium CartPole
@@ -303,7 +302,7 @@ Run:
 
 ```
 python3 -m pip install --user 'gymnasium>=1.0'
-lake exe torchlean ppo_cartpole
+lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 ## Atari Pong RAM
@@ -317,12 +316,14 @@ typed tensor just like the other examples.
 The viewer [NN.Examples.RL.PPOPongRamView API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOPongRamView.lean) displays
 the training curve artifact.
 
-Run:
+Dependency setup for the optional ALE path:
 
 ```
 python3 -m pip install --user 'gymnasium>=1.0' ale-py
-lake exe torchlean ppo_pong_ram
 ```
+
+This path is optional. It depends on a compatible external ALE/Gymnasium installation, so it is not
+part of the default `torchlean` quick-check list.
 
 # Interpreting A TorchLean RL Claim
 

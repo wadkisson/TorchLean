@@ -15,12 +15,12 @@ public meta import ProofWidgets.Demos.Macro
 
 This file implements the editor-side "write PyTorch, see TorchLean" translator workflow.
 
-The goal is deliberately modest and honest:
+The supported scope is deliberately small:
 
 - accept a Python source file, with a lower-level command for selected `nn.Sequential` /
   `nn.Module` text;
 - recognize common layer constructors by name;
-- emit a TorchLean skeleton using the public `nn.sequential!` style;
+- emit a TorchLean skeleton using the public `import NN` / `nn.Sequential!` style;
 - report the exact boundary between translated layers, layers that need extra shape information,
   and Python code that is outside this supported-subset assistant.
 
@@ -75,7 +75,7 @@ inductive Layer where
   | maxPool2d (kernel stride : Nat)
   /-- Adaptive average pooling is detected as a named boundary item. -/
   | adaptiveAvgPool2d (out : Nat)
-  /-- Flatten layer; translated to `nn.flatten` in vector-style sequential skeletons. -/
+  /-- Flatten layer; translated to `nn.Flatten` in vector-style sequential skeletons. -/
   | flatten
   /-- Elementwise ReLU. -/
   | relu
@@ -177,7 +177,7 @@ private def supported (l : Layer) : Bool :=
   | .unsupported _ _ => false
   | _ => true
 
-/-- Human-readable layer label used in the report table. -/
+/-- Layer label used in the report table. -/
 private def layerName : Layer → String
   | .linear i o => s!"Linear({i}, {o})"
   | .conv2d i o k s p => s!"Conv2d({i}, {o}, kernel={k}, stride={s}, padding={p})"
@@ -192,19 +192,19 @@ private def layerName : Layer → String
   | .unsupported raw _ => s!"Unsupported: {raw}"
 
 /--
-Render a layer as a direct `nn.sequential!` term when that is safe for the supported subset.
+Render a layer as a direct `nn.Sequential!` term when that is safe for the supported subset.
 
 Only vector-shaped elementwise and linear layers are emitted directly. Shape-changing CNN pieces are
 not silently guessed, because that would create exactly the kind of misleading "it translated!"
 experience TorchLean should avoid.
 -/
 private def layerTorchLeanTerm? : Layer → Option String
-  | .linear i o => some s!"nn.linear {i} {o} (pfx := Spec.Shape.scalar)"
-  | .flatten => some "nn.flatten"
-  | .relu => some "nn.relu"
-  | .gelu => some "nn.gelu"
-  | .sigmoid => some "nn.sigmoid"
-  | .tanh => some "nn.tanh"
+  | .linear i o => some s!"nn.Linear {i} {o}"
+  | .flatten => some "nn.Flatten"
+  | .relu => some "nn.ReLU"
+  | .gelu => some "nn.GELU"
+  | .sigmoid => some "nn.Sigmoid"
+  | .tanh => some "nn.Tanh"
   | _ => none
 
 /--
@@ -217,13 +217,13 @@ and seed, adaptive-pooling semantics, or an unsupported PyTorch operation.
 private def layerBoundaryComment? : Layer → Option String
   | .conv2d i o k s p =>
       some <| s!"-- Conv2d({i}, {o}, kernel_size={k}, stride={s}, padding={p}) detected: " ++
-        "add `nn.conv` after choosing `batch`, `inH`, and `inW`."
+        "add `nn.Conv2d` after choosing `batch`, `inH`, and `inW`."
   | .maxPool2d k s =>
       some s!"-- MaxPool2d(kernel_size={k}, stride={s}) detected: add pooling after choosing channel/spatial dimensions."
   | .adaptiveAvgPool2d o =>
       some s!"-- AdaptiveAvgPool2d({o}) detected: connect this to the specific TorchLean pooling spec you want."
   | .dropout =>
-      some "-- Dropout detected: add `nn.dropout p (seed := seed)` after making `p` and mode behavior explicit."
+      some "-- Dropout detected: add `nn.Dropout p (seed := seed)` after making `p` and mode behavior explicit."
   | .unsupported raw reason =>
       some s!"-- Unsupported PyTorch line: {raw} ({reason})"
   | _ => none
@@ -339,7 +339,7 @@ Generate a TorchLean skeleton from the recognized layer sequence.
 The emitted code is meant to be a starting point, not a final theorem. It imports the public
 TorchLean umbrella, opens the user-facing API namespaces, emits direct sequential terms for the safe
 subset, and then appends boundary notes as Lean comments. The next intended step is to add a concrete
-shape contract and wrap the model in a `train.Task` / `SeqTask`.
+shape contract and wrap the model in a `train.Advanced.Task` / `SeqTask`.
 -/
 def torchLeanSkeleton (r : Report) (name : String := "translatedModel") : String :=
   let translatedLines :=
@@ -358,11 +358,10 @@ def torchLeanSkeleton (r : Report) (name : String := "translatedModel") : String
   joinLines [
     "import NN",
     "",
-    "open NN.API",
-    "open Spec",
+    "open TorchLean",
     "",
     s!"def {name} :=",
-    "  nn.sequential![",
+    "  nn.Sequential![",
     body,
     "  ]",
     "",
@@ -370,7 +369,7 @@ def torchLeanSkeleton (r : Report) (name : String := "translatedModel") : String
     "",
     "-- Next steps:",
     "-- 1. Add the concrete input/output shape contract.",
-    "-- 2. Choose a loss and wrap this in a `train.Task` / `SeqTask`.",
+    "-- 2. Choose a loss and wrap this in a `train.Advanced.Task` / `SeqTask`.",
     "-- 3. If this came from a real PyTorch module, use `torch.export` capture for a checked graph path."
   ]
 

@@ -7,6 +7,9 @@ Authors: TorchLean Team
 module
 
 public import NN.Entrypoint.Spec
+public import NN.API.CLI
+public import NN.API.Macros
+public import NN.API.Public.TensorPack
 public import NN.MLTheory.CROWN.Core
 public import NN.MLTheory.CROWN.Graph
 public import NN.MLTheory.CROWN.Lyapunov.TwoStage.Core
@@ -148,7 +151,7 @@ Load stage-1 parameters exported by PyTorch as *float32 bit patterns*.
 We do this (instead of parsing JSON floats) so stage-2 runs under *bit-exact* float32 semantics
 (`IEEE32Exec`) without decimal conversion error.
 -/
-def loadStage1Params (width : Nat) (path : String) : IO (TorchLean.TList α (paramShapes
+def loadStage1Params (width : Nat) (path : String) : IO (NN.API.TensorPack α (paramShapes
   width)) := do
   let jsonStr ← IO.FS.readFile path
   let j ← match Json.parse jsonStr with
@@ -175,7 +178,7 @@ def loadStage1Params (width : Nat) (path : String) : IO (TorchLean.TList α (par
   let w2 ← mkMat 1 width (bitsToα w2Bits)
   let b2 ← mkVec 1 (bitsToα b2Bits)
 
-  pure <| .cons wC (.cons bC (.cons w1 (.cons b1 (.cons w2 (.cons b2 .nil)))))
+  pure <| tensorpack! wC, bC, w1, b1, w2, b2
 
 abbrev lossΓ (width : Nat) : List Shape := paramShapes width ++ [xShape]
 
@@ -188,14 +191,14 @@ then clamp to the training box `[-rad, rad]^2`.
 def pgdStepCompiled
     (width : Nat)
     (cLoss : _root_.Runtime.Autograd.Torch.CompiledScalar α (lossΓ width))
-    (params : TorchLean.TList α (paramShapes width))
+    (params : NN.API.TensorPack α (paramShapes width))
     (x : Tensor α xShape) : Tensor α xShape :=
-  let args : TorchLean.TList α (lossΓ width) :=
+  let args : NN.API.TensorPack α (lossΓ width) :=
     _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) params (.cons x .nil)
-  let gAll : TorchLean.TList α (lossΓ width) :=
+  let gAll : NN.API.TensorPack α (lossΓ width) :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.backward (α := α) (Γ := lossΓ width) cLoss args
-  let gx : TorchLean.TList α [xShape] :=
+  let gx : NN.API.TensorPack α [xShape] :=
     (_root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) gAll).2
   let .cons g .nil := gx
@@ -209,7 +212,7 @@ over a small box around the origin.
 This check proves that the training objective is small on that box; it is not
 claimed to match α/β-CROWN tightness.
 -/
-def checkBox (width : Nat) (params : TorchLean.TList α (paramShapes width)) (eps : α :=
+def checkBox (width : Nat) (params : NN.API.TensorPack α (paramShapes width)) (eps : α :=
   epsCheck) : IO Unit := do
   IO.println "Stage 2 check: IBP + CROWN on the scalar loss over a small box"
   let compiled ←
@@ -222,34 +225,52 @@ def checkBox (width : Nat) (params : TorchLean.TList α (paramShapes width)) (ep
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α xShape := Spec.zeros (α := α) xShape
-  let radT : Tensor α xShape := Spec.fill (α := α) eps xShape
-  let xB : FlatBox α :=
-    { dim := xDim
-      lo := Tensor.subSpec x0 radT
-      hi := Tensor.addSpec x0 radT }
-
-  let ps : ParamStore α :=
-    { compiled.ps with inputBoxes := compiled.ps.inputBoxes.insert compiled.inputId xB }
+  let xB : FlatBox α := NN.MLTheory.CROWN.FlatBox.lInfBall (α := α) x0 eps
+  let ps : ParamStore α := compiled.seedInputBox xB
 
   let ibp := runIBP (α := α) compiled.graph ps
-  let some outB := ibp[compiled.outputId]! | throw <| IO.userError "IBP produced no output box"
+  let outB ← compiled.outputBoxOrThrow ibp
   IO.println s!"[IBP] scalar loss box dim={outB.dim}"
 
-  let ctx : AffineCtx := { inputId := compiled.inputId, inputDim := xDim }
-  let crown := runCROWN (α := α) compiled.graph ps ctx ibp
-  match crown[compiled.outputId]! with
-  | none => IO.println "[CROWN] no affine bounds for scalar loss"
-  | some outAff =>
-      if hIn : outAff.inDim = xDim then
-        let xBox : Box α (.dim outAff.inDim .scalar) :=
-          { lo := Tensor.castVecDim (α := α) (n := xDim) (m := outAff.inDim) hIn.symm xB.lo
-            hi := Tensor.castVecDim (α := α) (n := xDim) (m := outAff.inDim) hIn.symm xB.hi }
-        let outLo := NN.MLTheory.CROWN.AffineVec.evalOnBox (α := α) outAff.loAff xBox
-        let outHi := NN.MLTheory.CROWN.AffineVec.evalOnBox (α := α) outAff.hiAff xBox
-        IO.println s!"[CROWN] loss lo = {pretty outLo.lo}"
-        IO.println s!"[CROWN] loss hi = {pretty outHi.hi}"
-      else
-        IO.println s!"[CROWN] unexpected input dim {outAff.inDim} (expected {xDim})"
+  match NN.MLTheory.CROWN.Graph.outputBoxCROWN? compiled.graph ps xB
+      compiled.inputId compiled.outputId xDim with
+  | .ok outB =>
+      IO.println s!"[CROWN] loss lo = {pretty outB.lo}"
+      IO.println s!"[CROWN] loss hi = {pretty outB.hi}"
+  | .error msg =>
+      IO.println s!"[CROWN] {msg}"
+
+/-- Parsed command options for the hybrid two-stage runner. -/
+structure HybridCliOptions where
+  weightsPath : String
+  forceStage1 : Bool
+  stage1Steps : Nat
+  longRun : Bool
+  paperRun : Bool
+  candidates : Nat
+deriving Repr
+
+/-- Parse all CLI flags once, so the runner and stage-1 bootstrap cannot disagree. -/
+def parseHybridCliOptions (width : Nat) (args : List String) : IO HybridCliOptions := do
+  let defaultPath : String := s!"_external/van_stage1_w{width}_bits.json"
+  let args := NN.API.CLI.dropDashDash args
+  let (weightsFlag?, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFlagValueOnce args "weights"
+  let (positionalWeights, args) ← NN.API.CLI.orThrow <|
+    NN.API.CLI.takePositionalDefault args defaultPath
+  let (forceStage1, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "stage1"
+  let (stage1Steps, args) ← NN.API.CLI.orThrow <|
+    NN.API.CLI.takeNatFlagDefault args "stage1-steps" 10
+  let (longRun, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "long"
+  let (paperRun, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "paper"
+  let (candidates, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeNatFlagDefault args "candidates" 1
+  NN.API.CLI.orThrow <| NN.API.CLI.requireNoArgs args
+  pure
+    { weightsPath := weightsFlag?.getD positionalWeights
+      forceStage1 := forceStage1
+      stage1Steps := stage1Steps
+      longRun := longRun
+      paperRun := paperRun
+      candidates := candidates }
 
 /--
 Run the external PyTorch Stage-1 exporter (if needed) and return the JSON path.
@@ -258,32 +279,19 @@ This is the only place pipeline (ii) depends on Python. The trust boundary is st
 - Stage 1 provides an **initialization only** (untrusted),
 - Stage 2 and the IBP/CROWN post-check run inside Lean under exact `IEEE32Exec` semantics.
 -/
-def ensureStage1Weights (width : Nat) (args : List String) : IO String := do
-  let defaultPath : String := s!"_external/van_stage1_w{width}_bits.json"
-  let weightsPath : String :=
-    match args.find? (fun a => a.startsWith "--weights=") with
-    | some a => (a.drop 10).toString
-    | none =>
-        match args.find? (fun a => !a.startsWith "--") with
-        | some a => a
-        | none => defaultPath
-
-  let force : Bool := args.any (· = "--stage1")
-  let steps : Nat :=
-    match args.find? (fun a => a.startsWith "--stage1-steps=") with
-    | some a => (a.drop 15).toString.toNat?.getD 10
-    | none => 10
-
+def ensureStage1Weights (width : Nat) (opts : HybridCliOptions) : IO String := do
+  let weightsPath := opts.weightsPath
   let weightsExists := (← System.FilePath.pathExists (System.FilePath.mk weightsPath))
-  if weightsExists && !force then
+  if weightsExists && !opts.forceStage1 then
     return weightsPath
 
-  IO.println s!"[stage1] running PyTorch exporter (width={width} steps={steps}) → {weightsPath}"
+  IO.println s!"[stage1] running PyTorch exporter (width={width} steps={opts.stage1Steps}) → {weightsPath}"
   let script : String :=
     "scripts/verification/two_stage/export_van_stage1_bits.py"
   let proc := (← IO.Process.spawn
     { cmd := "python3"
-      args := #[script, "--width", toString width, "--steps", toString steps, "--out", weightsPath]
+      args := #[script, "--width", toString width, "--steps", toString opts.stage1Steps,
+        "--out", weightsPath]
       stdout := .inherit
       stderr := .inherit })
   let code := (← proc.wait)
@@ -297,21 +305,16 @@ def ensureStage1Weights (width : Nat) (args : List String) : IO String := do
 /-- Main entrypoint for the hybrid pipeline (width is a parameter; CLI default is `defaultWidth`).
   -/
 def run (width : Nat) (args : List String) : IO Unit := do
-  let weightsPath ← ensureStage1Weights width args
+  let opts ← parseHybridCliOptions width args
+  let weightsPath ← ensureStage1Weights width opts
 
-  let longRun : Bool := args.any (· = "--long")
-  let paperRun : Bool := args.any (· = "--paper")
-  let stage2Rounds : Nat := (if longRun then 10 else if paperRun then 10 else 1)
-  let pgdSteps : Nat := (if longRun then 20 else if paperRun then 10 else 1)
-  let candidates : Nat :=
-    match args.find? (fun a => a.startsWith "--candidates=") with
-    | some a => (a.drop 13).toNat?.getD 1
-    | none => 1
+  let stage2Rounds : Nat := (if opts.longRun then 10 else if opts.paperRun then 10 else 1)
+  let pgdSteps : Nat := (if opts.longRun then 20 else if opts.paperRun then 10 else 1)
 
   IO.println "== TwoStage Hybrid workflow: Stage1=PyTorch (bits), Stage2=TorchLean (IEEE32Exec) =="
   IO.println
     (s!"weights={weightsPath} width={width} stage2Rounds={stage2Rounds} " ++
-      s!"candidates={candidates} pgdSteps={pgdSteps}")
+      s!"candidates={opts.candidates} pgdSteps={pgdSteps}")
 
   let initParams ← loadStage1Params width weightsPath
   let mod ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModule.create
@@ -319,8 +322,8 @@ def run (width : Nat) (args : List String) : IO Unit := do
     (opts := { backend := .compiled })
     (initRequiresGrad := List.replicate (paramShapes width).length true)
     (loss := lossProg width (β := α))
-    initParams
-  let tr := mod.trainer
+    (initParams := initParams)
+  let tr := _root_.Runtime.Autograd.TorchLean.Module.ScalarModule.trainer mod
 
   let cLoss ← TorchLean.Autodiff.compileLoss
     (α := α) (paramShapes := paramShapes width) (inputShapes := [xShape]) (lossProg width)
@@ -329,7 +332,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
   let mut seed : UInt64 := 1
   let mut foundViolations : Nat := 0
   for round in [0:stage2Rounds] do
-    for _ci in [0:candidates] do
+    for _ci in [0:opts.candidates] do
       let (seed', x0) := sampleVec2 seed rad
       seed := seed'
       let loss0 := _root_.Runtime.Autograd.Torch.scalarOf (←
@@ -338,7 +341,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
       let mut x := x0
       for _k in [0:pgdSteps] do
         x := pgdStepCompiled width cLoss params x
-      let xs : TorchLean.TList α [xShape] := .cons x .nil
+      let xs : NN.API.TensorPack α [xShape] := tensorpack! x
       let lossFound := _root_.Runtime.Autograd.Torch.scalarOf (←
         _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr xs)
       if (0 : α) < lossFound then
@@ -348,7 +351,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
 
   let params ← tr.getParams
   IO.println
-    (s!"[stage2] PGD counterexample candidates={stage2Rounds * candidates} " ++
+    (s!"[stage2] PGD counterexample candidates={stage2Rounds * opts.candidates} " ++
       s!"(positive-loss={foundViolations})")
   checkBox width params (eps := epsCheck)
 

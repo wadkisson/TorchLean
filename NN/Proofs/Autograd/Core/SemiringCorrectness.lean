@@ -100,25 +100,6 @@ def compose {α : Type} [CommSemiring α] {σ τ υ : Shape}
 
 end OpSpecCorrect
 
-/-!
-## Small list/finite-sum bookkeeping
-
-The semiring-generic dot product is defined by folding over coordinates, so we collect a small
-congruence lemma to rewrite the per-coordinate term.
--/
-
-/--
-If two functions `f` and `g` are pointwise equal, then folding `(+ f x)` over a list is the same as
-folding `(+ g x)`.
--/
-private lemma foldl_add_congr {α β : Type} [Add α] (l : List β) (f g : β → α) (a : α)
-    (h : ∀ x, f x = g x) :
-    l.foldl (fun s x => s + f x) a = l.foldl (fun s x => s + g x) a := by
-  induction l generalizing a with
-  | nil => simp
-  | cons hd tl ih =>
-    simp [List.foldl, h hd, ih]
-
 /--
 Elementwise multiplication is self-adjoint with respect to the algebraic tensor dot-product.
 
@@ -146,7 +127,7 @@ private theorem dot_elemwise_adjoint {α : Type} [CommSemiring α] {s : Shape}
             intro i
             simpa using (ih (dx := fdx i) (df := fdf i) (δ := fδ i))
           have hfold :=
-            foldl_add_congr (l := List.finRange n)
+            List.foldl_add_congr (l := List.finRange n)
               (f := fun i => dot (α := α) (mulSpec (fdx i) (fdf i)) (fδ i))
               (g := fun i => dot (α := α) (fdx i) (mulSpec (fdf i) (fδ i)))
               (a := (0 : α)) hterm

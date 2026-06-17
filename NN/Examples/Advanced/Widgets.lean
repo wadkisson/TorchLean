@@ -18,7 +18,7 @@ meta import NN.Spec.Core.TensorBridge
 /-!
 # Widget Gallery
 
-This file is best explored in an editor:
+The gallery is best explored in an editor:
 - put the cursor on a `#tensor_view` / `#ir_view` / `#float32_view` line, and
 - Lean will render a small interactive HTML panel in the infoview.
 
@@ -55,7 +55,7 @@ def gw44 : GridWorld 4 4 :=
 def pos : GridWorld.State 4 4 :=
   (⟨1, by decide⟩, ⟨2, by decide⟩)
 
-/-- Constant policy used to illustrate policy visualization. -/
+/-- Constant policy for the policy-visualization demo. -/
 def goRightPolicy : GridWorld.State 4 4 → GridWorld.Action :=
   fun _ => GridAction.right
 
@@ -132,6 +132,9 @@ private def tinyData : Array (Vec2 × Float) :=
   , ((0.0, 1.0), 2.0)
   ]
 
+private theorem tinyData_nonempty : 0 < tinyData.size := by
+  decide
+
 private structure Params where
   w1 : Mat2
   b1 : Vec2
@@ -179,7 +182,9 @@ private def sgdStep (p : Params) (x : Vec2) (y : Float) : (Params × Float × Fl
 private def trainLoop : Nat → Params → List Float → List Float → (List Float × List Float)
   | 0, _, losses, errs => (losses.reverse, errs.reverse)
   | Nat.succ k, p, losses, errs =>
-      let (x, y) := tinyData[(k % tinyData.size)]!
+      let idx : Fin tinyData.size := ⟨k % tinyData.size, Nat.mod_lt k tinyData_nonempty⟩
+      let sample := tinyData[idx]
+      let (x, y) := sample
       let (p', loss, absErr) := sgdStep p x y
       trainLoop k p' (loss :: losses) (absErr :: errs)
 

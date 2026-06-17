@@ -332,10 +332,12 @@ theorem approxT_sigmoid_spec {s : Shape} :
               have hone :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) oneR - (1 : ℝ)) ≤
                     oneEps (β := β) (fexp := fexp) := by
+                change
+                  abs ((TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd)
+                    (1 : ℝ)).val - (1 : ℝ)) ≤ oneEps (β := β) (fexp := fexp)
                 simpa [oneEps, NFBackend.toSpec, TorchLean.Floats.NF.toReal,
-                  Proofs.RuntimeRoundingApprox.roundR,
-                  TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal,
-                    TorchLean.Floats.NF.instOne] using
+                  Proofs.RuntimeRoundingApprox.roundR, TorchLean.Floats.NF.roundR,
+                  TorchLean.Floats.NF.ofReal] using
                   (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd :=
                     rnd) (1 : ℝ))
               have hdiv :=
@@ -347,7 +349,8 @@ theorem approxT_sigmoid_spec {s : Shape} :
                           (Activation.Math.sigmoidSpec (α := R) xR) -
                         Activation.Math.sigmoidSpec (α := ℝ) x) ≤
                     sigmoidBoundScalar (β := β) (fexp := fexp) (rnd := rnd) xR := by
-                simpa [Activation.Math.sigmoidSpec, sigmoidBoundScalar, oneEps, oneR, denomR, y]
+                simpa [Activation.Math.sigmoidSpec, sigmoidBoundScalar, oneEps, oneR, denomR, y,
+                  MathFunctions.exp]
                   using hdiv
               have hle :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd)
@@ -358,7 +361,7 @@ theorem approxT_sigmoid_spec {s : Shape} :
                 refine le_trans hb ?_
                 -- `linf_norm` of a scalar tensor is `abs` of its entry.
                 simpa [sigmoidBoundTensor, Spec.mapTensor, linfNorm, RuntimeApprox.linfNorm,
-                  tensorLinfNorm] using
+                  tensorLinfNorm, MathFunctions.abs] using
                   (le_abs_self (sigmoidBoundScalar (β := β) (fexp := fexp) (rnd := rnd) xR))
               exact
                 (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -437,9 +440,17 @@ theorem approxT_sigmoid_spec {s : Shape} :
                         (mapSpec (s := Shape.dim n s) (Activation.Math.sigmoidSpec (α := R))
                           (Tensor.dim xRf)))
                     ≤ B := by
-                simpa [tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                  linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                    Spec.mapTensor, mapSpec] using hfold
+                change
+                  List.foldl
+                    (fun a i =>
+                      max a
+                        (tensorDistance (α := SpecScalar) linfNorm
+                          (mapSpec (s := s) (Activation.Math.sigmoidSpec (α := ℝ)) (xSf i))
+                          (tensorToSpec (α := R)
+                            (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                            (mapSpec (s := s) (Activation.Math.sigmoidSpec (α := R)) (xRf i)))))
+                    0 (List.finRange n) ≤ B
+                exact hfold
               simpa [approxT, approxWith, B] using this
 end NFBackend
 
@@ -447,4 +458,3 @@ end
 
 end RuntimeApprox
 end Proofs
-

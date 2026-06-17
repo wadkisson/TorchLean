@@ -11,6 +11,7 @@ public import NN.Runtime.PyTorch.Import.Core
 public import NN.Spec.Core.Utils
 public import NN.Verification.Util.FloatApprox
 public import NN.Verification.Util.Json
+public import NN.Verification.Util.Tensor
 
 /-!
 # IBPCert
@@ -64,10 +65,12 @@ Returns `true` iff bounds match componentwise (within tolerance).
 On mismatch, prints both Lean and JSON bounds for debugging.
 -/
 def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol : Float := 1e-5) :
-    IO Bool := do
+  IO Bool := do
   let boxes := runIBP (α := Float) g ps
-  let some outB := boxes[outId]! |
-    throw <| IO.userError s!"Lean IBP produced no output box at node {outId}"
+  let outB ←
+    match NN.MLTheory.CROWN.Graph.outputBox? boxes outId with
+    | .ok outB => pure outB
+    | .error msg => throw <| IO.userError s!"Lean IBP produced no output box: {msg}"
 
   let topObj ← readJsonObjectFile path
   let resultObj ← expectFieldObj topObj "result" "top-level"
@@ -78,30 +81,31 @@ def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol
   let some loVec := parseFloatVec n loJ | throw <| IO.userError "Missing/invalid result.lo"
   let some hiVec := parseFloatVec n hiJ | throw <| IO.userError "Missing/invalid result.hi"
 
-  match outB.lo, outB.hi with
-  | .dim vlo, .dim vhi =>
-      let okLo :=
-        (List.finRange n).all (fun i =>
-          match vlo i with
-          | .scalar v => approxEq v (loVec i) (tol := tol))
-      let okHi :=
-        (List.finRange n).all (fun i =>
-          match vhi i with
-          | .scalar v => approxEq v (hiVec i) (tol := tol))
-      if okLo && okHi then
-        IO.println "IBP certificate verified: Python and Lean agree."
-        pure true
-      else
-        IO.println "Mismatch between Python and Lean IBP bounds."
-        let pyLoStr :=
-          String.intercalate ", " ((List.finRange n).map (fun i => toString (loVec i)))
-        let pyHiStr :=
-          String.intercalate ", " ((List.finRange n).map (fun i => toString (hiVec i)))
-        IO.println s!"Lean lo: {Spec.pretty outB.lo}"
-        IO.println s!"Py   lo: [{pyLoStr}]"
-        IO.println s!"Lean hi: {Spec.pretty outB.hi}"
-        IO.println s!"Py   hi: [{pyHiStr}]"
-        pure false
+  let (leanLo, leanHi) := NN.Verification.Util.Tensor.flatBoxBoundsToArrays outB
+  let okLo :=
+    (List.finRange n).all (fun i =>
+      match leanLo[i.val]? with
+      | some v => approxEq v (loVec i) (tol := tol)
+      | none => false)
+  let okHi :=
+    (List.finRange n).all (fun i =>
+      match leanHi[i.val]? with
+      | some v => approxEq v (hiVec i) (tol := tol)
+      | none => false)
+  if okLo && okHi then
+    IO.println "IBP certificate verified: Python and Lean agree."
+    pure true
+  else
+    IO.println "Mismatch between Python and Lean IBP bounds."
+    let pyLoStr :=
+      String.intercalate ", " ((List.finRange n).map (fun i => toString (loVec i)))
+    let pyHiStr :=
+      String.intercalate ", " ((List.finRange n).map (fun i => toString (hiVec i)))
+    IO.println s!"Lean lo: {Spec.pretty outB.lo}"
+    IO.println s!"Py   lo: [{pyLoStr}]"
+    IO.println s!"Lean hi: {Spec.pretty outB.hi}"
+    IO.println s!"Py   hi: [{pyHiStr}]"
+    pure false
 
 /--
 Run `check` and raise a readable error on mismatch.

@@ -1,0 +1,188 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.API.Public.Facade
+public import NN.Verification.TorchLean.Compile
+
+/-!
+# TorchLean Transformer IBP Workflow
+
+Small end-to-end workflow:
+
+TorchLean (MHA + LayerNorm + MSE) → compile to `NN.IR.Graph` → run:
+- IBP (`runIBP`)
+- basic CROWN forward bounds (`runCROWN`)
+- objective-dependent backward/dual CROWN (`runCROWNBackwardObjective`)
+
+Run:
+  `lake exe verify -- torchlean-transformer-ibp`
+  `lake exe verify -- torchlean-transformer-ibp --with-crown`
+  `lake exe verify -- torchlean-transformer-ibp --dtype ieee754exec`
+-/
+
+@[expose] public section
+
+
+namespace NN.Verification.TorchLean.TransformerIBPWorkflow
+
+open _root_.Spec
+open _root_.Spec.Tensor
+open _root_.TorchLean
+
+open NN.MLTheory.CROWN.Graph
+open NN.MLTheory.CROWN
+
+/-- Sequence length for the transformer verification example. -/
+def n : Nat := 2
+/-- Model embedding dimension. -/
+def dModel : Nat := 2
+/-- Number of attention heads. -/
+def numHeads : Nat := 1
+/-- Per-head embedding dimension. -/
+def headDim : Nat := 2
+/-- Batch size for the transformer verification example. -/
+def batch : Nat := 1
+
+/-- Input shape `(batch × n × dModel)`. -/
+def xShape : Shape := .dim batch (Shape.mat n dModel)
+/-- Projection weight shape for Q/K/V: `(dModel × (numHeads*headDim))`. -/
+def wProjShape : Shape := Shape.mat dModel (numHeads * headDim)
+/-- Output projection weight shape: `((numHeads*headDim) × dModel)`. -/
+def wOShape : Shape := Shape.mat (numHeads * headDim) dModel
+/-- LayerNorm scale parameter shape, matching the feature dimension. -/
+def gammaShape : Shape := Shape.vec dModel
+/-- LayerNorm beta shape, matching the feature dimension. -/
+def betaShape : Shape := Shape.vec dModel
+/-- MSE target shape (matches the model output shape). -/
+def targetShape : Shape := xShape
+
+/-- Parameter shapes list for `modelLoss` (`Wq,Wk,Wv,Wo,gamma,beta,target`). -/
+def paramShapes : List Shape :=
+  [wProjShape, wProjShape, wProjShape, wOShape, gammaShape, betaShape, targetShape]
+
+/-- TorchLean program: `mha -> layer_norm -> mse_loss`, returning a scalar loss. -/
+def modelLoss {α : Type} [Context α] [DecidableEq Shape] :
+    _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [xShape])
+      _root_.TorchLean.Shape.scalar :=
+  fun {m} _ _ =>
+    fun wq wk wv wo gamma beta target x =>
+      (do
+        let y ← Ops.multiHeadAttention (m := m) (α := α)
+          (batch := batch) (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim)
+          (h1 := by decide) wq wk wv wo x (mask := none)
+        let yLn ← Ops.layerNorm (m := m) (α := α)
+          (batch := batch) (seqLen := n) (embedDim := dModel) (h_seq_pos := by decide)
+          (h_embed_pos := by decide)
+          y gamma beta
+        Ops.mseLoss (m := m) (α := α) (s := xShape) yLn target
+        : m (Ops.RefTy (m := m) (α := α) _root_.TorchLean.Shape.scalar))
+
+/-- Runtime-selected typed runner used by the CLI entrypoint. -/
+def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+    [Runtime.Scalar α] (withCrown : Bool) : IO Unit := do
+  let cast : Float → α := Runtime.ofFloat
+  let params : nn.ParamTensors α paramShapes :=
+    nn.ParamTensors.of7
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+        [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+        [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+        [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+        [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2]
+        [cast 1.0, cast 1.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [2]
+        [cast 0.0, cast 0.0] (by rfl))
+      (NN.Tensor.tensorNDOfLenEq (α := α) [1, 2, 2]
+        [cast 0.0, cast 0.0, cast 0.0, cast 0.0] (by rfl))
+
+  let compiled ←
+    match Verification.compileProgram1
+          (α := α) (paramShapes := paramShapes) (σ := xShape)
+          (τ := _root_.TorchLean.Shape.scalar)
+          (modelLoss (α := α)) params with
+    | .ok c => pure c
+    | .error e => throw <| IO.userError e
+
+  IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
+
+  let x0 : Tensor α xShape :=
+    NN.Tensor.tensorNDOfLenEq (α := α) [1, 2, 2]
+      [cast 0.2, cast (-0.3), cast 0.7, cast 0.1] (by rfl)
+  let eps : α := Runtime.ofFloat 0.05
+  let xB : FlatBox α := Verification.lInfBall (α := α) x0 eps
+  let ps : ParamStore α := compiled.seedInputBox xB
+
+  let boxes := compiled.runIBP ps
+  let outB ← compiled.outputBoxOrThrow boxes
+  IO.println s!"[IBP] loss lo: {pretty outB.lo}"
+  IO.println s!"[IBP] loss hi: {pretty outB.hi}"
+
+  if !withCrown then
+    IO.println "[CROWN] skipped for the default runtime-check path; pass --with-crown for the heavier transformer CROWN run"
+    return ()
+
+  IO.println "[CROWN] running transformer-scale forward CROWN; this experimental path can take minutes"
+  let inputDim := Spec.Shape.size xShape
+  match compiled.outputBoxCROWN? ps xB with
+  | .ok outC =>
+      if hOut : outC.dim = 1 then
+          IO.println s!"[CROWN] loss lo: {pretty outC.lo}"
+          IO.println s!"[CROWN] loss hi: {pretty outC.hi}"
+      else
+        IO.println s!"[CROWN] unexpected output dim {outC.dim} (expected 1)"
+  | .error msg =>
+      IO.println s!"[CROWN] {msg}"
+
+  IO.println "[CROWN-backward] running objective-dependent backward CROWN"
+  let obj : FlatVec α := { n := 1, v := Spec.fill (α := α) Numbers.one (.dim 1 .scalar) }
+  match compiled.backwardObjectiveBox? ps boxes xB obj with
+  | .ok outC =>
+      IO.println s!"[CROWN-backward] loss lo: {pretty outC.lo}"
+      IO.println s!"[CROWN-backward] loss hi: {pretty outC.hi}"
+  | .error msg =>
+      IO.println s!"[CROWN-backward] {msg}"
+
+/-- Runtime-selected typed runner for the default IBP-only path. -/
+def runMainDefault {α : Type}
+    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+  runMain (α := α) false
+
+/-- Runtime-selected typed runner for the heavier IBP+CROWN path. -/
+def runMainWithCrown {α : Type}
+    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+  runMain (α := α) true
+
+/--
+CLI entry point for the transformer-IBP workflow.
+
+This is wired into `lake exe verify -- torchlean-transformer-ibp`.
+
+By default this command is a fast validation check: compile the TorchLean transformer fragment to the
+verification IR and run IBP on the scalar loss. Pass `--with-crown` to also run the experimental
+transformer-scale CROWN passes. The separate `torchlean-crown-ops` command keeps CROWN itself in the
+standard check suite on compact graphs, while this file focuses on the heavier attention/layer-norm
+front-end path.
+-/
+def main (args : List String) : IO Unit := do
+  let parsedWithCrown : Bool × List String ←
+    match CLI.takeBoolFlagOnce args "with-crown" with
+    | .ok parsed => pure parsed
+    | .error msg => throw <| IO.userError msg
+  let withCrown : Bool := parsedWithCrown.1
+  let restArgs : List String := parsedWithCrown.2
+  if withCrown then
+    Runtime.runWithDType "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
+      (@runMainWithCrown)
+  else
+    Runtime.runWithDType "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
+      (@runMainDefault)
+
+end NN.Verification.TorchLean.TransformerIBPWorkflow

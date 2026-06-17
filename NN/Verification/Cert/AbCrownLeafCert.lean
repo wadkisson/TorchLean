@@ -6,6 +6,8 @@ Authors: TorchLean Team
 
 module
 
+public import NN.API.CLI
+public import NN.Verification.Util.Array
 public import NN.Verification.Util.Json
 
 /-!
@@ -40,39 +42,9 @@ open Lean
 open Data
 open NN.Verification.Json
 
-/-- Boolean `≤` on `Float` (used for array-wise box comparisons). -/
-def leBool (x y : Float) : Bool := decide (x ≤ y)
-/-- Boolean `<` on `Float` (used for strict refutation checks). -/
-def ltBool (x y : Float) : Bool := decide (x < y)
-
-/--
-Check that a leaf box `[lo, hi]` is nested within a declared root box `[rootLo, rootHi]`.
-
-All arrays are interpreted pointwise.
--/
-def boxWithin (rootLo rootHi lo hi : Array Float) : Bool :=
-  all2 rootLo lo leBool && all2 lo hi leBool && all2 hi rootHi leBool
-
-/--
-Check that a leaf is verified by a lower-bound vector `lb` against an unsafe threshold `thr`.
-
-Interpretation: `lb` is a certified lower bound on some "violation score". If `lb[i] > thr[i]` for
-some index `i`, then that unsafe constraint is refuted.
--/
-def leafVerified (lb thr : Array Float) : Bool :=
-  any2 lb thr (fun l t => ltBool t l)  -- ∃i, lb[i] > threshold[i]
-
-/--
-Like `leafVerified`, but first try a supplied witness index.
-
-If the witness index is out of range, this returns `false` (callers usually fall back to
-`leafVerified`).
--/
-def leafVerifiedAt (lb thr : Array Float) (witnessIdx : Nat) : Bool :=
-  if witnessIdx < lb.size ∧ witnessIdx < thr.size then
-    ltBool thr[witnessIdx]! lb[witnessIdx]!
-  else
-    false
+/-- Bundled sample alpha-beta-CROWN leaf certificate. -/
+def defaultCertPath : String :=
+  "NN/Examples/Verification/AbCrown/sample_abcrown_leaf_cert_v0_1.json"
 
 /--
 Parse and validate a `abcrown_leaf_cert_v0_1` JSON certificate.
@@ -100,11 +72,13 @@ def checkAbCrownLeafCertV01 (path : String) : IO Unit := do
     let lb ← expectFieldFloatArray leafObj "lb" "leaf"
     let thr ← expectFieldFloatArray leafObj "threshold" "leaf"
 
-    let within := boxWithin rootLo rootHi lo hi
+    let within := NN.Verification.Util.Array.boxWithin rootLo rootHi lo hi
     let verified :=
       match ← optionalFieldNat? leafObj "witness_idx" "leaf" with
-      | some wi => leafVerifiedAt lb thr wi || leafVerified lb thr
-      | none => leafVerified lb thr
+      | some wi =>
+          NN.Verification.Util.Array.refutesThresholdAt lb thr wi ||
+            NN.Verification.Util.Array.refutesThreshold lb thr
+      | none => NN.Verification.Util.Array.refutesThreshold lb thr
     if within && verified then
       okCount := okCount + 1
     else
@@ -121,9 +95,6 @@ If no path is provided, checks a small bundled sample certificate under
 `NN/Examples/Verification/AbCrown/`.
 -/
 def run (args : List String) : IO Unit := do
-  let defaultCertPath :=
-    "NN/Examples/Verification/AbCrown/sample_abcrown_leaf_cert_v0_1.json"
-
   let usage :=
     String.intercalate "\n" [
       "Usage:",
@@ -133,11 +104,18 @@ def run (args : List String) : IO Unit := do
       s!"  {defaultCertPath}"
     ]
 
-  if args.contains "--help" || args.contains "-h" then
+  if NN.API.CLI.hasHelp args then
     IO.println usage
     return
 
-  let path := args.getD 0 defaultCertPath
+  let args := NN.API.CLI.dropDashDash args
+  let (path, rest) ←
+    match NN.API.CLI.takePositionalDefault args defaultCertPath with
+    | .ok result => pure result
+    | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
+  match NN.API.CLI.requireNoArgs rest with
+  | .ok () => pure ()
+  | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   checkAbCrownLeafCertV01 path
 
 end NN.Verification.Cert.AbCrownLeafCert

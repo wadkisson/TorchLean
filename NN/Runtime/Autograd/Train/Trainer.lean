@@ -15,7 +15,7 @@ This module defines a small, higher-level training API on top of a step function
 It stays local (no global state), while making it easy to:
 
 * return a structured report per step (loss + metrics)
-* render reports into human-readable logs
+* render reports into readable logs
 * plug in a logger if you want to print during training
 -/
 

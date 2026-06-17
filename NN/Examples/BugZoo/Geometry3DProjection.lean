@@ -21,7 +21,7 @@ small glue mistakes can silently invalidate the claim:
 - malformed `8 x 3` corner tensors or `3 x 4` camera matrices; and
 - projected 3D corners that are not actually enclosed by the claimed 2D detector box.
 
-Real reports motivating this card include PyTorch3D camera-conversion/projection issues
+Real reports motivating this example include PyTorch3D camera-conversion/projection issues
 `#522`, `#596`, `#1105`, `#1183`, `#1427`; Detectron2 rotated-box shape issue `#2402`;
 Omni3D/Cube R-CNN conversion issue `#60`; and BlenderProc projected-3D-bbox issue `#1150`.
 
@@ -44,7 +44,7 @@ namespace NN.Examples.BugZoo.Geometry3DProjection
 open NN.Verification.Geometry3D.Box3D
 
 /--
-The core 3D glue contract used by the BugZoo card.
+The core 3D glue contract used by this BugZoo example.
 
 If a certificate passes `checkCert`, then it satisfies the theorem-facing `Verified3DBox` predicate:
 positive image dimensions, ordered in-frame bbox, positive depth for all eight tensor corners,

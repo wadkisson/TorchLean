@@ -4,7 +4,7 @@ TorchLean keeps the data boundary focused. Python handles ecosystem formats and
 downloads; Lean receives `.npy`, numeric CSV, or text, then checks shapes and builds typed datasets.
 
 ```text
-external dataset -> Python converter/downloader -> .npy or numeric CSV -> NN.API.Data -> typed loader
+external dataset -> Python converter/downloader -> .npy or numeric CSV -> TorchLean.Data -> typed loader
 ```
 
 Use Python for JPEG folders, `.pt`, `.npz`, `.mat`, and dataset downloads. Use Lean for typed
@@ -35,7 +35,7 @@ This writes:
 | regression / operator learning | `X.npy : (N, ...)` | `Y.npy : (N, ...)` | `Data.SupervisedSource` |
 | classification | `X.npy : (N, ...)` | `y.npy : (N,)` labels | `Data.LabeledSource` |
 | tabular regression | numeric CSV with `x...,y...` | same CSV | `Data.TabularSupervisedSource` |
-| text modeling | UTF-8 text | tokenizer/windowing builds targets | `NN.API.Text` |
+| text modeling | UTF-8 text | tokenizer/windowing builds targets | `TorchLean.text` |
 | images | `X.npy : (N, C, H, W)` | `y.npy : (N,)` labels | `Data.LabeledSource` |
 
 Classification labels are numeric values such as `0.0`, `1.0`, ..., and are converted to one-hot
@@ -73,10 +73,10 @@ lake exe torchlean data_cifar10 --check-only --epochs 1 --batch 4 --train-size 8
 Model examples use the same API:
 
 ```bash
-lake exe -K cuda=true torchlean mlp --cuda --epochs 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 200 --epochs 2
+lake exe -K cuda=true torchlean mlp --cuda --steps 10
+lake exe -K cuda=true torchlean cnn --cuda --n-total 200 --steps 2
 lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 100
+lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 ## Convert External Data
@@ -101,17 +101,16 @@ python3 scripts/datasets/torchlean_data_convert.py image-folder \
 
 ## Lean API
 
-Import the public data surface with:
+Ordinary loader code should use the public API:
 
 ```lean
-import NN.API.Data
+import NN
+open TorchLean
 ```
 
 Classification source:
 
 ```lean
-open NN.API
-
 def src : Data.LabeledSource :=
   Data.LabeledSource.ofPaths
     .npy
@@ -125,8 +124,6 @@ def src : Data.LabeledSource :=
 Supervised regression source:
 
 ```lean
-open NN.API
-
 def src : Data.SupervisedSource :=
   Data.SupervisedSource.ofPaths
     .npy
@@ -141,14 +138,14 @@ Wrap loaded datasets with `Data.batchLoader` for typed minibatches:
 
 ```lean
 let loader := Data.batchLoader ds 8 (shuffle := true) (seed := 0) (dropLast := true)
-let (_loader', batches) ← Common.orThrow "trainer" <| Data.BatchLoader.epoch "trainer" loader
+let (_loader', batches) ← CLI.orThrow "trainer" <| Data.BatchLoader.epoch "trainer" loader
 ```
 
 The batch axis is reflected in the type, so image minibatches have shapes such as:
 
 ```text
-X : Tensor α (Shape.dim batch (Shape.Image C H W))
-Y : Tensor α (Shape.dim batch (Shape.Vec classes))
+X : Tensor α (Shape.dim batch (Shape.image C H W))
+Y : Tensor α (Shape.dim batch (Shape.vec classes))
 ```
 
 ## Provenance

@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import sys
 from argparse import ArgumentParser
+from importlib import metadata
 from typing import Any, Dict, NoReturn
 
 
@@ -80,9 +81,16 @@ def _register_ale_if_needed(env_id: str) -> None:
 
         gym.register_envs(ale_py)
     except Exception as e:
+        def version(pkg: str) -> str:
+            try:
+                return metadata.version(pkg)
+            except metadata.PackageNotFoundError:
+                return "not installed"
+
         raise RuntimeError(
             "Requested an `ALE/...` environment id, but `ale-py` could not be imported/registered. "
-            "Try: python3 -m pip install --user ale-py 'gymnasium>=1.0'"
+            f"Detected gymnasium={version('gymnasium')}, ale-py={version('ale-py')}. "
+            "Try: python3 -m pip install --user --upgrade ale-py 'gymnasium>=1.0'"
         ) from e
 
 

@@ -120,18 +120,18 @@ theorem observationHolds_of_checkObservation_eq_ok {obsShape : Spec.Shape} {nAct
   constructor
   · intro hFiniteSwitch
     -- With `checkObsFinite=true`, `checkObservation` must have successfully run `checkTensorFinite`.
-    have h' :
-        (do
-          Internal.checkTensorFinite (s := obsShape) (field := field) obs
-          match c.obsRange? with
-          | none => pure ()
-          | some (lo, hi) => Internal.checkTensorRange (s := obsShape) (field := field) lo hi obs) = .ok () := by
-      simpa [checkObservation, hFiniteSwitch] using h
-    except_cases hFinite : Internal.checkTensorFinite (s := obsShape) (field := field) obs using h' with u =>
-      cases u
-      exact
-        tensorFinite_of_checkTensorFinite_eq_ok (s := obsShape) (field := field) (t := obs)
-          (by simpa using hFinite)
+    have h' := h
+    simp [checkObservation, hFiniteSwitch, Bind.bind, Except.bind, Pure.pure, Except.pure] at h'
+    cases hFinite : Internal.checkTensorFinite (s := obsShape) (field := field) obs with
+    | error err =>
+        have hContra : (Except.error err : Except String Unit) = Except.ok () := by
+          simp [hFinite] at h'
+        cases hContra
+    | ok u =>
+        cases u
+        exact
+          tensorFinite_of_checkTensorFinite_eq_ok (s := obsShape) (field := field) (t := obs)
+            (by simpa using hFinite)
   · -- Range check component.
     cases hRange : c.obsRange? with
     | none =>
@@ -143,7 +143,7 @@ theorem observationHolds_of_checkObservation_eq_ok {obsShape : Spec.Shape} {nAct
         | false =>
             have hRangeOk :
                 Internal.checkTensorRange (s := obsShape) (field := field) lo hi obs = .ok () := by
-              simpa [checkObservation, hCF, hRange] using h
+              simpa [checkObservation, hCF, hRange, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h
             exact
               tensorInClosedInterval_of_checkTensorRange_eq_ok (s := obsShape) (field := field)
                 (lo := lo) (hi := hi) (t := obs) hRangeOk
@@ -162,7 +162,7 @@ theorem observationHolds_of_checkObservation_eq_ok {obsShape : Spec.Shape} {nAct
                     Internal.checkTensorRange (s := obsShape) (field := field) lo hi obs = .ok () := by
                   -- After the first check succeeds, the do-chain reduces to the second check.
                   have : Internal.checkTensorRange (s := obsShape) (field := field) lo hi obs = .ok () := by
-                    simpa [hFinite] using h'
+                    simpa [hFinite, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h'
                   exact this
                 exact
                   tensorInClosedInterval_of_checkTensorRange_eq_ok (s := obsShape) (field := field)
@@ -175,18 +175,18 @@ theorem rewardHolds_of_checkReward_eq_ok {obsShape : Spec.Shape} {nActions : Nat
     RewardHolds (obsShape := obsShape) (nActions := nActions) c reward := by
   constructor
   · intro hFiniteSwitch
-    have h' :
-        (do
-          Internal.checkFloatFinite (field := "reward") reward
-          match c.rewardRange? with
-          | none => pure ()
-          | some (lo, hi) => Internal.checkFloatRange (field := "reward") lo hi reward) = .ok () := by
-      simpa [checkReward, hFiniteSwitch] using h
-    except_cases hFinite : Internal.checkFloatFinite (field := "reward") reward using h' with u =>
-      cases u
-      exact
-        isFiniteFloat_of_checkFloatFinite_eq_ok (field := "reward") (x := reward)
-          (by simpa using hFinite)
+    have h' := h
+    simp [checkReward, hFiniteSwitch, Bind.bind, Except.bind, Pure.pure, Except.pure] at h'
+    cases hFinite : Internal.checkFloatFinite (field := "reward") reward with
+    | error err =>
+        have hContra : (Except.error err : Except String Unit) = Except.ok () := by
+          simp [hFinite] at h'
+        cases hContra
+    | ok u =>
+        cases u
+        exact
+          isFiniteFloat_of_checkFloatFinite_eq_ok (field := "reward") (x := reward)
+            (by simpa using hFinite)
   · cases hRange : c.rewardRange? with
     | none =>
         simp
@@ -196,7 +196,7 @@ theorem rewardHolds_of_checkReward_eq_ok {obsShape : Spec.Shape} {nActions : Nat
         cases hCF : c.checkRewardFinite with
         | false =>
             have hRangeOk : Internal.checkFloatRange (field := "reward") lo hi reward = .ok () := by
-              simpa [checkReward, hCF, hRange] using h
+              simpa [checkReward, hCF, hRange, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h
             exact floatInClosedInterval_of_checkFloatRange_eq_ok (field := "reward")
               (lo := lo) (hi := hi) (x := reward) hRangeOk
         | true =>
@@ -208,7 +208,7 @@ theorem rewardHolds_of_checkReward_eq_ok {obsShape : Spec.Shape} {nActions : Nat
             except_cases hFinite : Internal.checkFloatFinite (field := "reward") reward using h' with u =>
               cases u
               have hRangeOk : Internal.checkFloatRange (field := "reward") lo hi reward = .ok () := by
-                simpa [hFinite] using h'
+                simpa [hFinite, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h'
               exact floatInClosedInterval_of_checkFloatRange_eq_ok (field := "reward")
                 (lo := lo) (hi := hi) (x := reward) hRangeOk
 
@@ -247,7 +247,7 @@ theorem contractHolds_of_checkTransitionFin_eq_ok {obsShape : Spec.Shape} {nActi
                  nextObservation := nextObservation
                  terminated := terminated
                  truncated := truncated } : Transition obsShape nActions)) = .ok t := by
-        simpa [hDone] using h
+        simpa [hDone, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h
       cases hReward : checkReward (obsShape := obsShape) (nActions := nActions) c reward with
       | error e =>
           cases (by simpa [hReward] using h')
@@ -264,7 +264,7 @@ theorem contractHolds_of_checkTransitionFin_eq_ok {obsShape : Spec.Shape} {nActi
                      nextObservation := nextObservation
                      terminated := terminated
                      truncated := truncated } : Transition obsShape nActions)) = .ok t := by
-            simpa [hReward] using h'
+            simpa [hReward, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h'
           cases hObs : checkObservation (obsShape := obsShape) (nActions := nActions) c
               (field := "observation") observation with
           | error e =>
@@ -281,7 +281,7 @@ theorem contractHolds_of_checkTransitionFin_eq_ok {obsShape : Spec.Shape} {nActi
                          nextObservation := nextObservation
                          terminated := terminated
                          truncated := truncated } : Transition obsShape nActions)) = .ok t := by
-                simpa [hObs] using h''
+                simpa [hObs, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h''
               cases hNextObs : checkObservation (obsShape := obsShape) (nActions := nActions) c
                   (field := "nextObservation") nextObservation with
               | error e =>
@@ -298,7 +298,7 @@ theorem contractHolds_of_checkTransitionFin_eq_ok {obsShape : Spec.Shape} {nActi
                           terminated := terminated
                           truncated := truncated } :
                         Except String (Transition obsShape nActions)) = .ok t := by
-                    simpa [hNextObs] using h'''
+                    simpa [hNextObs, Bind.bind, Except.bind, Pure.pure, Except.pure, Except.instMonad] using h'''
                   have ht :
                       t =
                         { observation := observation

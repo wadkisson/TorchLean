@@ -414,6 +414,5 @@ If you want to turn a certificate into a Lean theorem, you must do so explicitly
    network/region you care about, and
 2) deriving the desired consequence from that assumption (e.g. Lyapunov conditions).
 
-This keeps the trust boundary visible: the external tool is not implicitly ``verified'' by this
-  file.
+Trust boundary: the external tool is not implicitly ``verified'' by this file.
 -/

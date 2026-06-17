@@ -116,11 +116,20 @@ def vecOfFun {n : Nat} (f : Fin n → ℝ) : Vec n :=
     vecOfFun (n := n) f i = f i := by
   simp [vecOfFun, EuclideanSpace.equiv]
 
+@[simp] lemma vecOfFun_ofLp {n : Nat} (f : Fin n → ℝ) (i : Fin n) :
+    (vecOfFun (n := n) f).ofLp i = f i := by
+  simp [vecOfFun, EuclideanSpace.equiv]
+
 @[simp] lemma vecOfFun_eta {n : Nat} (v : Vec n) :
     vecOfFun (n := n) (fun i => v i) = v := by
   classical
   -- `vecOfFun` is `EuclideanSpace.equiv.symm`, and the forward map is definitionally `fun i => v
   -- i`.
+  simp [vecOfFun, EuclideanSpace.equiv]
+
+@[simp] lemma vecOfFun_eta_ofLp {n : Nat} (v : Vec n) :
+    vecOfFun (n := n) (fun i => v.ofLp i) = v := by
+  classical
   simp [vecOfFun, EuclideanSpace.equiv]
 
 /--
@@ -164,12 +173,12 @@ def unflattenCtx : {Γ : List Shape} → CtxVec Γ → TList Γ
   | cons s ss ih =>
       ext i
       -- reduce to the `Fin.append_castAdd_natAdd` lemma on the underlying functions
-      simpa [flattenCtx, unflattenCtx, ih] using
+      simpa [flattenCtx, unflattenCtx, ih, vecOfFun, EuclideanSpace.equiv] using
         congrArg (fun f : Fin (Shape.size s + ctxSize ss) → ℝ => f i)
           (Fin.append_castAdd_natAdd (f := v) (m := Shape.size s) (n := ctxSize ss))
 
 -- ---------------------------------------------------------------------------
--- Dot/inner compatibility (`dotList` ↔ Euclidean inner product)
+-- Dot/inner agreement (`dotList` ↔ Euclidean inner product)
 -- ---------------------------------------------------------------------------
 
 /-- Cast a `Vec n` to `Vec m` along an equality, by reindexing coordinates. -/
@@ -374,8 +383,8 @@ lemma inner_toVecT_dim {n : Nat} {s : Shape} (a b : Fin n → Tensor ℝ s) :
             =
           ∑ i : Fin (n * Shape.size s),
             toVecT (t := Tensor.dim a) i * toVecT (t := Tensor.dim b) i := by
-              simpa using
-                inner_eq_sum_mul (x := toVecT (t := Tensor.dim a)) (y := toVecT (t := Tensor.dim b))
+              rw [inner_eq_sum_mul]
+              rfl
         _ =
           ∑ i : Fin 0,
             toVecT (t := Tensor.dim a) (e i) * toVecT (t := Tensor.dim b) (e i) := by
@@ -411,8 +420,8 @@ lemma inner_toVecT_dim {n : Nat} {s : Shape} (a b : Fin n → Tensor ℝ s) :
           =
         ∑ i : Fin (n * Shape.size s),
           toVecT (t := Tensor.dim a) i * toVecT (t := Tensor.dim b) i := by
-            simpa using
-              inner_eq_sum_mul (x := toVecT (t := Tensor.dim a)) (y := toVecT (t := Tensor.dim b))
+            rw [inner_eq_sum_mul]
+            rfl
       _ =
         ∑ p : Fin n × Fin (Shape.size s),
           toVecT (t := Tensor.dim a) (finProdFinEquiv p) *
@@ -439,7 +448,7 @@ lemma inner_toVecT_dim {n : Nat} {s : Shape} (a b : Fin n → Tensor ℝ s) :
 
 -- Dot product agrees with the Euclidean inner product after vectorization.
 /--
-Main compatibility lemma: tensor dot equals Euclidean inner product of vectorizations.
+Main agreement lemma: tensor dot equals Euclidean inner product of vectorizations.
 
 This is the bridge between `soundness.lean` (stated using `Spec.dot`) and the analytic theorems
 here (stated using Euclidean `inner`).
@@ -457,8 +466,20 @@ theorem dot_eq_inner_toVecT {s : Shape} (a b : Tensor ℝ s) :
               let vy : Vec 1 := toVecT (t := Tensor.scalar y)
               have hinner : inner ℝ vx vy = ∑ i : Fin 1, vx i * vy i :=
                 inner_eq_sum_mul (x := vx) (y := vy)
-              simpa [vx, vy, dot, sumSpec, tensorFoldlSpec, mulSpec, map2Spec, toVecT, toVecE,
-                Spec.toVec, flattenSpec, Shape.size] using hinner.symm
+              have hvx0 : vx.ofLp 0 = x := by
+                change ((PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin 1 => ℝ)).symm
+                  (fun _ : Fin 1 => x)).ofLp 0 = x
+                rfl
+              have hvy0 : vy.ofLp 0 = y := by
+                change ((PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin 1 => ℝ)).symm
+                  (fun _ : Fin 1 => y)).ofLp 0 = y
+                rfl
+              calc
+                dot (Tensor.scalar x) (Tensor.scalar y) = x * y := by
+                  simp [dot, sumSpec, tensorFoldlSpec, mulSpec, map2Spec]
+                _ = vx.ofLp 0 * vy.ofLp 0 := by simp [hvx0, hvy0]
+                _ = inner ℝ vx vy := by
+                  simpa using hinner.symm
   | dim n s ih =>
       cases a with
       | dim fa =>
@@ -552,10 +573,19 @@ theorem dotList_eq_inner_flattenCtx {Γ : List Shape} (x y : TList Γ) :
                     =
                   inner ℝ (toVecT (t := xh)) (toVecT (t := yh))
                     + inner ℝ (flattenCtx (Γ := ss) xt) (flattenCtx (Γ := ss) yt) := by
-                simpa [flattenCtx] using
-                  (inner_append (m := Shape.size s) (n := ctxSize ss)
+                change
+                  inner ℝ
+                    (appendVec (m := Shape.size s) (n := ctxSize ss) (toVecT (t := xh))
+                      (flattenCtx (Γ := ss) xt))
+                    (appendVec (m := Shape.size s) (n := ctxSize ss) (toVecT (t := yh))
+                      (flattenCtx (Γ := ss) yt))
+                    =
+                  inner ℝ (toVecT (t := xh)) (toVecT (t := yh))
+                    + inner ℝ (flattenCtx (Γ := ss) xt) (flattenCtx (Γ := ss) yt)
+                exact
+                  inner_append (m := Shape.size s) (n := ctxSize ss)
                     (a := toVecT (t := xh)) (c := toVecT (t := yh))
-                    (b := flattenCtx (Γ := ss) xt) (d := flattenCtx (Γ := ss) yt))
+                    (b := flattenCtx (Γ := ss) xt) (d := flattenCtx (Γ := ss) yt)
               calc
                 TList.dotList (ss := s :: ss) (TList.cons xh xt) (TList.cons yh yt)
                     = dot xh yh + TList.dotList (ss := ss) xt yt := by
@@ -991,7 +1021,8 @@ theorem hasFDerivAt_evalVec_and_jvp
       let D : CtxVec Γ →L[ℝ] CtxVec (Γ ++ []) := castCLM (h := h)
       refine ⟨D, ?_, ?_⟩
       · -- `evalVec` is the CLM itself.
-        simpa [Graph.evalVec, castCtxVec, castVec, castCLM, D, h] using (D.hasFDerivAt (x := xV))
+        change HasFDerivAt (castVec h) D xV
+        exact D.hasFDerivAt
       · intro dxV
         simp [Graph.jvpVec, castCtxVec, castVec, castCLM, D]
   | snoc g node ih =>
@@ -1011,7 +1042,11 @@ theorem hasFDerivAt_evalVec_and_jvp
             (fun xV : CtxVec Γ => node.forwardVec (Γ := Γ ++ ss) (τ := τ) (evalVec (Γ := Γ) (ss :=
               ss) g xV))
             (Dn.comp Dg) xV := by
-        simpa [ctxV] using (hnode.comp xV hDg)
+        change HasFDerivAt
+          ((node.forwardVec (Γ := Γ ++ ss) (τ := τ)) ∘
+            (evalVec (Γ := Γ) (ss := ss) g))
+          (Dn.comp Dg) xV
+        simpa [ctxV, Function.comp] using (hnode.comp xV hDg)
       -- pair derivative: `(ctxV, yV)`.
       have hpair :
           HasFDerivAt
@@ -1034,15 +1069,25 @@ theorem hasFDerivAt_evalVec_and_jvp
                 snocCtx (Γ := Γ ++ ss) (τ := τ) p.1 p.2)
               (snocCLM (Γ := Γ ++ ss) (τ := τ)) (ctxV, node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV)
                 := by
-          simpa [snocCtx, snocCLM, castVec, castCLM, appendCLM] using
-            ((snocCLM (Γ := Γ ++ ss) (τ := τ)).hasFDerivAt (x := (ctxV, node.forwardVec (Γ := Γ ++
-              ss) (τ := τ) ctxV)))
+          change HasFDerivAt
+            (snocCLM (Γ := Γ ++ ss) (τ := τ))
+            (snocCLM (Γ := Γ ++ ss) (τ := τ))
+            (ctxV, node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV)
+          exact (snocCLM (Γ := Γ ++ ss) (τ := τ)).hasFDerivAt
         have hcomp1 :=
           (Dcast.hasFDerivAt (x := snocCtx (Γ := Γ ++ ss) (τ := τ) ctxV (node.forwardVec (Γ := Γ ++
             ss) (τ := τ) ctxV))).comp xV
             (hsnoc.comp xV hpair)
         -- `evalVec` is definitionally this composition.
-        simpa [Graph.evalVec, ctxV, castCtxVec, castVec, assoc, D, Dcast, snocCLM] using hcomp1
+        change HasFDerivAt
+          ((castCLM hAssoc) ∘
+            (fun p : CtxVec (Γ ++ ss) × Vec (Shape.size τ) =>
+              snocCtx (Γ := Γ ++ ss) (τ := τ) p.1 p.2) ∘
+            fun xV : CtxVec Γ =>
+              (evalVec (Γ := Γ) (ss := ss) g xV,
+                node.forwardVec (Γ := Γ ++ ss) (τ := τ) (evalVec (Γ := Γ) (ss := ss) g xV)))
+          D xV
+        simpa [ctxV, D, Dcast, snocCLM, Function.comp, ContinuousLinearMap.comp_assoc] using hcomp1
       · intro dxV
         -- identify the JVP with the derivative application
         have hx : jvpVec (Γ := Γ) (ss := ss) g xV dxV = Dg dxV := hJg dxV
@@ -1160,7 +1205,8 @@ theorem hasFDerivAt_evalVec_and_jvp_at
       let h : ctxSize Γ = ctxSize (Γ ++ []) := congrArg ctxSize (List.append_nil Γ).symm
       let D : CtxVec Γ →L[ℝ] CtxVec (Γ ++ []) := castCLM (h := h)
       refine ⟨D, ?_, ?_⟩
-      · simpa [Graph.evalVec, castCtxVec, castVec, castCLM, D, h] using (D.hasFDerivAt (x := xV))
+      · change HasFDerivAt (castVec h) D xV
+        exact D.hasFDerivAt
       · intro dxV
         simp [Graph.jvpVec, castCtxVec, castVec, castCLM, D]
   | snoc g node ih =>
@@ -1193,14 +1239,24 @@ theorem hasFDerivAt_evalVec_and_jvp_at
                 snocCtx (Γ := Γ ++ ss) (τ := τ) p.1 p.2)
               (snocCLM (Γ := Γ ++ ss) (τ := τ))
               (ctxV, node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV) := by
-          simpa [snocCtx, snocCLM, castVec, castCLM, appendCLM] using
-            ((snocCLM (Γ := Γ ++ ss) (τ := τ)).hasFDerivAt
-              (x := (ctxV, node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV)))
+          change HasFDerivAt
+            (snocCLM (Γ := Γ ++ ss) (τ := τ))
+            (snocCLM (Γ := Γ ++ ss) (τ := τ))
+            (ctxV, node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV)
+          exact (snocCLM (Γ := Γ ++ ss) (τ := τ)).hasFDerivAt
         have hcomp1 :=
           (Dcast.hasFDerivAt (x := snocCtx (Γ := Γ ++ ss) (τ := τ) ctxV
             (node.forwardVec (Γ := Γ ++ ss) (τ := τ) ctxV))).comp xV
               (hsnoc.comp xV hpair)
-        simpa [Graph.evalVec, ctxV, castCtxVec, castVec, assoc, D, Dcast, snocCLM] using hcomp1
+        change HasFDerivAt
+          ((castCLM hAssoc) ∘
+            (fun p : CtxVec (Γ ++ ss) × Vec (Shape.size τ) =>
+              snocCtx (Γ := Γ ++ ss) (τ := τ) p.1 p.2) ∘
+            fun xV : CtxVec Γ =>
+              (evalVec (Γ := Γ) (ss := ss) g xV,
+                node.forwardVec (Γ := Γ ++ ss) (τ := τ) (evalVec (Γ := Γ) (ss := ss) g xV)))
+          D xV
+        simpa [ctxV, D, Dcast, snocCLM, Function.comp, ContinuousLinearMap.comp_assoc] using hcomp1
       · intro dxV
         have hx : jvpVec (Γ := Γ) (ss := ss) g xV dxV = Dg dxV := hJg dxV
         have hy' :

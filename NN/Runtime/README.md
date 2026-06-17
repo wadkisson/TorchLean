@@ -6,20 +6,21 @@ TorchLean to CUDA, PyTorch, Julia, and Gymnasium style environments.
 
 Most downstream code should not import modules from this directory directly. Prefer:
 
-* `import NN` for the ordinary public surface,
-* `import NN.API.Runtime` for the stable runtime API surface, or
+* `import NN` for ordinary model and training code,
+* `import NN.API.Runtime` when you are extending the runtime subsystem itself, or
 * `import NN.Entrypoint.Runtime` when you need the broad executable umbrella.
 
-There is no top level `NN.Runtime` Lean file. The project keeps public import
-surfaces under `NN.API.*` and `NN.Entrypoint.*` so that subsystem directories can contain
-implementation modules without creating competing umbrella names.
+There is no top level `NN.Runtime` Lean file. User-facing code goes through `TorchLean`; subsystem
+code uses focused `NN.API.*` or `NN.Entrypoint.*` imports so runtime implementation modules do not
+become competing umbrella names.
 
 ## Directory Map
 
 * `Autograd/Engine`: the small eager reverse-mode tape and runtime tape monad.
 * `Autograd/Compiled`: typed IR/DAG execution that lowers into the same tape machinery.
 * `Autograd/Torch`: lower level imperative session operations and linked compiled sessions.
-* `Autograd/TorchLean`: the user facing runtime front end used by `NN.API.Runtime`.
+* `Autograd/TorchLean`: the executable runtime front end used behind `TorchLean` and
+  `NN.API.Runtime`.
 * `Autograd/Train`: deterministic datasets, loaders, trainers, and optimizer integration.
 * `Optim`: pure optimizer equations and scheduler utilities.
 * `PyTorch`: import/export bridges for round trip checks against Python `torch.nn.Module`s.

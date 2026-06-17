@@ -161,8 +161,8 @@ theorem evalAtCoverageTags_complete (kind : OpKind) :
 /--
 The checklist is exactly the set of current IR constructor tags.
 
-Together with `evalAtCoverageTags_nodup`, this keeps the coverage summary honest in both
-directions: no missing constructor family and no stale tag unrelated to an `OpKind`.
+Together with `evalAtCoverageTags_nodup`, this proves the coverage summary in both directions:
+there is no missing constructor family and no stale tag unrelated to an `OpKind`.
 -/
 theorem evalAtCoverageTags_iff (tag : String) :
     tag ∈ evalAtCoverageTags ↔ ∃ kind : OpKind, kind.tag = tag := by

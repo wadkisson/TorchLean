@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -10,7 +9,7 @@ tag := "bugzoo-catalog"
 
 BugZoo is where we turn "this class of ML bug happens in real systems" into a small, named
 TorchLean contract. We built it as a verification catalog, not as a collection of artificial
-failures. Each card points at a bug family that has appeared in frameworks, compilers, deployment
+failures. Each example points at a bug family that has appeared in frameworks, compilers, deployment
 tools, or LLM serving stacks, then asks a narrow question: what object would have made the intended
 behavior explicit?
 
@@ -20,17 +19,17 @@ once a computation enters a typed TorchLean spec, shape changes, masks, token bo
 choices, stateful normalization parameters, and backend semantics become named objects that can be
 checked.
 
-BugZoo should be read as the smallest public proof-of-concept for TorchLean's philosophy. Each card
+BugZoo should be read as the smallest public proof-of-concept for TorchLean's philosophy. Each example
 starts from a failure mode that can occur in ordinary ML code, then asks what object would have made
 the intended behavior explicit.
 
 That is why every BugZoo file is small. A tiny theorem is often a better public contract than a
 large example. It lets us say "this is the exact thing we checked" beside the paper or issue from the
-real world that motivated the card.
+real world that motivated the example.
 
-# Card Anatomy
+# Example Anatomy
 
-A good BugZoo card has four parts:
+A good BugZoo example has four parts:
 
 - the pattern in the framework that goes wrong;
 - the TorchLean object that names the intended behavior;
@@ -50,12 +49,12 @@ $$`\text{bug pattern}
 \;\leadsto\;
 \text{checked claim}`
 
-That is why the cards are short. The goal is not to recreate an entire framework bug; the goal is
+That is why the examples are short. The goal is not to recreate an entire framework bug; the goal is
 to isolate the semantic invariant that would have made the bug harder to miss.
 
 Some representative contract shapes:
 
-| Card | Contract shape |
+| Example | Contract shape |
 |---|---|
 | Attention mask | $`j>i\Rightarrow A_{ij}=0` |
 | Batch invariance | $`\operatorname{select}(\operatorname{mapBatch}(f,X),i)=f(X_i)` |
@@ -66,13 +65,13 @@ Some representative contract shapes:
 | Stable loss | logits path uses log-softmax semantics |
 | Ignored labels | inactive labels contribute zero |
 
-# The Cards
+# The Examples
 
 ## Shape And Broadcast
 
 [NN.Examples.BugZoo.ShapeAndBroadcast API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/ShapeAndBroadcast.lean)
 records one of TorchLean's core design choices: shapes belong in the object, not as an
-afterthought. The card uses a missing batch dimension and a reduce then broadcast pattern as its
+afterthought. The example uses a missing batch dimension and a reduce then broadcast pattern as its
 running examples. In NumPy style tensor libraries, a reduced vector can silently expand back across a
 matrix and still produce a plausible loss. In TorchLean, ordinary elementwise operations require the
 same shape, and explicit broadcasting carries `Shape.CanBroadcastTo` evidence.
@@ -111,7 +110,7 @@ loss really takes the stable logits path. `crossEntropyProbabilities_clips_befor
 probability path clamps before `log`. `safeDivSpec_unfold` gives division with domain assumptions an
 explicit node protected by epsilon rather than hiding it in an optimizer or backend.
 
-This card is motivated by [TensorFuzz](https://proceedings.mlr.press/v97/odena19a.html), which
+This example is motivated by [TensorFuzz](https://proceedings.mlr.press/v97/odena19a.html), which
 targeted rare numerical failures, and by
 [empirical studies of numerical bugs](https://conf.researchr.org/details/ase-2022/ase-2022-nier-track/18/An-Empirical-Study-on-Numerical-Bugs-in-Deep-Learning-Programs)
 involving `log`, `sqrt`, division, `exp`, and reductions.
@@ -125,7 +124,7 @@ case where all labels were ignored and the result was `nan`.
 
 The TorchLean lesson is not "we copied every branch of a framework kernel." TorchLean exposes the
 policy. `labelContribution false loss = 0` states that ignored labels contribute no scalar loss, and
-the card's helper for empty reductions names one possible policy for the all ignored case. That
+the example's helper for empty reductions names one possible policy for the all ignored case. That
 matters because the bug is not in the idea of ignoring labels; it is in letting the empty active set
 pass through an unnamed backend reduction.
 
@@ -147,7 +146,7 @@ The all ignored case is then a declared reduction policy, not an accidental divi
 If a graph computes `x / 0` and masks the bad value afterward, the forward result may look hidden
 while the backward graph still contains the undefined operation.
 
-TorchLean's card names the difference between "divide first, mask later" and "safe divide, then
+TorchLean's example names the difference between "divide first, mask later" and "safe divide, then
 mask." `maskAfterSafeDiv` records `safedivSpec` before the mask, and
 `maskAfterSafeDiv_uses_epsilon_denominator` unfolds to division by `denominator + epsilon`. The
 contrast definition, `unsafeDivThenMask`, is kept in the file deliberately so importers and reviewers
@@ -163,7 +162,7 @@ fully masked rows, and interactions with API flags. PyTorch has had relevant rep
 and [fully masked heads producing NaNs](https://github.com/pytorch/pytorch/issues/160064) when
 weights are requested.
 
-The card connects the runtime convention to the math. Lean's real numbers do not contain literal
+The example connects the runtime convention to the math. Lean's real numbers do not contain literal
 negative infinity, so the file first uses `EReal` to state the exact fact:
 `exp(-infinity) = 0`. TorchLean's ordinary attention spec then uses the equivalent hard masked
 softmax numerator. The theorem `trueInfinityMask_future_attention_weight_zero` says that strict
@@ -175,13 +174,13 @@ In formula form:
 $$`j>i \quad\Longrightarrow\quad
 \operatorname{attentionWeight}_{causal}(i,j)=0`
 
-This card also points back to the original transformer paper,
+This example also points back to the original transformer paper,
 [*Attention Is All You Need*](https://arxiv.org/abs/1706.03762).
 
 ## Compiler Boundary
 
 [NN.Examples.BugZoo.CompilerBoundary API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/CompilerBoundary.lean) is the
-wrong code card. It is about optimized graphs that run, return tensors, and are nevertheless not
+wrong-code example. It is about optimized graphs that run, return tensors, and are nevertheless not
 the same computation as the source graph. [NNSmith](https://arxiv.org/abs/2207.13066) found
 compiler bugs across TVM, TensorRT, ONNXRuntime, and PyTorch,
 [FreeFuzz](https://arxiv.org/abs/2201.06589) found framework/API bugs by mining real snippets, and
@@ -206,13 +205,13 @@ $$`\operatorname{implements}(source,target)
 refuse to let proofs over real numbers silently masquerade as float32 deployment guarantees.
 Floating point verification attacks show why that matters: a property proved over reals can be
 invalidated by finite precision, exceptional values, fused operations, denorm behavior, or changed
-reduction order. The card cites
+reduction order. The example cites
 [Jia and Rinard's warning paper](https://doi.org/10.1109/SPW50608.2020.00058).
 
 TorchLean's answer is explicit modeling. `IEEE32Exec` is the executable bit level float32 model.
 Runtime `Float32` primitives are not transparent to the Lean kernel, so the theorem
 `runtimeFloat32_add_rewrites_to_ieee32` requires the named assumption
-`RuntimeFloat32MatchesIEEE32Exec`. We built that friction intentionally. If a proof uses the
+`RuntimeFloat32MatchesIEEE32Exec`. We built that friction on purpose. If a proof uses the
 float32 model, the boundary says where runtime conformance entered.
 
 The boundary is therefore visible in the theorem shape:
@@ -232,7 +231,7 @@ BatchNorm epsilon placement issue across backends, while
 [LEMON](https://lingming.cs.illinois.edu/courses/cs598ast-f20/paper-dnn-lib-testing.pdf) found
 BatchNormalization moving stat bugs and BatchNorm layers that produce NaNs.
 
-The card splits the concern in two. First, `normalizeCore_scalar_uses_variance_plus_epsilon` shows
+The example splits the concern in two. First, `normalizeCore_scalar_uses_variance_plus_epsilon` shows
 that TorchLean's scalar normalization puts epsilon inside the variance term before square root.
 Second, `RunningStats` packages inference time mean and variance as explicit inputs. This style is
 useful because train/eval mode bugs are often state bugs. If running statistics are ambient mutable
@@ -264,20 +263,20 @@ trail is the [LLM inference engine bug study](https://arxiv.org/abs/2506.09713).
 The local contract is modest. A cache append operation should preserve existing
 entries and put the newly decoded key/value in the final slot. That sounds obvious, but it is the
 kind of invariant that becomes fragile when a serving stack layers paged attention, batching, and
-mutable buffers. The BugZoo card says what the reference operation means before any external cache
+mutable buffers. The BugZoo example says what the reference operation means before any external cache
 manager is trusted to implement it.
 
 ## RoPE Position
 
 [NN.Examples.BugZoo.RoPEPosition API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/RoPEPosition.lean) pairs naturally
-with the KV cache card. Rotary position embeddings make position accounting part of the model's
+with the KV cache example. Rotary position embeddings make position accounting part of the model's
 meaning. A decode position off by one can be hard to notice because the tensor shapes still line
 up and the model still produces tokens.
 
 The file introduces `PositionSchedule` and `appendNextPosition`. The theorem
 `appendNextPosition_last` states that the newly appended token gets exactly the next sequence index.
 The schedule is explicit rather than derived from ambient mutable state. That is the same design
-move as the normalization card: if the state affects semantics, it should appear in the object we
+move as the normalization example: if the state affects semantics, it should appear in the object we
 inspect.
 
 ## Tokenizer Boundary
@@ -297,7 +296,7 @@ that constructs those `Fin` values from external bytes.
 # Catalog Value
 
 BugZoo makes proof engineering more concrete. Instead of saying "TorchLean helps with ML bugs," we
-can point at a card and ask what changed:
+can point at an example and ask what changed:
 
 - shape bugs become typed shapes and explicit broadcast evidence;
 - unstable losses become named stable specs and operators with explicit domains;

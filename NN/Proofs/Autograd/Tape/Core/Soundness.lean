@@ -40,18 +40,6 @@ namespace Autograd
 open Spec
 open Tensor
 
-/-
-In dependently-typed code, the same cast can arise with different proof terms. Since equality proofs
-are proof-irrelevant, we can normalize these casts away when they show up during definitional
-reductions (e.g. `List.get` on `Fin` indices).
--/
-theorem tensor_cast_shape_proof_irrel {α : Type} {s₁ s₂ : Shape}
-    (t : Tensor α s₁) (p q : s₁ = s₂) :
-    Tensor.castShape (t := t) p = Tensor.castShape (t := t) q := by
-  have : p = q := Subsingleton.elim _ _
-  cases this
-  rfl
-
 noncomputable section
 
 /--
@@ -346,7 +334,9 @@ theorem dotList_single {Γ : List Shape} {s : Shape}
                 -- proof-irrelevance.
                 dsimp [getIdx]
                 simp [TList.get, iHead]
-                exact tensor_cast_shape_proof_irrel (t := dxRest.get iTail) _ _
+                exact (Tensor.cast_shape_proof_irrel (dxRest.get iTail) :
+                  Tensor.castShape (t := dxRest.get iTail) _ =
+                    Tensor.castShape (t := dxRest.get iTail) _)
               calc
                 TList.dotList (.cons dx0 dxRest) (single ⟨iHead, h⟩ v)
                     = dot dx0 (fill (0 : ℝ) s0) + TList.dotList dxRest (single idxTail v) := by

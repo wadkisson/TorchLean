@@ -52,7 +52,7 @@ namespace Spec
 open Tensor
 open Activation
 
-variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
+variable {α : Type}
 
 /-! ## Elementwise lifting helpers -/
 
@@ -82,6 +82,8 @@ def reluOp [Mul α] [One α] [Zero α] [Max α] [LT α]
   {s : Shape} : OpSpec α s s :=
 { forward      := liftElementwise (α:=α) (s:=s) Activation.Math.reluSpec
 , backward     := liftElementwiseBackward (α:=α) (s:=s) Activation.Math.reluDerivSpec }
+
+variable [Context α]
 
 /-- Elementwise sigmoid OpSpec on any shape.
 
@@ -164,7 +166,7 @@ This `OpSpec` only returns the input gradient `dL/dx`. Parameter gradients for `
 are not part of `OpSpec` (those live at the graph/runtime level).
 
 PyTorch analogy: `torch.nn.Linear` forward, with autograd producing grads for `x/W/b`. -/
-def linearOp [Add α] [Mul α] [Zero α] [One α] {inDim outDim : Nat}
+def linearOp {α : Type} [Add α] [Mul α] [Zero α] [One α] {inDim outDim : Nat}
   (m : LinearSpec α inDim outDim) :
   OpSpec α (.dim inDim .scalar) (.dim outDim .scalar) :=
 { forward      := fun x => linearSpec (α:=α) m x
@@ -547,7 +549,7 @@ def identityOp {s : Shape} : OpSpec α s s :=
 /-- Reshape op (requires a size-equality proof).
 
 PyTorch analogy: `x.reshape(...)` (or `view`), but here the shape relationship is explicit. -/
-def reshapeOp {s t : Shape} [Inhabited α]
+def reshapeOp {s t : Shape}
   (h : s.size = t.size) : OpSpec α s t :=
 { forward      := fun x => reshapeSpec (α:=α) (s₁:=s) (s₂:=t) x h
 , backward     := fun _x dLdz => reshapeSpec (α:=α) (s₁:=t) (s₂:=s) dLdz h.symm }
@@ -564,14 +566,14 @@ def matrixTransposeOp {m n : Nat} :
 
 PyTorch analogy: `torch.full_like(x, value)` (but here we keep the input only to fit the `OpSpec`
 shape, and ignore its content). -/
-def constantOp {s : Shape} (value : α) [Inhabited α] : OpSpec α s s :=
+def constantOp {s : Shape} (value : α) : OpSpec α s s :=
 { forward      := fun _x => broadcastFill (α:=α) s value
 , backward     := fun x _d => mapSpec (fun _ => 0) x }
 
 /-- Replicate a scalar to any shape; backward sums gradients back to a scalar.
 
 PyTorch analogy: broadcasting a scalar in arithmetic, and in backward accumulating by sum. -/
-def scalarToShapeOp {s : Shape} [Inhabited α] :
+def scalarToShapeOp {s : Shape} :
   OpSpec α Shape.scalar s :=
 { forward      := fun a => replicate (α:=α) (s:=s) a
 , backward     := fun _a dLdy => Tensor.scalar (sumSpec (α:=α) dLdy) }
@@ -662,7 +664,7 @@ def concatDim0RightOp {n m : Nat} {s : Shape}
       rw [Nat.add_comm m n]) dLdz }
 
 /-- Slice a leading-axis range; backward inserts the upstream gradient into the original shape. -/
-def sliceRange0Op {n : Nat} {s : Shape} [Zero α]
+def sliceRange0Op {n : Nat} {s : Shape}
   (start len : Nat) (h : len + start ≤ n) :
   OpSpec α (.dim n s) (.dim len s) :=
 { forward      := fun x => sliceRange0Spec (α:=α) (n := n) (s := s) start len h x
@@ -676,7 +678,7 @@ PyTorch analogy: `torch.sum(x, dim=axis)` (with `keepdim=false`). -/
 def reduceSumOp {s : Shape} (axis : Nat)
   [valid : Shape.valid_axis_inst axis s]
   [wf : Shape.WellFormed s]
-  [Inhabited α] :
+  :
   OpSpec α s (shapeAfterSum s axis) :=
 { forward      := fun x => reduceSumAuto (α:=α) axis x
 , backward     := fun _x dLdz =>
@@ -696,7 +698,6 @@ PyTorch analogy: this is where PyTorch's implicit broadcasting rules and reducti
 gradients ("sum over broadcasted dimensions") happen. In TorchLean we keep those shape relations
 explicit. -/
 def binaryBroadcastOp {s1 s2 t : Shape}
-  [Inhabited α]
   (rhs : Tensor α s2)
   (cbx : Shape.CanBroadcastTo s1 t)
   (cby : Shape.CanBroadcastTo s2 t)
@@ -718,7 +719,6 @@ def binaryBroadcastOp {s1 s2 t : Shape}
 
 /-- Convenience: broadcasting-aware add with caller-provided reduction. -/
 def addBroadcastOp {s1 s2 t : Shape}
-  [Inhabited α]
   (rhs : Tensor α s2) (cbx : Shape.CanBroadcastTo s1 t) (cby : Shape.CanBroadcastTo s2 t)
   (reduce_back : Tensor α t → Tensor α s1) :
   OpSpec α s1 t :=
@@ -726,7 +726,6 @@ def addBroadcastOp {s1 s2 t : Shape}
 
 /-- Convenience: broadcasting-aware mul with caller-provided reduction. -/
 def mulBroadcastOp {s1 s2 t : Shape}
-  [Inhabited α]
   (rhs : Tensor α s2) (cbx : Shape.CanBroadcastTo s1 t) (cby : Shape.CanBroadcastTo s2 t)
   (reduce_back : Tensor α t → Tensor α s1) :
   OpSpec α s1 t :=

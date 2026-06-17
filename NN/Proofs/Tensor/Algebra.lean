@@ -9,6 +9,7 @@ module
 public import NN.Spec.Core.Tensor.Constructors
 public import NN.Spec.Core.Tensor.Linalg
 public import NN.Spec.Core.TensorOps
+public import NN.Proofs.Utils.List
 public import Mathlib.Data.List.Fold
 
 /-!
@@ -95,21 +96,6 @@ def dot {α : Type} [Zero α] [Add α] [Mul α] :
 
 /-! ## List-fold helpers -/
 
-private lemma foldl_add_congr {α β : Type} [Add α] (l : List β) (f g : β → α) (a : α)
-    (h : ∀ x, f x = g x) :
-    l.foldl (fun s x => s + f x) a = l.foldl (fun s x => s + g x) a := by
-  induction l generalizing a with
-  | nil => simp
-  | cons hd tl ih =>
-    simp [List.foldl, h hd, ih]
-
-private lemma foldl_add_const_zero {α β : Type} [AddMonoid α] (l : List β) (a : α) :
-    l.foldl (fun s _ => s + (0 : α)) a = a := by
-  induction l generalizing a with
-  | nil => simp
-  | cons _ tl ih =>
-    simp [List.foldl, add_zero]
-
 /--
 Distribute a fold of `g1 x + g2 x` into the sum of two folds.
 
@@ -119,18 +105,8 @@ This is a general “sum splits over addition” lemma used to prove bilinearity
 lemma foldl_add_distrib2 {α β : Type} [AddCommMonoid α] (l : List β) (g1 g2 : β → α) :
     ∀ a1 a2,
       l.foldl (fun s x => s + (g1 x + g2 x)) (a1 + a2) =
-        l.foldl (fun s x => s + g1 x) a1 + l.foldl (fun s x => s + g2 x) a2 := by
-  intro a1 a2
-  induction l generalizing a1 a2 with
-  | nil =>
-    simp
-  | cons hd tl ih =>
-    simp [List.foldl]
-    have hacc :
-        (a1 + a2) + (g1 hd + g2 hd) = (a1 + g1 hd) + (a2 + g2 hd) := by
-      abel
-    simpa [hacc, add_assoc, add_left_comm, add_comm] using
-      (ih (a1 := a1 + g1 hd) (a2 := a2 + g2 hd))
+        l.foldl (fun s x => s + g1 x) a1 + l.foldl (fun s x => s + g2 x) a2 :=
+  List.foldl_add_distrib2 l g1 g2
 
 /-! ## From executable folds to proof-friendly sums -/
 
@@ -142,26 +118,60 @@ proofs often prefer `Finset.sum` so they can use standard big-operator lemmas.
 -/
 lemma finRange_foldl_add_eq_finset_sum {α : Type} [AddCommMonoid α] {n : Nat} (f : Fin n → α) :
     (List.finRange n).foldl (fun s i => s + f i) 0 = (Finset.univ : Finset (Fin n)).sum f := by
-  classical
-  have hL :
-      (List.finRange n).foldl (fun s i => s + f i) 0 = ((List.finRange n).map f).sum := by
-    have hmap :
-        (List.finRange n).foldl (fun s i => s + f i) 0 =
-          List.foldl (fun s x => s + x) 0 ((List.finRange n).map f) := by
-      simpa using
-        (List.foldl_map (f := f) (g := fun s x => s + x) (l := List.finRange n) (init := (0 :
-          α))).symm
-    have hfold :
-        List.foldl (fun s x : α => s + x) 0 ((List.finRange n).map f) =
-          ((List.finRange n).map f).sum := by
-      simpa [List.sum] using
-        (List.foldl_eq_foldr (f := fun s x : α => s + x) (a := (0 : α))
-          (l := (List.finRange n).map f))
-    simpa [hmap] using hfold
-  have hR :
-      (Finset.univ : Finset (Fin n)).sum f = ((List.finRange n).map f).sum := by
-    simp [Finset.sum, Finset.val_univ_fin, Multiset.map_coe, Multiset.sum_coe]
-  exact hL.trans hR.symm
+  simpa using List.finRange_foldl_add_eq_finset_sum (n := n) (f := f)
+
+/--
+Accumulator form of `finRange_foldl_add_eq_finset_sum`.
+
+This is the tensor-proof namespace wrapper around the shared list lemma, so downstream proofs can
+stay on the `Spec.finRange_*` spelling exported by `NN.Proofs.Tensor.Basic.Core`.
+-/
+lemma finRange_foldl_add_acc {α : Type} [AddCommMonoid α] {n : Nat} (f : Fin n → α) (acc : α) :
+    (List.finRange n).foldl (fun s i => s + f i) acc =
+      acc + (Finset.univ : Finset (Fin n)).sum f := by
+  simpa using List.finRange_foldl_add_acc (n := n) (f := f) (acc := acc)
+
+/--
+Push an accumulator into a `finRange` additive fold.
+
+This is the non-commutative accumulator rewrite used by nested tensor specs: a fold from `0` plus an
+outer accumulator is the same fold started at that accumulator.
+-/
+lemma add_finRange_foldl_add_zero {α : Type} [AddMonoid α] {n : Nat}
+    (f : Fin n → α) (acc : α) :
+    acc + (List.finRange n).foldl (fun s i => s + f i) 0 =
+      (List.finRange n).foldl (fun s i => s + f i) acc := by
+  simpa using List.add_foldl_add0 (l := List.finRange n) (f := f) (acc := acc)
+
+/--
+Rewrite a fold over scalar tensors into a scalar fold.
+
+Several matrix/vector specs fold over `Tensor.scalar` values even though the proof wants the raw
+scalar expression. This lemma keeps that unwrapping pattern out of backend-specific proof files.
+-/
+lemma foldl_tensorScalar_mulAdd {α : Type} [Add α] [Mul α] {n : Nat}
+    (cols vals : Fin n → Tensor α .scalar) (l : List (Fin n)) (acc : α) :
+    List.foldl
+        (fun acc k =>
+          match acc, cols k, vals k with
+          | Tensor.scalar s, Tensor.scalar ak, Tensor.scalar vk => Tensor.scalar (s + ak * vk))
+        (Tensor.scalar acc) l =
+      Tensor.scalar
+        (List.foldl
+          (fun acc k =>
+            acc +
+              (match cols k with | Tensor.scalar x => x) *
+                (match vals k with | Tensor.scalar x => x))
+          acc l) := by
+  induction l generalizing acc with
+  | nil =>
+      simp
+  | cons k tl ih =>
+      cases hcols : cols k with
+      | scalar ak =>
+          cases hvals : vals k with
+          | scalar vk =>
+              simpa [List.foldl, hcols, hvals] using ih (acc := acc + ak * vk)
 
 /-! ## Dot-product algebra -/
 
@@ -174,17 +184,6 @@ variable {α : Type} [CommSemiring α]
   simp [dot]
 
 /-! ### Scaling -/
-
-private lemma foldl_add_mul_right {β : Type} (l : List β) (g : β → α) (a k : α) :
-    l.foldl (fun acc x => acc + g x * k) (a * k) = (l.foldl (fun acc x => acc + g x) a) * k := by
-  induction l generalizing a with
-  | nil =>
-    simp
-  | cons hd tl ih =>
-    -- Rewrite the starting accumulator using distributivity, then apply IH.
-    have hstart : a * k + g hd * k = (a + g hd) * k := by
-      simp [add_mul]
-    simpa [List.foldl, hstart] using (ih (a := a + g hd))
 
 theorem dot_scale_right {s : Shape} (a b : Tensor α s) (k : α) :
     dot (α := α) a (scaleSpec (α := α) (s := s) b k) = dot (α := α) a b * k := by
@@ -208,7 +207,7 @@ theorem dot_scale_right {s : Shape} (a b : Tensor α s) (k : α) :
                 (fun acc i => acc + dot (α := α) (fa i) (scaleSpec (α := α) (s := s) (fb i) k)) 0 =
               (List.finRange n).foldl (fun acc i => acc + dot (α := α) (fa i) (fb i) * k) 0 := by
           simpa using
-            (foldl_add_congr (l := List.finRange n)
+            (List.foldl_add_congr (l := List.finRange n)
               (f := fun i => dot (α := α) (fa i) (scaleSpec (α := α) (s := s) (fb i) k))
               (g := fun i => dot (α := α) (fa i) (fb i) * k)
               (a := (0 : α)) (h := hterm))
@@ -217,7 +216,7 @@ theorem dot_scale_right {s : Shape} (a b : Tensor α s) (k : α) :
               (List.finRange n).foldl (fun acc i => acc + dot (α := α) (fa i) (fb i)) 0 * k := by
           -- Use the fold lemma with initial accumulator `0`.
           simpa [zero_mul] using
-            (foldl_add_mul_right (α := α) (l := List.finRange n)
+            (List.foldl_add_mul_right (α := α) (l := List.finRange n)
               (g := fun i => dot (α := α) (fa i) (fb i)) (a := (0 : α)) (k := k))
         calc
           dot (α := α) (Tensor.dim fa) (scaleSpec (α := α) (s := Shape.dim n s) (Tensor.dim fb) k)
@@ -253,7 +252,7 @@ theorem dot_comm {s : Shape} (a b : Tensor α s) :
         have hfold :
             (List.finRange n).foldl (fun acc i => acc + dot (α := α) (fa i) (fb i)) 0 =
               (List.finRange n).foldl (fun acc i => acc + dot (α := α) (fb i) (fa i)) 0 := by
-          simpa using (foldl_add_congr (l := List.finRange n)
+          simpa using (List.foldl_add_congr (l := List.finRange n)
             (f := fun i => dot (α := α) (fa i) (fb i))
             (g := fun i => dot (α := α) (fb i) (fa i)) (a := (0 : α)) (h := hterm))
         simpa [dot] using hfold
@@ -303,7 +302,7 @@ theorem dot_add_left {s : Shape} (a b c : Tensor α s) :
                   (List.finRange n).foldl
                     (fun acc i => acc + (dot (α := α) (fa i) (fc i) + dot (α := α) (fb i) (fc i))) 0
                       := by
-              simpa using (foldl_add_congr (l := List.finRange n)
+              simpa using (List.foldl_add_congr (l := List.finRange n)
                 (f := fun i => dot (α := α) (addSpec (fa i) (fb i)) (fc i))
                 (g := fun i => dot (α := α) (fa i) (fc i) + dot (α := α) (fb i) (fc i))
                 (a := (0 : α)) (h := hterm))
@@ -344,7 +343,7 @@ theorem dot_fill_zero_right {s : Shape} (a : Tensor α s) :
       have hcongr :
           (List.finRange n).foldl (fun acc i => acc + dot (α := α) (fa i) (fill (0 : α) s)) 0 =
             (List.finRange n).foldl (fun acc (_i : Fin n) => acc + (0 : α)) 0 := by
-        simpa using (foldl_add_congr (l := List.finRange n)
+        simpa using (List.foldl_add_congr (l := List.finRange n)
           (f := fun i => dot (α := α) (fa i) (fill (0 : α) s))
           (g := fun _i => (0 : α)) (a := (0 : α)) (h := hterm))
       calc
@@ -414,17 +413,16 @@ lemma foldl_matvec_scalar {n : Nat} (l : List (Fin n)) (a : α)
   (cols vals : Fin n → Tensor α Shape.scalar) :
   l.foldl
       (fun (acc : Tensor α Shape.scalar) (k : Fin n) =>
-        Spec.matVecMulSpec.match_1
-          (motive := fun _ _ _ => Tensor α Shape.scalar)
-          acc (cols k) (vals k)
-          (fun s ak vk => Tensor.scalar (s + ak * vk)))
+        match acc, cols k, vals k with
+        | Tensor.scalar s, Tensor.scalar ak, Tensor.scalar vk =>
+            Tensor.scalar (s + ak * vk))
       (Tensor.scalar a)
     =
     Tensor.scalar
       (l.foldl
         (fun (s : α) (k : Fin n) =>
-          Spec.matMulSpec.match_1 (motive := fun _ _ => α) (cols k) (vals k)
-            (fun ak vk => s + ak * vk))
+          match cols k, vals k with
+          | Tensor.scalar ak, Tensor.scalar vk => s + ak * vk)
         a) := by
   induction l generalizing a with
   | nil =>
@@ -458,21 +456,33 @@ lemma toVec_mat_vec_mul_spec {m n : Nat}
         simp [matVecMulSpec, toVec, hrow]
         -- Convert the scalar-tensor fold into a scalar fold on `α`, then rewrite the outer `match`
         -- extraction.
-        have hextract := by
+        have hleft :
+            (match
+                (List.finRange n).foldl
+                  (fun (acc : Tensor α Shape.scalar) (k : Fin n) =>
+                    match acc, colsA k, valuesV k with
+                    | Tensor.scalar s, Tensor.scalar ak, Tensor.scalar vk =>
+                        Tensor.scalar (s + ak * vk))
+                  (Tensor.scalar 0) with
+              | Tensor.scalar x => x) =
+              (List.finRange n).foldl
+                (fun (s : α) (k : Fin n) =>
+                  match colsA k, valuesV k with
+                  | Tensor.scalar ak, Tensor.scalar vk => s + ak * vk)
+                0 := by
           have hfold :=
             foldl_matvec_scalar (l := List.finRange n) (a := (0 : α)) (cols := colsA) (vals :=
               valuesV)
           -- Apply the scalar-extraction function `Tensor.scalar x ↦ x` to both sides.
           simpa using congrArg (fun t => match t with | Tensor.scalar x => x) hfold
-        rw [hextract]
         -- Put the fold into canonical `s + f k` form, then convert to a `Finset.univ.sum`.
         let f : Fin n → α := fun k =>
-          Spec.matMulSpec.match_1 (motive := fun _ _ => α) (colsA k) (valuesV k) (fun ak vk => ak
-            * vk)
+          match colsA k, valuesV k with
+          | Tensor.scalar ak, Tensor.scalar vk => ak * vk
         have hfun :
             (fun (s : α) (k : Fin n) =>
-                Spec.matMulSpec.match_1 (motive := fun _ _ => α) (colsA k) (valuesV k)
-                  (fun ak vk => s + ak * vk))
+                match colsA k, valuesV k with
+                | Tensor.scalar ak, Tensor.scalar vk => s + ak * vk)
               =
               (fun s k => s + f k) := by
           funext s k
@@ -481,10 +491,8 @@ lemma toVec_mat_vec_mul_spec {m n : Nat}
             cases hv : valuesV k with
             | scalar vk =>
               simp [f, hcol, hv]
-        rw [hfun]
         have hsum : (List.finRange n).foldl (fun s k => s + f k) 0 = ∑ k : Fin n, f k := by
           simpa using finRange_foldl_add_eq_finset_sum (f := f)
-        rw [hsum]
         have hf :
             ∀ k : Fin n, f k = get2 (Tensor.dim rowsA) i k * toVec (Tensor.dim valuesV) k := by
           intro k
@@ -493,9 +501,17 @@ lemma toVec_mat_vec_mul_spec {m n : Nat}
             cases hv : valuesV k with
             | scalar vk =>
               simp [f, get2_eq, get_eq, toVec, hrow, hcol, hv]
-        refine (Finset.sum_congr rfl ?_)
-        intro k _
-        simpa using hf k
+        have hfoldFun :
+            (List.finRange n).foldl
+                (fun (s : α) (k : Fin n) =>
+                  match colsA k, valuesV k with
+                  | Tensor.scalar ak, Tensor.scalar vk => s + ak * vk)
+                0 =
+              (List.finRange n).foldl (fun s k => s + f k) 0 := by
+          exact congrArg (fun fn => (List.finRange n).foldl fn 0) hfun
+        refine hleft.trans (hfoldFun.trans (hsum.trans ?_))
+        exact Finset.sum_congr rfl (fun k _ => by
+          simpa [toVec] using hf k)
 
 /--
 Vector-matrix multiply coordinate expansion.
@@ -513,24 +529,16 @@ lemma toVec_vec_mat_mul_spec {m n : Nat}
     | dim rowsA =>
       simp [vecMatMulSpec, toVec, get2_eq, get_eq]
       let f : Fin m → α := fun i =>
-        vecMatMulSpec.match_3
-          (motive := fun _ _ => α)
-          (valuesV i) (rowsA i)
-          (fun vi colsA =>
-            vecMatMulSpec.match_1
-              (motive := fun _ => α)
-              (colsA j)
-              (fun aij => vi * aij))
+        match valuesV i, rowsA i with
+        | Tensor.scalar vi, Tensor.dim colsA =>
+            match colsA j with
+            | Tensor.scalar aij => vi * aij
       have hfun :
           (fun (s : α) (i : Fin m) =>
-              vecMatMulSpec.match_3
-                (motive := fun _ _ => α)
-                (valuesV i) (rowsA i)
-                (fun vi colsA =>
-                  vecMatMulSpec.match_1
-                    (motive := fun _ => α)
-                    (colsA j)
-                    (fun aij => s + vi * aij)))
+              match valuesV i, rowsA i with
+              | Tensor.scalar vi, Tensor.dim colsA =>
+                  match colsA j with
+                  | Tensor.scalar aij => s + vi * aij)
             =
             (fun s i => s + f i) := by
         funext s i
@@ -543,7 +551,17 @@ lemma toVec_vec_mat_mul_spec {m n : Nat}
               simp [f, hv, hrow, hcol]
       have hsum : (List.finRange m).foldl (fun s i => s + f i) 0 = ∑ i : Fin m, f i :=
         finRange_foldl_add_eq_finset_sum (f := f)
-      rw [hfun, hsum]
+      have hfoldFun :
+          (List.finRange m).foldl
+              (fun sum i =>
+                match valuesV i, rowsA i with
+                | Tensor.scalar vi, Tensor.dim colsA =>
+                    match colsA j with
+                    | Tensor.scalar aij => sum + vi * aij)
+              0 =
+            (List.finRange m).foldl (fun s i => s + f i) 0 := by
+        exact congrArg (fun fn => (List.finRange m).foldl fn 0) hfun
+      refine hfoldFun.trans (hsum.trans ?_)
       refine Finset.sum_congr rfl ?_
       intro i _
       cases hv : valuesV i with

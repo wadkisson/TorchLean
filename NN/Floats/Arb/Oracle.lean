@@ -157,7 +157,7 @@ structure MLPResult where
   precBits : Nat
   /-- Decimal digits used in printed endpoints. -/
   digits : Nat
-  /-- Per-output enclosures, each paired with human-readable endpoints. -/
+  /-- Per-output enclosures, each paired with decimal endpoint strings. -/
   output : Array (MidRad10Exp × String × String)
   deriving Repr, Inhabited
 
@@ -324,7 +324,7 @@ Parse a unary-mode JSON payload into a typed `Result`.
 
 In words: if the JSON matches the schema emitted by `arb_oracle.py --func ...`, then
 `parseResult` extracts the input/output enclosures and context parameters; otherwise it returns a
-human-readable error message.
+plain error message.
 -/
 def parseResult (j : Json) : Except String Result := do
   let func ← j.getObjVal? "func" >>= jsonToString

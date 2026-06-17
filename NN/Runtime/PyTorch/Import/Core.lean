@@ -26,7 +26,8 @@ directly in Lean. Instead, PyTorch loads the checkpoint and emits a small JSON r
 is easy to validate against a Lean `Shape` and easy to diff in tests.
 
 This importer is about **weights only**. Importing a captured *graph* (e.g. ONNX or `torch.export`)
-is a separate problem and lives at a different abstraction layer than this JSON `state_dict` shim.
+is a separate problem and lives at a different abstraction layer than this JSON `state_dict`
+adapter.
 
 This module is where we keep the shared logic that most PyTorch → TorchLean importers need:
 

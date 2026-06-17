@@ -7,10 +7,10 @@ Authors: TorchLean Team
 module
 
 public import Lean.Data.Json
-public import NN.API.Json
 public import NN.Runtime.External.Process
 public import NN.Runtime.PyTorch.Export.TorchExport
 public import NN.Runtime.PyTorch.Import.TorchExport
+public import NN
 
 /-!
 # PyTorch `nn.Module` → TorchLean IR Check
@@ -39,6 +39,18 @@ lake exe torchlean pytorch_export_check
 namespace NN.Examples.Interop.PyTorch.TorchExportCheck
 
 open Lean
+
+/-- Command-line help for the PyTorch export bridge check. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean PyTorch export bridge check"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean pytorch_export_check"
+    , ""
+    , "This command writes tiny PyTorch models, captures them with torch.export, validates the"
+    , "TorchLean IR JSON, and checks a few deliberate unsupported-op failures."
+    ]
 
 def workDir : System.FilePath :=
   Runtime.External.Process.artifactWorkDir "pytorch_export_check"
@@ -194,7 +206,7 @@ def runSupportedCase (ctor shape : String) : IO Unit := do
     let txt ← IO.FS.readFile outPath
     unless txt.contains "\"eps\"" do
       throw <| IO.userError "TinyBatchNorm2d export did not preserve BatchNorm epsilon metadata"
-  let j ← NN.API.Json.parseFile outPath
+  let j ← TorchLean.Json.parseFile outPath
   match Import.PyTorch.TorchExport.parseGraph j with
   | .ok cg =>
       IO.println s!"  accepted: nodes={cg.graph.nodes.size}, input={cg.inputId}, output={cg.outputId}"
@@ -236,7 +248,7 @@ or incorrectly treating the tuple producer as a tensor op.
 def runLeanUnsupportedCase (ctor shape msg : String) : IO Unit := do
   let outPath := workDir / s!"{ctor}.graph.json"
   let _stdout ← runCapture ctor outPath shape
-  let j ← NN.API.Json.parseFile outPath
+  let j ← TorchLean.Json.parseFile outPath
   match Import.PyTorch.TorchExport.parseGraph j with
   | .ok _ =>
       throw <| IO.userError s!"unsupported PyTorch value graph unexpectedly lowered: {ctor}"
@@ -264,7 +276,12 @@ def run : IO Unit := do
   IO.println "pytorch_export_check: ok"
 
 /-- Entrypoint used by `lake exe torchlean pytorch_export_check`. -/
-def main (_args : List String) : IO UInt32 := do
+def main (args : List String) : IO UInt32 := do
+  let args := _root_.TorchLean.CLI.dropDashDash args
+  if _root_.TorchLean.CLI.hasHelp args then
+    IO.println usage
+    return 0
+  _root_.TorchLean.CLI.requireNoArgs "pytorch_export_check" args
   run
   pure 0
 

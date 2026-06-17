@@ -22,9 +22,8 @@ This module proves the first foundational theorems for TorchLean's finite discou
 - Bellman optimality is itself monotone,
 - Bellman policy and Bellman optimality are contractions in the finite sup metric.
 
-The proofs are intentionally about deterministic finite MDPs first. That gives us a clean,
-trustworthy base to build on before introducing stochastic transitions or richer measure-theoretic
-machinery.
+The proofs start with deterministic finite MDPs. That gives us a trustworthy base before
+introducing stochastic transitions or richer measure-theoretic machinery.
 
 References:
 - Puterman, *Markov Decision Processes* (1994), discounted dynamic programming chapter:
@@ -251,8 +250,11 @@ theorem bellmanPolicy_contraction
       |valueAt (bellmanPolicy mdp policy values₁) state -
           valueAt (bellmanPolicy mdp policy values₂) state|) ?_
   intro state _
-  simpa [bellmanPolicy, valueAt] using
-    stateActionValue_abs_sub_le mdp values₁ values₂ hγ₀ state (policy state)
+  change
+    |stateActionValue mdp values₁ state (policy state) -
+        stateActionValue mdp values₂ state (policy state)|
+      ≤ mdp.discount * valueSupDist values₁ values₂
+  exact stateActionValue_abs_sub_le mdp values₁ values₂ hγ₀ state (policy state)
 
 /-- At a fixed state, Bellman optimality is Lipschitz with constant `γ`. -/
 theorem bellmanOptimality_abs_sub_le
@@ -291,7 +293,8 @@ theorem bellmanOptimality_abs_sub_le
           (Finset.univ : Finset (Fin nActions)).sup' Finset.univ_nonempty g|
         ≤ bound :=
     abs_sub_le_iff.mpr ⟨sub_le_iff_le_add'.mpr hs1, sub_le_iff_le_add'.mpr hs2⟩
-  simpa [bellmanOptimality, valueAt, f, g, bound] using habs
+  simpa [bellmanOptimality, valueAt, Spec.Tensor.vecGet, Spec.get, Spec.getAtSpec, Spec.Tensor.toScalar,
+    f, g, bound] using habs
 
 /-- Bellman optimality is a `γ`-contraction in the finite sup metric. -/
 theorem bellmanOptimality_contraction

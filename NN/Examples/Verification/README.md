@@ -1,10 +1,10 @@
 # Verification Artifacts and Workflows
 
-This directory contains the bundled verification artifacts and wrapper modules used by TorchLean's
+This directory contains the bundled verification artifacts and runnable entry modules used by TorchLean's
 unified verification CLI.
 
 Reusable verification code lives under `NN/Verification/*`.
-These files are the small assets and wrapper modules that keep `lake exe verify`
+These files are the small assets and entry modules that keep `lake exe verify`
 reproducible without pulling in large benchmark dumps.
 
 ## What To Run
@@ -37,18 +37,20 @@ reproducible without pulling in large benchmark dumps.
 
 ## Workflow Tiers
 
-- Native TorchLean verification: `TorchLean/*` and `Robustness/TorchLeanRobustness.lean` build
-  models in TorchLean, compile them to verifier IR, and run bound propagation directly. These do
-  not depend on an external verifier exporter.
+- Native TorchLean verification: `NN.Verification.Robustness.TorchLean` and
+  `NN.Verification.TorchLean.*` build models in TorchLean, compile them to verifier IR, and run
+  bound propagation directly.
 
-- Exporter-backed verification: `LiRPA/*` and `VNNComp/*` include example wrappers. `AbCrown/*`,
-  `ODE/*`, and `PINN/*` hold bundled artifacts consumed by reusable CLI/checker code under
-  `NN/Verification`. Python or external tools may produce candidate JSON artifacts, but Lean still
-  parses and checks the artifact before accepting it.
+- Exporter-backed verification: `LiRPA/*`, `VNNComp/*`, `AbCrown/*`, `ODE/*`, and `PINN/*` hold
+  bundled artifacts consumed by reusable CLI/checker code under `NN/Verification`. Python or
+  external tools may produce candidate JSON artifacts, but Lean still parses and checks the artifact
+  before accepting it.
 
-- Certificate checkers: `LiRPA/*`, `AbCrown/*`, `Robustness/VerifyMarginCert.lean`, and
-  `Splines/PiecewiseLinearVerify.lean` parse external artifacts and recompute the relevant
-  certificate condition inside Lean.
+- Certificate checkers: `LiRPA/*`, `AbCrown/*`,
+  `NN.Verification.Robustness.MarginCert`, and `NN.Verification.Splines.PiecewiseLinearCLI` parse
+  external artifacts and recompute the relevant certificate condition inside Lean. Classifier
+  margin checks share `NN.Verification.Robustness.TopLabel`, so JSON certificates and in-memory
+  IBP/CROWN bounds use the same top-label rule.
 
 - Data-backed robustness: `lake exe verify -- digits` runs `NN.Verification.Robustness.Digits`,
   which loads the exported sklearn digits weights and test data stored in `Robustness/`.
@@ -64,8 +66,8 @@ reproducible without pulling in large benchmark dumps.
   directory.
 
 Reusable Lean code for ODE/PINN and certificate checking belongs under `NN/Verification`.
-The `ODE/`, `PINN/`, `AbCrown/`, and `LiRPA/` folders here should contain only small artifacts,
-notes, or thin runnable wrappers. Producers generally belong under `scripts/verification/`.
+The `ODE/`, `PINN/`, `AbCrown/`, and `LiRPA/` folders here should contain small artifacts, notes,
+or thin runnable entries. Producers generally belong under `scripts/verification/`.
 
 ## Trust Boundaries
 

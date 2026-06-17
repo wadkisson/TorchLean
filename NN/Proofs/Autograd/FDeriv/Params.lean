@@ -184,7 +184,7 @@ lemma matApplyLin_adjoint_apply {m n : Nat} (x : Vec n) (δ : Vec m) :
       simpa [sub_eq_zero] using congrArg (fun t => t - inner ℝ (u - v) v) hEq
     have hinnerSub :
         inner ℝ (u - v) (u - v) = inner ℝ (u - v) u - inner ℝ (u - v) v := by
-      simpa using (inner_sub_right (x := u - v) (y := u) (z := v))
+      rw [inner_sub_right]
     exact hinnerSub.trans this
   have huv : u - v = 0 := (inner_self_eq_zero (𝕜 := ℝ) (x := (u - v))).1 h0
   have : u = v := sub_eq_zero.mp huv

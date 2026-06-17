@@ -346,7 +346,7 @@ def sinhCorrect {s : Shape} :
   jvp := fun x dx => mulSpec dx (coshSpec (α:=ℝ) (s:=s) x)
   correct := by
     intro x dx δ
-    simpa [Spec.sinhOp, Spec.liftElementwiseBackward] using (dot_elemwise_adjoint (dx:=dx)
+    simpa [Spec.sinhOp, Spec.liftElementwiseBackward, coshSpec] using (dot_elemwise_adjoint (dx:=dx)
       (df:=coshSpec (α:=ℝ) (s:=s) x) (δ:=δ))
 }
 
@@ -362,7 +362,7 @@ def coshCorrect {s : Shape} :
   jvp := fun x dx => mulSpec dx (sinhSpec (α:=ℝ) (s:=s) x)
   correct := by
     intro x dx δ
-    simpa [Spec.coshOp, Spec.liftElementwiseBackward] using (dot_elemwise_adjoint (dx:=dx)
+    simpa [Spec.coshOp, Spec.liftElementwiseBackward, sinhSpec] using (dot_elemwise_adjoint (dx:=dx)
       (df:=sinhSpec (α:=ℝ) (s:=s) x) (δ:=δ))
 }
 

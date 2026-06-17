@@ -9,7 +9,7 @@ module
 public import NN.MLTheory.Optimization.GDLinearConvergence
 
 import Mathlib.Logic.Function.Iterate
-import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Basic
+import Mathlib.Algebra.Order.GroupWithZero.Basic
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Ring
 

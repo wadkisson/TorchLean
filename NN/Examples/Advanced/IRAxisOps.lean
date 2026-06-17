@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public
+public import NN
 public import NN.IR.Check
 public import NN.Runtime.Autograd.Compiled.IRExec
 
@@ -15,7 +15,7 @@ public import NN.Runtime.Autograd.Compiled.IRExec
 
 IR axis-ops runtime tutorial.
 
-This file is a small “regression guard” for three ops where TorchLean’s IR uses an explicit `axis`:
+This example is a small regression guard for three ops where TorchLean’s IR uses an explicit `axis`:
 
 - `softmax axis` (PyTorch: `torch.softmax(x, dim=axis)`)
 - `concat axis` (PyTorch: `torch.cat(xs, dim=axis)`)
@@ -42,9 +42,24 @@ Run:
 
 namespace NN.Examples.Advanced.IRAxisOps
 
+open TorchLean
 open NN.IR
 
 open Runtime.Autograd.Compiled
+
+/-- Command-line help for the IR axis-ops tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean IR axis-ops tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean ir_axis_ops [options]"
+    , ""
+    , "Options:"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    ]
 
 /-!
 ## Test Shapes
@@ -52,9 +67,9 @@ open Runtime.Autograd.Compiled
 We keep shapes compact while still exercising the “axis is not last / not 0” code paths.
 -/
 
-abbrev s234 : Spec.Shape := NN.Tensor.shapeOfDims [2, 3, 4]
-abbrev s254 : Spec.Shape := NN.Tensor.shapeOfDims [2, 5, 4]
-abbrev s284 : Spec.Shape := NN.Tensor.shapeOfDims [2, 8, 4]
+abbrev s234 : Shape := NN.Tensor.shapeOfDims [2, 3, 4]
+abbrev s254 : Shape := NN.Tensor.shapeOfDims [2, 5, 4]
+abbrev s284 : Shape := NN.Tensor.shapeOfDims [2, 8, 4]
 
 /-!
 ## Small IR Graphs
@@ -76,7 +91,7 @@ def gConcatAxis1 : NN.IR.Graph :=
   -- The concat example uses `rand_uniform` sources, so the input node only fixes the graph's
   -- single-input interface for the shared runner.
   { nodes := #[
-      { id := 0, parents := [], kind := .input, outShape := Spec.Shape.scalar }
+      { id := 0, parents := [], kind := .input, outShape := _root_.TorchLean.Shape.scalar }
     , { id := 1, parents := [], kind := .randUniform (seed := 0), outShape := s234 }
     , { id := 2, parents := [], kind := .randUniform (seed := 1), outShape := s254 }
     , { id := 3, parents := [1, 2], kind := .concat (axis := 1), outShape := s284 }
@@ -87,8 +102,8 @@ def gConcatAxis1 : NN.IR.Graph :=
 -/
 
 def checkIR (tag : String) (g : NN.IR.Graph) : IO Unit := do
-  API.Common.orThrow s!"{tag}:checkWellFormed" <| g.checkWellFormed
-  API.Common.orThrow s!"{tag}:checkShapes" <| NN.IR.Graph.checkShapes g
+  CLI.orThrow s!"{tag}:checkWellFormed" <| g.checkWellFormed
+  CLI.orThrow s!"{tag}:checkShapes" <| NN.IR.Graph.checkShapes g
 
 def firstScalars {α : Type} [ToString α] : List α → String
   | [] => "[]"
@@ -98,11 +113,11 @@ def firstScalars {α : Type} [ToString α] : List α → String
         ++ "]"
 
 def runOne
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
     (tag : String)
     (g : NN.IR.Graph)
     (payload : NN.IR.Payload α)
-    (inputShape : Spec.Shape)
+    (inputShape : Shape)
     (x : Spec.Tensor α inputShape)
     (outputId : Fin g.nodes.size)
     (runCompiled : Bool := true) : IO Unit := do
@@ -110,7 +125,7 @@ def runOne
 
   -- Spec semantics (denotational model).
   let input : NN.IR.DVal α := NN.IR.DVal.mk (α := α) inputShape x
-  let outSpec ← API.Common.orThrow s!"{tag}:spec" <|
+  let outSpec ← CLI.orThrow s!"{tag}:spec" <|
     NN.IR.Graph.denote (α := α) (g := g) (payload := payload) (input := input) (outputId :=
       outputId)
   let ⟨sSpec, tSpec⟩ := outSpec
@@ -122,7 +137,7 @@ def runOne
     return ()
 
   -- Compiled bridge (IR → executable SSA) + execution.
-  let eg ← API.Common.orThrow s!"{tag}:compiled" <|
+  let eg ← CLI.orThrow s!"{tag}:compiled" <|
     Runtime.Autograd.Compiled.execGraphOfIR (α := α) (g := g) (payload := payload)
   let xExec : Spec.Tensor α eg.inShape ←
     if hIn : inputShape = eg.inShape then
@@ -150,14 +165,14 @@ def runOne
       s!"{tag}: spec/compiled outShape mismatch: spec={repr sSpec}, compiled={repr sExec}"
 
 def runOnce
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
-    (cast : Float → α) : IO Unit := do
+    {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
+    : IO Unit := do
   let payload : NN.IR.Payload α := {}
 
   -- A small but nontrivial 2×3×4 input tensor.
   let x234 : Spec.Tensor α s234 ←
-    API.Common.orThrow "ir_axis_ops:input234" <|
-      API.Common.tensorFGen (α := α) cast [2, 3, 4] (fun i =>
+    CLI.orThrow "ir_axis_ops:input234" <|
+      Tensor.tensorFGen (α := α) Runtime.ofFloat [2, 3, 4] (fun i =>
         (Float.ofNat i) / 10.0 - 1.0)
 
   IO.println ""
@@ -177,14 +192,23 @@ def runOnce
 
   IO.println ""
   IO.println "-- concat axis=1: [2,3,4] ++ [2,5,4] -> [2,8,4]"
-  let x0 : Spec.Tensor α Spec.Shape.scalar := Spec.Tensor.scalar (cast 0.0)
+  let x0 : Spec.Tensor α _root_.TorchLean.Shape.scalar :=
+    Spec.Tensor.scalar (Runtime.ofFloat (α := α) 0.0)
   runOne (α := α) (tag := "concat_axis1") (g := gConcatAxis1) (payload := payload)
-    (inputShape := Spec.Shape.scalar) (x := x0) (outputId := ⟨3, by decide⟩)
+    (inputShape := _root_.TorchLean.Shape.scalar) (x := x0) (outputId := ⟨3, by decide⟩)
+
+/-- Runtime-selected entrypoint body for the axis-ops tutorial. -/
+def runSelected
+    {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
+    (rest : List String) : IO Unit := do
+  CLI.requireNoArgs "ir_axis_ops" rest
+  runOnce (α := α)
 
 def main (args : List String) : IO Unit := do
-  let args := API.CLI.dropDashDash args
-  _root_.NN.API.TorchLean.Module.withRuntime args (fun {α} _ _ _ _ cast _opts rest => do
-    API.Common.orThrow "ir_axis_ops" <| API.CLI.requireNoArgs rest
-    runOnce (α := α) cast)
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
+  Runtime.withSelectedNoCast args (@runSelected)
 
 end NN.Examples.Advanced.IRAxisOps

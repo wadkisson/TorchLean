@@ -143,7 +143,7 @@ Mean-reduce along `axis`.
 Backward rule: broadcast the upstream cotangent back to `s` and divide by the reduced dimension.
 PyTorch comparison: `torch.mean(x, dim=axis)`.
 -/
-def reduceMean {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+def reduceMean {α : Type} [Context α] [DecidableEq Shape]
   {s : Shape} (axis : Nat) [valid : Shape.valid_axis_inst axis s] [wf : Shape.WellFormed s]
   (t : Tape α) (xId : Nat) : Result (Tape α × Nat) :=
   unary (α := α) (t := t) (σ := s) (τ := shapeAfterSum s axis)

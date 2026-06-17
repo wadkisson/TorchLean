@@ -224,7 +224,8 @@ lemma scaleCtx_get {α : Type} {toSpec : α → SpecScalar} {Γ : List Shape}
                   | mk iVal hiVal =>
                       cases iVal with
                       | zero =>
-                          simpa [TList.get, BList.get, scaleCtx, scaleT, scaleWith] using h.1
+                          change scaleT (α := α) (toSpec := toSpec) xSh xRh bh
+                          exact h.1
                       | succ j =>
                           have := ih (xS := xSt) (xR := xRt) (bs := bt) h.2
                             ⟨j, Nat.lt_of_succ_lt_succ hiVal⟩

@@ -52,10 +52,6 @@ local notation "R" => TorchLean.Floats.NF β fexp rnd
 
 set_option maxHeartbeats 4000000
 
-private lemma one_le_nat_coe {n : Nat} (hn : 0 < n) : (1 : ℝ) ≤ (n : ℝ) := by
-  have : (1 : Nat) ≤ n := Nat.succ_le_iff.2 hn
-  exact_mod_cast this
-
 -- ---------------------------------------------------------------------------
 -- Definitional unfoldings for 2D reductions (axis 0/1)
 -- ---------------------------------------------------------------------------
@@ -176,7 +172,8 @@ theorem approxT_reduce_sum_axis1_2d
             -- `linf_norm (Tensor.scalar b) = |b|`.
             have habs : abs (sumBound (β := β) (fexp := fexp) (rnd := rnd) (s := .dim n .scalar)
               eps (xRf i)) ≤ linfNorm boundVec := by
-              simpa [boundVec, linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm] using this
+              simpa [boundVec, linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm,
+                MathFunctions.abs] using this
             exact le_trans (le_abs_self _) habs
           have : abs
               (toSpec (β := β) (fexp := fexp) (rnd := rnd) (sumSpec (α := R) (s := .dim n .scalar)
@@ -192,11 +189,16 @@ theorem approxT_reduce_sum_axis1_2d
               (by
               simpa [abs_sub_comm] using this)
           -- Rewrite the component of `reduce_sum` at axis=1 to the row sum.
-          have hEqS := reduce_sum_axis1_get (α := ℝ) (m := m) (n := n) (x := Tensor.dim xSf) hRed' i
-          have hEqR := reduce_sum_axis1_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed' i
-          -- `convert` exposes the definitional-equality side conditions for the implicit arguments,
-          -- which is exactly what this componentwise approximation needs.
-          convert hScalarApprox using 1
+          cases hRed' with
+          | tail hRedTail =>
+              cases hs : xSf i with
+              | dim slicesS =>
+                  cases hr : xRf i with
+                  | dim slicesR =>
+                      simpa [Spec.Tensor.reduceSum, Spec.Tensor.reduceDim,
+                        Spec.Tensor.reduceDim.aux, Spec.Tensor.reduceFirstDim,
+                        Spec.Tensor.shapeAfterSum, getAtSpec, sumSpec, hs, hr, hRedTail,
+                        tensorFoldlSpec] using hScalarApprox
 
 -- ---------------------------------------------------------------------------
 -- Row-wise mean (axis=1) on a 2D tensor
@@ -235,7 +237,8 @@ theorem approxT_reduce_mean_axis1_2d
   intro s hm' hn' hAxis hRed
   classical
   have hε : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) (s := s) hx
-  have hn1 : (1 : ℝ) ≤ (n : ℝ) := one_le_nat_coe (n := n) hn
+  have hn1 : (1 : ℝ) ≤ (n : ℝ) := by
+    exact_mod_cast (Nat.succ_le_iff.2 hn : (1 : Nat) ≤ n)
   cases xS with
   | dim xSf =>
       cases xR with
@@ -289,7 +292,8 @@ theorem approxT_reduce_mean_axis1_2d
             have := linf_norm_le_get_dim (t := boundVec) i
             have habs : abs ((match boundVec with | .dim f => f i).toScalar) ≤ linfNorm boundVec :=
               by
-              simpa [linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm] using this
+              simpa [boundVec, linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm,
+                MathFunctions.abs] using this
             exact le_trans (le_abs_self _) habs
           have hb :
               abs
@@ -312,11 +316,41 @@ theorem approxT_reduce_mean_axis1_2d
               (by
               simpa [abs_sub_comm] using this)
           -- Rewrite the component of `reduce_mean` at axis=1.
-          have hEqS := reduce_mean_axis1_get (α := ℝ) (m := m) (n := n) (x := Tensor.dim xSf) hRed'
-            i
-          have hEqR := reduce_mean_axis1_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed'
-            i
-          convert hScalarApprox using 1
+          cases hRed' with
+          | tail hRedTail =>
+              cases hs : xSf i with
+              | dim slicesS =>
+                  cases hr : xRf i with
+                  | dim slicesR =>
+                      have hScalarApprox' :
+                          approxT (α := R)
+                            (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                            (Tensor.scalar
+                              (tensorFoldlSpec.go (fun x1 x2 : SpecScalar => x1 + x2) n
+                                Shape.scalar (fun i => slicesS i) 0 0 / (n : SpecScalar)))
+                            (Tensor.scalar
+                              (tensorFoldlSpec.go (fun x1 x2 : R => x1 + x2) n
+                                Shape.scalar (fun i => slicesR i) 0 0 / (n : R)))
+                            (linfNorm boundVec) := by
+                        simpa [sumSpec, hs, hr, tensorFoldlSpec] using hScalarApprox
+                      simp [Spec.Tensor.reduceMean, Spec.Tensor.reduceSum,
+                        Spec.Tensor.reduceDim, Spec.Tensor.reduceDim.aux,
+                        Spec.Tensor.reduceFirstDim, Spec.Tensor.shapeAfterSum,
+                        Spec.Tensor.getDimSize, getAtSpec, sumSpec, mapSpec, hs, hr,
+                        tensorFoldlSpec]
+                      change
+                        approxT (α := R)
+                          (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                          (Tensor.scalar
+                            (tensorFoldlSpec.go (fun x1 x2 : SpecScalar => x1 + x2) n
+                              Shape.scalar (fun i => slicesS i) 0 0 / (n : SpecScalar)))
+                          (Tensor.scalar
+                            (tensorFoldlSpec.go (fun x1 x2 : R => x1 + x2) n
+                              Shape.scalar (fun i => slicesR i) 0 0 /
+                                TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd)
+                                  (n : ℝ)))
+                          (linfNorm boundVec)
+                      simpa using hScalarApprox'
 
 -- ---------------------------------------------------------------------------
 -- Column-wise sum (axis=0) on a 2D tensor
@@ -391,7 +425,7 @@ theorem approxT_reduce_sum_axis0_2d
                         rnd))
                         (xS := Tensor.dim colsS) (xR := Tensor.dim colsR) (eps := eps) (by simpa
                           [hs, hr] using hrow) j
-                    simpa [colS, colR, hs, hr] using hij
+                    simpa [colS, colR, hs, hr, sliceSpec] using hij
 
           have hSum :=
             approxT_sum_spec (β := β) (fexp := fexp) (rnd := rnd) (s := .dim m .scalar)
@@ -407,7 +441,8 @@ theorem approxT_reduce_sum_axis0_2d
             have habs : abs (sumBound (β := β) (fexp := fexp) (rnd := rnd) (s := .dim m .scalar)
               eps (colR (m := m) (n := n) xRf j)) ≤
                 linfNorm boundVec := by
-              simpa [boundVec, linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm] using this
+              simpa [boundVec, linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm,
+                MathFunctions.abs] using this
             exact le_trans (le_abs_self _) habs
           have : abs
               (toSpec (β := β) (fexp := fexp) (rnd := rnd)
@@ -424,10 +459,14 @@ theorem approxT_reduce_sum_axis0_2d
             (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).2
               (by
               simpa [abs_sub_comm] using this)
-          simpa [colS, colR, Spec.Tensor.reduceSum, Spec.Tensor.reduceDim,
-            Spec.Tensor.reduceDim.aux,
-            Spec.Tensor.reduceFirstDim, Spec.Tensor.shapeAfterSum, getAtSpec, sliceSpec]
-              using hScalarApprox
+          have hEqS :=
+            reduce_sum_axis0_get (α := SpecScalar) (m := m) (n := n) (x := Tensor.dim xSf) hRed j
+          have hEqR :=
+            reduce_sum_axis0_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed j
+          simp [colS, colR, sliceSpec] at hScalarApprox
+          simp [getAtSpec, sliceSpec] at hEqS hEqR
+          rw [← hEqS, ← hEqR] at hScalarApprox
+          exact hScalarApprox
 
 end NFBackend
 

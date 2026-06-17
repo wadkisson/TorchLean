@@ -288,9 +288,9 @@ def adamUpdateArrayBiasCorrected
 /--
 Run reverse-mode on the fused-FNO tape and update every recorded parameter with Adam.
 
-Gradients are computed on CUDA buffers and downloaded to host arrays before the update. This keeps
-the wrapper simple and explicit; high-throughput optimizer kernels should live in a separate CUDA
-optimizer layer rather than being hidden inside this model helper.
+Gradients are computed on CUDA buffers and downloaded to host arrays before the update. A
+high-throughput optimizer kernel should live in a separate CUDA optimizer layer, not inside this
+model helper.
 -/
 def updateParamsAdam
     (ps : Array Param) (fw : Forward) (lr : Float) (st : AdamState)

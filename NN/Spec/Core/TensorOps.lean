@@ -203,11 +203,11 @@ def ltMaskSpec {s : Shape} (a b : Tensor α s) : Tensor α s :=
   map2Spec (fun x y => if x < y then 1 else 0) a b
 
 /-- Convert a Bool to `α` using `1`/`0`. -/
-def boolToAlphaSpec [One α] [Zero α] : Bool → α :=
+def boolToAlphaSpec : Bool → α :=
   fun b => if b then 1 else 0
 
 /-- Multiply a tensor by a Bool mask (casts the mask to `0/1`). -/
-def mulBoolMaskSpec [Mul α] [One α] [Zero α] {s : Shape} (t : Tensor α s) (mask : Tensor Bool s)
+def mulBoolMaskSpec {s : Shape} (t : Tensor α s) (mask : Tensor Bool s)
   : Tensor α s :=
   map2Spec (fun x b => x * boolToAlphaSpec b) t mask
 

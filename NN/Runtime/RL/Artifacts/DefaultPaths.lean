@@ -34,7 +34,7 @@ namespace DefaultPaths
 def ppoCartPoleTrainLog : System.FilePath :=
   ("data/rl/ppo_cartpole_trainlog.json" : System.FilePath)
 
-/-- Default training-log path written by `torchlean ppo_pong_ram` (override with `--log`). -/
+/-- Default training-log path for the optional Pong RAM artifact viewer. -/
 def ppoPongRamTrainLog : System.FilePath :=
   ("data/rl/ppo_pong_ram_trainlog.json" : System.FilePath)
 

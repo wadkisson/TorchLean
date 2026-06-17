@@ -78,12 +78,12 @@ def cnn (cfg : CnnConfig)
   letI : NeZero cfg.conv.kW := ⟨h_kW⟩
   letI : NeZero cfg.pool.kH := ⟨h_poolKH⟩
   letI : NeZero cfg.pool.kW := ⟨h_poolKW⟩
-  nn.sequential![
+  nn.Sequential![
     nn.conv cfg.conv,
-    nn.relu,
-    nn.maxPool cfg.pool,
-    nn.flattenBatch,
-    nn.linear cfg.featSize cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    ReLU,
+    maxPool cfg.pool,
+    FlattenBatch,
+    Linear cfg.featSize cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
   ]
 
 end models

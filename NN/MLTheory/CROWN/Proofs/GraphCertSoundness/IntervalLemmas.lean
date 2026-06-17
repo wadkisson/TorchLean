@@ -198,8 +198,9 @@ theorem box_mul_elem_sound_real (n : Nat)
                             interval_mul_bounds (lx := lx) (ux := ux) (ly := ly) (uy := uy)
                               (x := xv) (y := yv) (hx := hx'.1) (hx' := hx'.2) (hy := hy'.1) (hy' :=
                                 hy'.2)
-                          simpa [Tensor.mulSpec, Tensor.map2Spec, min2_eq_min, max2_eq_max, hLx,
-                            hUx, hLy, hUy, hX, hY] using hMul
+                          simpa [Tensor.mulSpec, Tensor.map2Spec, min2_eq_min, max2_eq_max,
+                            BoundOps.mulDown, BoundOps.mulUp, hLx, hUx, hLy, hUy, hX, hY]
+                            using hMul
 
 /-!
 ### Casting lemmas (avoid `cases` on `B.dim = v.n`)
@@ -293,7 +294,7 @@ theorem encloses_of_contains {n : Nat}
             | scalar u =>
               cases hX : fx i with
               | scalar v =>
-                simpa [toFlatBox, getDimScalarFn, hL, hU, hX] using hx_i
+                simpa [toFlatBox, getDimScalarFn, Box.contains, hL, hU, hX] using hx_i
 
 theorem contains_of_encloses
     (B : FlatBox ℝ) (x : Tensor ℝ (.dim B.dim .scalar)) :
@@ -317,7 +318,7 @@ theorem contains_of_encloses
             | scalar u =>
               cases hX : fx i with
               | scalar v =>
-                simpa [ofFlatBox, getDimScalarFn, hL, hU, hX] using hx_i
+                simpa [ofFlatBox, getDimScalarFn, Box.contains, hL, hU, hX] using hx_i
 
 /-!
 ### Point Boxes Always Enclose Their Point

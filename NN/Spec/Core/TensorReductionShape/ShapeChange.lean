@@ -67,7 +67,7 @@ def unflattenSpec {α : Type} [Inhabited α] : ∀ (s : Shape), Tensor α (.dim 
   → Tensor α s
 | Shape.scalar, Tensor.dim f =>
   -- `Shape.size Shape.scalar = 1`, so the input always has an element at index `0`.
-  -- This keeps the definition simple and avoids extra proof obligations downstream.
+  -- Matching directly avoids extra proof obligations downstream.
   match f ⟨0, by simp [Shape.size]⟩ with
   | Tensor.scalar x => Tensor.scalar x
 | Shape.dim n s', Tensor.dim f =>

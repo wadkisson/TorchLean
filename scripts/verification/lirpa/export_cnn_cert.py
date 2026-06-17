@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Export a deterministic CNN certificate with a ReLU affine relaxation."""
-import json
-from typing import List, Tuple, Dict, Any
+from typing import Any
+
+from common import affine_interval, write_json
 
 # CNN graph (mirrors the Lean CNN certificate workflow):
 # input (1x4x4) -> conv2d (1x3x3, stride=1,pad=0) + ReLU (as CROWN affine) -> flatten -> linear head (2)
@@ -15,7 +16,7 @@ nConv = outC * outH * outW
 nOut = 2
 
 
-def seed_conv_params() -> Tuple[List[List[List[List[float]]]], List[float]]:
+def seed_conv_params() -> tuple[list[list[list[list[float]]]], list[float]]:
     """Return deterministic convolution weights and biases."""
     # kernel[outC][inC][kH][kW] with entries 1 + (i + j)
     kernel = [
@@ -29,7 +30,7 @@ def seed_conv_params() -> Tuple[List[List[List[List[float]]]], List[float]]:
     return kernel, bias
 
 
-def seed_input_box(eps: float = 0.1) -> Tuple[List[List[List[float]]], List[List[List[float]]]]:
+def seed_input_box(eps: float = 0.1) -> tuple[list[list[list[float]]], list[list[list[float]]]]:
     """Return a small input image interval box centered at all ones."""
     # center ones
     lo = [[[1.0 - eps for _ in range(inW)] for _ in range(inH)] for _ in range(inC)]
@@ -37,7 +38,7 @@ def seed_input_box(eps: float = 0.1) -> Tuple[List[List[List[float]]], List[List
     return lo, hi
 
 
-def ibp_conv2d_preact(kernel, bias, lo, hi) -> Tuple[List[List[List[float]]], List[List[List[float]]]]:
+def ibp_conv2d_preact(kernel, bias, lo, hi) -> tuple[list[list[list[float]]], list[list[list[float]]]]:
     """Compute pre-activation interval bounds for the convolution output."""
     # Compute pre-activation bounds y_lo/hi[outC][outH][outW]
     ylo = [[[0.0 for _ in range(outW)] for _ in range(outH)] for _ in range(outC)]
@@ -68,7 +69,7 @@ def ibp_conv2d_preact(kernel, bias, lo, hi) -> Tuple[List[List[List[float]]], Li
     return ylo, yhi
 
 
-def relu_relax_scalar(l: float, u: float) -> Tuple[float, float]:
+def relu_relax_scalar(l: float, u: float) -> tuple[float, float]:
     """Return slope/intercept for an upper affine ReLU relaxation on `[l, u]`."""
     if u > 0:
         if l > 0:
@@ -80,15 +81,15 @@ def relu_relax_scalar(l: float, u: float) -> Tuple[float, float]:
     return 0.0, 0.0
 
 
-def flatten3(x3: List[List[List[float]]]) -> List[float]:
+def flatten3(x3: list[list[list[float]]]) -> list[float]:
     """Flatten `[outC][outH][outW]` data in the same order as the Lean checker."""
     return [x3[oc][i][j] for oc in range(outC) for i in range(outH) for j in range(outW)]
 
 
-def conv2d_linear_matrix(kernel) -> List[List[float]]:
+def conv2d_linear_matrix(kernel) -> list[list[float]]:
     """Materialize the convolution as a dense matrix for the affine certificate."""
     # Build Wconv[nConv x nIn] as in Lean conv2d_linear_matrix
-    def decode_in(c: int) -> Tuple[int, int, int]:
+    def decode_in(c: int) -> tuple[int, int, int]:
         """Decode one flattened input index into `(channel, row, column)`."""
         c0 = c // (inH * inW)
         r0 = c % (inH * inW)
@@ -121,31 +122,12 @@ def conv2d_linear_matrix(kernel) -> List[List[float]]:
     return W
 
 
-def mat_row_scale(W: List[List[float]], v: List[float]) -> List[List[float]]:
+def mat_row_scale(W: list[list[float]], v: list[float]) -> list[list[float]]:
     """Scale row `i` of matrix `W` by `v[i]`."""
     return [[v[i] * aij for aij in row] for i, row in enumerate(W)]
 
 
-def ibp_linear(W: List[List[float]], b: List[float], lo: List[float], hi: List[float]):
-    """Propagate interval bounds through an affine layer."""
-    m, n = len(W), len(W[0])
-    out_lo = []
-    out_hi = []
-    for i in range(m):
-        lo_i = b[i]
-        hi_i = b[i]
-        for j in range(n):
-            a = W[i][j]
-            p = a * lo[j]
-            q = a * hi[j]
-            lo_i += min(p, q)
-            hi_i += max(p, q)
-        out_lo.append(lo_i)
-        out_hi.append(hi_i)
-    return out_lo, out_hi
-
-
-def run_ibp() -> Dict[str, Any]:
+def run_ibp() -> dict[str, Any]:
     """Compute the CNN certificate payload consumed by Lean."""
     kernel, bias = seed_conv_params()
     x_lo3, x_hi3 = seed_input_box(0.1)
@@ -169,11 +151,11 @@ def run_ibp() -> Dict[str, Any]:
     # Flatten input box and propagate linear affine
     x_lo = [x_lo3[0][i][j] for i in range(inH) for j in range(inW)]
     x_hi = [x_hi3[0][i][j] for i in range(inH) for j in range(inW)]
-    h_lo, h_hi = ibp_linear(A, c, x_lo, x_hi)
+    h_lo, h_hi = affine_interval(A, c, x_lo, x_hi)
     # Linear head 2 x nConv with W[i,j] = 2 + (i + j), b[i] = i
     Whead = [[float(2 + (i + j)) for j in range(nConv)] for i in range(nOut)]
     bhead = [float(i) for i in range(nOut)]
-    y_lo, y_hi = ibp_linear(Whead, bhead, h_lo, h_hi)
+    y_lo, y_hi = affine_interval(Whead, bhead, h_lo, h_hi)
     return {
         "graph": "cnn_graph_workflow_v1",
         "input_box": {"id": 0, "dim": nIn, "lo": x_lo, "hi": x_hi},
@@ -185,9 +167,8 @@ def main():
     """Write the CNN certificate to the bundled examples directory."""
     cert = run_ibp()
     out_path = "NN/Examples/Verification/LiRPA/cnn_cert.json"
-    with open(out_path, "w") as f:
-        json.dump(cert, f, indent=2)
-    print(f"Wrote certificate to {out_path}")
+    out = write_json(out_path, cert)
+    print(f"Wrote certificate to {out}")
 
 
 if __name__ == "__main__":

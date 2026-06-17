@@ -132,8 +132,8 @@ theorem l2_norm_concatenation {n : Nat} {s : Shape}
         _ = (Finset.univ : Finset (Fin n)).sum (fun i => sumSpec (mulSpec (f i) (f i))) := by
           -- Use the canonical lemma from `NN/Proofs/Tensor/Basic.lean` instead of duplicating the
           -- outer-fold-to-`Finset.sum` proof here.
-          simpa [Spec.get] using
-            (Spec.sum_spec_dim (t := Tensor.dim (fun i => mulSpec (f i) (f i))))
+            simpa [Spec.get, Spec.getAtSpec] using
+              (Spec.sum_spec_dim (t := Tensor.dim (fun i => mulSpec (f i) (f i))))
         _ = (Finset.univ : Finset (Fin n)).sum (fun i => tensorNormSquared (f i)) := by
           refine Finset.sum_congr rfl ?_
           intro i _
@@ -310,10 +310,10 @@ theorem relu_nonneg_inductive {s : Shape} (t : Tensor ℝ s) :
     | nil =>
       simp
     | cons head tail =>
-      simp
-      by_cases h : head < n
-      · simpa [h] using ih ⟨head, h⟩ tail
-      · simp [h]
+        simp
+        by_cases h : head < n
+        · simpa [Activation.reluSpec, mapSpec, h] using ih ⟨head, h⟩ tail
+        · simp [h]
 
 /--
 Sigmoid output bounds extend inductively.
@@ -490,8 +490,8 @@ theorem nested_lipschitz_composition {s : Shape}
           exact mul_le_mul_of_nonneg_left head_bound cs_nonneg
         _ = (c :: cs).foldl (· * ·) 1 * tensorL2Dist x y := by
           -- Convert folds to products and reorder.
-          rw [← List.prod_eq_foldl (l := cs), ← List.prod_eq_foldl (l := c :: cs)]
-          simp [List.prod_cons, mul_assoc, mul_left_comm]
+            rw [← List.prod_eq_foldl (xs := cs), ← List.prod_eq_foldl (xs := c :: cs)]
+            simp [List.prod_cons, mul_assoc, mul_left_comm]
         _ = cs.foldl (· * ·) c * tensorL2Dist x y := by
           simp [List.foldl]
 

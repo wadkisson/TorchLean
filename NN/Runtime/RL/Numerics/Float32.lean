@@ -15,8 +15,8 @@ public import NN.Runtime.RL.Numerics.Float32.Intervals
 /-!
 # RL Float32 Numeric Checks (Umbrella)
 
-This is the stable import for TorchLean's explicit binary32 RL diagnostics. The implementation is
-split by concern:
+Umbrella import for TorchLean's explicit binary32 RL diagnostics. The implementation is split by
+concern:
 
 - `Types`: `IEEE32Exec`/`Interval32` aliases, boundary casts, and checked scalar primitives;
 - `Returns`: checked discounted backups and fixed-horizon returns;

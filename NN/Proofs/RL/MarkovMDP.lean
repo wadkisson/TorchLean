@@ -253,6 +253,9 @@ theorem bellmanPolicy_contraction [Nonempty S]
       exact ⟨_, ⟨s0, rfl⟩⟩)
     ?_
   rintro _ ⟨state, rfl⟩
+  change
+    |bellmanPolicy mdp policy values₁ state - bellmanPolicy mdp policy values₂ state| ≤
+      mdp.discount * valueSupDist values₁ values₂
   simpa [bellmanPolicy] using
     actionValue_abs_sub_le (S := S) (A := A) mdp valid values₁ values₂
       hMeas₁ hMeas₂ hBdd₁ hBdd₂ state (policy state)
@@ -328,6 +331,9 @@ theorem bellmanOptimality_contraction [Nonempty S]
       exact ⟨_, ⟨s0, rfl⟩⟩)
     ?_
   rintro _ ⟨state, rfl⟩
+  change
+    |bellmanOptimality mdp values₁ state - bellmanOptimality mdp values₂ state| ≤
+      mdp.discount * valueSupDist values₁ values₂
   simpa using
     bellmanOptimality_abs_sub_le (S := S) (A := A) mdp valid values₁ values₂
       hMeas₁ hMeas₂ hBdd₁ hBdd₂ state

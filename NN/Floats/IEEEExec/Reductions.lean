@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Basic
+public import Mathlib.Algebra.Order.GroupWithZero.Basic
 public import Mathlib.Data.List.Permutation
 public import NN.Floats.IEEEExec.BridgeFP32Total
 import Mathlib.Tactic.Linarith
@@ -253,7 +253,8 @@ theorem evalRound_enclosure_of_LocalAddBound
       have hgb : growth u b.leafCount ≤ growth u (n - 1) := by
         have : b.leafCount ≤ n - 1 := by
           have : b.leafCount + 1 ≤ n := by
-            simpa [n] using Nat.add_le_add_right hnA b.leafCount
+            simpa [n, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+              Nat.add_le_add_right hnA b.leafCount
           exact Nat.le_pred_of_lt (Nat.lt_of_lt_of_le (Nat.lt_succ_self b.leafCount) this)
         exact hmono this
 
@@ -413,7 +414,7 @@ If the whole reduction evaluates on the finite branch, then the final result is 
 -/
 theorem isFinite_evalIEEE_of_FiniteEvalSumTree :
     ∀ t : SumTree IEEE32Exec, FiniteEvalSumTree t → isFinite (evalIEEE t) = true
-  | .leaf x, hx => by simpa [evalIEEE] using hx
+  | .leaf x, hx => by simpa [evalIEEE, FiniteEvalSumTree] using hx
   | .node a b, hx => by simpa [evalIEEE] using hx.2.2
 
 /--
@@ -567,7 +568,7 @@ def FiniteEvalDot : SumTree (IEEE32Exec × IEEE32Exec) → Prop
 /-- If a dot-product reduction stays finite at every step, then the final result is finite. -/
 theorem isFinite_evalDotIEEE_of_FiniteEvalDot :
     ∀ t : SumTree (IEEE32Exec × IEEE32Exec), FiniteEvalDot t → isFinite (evalDotIEEE t) = true
-  | .leaf _, hx => by simpa [evalDotIEEE] using hx
+  | .leaf _, hx => by simpa [evalDotIEEE, FiniteEvalDot] using hx
   | .node a b, hx => by simpa [evalDotIEEE] using hx.2.2
 
 /--

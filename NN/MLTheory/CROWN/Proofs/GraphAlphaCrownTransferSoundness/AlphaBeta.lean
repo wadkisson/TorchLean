@@ -167,16 +167,13 @@ theorem alphaBetaCrown_transfer_sound
                               simpa [CrownCertSoundness.boundsEvalAt] using hdimB
 
                             -- IBP enclosure for the parent value.
-                            have hibpHere :
-                                match ibp[p1]!, vals[p1]! with
-                                | some B0, some v0 => CertSoundness.EnclosesBox B0 v0
-                                | _, _ => True := by
-                              have : p1 < vals.size := by
+                            have hencIbp : CertSoundness.EnclosesBox preB vp := by
+                              have hltVals : p1 < vals.size := by
                                 have : p1 < g.nodes.size := lt_trans (htopo id hid p1 hpMem) hid
                                 simpa [hsem.1] using this
-                              simpa using hibp p1 this
-                            have hencIbp : CertSoundness.EnclosesBox preB vp := by
-                              simpa [hpre, hvpp] using hibpHere
+                              have hraw := hibp p1 hltVals
+                              rw [hpre, hvpp] at hraw
+                              exact hraw
 
                             rcases hencIbp with ⟨hdimIbp, hboxIbp⟩
 
@@ -281,14 +278,16 @@ theorem alphaBetaCrown_transfer_sound
                                     castDimScalar (α := ℝ) hout (boundsEvalAt (α := ℝ) xin x').lo =
                                       lAff := by
                                   simpa [CrownCertSoundness.boundsEvalAt,
-                                    CrownCertSoundness.affineEvalAt, lAff, x', xLo] using
+                                    CrownCertSoundness.affineEvalAt, lAff, x', xLo,
+                                    Cert.castAffineOut] using
                                     (affineEvalAt_castAffineOut (h := hout) (aff := xin.loAff) (x :=
                                       x')).symm
                                 have hu :
                                     castDimScalar (α := ℝ) hout (boundsEvalAt (α := ℝ) xin x').hi =
                                       uAff := by
                                   simpa [CrownCertSoundness.boundsEvalAt,
-                                    CrownCertSoundness.affineEvalAt, uAff, x', xHi] using
+                                    CrownCertSoundness.affineEvalAt, uAff, x', xHi,
+                                    Cert.castAffineOut] using
                                     (affineEvalAt_castAffineOut (h := hout) (aff := xin.hiAff) (x :=
                                       x')).symm
                                 have hzAff :
@@ -453,8 +452,10 @@ theorem alphaBetaCrown_transfer_sound
                                       Activation.Math.reluSpec (α := ℝ) zi := by
                                     simpa [zi] using (toVec_relu_spec (t := z) (i := i))
                                   constructor
-                                  · simpa [hrelu] using hlo
-                                  · simpa [hrelu] using hhi
+                                  · rw [hrelu]
+                                    exact hlo
+                                  · rw [hrelu]
+                                    exact hhi
                                 rw [hb]
                                 refine ⟨hinDim, ?_⟩
                                 dsimp [CrownCertSoundness.EnclosesVec]
@@ -523,7 +524,7 @@ theorem alphaBetaCrown_transfer_sound
                                                            (inDim := xin.inDim) (hidDim := preB.dim)
                                                            relaxHi xHi } : FlatAffineBounds ℝ) =
                                                   some b := by
-                                              simpa [αt, hrelax] using hs''
+                                              simpa [αt, hrelax, xLo, xHi, Cert.castAffineOut] using hs''
                                             exact relu_beta_common αt hαrange relaxLo relaxHi hrelax
                                               hbEq
                                   ·
@@ -562,7 +563,7 @@ theorem alphaBetaCrown_transfer_sound
                                                          (inDim := xin.inDim) (hidDim := preB.dim)
                                                          relaxHi xHi } : FlatAffineBounds ℝ) =
                                                 some b := by
-                                            simpa [αt, hrelax] using hs''
+                                            simpa [αt, hrelax, xLo, xHi, Cert.castAffineOut] using hs''
                                           exact relu_beta_common αt hαrange relaxLo relaxHi hrelax
                                             hbEq
                             ·

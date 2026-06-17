@@ -9,15 +9,21 @@ module
 public import NN.Library
 
 /-!
-# TorchLean
+# NN
 
-Root umbrella import.
+Canonical TorchLean umbrella import.
 
-This re-exports `NN.Library`, the curated umbrella for TorchLean's reusable library surface.
-Examples and CLI registries are documented as additional `NN:docs` roots, but they do not sit under
-`import NN` because many examples intentionally import `NN`.
+This re-exports `NN.Library`, the curated umbrella for TorchLean's reusable API, runtime, proof,
+verification, and widget surface. Ordinary downstream files can start here:
 
-For subsystem-specific imports, use the `NN/Entrypoint/*` modules.
+```lean
+import NN
+open TorchLean
+```
+
+The public names remain under the `TorchLean` namespace because that is the project API, but the
+module import is `NN`. For smaller imports, use `NN.Entrypoint.API`, `NN.Entrypoint.Tensor`,
+`NN.Entrypoint.IR`, or another subsystem entrypoint.
 -/
 
 @[expose] public section

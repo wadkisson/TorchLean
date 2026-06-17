@@ -146,7 +146,7 @@ Elementwise absolute value.
 
 PyTorch comparison: `torch.abs(x)`.
 -/
-def abs {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def abs {α : Type} [Context α] [DecidableEq Shape]
   [DecidableRel ((· > ·) : α → α → Prop)]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
@@ -170,7 +170,7 @@ Elementwise square root.
 
 PyTorch comparison: `torch.sqrt(x)`.
 -/
-def sqrt {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def sqrt {α : Type} [Context α] [DecidableEq Shape]
   [DecidableRel ((· > ·) : α → α → Prop)]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
@@ -204,7 +204,7 @@ Elementwise clamp to `[minVal, maxVal]`.
 
 PyTorch comparison: `torch.clamp(x, min=minVal, max=maxVal)`.
 -/
-def clamp {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def clamp {α : Type} [Context α] [DecidableEq Shape]
   [DecidableRel ((· > ·) : α → α → Prop)]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) (minVal maxVal : α) : MWith α Δ Γ (Var s) :=
     do
@@ -236,7 +236,7 @@ the eager tape (`NN.Runtime.Autograd.Engine.Core`).
 
 PyTorch comparison: `torch.maximum(a, b)`.
 -/
-def max {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def max {α : Type} [Context α] [DecidableEq Shape]
   [DecidableRel ((· > ·) : α → α → Prop)]
   {Δ : Type} {Γ : List Shape} {s : Shape} (a b : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
@@ -280,7 +280,7 @@ At ties we split the gradient equally (`0.5` / `0.5`).
 
 PyTorch comparison: `torch.minimum(a, b)`.
 -/
-def min {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def min {α : Type} [Context α] [DecidableEq Shape]
   [DecidableRel ((· > ·) : α → α → Prop)]
   {Δ : Type} {Γ : List Shape} {s : Shape} (a b : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
@@ -343,7 +343,7 @@ def relu {α : Type}
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise sigmoid. PyTorch comparison: `torch.sigmoid(x)`. -/
-def sigmoid {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def sigmoid {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -362,7 +362,7 @@ def sigmoid {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise tanh. PyTorch comparison: `torch.tanh(x)`. -/
-def tanh {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def tanh {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -385,7 +385,7 @@ Softmax along the last axis (recursing over outer dimensions).
 
 PyTorch comparison: `torch.softmax(x, dim=-1)`.
 -/
-def softmax {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def softmax {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -409,7 +409,7 @@ Stable log-softmax along the last axis.
 This is a primitive in the compiled graph, not the composition `log ∘ softmax`, so proof/IR
 execution and eager CUDA share the same PyTorch-style numerical contract.
 -/
-def logSoftmax {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def logSoftmax {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -429,7 +429,7 @@ def logSoftmax {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise softplus. PyTorch comparison: `torch.nn.functional.softplus(x)`. -/
-def softplus {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def softplus {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -448,7 +448,7 @@ def softplus {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise exponential. PyTorch comparison: `torch.exp(x)`. -/
-def exp {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def exp {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -465,7 +465,7 @@ def exp {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise natural logarithm. PyTorch comparison: `torch.log(x)`. -/
-def log {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def log {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -488,7 +488,7 @@ def log {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := s) g node
 
 /-- Elementwise reciprocal `x ↦ 1/x`. PyTorch comparison: `torch.reciprocal(x)`. -/
-def inv {α : Type} [Context α] [Mul α] [Add α] [Zero α] [DecidableEq Shape]
+def inv {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var s) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
@@ -514,7 +514,7 @@ Elementwise numerically-stable log (uses an internal `ε`).
 
 PyTorch comparison: commonly written `torch.log(x + eps)`.
 -/
-def safeLog {α : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def safeLog {α : Type} [Context α] [DecidableEq Shape]
   {Δ : Type} {Γ : List Shape} {s : Shape} (x : Var s) (ε : α := Numbers.epsilon) : MWith α Δ Γ (Var
     s) := do
   let ⟨ss, g⟩ ← get
@@ -651,7 +651,7 @@ def mseLoss {α : Type}
 
   The JVP is the bilinear product rule `d(A @ B) = dA @ B + A @ dB`.
   -/
-  def matmul {α : Type} {Δ : Type} [Context α] [Add α] [Zero α]
+  def matmul {α : Type} {Δ : Type} [Context α]
     [DecidableRel ((· > ·) : α → α → Prop)] [DecidableEq Shape]
     {Γ : List Shape} {m n p : Nat}
     (a : Var (.dim m (.dim n .scalar))) (b : Var (.dim n (.dim p .scalar))) :
@@ -726,7 +726,7 @@ def mseLoss {α : Type}
 
   PyTorch comparison: `torch.cat([a, b], dim=0)` for 1D tensors.
   -/
-  def concatVectors {α : Type} {Δ : Type} [Context α] [Add α] [Zero α]
+  def concatVectors {α : Type} {Δ : Type} [Context α]
     [DecidableRel ((· > ·) : α → α → Prop)] [DecidableEq Shape]
     {Γ : List Shape} {n m : Nat}
     (a : Var (.dim n .scalar)) (b : Var (.dim m .scalar)) :

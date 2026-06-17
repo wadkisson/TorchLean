@@ -77,7 +77,7 @@ def main() -> int:
     try:
         subprocess.run([landrun, "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
     except Exception as e:
-        _die(f"`landrun` was found but could not be executed ({e}). Check GLIBC compatibility or rebuild from source.")
+        _die(f"`landrun` was found but could not be executed ({e}). Check the GLIBC version or rebuild from source.")
 
     # Comparator uses `landrun --best-effort`; on kernels without Landlock support this may degrade
     # to a much weaker sandbox (or effectively no sandbox). Warn loudly so users don't rely on it

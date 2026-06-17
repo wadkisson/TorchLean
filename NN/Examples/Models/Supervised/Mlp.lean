@@ -13,8 +13,7 @@ module
 
 
 public import NN
-public import NN.API.Models.Mlp
-public import NN.Examples.Data.RealPaths
+public import NN.Examples.Models.Common
 
 /-!
 # MLP Tabular Regression
@@ -38,8 +37,7 @@ CSV, pass `--csv PATH` with the same columns.
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Supervised.Mlp
 
@@ -47,7 +45,7 @@ namespace NN.Examples.Models.Supervised.Mlp
 def exeName : String := "torchlean mlp"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "mlp"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "mlp"
 
 /-- Static minibatch size for the Auto MPG tabular loader. -/
 def batch : Nat := 5
@@ -66,68 +64,49 @@ def cfg : nn.models.Mlp1Config :=
   { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
 /-- Input shape: a minibatch of Auto MPG feature vectors. -/
-abbrev σ : Shape :=
-  nn.models.mlp1InShape cfg
+abbrev σ := Shape.mat batch inDim
 
 /-- Output shape: one scalar regression prediction per row. -/
-abbrev τ : Shape :=
-  nn.models.mlp1OutShape cfg
+abbrev τ := Shape.mat batch outDim
 
 /-- One-hidden-layer ReLU MLP from the public model API. -/
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.mlp1Relu cfg
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.Mlp1ReLU cfg
 
 /--
-Load the prepared Auto MPG CSV as a typed minibatch loader.
+Auto MPG as a public TorchLean dataset.
 
-The dataset-specific facts stay here: the default preparation script writes columns `x1..x7,y`,
-the first seven columns are inputs, the last column is the regression target, and we use full
-minibatches of size `batch`.  The generic CSV-to-loader mechanics live in `Data.tabularCsvLoader`.
+The only dataset-specific details here are the CSV path, header convention, batch size, and feature
+count. Runtime scalar selection stays inside `Trainer`, so the same dataset works for CPU, CUDA,
+compiled, eager, and checked scalar modes.
 -/
-def loadAutoMpg {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
-    (path : System.FilePath) (seed : Nat) : IO (Data.BatchLoader α batch (Shape.Vec inDim)
-      (Shape.Vec outDim)) := do
-  unless (← path.pathExists) do
-    throw <| IO.userError
-      s!"{exeName}: missing CSV dataset: {path}\nRun: python3 scripts/datasets/download_example_data.py --auto-mpg"
-  let loaderE ← Data.tabularCsvLoader (α := α) path batch inDim outDim
-    (csvOptions := { skipHeader := true }) (shuffle := true) (seed := seed) (dropLast := true)
-  Common.orThrow exeName loaderE
+def data (path : System.FilePath) (seed : Nat) :
+    Trainer.Dataset σ τ :=
+  Data.tabularCsvDataset path batch inDim outDim
+    (csvOptions := { skipHeader := true }) (shuffle := true) (seed := seed)
 
-/--
-Instantiate the MLP, attach Adam, train for the requested number of updates, and write the standard
-training log if logging is enabled.
-
-CPU and CUDA both use the same Float runtime module; `opts` selects the device and backend.
--/
-def fitAutoMpg (opts : Runtime.Autograd.Torch.Options)
-    (flags : Common.CsvModelTrainFlags) : IO (train.FitReport Float) := do
-  let loader ← loadAutoMpg (α := Float) flags.csvPath flags.seed
-  nn.withModel mkModel fun model => do
-    let modDef := nn.mseScalarModuleDef model
-    let module ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-    let opt := Common.adamOptimizer (α := Float) id (nn.paramShapes model) flags.train.lr
-    let cudaMemWatch :=
-      Common.effectiveCudaMemWatch opts flags.train.train.steps flags.train.cudaMemWatch
-    let (report, _loader') ← train.fitModuleLoaderStepsLoggedFloat module opt opts
-      flags.train.train.steps loader flags.train.train.log "MLP tabular training"
-      #[s!"dataset={flags.csvPath}", s!"device={if opts.useGpu then "cuda" else "cpu"}",
-        s!"lr={flags.train.lr}", s!"steps={flags.train.train.steps}", s!"batch={batch}",
-        s!"cuda_mem_watch={cudaMemWatch}"]
-      "loss" flags.train.cudaMemWatch
-    pure report
+/-- Train the Auto MPG MLP with the public `Trainer` surface. -/
+def train (opts : Options) (flags : ModelZoo.CsvTrainFlags) :
+    IO (Trainer.TrainResult σ τ) := do
+  Data.requireFile exeName "CSV dataset" flags.csvPath RealData.missingAutoMpgHint
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := flags.lr } })
+        .regression
+        (seed := flags.seed)
+  trainer.train
+    (data flags.csvPath flags.seed)
+    (ModelZoo.TrainFlags.trainOptions flags.toModelTrainFlags
+      (title := "MLP tabular training")
+      (notes := #[s!"dataset={flags.csvPath}", s!"lr={flags.lr}",
+        s!"steps={flags.steps}", s!"batch={batch}"]))
 
 /-- CLI entrypoint for Auto MPG regression on CPU or CUDA. -/
-def main (args : List String) : IO UInt32 := do
-  Common.runFloat exeName args
-    (banner := fun opts =>
-      s!"{exeName}: Auto MPG MLP regression (device={if opts.useGpu then "cuda" else "cpu"})")
-    (k := fun opts rest => do
-      let (flags, rest) ← Common.orThrow exeName <|
-        Common.parseCsvModelTrainFlags exeName rest
-          _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
-      Common.orThrow exeName <| CLI.requireNoArgs rest
-      let report ← fitAutoMpg opts flags
-      Common.printFitReport flags.train.train.steps report)
+def main (args : List String) : IO UInt32 :=
+  Trainer.Command.regressionCsv exeName args
+    _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
+    (ModelZoo.bannerWithDevice exeName "Auto MPG MLP regression")
+    train
 
 end NN.Examples.Models.Supervised.Mlp

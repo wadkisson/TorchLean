@@ -899,6 +899,34 @@ def runCROWNBackwardObjective
     exact some { inDim := ctx.inputDim, outDim := 1, loAff := loAff, hiAff := hiAff }
   | _, _ => exact none
 
+/-- Evaluate already-computed backward-CROWN objective bounds on an input box. -/
+def evalBackwardObjectiveBox? (bounds : FlatAffineBounds α) (xB : FlatBox α)
+    (inputDim : Nat) : Except String (FlatBox α) := do
+  if hIn : bounds.inDim = inputDim then
+    if hXB : xB.dim = inputDim then
+      if hOut : bounds.outDim = 1 then
+        let outB := bounds.evalOnFlatBoxAsDim xB (by simpa [hXB] using hIn.symm) hOut
+        pure { dim := 1, lo := outB.lo, hi := outB.hi }
+      else
+        throw s!"backward CROWN objective dimension mismatch: got {bounds.outDim}, expected 1"
+    else
+      throw s!"input box dimension mismatch: got {xB.dim}, expected {inputDim}"
+  else
+    throw s!"backward CROWN input dimension mismatch: got {bounds.inDim}, expected {inputDim}"
+
+/--
+Run objective-dependent backward CROWN and evaluate the scalar objective bounds on the input box.
+
+The result is a `FlatBox` of dimension `1`, with `lo[0]` and `hi[0]` bounding
+`objᵀ * output` over `xB`.
+-/
+def backwardObjectiveBox? (g : Graph) (ps : ParamStore α) (ctx : AffineCtx)
+    (ibp : Array (Option (FlatBox α))) (xB : FlatBox α)
+    (outputId : Nat) (obj : FlatVec α) : Except String (FlatBox α) := do
+  let some bounds := runCROWNBackwardObjective (α := α) g ps ctx ibp outputId obj
+    | throw "CROWN backward objective failed"
+  evalBackwardObjectiveBox? (α := α) bounds xB ctx.inputDim
+
 /--
 Backward CROWN objective lower bound with externally-provided ReLU alpha slopes.
 

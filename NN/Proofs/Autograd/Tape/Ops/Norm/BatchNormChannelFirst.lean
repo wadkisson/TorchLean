@@ -113,11 +113,6 @@ def idxBeta {channels height width : Nat} {ss : List Shape} :
     Idx (ΓBN channels height width ++ ss) (VecShape channels) :=
   ⟨⟨2, by simp [ΓBN]⟩, by simp [ΓBN]⟩
 
-/-- Index helper for the last element of an extended context `Γ ++ ss ++ [τ]`. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 -- BatchNorm graph and saved-tensor layout used by the channel-first proof.
 
 /-!
@@ -164,7 +159,7 @@ def g1 {channels height width : Nat} :
 def idxXMat {channels height width : Nat} :
     Idx (ΓBN channels height width ++ [MatShape channels (hw height width)]) (MatShape channels (hw
       height width)) :=
-  idxLast (Γ := ΓBN channels height width) (ss := []) (τ := MatShape channels (hw height width))
+  Idx.last (Γ := ΓBN channels height width) (ss := []) (τ := MatShape channels (hw height width))
 
 /-- Per-channel mean over spatial dims: `mean : C×(H*W) → C`. -/
 def nodeMean {channels height width : Nat} :
@@ -184,7 +179,7 @@ def g2 {channels height width : Nat} :
 def idxMean {channels height width : Nat} :
     Idx (ΓBN channels height width ++ [MatShape channels (hw height width), VecShape channels])
       (VecShape channels) :=
-  idxLast (Γ := ΓBN channels height width) (ss := [MatShape channels (hw height width)]) (τ :=
+  Idx.last (Γ := ΓBN channels height width) (ss := [MatShape channels (hw height width)]) (τ :=
     VecShape channels)
 
 /-- Broadcast `mean` back to `C×(H*W)` (row-wise). -/
@@ -209,7 +204,7 @@ def idxMeanB {channels height width : Nat} :
     Idx (ΓBN channels height width ++
         [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
           width)]) (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := [MatShape channels (hw height width), VecShape channels])
     (τ := MatShape channels (hw height width))
@@ -249,7 +244,7 @@ def idxCentered {channels height width : Nat} :
         [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
           width),
          MatShape channels (hw height width)]) (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
       width)])
@@ -285,7 +280,7 @@ def idxCenteredSq {channels height width : Nat} :
           width),
          MatShape channels (hw height width), MatShape channels (hw height width)]) (MatShape
            channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
       width),
@@ -324,7 +319,7 @@ def idxVar {channels height width : Nat} :
           width),
          MatShape channels (hw height width), MatShape channels (hw height width), VecShape
            channels]) (VecShape channels) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
       width),
@@ -357,7 +352,7 @@ def batchNormPrefixVarEps {channels height width : Nat} (ε : ℝ) :
 /-- Index of `var_eps` in `ΓBN ++ ssPrefixVarEps`. -/
 def idxVarEps {channels height width : Nat} :
     Idx (ΓBN channels height width ++ ssPrefixVarEps channels height width) (VecShape channels) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := [MatShape channels (hw height width), VecShape channels, MatShape channels (hw height
       width),
@@ -387,7 +382,7 @@ def batchNormPrefixStd {channels height width : Nat} (ε : ℝ) :
 /-- Index of `std` in `ΓBN ++ ssPrefixStd`. -/
 def idxStd {channels height width : Nat} :
     Idx (ΓBN channels height width ++ ssPrefixStd channels height width) (VecShape channels) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixVarEps channels height width)
     (τ := VecShape channels)
@@ -410,7 +405,7 @@ def g8 {channels height width : Nat} (ε : ℝ) :
 def idxInvStd {channels height width : Nat} :
     Idx (ΓBN channels height width ++ (ssPrefixStd channels height width ++ [VecShape channels]))
       (VecShape channels) :=
-  idxLast (Γ := ΓBN channels height width) (ss := ssPrefixStd channels height width) (τ := VecShape
+  Idx.last (Γ := ΓBN channels height width) (ss := ssPrefixStd channels height width) (τ := VecShape
     channels)
 
 /-- Broadcast `inv_std` back to `C×(H*W)` (row-wise), producing `inv_std_b`. -/
@@ -463,7 +458,7 @@ def idxInvStdB9 {channels height width : Nat} :
     Idx (ΓBN channels height width ++ (ssPrefixStd channels height width ++ [VecShape channels,
       MatShape channels (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast (Γ := ΓBN channels height width) (ss := ssPrefixStd channels height width ++ [VecShape
+  Idx.last (Γ := ΓBN channels height width) (ss := ssPrefixStd channels height width ++ [VecShape
     channels]) (τ := MatShape channels (hw height width))
 
 /-- Normalize: `normalized := centered ⊙ inv_std_b`. -/
@@ -492,7 +487,7 @@ def idxNorm10 {channels height width : Nat} :
       (ssPrefixStd channels height width ++ [VecShape channels, MatShape channels (hw height width),
         MatShape channels (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixStd channels height width ++ [VecShape channels, MatShape channels (hw height
       width)])
@@ -531,7 +526,7 @@ def idxGammaB11 {channels height width : Nat} :
           width),
          MatShape channels (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixStd channels height width ++ [VecShape channels, MatShape channels (hw height
       width), MatShape channels (hw height width)])
@@ -579,7 +574,7 @@ def idxScaled12 {channels height width : Nat} :
           width),
          MatShape channels (hw height width), MatShape channels (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixStd channels height width ++ [VecShape channels, MatShape channels (hw height
       width), MatShape channels (hw height width),
@@ -627,7 +622,7 @@ def idxBetaB13 {channels height width : Nat} :
          MatShape channels (hw height width), MatShape channels (hw height width), MatShape channels
            (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixStd channels height width ++
       [VecShape channels, MatShape channels (hw height width), MatShape channels (hw height width),
@@ -684,7 +679,7 @@ def idxYMat {channels height width : Nat} :
            (hw height width),
          MatShape channels (hw height width)]))
       (MatShape channels (hw height width)) :=
-  idxLast
+  Idx.last
     (Γ := ΓBN channels height width)
     (ss := ssPrefixStd channels height width ++
       [VecShape channels, MatShape channels (hw height width), MatShape channels (hw height width),

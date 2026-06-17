@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.API.CLI
 public import NN.Verification.Geometry3D.Box3D
 
 /-!
@@ -34,11 +35,12 @@ def verifyCert (path : String := defaultCertPath) : IO Unit :=
 
 /-- CLI entrypoint used by the unified verification dispatcher. -/
 def main (args : List String) : IO Unit := do
-  let path :=
-    match args with
-    | [] => defaultCertPath
-    | "--" :: rest => rest.getD 0 defaultCertPath
-    | a :: _ => a
+  let args := NN.API.CLI.defaultPathFlagFromPositional args "cert" defaultCertPath
+  let (path, args) ←
+    match NN.API.CLI.takeFlagValueDefault args "cert" defaultCertPath with
+    | .ok result => pure result
+    | .error e => throw <| IO.userError e
+  NN.API.CLI.orThrow <| NN.API.CLI.requireNoArgs args
   verifyCert path
 
 end NN.Verification.Geometry3D.CLI

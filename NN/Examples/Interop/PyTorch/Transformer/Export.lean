@@ -75,7 +75,7 @@ def generateTransformerEncoderPyTorchClass (seqLen embedDim headCount hiddenDim 
     indent4 "return self.fc2(F.relu(self.fc1(x)))",
     "",
     s!"class {className}(nn.Module):",
-    (s!"\"\"\"Transformer Encoder with {numLayers} layers, {headCount} heads, " ++
+    indent2 (s!"\"\"\"Transformer Encoder with {numLayers} layers, {headCount} heads, " ++
       s!"embed dim {embedDim}, hidden dim {hiddenDim}\"\"\""),
     indent2 "",
     indent2 s!"def __init__(self):",
@@ -171,7 +171,7 @@ def generateTransformerEncoderWithWeights (seqLen embedDim headCount hiddenDim :
     "if __name__ == \"__main__\":",
     indent2 s!"model = {className}()",
     indent2 "model = load_transformer_weights(model)",
-    s!"x = torch.randn(1, {seqLen}, {embedDim})  # batch=1, seq_len={seqLen}, embed_dim={embedDim}",
+    indent2 s!"x = torch.randn(1, {seqLen}, {embedDim})  # batch=1, seq_len={seqLen}, embed_dim={embedDim}",
     indent2 "y = model(x)",
     indent2 "print(f\"Input shape: {x.shape}\")",
     indent2 "print(f\"Output shape: {y.shape}\")",

@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.API.CLI
 public import NN.MLTheory.CROWN.Lyapunov.Verification
 
 /-!
@@ -106,21 +107,13 @@ Usage (via the CLI tool registered in `NN/Verification/CLI.lean`):
   \"[-1,1]x[-1,1]\" --dynamics van_der_pol`
 -/
 def main (args : List String) : IO Unit := do
-  let rec stripHandledFlags : List String → List String
-    | [] => []
-    | "--out" :: _val :: rest => stripHandledFlags rest
-    | a :: rest =>
-        if a.startsWith "--out=" || a = "--format" || a.startsWith "--format=" ||
-           a = "--lean-namespace" || a.startsWith "--lean-namespace=" then
-          stripHandledFlags rest
-        else
-          a :: stripHandledFlags rest
+  let args := NN.API.CLI.dropDashDash args
 
-  -- parse: `--model PATH`
   let modelPath ←
-    match args.dropWhile (· != "--model") with
-    | _ :: path :: _ => pure path
-    | _ => throw <| IO.userError "expected `--model <path>`"
+    match NN.API.CLI.flagValue? args "model" with
+    | .ok (some path) => pure path
+    | .ok none => throw <| IO.userError "expected `--model <path>`"
+    | .error e => throw <| IO.userError e
 
   let baseName : String :=
     match modelPath.splitOn "/" |>.reverse with
@@ -138,14 +131,11 @@ def main (args : List String) : IO Unit := do
   let safeName : String :=
     stem.replace "-" "_" |>.replace "." "_"
 
-  let outPath : String :=
-    match args.dropWhile (· != "--out") with
-    | _ :: p :: _ => p
-    | _ =>
-        match args.findSome? (fun a => if a.startsWith "--out=" then some (a.drop 6).toString else
-          none) with
-        | some p => p
-        | none => s!"NN/MLTheory/CROWN/Lyapunov/Generated/{safeName}.lean"
+  let outPath ←
+    match NN.API.CLI.flagValue? args "out" with
+    | .ok (some path) => pure path
+    | .ok none => pure s!"NN/MLTheory/CROWN/Lyapunov/Generated/{safeName}.lean"
+    | .error e => throw <| IO.userError e
 
   -- ensure output directory exists (best-effort)
   let outDir : String :=
@@ -162,8 +152,8 @@ def main (args : List String) : IO Unit := do
     #[script, "verify", "--format", "lean-full", "--lean-namespace",
       "NN.MLTheory.CROWN.Lyapunov.Generated"]
 
-  -- forward user args, but drop any `--out=...` (handled by Lean runner)
-  let forwarded : Array String := (stripHandledFlags args).toArray
+  let forwarded : Array String :=
+    (NN.API.CLI.stripFlagValues args ["out", "format", "lean-namespace"]).toArray
 
   let proc := (← IO.Process.spawn { cmd := "python3", args := baseArgs ++ forwarded, stdout := .piped, stderr := .inherit })
   let out ← proc.stdout.readToEnd

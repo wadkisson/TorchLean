@@ -24,11 +24,10 @@ over the sequence dimension. The runtime API and compiled IR path both route thr
 definition; this file proves the corresponding reverse-mode graph rule.
 
 Because the proof graph uses the differentiable scalar nodes `sqrt (max x 0)` and `inv`, the main
-theorem is pointwise (`GraphFDerivCorrectAt`) with explicit domain assumptions. Those hypotheses
-are the honest mathematical boundary: away from the clamp kink and zero denominator, backprop is the
-adjoint of the Fréchet derivative. The executable `Spec.layerNorm` additionally clamps the raw
-variance before adding epsilon as a numerical guard; over exact real variance this is the same
-contract on the positive branch used by the proof.
+theorem is pointwise (`GraphFDerivCorrectAt`) with explicit domain assumptions. Away from the clamp
+kink and zero denominator, backprop is the adjoint of the Fréchet derivative. The executable
+`Spec.layerNorm` additionally clamps the raw variance before adding epsilon as a numerical guard;
+over exact real variance this is the same contract on the positive branch used by the proof.
 
 ## PyTorch correspondence / citations
 - Conceptually corresponds to `torch.nn.LayerNorm` (without batching/running stats): normalize along
@@ -97,11 +96,6 @@ def idxGamma {m n : Nat} {ss : List Shape} : Idx (ΓLN m n ++ ss) (VecShape n) :
 def idxBeta {m n : Nat} {ss : List Shape} : Idx (ΓLN m n ++ ss) (VecShape n) :=
   ⟨⟨2, by simp [ΓLN]⟩, by simp [ΓLN]⟩
 
-/-- Index helper for the last element of an extended context `Γ ++ ss ++ [τ]`. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 -- ---------------------------------------------------------------------------
 -- LayerNorm graph (explicit `snoc` chain; no `let`-blocked reducibility)
 -- ---------------------------------------------------------------------------
@@ -118,7 +112,7 @@ def g1 {m n : Nat} : Graph (ΓLN m n) [VecShape m] :=
 
 /-- Index of `mean` in the extended context `ΓLN ++ [mean]`. -/
 def idxMean {m n : Nat} : Idx (ΓLN m n ++ [VecShape m]) (VecShape m) :=
-  idxLast (Γ := ΓLN m n) (ss := []) (τ := VecShape m)
+  Idx.last (Γ := ΓLN m n) (ss := []) (τ := VecShape m)
 
 /-- Broadcast `mean` back to `m×n` (row-wise). -/
 def nodeMeanB {m n : Nat} : Node (ΓLN m n ++ [VecShape m]) (MatShape m n) :=
@@ -130,7 +124,7 @@ def g2 {m n : Nat} : Graph (ΓLN m n) [VecShape m, MatShape m n] :=
 
 /-- Index of `mean_b` in `ΓLN ++ [mean, mean_b]`. -/
 def idxMeanB {m n : Nat} : Idx (ΓLN m n ++ [VecShape m, MatShape m n]) (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := [VecShape m]) (τ := MatShape m n)
+  Idx.last (Γ := ΓLN m n) (ss := [VecShape m]) (τ := MatShape m n)
 
 /-- Center: `centered := X - mean_b`. -/
 def nodeCentered {m n : Nat} : Node (ΓLN m n ++ [VecShape m, MatShape m n]) (MatShape m n) :=
@@ -145,7 +139,7 @@ def g3 {m n : Nat} : Graph (ΓLN m n) [VecShape m, MatShape m n, MatShape m n] :
 /-- Index of `centered` in `ΓLN ++ [mean, mean_b, centered]`. -/
 def idxCentered {m n : Nat} :
     Idx (ΓLN m n ++ [VecShape m, MatShape m n, MatShape m n]) (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n]) (τ := MatShape m n)
+  Idx.last (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n]) (τ := MatShape m n)
 
 /-- Square `centered`: `centered_sq := centered ⊙ centered`. -/
 def nodeCenteredSq {m n : Nat} : Node (ΓLN m n ++ [VecShape m, MatShape m n, MatShape m n])
@@ -160,7 +154,7 @@ def g4 {m n : Nat} : Graph (ΓLN m n) [VecShape m, MatShape m n, MatShape m n, M
 /-- Index of `centered_sq` in the extended context. -/
 def idxCenteredSq {m n : Nat} :
     Idx (ΓLN m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m n]) (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n, MatShape m n]) (τ := MatShape m n)
+  Idx.last (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n, MatShape m n]) (τ := MatShape m n)
 
 /-- Variance per row: `var := mean(centered_sq)` producing a length-`m` vector. -/
 def nodeVar {m n : Nat} :
@@ -177,7 +171,7 @@ def g5 {m n : Nat} : Graph (ΓLN m n) [VecShape m, MatShape m n, MatShape m n, M
 def idxVar {m n : Nat} :
     Idx (ΓLN m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m n, VecShape m]) (VecShape m)
       :=
-  idxLast (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n, MatShape m n, MatShape m n]) (τ :=
+  Idx.last (Γ := ΓLN m n) (ss := [VecShape m, MatShape m n, MatShape m n, MatShape m n]) (τ :=
     VecShape m)
 
 /-- Add epsilon: `var_eps := var + ε`. -/
@@ -193,7 +187,7 @@ def layerNormPrefix6 {m n : Nat} (ε : ℝ) : Graph (ΓLN m n) (ssPrefix6 m n) :
 
 /-- Index of `var_eps` in `ΓLN ++ ssPrefix6`. -/
 def idxVarEps {m n : Nat} : Idx (ΓLN m n ++ ssPrefix6 m n) (VecShape m) :=
-  idxLast (Γ := ΓLN m n)
+  Idx.last (Γ := ΓLN m n)
     (ss := [VecShape m, MatShape m n, MatShape m n, MatShape m n, VecShape m])
     (τ := VecShape m)
 
@@ -213,7 +207,7 @@ def layerNormPrefix7 {m n : Nat} (ε : ℝ) : Graph (ΓLN m n) (ssPrefix7 m n) :
 
 /-- Index of `std` in `ΓLN ++ ssPrefix7`. -/
 def idxStd {m n : Nat} : Idx (ΓLN m n ++ ssPrefix7 m n) (VecShape m) :=
-  idxLast (Γ := ΓLN m n) (ss := ssPrefix6 m n) (τ := VecShape m)
+  Idx.last (Γ := ΓLN m n) (ss := ssPrefix6 m n) (τ := VecShape m)
 
 /-- Inverse standard deviation: `inv_std := 1/std`. -/
 def nodeInvStd {m n : Nat} : Node (ΓLN m n ++ ssPrefix7 m n) (VecShape m) :=
@@ -225,7 +219,7 @@ def g8 {m n : Nat} (ε : ℝ) : Graph (ΓLN m n) (ssPrefix7 m n ++ [VecShape m])
 
 /-- Index of `inv_std` in the extended context. -/
 def idxInvStd {m n : Nat} : Idx (ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m])) (VecShape m) :=
-  idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n) (τ := VecShape m)
+  Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n) (τ := VecShape m)
 
 /-- Broadcast `inv_std` back to `m×n` (row-wise). -/
 def nodeInvStdB {m n : Nat} :
@@ -247,7 +241,7 @@ def idxCentered9 {m n : Nat} :
 /-- Index of `inv_std_b` in the stage-`g9` context. -/
 def idxInvStdB9 {m n : Nat} :
     Idx (ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m, MatShape m n])) (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m]) (τ := MatShape m n)
+  Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m]) (τ := MatShape m n)
 
 /-- Node computing `normalized := centered ⊙ inv_std_b`. -/
 def nodeNorm {m n : Nat} :
@@ -280,14 +274,14 @@ def idxNorm11 {m n : Nat} :
       (MatShape m n) :=
   _root_.Proofs.Autograd.Idx.weaken (Γ := ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m, MatShape m n,
     MatShape m n]))
-    (idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n]) (τ := MatShape m n))
+    (Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n]) (τ := MatShape m n))
     (rest := [MatShape m n])
 
 /-- Index of `gamma_b` at stage `g11`. -/
 def idxGammaB11 {m n : Nat} :
     Idx (ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m n]))
       (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n]) (τ :=
+  Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n]) (τ :=
     MatShape m n)
 
 /-- Scale: `scaled := normalized ⊙ gamma_b`. -/
@@ -327,7 +321,7 @@ def idxScaled13 {m n : Nat} :
       MatShape m n, MatShape m n])) (MatShape m n) :=
   _root_.Proofs.Autograd.Idx.weaken (Γ := ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m, MatShape m n,
     MatShape m n, MatShape m n, MatShape m n]))
-    (idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n,
+    (Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n,
       MatShape m n]) (τ := MatShape m n))
     (rest := [MatShape m n])
 
@@ -335,7 +329,7 @@ def idxScaled13 {m n : Nat} :
 def idxBetaB13 {m n : Nat} :
     Idx (ΓLN m n ++ (ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m n,
       MatShape m n, MatShape m n])) (MatShape m n) :=
-  idxLast (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m
+  Idx.last (Γ := ΓLN m n) (ss := ssPrefix7 m n ++ [VecShape m, MatShape m n, MatShape m n, MatShape m
     n, MatShape m n]) (τ := MatShape m n)
 
 /-- Output: `y := scaled + beta_b`. -/
@@ -724,7 +718,8 @@ def wholeNodeFDerivCorrectAt {Γ : List Shape} {m n : Nat}
       rfl
     have hFderiv :
         fderiv ℝ f xV = out.comp (Dg.comp pack) := by
-      simpa [hfEq] using hOut.fderiv
+      rw [← hfEq]
+      exact hOut.fderiv
     rw [hFderiv]
     simpa [wholeNode, f, pack, g, out] using hOut
   · intro dxV

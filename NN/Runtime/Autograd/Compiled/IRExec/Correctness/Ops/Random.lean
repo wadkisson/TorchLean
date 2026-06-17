@@ -173,7 +173,21 @@ theorem buildFrom_denoteAllFrom_bernoulli_mask
                   buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape)
                       (i := i + 1) st1 =
                     .ok st' := by
-                simpa [st1, nodeData] using hBuild
+                change
+                  buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape)
+                      (i := i + 1)
+                      ⟨ss ++ [n.outShape],
+                        GraphData.snoc (α := α) (Δ := Unit) (Γ := [inShape]) (ss := ss)
+                          (τ := n.outShape) gd
+                          (mkFwdNode (α := α) (Γ := [inShape] ++ ss) (τ := n.outShape)
+                            (fun ctx =>
+                              Runtime.Autograd.TorchLean.Random.mask (α := α)
+                                (Runtime.Autograd.TorchLean.Random.keyOf seed i)
+                                (match getIdx (α := α) (xs := ctx) ip with
+                                | Tensor.scalar v => v)
+                                (s := n.outShape)))⟩ =
+                    .ok st'
+                exact hBuild
               have hGet :
                   vals0[pId]! =
                     NN.IR.DVal.mk (α := α) Shape.scalar (getIdx (α := α) (xs := ctx) ip) := by

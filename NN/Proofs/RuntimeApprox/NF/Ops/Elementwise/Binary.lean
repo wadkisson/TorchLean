@@ -79,6 +79,7 @@ theorem approxT_add_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                         refine le_trans hxy ?_
                         -- `linf_norm` of the scalar bound tensor is `abs` of its scalar entry.
                         simpa [addBoundTensor, tensorToSpec, Spec.mapTensor, map2Spec,
+                          MathFunctions.abs,
                           linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm] using
                           (le_abs_self (epsx + epsy +
                             neuralUlp β fexp
@@ -190,11 +191,20 @@ theorem approxT_add_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                                   (rnd := rnd))
                                   (addSpec (xRf i) (yRf i))))
                             (acc := (0 : ℝ)) (eps := B) hB_nonneg hf
-                        -- Rewrite back into `tensor_distance`.
-                        simpa [tensorDistance,
-                          NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                          linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                            Spec.mapTensor] using hfold
+                        -- Rewrite back into the `tensorDistance` fold over the outer dimension.
+                        simp [tensorDistance,
+                          linfNorm, RuntimeApprox.linfNorm, tensorToSpec, Spec.mapTensor]
+                        change
+                          List.foldl
+                            (fun a i =>
+                              max a
+                                (tensorLinfNorm
+                                  (((xSf i).addSpec (ySf i)).subSpec
+                                    (mapTensor (toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                                      ((xRf i).addSpec (yRf i))))))
+                            0 (List.finRange n) ≤ B
+                        simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec,
+                          MathFunctions.abs, Spec.mapTensor] using hfold
 
                       -- Conclude `approxT` for the whole tensor.
                       simpa [approxT, approxWith, B, addSpec, map2Spec] using this
@@ -271,6 +281,7 @@ theorem approxT_mul_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                                   := by
                         refine le_trans hxy ?_
                         simpa [mulBoundTensor, tensorToSpec, Spec.mapTensor, map2Spec,
+                          MathFunctions.abs,
                           linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm] using
                           (le_abs_self
                             ((abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) + epsx) * epsy +
@@ -372,10 +383,19 @@ theorem approxT_mul_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                                   (rnd := rnd))
                                   (mulSpec (xRf i) (yRf i))))
                             (acc := (0 : ℝ)) (eps := B) hB_nonneg hf
-                        simpa [tensorDistance,
-                          NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                          linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                            Spec.mapTensor] using hfold
+                        simp [tensorDistance,
+                          linfNorm, RuntimeApprox.linfNorm, tensorToSpec, Spec.mapTensor]
+                        change
+                          List.foldl
+                            (fun a i =>
+                              max a
+                                (tensorLinfNorm
+                                  (((xSf i).mulSpec (ySf i)).subSpec
+                                    (mapTensor (toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                                      ((xRf i).mulSpec (yRf i))))))
+                            0 (List.finRange n) ≤ B
+                        simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec,
+                          MathFunctions.abs, Spec.mapTensor] using hfold
 
                       simpa [approxT, approxWith, B, mulSpec, map2Spec] using this
 end NFBackend
@@ -384,4 +404,3 @@ end
 
 end RuntimeApprox
 end Proofs
-

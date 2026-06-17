@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -10,7 +9,7 @@ tag := "examples"
 
 This page is a guided path through the examples. The repository has many examples, but the first pass
 should be short: one tensor file, one training run, one autograd run, one graph/checker run, and one
-BugZoo card.
+BugZoo example.
 
 Each example group has a teaching role: what it exercises, where data enters the system, what gets
 checked, and what a successful run establishes.
@@ -61,7 +60,7 @@ lake build NN.Examples.Zoo
 Start with the MLP and CNN examples. They show the basic pattern:
 
 - the dataset is represented as tensors;
-- the model is built through `NN.API.nn`;
+- the model is built through the public `TorchLean.nn` API;
 - parameters are explicit;
 - the optimizer returns updated state;
 - the log records an ordinary loss trace.
@@ -71,7 +70,7 @@ examples.
 
 ```
 lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean cnn --cpu --n-total 20 --steps 1
+lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
 ```
 
 ## 2. A graph is checked
@@ -105,12 +104,12 @@ The style is:
 For papers, talks, and documentation, this is often the most useful example family: it shows how
 TorchLean turns a bug pattern into a checked statement.
 
-# Fast Kernels, Bug Cards, and Verification
+# Fast Kernels, BugZoo, and Verification
 
 A useful way to read the examples is as one chain:
 
 1. *Fast kernel*: a runtime path uses an optimized implementation, such as fused CUDA attention.
-2. *Bug card*: BugZoo states the semantic hazard, such as mask polarity, cache position mismatch, or
+2. *BugZoo example*: BugZoo states the semantic hazard, such as mask polarity, cache position mismatch, or
    floating-point boundary mismatch.
 3. *Contract*: the spec names the intended mathematical behavior.
 4. *Checker or theorem*: Lean checks an artifact, proves a local theorem, or records the remaining
@@ -122,7 +121,7 @@ For attention, the chain looks like this:
   kernels.
 - Spec: `Spec.flashAttention` and `Spec.scaledDotProductAttention` name the forward contract.
 - Theorem: `flashAttention_eq_scaledDotProductAttention` states that the fused spec denotes SDPA.
-- Bug card: `BugZoo.AttentionMask` records the exact mask property, including future tokens getting
+- BugZoo example: `BugZoo.AttentionMask` records the exact mask property, including future tokens getting
   zero attention under causal masking.
 - Verification fixture: `torchlean-transformer-ibp` pushes a tiny transformer style graph through
   the same verifier surface.
@@ -143,7 +142,7 @@ The examples are grouped so each subtree has a job:
 - [Quickstart examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Quickstart/)
   Typed-tensor warmups, autograd basics, and the smallest training tutorials.
 - [Model examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/)
-  The main model zoo used by `lake exe torchlean`: MLP, CNN, ResNet, ViT, RNN/LSTM,
+  The main model zoo used by `lake exe torchlean`: MLP, KAN, CNN, ViT, RNN/LSTM,
   Transformer, GPT text examples, Mamba examples, diffusion, and RL examples.
 - [Advanced examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Advanced/)
   GraphSpec, float-mode, tensor-bridge, and TorchLean-to-PyTorch IR examples.
@@ -200,7 +199,7 @@ Expected outputs on a healthy run:
   semantics.
 - `autodiff_demo`: prints a value and a gradient, not only a successful build.
 - `lake exe torchlean mlp --cpu --steps 10`: prints a short loss trace trending downward.
-- `lake exe torchlean gpt_adder --steps 50 --cuda` (after `lake build -R -K cuda=true`): runs the minGPT
+- `lake exe torchlean gpt_adder --steps 1 --cuda` (after `lake build -R -K cuda=true`): runs the minGPT
   addition example on GPU when the CUDA backend has been built.
 - `torchlean-ibp`: prints interval bounds for the output node, not raw graph internals.
 
@@ -238,7 +237,7 @@ For debugging compilation to IR or verifier-style passes, `--backend compiled` i
 
 # Model zoo and real data
 
-The model surface is wide: classical feedforward and conv nets, ViT and ResNet blocks,
+The model surface is wide: classical feedforward and conv nets, ViT and residual blocks,
 recurrent and attention language models, state space and diffusion examples, and PPO RL
 environments, not only the original MLP/CNN tutorials. Model examples are driven by:
 
@@ -251,14 +250,14 @@ First run:
 
 `lake exe torchlean --help`
 
-## `torchlean` subcommands (curated zoo)
+## `torchlean` subcommands
 
 Use these as starting points; each module's header documents the full flag surface.
 
-- `mlp`: tabular/vector regression; synthetic or CSV data; a good first GPU runtime check after `cuda=true`.
+- `mlp`: Auto MPG tabular regression; a good first GPU runtime check after `cuda=true`.
+- `kan`: Auto MPG tabular regression with KAN edge-basis functions.
 - `cnn`: convolutional training on CIFAR-style tensors; prepare `data/real` with the download
   script for real data.
-- `resnet`: residual CNN block stack; the usual architecture anchor is He et al., ResNet (2015).
 - `vit`: patch embedding plus transformer-style vision; the usual anchor is Dosovitskiy et al.,
   ViT (2020).
 - `rnn`, `lstm`: sequence modeling baselines over recurrent state.
@@ -266,26 +265,25 @@ Use these as starting points; each module's header documents the full flag surfa
 - `gpt2`, `text_gpt2`: decoder-style language modeling; `text_gpt2` uses file-backed text.
 - `mamba`: selective state-space model example.
 - `diffusion`: generative diffusion training loop.
-- `ppo_*`: policy optimization in compact controlled environments.
+- `ppo_gridworld`, `ppo_cartpole`: policy optimization in compact controlled environments.
 - `floats_arb_ieee_compare`: compares float semantics modes and pairs with *Floating-Point
   Semantics*.
 
-Runnable via `torchlean`: `lake exe torchlean gpt_adder` (Karpathy-style single-CUDA-kernel addition learning;
-not a `torchlean` subcommand).
+Runnable via `torchlean`: `lake exe torchlean gpt_adder` trains the small addition example through
+the same runner as the other model-zoo commands.
 
-Example invocations (CPU is always available; add `--cuda` after building with `-K cuda=true`):
+Example invocations:
 
 ```
 lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean cnn --cpu --n-total 20 --steps 1
-lake exe torchlean resnet --cuda --n-total 20 --steps 1
-lake exe torchlean vit --cuda --n-total 20 --steps 1
-lake exe torchlean rnn --cuda --tiny-shakespeare --steps 1
-lake exe torchlean transformer --cuda --tiny-stories --steps 1
-lake exe torchlean mamba --cuda --tiny-shakespeare --steps 25
-lake exe torchlean diffusion --cpu --steps 5
-lake exe torchlean gpt2 --cuda --steps 1
-lake build -R -K cuda=true && lake exe torchlean gpt_adder --steps 50 --cuda
+lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
+lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
+lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
+lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
+lake build -R -K cuda=true && lake exe torchlean gpt_adder --steps 1 --cuda
 ```
 
 The real data helper prepares the small public corpora and CIFAR shards used by these examples:
@@ -299,7 +297,7 @@ tests without network access.
 These model examples matter because they show that TorchLean's public API is not limited to one
 teaching example:
 
-- MLPs, CNNs, attention blocks, and residual blocks share the same `NN.API` vocabulary,
+- MLPs, CNNs, attention blocks, and residual blocks share the same `TorchLean` vocabulary,
 - the `zero_grad / backward / step` rhythm can be written directly in Lean,
 - and the same scripts can still switch dtype and backend from the CLI.
 
@@ -310,7 +308,7 @@ three increasingly realistic patterns:
 
 - `csv_loader_train`
   Disk-backed tabular data, `Data.Transforms.Compose`, minibatch loaders, and a learning-rate
-  schedule (`train.stepEpochLR`).
+  schedule (`Trainer.stepEpochLR`).
 - `npy_loader_train`
   NumPy/PyTorch `.npy` interop with typed dataset reconstruction on the Lean side.
 - `cifar10_npy_cnn_train`
@@ -332,7 +330,7 @@ Two examples highlight newer architecture and interop work beyond the smallest t
 
 - Lean example: [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/GraphSpec/Tutorial.lean)
 - Command:
-   `lake exe torchlean graphspec_mlp --backend compiled`
+   `lake exe torchlean graphspec --backend eager`
 
 This example defines an MLP once in GraphSpec, lowers it to the TorchLean training surface, and then
 trains it with the ordinary public API. It is the fastest way to see GraphSpec as a real user
@@ -352,14 +350,13 @@ This example sits at an important boundary in the repo:
 The supported architectures already include more than a single linear layer:
 
 - `linear`, `mlp`, `sum`, `autoencoder`,
-- `cnn`, `conv-mlp`,
 - `mha`, `mha-mask`,
 - `transformer`.
 
 # BugZoo Case Studies
 
 BugZoo deserves its own reading pass because it explains what kinds of mistakes TorchLean is trying
-to make visible. The [BugZoo API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/) contains the checked cards, with the
+to make visible. The [BugZoo API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/) contains the checked examples, with the
 full motivation in the [BugZoo overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/README.md).
 
 The case studies are compact, but they cover a broad range:
@@ -387,7 +384,7 @@ The case studies are compact, but they cover a broad range:
 - *Tokenizer boundary*: vocabulary/config mismatch; TorchLean represents token ids as
   `Fin vocabSize`.
 
-These cards do not solve every production incident. They show a repeatable method: take a bug that
+These examples do not solve every production incident. They show a repeatable method: take a bug that
 normally sits inside an opaque runtime, name the boundary, and attach a
 small checked statement to it.
 
@@ -445,7 +442,7 @@ To mirror the paper's example ordering, try:
 
 1. `simple_mlp_train`
 2. `pytorch_loop_mlp_train`
-3. `graphspec_mlp_demo`
+3. `graphspec`
 4. `torchlean-ibp`
 5. `torchlean-crown-ops`
 6. `pinn-cert` or `pinn-cli`
@@ -479,7 +476,7 @@ After edits, the fastest regression check for the public surface is:
 
 # Adding A New Example
 
-Checklist for adding a new example to the curated zoo:
+Checklist for adding a new example:
 
 - Put it in the right subtree:
   `NN/Examples/Models` for model zoo examples, `NN/Examples/Quickstart` for small
@@ -489,14 +486,14 @@ Checklist for adding a new example to the curated zoo:
   [model runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean) and make sure `NN.Examples.Zoo`
   imports it.
 - Use the public API where appropriate:
-  `open NN.API` and stick to `nn`, `Data`, `train`, and `optim` unless the example is explicitly
-  advanced.
+  `import NN`, `open TorchLean`, and stick to `nn`, `Data`, `Trainer`, and `optim` unless
+  the example is explicitly advanced.
 - Add a short module docstring at the top with:
   1. what the example demonstrates, and
   2. the exact `lake env lean --run ...` command.
 - Parse flags consistently:
-  support `--seed` when randomness is involved, and use `train.run` to parse `--dtype` and
-  `--backend`.
+  support `--seed` when randomness is involved, and prefer the shared `ModelZoo.runFloat` /
+  public `Trainer.new` route for `--dtype`, `--backend`, and device selection.
 - Keep the default run bounded:
   small dataset, compact model, few steps or epochs; heavier runs remain behind flags.
 

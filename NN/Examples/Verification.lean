@@ -15,9 +15,9 @@ public import NN.Examples.Verification.VNNComp
 /-!
 # Verification Examples
 
-Runnable and theorem-backed examples that show TorchLean's verification stack on concrete
-artifacts. The reusable checkers remain under `NN.Verification`; the bundled certs and wrapper
-modules live here so the examples tree is the visible place users look first.
+Runnable and theorem-backed examples for TorchLean's verification stack. Reusable checker
+implementations live under `NN.Verification`; this namespace gathers the small example entrypoints
+and bundled artifacts that make the workflows easy to run.
 -/
 
 @[expose] public section

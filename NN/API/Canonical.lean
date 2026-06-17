@@ -15,5 +15,3 @@ public import NN.API.Public
 
 Prefer `import NN` for the full library, or `import NN.Entrypoint.API` for the focused API entrypoint.
 -/
-
-@[expose] public section

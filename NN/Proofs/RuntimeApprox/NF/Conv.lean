@@ -110,7 +110,7 @@ lemma approx_fold_add_state {ι : Type} (l : List ι)
   intro accS st hAcc hTerm
   induction l generalizing accS st with
   | nil =>
-      simp at hAcc ⊢
+      change abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) st.1 - accS) ≤ st.2
       simpa using hAcc
   | cons hd tl ih =>
       have hHd : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (termR hd) - termS hd) ≤ epsTerm
@@ -305,8 +305,8 @@ Pointwise absolute-error bound for one Conv2D output scalar in the NF backend.
 
 Implementation note:
 we replay the same fold structure as `Spec.conv2d_spec`, but track an explicit absolute-error
-budget alongside the runtime accumulator. This keeps the bound aligned with the runtime addition
-order (which matters for worst-case rounding error).
+budget alongside the runtime accumulator. The bound follows the runtime addition order, which
+matters for worst-case rounding error.
 -/
 def conv2dPointBound
     {inC outC kH kW stride padding inH inW : Nat}

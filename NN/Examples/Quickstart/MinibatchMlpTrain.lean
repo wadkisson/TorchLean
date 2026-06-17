@@ -7,21 +7,23 @@ Authors: TorchLean Team
 module
 
 public import NN
+public import NN.Examples.Quickstart.Common
 public import NN.Examples.Data.SamplePaths
 
 /-!
 # Minibatch MLP training (batching is implicit)
 
-This next-step file shows the intended "PyTorch-like" minibatch path in TorchLean:
+This next-step file shows the intended minibatch path in TorchLean:
 
-1. Keep the dataset per-sample (`x : Vec inDim`, `y : Vec outDim`).
-2. Use `Data.batchLoader` to collate minibatches.
-3. Write the model and task over the minibatch shape (`batch × Vec inDim`).
-4. Train one step per minibatch.
+1. load a CSV dataset through `Data`,
+2. choose persistent runtime settings with `Trainer.RunConfig`,
+3. write the model over the minibatch shape (`batch × Vec inDim`),
+4. call `trainer.train data trainOptions`,
+5. reuse the trained handle for one follow-up prediction batch.
 
 Run the loader tutorial instead when possible:
 
-- `lake exe torchlean data_csv --epochs 1 --batch 5 --dtype float --backend eager`
+- `lake exe torchlean data_csv --steps 1 --batch 5 --dtype float --backend eager`
 
 Build this comparison module directly with:
 
@@ -32,8 +34,8 @@ Optional flags (tutorial-specific):
 - `--data-dir PATH` (default: `NN/Examples/Data`)
 - `--csv PATH` (override the CSV file)
 - `--seed S`
+- `--steps N`
 - `--batch N`
-- `--epochs E`
 -/
 
 @[expose] public section
@@ -41,73 +43,78 @@ Optional flags (tutorial-specific):
 
 namespace NN.Examples.Quickstart.MinibatchMLPTrain
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
+
+/-- Default JSON log path used only when the user explicitly passes `--log`. -/
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "quickstart_minibatch_mlp"
+
+def missingCsvHint : String :=
+  "Generate the small regression CSV with:\n" ++
+  "  python3 NN/Examples/Data/generate_small_data.py"
 
 def inDim : Nat := 2
 def hidDim : Nat := 8
 def outDim : Nat := 1
 
-/-- Batched MLP `2 -> 8 -> 1`. -/
-def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.Mat batch inDim) (Shape.Mat batch outDim)) :=
-  nn.sequential![
-    nn.linear inDim hidDim (pfx := NN.Tensor.Shape.Vec batch),
-    nn.relu,
-    nn.linear hidDim outDim (pfx := NN.Tensor.Shape.Vec batch)
-  ]
+/-- Batched MLP `2 -> 8 -> 1` built from the public model constructor. -/
+def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
+  nn.models.Mlp1ReLU
+    { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
-def loadDataset (csvPath : System.FilePath)
-    {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] :
-    IO (Except String (Data.Dataset (sample.Supervised α (Shape.Vec inDim) (Shape.Vec outDim)))) :=
-      do
-  let opts : Data.CsvOptions := { skipHeader := true }
-  Data.fromCsvSupervised (α := α) csvPath inDim outDim (opts := opts)
+/-- Command-line help for the minibatch MLP quickstart. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean minibatch MLP quickstart"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean quickstart_minibatch_mlp [options]"
+    , ""
+    , "Options:"
+    , "  --data-dir PATH"
+    , "  --csv PATH"
+    , "  --seed N"
+    , "  --batch N"
+    , "  --steps N"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    , "  --log PATH"
+    ]
 
 def main (args : List String) : IO Unit := do
-  let args := API.CLI.dropDashDash args
-
-  let (dataDir, args) ← API.Common.orThrow "MinibatchMLPTrain" <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
-  let (seed, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takeSeed args 0
-  let (eb, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takeEpochBatch args 30 5
-  let (csv?, args) ← API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.takePathFlagOnce args "csv"
-  let csvPath := csv?.getD (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
-  if eb.batch = 0 then
-    throw <| IO.userError "MinibatchMLPTrain: --batch must be > 0"
-
-  let task : train.Task (shape![eb.batch, inDim]) (shape![eb.batch, outDim]) :=
-    train.regression (nn.build seed (mkModel (batch := eb.batch)))
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
+  let (dataDir, args) ← CLI.orThrow "MinibatchMLPTrain" <|
+    _root_.NN.Examples.Data.SamplePaths.takeDataDir args
+  let (seed, args) ← CLI.seed "MinibatchMLPTrain" args
+  let (batch, args) ← CLI.positiveNatFlag "MinibatchMLPTrain" args "batch" 5
+  let (csvPath, args) ← CLI.pathFlagDefault "MinibatchMLPTrain" args "csv"
+    (_root_.NN.Examples.Data.SamplePaths.regressionCsv dataDir)
+  let parsed ←
+    _root_.NN.Examples.Quickstart.parseRuntimeTrain
+      "MinibatchMLPTrain" args defaultLogJson 30 (optim.adam { lr := 0.05 })
+  let trainer := Trainer.new (mkModel (batch := batch)) <|
+    Trainer.Config.fromRunConfig parsed.run .regression (seed := seed)
 
   IO.println "== Quickstart next step: minibatch MLP training =="
   IO.println s!"data_dir = {dataDir}"
   IO.println s!"csv_path  = {csvPath}"
   IO.println s!"seed      = {seed}"
-  IO.println s!"model     = MLP(2 -> 8 -> 1)"
-  IO.println (s!"train     = Adam(lr=0.05), epochs={eb.epochs}, batch_size={eb.batch}, " ++
+  trainer.printInfo
+  IO.println (s!"train     = Adam(lr=0.05), steps={parsed.train.steps}, batch_size={batch}, " ++
     s!"shuffle=true, drop_last=true")
 
-  train.run task args (fun {α} _ _ _ _ runner rest => do
-    API.Common.orThrow "MinibatchMLPTrain" <| API.CLI.requireNoArgs rest
-
-    let dsE ← loadDataset (csvPath := csvPath) (α := α)
-    let ds ← API.Common.orThrow "MinibatchMLPTrain" dsE
-
-    let loader := Data.batchLoader ds eb.batch (shuffle := true) (seed := seed) (dropLast := true)
-    let batchedDs ← API.Common.orThrow "MinibatchMLPTrain" <| Data.BatchLoader.batchDataset loader
-
-    let cfg : train.LoaderFitConfig := { (train.epochs eb.epochs (optimizer := optim.adam 0.05))
-      with logEvery := 0 }
-    let hooks : train.Callbacks α :=
-      (train.onTrainStart do
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "before")
-      ++ train.logLossEvery 5
-      ++ (train.onTrainEnd (fun _ =>
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "after"))
-
-    let (_report, _loader') ← train.fitLoaderWith (task := task) runner cfg loader hooks
-    pure ())
+  let csvOptions : Data.CsvOptions := { skipHeader := true }
+  let data :=
+    Data.tabularCsvDataset csvPath batch inDim outDim
+      (csvOptions := csvOptions) (shuffle := true) (seed := seed)
+  Data.requireFile "MinibatchMLPTrain" "CSV dataset" csvPath missingCsvHint
+  let trained ← trainer.train data parsed.trainOptions
+  trained.printSummary
+  let heldout : Tensor.T Float (Shape.mat batch inDim) :=
+    Tensor.fill 0.25 (Shape.mat batch inDim)
+  trained.printPrediction "predict(batch=heldout)" heldout
 
 end NN.Examples.Quickstart.MinibatchMLPTrain

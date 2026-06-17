@@ -9,6 +9,7 @@ module
 public import NN.API.Public
 public import NN.Verification.Util.FloatApprox
 public import NN.Verification.Util.Json
+public import NN.Verification.Util.Tensor
 
 /-!
 # Tensor-native 3D box camera certificates
@@ -281,16 +282,6 @@ def vecGet {α : Type} {n : Nat}
 def corner {α : Type} (corners : BoxCorners α) (i : Fin 8) : Point3 α :=
   Spec.Tensor.dim (fun j => Spec.Tensor.scalar (matGet corners i j))
 
-/-- Build a matrix tensor from a coordinate function. Useful for small artifacts. -/
-def matOfFn {α : Type} (rows cols : Nat) (f : Fin rows → Fin cols → α) :
-    Spec.Tensor α (NN.Tensor.Shape.Mat rows cols) :=
-  Spec.Tensor.dim (fun i => Spec.Tensor.dim (fun j => Spec.Tensor.scalar (f i j)))
-
-/-- Build a vector tensor from a coordinate function. Useful for small artifacts. -/
-def vecOfFn {α : Type} (n : Nat) (f : Fin n → α) :
-    Spec.Tensor α (NN.Tensor.Shape.Vec n) :=
-  Spec.Tensor.dim (fun i => Spec.Tensor.scalar (f i))
-
 /-- Raw homogeneous camera coordinate `P[row] · [X,Y,Z,1]`. -/
 def cameraCoord {α : Type} [OfNat α 1] [Add α] [Mul α]
     (P : CameraP α) (x : Point3 α) (row : Fin 3) : α :=
@@ -317,7 +308,7 @@ def projectY {α : Type} [OfNat α 1] [Add α] [Mul α] [Div α]
 /-- Project one 3D point to a 2D tensor. -/
 def projectPoint {α : Type} [OfNat α 1] [Add α] [Mul α] [Div α]
     (P : CameraP α) (x : Point3 α) : Point2 α :=
-  vecOfFn 2 (fun j =>
+  Spec.vectorTensor (fun j : Fin 2 =>
     if j.val = 0 then
       projectX P x
     else
@@ -326,7 +317,7 @@ def projectPoint {α : Type} [OfNat α 1] [Add α] [Mul α] [Div α]
 /-- Project all eight cuboid corners. -/
 def projectBox {α : Type} [OfNat α 1] [Add α] [Mul α] [Div α]
     (P : CameraP α) (corners : BoxCorners α) : ProjectedCorners α :=
-  matOfFn 8 2 (fun i j => vecGet (projectPoint P (corner corners i)) j)
+  Spec.matrixTensor (fun i j => vecGet (projectPoint P (corner corners i)) j)
 
 /-- A compact exported 3D-box/camera certificate. -/
 structure BoxCameraCert (α : Type) where
@@ -804,21 +795,6 @@ theorem Verified3DBox.projected_corner_in_claimed_bbox {α : Type} [OfNat α 0] 
 /-- Expected schema string for JSON artifacts accepted by this checker. -/
 def formatString : String := "torchlean.camera.box3d.v1"
 
-/-- Tensor from a flat array. The caller is responsible for checking the length. -/
-def matFloatOfFlat (rows cols : Nat) (xs : Array Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.Mat rows cols) :=
-  matOfFn rows cols (fun i j => xs.getD (i.val * cols + j.val) 0.0)
-
-/-- Vector tensor from a flat array. The caller is responsible for checking the length. -/
-def vecFloatOfFlat (n : Nat) (xs : Array Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.Vec n) :=
-  vecOfFn n (fun i => xs.getD i.val 0.0)
-
-/-- Reject a flat JSON tensor field whose length does not match the checker schema. -/
-def requireSize (ctx : String) (xs : Array Float) (expected : Nat) : IO Unit := do
-  if xs.size != expected then
-    throw <| IO.userError s!"{ctx}: expected {expected} floats, got {xs.size}"
-
 /-- Parse a JSON artifact into the Float checker representation. -/
 def parseJsonCert (j : Lean.Json) : IO (BoxCameraCert Float) := do
   expectFormat j formatString
@@ -828,16 +804,19 @@ def parseJsonCert (j : Lean.Json) : IO (BoxCameraCert Float) := do
   let cameraFlat ← expectFieldFloatArray j "camera_P" "top-level"
   let cornersFlat ← expectFieldFloatArray j "corners3d" "top-level"
   let bboxFlat ← expectFieldFloatArray j "bbox2d" "top-level"
-  requireSize "top-level.camera_P" cameraFlat 12
-  requireSize "top-level.corners3d" cornersFlat 24
-  requireSize "top-level.bbox2d" bboxFlat 4
+  let camera ← NN.Verification.Util.Tensor.requireMatOfFlatArray
+    "top-level.camera_P" 3 4 cameraFlat
+  let corners ← NN.Verification.Util.Tensor.requireMatOfFlatArray
+    "top-level.corners3d" 8 3 cornersFlat
+  let bbox ← NN.Verification.Util.Tensor.requireVecOfArray
+    "top-level.bbox2d" 4 bboxFlat
   pure {
     width := width
     height := height
     tol := tol
-    camera := matFloatOfFlat 3 4 cameraFlat
-    corners := matFloatOfFlat 8 3 cornersFlat
-    bbox := vecFloatOfFlat 4 bboxFlat
+    camera := camera
+    corners := corners
+    bbox := bbox
   }
 
 /--

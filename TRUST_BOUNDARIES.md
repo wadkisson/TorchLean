@@ -23,8 +23,9 @@ import/export scripts, Julia/Python producers, and artifact-checking conventions
 - `NN/MLTheory/CROWN/Lyapunov/Oracle.lean`: `crown_oracle` assumes an external CROWN
   checker has produced a `CrownOracleWitness lyap cert`; given that witness, the certificate
   soundly bounds `V` and `Vdot` over the stated region.
-- `NN/Runtime/Autograd/Engine/Cuda/Trusted.lean`: `instNonemptyBuffer` assumes the external
-  CUDA/stub runtime can construct values of the opaque `Cuda.Buffer` type.
+- `NN/Runtime/Autograd/Engine/Cuda/Trusted.lean`: `instNonemptyBuffer` is the nonemptiness witness
+  Lean needs for opaque extern declarations returning `Cuda.Buffer`. It does not allocate or
+  validate a CUDA buffer; real buffers still come from explicit FFI constructors/copy operations.
 - `scripts/checks/repo_lint.py` allowlists these exact axiom names. New axioms must be added here
   deliberately and documented in this file.
 
@@ -88,7 +89,7 @@ Important examples include:
   accumulation paths with fixed-order algorithms (slower, but bit-stable across runs on the same
   GPU). You can enable it either:
   - from Lean (recommended): `let _ := Runtime.Autograd.Cuda.Buffer.setDeterministicReductionsChecked true`
-  - via env var: `TORCHLEAN_CUDA_DETERMINISTIC_REDUCTIONS=1` (or compatibility alias `TORCHLEAN_DETERMINISTIC_REDUCTIONS=1`)
+  - via env var: `TORCHLEAN_CUDA_DETERMINISTIC_REDUCTIONS=1`
   Coverage includes:
   - reductions: `Buffer.reduceSum`, `Buffer.reduceMean`, `reduceFromBroadcastTo`, `reduceSumAxis`
   - gather/scatter backprop: `scatterAdd`, `scatterAddRows`

@@ -318,8 +318,8 @@ header .header_filename {
 
 /* Cross-site links --------------------------------------------------------
    Generated API pages sit under `/docs/`, while the human guide and examples
-   sit elsewhere in the Jekyll site.  These links prevent the docs from feeling
-   like a dead-end generated artifact. */
+   sit elsewhere in the Jekyll site.  These links connect the generated API
+   pages back to the rest of the public site. */
 .tl-docsite-links {
   display: flex;
   align-items: center;
@@ -999,8 +999,8 @@ def rename_docgen_header(docs: Path) -> None:
     express against generated HTML fragments:
 
     - add cross-site links to each generated header,
-    - fix old path casing in generated doc links,
-    - convert old `tl-docsite-links` nav wrappers into divs,
+    - normalize path casing in generated doc links,
+    - convert `tl-docsite-links` nav wrappers into divs,
     - add a compact declaration-kind legend to pages with declarations.
 
     These are narrow string rewrites against stable DocGen fragments.
@@ -1029,8 +1029,7 @@ def rename_docgen_header(docs: Path) -> None:
         # module name display.
         updated = text.replace("<span>Documentation</span>", "<span>TorchLean API</span>")
 
-        # Older docstrings used a lowercase `tensor` path. Linux hosting is
-        # case-sensitive, so this rewrite keeps old links working.
+        # Normalize the generated Tensor page path for case-sensitive hosting.
         updated = updated.replace(
             "NN/Spec/Core/tensor/Core.html",
             "NN/Spec/Core/Tensor/Core.html",

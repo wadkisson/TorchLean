@@ -53,7 +53,6 @@ variable {obs latent : Shape} {numCodes : Nat}
 
 /-- The VQ-VAE loss splits into reconstruction, codebook, and commitment terms. -/
 @[simp] theorem vqvae_loss_decomposition
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α obs latent numCodes) (beta : α) (x : Tensor α obs) (idx : Fin numCodes) :
     loss model beta x idx =
       reconstructionLoss model x idx + codebookLoss model x idx +

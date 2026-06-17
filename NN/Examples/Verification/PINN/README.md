@@ -6,7 +6,8 @@ This folder contains checked assets that can be reviewed directly. Python produc
 
 - `pinn_cert.json`: compact certificate artifact checked by `lake exe verify -- pinn-cert`.
 - `sample_dataset_1d.json`, `sample_dataset_2d.json`: compact dataset artifacts for
-  `lake exe verify -- pinn-dataset-check`.
+  `lake exe verify -- pinn-dataset-check`. The dataset command is diagnostic by default: it prints
+  contained/missed counts and exits successfully unless `--strict` is passed.
 - `export_pinn_cert.py`: regenerates the compact certificate artifact.
 - `train_pinn_1d.py`, `train_pinn_2d.py`: train local PINN checkpoints/weight JSONs.
 - `export_pinn_weights.py`: converts a PyTorch checkpoint or fresh model to TorchLean JSON.

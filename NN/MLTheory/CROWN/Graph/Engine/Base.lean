@@ -146,8 +146,30 @@ structure ParamStore (α : Type) [Context α] where
   batchNorm2dNchwEval : Std.HashMap Nat (BatchNorm2DNchwEvalParams α) :=
     Std.HashMap.emptyWithCapacity
 
+namespace ParamStore
+
+/-- Insert an input interval box for a graph node. -/
+def seedInputBox {α : Type} [Context α]
+    (ps : ParamStore α) (inputId : Nat) (xB : FlatBox α) : ParamStore α :=
+  { ps with inputBoxes := ps.inputBoxes.insert inputId xB }
+
+/-- Seed a graph input with a uniform `ℓ∞` box around a shaped tensor. -/
+def seedLInfBall {α : Type} [Context α] {s : Shape}
+    (ps : ParamStore α) (inputId : Nat) (center : Tensor α s) (eps : α) : ParamStore α :=
+  ps.seedInputBox inputId <| FlatBox.lInfBall (α := α) center eps
+
+end ParamStore
+
+/-- Read a node's interval box from an IBP-style result array. -/
+def outputBox? {α : Type} [Context α]
+    (boxes : Array (Option (FlatBox α))) (outId : Nat) : Except String (FlatBox α) := do
+  match boxes[outId]? with
+  | some (some outB) => pure outB
+  | some none => throw s!"output box missing at node {outId}"
+  | none => throw s!"output node {outId} is out of bounds for {boxes.size} boxes"
+
 /-- Default inhabitant for `FlatBox` (a 0-dimensional box at `0`). -/
-instance [Context α] : Inhabited (FlatBox α) where
+instance : Inhabited (FlatBox α) where
   default := { dim := 0, lo := Spec.fill (α:=α) 0 (.dim 0 .scalar), hi := Spec.fill (α:=α) 0 (.dim 0
     .scalar) }
 

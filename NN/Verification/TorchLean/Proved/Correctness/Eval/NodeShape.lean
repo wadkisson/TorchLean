@@ -335,6 +335,14 @@ open NN.Verification.TorchLean
             rename_i s
             let yV : DVal α := vals[yhat.id]!
             let tV : DVal α := vals[target.id]!
+            have hSomeY : vals[yhat.id]? = some yV := by
+              simpa [yV] using
+                val_get?_eq_some_of_hShapes (α := α) (vals := vals) (idx := yhat)
+                  (hShapes := hShapes)
+            have hSomeT : vals[target.id]? = some tV := by
+              simpa [tV] using
+                val_get?_eq_some_of_hShapes (α := α) (vals := vals) (idx := target)
+                  (hShapes := hShapes)
             have hy : yV.shape = s := by
               simpa [yV] using
                 shape_of_vals_of_hShapes (α := α) (inShape := inShape) (ss := ss) (s := s)
@@ -349,7 +357,8 @@ open NN.Verification.TorchLean
               simpa [DVal.shape] using (hy.trans ht.symm)
             have hEq := hv
             simp (config := { zeta := true })
-              [evalNode, yV, tV, hCond, Except.pure, Pure.pure] at hEq
+              [evalNode, getDVal?, yV, tV, hSomeY, hSomeT, hCond, Bind.bind, Except.bind,
+                Except.pure, Pure.pure] at hEq
             cases hEq
             simp
 end Correctness

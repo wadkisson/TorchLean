@@ -29,6 +29,7 @@ python3 scripts/docs/polish_docgen.py --docs home_page/docs
 rm -rf home_page/manual
 
 echo "==> Building Verso Guide (Blueprint Package)"
+rm -rf _out/blueprint
 (cd blueprint && lake exe blueprint-gen --output ../_out/blueprint)
 # Verso does not automatically copy arbitrary guide assets in every local build
 # mode, so mirror the guide asset directory before polishing the generated HTML.
@@ -89,7 +90,7 @@ fi
 (cd home_page && "${BUNDLE_CMD[@]}" config set path vendor/bundle && "${BUNDLE_CMD[@]}" install)
 
 echo "==> Building Jekyll site"
-(cd home_page && "${BUNDLE_CMD[@]}" exec jekyll build --config _config.yml,_config_dev.yml)
+(cd home_page && rm -rf _site && "${BUNDLE_CMD[@]}" exec jekyll build --config _config.yml,_config_dev.yml)
 
 cat <<'EOF'
 

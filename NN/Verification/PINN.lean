@@ -10,6 +10,7 @@ public import NN.Verification.PINN.Architecture
 public import NN.Verification.PINN.CLI
 public import NN.Verification.PINN.Certificate
 public import NN.Verification.PINN.Core
+public import NN.Verification.PINN.Dataset
 public import NN.Verification.PINN.DatasetCheck
 public import NN.Verification.PINN.PdeAst
 public import NN.Verification.PINN.PdeParse

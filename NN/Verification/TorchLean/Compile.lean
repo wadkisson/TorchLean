@@ -42,7 +42,7 @@ References (informal):
 - LiRPA unification viewpoint: Xu et al. (2020).
 -/
 
-public section
+@[expose] public section
 
 
 namespace NN.Verification.TorchLean
@@ -98,7 +98,7 @@ Ensure a `Ref` is represented by an IR node.
 Compile-time constants are materialized as `.const` nodes and recorded in the verifier
 `ParamStore`; existing graph nodes are returned unchanged.
 -/
-def ensureNode {α : Type} [Context α] [Inhabited α]
+def ensureNode {α : Type} [Context α]
     {s : Shape} (r : Ref α s) : BuildM α Nat := do
   match r with
   | .node id => pure id
@@ -112,7 +112,7 @@ def ensureNode {α : Type} [Context α] [Inhabited α]
       pure id
 
 /-- Emit a unary IR operation with one parent node. -/
-def emitUnary {α : Type} [Context α] [Inhabited α]
+def emitUnary {α : Type} [Context α]
     {s t : Shape} (kind : OpKind) (x : Ref α s) (outShape : Shape := t) : BuildM α (Ref α t) := do
   let pid ← ensureNode (α := α) x
   let id ← freshId (α := α)
@@ -121,7 +121,7 @@ def emitUnary {α : Type} [Context α] [Inhabited α]
   pure (.node id)
 
 /-- Emit a binary IR operation whose operands have the same shape. -/
-def emitBinary {α : Type} [Context α] [Inhabited α]
+def emitBinary {α : Type} [Context α]
     {s : Shape} (kind : OpKind) (a b : Ref α s) : BuildM α (Ref α s) := do
   let pa ← ensureNode (α := α) a
   let pb ← ensureNode (α := α) b
@@ -131,7 +131,7 @@ def emitBinary {α : Type} [Context α] [Inhabited α]
   pure (.node id)
 
 /-- Emit a matrix-multiplication IR node. -/
-def emitMatmul {α : Type} [Context α] [Inhabited α]
+def emitMatmul {α : Type} [Context α]
     {sA sB sOut : Shape} (a : Ref α sA) (b : Ref α sB) (outShape : Shape := sOut) :
     BuildM α (Ref α sOut) := do
   let pa ← ensureNode (α := α) a
@@ -179,7 +179,7 @@ private theorem vector2_toList {α : Type} (v : Vector α 2) :
               Nat.succ_le_succ (Nat.succ_le_succ (Nat.zero_le i))
             exact (False.elim ((Nat.not_lt_of_ge this) hi2))
 
-instance {α : Type} [Context α] [DecidableEq Shape] [Inhabited α] :
+instance {α : Type} [Context α] [DecidableEq Shape] :
     Runtime.Autograd.Torch.Ops (m := BuildM α) (α := α) where
   Ref := Ref α
 
@@ -429,9 +429,11 @@ instance {α : Type} [Context α] [DecidableEq Shape] [Inhabited α] :
               simp [Shape.ofList]
               simp [Spec.poolOutSpatialPad, Vector.ofFn, Vector.get]
               have hs' : stride[1] = stride[0] := by
-                simpa [sH, sW] using hs.symm
+                change stride.get ⟨1, by decide⟩ = stride.get ⟨0, by decide⟩
+                exact hs.symm
               have hp' : padding[1] = padding[0] := by
-                simpa [pH, pW] using hp.symm
+                change padding.get ⟨1, by decide⟩ = padding.get ⟨0, by decide⟩
+                exact hp.symm
               simp [hs', hp']
               simp [outShape, Spec.pool2dMultiOutShapePad, inH, inW, kH, kW, sH, pH]
               simp [Vector.get]
@@ -493,9 +495,11 @@ instance {α : Type} [Context α] [DecidableEq Shape] [Inhabited α] :
               simp [Shape.ofList]
               simp [Spec.poolOutSpatialPad, Vector.ofFn, Vector.get]
               have hs' : stride[1] = stride[0] := by
-                simpa [sH, sW] using hs.symm
+                change stride.get ⟨1, by decide⟩ = stride.get ⟨0, by decide⟩
+                exact hs.symm
               have hp' : padding[1] = padding[0] := by
-                simpa [pH, pW] using hp.symm
+                change padding.get ⟨1, by decide⟩ = padding.get ⟨0, by decide⟩
+                exact hp.symm
               simp [hs', hp']
               simp [outShape, Spec.pool2dMultiOutShapePad, inH, inW, kH, kW, sH, pH]
               simp [Vector.get]
@@ -787,9 +791,11 @@ instance {α : Type} [Context α] [DecidableEq Shape] [Inhabited α] :
               simp [Shape.ofList]
               simp [Spec.convOutSpatial, Spec.convOutDim, Vector.ofFn, Vector.get]
               have hs' : stride[1] = stride[0] := by
-                simpa [sH, sW] using hs.symm
+                change stride.get ⟨1, by decide⟩ = stride.get ⟨0, by decide⟩
+                exact hs.symm
               have hp' : padding[1] = padding[0] := by
-                simpa [pH, pW] using hp.symm
+                change padding.get ⟨1, by decide⟩ = padding.get ⟨0, by decide⟩
+                exact hp.symm
               simp [hs', hp']
               simp [outShape, outH, outW, inH, inW, kH, kW, sH, pH]
               simp [Vector.get]
@@ -871,6 +877,143 @@ structure CompiledIR (α : Type) [Context α] where
   /-- Output node id. -/
   outputId : Nat
 
+/-- Seed the distinguished verifier input with an explicit flat input box. -/
+def CompiledIR.seedInputBox {α : Type} [Context α]
+    (compiled : CompiledIR α) (xB : NN.MLTheory.CROWN.FlatBox α) :
+    NN.MLTheory.CROWN.Graph.ParamStore α :=
+  compiled.ps.seedInputBox compiled.inputId xB
+
+/-- Flatten a shaped center/radius pair into the verifier input-box representation. -/
+def lInfBox {α : Type} [Context α] {s : Shape}
+    (center radius : Tensor α s) : NN.MLTheory.CROWN.FlatBox α :=
+  NN.MLTheory.CROWN.FlatBox.lInfBox (α := α) center radius
+
+/-- Uniform `ℓ∞` box around a shaped TorchLean input tensor. -/
+def lInfBall {α : Type} [Context α] {s : Shape}
+    (center : Tensor α s) (eps : α) : NN.MLTheory.CROWN.FlatBox α :=
+  NN.MLTheory.CROWN.FlatBox.lInfBall (α := α) center eps
+
+/-- Seed the distinguished verifier input with a uniform `ℓ∞` ball. -/
+def CompiledIR.seedLInfBall {α : Type} [Context α] {s : Shape}
+    (compiled : CompiledIR α) (center : Tensor α s) (eps : α) :
+    NN.MLTheory.CROWN.Graph.ParamStore α :=
+  compiled.ps.seedLInfBall compiled.inputId center eps
+
+/-- Shape of the distinguished verifier input node. -/
+def CompiledIR.inputShape? {α : Type} [Context α] (compiled : CompiledIR α) :
+    Except String Shape := do
+  match compiled.graph.nodes[compiled.inputId]? with
+  | some node => pure node.outShape
+  | none =>
+      throw s!"compiled verifier input node {compiled.inputId} is out of bounds for {compiled.graph.nodes.size} graph nodes"
+
+/-- Flattened dimension of the distinguished verifier input node. -/
+def CompiledIR.inputDim? {α : Type} [Context α] (compiled : CompiledIR α) :
+    Except String Nat := do
+  pure (Shape.size (← compiled.inputShape?))
+
+/-- Checked affine/CROWN context for the distinguished verifier input. -/
+def CompiledIR.affineCtx? {α : Type} [Context α] (compiled : CompiledIR α) :
+    Except String NN.MLTheory.CROWN.Graph.AffineCtx := do
+  pure { inputId := compiled.inputId, inputDim := ← compiled.inputDim? }
+
+/--
+Compatibility affine/CROWN context for existing callers.
+
+New verifier paths should prefer `affineCtx?`, which reports malformed compiled graphs through
+`Except`. This pure helper avoids panic-style indexing but cannot surface an error.
+-/
+def CompiledIR.affineCtx {α : Type} [Context α] (compiled : CompiledIR α) :
+    NN.MLTheory.CROWN.Graph.AffineCtx :=
+  { inputId := compiled.inputId
+    inputDim :=
+      match compiled.inputDim? with
+      | .ok n => n
+      | .error _ => 0 }
+
+/-- Run IBP on a compiled verifier graph. -/
+def CompiledIR.runIBP {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
+    (compiled : CompiledIR α)
+    (ps : NN.MLTheory.CROWN.Graph.ParamStore α) :
+    Array (Option (NN.MLTheory.CROWN.FlatBox α)) :=
+  NN.MLTheory.CROWN.Graph.runIBP (α := α) compiled.graph ps
+
+/-- Read the verifier output box from an IBP result array. -/
+def CompiledIR.outputBox? {α : Type} [Context α]
+    (compiled : CompiledIR α)
+    (boxes : Array (Option (NN.MLTheory.CROWN.FlatBox α))) :
+    Except String (NN.MLTheory.CROWN.FlatBox α) := do
+  NN.MLTheory.CROWN.Graph.outputBox? boxes compiled.outputId
+
+/-- Read the compiled verifier output box, throwing an `IO.userError` if it is missing. -/
+def CompiledIR.outputBoxOrThrow {α : Type} [Context α]
+    (compiled : CompiledIR α)
+    (boxes : Array (Option (NN.MLTheory.CROWN.FlatBox α))) :
+    IO (NN.MLTheory.CROWN.FlatBox α) := do
+  match compiled.outputBox? boxes with
+  | .ok outB => pure outB
+  | .error msg => throw <| IO.userError msg
+
+/-- Read the verifier output affine form from a forward affine result array. -/
+def CompiledIR.outputAffine? {α : Type} [Context α]
+    (compiled : CompiledIR α)
+    (affs : Array (Option (NN.MLTheory.CROWN.Graph.FlatAffine α))) :
+    Except String (NN.MLTheory.CROWN.Graph.FlatAffine α) := do
+  match affs[compiled.outputId]? with
+  | some (some outAff) => pure outAff
+  | some none => throw s!"verification output affine missing at node {compiled.outputId}"
+  | none =>
+      throw s!"verification output node {compiled.outputId} is out of bounds for {affs.size} affine entries"
+
+/-- Read the verifier output CROWN bounds from a forward CROWN result array. -/
+def CompiledIR.outputCROWN? {α : Type} [Context α]
+    (compiled : CompiledIR α)
+    (bounds : Array (Option (NN.MLTheory.CROWN.Graph.FlatAffineBounds α))) :
+    Except String (NN.MLTheory.CROWN.Graph.FlatAffineBounds α) := do
+  match bounds[compiled.outputId]? with
+  | some (some outB) => pure outB
+  | some none => throw s!"verification CROWN output missing at node {compiled.outputId}"
+  | none =>
+      throw s!"verification output node {compiled.outputId} is out of bounds for {bounds.size} CROWN entries"
+
+/-- Run forward CROWN and evaluate the compiled verifier output on a selected input box. -/
+def CompiledIR.outputBoxCROWN? {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
+    (compiled : CompiledIR α) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
+    (xB : NN.MLTheory.CROWN.FlatBox α) :
+    Except String (NN.MLTheory.CROWN.FlatBox α) := do
+  let inputDim ← compiled.inputDim?
+  NN.MLTheory.CROWN.Graph.outputBoxCROWN? (α := α) compiled.graph ps xB
+    compiled.inputId compiled.outputId inputDim
+
+/-- Run forward CROWN for a compiled verifier graph, throwing an `IO.userError` on failure. -/
+def CompiledIR.outputBoxCROWNOrThrow {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
+    (compiled : CompiledIR α) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
+    (xB : NN.MLTheory.CROWN.FlatBox α) :
+    IO (NN.MLTheory.CROWN.FlatBox α) := do
+  match compiled.outputBoxCROWN? ps xB with
+  | .ok outB => pure outB
+  | .error msg => throw <| IO.userError msg
+
+/-- Run objective-dependent backward CROWN and evaluate the scalar objective on the input box. -/
+def CompiledIR.backwardObjectiveBox? {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
+    (compiled : CompiledIR α) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
+    (ibp : Array (Option (NN.MLTheory.CROWN.FlatBox α)))
+    (xB : NN.MLTheory.CROWN.FlatBox α) (obj : NN.MLTheory.CROWN.Graph.FlatVec α) :
+    Except String (NN.MLTheory.CROWN.FlatBox α) := do
+  let ctx ← compiled.affineCtx?
+  NN.MLTheory.CROWN.Graph.backwardObjectiveBox? (α := α) compiled.graph ps ctx
+    ibp xB compiled.outputId obj
+
+/-- `IO` wrapper around `CompiledIR.backwardObjectiveBox?`. -/
+def CompiledIR.backwardObjectiveBoxOrThrow {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
+    (compiled : CompiledIR α) (ps : NN.MLTheory.CROWN.Graph.ParamStore α)
+    (ibp : Array (Option (NN.MLTheory.CROWN.FlatBox α)))
+    (xB : NN.MLTheory.CROWN.FlatBox α) (obj : NN.MLTheory.CROWN.Graph.FlatVec α) :
+    IO (NN.MLTheory.CROWN.FlatBox α) := do
+  match compiled.backwardObjectiveBox? ps ibp xB obj with
+  | .ok outB => pure outB
+  | .error msg => throw <| IO.userError msg
+
 /-- Convert a parameter `TList` into a `RefList` of compile-time constants. -/
 def refListConstOfTList {α : Type} [Context α] :
     {ss : List Shape} → Runtime.Autograd.Torch.TList α ss → Runtime.Autograd.Torch.RefList (Ref α)
@@ -880,7 +1023,7 @@ def refListConstOfTList {α : Type} [Context α] :
 
 /-- Compile a TorchLean forward model with a single distinguished input (the last argument). -/
 def compileForward1
-    {α : Type} [Context α] [DecidableEq Shape] [Inhabited α]
+    {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :

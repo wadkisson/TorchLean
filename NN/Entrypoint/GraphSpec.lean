@@ -39,8 +39,8 @@ It gives you:
 - the optional lowering to `TorchLean.NN.Seq` when primitives provide `toLayerDefM?`,
 - and the model/primitive bridge theorems that connect GraphSpec syntax to Spec references.
 
-We keep this file as an umbrella re-export (no real logic here) so the import path stays stable
-even as the internals evolve.
+This file is an umbrella re-export. It has no real logic; the implementation lives in the imported
+modules.
 -/
 
 @[expose] public section

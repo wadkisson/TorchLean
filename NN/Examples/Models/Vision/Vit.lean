@@ -3,10 +3,9 @@ Copyright (c) 2026 TorchLean
 Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
-Device-agnostic real-data example:
+Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe torchlean vit --cpu
-  lake build -R -K cuda=true && lake exe torchlean vit --cuda
+  lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 1 --steps 1
 
 This is a real-data ViT-style CIFAR-10 minibatch run:
 - patch embedding via Conv2d,
@@ -19,7 +18,6 @@ module
 
 
 public import NN
-public import NN.API.Models.Vit
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -29,53 +27,85 @@ Runnable `torchlean vit` example. It trains a compact ViT-style image classifier
 prepared CIFAR-10 minibatch: patch embedding by convolution, token reshape, transformer block, and
 linear head.
 
-The reusable model wiring lives in `NN.API.Models.Vit` (`nn.models.vit1`). This file is the
-runnable wrapper (CIFAR loader construction + step-limited training loop).
+The reusable model wiring lives behind the public `TorchLean.nn.models.ViT` constructor. The command
+adds CIFAR loader construction and the step-limited training loop.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
-lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 200 --steps 1
+lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 1 --steps 1
 ```
 
-Tip: the defaults are set for a short validation run. For a longer run, bump `--steps` and
-`--n-total`, and enable CUDA fused kernels:
+This command is a small runtime check. Larger image-token runs belong in runtime profiling work,
+not the default quick path:
 
 ```bash
 lake build -R -K cuda=true
-lake exe torchlean vit --cuda --fast-kernels --n-total 2000 --steps 50
+lake exe torchlean vit --cuda --fast-kernels --n-total 1 --steps 1
 ```
 -/
 
 @[expose] public section
 
-open _root_.Spec
-open _root_.Spec.Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Vision.Vit
 
+/-- CLI subcommand name used in terminal banners and parser errors. -/
 def exeName : String := "torchlean vit"
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "vit"
 
-def batch : Nat := 2
+/-- Default JSON loss-curve path for this command. -/
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "vit"
+
+/--
+Static minibatch size for the ViT example.
+
+The batch axis is part of the checked model type, so changing this value changes the input and
+output shapes at compile time.
+-/
+def batch : Nat := 1
+
+/-- CIFAR image channels. -/
 def inC : Nat := 3
-def inH : Nat := RealData.cifarHeight
-def inW : Nat := RealData.cifarWidth
 
-def patchH : Nat := 4
-def patchW : Nat := 4
-def stride : Nat := 4
+/-- Height of the CIFAR crop used by this runnable ViT command. -/
+def inH : Nat := 2
+
+/-- Width of the CIFAR crop used by this runnable ViT command. -/
+def inW : Nat := 2
+
+/-- Patch height used by the convolutional patch embedding. -/
+def patchH : Nat := 2
+
+/-- Patch width used by the convolutional patch embedding. -/
+def patchW : Nat := 2
+
+/-- Patch stride; equal to patch size here, so patches do not overlap. -/
+def stride : Nat := 2
+
+/-- No zero-padding for the patch embedding. -/
 def padding : Nat := 0
 
--- CIFAR images are 32×32; 4×4 patches with stride 4 produce an 8×8 token grid. The attention
--- width is `dModel = numHeads * headDim`, matching the API-level Transformer block contract.
-def dModel : Nat := 32
+/--
+Transformer feature width.
+
+CIFAR rows are cropped before training. A 2×2 patch covers the whole crop here, so the command
+exercises the ViT path with one image token and a small classifier head.
+-/
+def dModel : Nat := 1
+
+/-- CIFAR class count, hence the output-logit width. -/
 def outDim : Nat := RealData.cifarClasses
 
-def numHeads : Nat := 4
-def headDim : Nat := 8
-def ffnHidden : Nat := 128
+/-- Number of attention heads in the single encoder block. -/
+def numHeads : Nat := 1
 
+/-- Per-head feature width; `numHeads * headDim = dModel`. -/
+def headDim : Nat := 1
+
+/-- Feed-forward hidden width inside the encoder block. -/
+def ffnHidden : Nat := 2
+
+/-- Shared ViT configuration used by shapes and the reusable public model constructor. -/
 def cfg : nn.models.VitConfig :=
   { batch := batch
     inC := inC
@@ -91,23 +121,44 @@ def cfg : nn.models.VitConfig :=
     headDim := headDim
     ffnHidden := ffnHidden }
 
-abbrev σ : Shape :=
-  nn.models.vitInShape cfg
+abbrev σ :=
+  Shape.images batch inC inH inW
 
-abbrev τ : Shape :=
-  nn.models.vitOutShape cfg
+abbrev τ :=
+  Shape.mat batch outDim
 
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.vit1 cfg
+/--
+Compact ViT-style classifier from the public model API.
 
-def main (args : List String) : IO UInt32 := do
-  Common.runFloat exeName args
-    (banner := fun opts =>
-      s!"{exeName}: ViT CIFAR training (device={if opts.useGpu then "cuda" else "cpu"})")
-    (k := fun opts rest => do
-      let flags ← Common.orThrow exeName <|
-        RealData.parseCifarModelTrainFlags exeName rest defaultLogJson 1 1e-3
-      let report ← RealData.fitCifarClassifier exeName "ViT CIFAR training" batch mkModel opts flags
-      Common.printFitReport flags.train.train.steps report)
+The constructor builds patch embedding, token reshape, one encoder block, and the classifier head.
+-/
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.ViT cfg
+
+/-- Train the CIFAR ViT with the public `Trainer` surface. -/
+def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
+    IO Trainer.TrainSummary := do
+  let batches ←
+    RealData.loadCifarBatches exeName batch flags.nRows flags.seed flags.xPath flags.yPath
+  let batches := batches.map (RealData.cropCifarBatch batch inH inW (by decide) (by decide))
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.adam { lr := flags.lr } })
+        .classification
+        (seed := flags.seed)
+  let trained ← trainer.train
+    (Data.floatSamples batches)
+    (ModelZoo.TrainFlags.trainOptions flags.toModelTrainFlags
+      (title := "ViT CIFAR training")
+      (notes := RealData.cifarClassifierNotes batch flags))
+  pure trained.report
+
+/-- CLI entrypoint for CIFAR ViT training; CUDA is the maintained validation path. -/
+def main (args : List String) : IO UInt32 :=
+  Trainer.Command.classificationNpy exeName args
+    (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 1 1e-3)
+    (ModelZoo.bannerWithDevice exeName "ViT CIFAR training")
+    train
 
 end NN.Examples.Models.Vision.Vit

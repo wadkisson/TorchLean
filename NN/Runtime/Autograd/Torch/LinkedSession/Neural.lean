@@ -30,7 +30,7 @@ Record elementwise logistic sigmoid.
 
 PyTorch comparison: `torch.sigmoid(x)`.
 -/
-def sigmoid {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def sigmoid {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -45,7 +45,7 @@ Record elementwise hyperbolic tangent.
 
 PyTorch comparison: `torch.tanh(x)`.
 -/
-def tanh {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def tanh {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -61,7 +61,7 @@ Record softmax (shape-preserving).
 PyTorch comparison: `torch.softmax(x, dim=...)`. This helper uses the convention baked into the
 underlying `GraphM.softmax` implementation.
 -/
-def softmax {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def softmax {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -77,7 +77,7 @@ Record stable log-softmax in the linked compiled session.
 This commits a single `GraphM.logSoftmax` node instead of expanding to `softmax` followed by
 `log`, so compiled execution keeps the same stable semantics as eager CPU/CUDA.
 -/
-def logSoftmax {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def logSoftmax {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -92,7 +92,7 @@ Record elementwise softplus.
 
 PyTorch comparison: `torch.nn.functional.softplus(x)`.
 -/
-def softplus {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def softplus {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -107,7 +107,7 @@ Record elementwise exponential.
 
 PyTorch comparison: `torch.exp(x)`.
 -/
-def exp {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def exp {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -122,7 +122,7 @@ Record elementwise natural logarithm.
 
 PyTorch comparison: `torch.log(x)`.
 -/
-def log {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def log {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -138,7 +138,7 @@ Record elementwise log with epsilon guard.
 This is intended for numerically stable losses; it corresponds approximately to `log(max(x, ε))`.
 PyTorch comparison: `torch.log(torch.clamp(x, min=ε))`.
 -/
-def safeLog {α : Type} (s : SessionIR α) [Context α] [Zero α] [DecidableEq Shape] {sh : Shape}
+def safeLog {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape] {sh : Shape}
   (x : TensorRef α sh) (ε : α := Numbers.epsilon) : IO (TensorRef α sh) :=
   commitGraphM (α := α) s (β := TensorRef α sh) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -43,18 +42,17 @@ feature vector of length `4` and produces two logits:
 ```
 import NN
 
-open NN.Tensor
-open NN.API
+open TorchLean
 
-def tinyClassifier : nn.M (nn.Sequential (Shape.Vec 4) (Shape.Vec 2)) :=
-  nn.sequential![
-    nn.linear 4 8 (pfx := Shape.scalar),
-    nn.relu,
-    nn.linear 8 2 (pfx := Shape.scalar)
+def tinyClassifier : nn.M (nn.Sequential (Shape.vec 4) (Shape.vec 2)) :=
+  nn.Sequential![
+    nn.Linear 4 8,
+    nn.ReLU,
+    nn.Linear 8 2
   ]
 
 def tinyTask (seed : Nat) :=
-  train.classificationOneHot (nn.build seed tinyClassifier)
+  Trainer.new tinyClassifier { task := .classification, seed := seed }
 ```
 
 At this stage there is no proof obligation. This is model code. The difference from a Python script
@@ -76,9 +74,10 @@ exist and how they are composed; the parameter bundle says which trained numbers
 use.
 
 ```
-def builtTiny := nn.build 2026 tinyClassifier
+def builtTiny :=
+  Trainer.new tinyClassifier { task := .classification, seed := 2026 }
 
--- The structure and the parameter bundle are explicit values.
+-- The task contains the model structure and initialized parameter bundle.
 #check builtTiny
 ```
 
@@ -98,7 +97,7 @@ be inspected or related by theorems.
 
 The graph chapters explain how TorchLean lowers model code into `NN.IR.Graph`, a DAG whose nodes
 carry operation tags and are shared by runtime inspection and verifier code. The graph is not meant
-to be pleasant model authoring syntax. It is the object a compiler, widget, or verifier can inspect
+to be model authoring syntax. It is the object a compiler, widget, or verifier can inspect
 node by node.
 
 The discipline is:
@@ -165,7 +164,7 @@ proof.
 ```
 import NN
 
-open NN.Tensor
+open TorchLean
 
 def a : Tensor Float (shape![2]) :=
   tensor! [1.0, 2.0]

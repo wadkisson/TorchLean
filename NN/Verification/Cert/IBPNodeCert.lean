@@ -58,19 +58,26 @@ open Lean Data Json
 def readIBPNodeCertificate (g : Graph) (path : String) : IO (Array (Option (FlatBox Float))) := do
   let topObj ← readJsonObjectFile path
   let arr ← expectFieldArray topObj "ibp" "top-level"
-  if arr.size ≠ g.nodes.size then
+  if hSize : arr.size = g.nodes.size then
+    let mut out : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
+    for i in List.finRange g.nodes.size do
+      let node := g.nodes[i.val]'i.isLt
+      let hArr : i.val < arr.size := by
+        rw [hSize]
+        exact i.isLt
+      let entryJson := arr[i.val]'hArr
+      let entry ← parseFlatBox? node.outShape.size entryJson
+      out := out.push entry
+    pure out
+  else
     throw <| IO.userError s!"ibp array length {arr.size} ≠ g.nodes.size {g.nodes.size}"
-  let mut out : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
-  for i in [0:g.nodes.size] do
-    let dim := g.nodes[i]!.outShape.size
-    let entry ← parseFlatBox? dim arr[i]!
-    out := out.push entry
-  pure out
 
 /-- Check the local IBP enclosure condition for one node against a certificate entry. -/
 def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (FlatBox Float)))
     (id : Nat) (tol : Float) : IO Bool := do
-  let node := g.nodes[id]!
+  let some node := g.nodes[id]?
+    | IO.eprintln s!"[IBPNodeCert] node {id}: out of bounds for graph with {g.nodes.size} nodes"
+      pure false
   let needsParents :=
     match node.kind with
     | .input | .const _ => false
@@ -82,9 +89,15 @@ def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (Flat
     IO.eprintln
       s!"[IBPNodeCert] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
     return false
-  let certBox? := cert[id]!
+  let certBox? :=
+    match cert[id]? with
+    | some entry => entry
+    | none => none
   let computed := propagateIBPNode (α := Float) g.nodes ps cert id
-  let computedBox? := computed[id]!
+  let computedBox? :=
+    match computed[id]? with
+    | some entry => entry
+    | none => none
   match certBox?, computedBox? with
   | none, _ =>
       IO.eprintln s!"[IBPNodeCert] node {id}: certificate missing (null)"

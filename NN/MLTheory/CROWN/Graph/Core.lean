@@ -48,13 +48,32 @@ PyTorch analogues (conceptual):
 - `auto_LiRPA` as a practical LiRPA implementation over PyTorch graphs.
 -/
 
-public section
+@[expose] public section
 
 
 namespace NN.MLTheory.CROWN
 
+open _root_.Spec
+open _root_.Spec.Tensor
+
 /-- Alias for the typed IR computation graph used by the CROWN/LiRPA engines. -/
 abbrev Graph := NN.IR.Graph
+
+namespace FlatBox
+
+/-- Flatten a shaped center/radius pair into the graph-level interval-box representation. -/
+def lInfBox {α : Type} [Context α] {s : Shape}
+    (center radius : Tensor α s) : FlatBox α :=
+  { dim := Shape.size s
+    lo := Tensor.flattenSpec (α := α) <| Tensor.subSpec center radius
+    hi := Tensor.flattenSpec (α := α) <| Tensor.addSpec center radius }
+
+/-- Uniform `ℓ∞` box around a shaped tensor. -/
+def lInfBall {α : Type} [Context α] {s : Shape}
+    (center : Tensor α s) (eps : α) : FlatBox α :=
+  lInfBox (α := α) center (Spec.fill (α := α) eps s)
+
+end FlatBox
 
 end NN.MLTheory.CROWN
 
@@ -94,6 +113,53 @@ structure FlatAffineBounds (α : Type) [Context α] where
   loAff  : AffineVec α inDim outDim
   /-- Upper affine bound form. -/
   hiAff  : AffineVec α inDim outDim
+
+namespace FlatAffine
+
+variable {α : Type} [Context α] [BoundOps α]
+
+/-- Evaluate a flattened affine form on a flattened input box after checking the input dimension. -/
+def evalOnFlatBox (aff : FlatAffine α) (xB : FlatBox α) (hIn : xB.dim = aff.inDim) :
+    Box α (.dim aff.outDim .scalar) :=
+  AffineVec.evalOnBox (α := α) aff.aff (xB.toVecBox hIn)
+
+/-- Evaluate and view the output at a checked vector dimension. -/
+def evalOnFlatBoxAsDim (aff : FlatAffine α) (xB : FlatBox α)
+    (hIn : xB.dim = aff.inDim) {m : Nat} (hOut : aff.outDim = m) :
+    Box α (.dim m .scalar) :=
+  let out := aff.evalOnFlatBox xB hIn
+  { lo := Tensor.castVecDim (α := α) (n := aff.outDim) (m := m) hOut out.lo
+    hi := Tensor.castVecDim (α := α) (n := aff.outDim) (m := m) hOut out.hi }
+
+end FlatAffine
+
+namespace FlatAffineBounds
+
+variable {α : Type} [Context α] [BoundOps α]
+
+/--
+Evaluate lower/upper affine bounds on a flattened input box.
+
+The lower affine form contributes the lower endpoint; the upper affine form contributes the upper
+endpoint. This is the common CROWN workflow shape.
+-/
+def evalOnFlatBox (bounds : FlatAffineBounds α) (xB : FlatBox α)
+    (hIn : xB.dim = bounds.inDim) : Box α (.dim bounds.outDim .scalar) :=
+  let xBox := xB.toVecBox hIn
+  let loB := AffineVec.evalOnBox (α := α) bounds.loAff xBox
+  let hiB := AffineVec.evalOnBox (α := α) bounds.hiAff xBox
+  { lo := loB.lo
+    hi := hiB.hi }
+
+/-- Evaluate lower/upper affine bounds and view the output at a checked vector dimension. -/
+def evalOnFlatBoxAsDim (bounds : FlatAffineBounds α) (xB : FlatBox α)
+    (hIn : xB.dim = bounds.inDim) {m : Nat} (hOut : bounds.outDim = m) :
+    Box α (.dim m .scalar) :=
+  let out := bounds.evalOnFlatBox xB hIn
+  { lo := Tensor.castVecDim (α := α) (n := bounds.outDim) (m := m) hOut out.lo
+    hi := Tensor.castVecDim (α := α) (n := bounds.outDim) (m := m) hOut out.hi }
+
+end FlatAffineBounds
 
 /--
 Per-node bound state (flattened).

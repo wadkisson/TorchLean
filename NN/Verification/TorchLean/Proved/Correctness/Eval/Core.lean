@@ -29,8 +29,8 @@ namespace IRStep
 /-- Reflexivity for the structural shape equality used by IR runtime guards. -/
 theorem shapeBEq_refl (s : Shape) : (s == s) = true := by
   induction s with
-  | scalar => rfl
-  | dim _ rest ih =>
+      | scalar => rfl
+      | dim _ rest ih =>
       have ih' : Shape.areEqual rest rest = true := by
         simpa [BEq.beq] using ih
       simp [BEq.beq, Shape.areEqual, ih']
@@ -102,9 +102,9 @@ def evalFGraphVals
     (params : Runtime.Autograd.Torch.TList α paramShapes)
     (vals : Array (DVal α)) : Except String (Array (DVal α)) := do
   match g with
-  | .ret _y =>
+      | .ret _y =>
       pure vals
-  | .let1 (ss := ss) (mid := mid) (out := out) node gNext =>
+      | .let1 (ss := ss) (mid := mid) (out := out) node gNext =>
       let vOut ←
         evalNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := mid)
           node params vals
@@ -127,13 +127,14 @@ theorem getVal_eq_ok
     {α : Type} [Context α] [DecidableEq Shape]
     {inShape : Shape} {ss : List Shape} {expected : Shape}
     (vals : Array (DVal α)) (idx : Idx (Ctx inShape ss) expected)
+    (hSome : vals[idx.id]? = some (vals[idx.id]!))
     (h : (vals[idx.id]!).1 = expected) :
     getVal (α := α) (inShape := inShape) (ss := ss) (s := expected) vals idx =
       Except.ok (h ▸ (vals[idx.id]!).snd) := by
-  unfold getVal
-  simp [DVal.shape]
-  rw [dif_pos h]
-  rfl
+  simp [getVal, getDVal?, hSome, DVal.shape, Bind.bind, Except.bind]
+  split
+  · rfl
+  · contradiction
 
   /--
   Generic prefix-preservation argument for `ParamStore` lookups.
@@ -156,18 +157,18 @@ theorem getVal_eq_ok
                 (ss := ss₀) (out := mid₀) id node params ps).2 k =
             read ps k)
       (g : FGraph α paramShapes inShape ss out)
-      (params : Runtime.Autograd.Torch.TList α paramShapes)
-      (c : NN.Verification.TorchLean.CompiledIR α)
+    (params : Runtime.Autograd.Torch.TList α paramShapes)
+    (c : NN.Verification.TorchLean.CompiledIR α)
       {k : Nat} (hk : k < c.graph.nodes.size) :
       read
           (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss)
             (out := out) g params c).ps k =
         read c.ps k := by
     classical
-    induction g generalizing c with
-    | ret y =>
+      induction g generalizing c with
+      | ret y =>
         simp [compileFGraph]
-    | @let1 ss₀ mid₀ out₀ node gNext ih =>
+      | @let1 ss₀ mid₀ out₀ node gNext ih =>
         let id := c.graph.nodes.size
         have hk' : k < id := by simpa [id] using hk
         have hk_succ : k < id + 1 := Nat.lt_succ_of_lt hk'
@@ -209,8 +210,8 @@ theorem getVal_eq_ok
     (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
       out)
         g params c).ps.constVals.get? k = c.ps.constVals.get? k := by
-  classical
-  exact
+    classical
+    exact
     compileFGraph_ps_lookup_get?_lt
       (α := α) (β := NN.MLTheory.CROWN.Graph.FlatVec α)
       (read := fun ps k => ps.constVals.get? k)
@@ -235,8 +236,8 @@ theorem getVal_eq_ok
     (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
       out)
         g params c).ps.linearWB.get? k = c.ps.linearWB.get? k := by
-  classical
-  exact
+    classical
+    exact
     compileFGraph_ps_lookup_get?_lt
       (α := α) (β := NN.MLTheory.CROWN.Graph.LinParams α)
       (read := fun ps k => ps.linearWB.get? k)
@@ -261,8 +262,8 @@ theorem getVal_eq_ok
     (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
       out)
         g params c).ps.conv2dCfg.get? k = c.ps.conv2dCfg.get? k := by
-  classical
-  exact
+    classical
+    exact
     compileFGraph_ps_lookup_get?_lt
       (α := α) (β := NN.MLTheory.CROWN.Graph.Conv2DParams α)
       (read := fun ps k => ps.conv2dCfg.get? k)
@@ -289,8 +290,8 @@ theorem getVal_eq_ok
       out)
         g params c).ps.batchNorm2dNchwEval.get? k =
       c.ps.batchNorm2dNchwEval.get? k := by
-  classical
-  exact
+    classical
+    exact
     compileFGraph_ps_lookup_get?_lt
       (α := α) (β := NN.MLTheory.CROWN.Graph.BatchNorm2DNchwEvalParams α)
       (read := fun ps k => ps.batchNorm2dNchwEval.get? k)
@@ -311,16 +312,16 @@ theorem getVal_eq_ok
     (c : NN.Verification.TorchLean.CompiledIR α)
     {i : Nat} (hi : i < c.graph.nodes.size) :
     (NN.IR.Graph.getNode
-        (g := (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss)
+      (g := (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss)
           (out := out)
           g params c).graph) i)
       =
     NN.IR.Graph.getNode (g := c.graph) i := by
-  classical
-  induction g generalizing c with
-  | ret y =>
+    classical
+    induction g generalizing c with
+    | ret y =>
       simp [compileFGraph]
-  | @let1 ss₀ mid₀ out₀ node gNext ih =>
+    | @let1 ss₀ mid₀ out₀ node gNext ih =>
       let id := c.graph.nodes.size
       let res :=
         compileNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
@@ -345,54 +346,67 @@ theorem getVal_eq_ok
         simpa [c', res, id] using getNode_push_lt (g := c.graph) (n := n) (hi := hi)
       simpa [compileFGraph, c', id, res] using Eq.trans hNext hPush
 
-    /-- `compileFGraph` is monotone in `graph.nodes.size` (it only appends nodes). -/
-    theorem compileFGraph_nodesSize_le
-        {α : Type} [Context α]
-        {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
+  /-- `compileFGraph` is monotone in `graph.nodes.size` (it only appends nodes). -/
+  theorem compileFGraph_nodesSize_le
+      {α : Type} [Context α]
+      {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
         (g : FGraph α paramShapes inShape ss out)
       (params : Runtime.Autograd.Torch.TList α paramShapes)
       (c : NN.Verification.TorchLean.CompiledIR α) :
-      c.graph.nodes.size ≤
-        (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
+    c.graph.nodes.size ≤
+      (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
           out)
-            g params c).graph.nodes.size := by
+        g params c).graph.nodes.size := by
     classical
     induction g generalizing c with
     | ret y =>
         simp [compileFGraph]
     | @let1 ss₀ mid₀ out₀ node gNext ih =>
-      let id := c.graph.nodes.size
-      let res :=
-        compileNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
-          mid₀)
-          id node params c.ps
-      let n : NN.IR.Node := res.1
-      let ps' : NN.MLTheory.CROWN.Graph.ParamStore α := res.2
-      let c' : NN.Verification.TorchLean.CompiledIR α :=
-        { c with graph := { nodes := c.graph.nodes.push n }, ps := ps', outputId := id }
-      have h1 : c.graph.nodes.size ≤ c'.graph.nodes.size := by
-        simp [c', Array.size_push]
-      have h2 : c'.graph.nodes.size ≤
-          (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀ ++
-            [mid₀]) (out := out₀)
-            gNext params c').graph.nodes.size := by
-        exact ih (c := c')
-      simpa [compileFGraph, c', id, res] using Nat.le_trans h1 h2
+        let id := c.graph.nodes.size
+        let res :=
+          compileNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
+            mid₀)
+            id node params c.ps
+        let n : NN.IR.Node := res.1
+        let ps' : NN.MLTheory.CROWN.Graph.ParamStore α := res.2
+        let c' : NN.Verification.TorchLean.CompiledIR α :=
+          { c with graph := { nodes := c.graph.nodes.push n }, ps := ps', outputId := id }
+        have h1 : c.graph.nodes.size ≤ c'.graph.nodes.size := by
+          simp [c', Array.size_push]
+        have h2 : c'.graph.nodes.size ≤
+            (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀ ++
+              [mid₀]) (out := out₀)
+              gNext params c').graph.nodes.size := by
+          exact ih (c := c')
+        simpa [compileFGraph, c', id, res] using Nat.le_trans h1 h2
 
     /-- Shape lookup through `shapesOfVals` agrees with looking up the dynamic value first. -/
     lemma shapesOfVals_get?_eq
         {α : Type} [Context α] (vals : Array (DVal α)) (i : Nat) :
         (shapesOfVals (α := α) vals)[i]? = (vals[i]?).map (fun v => v.1) := by
-    -- Avoid `simp` loops on `Array.getElem?_eq_toList_get?'`.
-    have hToList : vals.toList[i]? = vals[i]? := by
-      simp
-    -- `List.getElem?_map` reduces the `map` and then we rewrite the list lookup to the array
-    -- lookup.
-    simp [shapesOfVals, List.getElem?_map, hToList]
+      -- Avoid `simp` loops on `Array.getElem?_eq_toList_get?'`.
+      have hToList : vals.toList[i]? = vals[i]? := by
+        simp
+      -- `List.getElem?_map` reduces the `map` and then we rewrite the list lookup to the array
+      -- lookup.
+      simp [shapesOfVals, List.getElem?_map, hToList]
 
   @[simp] lemma shapesOfVals_length {α : Type} [Context α] (vals : Array (DVal α)) :
       (shapesOfVals (α := α) vals).length = vals.size := by
-    simp [shapesOfVals]
+      simp [shapesOfVals]
+
+  /-- A shape-context invariant proves that a typed index is in bounds for the value array. -/
+  theorem val_get?_eq_some_of_hShapes
+      {α : Type} [Context α]
+      {inShape : Shape} {ss : List Shape} {s : Shape}
+      (vals : Array (DVal α)) (idx : Idx (Ctx inShape ss) s)
+      (hShapes : shapesOfVals (α := α) vals = Ctx inShape ss) :
+      vals[idx.id]? = some (vals[idx.id]!) := by
+    have hLen : vals.size = (Ctx inShape ss).length := by
+      simpa [shapesOfVals_length] using congrArg List.length hShapes
+    have hiΓ : idx.id < (Ctx inShape ss).length := idx_id_lt_length (x := idx)
+    have hiVals : idx.id < vals.size := by simpa [hLen] using hiΓ
+    simp [getElem?_pos, hiVals]
 
   @[simp] theorem shape_of_vals_of_hShapes
       {α : Type} [Context α]
@@ -425,10 +439,26 @@ theorem getVal_eq_ok
         (vals[idx.id]?).map (fun v => v.1) = some s := by
       simpa [shapesOfVals_get?_eq] using hShapesAt
     -- `idx.id < vals.size`, so the Array lookup is `some (vals[idx.id]!)`.
-    have hSome : vals[idx.id]? = some (vals[idx.id]!) := by
-      simp [getElem?_pos, hiVals]
+    have hSome : vals[idx.id]? = some (vals[idx.id]!) :=
+      val_get?_eq_some_of_hShapes vals idx hShapes
     -- Extract the shape from the mapped option.
     simpa [hSome] using hAt
+
+  /--
+  `getVal` succeeds from a well-shaped executable context.
+
+  This is the proof-facing form of `getVal_eq_ok`: callers use the semantic invariant
+  `shapesOfVals vals = Ctx inShape ss`, and the lemma derives the array-bounds fact internally.
+  -/
+  theorem getVal_eq_ok_of_hShapes
+      {α : Type} [Context α] [DecidableEq Shape]
+      {inShape : Shape} {ss : List Shape} {expected : Shape}
+      (vals : Array (DVal α)) (idx : Idx (Ctx inShape ss) expected)
+      (h : (vals[idx.id]!).1 = expected)
+      (hShapes : shapesOfVals (α := α) vals = Ctx inShape ss := by assumption) :
+      getVal (α := α) (inShape := inShape) (ss := ss) (s := expected) vals idx =
+        Except.ok (h ▸ (vals[idx.id]!).snd) :=
+    getVal_eq_ok vals idx (val_get?_eq_some_of_hShapes vals idx hShapes) h
 end Correctness
 
 end NN.Verification.TorchLean.Proved

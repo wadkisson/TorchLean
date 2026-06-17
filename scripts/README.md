@@ -10,8 +10,8 @@ artifacts belong in ignored output directories such as `data/`, `_out/`, or `hom
 
 Everything is organized by purpose:
 
-- `checks/`: local CI, repository lint, dependency audit, CUDA sanitizer/profiling helpers, and
-  Lake's Lean lint driver.
+- `checks/`: local CI, repository lint, dependency audit, CUDA sanitizer helpers, and Lake's Lean
+  lint driver.
 - `docs/`: public site, DocGen, and Verso post-processing.
 - `datasets/`: dataset download, conversion, and training-log plotting helpers.
 - `verification/`: certificate producers and artifact-regeneration workflows.
@@ -23,6 +23,7 @@ Everything is organized by purpose:
 These scripts are used by the build, documentation, and local verification paths:
 
 - `checks/check.sh`
+- `checks/example_smoke.sh`
 - `checks/cuda_sanitize_tests.sh`
 - `checks/cuda_profile_tests.sh`
 - `checks/check_case_collisions.py`
@@ -98,6 +99,11 @@ Generated locally:
 
 - `checks/check.sh`: local verification gate for `lake build`, `lake test`, `lake lint`,
   and optional CUDA / `NN.CI.All` checks.
+- `checks/example_smoke.sh`: sequential smoke test for the public `lake exe torchlean ...`
+  example surface. It audits every registered subcommand's `--help` path and runs compact
+  tutorial/interop examples; pass `--cuda` for a short real-CUDA model smoke set, or
+  `--extended-cuda` for a broader one-step model-zoo CUDA run. Optional external-environment
+  checks, such as ALE/Pong, live behind `--external-rl`.
 - `checks/cuda_sanitize_tests.sh`: CUDA sanitizer runner for the CUDA runtime test suite.
 - `checks/cuda_profile_tests.sh`: optional Nsight Systems / Nsight Compute wrapper for CUDA
   performance reports.
@@ -114,6 +120,7 @@ Useful commands:
 
 ```bash
 scripts/checks/check.sh --ci-all
+scripts/checks/example_smoke.sh
 scripts/checks/cuda_profile_tests.sh --both
 python3 scripts/checks/repo_lint.py --fail-on-warn
 python3 scripts/checks/dependency_audit.py --markdown /tmp/torchlean_dependency_audit.md --fail-on-error
@@ -127,6 +134,9 @@ python3 scripts/checks/check_case_collisions.py
   windows, and tiny text corpora.
 - `datasets/download_wikitext.py`: optional WikiText preparation helper for text-model
   experiments. Requires `pyarrow`.
+- `datasets/prepare_gpt2_corpus.py`: tokenizes local/Hugging Face text corpora into GPT-2 id
+  streams for sequence-model experiments. Requires `transformers`.
+- `datasets/plot_trainlog.py`: renders TorchLean `TrainLog` JSON curves for quick local inspection.
 - `datasets/torchlean_data_convert.py`: converts `.npy`, `.npz`, `.mat`, `.pt/.pth`, CSV,
   and image-folder datasets into TorchLean's `.npy` tensor format. Optional formats require the
   corresponding Python package (`scipy`, `torch`, or `pillow`).
@@ -144,6 +154,10 @@ python3 scripts/checks/check_case_collisions.py
 
 - `docs/build_site.sh`: rebuilds the generated API docs, the Verso guide (from the
   `blueprint/` package), dependency graph JSON, and homepage bundle.
+- `docs/polish_docgen.py`: post-processes DocGen HTML with the TorchLean landing page,
+  navigation links, declaration legends, and site styling.
+- `docs/polish_verso_guide.py`: post-processes the Verso guide with responsive figures,
+  copy buttons, theorem cards, and asset wiring.
 
 `docs/build_site.sh` is the full site build: it rebuilds Lean modules, DocGen, the Verso guide,
 the dependency graph JSON, and the Jekyll site. To refresh only the graph artifact, run
@@ -154,3 +168,54 @@ the dependency graph JSON, and the Jekyll site. To refresh only the graph artifa
 - `sandbox/run_comparator.py`: optional wrapper for `leanprover/comparator`.
 - `comparator/nn_ci_all.json`: Comparator config for the `NN.CI.ComparatorAll`
   marker theorem.
+
+## Reinforcement Learning
+
+- `rl/gymnasium_server.py`: JSON-lines Gymnasium bridge used by Lean-side RL experiments.
+- `rl/export_gymnasium_rollout.py`: collects a Gymnasium rollout into TorchLean's JSON format.
+- `rl/train_ppo_cartpole_sb3.py`: Stable-Baselines3 CartPole baseline for comparing against the
+  TorchLean PPO path.
+
+## Verification Producers
+
+These scripts produce artifacts for Lean checkers. The Python/Julia side is the producer; Lean is
+the checker.
+
+- `verification/regenerate_assets.py`: command catalog for refreshing curated verification
+  artifacts by group.
+- `verification/lirpa/cert_runner.py`: shared LiRPA/PINN certificate runner that can also invoke
+  `lake exe verify`.
+- `verification/lirpa/common.py`: shared interval-arithmetic and JSON-writing helpers for the
+  small LiRPA certificate producers.
+- `verification/lirpa/export_mlp_cert.py`, `verification/lirpa/export_cnn_cert.py`,
+  `verification/lirpa/export_attention_cert.py`, `verification/lirpa/export_gru_cert.py`,
+  `verification/lirpa/export_crown_cert.py`: small deterministic LiRPA/CROWN certificate
+  producers.
+- `verification/robustness/train_digits_linear.py`: trains the tiny digits linear model used by
+  robustness examples.
+- `verification/robustness/export_margin_cert.py`: writes logit-margin certificates consumed by
+  the robustness checker.
+- `verification/pinn/train_pinn_1d.py`, `verification/pinn/train_pinn_2d.py`: configurable
+  PyTorch PINN trainers.
+- `verification/pinn/export_pinn_cert.py`, `verification/pinn/export_pinn_weights.py`,
+  `verification/pinn/import_burgers_shock_mat.py`: PINN certificate, weight, and dataset producers.
+- `verification/pinn/safe_expr.py`: restricted expression evaluator shared by the PINN trainers.
+- `verification/splines/fit_piecewise_linear.jl`: dependency-light Julia producer for the spline
+  certificate example.
+- `verification/two_stage/export_van_stage1_bits.py`: Stage-1 artifact producer for the Van der Pol
+  two-stage workflow.
+- `verification/two_stage/cegis_van_stage2_python_baseline.py`: Python baseline for comparing
+  against the Lean-checked Stage-2 workflow.
+
+## Geometry3D Producers
+
+- `verification/geometry3d/export_hf_depth_box3d_cert.py`: DETR/depth-pipeline certificate
+  producer.
+- `verification/geometry3d/export_omni3d_box3d_cert.py`: Cube R-CNN / Omni3D-style certificate
+  producer.
+- `verification/geometry3d/export_wilddet3d_box3d_cert.py`: WildDet3D certificate producer.
+- `verification/geometry3d/render_box3d_cert_overlay.py`: visual overlay renderer for certificates.
+- `verification/geometry3d/plot_box3d_bbox_diagnostic.py`: numeric bbox diagnostic plotter.
+- `verification/geometry3d/test_bad_box3d_certs.py`: negative-test generator that requires Lean to
+  reject mutated certificates.
+- `verification/geometry3d/safe_image_io.py`: shared HTTPS/local RGB image loader.

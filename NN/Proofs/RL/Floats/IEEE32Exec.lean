@@ -86,7 +86,8 @@ theorem toReal_discountedBackup_eq_fp32Round_chain_of_isFinite
         fp32Round (toReal reward + toReal (mul (mul gamma mask) bootstrap)) :=
     toReal_add_eq_fp32Round_of_isFinite (x := reward) (y := (mul (mul gamma mask) bootstrap)) h₃
   -- Substitute the intermediate refinement equations to expose the nested rounding structure.
-  simpa [mask, ht1, ht2] using hout
+  simpa [mask, ht1, ht2, HAdd.hAdd, HMul.hMul, Add.add, Mul.mul, IEEE32Exec.instAdd,
+    IEEE32Exec.instMul] using hout
 
 /--
 Refinement theorem for the TD residual / Bellman error in executable float32 semantics.
@@ -130,7 +131,8 @@ theorem toReal_tdResidual_eq_fp32Round_chain_of_isFinite
   -- Then apply the subtraction refinement for the final TD residual step.
   have hbackupFin :
       isFinite (discountedBackup (α := IEEE32Exec) reward gamma nextValue done) = true := by
-    simpa [discountedBackup] using h₃
+    simpa [discountedBackup, HAdd.hAdd, HMul.hMul, Add.add, Mul.mul, IEEE32Exec.instAdd,
+      IEEE32Exec.instMul] using h₃
   have hsubReal :
       toReal (sub (discountedBackup (α := IEEE32Exec) reward gamma nextValue done) value) =
         fp32Round
@@ -141,7 +143,8 @@ theorem toReal_tdResidual_eq_fp32Round_chain_of_isFinite
 
   -- Unfold the RL definition and substitute the refined discounted-backup real meaning.
   -- `tdResidual = tdTarget - value` and `tdTarget = discountedBackup`.
-  simpa [Spec.RL.tdResidual, Spec.RL.tdTarget, hbackup, sub_eq_add_neg]
+  simpa [Spec.RL.tdResidual, Spec.RL.tdTarget, hbackup, HSub.hSub, Sub.sub,
+    IEEE32Exec.instSub, sub_eq_add_neg]
     using hsubReal
 
 end Float32Exec

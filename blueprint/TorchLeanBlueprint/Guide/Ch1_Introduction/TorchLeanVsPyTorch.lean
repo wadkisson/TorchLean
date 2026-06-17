@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -59,17 +58,17 @@ payload that will be executed, saved, lowered, or verified.
 -- TorchLean
 import NN
 
-open NN.Tensor
-open NN.API
+open TorchLean
 
-def model : nn.M (nn.Sequential (Shape.Vec 10) (Shape.Vec 5)) :=
-  nn.sequential![
-    nn.linear 10 32 (pfx := Shape.scalar),
-    nn.gelu,
-    nn.linear 32 5 (pfx := Shape.scalar)
+def model : nn.M (nn.Sequential (Shape.vec 10) (Shape.vec 5)) :=
+  nn.Sequential![
+    nn.Linear 10 32,
+    nn.GELU,
+    nn.Linear 32 5
   ]
 
-def built := nn.build 2026 model
+def trainer :=
+  Trainer.new model { task := .classification, seed := 2026 }
 ```
 
 Informally, the forward pass is a function of both the architecture and the parameters:
@@ -144,7 +143,7 @@ A robustness checker, for example, should not have to trust a training script. I
 graph, a parameter payload, an input region, and a certificate or bound propagation result whose
 meaning is defined in Lean.
 
-This is where TorchLean most clearly differs from a PyTorch clone. The goal is not simply to run the
+This is where TorchLean most clearly differs from an ordinary tensor runtime. The goal is not simply to run the
 same model syntax. The goal is to keep the runnable workflow connected to a semantic object that
 proofs and checkers can cite.
 

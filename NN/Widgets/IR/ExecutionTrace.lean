@@ -79,7 +79,7 @@ private structure Trace (α : Type) [Context α] where
 
 /-- Execute a graph step-by-step, recording values until the first error. -/
 private def execTrace
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (payload : Payload α) (input : Runtime.AnyTensor α) : Trace α :=
   let inputD : DVal α := DVal.mk (α := α) input.s input.t
   let rec go (i : Nat) (vals : Array (DVal α)) : Trace α :=
@@ -127,7 +127,7 @@ private def nodeRowHtml {α : Type} [Context α] [ToString α]
 
 /-- Render an "execute and show intermediates" panel for an IR graph and a single input. -/
 def irExecTraceHtml
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape] [ToString α]
+    {α : Type} [Context α] [DecidableEq Shape] [ToString α]
     (g : Graph) (payload : Payload α) (input : Runtime.AnyTensor α) : ProofWidgets.Html :=
   let wf := g.checkWellFormed
   let sh := g.checkShapes

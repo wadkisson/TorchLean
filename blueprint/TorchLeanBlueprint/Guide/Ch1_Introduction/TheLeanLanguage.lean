@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -119,13 +118,13 @@ shape. This uses Lean's *dependent types*.
 ```
 import NN
 
-open NN.Tensor
+open TorchLean
 
 -- A 4D NCHW tensor with batch 16, 3 channels, and 224x224 spatial dimensions.
 def inputImageShape : Shape :=
   shape![16, 3, 224, 224]
 
-#check Tensor Float inputImageShape
+#check Tensor.T Float inputImageShape
 ```
 
 If a function demands a tensor of one shape and a value has another shape, the mismatch is visible to
@@ -171,9 +170,9 @@ result dynamically inside your editor.
 ```
 import NN
 
-open NN.API
+open TorchLean
 
-#check nn.linear 128 64
+#check nn.Linear 128 64
 -- Lean reports the input and output shapes in the type.
 
 #eval 5 * 5

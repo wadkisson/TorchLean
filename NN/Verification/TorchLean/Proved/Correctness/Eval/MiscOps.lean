@@ -11,7 +11,7 @@ public import NN.Verification.TorchLean.Proved.Correctness.Eval.LayerNorm
 /-!
 # Miscellaneous IR Evaluation
 
-Local semantics for graph-plumbing nodes and scalar losses that appear in imported or compiled IR
+Local semantics for graph-structural nodes and scalar losses that appear in imported or compiled IR
 graphs.
 -/
 
@@ -33,7 +33,7 @@ def inputGraph (s : Shape) : Graph :=
 
 /-- Local IR semantics for an input node. -/
 theorem evalAt_input_eq
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : Tensor α s) :
     Graph.evalAt (α := α) (g := inputGraph s) (payload := {})
         (input := DVal.mk (α := α) s x) (vals := #[]) (i := 0)
@@ -60,7 +60,7 @@ def randUniformGraph (seed : Nat) (s : Shape) : Graph :=
 
 /-- Local IR semantics for deterministic seeded uniform sampling. -/
 theorem evalAt_randUniform_eq
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (seed : Nat) {s : Shape} :
     Graph.evalAt (α := α) (g := randUniformGraph seed s) (payload := {})
         (input := DVal.mk (α := α) s (Tensor.default (α := α) (s := s))) (vals := #[]) (i := 0)

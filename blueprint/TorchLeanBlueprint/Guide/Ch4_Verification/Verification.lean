@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -324,7 +323,7 @@ input uncertainty set, run a verifier pass such as IBP, and then read off the ou
 output node id.
 
 The runnable example is
-[TorchLean IBP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanIBP.lean), and the
+[TorchLean IBP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean), and the
 matching CLI entrypoint is `lake exe verify -- torchlean-ibp`.
 
 Below is the essential core of that file, trimmed to the minimum needed to follow the pipeline:
@@ -333,23 +332,20 @@ Below is the essential core of that file, trimmed to the minimum needed to follo
 import NN
 import NN.Verification.TorchLean.Compile
 
-open _root_.Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
 
 open NN.MLTheory.CROWN.Graph
 open NN.MLTheory.CROWN
 
-def model : nn.Sequential (Shape.Vec 2) (Shape.Vec 1) :=
+def model : nn.Sequential (Shape.vec 2) (Shape.vec 1) :=
   nn.blocks.mlp 2 1 { hidden := [3], activation := .relu, seedBase := 0 }
 
 def paramShapes : List Shape := nn.paramShapes model
 
-def runOnce {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] [DecidableEq Shape] [ToString α] : IO Unit := do
+def runOnce : IO Unit := do
   -- Parameters in the order expected by `paramShapes`.
-  let params : tlist.TList α paramShapes :=
-    tlist!
+  let params : TensorPack Float paramShapes :=
+    tensorpack!
       (tensorND! [3, 2] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
       (tensorND! [3] [0.1, 0.2, 0.3]),
       (tensorND! [1, 3] [0.7, 0.8, 0.9]),
@@ -357,21 +353,20 @@ def runOnce {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] [DecidableEq S
 
   let compiled ←
     match NN.Verification.TorchLean.compileForward1
-          (α := α) (paramShapes := paramShapes) (inShape := Shape.Vec 2) (outShape := Shape.Vec 1)
-          (nn.program (model := model) (α := α)) params with
+          (α := Float) (paramShapes := paramShapes) (inShape := Shape.vec 2) (outShape := Shape.vec 1)
+          (nn.program (model := model) (α := Float)) params with
     | .ok c => pure c
     | .error e => throw <| IO.userError e
 
   -- Seed an input box x in [x0 - eps, x0 + eps].
-  let x0 : Tensor α (Shape.Vec 2) := tensorND! [2] [0.5, 0.8]
-  let eps : α := Runtime.ofFloat 0.1
-  let rad : Tensor α (Shape.Vec 2) := Spec.fill eps (Shape.Vec 2)
-  let xB : FlatBox α := { dim := 2, lo := Tensor.sub_spec x0 rad, hi := Tensor.add_spec x0 rad }
+  let x0 : Tensor Float (Shape.vec 2) := tensorND! [2] [0.5, 0.8]
+  let rad : Tensor Float (Shape.vec 2) := Spec.fill 0.1 (Shape.vec 2)
+  let xB : FlatBox Float := { dim := 2, lo := Tensor.sub_spec x0 rad, hi := Tensor.add_spec x0 rad }
 
   -- Run IBP on the compiled IR + parameter store.
-  let ps : ParamStore α :=
+  let ps : ParamStore Float :=
     { compiled.ps with inputBoxes := compiled.ps.inputBoxes.insert compiled.inputId xB }
-  let boxes := runIBP (α := α) compiled.graph ps
+  let boxes := runIBP (α := Float) compiled.graph ps
 
   -- Read the output bounds.
   let some outB := boxes[compiled.outputId]! | throw <| IO.userError "IBP produced no output box"
@@ -473,7 +468,7 @@ IBP gives:
 
 The margin lower bound is `1.8 - 1.5 = 0.3`.
 
-So the verifier can certify class `0` over the whole input box. This is the pleasant case: the
+So the verifier can certify class `0` over the whole input box. This is the simple case: the
 property is simple enough that interval endpoints are already decisive.
 
 ## Example 2: IBP can lose a true correlation
@@ -659,7 +654,7 @@ This section answers a simple question: what data do the verifier passes actuall
 
 - `Graph` is a DAG of `Node`s.
 - Nodes store `parents`, an op tag `OpKind`, and a declared `outShape`.
-- TorchLean intentionally keeps *values/parameters out of the graph*, because different backends want
+- TorchLean keeps *values/parameters out of the graph*, because different backends want
   different parameter stores.
 
 ## `ParamStore` (Values, Weights, and Seed Input Boxes)
@@ -755,7 +750,7 @@ For CROWN node certificates, the imported JSON has four conceptual parts:
 
 ```
 ctx    : which input node the affine forms are written against
-ibp    : interval boxes used to choose/validate nonlinear relaxations
+ibp    : interval boxes for choosing/validating nonlinear relaxations
 crown  : claimed affine lower/upper forms for each node
 alpha  : optional ReLU lower-slope choices
 beta   : optional ReLU phase choices, encoded as -1 / 0 / 1

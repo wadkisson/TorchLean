@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Small image-loading helpers for Geometry3D certificate exporters."""
 
 from __future__ import annotations

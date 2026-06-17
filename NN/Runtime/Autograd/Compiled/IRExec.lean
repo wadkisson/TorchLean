@@ -87,8 +87,6 @@ open NN.IR
 
 /--
 `simp` rule for `Except`-`do` chains: binding an `.ok` value is just function application.
-
-This keeps proof scripts around `buildFrom` readable when large `do` blocks are unfolded.
 -/
 @[simp] theorem Except.ok_bind {ε α β : Type} (a : α) (f : α → Except ε β) :
     (Except.ok a >>= f) = f a := by
@@ -1087,13 +1085,19 @@ def buildFrom
                 let nSum : Nat := infos.foldl (fun acc info => acc + info.1) 0
                 if hSum : nSum = nOut then
                   let forward := fun ctx : TList α ([inShape] ++ ss) =>
-                    let outSigma :=
+                    let outSigma : Sigma fun n => Tensor α (.dim n rest) :=
                       concatDim0FromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx infos
+                    have houtSigma :
+                        outSigma =
+                          concatDim0FromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx
+                            infos := rfl
                     let nSum' : Nat := outSigma.1
                     let tSum : Tensor α (.dim nSum' rest) := outSigma.2
                     have hn : nSum' = nSum := by
                       -- `nSum'` is the first component of the same fold used to compute `nSum`.
-                      simpa [nSum', nSum] using
+                      change outSigma.1 = nSum
+                      rw [houtSigma]
+                      simpa [nSum] using
                         (concatDim0FromInfos_fst_eq_sum (α := α) (Γ := [inShape] ++ ss) (rest :=
                           rest) ctx infos)
                     let tSum' : Tensor α (.dim nSum rest) :=

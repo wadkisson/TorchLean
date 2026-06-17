@@ -63,8 +63,8 @@ open scoped BigOperators
 
 -- Re-export generic helpers (defined once in `Proofs.TensorAlgebra`) into `Spec.*`.
 export Proofs.TensorAlgebra (toVec ofVec toVec_ofVec ofVec_toVec)
-export Proofs.TensorAlgebra (finRange_foldl_add_eq_finset_sum foldl_add_distrib2
-  foldl_matvec_scalar)
+export Proofs.TensorAlgebra (finRange_foldl_add_eq_finset_sum finRange_foldl_add_acc
+  add_finRange_foldl_add_zero foldl_tensorScalar_mulAdd foldl_add_distrib2 foldl_matvec_scalar)
 
 /-! ## Algebraic instances for small tensor shapes -/
 

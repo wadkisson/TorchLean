@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Proofs.RuntimeApprox.NF.Ops.Scalar
+public import NN.Proofs.Tensor.Basic.Folds
 
 /-!
 # NF Sum Reduction Bounds
@@ -78,30 +79,6 @@ def sumBound {s : Shape} (epsElem : ℝ) (tR : Tensor R s) : ℝ :=
   (sumFoldState (β := β) (fexp := fexp) (rnd := rnd) (s := s) epsElem
     ((0 : R), neuralUlp β fexp 0 TrainingPhase.forward / 2) tR).2
 
--- ---------------------------------------------------------------------------
--- `tensor_foldl_spec.go` one-step unfoldings
--- ---------------------------------------------------------------------------
-
-/--
-One-step unfolding of `tensor_foldl_spec.go` when `k < n`.
-
-We keep this as a private lemma so downstream proofs can peel the `go` loop through this stable
-equation instead of expanding the recursive definition at every use site.
--/
-private lemma tensor_foldl_spec_go_of_lt {α β : Type} (f : β → α → β)
-    {n : Nat} {s : Shape} (values : Fin n → Tensor α s) {k : Nat} (acc : β) (hk : k < n) :
-    tensorFoldlSpec.go f n s values k acc =
-      tensorFoldlSpec.go f n s values (k + 1) (tensorFoldlSpec f acc (values ⟨k, hk⟩)) := by
-  rw [tensorFoldlSpec.go.eq_1]
-  simp [hk]
-
-/-- One-step unfolding of `tensor_foldl_spec.go` when the loop terminates (`¬ k < n`). -/
-private lemma tensor_foldl_spec_go_of_not_lt {α β : Type} (f : β → α → β)
-    {n : Nat} {s : Shape} (values : Fin n → Tensor α s) {k : Nat} (acc : β) (hk : ¬ k < n) :
-    tensorFoldlSpec.go f n s values k acc = acc := by
-  rw [tensorFoldlSpec.go.eq_1]
-  simp [hk]
-
 omit [NeuralValidRndToNearest rnd] in
 /--
 The accumulator component of `sum_fold_state` matches the plain spec fold.
@@ -134,15 +111,15 @@ private lemma sum_fold_state_fst_eq {s : Shape} (epsElem : ℝ) (st : R × ℝ) 
                   have : n ≤ k := Nat.sub_eq_zero_iff_le.mp hn
                   exact Nat.le_antisymm hk this
                 subst k
-                simp [tensor_foldl_spec_go_of_not_lt]
+                simp [Spec.tensor_foldl_spec_go_of_not_lt]
             | succ m ih_go =>
                 have hlt : k < n := by
                   have : 0 < n - k := by simp [hn]
                   exact Nat.sub_pos_iff_lt.mp this
                 have hk1 : k + 1 ≤ n := Nat.succ_le_of_lt hlt
-                rw [tensor_foldl_spec_go_of_lt (f := sumStep (β := β) (fexp := fexp) (rnd := rnd) epsElem)
+                rw [Spec.tensor_foldl_spec_go_of_lt (f := sumStep (β := β) (fexp := fexp) (rnd := rnd) epsElem)
                   (values := valuesR) (k := k) (acc := st) hlt]
-                rw [tensor_foldl_spec_go_of_lt (f := (· + ·)) (values := valuesR) (k := k) (acc := st.1) hlt]
+                rw [Spec.tensor_foldl_spec_go_of_lt (f := (· + ·)) (values := valuesR) (k := k) (acc := st.1) hlt]
                 have h_next : n - (k + 1) = m := by
                   rw [Nat.sub_succ, hn]
                   rfl
@@ -224,15 +201,15 @@ private theorem approx_sum_fold_state {s : Shape} :
                       have : n ≤ k := Nat.sub_eq_zero_iff_le.mp hn
                       exact Nat.le_antisymm hk this
                     subst k
-                    simpa [tensor_foldl_spec_go_of_not_lt] using hAcc
+                    simpa [Spec.tensor_foldl_spec_go_of_not_lt] using hAcc
                 | succ m ih_go =>
                     have hlt : k < n := by
                       have : 0 < n - k := by simp [hn]
                       exact Nat.sub_pos_iff_lt.mp this
                     have hk1 : k + 1 ≤ n := Nat.succ_le_of_lt hlt
-                    rw [tensor_foldl_spec_go_of_lt (f := sumStep (β := β) (fexp := fexp) (rnd := rnd) epsElem)
+                    rw [Spec.tensor_foldl_spec_go_of_lt (f := sumStep (β := β) (fexp := fexp) (rnd := rnd) epsElem)
                       (values := valuesR) (k := k) (acc := st) hlt]
-                    rw [tensor_foldl_spec_go_of_lt (f := (· + ·)) (values := valuesS) (k := k) (acc := accS) hlt]
+                    rw [Spec.tensor_foldl_spec_go_of_lt (f := (· + ·)) (values := valuesS) (k := k) (acc := accS) hlt]
                     have h_next : n - (k + 1) = m := by
                       rw [Nat.sub_succ, hn]
                       rfl
@@ -252,7 +229,7 @@ private theorem approx_sum_fold_state {s : Shape} :
                         (st := tensorFoldlSpec
                           (sumStep (β := β) (fexp := fexp) (rnd := rnd) epsElem) st (valuesR ⟨k,
                             hlt⟩))
-                        hk1 (by simpa [h_next] using h_step)
+                        hk1 (by simpa [h_next, sumFoldState] using h_step)
                     simpa [h_next] using htail
               have h0 := go_sound (k := 0) (accS := accS) (st := st) (by exact Nat.zero_le n) hAcc
               simpa [sumFoldState, tensorFoldlSpec] using h0
@@ -274,11 +251,9 @@ theorem approxT_sum_spec {s : Shape} :
   -- Start from accumulator 0 with a conservative rounding bound.
   let initEps : ℝ := neuralUlp β fexp 0 TrainingPhase.forward / 2
   have hAcc : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) - (0 : ℝ)) ≤ initEps := by
-    -- `toSpec (0 : R)` is `roundR 0`, so this is exactly the single-step rounding bound.
-    simpa [initEps, NFBackend.toSpec, TorchLean.Floats.NF.toReal,
-      Proofs.RuntimeRoundingApprox.roundR,
-      TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal] using
-      (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ))
+    have hnonneg : 0 ≤ initEps := by
+      exact div_nonneg (neuralUlp.nonneg β fexp 0 TrainingPhase.forward) (by norm_num)
+    simpa [initEps] using hnonneg
   have h :=
     approx_sum_fold_state (β := β) (fexp := fexp) (rnd := rnd) (s := s)
       (xS := xS) (xR := xR) (accS := (0 : ℝ)) (st := ((0 : R), initEps)) (epsElem := eps) hAcc hx

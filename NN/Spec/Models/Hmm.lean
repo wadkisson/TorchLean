@@ -135,8 +135,8 @@ private def uniformVec {n : Nat} : Tensor α (.dim n .scalar) :=
 
 /-- Normalize a nonnegative vector `v` to sum to `1`, returning `(v / sum(v), sum(v))`.
 
-If the sum is `0`, we fall back to a uniform distribution. This keeps the forward pass total and
-avoids propagating `NaN`/division-by-zero behavior into later computations.
+If the sum is `0`, fall back to a uniform distribution instead of propagating
+`NaN`/division-by-zero behavior into later computations.
 -/
 def normalizeVec {n : Nat} (v : Tensor α (.dim n .scalar)) : (Tensor α (.dim n .scalar) × α) :=
   let s := sumSpec v

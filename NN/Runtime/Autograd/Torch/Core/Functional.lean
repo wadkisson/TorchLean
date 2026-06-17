@@ -698,7 +698,10 @@ def globalAvgPool2dChw {c h w : Nat}
   let axisH : Nat := Shape.rank sCH - 1
   have hrank2 : Shape.rank sCH > 0 := by simp [hsCH, Shape.rank]
   let _ : Shape.valid_axis_inst axisH sCH := Shape.validAxisLastAuto hrank2
-  let yC ← reduceMean (m := m) (α := α) (s := sCH) axisH (by simpa [hsCH] using yCH)
+  let yCH' : Ref (m := m) (α := α) sCH := by
+    change Ref (m := m) (α := α) (shapeAfterSum sCHW axisW)
+    exact yCH
+  let yC ← reduceMean (m := m) (α := α) (s := sCH) axisH yCH'
   have hsC : shapeAfterSum sCH axisH = .dim c .scalar := by
     simp [hsCH, axisH, Shape.rank]
   return (by simpa [hsC] using yC)
@@ -728,7 +731,10 @@ def globalAvgPool2dNchw {n c h w : Nat}
   let axisH : Nat := Shape.rank sNCH - 1
   have hrank2 : Shape.rank sNCH > 0 := by simp [hsNCH, Shape.rank]
   let _ : Shape.valid_axis_inst axisH sNCH := Shape.validAxisLastAuto hrank2
-  let yNC ← reduceMean (m := m) (α := α) (s := sNCH) axisH (by simpa [hsNCH] using yNCH)
+  let yNCH' : Ref (m := m) (α := α) sNCH := by
+    change Ref (m := m) (α := α) (shapeAfterSum sNCHW axisW)
+    exact yNCH
+  let yNC ← reduceMean (m := m) (α := α) (s := sNCH) axisH yNCH'
   have hsNC : shapeAfterSum sNCH axisH = .dim n (.dim c .scalar) := by
     simp [hsNCH, axisH, Shape.rank, shapeAfterSum]
   return (by simpa [hsNC] using yNC)

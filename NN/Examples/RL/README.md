@@ -4,10 +4,13 @@ This folder is the companion layer for TorchLean's runnable RL examples.
 
 The executable trainers are under `NN/Examples/Models` and are selected through the shared runner:
 
-- `lake exe torchlean ppo_gridworld`
-- `lake exe torchlean ppo_cartpole`
-- `lake exe torchlean ppo_pong_ram`
+- `lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`
+- `lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`
 - `lake exe torchlean dqn_replay`
+
+The Pong RAM files remain in the tree as an optional ALE/Gymnasium boundary example. They are not
+part of the default runner quick-check list because they depend on a compatible external `ale-py` /
+`gymnasium` installation.
 
 The files here do three different jobs:
 
@@ -29,8 +32,8 @@ The Python boundary helpers live under `scripts/rl/` so runtime code does not de
 1. Train or runtime check a Lean example:
 
 ```bash
-lake exe torchlean ppo_gridworld --updates 200
-lake exe torchlean ppo_cartpole
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 2. Open the corresponding `*View.lean` file in the editor and put the cursor on the widget command.
@@ -46,7 +49,7 @@ For CartPole:
 python3 -m pip install --user 'gymnasium>=1.0'
 ```
 
-For ALE/Pong RAM:
+Optional ALE/Pong RAM path:
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0' ale-py

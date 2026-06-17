@@ -23,10 +23,10 @@ Start here if you want the shortest route through the examples:
 | Typed tensors | `Quickstart/TensorBasics.lean` | `lake exe torchlean quickstart_tensors` |
 | Editor widgets | `Quickstart/Widgets.lean` | open the file and run the `#..._view` commands |
 | Runtime scalar modes | `Advanced/Floats/Float32Modes.lean` | `lake exe torchlean float32_modes` |
-| Autograd API | `Quickstart/AutogradBasics.lean` | `lake exe torchlean quickstart_autograd --dtype float --backend eager` |
+| Autograd API | `Quickstart/AutogradBasics.lean` | `lake exe torchlean quickstart_autograd` |
 | Proof basics | `Quickstart/Proofs.lean` | `lake build NN.Examples.Quickstart.Proofs` |
 | Simple training | `Quickstart/SimpleMlpTrain.lean` | `lake exe torchlean quickstart_mlp --steps 200 --dtype float --backend compiled` |
-| Data loading | `Data/Loaders/Csv.lean` | `lake exe torchlean data_csv --epochs 1 --batch 5 --dtype float --backend eager` |
+| Data loading | `Data/Loaders/Csv.lean` | `lake exe torchlean data_csv --steps 30 --batch 5 --dtype float --backend eager` |
 | Verification | `Verification/TorchLean/*` | `lake exe verify -- torchlean-ibp` |
 | PyTorch import/export | `Interop/PyTorch/Roundtrip.lean` | `lake exe torchlean pytorch_roundtrip --model mlp --action import` |
 
@@ -78,32 +78,45 @@ The Lean boundary format is `.npy` or simple numeric CSV. Use
 ## Common Commands
 
 ```bash
-lake exe torchlean mlp --epochs 10
-lake exe torchlean cnn --cuda --epochs 1
-lake exe torchlean gpt2 --cuda --tiny-shakespeare --steps 100
-lake exe torchlean mamba --cuda --tiny-shakespeare --steps 25
-lake exe torchlean ppo_gridworld --updates 200
+lake exe torchlean mlp --steps 10
+lake exe -K cuda=true torchlean cnn --cuda --steps 10
+lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
+lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 lake exe verify -- torchlean-ibp
 ```
+
+CPU is the quick path for small tabular, tensor, and recurrent examples. CNN, ViT, Transformer,
+GPT-style text, diffusion, FNO, and PPO examples are CUDA validation targets; their CPU paths are useful
+for debugging but too slow for the normal example matrix.
 
 Most training commands can write a training curve:
 
 ```bash
-lake exe torchlean mlp --epochs 10 --log data/model_zoo/mlp_trainlog.json
+lake exe torchlean mlp --steps 10 --log data/model_zoo/mlp_trainlog.json
 python3 scripts/datasets/plot_trainlog.py data/model_zoo/mlp_trainlog.json --out-dir plots/model_zoo
 ```
 
 ## Public API Used By Examples
 
-Examples should prefer the curated API modules:
+Most runnable examples should prefer the `NN` umbrella:
+
+```lean
+import NN
+open TorchLean
+```
+
+Advanced subsystem examples can still name focused modules when the point of the example is that
+internal layer:
 
 | Surface | Use |
 | --- | --- |
-| `NN.API.Public` | PyTorch-style `API.nn`, `API.train`, `API.optim`, `API.Data`, and sample helpers. |
-| `NN.Tensor.API` | Typed tensor constructors and printing. |
-| `NN.API.Runtime` | Advanced runtime/session access. |
+| `TorchLean` | Public model, tensor, data, training, runtime, text, and RL names. |
+| `NN.API.Public` | Facade backing modules; ordinary examples should not import this directly. |
+| `NN.Tensor.API` | Typed tensor constructors and printing when working below the `NN` umbrella. |
+| `NN.API.Runtime` | Runtime subsystem access for code that is explicitly extending the runtime layer. |
 | `NN.Entrypoint.Verification` | Verification APIs and theorem-level surfaces. |
 | `NN.Verification.CLI` | The `lake exe verify` registry. |
 
-For conceptual explanations, use the website guide. This README is the local index for runnable
-example files and commands.
+For conceptual explanations, use the website guide. This local index is for runnable example files
+and commands.

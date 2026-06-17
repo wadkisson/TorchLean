@@ -66,23 +66,18 @@ def idxHidden {inputSize hiddenSize : Nat} {ss : List Shape} :
     Idx (ΓElman inputSize hiddenSize ++ ss) (HShape hiddenSize) :=
   ⟨⟨1, by simp [ΓElman]⟩, by simp [ΓElman, HShape]⟩
 
-/-- Most recently appended tensor helper. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 /-- Index of the concatenated `[x; h]` vector. -/
 def idxConcat {inputSize hiddenSize : Nat} :
     Idx (ΓElman inputSize hiddenSize ++ [.dim (inputSize + hiddenSize) .scalar])
       (.dim (inputSize + hiddenSize) .scalar) :=
-  idxLast (Γ := ΓElman inputSize hiddenSize) (ss := [])
+  Idx.last (Γ := ΓElman inputSize hiddenSize) (ss := [])
     (τ := .dim (inputSize + hiddenSize) .scalar)
 
 /-- Index of the affine preactivation. -/
 def idxPre {inputSize hiddenSize : Nat} :
     Idx (ΓElman inputSize hiddenSize ++
       [.dim (inputSize + hiddenSize) .scalar, HShape hiddenSize]) (HShape hiddenSize) :=
-  idxLast (Γ := ΓElman inputSize hiddenSize)
+  Idx.last (Γ := ΓElman inputSize hiddenSize)
     (ss := [.dim (inputSize + hiddenSize) .scalar]) (τ := HShape hiddenSize)
 
 /--
@@ -266,9 +261,10 @@ theorem elmanTwoStep_hasFDerivAt
       HasFDerivAt (fun z : E => secondCtx (cellEval (firstCtx z)))
         (DsecondCtx.comp ((fderiv ℝ cellEval (firstCtx x)).comp DfirstCtx)) x :=
     hSecondCtx.comp x hFirstEval
-  simpa [cellEval] using
+  have hcomp :=
     (elmanCell_eval_hasFDerivAt (inputSize := inputSize) (hiddenSize := hiddenSize)
       cell (secondCtx (cellEval (firstCtx x)))).comp x hSecondCtxAfterFirst
+  exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
 
 /-- Forward evaluation map for a single Elman-cell graph. -/
 def elmanCellEval {inputSize hiddenSize : Nat}
@@ -341,7 +337,7 @@ theorem elmanUnroll_hasFDerivAt
   induction steps generalizing x with
   | nil =>
       refine ⟨fderiv ℝ (elmanCellEval cell) x, ?_⟩
-      simpa [elmanCellEval, elmanUnroll] using
+      simpa [ΓElman, elmanCellEval, elmanUnroll] using
         elmanCell_eval_hasFDerivAt (inputSize := inputSize) (hiddenSize := hiddenSize) cell x
   | cons step rest ih =>
       rcases hSteps with ⟨⟨Dstep, hStep⟩, hRest⟩
@@ -356,7 +352,8 @@ theorem elmanUnroll_hasFDerivAt
         hStep.comp x hCell
       rcases ih (step (cellEval x)) hRest with ⟨Drest, hUnrollRest⟩
       refine ⟨Drest.comp (Dstep.comp (fderiv ℝ cellEval x)), ?_⟩
-      simpa [elmanUnroll, cellEval] using hUnrollRest.comp x hStepAfterCell
+      have hcomp := hUnrollRest.comp x hStepAfterCell
+      exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
 
 end
 

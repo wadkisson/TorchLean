@@ -118,13 +118,6 @@ structure Options where
   Compiled backend behavior is unchanged.
   -/
   useGpu : Bool := false
-  /--
-  Strict CUDA mode (eager backend only).
-
-  Note: in CUDA eager mode TorchLean does not fall back to CPU per-op; missing CUDA ops always
-  throw. This flag is retained for API compatibility.
-  -/
-  strictCuda : Bool := false
 deriving Repr
 
 /- Convenience API for PyTorch-style device selection. -/

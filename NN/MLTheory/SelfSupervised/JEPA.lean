@@ -31,7 +31,7 @@ namespace NN.MLTheory.SelfSupervised
 JEPA loss over target block indices.
 
 `context` abstracts the context encoder output, `target` abstracts target-block representations,
-and `predict` abstracts the predictor head.  This keeps the objective theorem independent from any
+and `predict` abstracts the predictor head. The objective theorem is independent from any
 particular image backbone.
 -/
 def jepaLoss {n : Nat} {Context Target Pred : Type}

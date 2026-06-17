@@ -437,7 +437,7 @@ lemma prod_sgn_comp_eq_prod_pow_fiberCount {d : Nat} (p : Fin d → Fin d) (ε :
     -- Each inner product is a constant product, hence a power by the fiber card.
     simp [fiberCount, Finset.prod_const]
   -- Combine.
-  simpa [hpow] using hfib.symm
+  simpa [hpow, fiberCount] using hfib.symm
 
 /--
 The “sign cancellation coefficient” associated to a map `p : Fin d → Fin d`.
@@ -747,7 +747,6 @@ theorem polarization_prod {d : Nat} (u : Fin d → ℝ) :
       (fun p : (Fin d → Fin d) => (∏ i : Fin d, u (p i)) * signCoeff (d := d) p)
       (fun p : (Fin d → Fin d) =>
         if Function.Bijective p then (2 : ℝ) ^ d * (∏ i : Fin d, u i) else 0) (fun p => ?_)
-    dsimp
     by_cases hb : Function.Bijective p
     · -- bijective case: both sides collapse to the same constant.
       have hprod : (∏ i : Fin d, u (p i)) = ∏ i : Fin d, u i := by
@@ -885,7 +884,7 @@ lemma dot_add {n : Nat} (w1 w2 : Fin n → ℝ) (x : ReLUMlpBridge.TensorVec n) 
   classical
   simp [dot, add_mul, Finset.sum_add_distrib]
 
-/-- Negation compatibility for `dot`: `dot (-w) = - dot w`. -/
+/-- Negation law for `dot`: `dot (-w) = - dot w`. -/
 lemma dot_neg {n : Nat} (w : Fin n → ℝ) (x : ReLUMlpBridge.TensorVec n) :
     dot (fun k => -w k) x = - dot w x := by
   classical
@@ -898,7 +897,11 @@ lemma dot_wPlus {n : Nat} (i j : Fin n) (x : ReLUMlpBridge.TensorVec n) :
   have hadd :
       dot (wPlus (n := n) i j) x =
         dot (stdBasis (n := n) i) x + dot (stdBasis (n := n) j) x := by
-    simpa [wPlus] using dot_add (n := n) (w1 := stdBasis (n := n) i) (w2 := stdBasis (n := n) j) x
+    have hw : wPlus (n := n) i j = fun k => stdBasis (n := n) i k + stdBasis (n := n) j k := by
+      funext k
+      rfl
+    rw [hw]
+    exact dot_add (n := n) (w1 := stdBasis (n := n) i) (w2 := stdBasis (n := n) j) x
   simp [hadd, dot_stdBasis]
 
 /-- `dot (e_i - e_j) x = x_i - x_j` for `TensorVec` coordinates. -/
@@ -909,8 +912,13 @@ lemma dot_wMinus {n : Nat} (i j : Fin n) (x : ReLUMlpBridge.TensorVec n) :
       dot (wMinus (n := n) i j) x =
         dot (stdBasis (n := n) i) x + dot (fun k => - stdBasis (n := n) j k) x := by
     -- rewrite `wMinus` as `w1 + (-w2)` then apply linearity
-    simpa [wMinus, sub_eq_add_neg, add_assoc] using
-      dot_add (n := n) (w1 := stdBasis (n := n) i) (w2 := fun k => - stdBasis (n := n) j k) x
+    have hw : wMinus (n := n) i j =
+        fun k => stdBasis (n := n) i k + - stdBasis (n := n) j k := by
+      funext k
+      simp [wMinus, sub_eq_add_neg]
+    rw [hw]
+    exact dot_add (n := n) (w1 := stdBasis (n := n) i)
+      (w2 := fun k => - stdBasis (n := n) j k) x
   -- finish with `dot_stdBasis` and `dot_neg`
   have hneg : dot (fun k => - stdBasis (n := n) j k) x = - dot (stdBasis (n := n) j) x := by
     simpa using dot_neg (n := n) (w := stdBasis (n := n) j) x
@@ -1741,13 +1749,13 @@ theorem relu_universal_approximation_compact (f : C(K, ℝ)) :
 
 end ReLUStoneWeierstrassBridgeFull
 
-/-! ## Two compatibility forms for two-dimensional multiplication -/
+/-! ## Two forms for two-dimensional multiplication -/
 
 /--
-Compatibility theorem for the standalone 2D multiplication construction from `ReLUMulApprox`.
+Agreement theorem for the standalone 2D multiplication construction from `ReLUMulApprox`.
 
-The n-dimensional development below subsumes this result, but keeping this theorem name gives
-downstream files a stable import point for the classical two-coordinate multiplication statement.
+The n-dimensional development below subsumes this result. This theorem name remains available for
+downstream files that use the classical two-coordinate multiplication statement.
 -/
 theorem relu_mul_universal_approximation_box2d
     {M : ℝ} (hM : 0 < M) :
@@ -1767,7 +1775,7 @@ lemma boxN_two_iff_box (M : ℝ) (x : ReLUMulApprox.TensorVec2) :
       simpa [ReLUMulApprox.box, ReLUMulApprox.x1] using this
   · intro hx
     -- Convert a two-coordinate box proof into the corresponding pair of interval facts.
-    dsimp [boxN]
+    change ∀ i : Fin 2, toVec x i ∈ Set.Icc (-M) M
     refine (Fin.forall_fin_two).2 ?_
     refine And.intro ?_ ?_
     · simpa [ReLUMulApprox.box, ReLUMulApprox.x0] using hx.1

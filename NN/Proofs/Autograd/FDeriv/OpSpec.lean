@@ -108,7 +108,9 @@ theorem backward_eq_adjoint_fderiv {inDim outDim : Nat} (C : OpSpecFDerivCorrect
         VJP[C.forwardVec, xV] (toVecE δ) := by
     -- Use the dot-level correctness to characterize the backward cotangent via inner products.
     have hf : HasFDerivAt (C.forwardVec) (C.deriv xV) xV := by
-      simpa [OpSpecFDerivCorrect.forwardVec] using (C.hasFDerivAt xV)
+      change HasFDerivAt
+        (fun xV : Vec inDim => toVecE (C.correct.op.forward (ofVecE xV))) (C.deriv xV) xV
+      exact C.hasFDerivAt xV
     have hfderiv : fderiv ℝ (C.forwardVec) xV = C.deriv xV := by
       simpa using hf.fderiv
 
@@ -151,7 +153,7 @@ theorem backward_eq_adjoint_fderiv {inDim outDim : Nat} (C : OpSpecFDerivCorrect
         simpa [sub_eq_zero] using congrArg (fun t => t - inner ℝ (u - v) v) hEq
       have hinnerSub :
           inner ℝ (u - v) (u - v) = inner ℝ (u - v) u - inner ℝ (u - v) v := by
-        simpa using (inner_sub_right (x := u - v) (y := u) (z := v))
+        rw [inner_sub_right]
       exact hinnerSub.trans this
     have huv : u - v = 0 := (inner_self_eq_zero (𝕜 := ℝ) (x := (u - v))).1 h0
     have huv' : u = v := sub_eq_zero.mp huv
@@ -183,9 +185,14 @@ def compose {inDim midDim outDim : Nat}
     intro xV
     -- Use the chain rule in Euclidean space and then rewrite the forward function.
     have hf : HasFDerivAt (f.forwardVec) (f.deriv xV) xV := by
-      simpa [OpSpecFDerivCorrect.forwardVec] using (f.hasFDerivAt xV)
+      change HasFDerivAt
+        (fun xV : Vec inDim => toVecE (f.correct.op.forward (ofVecE xV))) (f.deriv xV) xV
+      exact f.hasFDerivAt xV
     have hg : HasFDerivAt (g.forwardVec) (g.deriv (f.forwardVec xV)) (f.forwardVec xV) := by
-      simpa [OpSpecFDerivCorrect.forwardVec] using (g.hasFDerivAt (f.forwardVec xV))
+      change HasFDerivAt
+        (fun xV : Vec midDim => toVecE (g.correct.op.forward (ofVecE xV)))
+        (g.deriv (f.forwardVec xV)) (f.forwardVec xV)
+      exact g.hasFDerivAt (f.forwardVec xV)
     have hcomp : HasFDerivAt (fun xV => g.forwardVec (f.forwardVec xV))
         ((g.deriv (f.forwardVec xV)).comp (f.deriv xV)) xV := hg.comp xV hf
     -- The composed `OpSpecCorrect` forward is definitionally `g ∘ f` up to `ofVecE/toVecE`

@@ -237,10 +237,10 @@ lake exe verify -- abcrown-leaf \
 
 ## Where To Read The Source
 
-- TorchLean-native graph and IBP example:
-  [`NN/Examples/Verification/TorchLean/TorchLeanIBP.lean`]({{ '/docs/NN/Examples/Verification/TorchLean/TorchLeanIBP.html' | relative_url }})
-- CROWN operation example:
-  [`NN/Examples/Verification/TorchLean/TorchLeanCrownOps.lean`]({{ '/docs/NN/Examples/Verification/TorchLean/TorchLeanCrownOps.html' | relative_url }})
+- TorchLean-native graph and IBP workflow:
+  [`NN/Verification/TorchLean/IBPWorkflow.lean`]({{ '/docs/NN/Verification/TorchLean/IBPWorkflow.html' | relative_url }})
+- CROWN operation workflow:
+  [`NN/Verification/TorchLean/CrownOpsWorkflow.lean`]({{ '/docs/NN/Verification/TorchLean/CrownOpsWorkflow.html' | relative_url }})
 - α,β-CROWN leaf certificate checker:
   [`NN.Verification.Cert.AbCrownLeafCert`]({{ '/docs/NN/Verification/Cert/AbCrownLeafCert.html' | relative_url }})
 - Verification guide chapter:

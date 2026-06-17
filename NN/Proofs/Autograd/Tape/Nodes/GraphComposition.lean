@@ -157,7 +157,12 @@ def weakenNodeMiddleFDerivCorrect {Γ extra ss : List Shape} {τ : Shape}
       jvp_eq := ?_ }
   · intro x
     have hnode := (hn.hasFDerivAt (L x)).comp x (L.hasFDerivAt (x := x))
-    simpa [weakenNodeMiddle, L] using hnode
+    have hnode' :
+        HasFDerivAt
+          (fun y => node.forwardVec (Γ := Γ ++ ss) (τ := τ) (L y))
+          ((hn.deriv (L x)).comp L) x := by
+      exact hnode.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
+    simpa [weakenNodeMiddle, Node.forwardVec_ofVec, L] using hnode'
   · intro x dx
     simpa [weakenNodeMiddle, L, ContinuousLinearMap.comp_apply] using hn.jvp_eq (L x) (L dx)
 

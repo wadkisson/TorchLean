@@ -15,7 +15,7 @@ TorchLean examples are not only executable scripts. Many guarantees are ordinary
 shape round-trips, typed tensor construction, activation identities, and later full verification
 statements.
 
-This file focuses on the core boundary. It shows the two proof styles a new user should recognize first:
+Start with the boundary where TorchLean becomes more than an executable ML library:
 
 - compile-time guarantees from shape-indexed tensor types, and
 - ordinary mathematical lemmas about the public API.
@@ -27,8 +27,7 @@ The deeper proof libraries live under `NN.Proofs.*`, `NN.Verification.*`, and `N
 
 namespace NN.Examples.Quickstart.Proofs
 
-open Spec
-open NN.API
+open TorchLean
 
 /--
 A tensor's shape is part of its type.
@@ -41,7 +40,7 @@ before runtime:
 -- def badVector : Tensor Float (shape![3]) := tensor! [1.0, 2.0]
 ```
 -/
-def twoVector : Spec.Tensor Float (shape![2]) :=
+def twoVector : Tensor.T Float (shape![2]) :=
   tensor! [1.0, 2.0]
 
 /--
@@ -51,7 +50,7 @@ This is the compact theorem behind many JSON/CLI/data-loader paths: parse dimens
 then recover the precise `Shape` used by the typed tensor API.
 -/
 theorem matrix_shape_roundtrip :
-    NN.Tensor.shapeOfDims (Spec.Shape.toList (shape![2, 3])) = shape![2, 3] := by
+    Shape.ofDims (Shape.toList (shape![2, 3])) = shape![2, 3] := by
   simp
 
 /--
@@ -61,13 +60,15 @@ This is deliberately a compact theorem, but it has the same form as larger libra
 semantic contract once, prove it in Lean, and use it downstream without trusting comments or tests.
 -/
 theorem relu_eq_self_of_nonnegative (x : ℝ) (hx : 0 ≤ x) :
-    Semantics.relu x = x := by
-  simpa [Semantics.relu] using (max_eq_left hx : max x 0 = x)
+    TorchLean.Semantics.relu x = x := by
+  unfold TorchLean.Semantics.relu
+  exact max_eq_left hx
 
 /-- ReLU clamps nonpositive real inputs to zero. -/
 theorem relu_eq_zero_of_nonpositive (x : ℝ) (hx : x ≤ 0) :
-    Semantics.relu x = 0 := by
-  simpa [Semantics.relu] using (max_eq_right hx : max x 0 = 0)
+    TorchLean.Semantics.relu x = 0 := by
+  unfold TorchLean.Semantics.relu
+  exact max_eq_right hx
 
 /--
 Concrete examples can also be proven by simplification.
@@ -75,10 +76,10 @@ Concrete examples can also be proven by simplification.
 This is often enough for small API examples where the point is to show the proof shape without
 introducing a larger mathematical development.
 -/
-example : Semantics.relu (3 : ℝ) = 3 := by
+example : TorchLean.Semantics.relu (3 : ℝ) = 3 := by
   exact relu_eq_self_of_nonnegative 3 (by norm_num)
 
-example : Semantics.relu (-2 : ℝ) = 0 := by
+example : TorchLean.Semantics.relu (-2 : ℝ) = 0 := by
   exact relu_eq_zero_of_nonpositive (-2) (by norm_num)
 
 end NN.Examples.Quickstart.Proofs

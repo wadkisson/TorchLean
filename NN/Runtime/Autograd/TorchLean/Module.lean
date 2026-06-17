@@ -383,7 +383,7 @@ namespace ScalarModule
 /--
 Create a runtime scalar-loss module from an explicit loss program and initial parameter values.
 
-This is the low-level constructor; most users start from a `ScalarModuleDef` and call
+This is the low-level constructor; public training code starts from a `ScalarModuleDef` and calls
 `ScalarModuleDef.instantiate`.
 -/
 def create {α : Type} [Context α] [DecidableEq Shape]
@@ -490,8 +490,7 @@ def trainWith {α : Type} [Context α] [DecidableEq Shape] [ToString α]
     m.trainer opt st0 steps samples (logEvery := logEvery)
 
 /-- Compute the mean loss over a list of samples (no parameter updates). -/
-def meanLoss {α : Type} [Context α] [DecidableEq Shape] [ToString α] [Add α] [Div α] [Zero α] [Coe
-  Nat α]
+def meanLoss {α : Type} [Context α] [DecidableEq Shape] [ToString α]
     {paramShapes inputShapes : List Shape}
     (m : ScalarModule α paramShapes inputShapes)
     (samples : List (Torch.TList α inputShapes)) : IO α :=
@@ -516,7 +515,8 @@ def instantiateWith {α : Type} [Context α] [DecidableEq Shape]
     IO (ScalarModule α paramShapes inputShapes) := do
   let initParams : Torch.TList α paramShapes := castTList (α := α) cast d.initParams
   ScalarModule.create (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes)
-    (opts := opts) (initRequiresGrad := d.initRequiresGrad) (loss := d.loss (α := α)) initParams
+    (opts := opts) (initRequiresGrad := d.initRequiresGrad)
+    (loss := d.loss (α := α)) initParams
 
 /--
 Instantiate a Float module using runtime parameter initializers.
@@ -534,8 +534,8 @@ def instantiateFloatWithRuntimePlan {paramShapes inputShapes : List Shape}
     IO (ScalarModule Float paramShapes inputShapes) := do
   let initParams := RuntimeInit.zeroFloatTList (ss := paramShapes)
   let module ← ScalarModule.create (α := Float) (paramShapes := paramShapes) (inputShapes := inputShapes)
-    (opts := opts) (initRequiresGrad := d.initRequiresGrad) (loss := d.loss (α := Float))
-    initParams
+    (opts := opts) (initRequiresGrad := d.initRequiresGrad)
+    (loss := d.loss (α := Float)) initParams
   RuntimeInit.applyFloatPlan (opts := opts) module.trainer.params plan
   pure module
 

@@ -9,24 +9,36 @@ module
 -- shake: keep-all
 
 public import NN.API.Public.NN
-public import NN.API.Public.Training
+public import NN.API.Public.TensorPack
 public import NN.API.Public.Seeded
 public import NN.API.Public.Autograd
 
 /-!
 # API Public
 
-PyTorch-style public API for TorchLean.
+Clean public API for TorchLean model code.
 
-Most user code should be able to `import NN` and then work with the public namespaces exported here:
+User code should use the umbrella import:
 
-- `API.nn`     (model/layer builders)
-- `API.optim`  (optimizer configs for training)
-- `API.Adapters` (LoRA and other model adapters)
-- `API.train`  (fit/predict helpers)
-- `API.Data`   (datasets/loaders + CSV/NPY readers)
-- `API.autograd` (grad/vjp/jacobian helpers)
-- `API.rand` (deterministic RNG helpers)
-- `API.text` (tokenizers and text-model helpers)
-- `API.ssl` (self-supervised sample/objective helpers)
+```lean
+import NN
+open TorchLean
+```
+
+This module remains the subsystem surface behind those namespaces. The stable user names
+are:
+
+- `TorchLean.nn` (model/layer builders)
+- `TorchLean.optim` (optimizer configs)
+- `TorchLean.Trainer` (train/evaluate APIs)
+- `TorchLean.Data` (datasets/loaders + CSV/NPY readers)
+- `TorchLean.Loss` and `TorchLean.Metrics`
+
+Advanced users can still import `NN.API.Public` directly when they are extending TorchLean itself
+or deliberately working below the `NN` umbrella.
+
+The callback-heavy training namespace lives in `NN.API.Public.Training`. It is deliberately not
+re-exported from this umbrella module: ordinary code should get training through `TorchLean.Trainer`,
+while files that truly need callback runners should import the advanced training
+module explicitly.
 -/

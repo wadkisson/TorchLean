@@ -144,8 +144,7 @@ def param {α : Type} (s : SessionIR α) {sh : Shape}
 /--
 Enforce the session invariant: leaves must be created before any op node.
 
-This keeps the `GraphData` context split `Γ ++ ss` easy to reason about and matches the typical
-training pattern: `resetTape → add leaves → forward ops → backward`.
+This matches the usual training pattern: `resetTape → add leaves → forward ops → backward`.
 -/
 def ensureNoNodes {α : Type} (st : SessionIRState α) : IO Unit := do
   match st.ss with
@@ -339,4 +338,3 @@ end Internal
 end Torch
 end Autograd
 end Runtime
-

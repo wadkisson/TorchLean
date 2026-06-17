@@ -51,15 +51,15 @@ namespace NN.Examples.Advanced.Floats.Float32Modes
 
 open _root_.Spec
 open _root_.Spec.Tensor
-open NN.API
-open TorchLean.Floats.IEEE754
+open _root_.TorchLean
+open _root_.TorchLean.Floats.IEEE754
 
 /-
-This tutorial uses the *public* TorchLean API surface:
+This tutorial uses the public TorchLean surface:
 
-- models: `API.nn.Sequential` built from `API.nn.*`
-- execution: `API.nn.compileOut` + `API.nn.predict1`
-- autodiff: `API.autograd.model.vjpParams` / `vjpInputs`
+- models: `nn.Sequential` built from `nn.*`
+- execution: `nn.compileOut` + `nn.predict1`
+- autodiff: `autograd.model.vjpParams` / `vjpInput`
 
 No `Runtime.Autograd.*` tape/session machinery appears in this file.
 -/
@@ -89,11 +89,11 @@ def quietNaN32 : IEEE32Exec := IEEE32Exec.canonicalNaN
 #float32_view quietNaN32
 #float32_compare_view one32, quietNaN32
 
-def model : nn.Sequential (NN.Tensor.Shape.Vec 2) (NN.Tensor.Shape.Vec 1) :=
+def model : nn.Sequential (Shape.vec 2) (Shape.vec 1) :=
   -- A compact 2-layer MLP with ReLU:
   --   Linear(2 -> 3) -> ReLU -> Linear(3 -> 1)
   --
-  -- This uses the public `API.nn` surface (PyTorch-like layer stacking and named configs).
+  -- This uses the public `nn` surface (PyTorch-like layer stacking and named configs).
   --
   -- Note: this tutorial supplies *explicit* parameter tensors below, so the init seeds are irrelevant
   -- here.
@@ -102,14 +102,14 @@ def model : nn.Sequential (NN.Tensor.Shape.Vec 2) (NN.Tensor.Shape.Vec 1) :=
 -- This tutorial returns a single typed bundle so we can:
 -- - print everything in one place, and
 -- - compare Float vs IEEE32Exec numerically at the end.
-def OutShapes : List Spec.Shape :=
-  [NN.Tensor.Shape.Vec 1, NN.Tensor.Shape.Mat 3 2, NN.Tensor.Shape.Vec 3,
-   NN.Tensor.Shape.Mat 1 3, NN.Tensor.Shape.Vec 1, NN.Tensor.Shape.Vec 2]
+def OutShapes : List Shape :=
+  [Shape.vec 1, Shape.mat 3 2, Shape.vec 3,
+   Shape.mat 1 3, Shape.vec 1, Shape.vec 2]
 abbrev OutPack (α : Type) :=
-  tlist.TList α OutShapes
+  tensorpack.TensorPack α OutShapes
 
 def runOnce {α : Type}
-    [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
+    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
     (tag : String) : IO (OutPack α) := do
   -- TorchLean examples typically treat `Float` as the "host literal" type, then inject those
   -- literals into
@@ -129,11 +129,11 @@ def runOnce {α : Type}
       model[2].bias.copy_(torch.tensor([0.4]))
   ```
 
-  `autograd.model.Params model α` is a typed list (`TList`) of tensors. The shapes are determined by
-  the model, so the parameter order cannot be silently permuted.
+  `autograd.model.Params model α` is a typed tensor pack (`TensorPack`) whose shapes are determined
+  by the model, so the parameter order cannot be silently permuted.
   -/
   let params : autograd.model.Params model α :=
-    tlist!
+    tensorpack!
       (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
         [cast 0.1, cast 0.2, cast 0.3, cast 0.4, cast 0.5, cast 0.6]
         (by rfl)),
@@ -144,7 +144,7 @@ def runOnce {α : Type}
       (NN.Tensor.tensorNDOfLenEq (α := α) [1] [cast 0.4] (by rfl))
 
   -- One input vector x in R^2.
-  let x : Spec.Tensor α (NN.Tensor.Shape.Vec 2) :=
+  let x : Spec.Tensor α (Shape.vec 2) :=
     NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
 
   /-
@@ -177,21 +177,21 @@ def runOnce {α : Type}
   A VJP needs an output cotangent seed. Since the output shape is `Vec 1`, seeding with `[1]`
   computes the same gradient as differentiating `sum(y)`.
   -/
-  let seedOut : Spec.Tensor α (NN.Tensor.Shape.Vec 1) :=
-    Spec.fill (α := α) (cast 1.0) (NN.Tensor.Shape.Vec 1)
+  let seedOut : Spec.Tensor α (Shape.vec 1) :=
+    Spec.fill (α := α) (cast 1.0) (Shape.vec 1)
 
-  -- Gradients w.r.t. *parameters* (same `TList` structure/order as `params`).
+  -- Gradients w.r.t. *parameters* (same `TensorPack` structure/order as `params`).
   let dparams ← autograd.model.vjpParams (α := α) model params x seedOut
-  -- Gradients w.r.t. *inputs* (here: just the input vector `dX`, no `TList` noise).
+  -- Gradients w.r.t. *inputs* (here: just the input vector `dX`, no tensor-pack noise).
   let dX ← autograd.model.vjpInput (α := α) model params x seedOut
 
   /-
-  ### 4. Unpack the typed gradient list
+  ### 4. Unpack the typed gradient pack
 
-  TorchLean uses a typed list (`TList`) so parameter-gradient shapes stay in the type. The helper
-  `tlist.unpack4` is just less noisy than pattern matching on the typed list.
+  TorchLean keeps parameter-gradient shapes in a typed tensor pack. The helper
+  `tensorpack.unpack4` is just less noisy than pattern matching on the pack directly.
   -/
-  let (dW1, db1, dW2, db2) := tlist.unpack4 dparams
+  let (dW1, db1, dW2, db2) := tensorpack.unpack4 dparams
 
   IO.println s!"== {tag} =="
   IO.println s!"y   = {Spec.pretty y}"
@@ -201,20 +201,20 @@ def runOnce {α : Type}
   IO.println s!"db2 = {Spec.pretty db2}"
   IO.println s!"dX  = {Spec.pretty dX}"
 
-  pure (tlist! y, dW1, db1, dW2, db2, dX)
+  pure (tensorpack! y, dW1, db1, dW2, db2, dX)
 
-def maxAbsDiffTensor {s : Spec.Shape} (a b : Spec.Tensor Float s) : Float :=
+def maxAbsDiffTensor {s : Shape} (a b : Spec.Tensor Float s) : Float :=
   let diffs :=
     (Spec.toList a).zip (Spec.toList b) |>.map (fun (x, y) => Float.abs (x - y))
   diffs.foldl max 0.0
 
 def unpackOutPack {α : Type} (p : OutPack α) :
-    Spec.Tensor α (NN.Tensor.Shape.Vec 1) ×
-      Spec.Tensor α (NN.Tensor.Shape.Mat 3 2) ×
-      Spec.Tensor α (NN.Tensor.Shape.Vec 3) ×
-      Spec.Tensor α (NN.Tensor.Shape.Mat 1 3) ×
-      Spec.Tensor α (NN.Tensor.Shape.Vec 1) ×
-      Spec.Tensor α (NN.Tensor.Shape.Vec 2) :=
+    Spec.Tensor α (Shape.vec 1) ×
+      Spec.Tensor α (Shape.mat 3 2) ×
+      Spec.Tensor α (Shape.vec 3) ×
+      Spec.Tensor α (Shape.mat 1 3) ×
+      Spec.Tensor α (Shape.vec 1) ×
+      Spec.Tensor α (Shape.vec 2) :=
   match p with
   | .cons y (.cons dW1 (.cons db1 (.cons dW2 (.cons db2 (.cons dX .nil))))) =>
       (y, dW1, db1, dW2, db2, dX)
@@ -228,7 +228,23 @@ def maxAbsDiffPack (a b : OutPack Float) : Float :=
       (max (maxAbsDiffTensor adb1 bdb1) (maxAbsDiffTensor adW2 bdW2))
       (max (maxAbsDiffTensor adb2 bdb2) (maxAbsDiffTensor adX bdX)))
 
-def main (_args : List String) : IO Unit := do
+/-- Command-line help for the Float32 backend tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean Float32 backend tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean float32_modes"
+    , ""
+    , "This demo has no tutorial-specific flags."
+    ]
+
+def main (args : List String) : IO Unit := do
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
+  CLI.requireNoArgs "float32_modes" args
   IO.println "== Float32 backend tutorial =="
   IO.println
     "Note: `float32-mode=fp32` is proof-only (noncomputable); use it in theorems, not IO runs."
@@ -239,7 +255,7 @@ def main (_args : List String) : IO Unit := do
   let r32 ← runOnce (α := TorchLean.Floats.F32 .ieee754Exec) "Float32 (IEEE32Exec)"
 
   let r32F : OutPack Float :=
-    tlist.map (α := TorchLean.Floats.F32 .ieee754Exec) (β := Float)
+    tensorpack.map (α := TorchLean.Floats.F32 .ieee754Exec) (β := Float)
       (fun {_s} t => Spec.mapTensor TorchLean.Floats.IEEE754.IEEE32Exec.toFloat t)
       r32
 

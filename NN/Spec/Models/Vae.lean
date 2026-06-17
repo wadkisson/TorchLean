@@ -73,7 +73,7 @@ def forward (model : Model α obs latent) (x : Tensor α obs)
   model.decoder.forward (sampleLatent model x eps)
 
 /-- Reconstruction term, using mean-squared error in observation space. -/
-def reconstructionLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def reconstructionLoss
     (model : Model α obs latent) (x : Tensor α obs)
     (eps : Tensor α latent) : α :=
   Spec.mseSpec (s := obs) (forward model x eps) x
@@ -84,7 +84,7 @@ def klLoss (model : Model α obs latent) (x : Tensor α obs) : α :=
   diagonalGaussianKlToStandard mu logvar
 
 /-- β-VAE objective: reconstruction loss plus `β` times the diagonal-Gaussian KL term. -/
-def loss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def loss
     (model : Model α obs latent) (beta : α) (x : Tensor α obs)
     (eps : Tensor α latent) : α :=
   reconstructionLoss model x eps + beta * klLoss model x
@@ -99,7 +99,6 @@ def loss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
 
 /-- The VAE objective is exactly reconstruction plus a weighted KL term. -/
 @[simp] theorem loss_eq_reconstruction_add_kl
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α obs latent) (beta : α) (x : Tensor α obs) (eps : Tensor α latent) :
     loss model beta x eps =
       reconstructionLoss model x eps + beta * klLoss model x := by

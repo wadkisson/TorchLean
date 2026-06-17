@@ -80,17 +80,21 @@ def parseBetaVec? (dim : Nat) (j : Json) : IO (Option (Array Int)) := do
   match j with
   | .null => pure none
   | .arr xs =>
-      if xs.size ≠ dim then
+      if hSize : xs.size = dim then
+        let mut out : Array Int := Array.mkEmpty dim
+        for k in List.finRange dim do
+          let h : k.val < xs.size := by
+            rw [hSize]
+            exact k.isLt
+          let some i := parseInt? (xs[k.val]'h)
+            | throw <| IO.userError s!"Invalid beta[i][{k.val}]: expected int"
+          if i = (-1) || i = 0 || i = 1 then
+            out := out.push i
+          else
+            throw <| IO.userError s!"Invalid beta[i][{k.val}]: expected -1/0/1"
+        pure (some out)
+      else
         throw <| IO.userError s!"Invalid beta[i]: expected int array length {dim}"
-      let mut out : Array Int := Array.mkEmpty dim
-      for k in [0:xs.size] do
-        let some i := parseInt? xs[k]!
-          | throw <| IO.userError s!"Invalid beta[i][{k}]: expected int"
-        if i = (-1) || i = 0 || i = 1 then
-          out := out.push i
-        else
-          throw <| IO.userError s!"Invalid beta[i][{k}]: expected -1/0/1"
-      pure (some out)
   | _ => throw <| IO.userError "Invalid beta[i]: expected null or int array"
 
 /-!
@@ -121,17 +125,19 @@ def readAlphaBetaCROWNNodeCertificate (g : Graph) (path : String) : IO AlphaBeta
     | none => pure (Array.replicate g.nodes.size Json.null)
     | some betaJ => expectArray betaJ "top-level.beta"
 
-  if betaArr.size ≠ g.nodes.size then
+  if hSize : betaArr.size = g.nodes.size then
+    let mut beta : Array (Option (Array Int)) := Array.mkEmpty g.nodes.size
+    for i in List.finRange g.nodes.size do
+      let node := g.nodes[i.val]'i.isLt
+      let hBeta : i.val < betaArr.size := by
+        rw [hSize]
+        exact i.isLt
+      let betaJson := betaArr[i.val]'hBeta
+      let betaEntry ← parseBetaVec? node.outShape.size betaJson
+      beta := beta.push betaEntry
+    pure { ctx := core.ctx, ibp := core.ibp, crown := core.crown, alpha := core.alpha, beta := beta }
+  else
     throw <| IO.userError s!"beta length {betaArr.size} ≠ g.nodes.size {g.nodes.size}"
-
-  let mut beta : Array (Option (Array Int)) := Array.mkEmpty g.nodes.size
-
-  for i in [0:g.nodes.size] do
-    let outDim := g.nodes[i]!.outShape.size
-    let betaEntry ← parseBetaVec? outDim betaArr[i]!
-    beta := beta.push betaEntry
-
-  pure { ctx := core.ctx, ibp := core.ibp, crown := core.crown, alpha := core.alpha, beta := beta }
 
 /-- Check the local alpha/beta-CROWN enclosure condition for one node against a certificate entry.
   -/

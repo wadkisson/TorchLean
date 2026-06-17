@@ -160,8 +160,8 @@ accepted.
 # Julia: Numeric Producers And Certificate Search
 
 Julia is useful when the producing side wants high performance numerical code, differential
-equation tooling, optimization, spline fitting, or GPU-heavy search. The wrapper is intentionally
-thin and optional:
+equation tooling, optimization, spline fitting, or GPU-heavy search. The wrapper stays thin and
+optional:
 
 ```
 import NN.Runtime.External.Julia

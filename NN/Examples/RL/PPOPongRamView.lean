@@ -12,23 +12,21 @@ public import NN.Runtime.RL.Artifacts.DefaultPaths
 /-!
 # PPO Atari Pong RAM Artifacts
 
-This file visualizes the training curve produced by
-`NN/Examples/Models/RL/PPOPongRam.lean` (`lake exe torchlean ppo_pong_ram`).
+This file visualizes the training curve produced by the optional Pong RAM PPO module in
+`NN/Examples/Models/RL/PPOPongRam.lean`.
 
 Pong RAM uses the same Gymnasium boundary as CartPole, with ALE registration and a
 higher-dimensional observation. The viewer focuses on saved-artifact inspection for the Atari RAM
 path rather than benchmark-specific PPO tuning.
 
-Workflow:
-1. Run:
+Dependency setup for the optional ALE path:
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0' ale-py
-lake exe torchlean ppo_pong_ram
-lake build -R -K cuda=true && lake exe torchlean ppo_pong_ram --cuda
 ```
 
-2. Put the cursor on the command below in an editor. The infoview will render the saved log.
+After producing a log, put the cursor on the command below in an editor. The infoview will render
+the saved log.
 
 Notes:
 - The executable writes `data/rl/ppo_pong_ram_trainlog.json` by default (override with `--log`).
@@ -40,7 +38,7 @@ References:
 - ALE docs: https://ale.farama.org/
 -/
 
-/-- Default training-log path written by `torchlean ppo_pong_ram` (override with `--log`). -/
+/-- Default training-log path for the optional Pong RAM artifact viewer. -/
 def trainLogPath : System.FilePath :=
   Runtime.RL.Artifacts.DefaultPaths.ppoPongRamTrainLog
 

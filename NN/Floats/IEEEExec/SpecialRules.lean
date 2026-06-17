@@ -125,7 +125,7 @@ theorem expField_quietNaN_eq (x : IEEE32Exec) :
     unfold quietNaN
     simp [hx]
     -- Reduce to a raw-bit statement.
-    simpa using (expField_ofBits_or_quietBit (b := x.bits))
+    simpa [IEEE32Exec.ofBits] using (expField_ofBits_or_quietBit (b := x.bits))
   · simp [quietNaN, hx]
 
 /-- A shorter name for `expField_quietNaN_eq` (keeps the original name stable). -/

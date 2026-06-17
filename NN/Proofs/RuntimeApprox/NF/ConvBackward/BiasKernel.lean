@@ -223,9 +223,16 @@ theorem approx_conv2d_bias_point
             (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
                 acc + getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 = sumR := by
       simpa [out_h, out_w, conv2dOutH, conv2dOutW] using hFoldR
-    simpa [Spec.conv2dBiasDerivSpec, Spec.convBiasDerivSpec, Spec.Private.foldlIndices,
-      Spec.Private.foldlIndices.go, Spec.convOutSpatial, Spec.convOutDim, Vector.get,
-      Vector.toList_ofFn, out_ch.isLt, sumR] using hFoldR'
+    have hSpec :
+        getAtOrZero (Spec.conv2dBiasDerivSpec (α := R) (layer := layerR) (input := inputR)
+          (grad_output := δR))
+          [out_ch.val] =
+        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
+            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+                acc + getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 := by
+      simp [Spec.conv2dBiasDerivSpec, out_ch.isLt]
+      rfl
+    exact hSpec.trans hFoldR'
 
   have houtS :
       getAtOrZero (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layerS) (input := inputS)
@@ -261,9 +268,16 @@ theorem approx_conv2d_bias_point
             (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
                 acc + getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 = sumS := by
       simpa [out_h, out_w, conv2dOutH, conv2dOutW] using hFoldS
-    simpa [Spec.conv2dBiasDerivSpec, Spec.convBiasDerivSpec, Spec.Private.foldlIndices,
-      Spec.Private.foldlIndices.go, Spec.convOutSpatial, Spec.convOutDim, Vector.get,
-      Vector.toList_ofFn, out_ch.isLt, sumS] using hFoldS'
+    have hSpec :
+        getAtOrZero (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layerS) (input := inputS)
+          (grad_output := δS))
+          [out_ch.val] =
+        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
+            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+                acc + getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 := by
+      simp [Spec.conv2dBiasDerivSpec, out_ch.isLt]
+      rfl
+    exact hSpec.trans hFoldS'
 
   have hFinal :
       abs
@@ -615,43 +629,34 @@ theorem approx_conv2d_kernel_point
         (grad_output := δR))
           [out_ch.val, in_ch.val, di.val, dj.val] = sumR := by
     have hFoldR' :
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (conv2dOutH inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (conv2dOutW inW kW stride padding)).foldl (fun acc j =>
                 acc +
                   getAtOrZero
-                      (if h4 : padding = 0 then
-                        tensorCast
-                          (Shape.dim inC (Shape.dim (inH + 2 * padding) (Shape.dim (inW + 2 *
-                            padding) Shape.scalar)))
-                          (by simp; rw [h4])
-                          inputR
-                      else padMultiChannel inputR padding)
+                      (paddedInput (inC := inC) (inH := inH) (inW := inW)
+                        (padding := padding) inputR)
                       [in_ch.val, i.val * stride + di.val, j.val * stride + dj.val] *
                     getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 = sumR := by
-      simpa [out_h, out_w, conv2dOutH, conv2dOutW, paddedR] using hFoldR
+      simpa [out_h, out_w, paddedR, paddedInput] using hFoldR
     have hGet :
         getAtOrZero (Spec.conv2dKernelDerivSpec (α := R) (layer := layerR) (input := inputR)
           (grad_output := δR))
             [out_ch.val, in_ch.val, di.val, dj.val] =
-          (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-              (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+          (List.finRange (conv2dOutH inH kH stride padding)).foldl (fun acc i =>
+              (List.finRange (conv2dOutW inW kW stride padding)).foldl (fun acc j =>
                   acc +
                     getAtOrZero
-                        (if h4 : padding = 0 then
-                          tensorCast
-                            (Shape.dim inC (Shape.dim (inH + 2 * padding) (Shape.dim (inW + 2 *
-                              padding) Shape.scalar)))
-                            (by simp; rw [h4])
-                            inputR
-                        else padMultiChannel inputR padding)
+                        (paddedInput (inC := inC) (inH := inH) (inW := inW)
+                          (padding := padding) inputR)
                         [in_ch.val, i.val * stride + di.val, j.val * stride + dj.val] *
                         getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 := by
-        simpa [Spec.conv2dKernelDerivSpec, conv2dOutH, conv2dOutW, paddedInput,
-          tensor_cast_eq_cast_shape, get_at_or_zero_tensor_cast, out_ch.isLt, in_ch.isLt,
-          di.isLt, dj.isLt] using
+        convert
           (conv2dKernelFoldRead_eq_paddedFold (input := inputR) (grad := δR)
             (out_ch := out_ch) (in_ch := in_ch) (di := di.val) (dj := dj.val)
-            (stride := stride) (padding := padding))
+            (stride := stride) (padding := padding)) using 1
+        · simp [Spec.conv2dKernelDerivSpec, out_ch.isLt, in_ch.isLt,
+            di.isLt, dj.isLt]
+          rfl
     exact hGet.trans hFoldR'
 
   have houtS :
@@ -659,43 +664,34 @@ theorem approx_conv2d_kernel_point
         (grad_output := δS))
           [out_ch.val, in_ch.val, di.val, dj.val] = sumS := by
     have hFoldS' :
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (conv2dOutH inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (conv2dOutW inW kW stride padding)).foldl (fun acc j =>
                 acc +
                   getAtOrZero
-                      (if h4 : padding = 0 then
-                        tensorCast
-                          (Shape.dim inC (Shape.dim (inH + 2 * padding) (Shape.dim (inW + 2 *
-                            padding) Shape.scalar)))
-                          (by simp; rw [h4])
-                          inputS
-                      else padMultiChannel inputS padding)
+                      (paddedInput (inC := inC) (inH := inH) (inW := inW)
+                        (padding := padding) inputS)
                       [in_ch.val, i.val * stride + di.val, j.val * stride + dj.val] *
                     getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 = sumS := by
-      simpa [out_h, out_w, conv2dOutH, conv2dOutW, paddedS] using hFoldS
+      simpa [out_h, out_w, paddedS, paddedInput] using hFoldS
     have hGet :
         getAtOrZero (Spec.conv2dKernelDerivSpec (α := ℝ) (layer := layerS) (input := inputS)
           (grad_output := δS))
             [out_ch.val, in_ch.val, di.val, dj.val] =
-          (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-              (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+          (List.finRange (conv2dOutH inH kH stride padding)).foldl (fun acc i =>
+              (List.finRange (conv2dOutW inW kW stride padding)).foldl (fun acc j =>
                   acc +
                     getAtOrZero
-                        (if h4 : padding = 0 then
-                          tensorCast
-                            (Shape.dim inC (Shape.dim (inH + 2 * padding) (Shape.dim (inW + 2 *
-                              padding) Shape.scalar)))
-                            (by simp; rw [h4])
-                            inputS
-                        else padMultiChannel inputS padding)
+                        (paddedInput (inC := inC) (inH := inH) (inW := inW)
+                          (padding := padding) inputS)
                         [in_ch.val, i.val * stride + di.val, j.val * stride + dj.val] *
                         getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 := by
-        simpa [Spec.conv2dKernelDerivSpec, conv2dOutH, conv2dOutW, paddedInput,
-          tensor_cast_eq_cast_shape, get_at_or_zero_tensor_cast, out_ch.isLt, in_ch.isLt,
-          di.isLt, dj.isLt] using
+        convert
           (conv2dKernelFoldRead_eq_paddedFold (input := inputS) (grad := δS)
             (out_ch := out_ch) (in_ch := in_ch) (di := di.val) (dj := dj.val)
-            (stride := stride) (padding := padding))
+            (stride := stride) (padding := padding)) using 1
+        · simp [Spec.conv2dKernelDerivSpec, out_ch.isLt, in_ch.isLt,
+            di.isLt, dj.isLt]
+          rfl
     exact hGet.trans hFoldS'
 
   have hFinal :
@@ -823,10 +819,12 @@ theorem approxT_conv2d_bias_deriv_spec
       (linfNorm bT)
   have hEntryS :
       entryS = Tensor.scalar (getAtOrZero outS [oc.val]) := by
-    simpa [entryS] using (entry_eq_scalar_get_at_or_zero1 (t := outS) oc)
+    convert (entry_eq_scalar_get_at_or_zero1 (t := outS) oc) using 1
+    rfl
   have hEntryR :
       entryR = Tensor.scalar (getAtOrZero outR [oc.val]) := by
-    simpa [entryR] using (entry_eq_scalar_get_at_or_zero1 (t := outR) oc)
+    convert (entry_eq_scalar_get_at_or_zero1 (t := outR) oc) using 1
+    rfl
   have happ :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
         (Tensor.scalar (getAtOrZero outS [oc.val]))
@@ -935,13 +933,17 @@ theorem approxT_conv2d_kernel_deriv_spec
     let bTocicdi := match bTocic with | .dim f => f di
     let bTocicdidj := match bTocicdi with | .dim f => f dj
     have h0 : linfNorm bToc ≤ linfNorm bT := by
-      simpa [bToc] using (linf_norm_le_get_dim (t := bT) oc)
+      convert (linf_norm_le_get_dim (t := bT) oc) using 1
+      rfl
     have h1' : linfNorm bTocic ≤ linfNorm bToc := by
-      simpa [bTocic] using (linf_norm_le_get_dim (t := bToc) ic)
+      convert (linf_norm_le_get_dim (t := bToc) ic) using 1
+      rfl
     have h2' : linfNorm bTocicdi ≤ linfNorm bTocic := by
-      simpa [bTocicdi] using (linf_norm_le_get_dim (t := bTocic) di)
+      convert (linf_norm_le_get_dim (t := bTocic) di) using 1
+      rfl
     have h3' : linfNorm bTocicdidj ≤ linfNorm bTocicdi := by
-      simpa [bTocicdidj] using (linf_norm_le_get_dim (t := bTocicdi) dj)
+      convert (linf_norm_le_get_dim (t := bTocicdi) dj) using 1
+      rfl
     have hchain : linfNorm bTocicdidj ≤ linfNorm bT :=
       le_trans (le_trans (le_trans h3' h2') h1') h0
     let bound :=
@@ -989,10 +991,12 @@ theorem approxT_conv2d_kernel_deriv_spec
       (linfNorm bT)
   have hEntryS :
       entryS = Tensor.scalar (getAtOrZero outS [oc.val, ic.val, di.val, dj.val]) := by
-    simpa [entryS] using (entry_eq_scalar_get_at_or_zero4 (t := outS) oc ic di dj)
+    convert (entry_eq_scalar_get_at_or_zero4 (t := outS) oc ic di dj) using 1
+    rfl
   have hEntryR :
       entryR = Tensor.scalar (getAtOrZero outR [oc.val, ic.val, di.val, dj.val]) := by
-    simpa [entryR] using (entry_eq_scalar_get_at_or_zero4 (t := outR) oc ic di dj)
+    convert (entry_eq_scalar_get_at_or_zero4 (t := outR) oc ic di dj) using 1
+    rfl
 
   have happ :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))

@@ -146,7 +146,9 @@ theorem foldlM_addGradAll_toIndexedAnyList_eq_add {α : Type} [Add α] [Decidabl
                     suffix).size := by
                 simp [Array.size_append, Nat.add_assoc]
               have hshapeG : contribHeadAny.s = node0.value.s := by
-                simpa [contribHeadAny, seedHeadAny] using hshape0.symm
+                calc
+                  contribHeadAny.s = seedHeadAny.s := by rfl
+                  _ = node0.value.s := hshape0.symm
               have hshapeExisting : seedHeadAny.s = node0.value.s := by
                 simpa using hshape0.symm
               have hnode0' : t.getNode? pref.size = some node0 := by
@@ -205,13 +207,17 @@ theorem foldlM_addGradAll_toIndexedAnyList_eq_add {α : Type} [Add α] [Decidabl
                       .ok newHeadAny := by
                   cases hseedShape
                   cases hcontribShape
-                  simpa [seedHeadAny, contribHeadAny] using hsummed
+                  simp [Runtime.Autograd.AnyTensor.add, Runtime.Autograd.AnyTensor.mk,
+                    Tensor.castShape, seedHeadAny, contribHeadAny, newHeadAny] at hsummed ⊢
 
                 rw [hsummed']
                 simp [newHeadAny]
 
               -- Rewrite back to the original associative form for the outer goal.
-              simpa [Array.append_assoc, hacc0] using this
+              rw [hacc0]
+              rw [Array.append_assoc]
+              conv_rhs => rw [Array.append_assoc]
+              exact this
 
           have hnodesTail :
               ∀ i (hi : i < ss.length),
@@ -281,8 +287,9 @@ theorem foldlM_addGradAll_toIndexedAnyList_eq_add {α : Type} [Add α] [Decidabl
               simpa [hacc0] using hadd0
             simpa [Array.append_assoc] using hadd0'
 
-          simpa [TList.toIndexedAnyList, List.foldlM, hadd0Push, TList.add, TList.toAnyArray_cons,
-            Array.append_assoc, seedHeadAny, contribHeadAny, newHeadAny]
+          simpa [TList.toIndexedAnyList, List.foldlM, Bind.bind, Except.bind, Pure.pure,
+            Except.pure, hadd0Push, TList.add, TList.toAnyArray_cons, Array.append_assoc,
+            seedHeadAny, contribHeadAny, newHeadAny]
             using htail
 
 /--
@@ -432,7 +439,7 @@ theorem backwardDenseFromStep_ok_size {α : Type} [Add α] [DecidableEq Shape]
                         (fun acc2 (pid, pg) => Runtime.Autograd.Tape.addGradAll (t := t) acc2 pid
                           pg) acc1 =
                       .ok accOut := by
-                  simpa [List.foldlM, h1] using hfold
+                  simpa [List.foldlM, Bind.bind, Except.bind, Pure.pure, Except.pure, h1] using hfold
                 have hs1 : acc1.size = acc0.size :=
                   addGradAll_ok_size (t := t) (grads := acc0) (id := pid) (g := pg) (grads' := acc1)
                     (by
@@ -472,7 +479,7 @@ theorem backwardDenseFromStep_ok_size {α : Type} [Add α] [DecidableEq Shape]
                           .ok acc' := by
                       simpa
                         [Runtime.Autograd.Tape.backwardDenseFromStep, hnode, hreq, hgrad, hshape,
-                          dLdy, hback]
+                          dLdy, hback, Bind.bind, Except.bind, Pure.pure, Except.pure]
                         using h
                     simpa using fold_ok_size contribs acc acc' hfold
               ·

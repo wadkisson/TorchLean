@@ -195,42 +195,61 @@ def parseCROWNNodeCoreCertificate (g : Graph) (topObj : Json) :
     | none => pure (Array.replicate g.nodes.size Json.null)
     | some alphaJ => expectArray alphaJ "top-level.alpha"
 
-  if ibpArr.size ≠ g.nodes.size then
+  if hIbpSize : ibpArr.size = g.nodes.size then
+    if hCrownSize : crownArr.size = g.nodes.size then
+      if hAlphaSize : alphaArr.size = g.nodes.size then
+        let mut ibp : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
+        let mut crown : Array (Option (FlatAffineBounds Float)) := Array.mkEmpty g.nodes.size
+        let mut alpha : Array (Option (FlatVec Float)) := Array.mkEmpty g.nodes.size
+
+        for i in List.finRange g.nodes.size do
+          let node := g.nodes[i.val]'i.isLt
+          let outDim := node.outShape.size
+          let hIbp : i.val < ibpArr.size := by
+            rw [hIbpSize]
+            exact i.isLt
+          let hCrown : i.val < crownArr.size := by
+            rw [hCrownSize]
+            exact i.isLt
+          let hAlpha : i.val < alphaArr.size := by
+            rw [hAlphaSize]
+            exact i.isLt
+          let ibpJson := ibpArr[i.val]'hIbp
+          let ibpEntry ← parseFlatBox? outDim ibpJson
+          ibp := ibp.push ibpEntry
+          let crownJson := crownArr[i.val]'hCrown
+          let crownEntry ← parseAffineBounds? ctx.inputDim outDim crownJson
+          crown := crown.push crownEntry
+          let alphaJson := alphaArr[i.val]'hAlpha
+          let alphaEntry ← parseAlphaVec? outDim alphaJson
+          alpha := alpha.push alphaEntry
+
+        pure { ctx := ctx, ibp := ibp, crown := crown, alpha := alpha }
+      else
+        throw <| IO.userError s!"alpha length {alphaArr.size} ≠ g.nodes.size {g.nodes.size}"
+    else
+      throw <| IO.userError s!"crown length {crownArr.size} ≠ g.nodes.size {g.nodes.size}"
+  else
     throw <| IO.userError s!"ibp length {ibpArr.size} ≠ g.nodes.size {g.nodes.size}"
-  if crownArr.size ≠ g.nodes.size then
-    throw <| IO.userError s!"crown length {crownArr.size} ≠ g.nodes.size {g.nodes.size}"
-  if alphaArr.size ≠ g.nodes.size then
-    throw <| IO.userError s!"alpha length {alphaArr.size} ≠ g.nodes.size {g.nodes.size}"
-
-  let mut ibp : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
-  let mut crown : Array (Option (FlatAffineBounds Float)) := Array.mkEmpty g.nodes.size
-  let mut alpha : Array (Option (FlatVec Float)) := Array.mkEmpty g.nodes.size
-
-  for i in [0:g.nodes.size] do
-    let outDim := g.nodes[i]!.outShape.size
-    let ibpEntry ← parseFlatBox? outDim ibpArr[i]!
-    ibp := ibp.push ibpEntry
-    let crownEntry ← parseAffineBounds? ctx.inputDim outDim crownArr[i]!
-    crown := crown.push crownEntry
-    let alphaEntry ← parseAlphaVec? outDim alphaArr[i]!
-    alpha := alpha.push alphaEntry
-
-  pure { ctx := ctx, ibp := ibp, crown := crown, alpha := alpha }
 
 /-- Check that an optional per-node certificate array contains all parents of node `id`. -/
 def parentsOk {β : Type} (g : Graph) (cert : Array (Option β)) (id : Nat) : Bool :=
-  let node := g.nodes[id]!
-  node.parents.all (fun p =>
-    if p < id then
-      match cert[p]! with
-      | some _ => true
-      | none => false
-    else
-      false)
+  match g.nodes[id]? with
+  | none => false
+  | some node =>
+      node.parents.all (fun p =>
+        if p < id then
+          match cert[p]? with
+          | some (some _) => true
+          | _ => false
+        else
+          false)
 
 /-- Safe lookup for optional flat boxes used by certificate-side shape checks. -/
 def getFlatBox? (cert : Array (Option (FlatBox Float))) (id : Nat) : Option (FlatBox Float) :=
-  if _h : id < cert.size then cert[id]! else none
+  match cert[id]? with
+  | some box? => box?
+  | none => none
 
 /--
 Check that binary elementwise parent boxes have the same flattened size as each other and as the
@@ -239,14 +258,16 @@ the left box on a dimension mismatch.
 -/
 def binaryElementwiseBoxesMatchOutput
     (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
-  let node := g.nodes[id]!
-  match node.parents with
-  | p1 :: p2 :: _ =>
-      match getFlatBox? cert p1, getFlatBox? cert p2 with
-      | some B1, some B2 =>
-          B1.dim == B2.dim && B1.dim == node.outShape.size
-      | _, _ => false
-  | _ => false
+  match g.nodes[id]? with
+  | none => false
+  | some node =>
+      match node.parents with
+      | p1 :: p2 :: _ =>
+          match getFlatBox? cert p1, getFlatBox? cert p2 with
+          | some B1, some B2 =>
+              B1.dim == B2.dim && B1.dim == node.outShape.size
+          | _, _ => false
+      | _ => false
 
 /-- Check whether a flat box is entirely inside the positive domain needed by true `log`. -/
 def flatBoxStrictlyAbove (B : FlatBox Float) (eps : Float) : Bool :=
@@ -265,18 +286,20 @@ that the mathematical rules need.
 -/
 def ibpNodePreconditionsOk
     (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
-  let node := g.nodes[id]!
-  match node.kind with
-  | .add | .sub | .mul_elem | .maxElem | .minElem =>
-      binaryElementwiseBoxesMatchOutput g cert id
-  | .log =>
-      match node.parents with
-      | p1 :: _ =>
-          match getFlatBox? cert p1 with
-          | some B => flatBoxStrictlyAbove B Numbers.epsilon
-          | none => false
-      | _ => false
-  | _ => true
+  match g.nodes[id]? with
+  | none => false
+  | some node =>
+      match node.kind with
+      | .add | .sub | .mul_elem | .maxElem | .minElem =>
+          binaryElementwiseBoxesMatchOutput g cert id
+      | .log =>
+          match node.parents with
+          | p1 :: _ =>
+              match getFlatBox? cert p1 with
+              | some B => flatBoxStrictlyAbove B Numbers.epsilon
+              | none => false
+          | _ => false
+      | _ => true
 
 /-- Pretty-printer for a flat box, used in certificate mismatch messages. -/
 def prettyFlatBox (B : FlatBox Float) : String :=
@@ -300,7 +323,9 @@ def checkCROWNLikeNode
     (ctx : AffineCtx)
     (id : Nat) (tol : Float)
     (computed? : Option (FlatAffineBounds Float)) : IO Bool := do
-  let node := g.nodes[id]!
+  let some node := g.nodes[id]?
+    | IO.eprintln s!"[{label}] node {id}: out of bounds for graph with {g.nodes.size} nodes"
+      pure false
   let needsParents :=
     match node.kind with
     | .input | .const _ => false
@@ -313,7 +338,11 @@ def checkCROWNLikeNode
       s!"[{label}] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
     return false
 
-  match certCrown[id]!, computed? with
+  let certCrown? :=
+    match certCrown[id]? with
+    | some entry => entry
+    | none => none
+  match certCrown?, computed? with
   | none, _ =>
       IO.eprintln s!"[{label}] node {id}: certificate missing (null)"
       pure false

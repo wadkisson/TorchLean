@@ -123,6 +123,11 @@ lemma encloses_iff_toVec {n : Nat}
 
 /-! ## Small tensor algebra helpers -/
 
+@[simp] lemma real_numbers_one : (Numbers.one : ℝ) = (1 : ℝ) := rfl
+@[simp] lemma real_numbers_zero : (Numbers.zero : ℝ) = (0 : ℝ) := rfl
+@[simp] lemma real_one_one : (One.one : ℝ) = (1 : ℝ) := rfl
+@[simp] lemma real_zero_zero : (Zero.zero : ℝ) = (0 : ℝ) := rfl
+
 lemma add_spec_fill_zero_right {n : Nat}
     (t : Tensor ℝ (.dim n .scalar)) :
     Tensor.addSpec (α := ℝ) t (Spec.fill (α := ℝ) (0 : ℝ) (.dim n .scalar)) = t := by
@@ -164,6 +169,11 @@ lemma castDimScalar_proof_irrel {n n' : Nat}
   have : h₁ = h₂ := Subsingleton.elim _ _
   cases this
   rfl
+
+@[simp] lemma castDimScalar_self {n : Nat}
+    (h : n = n) (t : Tensor ℝ (.dim n .scalar)) :
+    castDimScalar (α := ℝ) h t = t := by
+  exact castDimScalar_proof_irrel h rfl t
 
 /-- `toVec` commutes with `castDimScalar` (up to `Fin.cast`). -/
 lemma toVec_castDimScalar {n n' : Nat} (h : n = n') (t : Tensor ℝ (.dim n .scalar)) (i : Fin n') :
@@ -274,20 +284,10 @@ lemma enclosesAtInput_castOut (ctx : AffineCtx) (x : Tensor ℝ (.dim ctx.inputD
   dsimp
   rcases hvec with ⟨hdim, henc⟩
   -- Cast the enclosure result from `xin.outDim` to `outDim'` via `hout`.
-  have henc' :
-      Theorems.Semantics.encloses (α := ℝ)
-        { dim := outDim'
-          lo := castDimScalar (α := ℝ) hout (CrownCertSoundness.boundsEvalAt (α := ℝ) xin
-            (castDimScalar (α := ℝ) hinDim.symm x)).lo
-          hi := castDimScalar (α := ℝ) hout (CrownCertSoundness.boundsEvalAt (α := ℝ) xin
-            (castDimScalar (α := ℝ) hinDim.symm x)).hi }
-        (castDimScalar (α := ℝ) hout (castDimScalar (α := ℝ) hdim.symm vp.v)) := by
-    -- `henc` is an enclosure for `boundsEvalAt xin x'` at `castDimScalar hdim.symm vp.v`.
-    -- Transport it across `hout`.
-    simpa using
-      (sem_encloses_castDim (B := CrownCertSoundness.boundsEvalAt (α := ℝ) xin (castDimScalar (α :=
-        ℝ) hinDim.symm x))
-        (h := hout) (x := castDimScalar (α := ℝ) hdim.symm vp.v) henc)
+  have hencCast :=
+    (sem_encloses_castDim (B := CrownCertSoundness.boundsEvalAt (α := ℝ) xin (castDimScalar (α :=
+      ℝ) hinDim.symm x))
+      (h := hout) (x := castDimScalar (α := ℝ) hdim.symm vp.v) henc)
   -- Simplify the RHS cast: `hout ∘ hdim.symm` is a proof of `vp.n = outDim'`, so it matches
   -- `hvout`.
   have hvout' : Eq.trans hdim.symm hout = hvout := by
@@ -295,8 +295,12 @@ lemma enclosesAtInput_castOut (ctx : AffineCtx) (x : Tensor ℝ (.dim ctx.inputD
   have hxCast :
       castDimScalar (α := ℝ) hout (castDimScalar (α := ℝ) hdim.symm vp.v)
         = castDimScalar (α := ℝ) hvout vp.v := by
-    simpa [hvout', castDimScalar_trans] using
-      (castDimScalar_trans (h₁ := hdim.symm) (h₂ := hout) (t := vp.v)).symm
+    calc
+      castDimScalar (α := ℝ) hout (castDimScalar (α := ℝ) hdim.symm vp.v)
+          = castDimScalar (α := ℝ) (Eq.trans hdim.symm hout) vp.v := by
+              exact (castDimScalar_trans (h₁ := hdim.symm) (h₂ := hout) (t := vp.v)).symm
+      _ = castDimScalar (α := ℝ) hvout vp.v := by
+              exact castDimScalar_proof_irrel (Eq.trans hdim.symm hout) hvout vp.v
   -- Rewrite the enclosure `henc'` to target `castDimScalar hvout vp.v`.
   have henc1 :
       Theorems.Semantics.encloses (α := ℝ)
@@ -306,7 +310,7 @@ lemma enclosesAtInput_castOut (ctx : AffineCtx) (x : Tensor ℝ (.dim ctx.inputD
           hi := castDimScalar (α := ℝ) hout (CrownCertSoundness.boundsEvalAt (α := ℝ) xin
             (castDimScalar (α := ℝ) hinDim.symm x)).hi }
         (castDimScalar (α := ℝ) hvout vp.v) := by
-    simpa [hxCast] using henc'
+    exact sem_encloses_value_eq hxCast hencCast
 
   -- Avoid rewriting dependent `boundsEvalAt` equalities: transfer componentwise between the
   -- explicit cast box
@@ -1278,10 +1282,12 @@ lemma boundsEvalAt_linear_bounds_from_affine
         (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xB.inDim) (n := n) (m := m) W b xB hout) x =
       { dim := m
         lo :=
-          let l := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n) (by simpa [hout] using
-            xB.loAff) x
-          let u := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n) (by simpa [hout] using
-            xB.hiAff) x
+          let l := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n)
+            (Cert.castAffineOut (α := ℝ) (n := xB.inDim) (m := xB.outDim) (m' := n) hout
+              xB.loAff) x
+          let u := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n)
+            (Cert.castAffineOut (α := ℝ) (n := xB.inDim) (m := xB.outDim) (m' := n) hout
+              xB.hiAff) x
           Tensor.addSpec (α := ℝ)
             (Tensor.addSpec (α := ℝ)
               (Spec.matVecMulSpec (α := ℝ) (NN.MLTheory.CROWN.IBP.matPos (α := ℝ) (m := m) (n :=
@@ -1290,10 +1296,12 @@ lemma boundsEvalAt_linear_bounds_from_affine
                 n) W) u))
             b
         hi :=
-          let l := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n) (by simpa [hout] using
-            xB.loAff) x
-          let u := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n) (by simpa [hout] using
-            xB.hiAff) x
+          let l := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n)
+            (Cert.castAffineOut (α := ℝ) (n := xB.inDim) (m := xB.outDim) (m' := n) hout
+              xB.loAff) x
+          let u := affineEvalAt (α := ℝ) (inDim := xB.inDim) (outDim := n)
+            (Cert.castAffineOut (α := ℝ) (n := xB.inDim) (m := xB.outDim) (m' := n) hout
+              xB.hiAff) x
           Tensor.addSpec (α := ℝ)
             (Tensor.addSpec (α := ℝ)
               (Spec.matVecMulSpec (α := ℝ) (NN.MLTheory.CROWN.IBP.matPos (α := ℝ) (m := m) (n :=

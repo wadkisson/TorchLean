@@ -55,16 +55,12 @@ def getScalar {n : Nat} (t : Tensor α (.dim n .scalar)) (i : Fin n) : α :=
 /--
 Componentwise validity of a flat interval box: `lo ≤ hi` for every coordinate.
 
-This is a proof-facing predicate; it is used to state preservation properties of IBP/CROWN box
-operators over ordered backends (e.g. `ℝ`).
+This is a proof-facing predicate; it uses the order carried by `Context α`, which keeps all CROWN
+box predicates in the same scalar universe as the executable operators.
 -/
-def Valid [Preorder α] (B : FlatBox α) : Prop :=
-  -- Important: `Context α` also provides an `LE α` instance. To keep `Valid` tied to the *order*
-  -- coming from `Preorder α` (so we can use `le_rfl`, `le_trans`, etc.), we apply `LE.le`
-  -- explicitly with the `Preorder`-provided `LE` instance.
-  let inst : Preorder α := inferInstance
+def Valid (B : FlatBox α) : Prop :=
   ∀ i : Fin B.dim,
-    @LE.le α inst.toLE (getScalar (α := α) B.lo i) (getScalar (α := α) B.hi i)
+    getScalar (α := α) B.lo i ≤ getScalar (α := α) B.hi i
 
 /--
 Build a singleton `FlatBox` from an exact vector tensor `t` (set `lo = hi = t`).
@@ -73,12 +69,13 @@ def ofTensor {n : Nat} (t : Tensor α (.dim n .scalar)) : FlatBox α :=
   { dim := n, lo := t, hi := t }
 
 /-- A singleton flat box is always valid (over any preorder). -/
-theorem valid_ofTensor [Preorder α] {n : Nat} (t : Tensor α (.dim n .scalar)) :
+theorem valid_ofTensor (le_refl : ∀ a : α, a ≤ a) {n : Nat}
+    (t : Tensor α (.dim n .scalar)) :
     (ofTensor (α := α) t).Valid := by
   intro i
-  -- After unfolding `Valid`/`ofTensor`, the goal is reflexivity in the `Preorder` order.
+  -- After unfolding `Valid`/`ofTensor`, both endpoints are the same scalar entry.
   dsimp [Valid, ofTensor]
-  exact le_rfl
+  exact le_refl _
 
 end FlatBox
 

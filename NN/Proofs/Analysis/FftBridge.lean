@@ -133,7 +133,8 @@ When we instantiate the runtime definitions at mathlib `ℂ`, that value is the 
 private lemma FFT1D_I_eq :
     Runtime.Autograd.TorchLean.NN.FFT1D.I (α := ℂ) = (Complex.I : ℂ) := by
   -- `FFT1D.I` is defined as `sqrt(-1)`.
-  simpa [Runtime.Autograd.TorchLean.NN.FFT1D.I, Numbers.neg_one] using (Complex.sqrt_neg_one)
+  change Complex.sqrt (-1 : ℂ) = (Complex.I : ℂ)
+  exact Complex.sqrt_neg_one
 
 /--
 Runtime forward twiddle factors match the negative-frequency root powers from the exact DFT

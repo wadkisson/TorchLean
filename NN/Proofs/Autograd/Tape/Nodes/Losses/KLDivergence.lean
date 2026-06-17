@@ -330,13 +330,17 @@ def klDivLastFderivAt {Γ : List Shape} {m n : Nat}
   have hlogq :
       HasFDerivAt logqMN logqDeriv xV := by
     -- compose the vector-log derivative with `qMN`
-    simpa [logqMN, logqDeriv] using (hlogq0.comp xV hq0)
+    have hcomp := hlogq0.comp xV hq0
+    refine hcomp.congr_of_eventuallyEq ?_
+    exact Filter.Eventually.of_forall fun _ => rfl
 
   let rhsMN : CtxVec Γ → Vec (m * n) := fun x => logqMN x - lpMN x
   let rhsDeriv : CtxVec Γ →L[ℝ] Vec (m * n) := logqDeriv - lpMNCLM
   have hrhs :
       HasFDerivAt rhsMN rhsDeriv xV := by
-    simpa [rhsMN, rhsDeriv] using hlogq.sub hlp0
+    have hsub := hlogq.sub hlp0
+    refine hsub.congr_of_eventuallyEq ?_
+    exact Filter.Eventually.of_forall fun _ => rfl
 
   have hinter :
       HasFDerivAt (fun x => inner ℝ (qMN x) (rhsMN x))
@@ -417,7 +421,7 @@ def klDivLastFderivAt {Γ : List Shape} {m n : Nat}
       have hrhsMN : rhsMN xV = rhs := by
         simp [rhsMN, rhs, logqMN, lpMN, logq, lp, sub_eq_add_neg]
       -- now unfold the derivative of `inner` and the linear maps feeding it
-      simp [D, ContinuousLinearMap.smul_apply, smul_eq_mul, ContinuousLinearMap.comp_apply,
+      simp [D, smul_eq_mul, ContinuousLinearMap.comp_apply,
         ContinuousLinearMap.prod_apply, fderivInnerCLM_apply, hq, hrhsDeriv, hrhsMN,
         q, dq, rhs, drhs, add_comm]
     have hR : ((vecScalarCLM.comp D) dxV).ofLp i = D dxV := by

@@ -187,7 +187,7 @@ def jvpAvailability (op : String) : JvpAvailability :=
   else
     .implemented
 
-/-- Human-readable message for reverse-only compiled ops. -/
+/-- Diagnostic message for reverse-only compiled ops. -/
 def reverseOnlyJvpMessage (op : String) : String :=
   s!"compiled GraphM: forward-mode JVP requested for op `{op}`, " ++
   "but this compiled node is reverse-mode only. Use VJP/backprop, avoid this op in forward-mode " ++

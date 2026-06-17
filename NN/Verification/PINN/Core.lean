@@ -8,6 +8,7 @@ module
 
 public import NN.MLTheory.CROWN.Graph
 public import NN.Tensor.API
+public import NN.Verification.Util.Json
 
 /-!
 # PINN Core
@@ -20,7 +21,7 @@ This module is shared by the PINN verification workflows. It provides:
 - a few interval/finite-difference residual helpers,
 - JSON parsing for the certificate schema used by the surrounding examples.
 
-Most users should run the curated entrypoints instead of importing this file directly:
+Run the curated entrypoints instead of importing this file directly:
 - `lake exe verify -- pinn-cert [NN/Examples/Verification/PINN/pinn_cert.json]`
 - `lake exe verify -- pinn-dataset-check --dataset=PATH.json [--weights=WEIGHTS.json]`
 
@@ -41,6 +42,57 @@ open _root_.Spec
 open _root_.Spec.Tensor
 open Lean
 open Json
+
+/-- Require a JSON object field in an `Except` parser. -/
+def expectFieldObjE (ctx key : String) (j : Json) :
+    Except String (Std.TreeMap.Raw String Json compare) := do
+  NN.API.Json.expectObjE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
+/-- Require a JSON array field in an `Except` parser. -/
+def expectFieldArrayE (ctx key : String) (j : Json) : Except String (Array Json) := do
+  NN.API.Json.expectArrayE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
+/-- Require a JSON array whose entries are all floats. -/
+def expectFloatArrayE (ctx : String) (j : Json) : Except String (Array Float) := do
+  let xs ← NN.API.Json.expectArrayE ctx j
+  xs.mapIdxM (fun i x => NN.Verification.Json.expectFloatE s!"{ctx}[{i}]" x)
+
+/-- Require a float-array field. -/
+def expectFieldFloatArrayE (ctx key : String) (j : Json) :
+    Except String (Array Float) := do
+  expectFloatArrayE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
+/-- Require an interval object `{ "lo": ..., "hi": ... }`. -/
+def expectIntervalPairE (ctx : String) (j : Json) : Except String (Float × Float) := do
+  let lo ← NN.Verification.Json.expectFieldFloatE ctx "lo" j
+  let hi ← NN.Verification.Json.expectFieldFloatE ctx "hi" j
+  pure (lo, hi)
+
+/-- Require an array of interval pairs with an expected length. -/
+def expectIntervalPairArrayE (ctx : String) (j : Json) (expected : Nat) :
+    Except String (List (Float × Float)) := do
+  let loA ← expectFieldFloatArrayE ctx "lo" j
+  let hiA ← expectFieldFloatArrayE ctx "hi" j
+  if h : loA.size = expected ∧ hiA.size = expected then
+    pure <| (List.finRange expected).map (fun (i : Fin expected) =>
+      have hlo : i.val < loA.size := by
+        rw [h.1]
+        exact i.isLt
+      have hhi : i.val < hiA.size := by
+        rw [h.2]
+        exact i.isLt
+      (loA[i.val]'hlo, hiA[i.val]'hhi))
+  else
+    throw s!"{ctx}: length mismatch (expected {expected})"
+
+/-- Require one finite-difference `u_bounds` entry. -/
+def expectUBoundsEntryE (ctx : String) (j : Json) :
+    Except String (Float × (Float × Float) × (Float × Float) × (Float × Float)) := do
+  let x ← NN.Verification.Json.expectFieldFloatE ctx "x" j
+  let uMinus ← expectIntervalPairE s!"{ctx}.u_minus" (← NN.API.Json.expectFieldE ctx "u_minus" j)
+  let u ← expectIntervalPairE s!"{ctx}.u" (← NN.API.Json.expectFieldE ctx "u" j)
+  let uPlus ← expectIntervalPairE s!"{ctx}.u_plus" (← NN.API.Json.expectFieldE ctx "u_plus" j)
+  pure (x, uMinus, u, uPlus)
 
 /-- Configuration parsed from a PINN certificate JSON. -/
 structure PinnCfg where
@@ -133,21 +185,13 @@ def seedParamsFloat2D : ParamStore Float :=
 /-- Seed a 1D input box `[x - eps, x + eps]` at node id 0. -/
 def seedInputFloat (ps : ParamStore Float) (x : Float) (eps : Float) : ParamStore Float :=
   let x0 : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
-  let rad := Spec.fill (α:=Float) eps (.dim 1 .scalar)
-  let xB : Box Float (.dim 1 .scalar) :=
-    { lo := Tensor.subSpec x0 rad
-      hi := Tensor.addSpec x0 rad }
-  { ps with inputBoxes := ps.inputBoxes.insert 0 { dim := 1, lo := xB.lo, hi := xB.hi } }
+  ps.seedLInfBall 0 x0 eps
 
 /-- Seed a 2D input box `[(x,y) - eps, (x,y) + eps]` at node id 0. -/
 def seedInputFloat2D (ps : ParamStore Float) (x y : Float) (eps : Float) : ParamStore Float :=
   let x0 : Tensor Float (.dim 2 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (if decide (i.val = 0) then x else y))
-  let rad := Spec.fill (α:=Float) eps (.dim 2 .scalar)
-  let xB : Box Float (.dim 2 .scalar) :=
-    { lo := Tensor.subSpec x0 rad
-      hi := Tensor.addSpec x0 rad }
-  { ps with inputBoxes := ps.inputBoxes.insert 0 { dim := 2, lo := xB.lo, hi := xB.hi } }
+  ps.seedLInfBall 0 x0 eps
 
 /-
   Hessian/Laplacian helpers (2D)
@@ -171,18 +215,18 @@ def hessian2D (g : Graph) (ps : ParamStore Float)
     let seedX := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := Float) inDim 0)
     let d1x := NN.MLTheory.CROWN.Graph.runDerivDirectional (α:=Float) g ps ibp seedX
     let d2x := NN.MLTheory.CROWN.Graph.runDeriv2D (α:=Float) g ps ibp d1x
-    match d2x[5]! with
-    | some B => some (Spec.Tensor.sumSpec B.lo, Spec.Tensor.sumSpec B.hi)
-    | none => none
+    match d2x[5]? with
+    | some (some B) => some (Spec.Tensor.sumSpec B.lo, Spec.Tensor.sumSpec B.hi)
+    | _ => none
   -- Y direction (only if inDim ≥ 2)
   let d2y : Option (Float × Float) :=
     if inDim ≥ 2 then
       let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := Float) inDim 1)
       let d1y := NN.MLTheory.CROWN.Graph.runDerivDirectional (α:=Float) g ps ibp seedY
       let d2y := NN.MLTheory.CROWN.Graph.runDeriv2D (α:=Float) g ps ibp d1y
-      match d2y[5]! with
-      | some B => some (Spec.Tensor.sumSpec B.lo, Spec.Tensor.sumSpec B.hi)
-      | none => none
+      match d2y[5]? with
+      | some (some B) => some (Spec.Tensor.sumSpec B.lo, Spec.Tensor.sumSpec B.hi)
+      | _ => none
     else none
   (d2x, d2y)
 
@@ -197,60 +241,34 @@ def laplacianBounds2D (g : Graph) (ps : ParamStore Float) : Option (Float × Flo
 /-- Parse the JSON certificate consumed by the PINN verification CLI. -/
 def parseCert (j : Json) : Except String (PinnCfg × (List (Float × Float)) × (List (Float × Float))
   × (List (Float × (Float×Float) × (Float×Float) × (Float×Float)))) := do
-  let o ← j.getObj?
-  let po ← (o.get? "pinn").getD Json.null |>.getObj?
-  let pdeStr :=
-    match (po.get? "pde").getD Json.null with
-    | .str s => s
-    | _ => "u''(x) = 0"
-  let h ← (po.get? "h").getD Json.null |>.getNum?
-  let eps ← (po.get? "eps").getD Json.null |>.getNum?
-  let ptsJ ← (po.get? "points").getD Json.null |>.getArr?
-  let ptsA : Array Float :=
-    ptsJ.map (fun x => match x with | .num v => v.toFloat | _ => 0.0)
+  let o ← NN.API.Json.expectObjE "PINN certificate" j
+  let po ← expectFieldObjE "PINN certificate" "pinn" j
+  let pdeStr ←
+    match Std.TreeMap.Raw.get? po "pde" with
+    | none => pure "u''(x) = 0"
+    | some Json.null => pure "u''(x) = 0"
+    | some pdeJ =>
+        match pdeJ with
+        | .str s => pure s
+        | _ => throw "PINN certificate.pinn.pde: expected string"
+  let h ← NN.Verification.Json.expectFieldFloatE "PINN certificate.pinn" "h" (.obj po)
+  let eps ← NN.Verification.Json.expectFieldFloatE "PINN certificate.pinn" "eps" (.obj po)
+  let ptsA ← expectFieldFloatArrayE "PINN certificate.pinn" "points" (.obj po)
   let nPts := ptsA.size
   let pts : Spec.Tensor Float (.dim nPts .scalar) :=
     Spec.Tensor.dim (fun i => Spec.Tensor.scalar ptsA[i])
-  let rb ← (o.get? "residual_bounds").getD Json.null |>.getObj?
-  let rloA ← (rb.get? "lo").getD Json.null |>.getArr?
-  let rhiA ← (rb.get? "hi").getD Json.null |>.getArr?
-  if rloA.size ≠ nPts ∨ rhiA.size ≠ nPts then
-    throw "residual length mismatch"
-  let resPairs := (List.finRange nPts).map (fun i =>
-    let lo := match rloA[i]! with | .num v => v.toFloat | _ => 0.0
-    let hi := match rhiA[i]! with | .num v => v.toFloat | _ => 0.0
-    (lo, hi))
+  let rb ← NN.API.Json.expectFieldE "PINN certificate" "residual_bounds" j
+  let resPairs ← expectIntervalPairArrayE "PINN certificate.residual_bounds" rb nPts
   -- optional derivative-based residuals
   let resPairsDeriv ←
-    match (o.get? "residual_bounds_deriv") with
-    | some (.obj rbo) =>
-      match (rbo.get? "lo").getD Json.null |>.getArr?, (rbo.get? "hi").getD Json.null |>.getArr?
-        with
-      | Except.ok rloDA, Except.ok rhiDA =>
-        if rloDA.size = nPts ∧ rhiDA.size = nPts then
-          pure <| (List.finRange nPts).map (fun i =>
-            let lo := match rloDA[i]! with | .num v => v.toFloat | _ => 0.0
-            let hi := match rhiDA[i]! with | .num v => v.toFloat | _ => 0.0
-            (lo, hi))
-        else
-          pure <| List.replicate nPts (0.0, 0.0)
-      | _, _ => pure <| List.replicate nPts (0.0, 0.0)
+    match Std.TreeMap.Raw.get? o "residual_bounds_deriv" with
+    | some Json.null => pure <| List.replicate nPts (0.0, 0.0)
+    | some derivJ => expectIntervalPairArrayE "PINN certificate.residual_bounds_deriv" derivJ nPts
     | _ => pure <| List.replicate nPts (0.0, 0.0)
-  let ubA ← (o.get? "u_bounds").getD Json.null |>.getArr?
-  let uTriples := ubA.toList.map (fun e =>
-    match e with
-    | .obj eo =>
-      let x := match (eo.get? "x").getD Json.null with | .num v => v.toFloat | _ => 0.0
-      let getPair (k : String) : (Float × Float) :=
-        match (eo.get? k).getD Json.null with
-        | .obj ko =>
-          let lo := match (ko.get? "lo").getD Json.null with | .num v => v.toFloat | _ => 0.0
-          let hi := match (ko.get? "hi").getD Json.null with | .num v => v.toFloat | _ => 0.0
-          (lo, hi)
-        | _ => (0.0, 0.0)
-      (x, getPair "u_minus", getPair "u", getPair "u_plus")
-    | _ => (0.0, (0.0,0.0), (0.0,0.0), (0.0,0.0)))
-  pure ({ pde := pdeStr, h := h.toFloat, eps := eps.toFloat, nPts := nPts, pts := pts }
+  let ubA ← expectFieldArrayE "PINN certificate" "u_bounds" j
+  let uTriples ← (List.finRange ubA.size).mapM (fun (i : Fin ubA.size) =>
+    expectUBoundsEntryE s!"PINN certificate.u_bounds[{i.val}]" ubA[i.val])
+  pure ({ pde := pdeStr, h := h, eps := eps, nPts := nPts, pts := pts }
     , resPairs, resPairsDeriv, uTriples)
 
 /-- Finite-difference residual bounds for 1D second derivative. -/
@@ -318,17 +336,13 @@ def seedParamsGeneric2D {α : Type} [Context α] : ParamStore α :=
 /-- Generic input seeding for 1D. -/
 def seedInputGeneric {α : Type} [Context α] (ps : ParamStore α) (x : α) (eps : α) : ParamStore α :=
   let x0 : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
-  let rad := Spec.fill (α:=α) eps (.dim 1 .scalar)
-  let xB : Box α (.dim 1 .scalar) := { lo := Tensor.subSpec x0 rad, hi := Tensor.addSpec x0 rad }
-  { ps with inputBoxes := ps.inputBoxes.insert 0 { dim := 1, lo := xB.lo, hi := xB.hi } }
+  ps.seedLInfBall 0 x0 eps
 
 /-- Generic input seeding for 2D. -/
 def seedInputGeneric2D {α : Type} [Context α] (ps : ParamStore α) (x y : α) (eps : α) : ParamStore
   α :=
   let x0 : Tensor α (.dim 2 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (if decide (i.val = 0) then x else y))
-  let rad := Spec.fill (α:=α) eps (.dim 2 .scalar)
-  let xB : Box α (.dim 2 .scalar) := { lo := Tensor.subSpec x0 rad, hi := Tensor.addSpec x0 rad }
-  { ps with inputBoxes := ps.inputBoxes.insert 0 { dim := 2, lo := xB.lo, hi := xB.hi } }
+  ps.seedLInfBall 0 x0 eps
 
 end NN.Verification.PINN

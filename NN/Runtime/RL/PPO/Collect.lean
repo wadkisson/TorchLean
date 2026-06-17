@@ -60,8 +60,7 @@ The caller provides:
 - `predictLogits` for the current actor,
 - `predictValue` for the current critic (returns a scalar `α`).
 
-This keeps the PPO runtime API small while still supporting the “compiled model + parameters”
-calling convention used throughout TorchLean.
+The API supports the “compiled model + parameters” calling convention used throughout TorchLean.
 -/
 def collectRolloutSessionWith {obsShape : Shape} {nActions horizon : Nat} {Sess : Type}
     [Fact (0 < horizon)] [Fact (0 < nActions)]

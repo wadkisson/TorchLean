@@ -8,122 +8,90 @@ module
 
 public import NN
 public import NN.Examples.Models.Sequence.Gpt2
-public import NN.API.Runtime
 
 /-!
 # GPT-2 Saved-Weights Example
 
-This file is the load-and-sample half of the byte-level GPT example.
+This is the load-and-sample half of the byte-level GPT example.
 
 1. Train and save parameters:
 
 ```bash
 lake build -R -K cuda=true torchlean:exe
-lake exe torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 200 \
-  --prompt "First Citizen:" --generate 96 \
+lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 \
+  --prompt "First Citizen:" --generate 0 \
   --save-params data/model_zoo/gpt2_shakespeare.params.json
 ```
 
 2. Load the saved weights and sample text (no training loop, no optimizer state):
 
 ```bash
-lake exe torchlean gpt2_saved --cuda --fast-kernels \
+lake exe -K cuda=true torchlean gpt2_saved --cuda --fast-kernels \
   --params data/model_zoo/gpt2_shakespeare.params.json \
-  --prompt "First Citizen:" --generate 160
+  --prompt "First Citizen:" --generate 0
 ```
 
-## What A "Checkpoint" Is In TorchLean
+## What A Checkpoint Is Here
 
-TorchLean's simplest checkpoint format is explicit:
+This example uses the simplest TorchLean checkpoint format:
 
-- a **typed parameter pack**: `TList Float (nn.paramShapes model)`,
-- encoded as **exact IEEE-754 bit patterns** (`Float.toBits`) in JSON, and
-- validated by shape on load.
+- a shape-indexed pack of model parameters,
+- stored as exact `Float.toBits` values in JSON, and
+- checked against the model's parameter shapes before inference starts.
 
-So "save/load" is model-agnostic: if you can name the model, you can name its
-`paramShapes`, and you can save/load the parameters.
+So save/load is model-agnostic: if we can name the model, TorchLean can compute the expected
+parameter shapes and reject stale or mismatched checkpoint files.
 
 ## Why This Is A Separate Example
 
-TorchLean's checkpoint format is shape-indexed and architecture-agnostic: it is just a typed
-parameter pack (`TList Float (nn.paramShapes model)`). This file exists to show the simplest
-"inference-only" workflow: load a checkpoint and run sampling, without building a training loop.
+The inference-only workflow is direct: load a checkpoint, convert it into runtime
+parameter handles, and sample text without building a training loop.
 -/
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Sequence.Gpt2Saved
 
 /-- CLI subcommand name used in terminal banners and error messages. -/
 def exeName : String := "torchlean gpt2_saved"
 
-/-- Parsed options for loading a byte-level GPT checkpoint and sampling from it. -/
-structure LoadOptions where
-  /-- JSON bits checkpoint produced by `torchlean gpt2 --save-params ...`. -/
-  paramsPath : System.FilePath
-  /-- Prompt string (byte-tokenized by the same tokenizer as `Gpt2`). -/
-  prompt : String
-  /-- Number of tokens to generate past the prompt. -/
-  generate : Nat
-  /-- Softmax temperature used during sampling (must be > 0). -/
-  temperature : Float
-  /-- Top-k sampling cutoff; smaller values are more conservative. -/
-  topK : Nat
-  /-- Penalize repeating tokens in the recent window. `1.0` disables the penalty. -/
-  repeatPenalty : Float
-  /-- Size of the repeat-penalty window. -/
-  repeatWindow : Nat
-  /-- RNG seed for sampling. -/
-  seed : Nat
-  /-- If `true`, replace non-ASCII bytes by escapes when displaying the sampled string. -/
-  asciiOnly : Bool
-deriving Repr
-
-/-- Parse saved-parameter and generation flags after runtime/device flags. -/
-def parseLoadOptions (args : List String) : Except String (LoadOptions × List String) := do
-  let (paramsRaw?, args) ← CLI.takeFlagValueOnce args "params"
-  let paramsRaw ←
-    match paramsRaw? with
-    | some p => pure p
-    | none => throw s!"{exeName}: missing required --params <path>"
-  let (gen, args) ← text.parseGenerationOptions exeName args
-    { prompt := "First Citizen:"
-      generate := 96
-      temperature := 0.85
-      topK := 12
-      repeatPenalty := 1.25
-      repeatWindow := 24
-      seed := 7
-      asciiOnly := false }
-  pure ({ paramsPath := (paramsRaw : System.FilePath)
-          prompt := gen.prompt
-          generate := gen.generate
-          temperature := gen.temperature
-          topK := gen.topK
-          repeatPenalty := gen.repeatPenalty
-          repeatWindow := gen.repeatWindow
-          seed := gen.seed
-          asciiOnly := gen.asciiOnly }, args)
+/-- Help text for checkpoint-only GPT-2 sampling. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "Usage:"
+    , "  lake exe -K cuda=true torchlean gpt2_saved --cuda --params PATH [generation flags]"
+    , ""
+    , "Required:"
+    , "  --params PATH        JSON parameter checkpoint written by `torchlean gpt2 --save-params`"
+    , ""
+    , "Common generation flags:"
+    , "  --prompt TEXT        prompt prefix"
+    , "  --generate N         number of bytes to generate"
+    , "  --temperature X      sampling temperature"
+    , "  --top-k N            top-k cutoff"
+    , "  --seed N             sampling seed"
+    ]
 
 /--
 Load parameters from disk and run sampling with the fixed byte-level GPT architecture.
 
-Important: the checkpoint must match `Gpt2.mkModel`'s parameter shapes. If the model configuration
+Important: the checkpoint must match `Gpt2.model`'s parameter shapes. If the model configuration
 in `Gpt2.lean` changes (heads, width, layers, etc.), mismatched checkpoints fail the shape check
 before sampling starts.
 -/
-def sampleWithSavedParams (opts : Runtime.Autograd.Torch.Options) (load : LoadOptions) :
+def sampleWithSavedParams
+    (load : text.SavedParamsGenerationOptions) :
     IO String := do
-  nn.withModel NN.Examples.Models.Sequence.Gpt2.mkModel fun model => do
-    -- This is the generic “load parameters for any TorchLean model” helper:
-    -- a checkpoint is just a shape-indexed `TList Float (nn.paramShapes model)`.
-    let ps ← TorchLean.ParamIO.loadTListBits (paramShapes := nn.paramShapes model) load.paramsPath
-    let params ← _root_.Runtime.Autograd.Torch.ParamList.ofTList (α := Float) (ss := nn.paramShapes model) ps
+  nn.withModel NN.Examples.Models.Sequence.Gpt2.model fun model => do
+    -- The checkpoint boundary is shape-indexed: stale files fail before sampling starts.
+    let paramsBits ← Checkpoint.loadModelParamBits model load.paramsPath
+    let compiled ← nn.compileOut model (α := Float)
+    let predict : NN.Examples.Models.Sequence.Gpt2.Predictor :=
+      fun x => pure <| nn.predict1 model compiled paramsBits x
     let outIds ←
-      NN.Examples.Models.Sequence.Gpt2.generateSampled opts model params load.prompt load.generate
+      NN.Examples.Models.Sequence.Gpt2.generateSampled predict load.prompt load.generate
         load.temperature load.topK load.seed load.repeatWindow load.repeatPenalty load.asciiOnly
     let txt := text.escapeByteIdsForDisplay outIds
     IO.println s!"  loaded={load.paramsPath}"
@@ -133,13 +101,23 @@ def sampleWithSavedParams (opts : Runtime.Autograd.Torch.Options) (load : LoadOp
 
 /-- CLI entrypoint for saved-parameter sampling. -/
 def main (args : List String) : IO UInt32 := do
-  Common.runFloat exeName args
-    (banner := fun opts =>
-      s!"{exeName}: sample from saved params (device={if opts.useGpu then "cuda" else "cpu"})")
-    (k := fun opts rest => do
-      let (load, rest) ← Common.orThrow exeName <| parseLoadOptions rest
-      Common.orThrow exeName <| CLI.requireNoArgs rest
-      let _ ← sampleWithSavedParams opts load
-      pure ())
+  if args.contains "--help" || args.contains "-h" then
+    IO.println usage
+    return 0
+  ModelZoo.runFloat exeName args
+    (banner := fun _ => s!"{exeName}: sample from saved params")
+    (k := fun _opts rest => do
+      let (load, rest) ← ModelZoo.orThrow exeName <|
+        text.SavedParamsGenerationOptions.parse exeName rest
+          { prompt := "First Citizen:"
+            generate := 96
+            temperature := 0.85
+            topK := 12
+            repeatPenalty := 1.25
+            repeatWindow := 24
+            seed := 7
+            asciiOnly := false }
+      CLI.requireNoArgs exeName rest
+      let _ ← sampleWithSavedParams load)
 
 end NN.Examples.Models.Sequence.Gpt2Saved

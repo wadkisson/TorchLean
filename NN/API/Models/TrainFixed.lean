@@ -26,7 +26,8 @@ Scope:
 - it is model-agnostic: callers supply the loss wrapper and optimizer constructor;
 - it is backend-agnostic: callers can use it on CPU or CUDA via `TorchLean.Options`.
 
-For dataset-backed training, use the loader/stream helpers in `NN.API.train`.
+For dataset-backed training, use the `TorchLean.Trainer` facade exported by `NN` or the shared model-zoo
+loader helpers.
 -/
 
 @[expose] public section
@@ -58,7 +59,7 @@ def steps
       (cast : Float → α) → (paramShapes : List Shape) → TorchLean.Optim.Optimizer α paramShapes)
     (cast : Float → α)
     (opts : TorchLean.Options)
-    (sample : sample.Supervised α σ τ)
+    (sample : SupervisedSample α σ τ)
     (steps : Nat)
     (cudaMemWatch : Nat := 0) :
     IO (LossPair α) := do
@@ -88,7 +89,7 @@ def curveFloat
     (mkOptim :
       (paramShapes : List Shape) → TorchLean.Optim.Optimizer Float paramShapes)
     (opts : TorchLean.Options)
-    (sample : sample.Supervised Float σ τ)
+    (sample : SupervisedSample Float σ τ)
     (steps : Nat)
     (cudaMemWatch : Nat := 0) :
     IO _root_.Runtime.Training.Curve := do

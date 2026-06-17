@@ -104,7 +104,7 @@ lemma netx_update_eq (p : Params ℝ n) (x0 : Fin n → ℝ) (u : Fin n) (xu' : 
       (∑ j ∈ (U (n := n)), p.W u j * x0 j)
         =
       (p.W u u * x0 u) + ∑ j ∈ (U (n := n) \ {u}), p.W u j * x0 j := by
-    rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+    rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
   -- Subtract and simplify.
   calc
     netx (n := n) p (Function.update x0 u xu') u
@@ -147,7 +147,7 @@ lemma quad_inner_delta_ne (p : Params ℝ n) {u i : Fin n} (hi : i ≠ u)
       (∑ j ∈ (U (n := n)), p.W i j * x0 i * x0 j)
         =
       (p.W i u * x0 i * x0 u) + ∑ j ∈ (U (n := n) \ {u}), p.W i j * x0 i * x0 j := by
-    rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+    rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
   calc
     (∑ j ∈ (U (n := n)), p.W i j * x0 i * (Function.update x0 u xu' j))
         -
@@ -180,7 +180,7 @@ lemma quad_delta_update (p : Params ℝ n) (hsym : SymmetricW (n := n) p) (hdiag
       ∑ i ∈ (U (n := n) \ {u}), ∑ j ∈ (U (n := n)), p.W i j * x1 i * x1 j := by
     -- `sum_eq_add_sum_diff_singleton` with `s = U`.
     simp [quad]
-    rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+    rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
   have hsplit0 :
       quad (n := n) p x0
         =
@@ -188,7 +188,7 @@ lemma quad_delta_update (p : Params ℝ n) (hsym : SymmetricW (n := n) p) (hdiag
         +
       ∑ i ∈ (U (n := n) \ {u}), ∑ j ∈ (U (n := n)), p.W i j * x0 i * x0 j := by
     simp [quad]
-    rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+    rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
   -- For `i ≠ u`, `x1 i = x0 i`, and only the inner sum's `j=u` term changes.
   have hrest :
       (∑ i ∈ (U (n := n) \ {u}), ∑ j ∈ (U (n := n)), p.W i j * x1 i * x1 j)
@@ -300,7 +300,7 @@ lemma quad_delta_update (p : Params ℝ n) (hsym : SymmetricW (n := n) p) (hdiag
         netx (n := n) p x0 u =
           (p.W u u * x0 u) + ∑ i ∈ (U (n := n) \ {u}), p.W u i * x0 i := by
       simp [netx]
-      rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu']
+      rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu']
     have hdiag' : p.W u u = 0 := hdiag u
     have hswap :
         (∑ i ∈ (U (n := n) \ {u}), p.W i u * x0 i) =
@@ -377,7 +377,7 @@ theorem energy_updateAt_le (p : Params ℝ n) (hsym : SymmetricW (n := n) p) (hd
         (∑ i ∈ (U (n := n)), p.θ i * x0 i)
           =
         (p.θ u * x0 u) + ∑ i ∈ (U (n := n) \ {u}), p.θ i * x0 i := by
-      rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+      rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
     calc
       (∑ i ∈ (U (n := n)), p.θ i * x1 i) - (∑ i ∈ (U (n := n)), p.θ i * x0 i)
           =
@@ -476,7 +476,7 @@ theorem energy_updateAt_delta (p : Params ℝ n)
         (∑ i ∈ (U (n := n)), p.θ i * x0 i)
           =
         (p.θ u * x0 u) + ∑ i ∈ (U (n := n) \ {u}), p.θ i * x0 i := by
-      rw [Finset.sum_eq_add_sum_diff_singleton_of_mem hu]
+      rw [Finset.sum_eq_add_sum_sdiff_singleton_of_mem hu]
     calc
       (∑ i ∈ (U (n := n)), p.θ i * x1 i) - (∑ i ∈ (U (n := n)), p.θ i * x0 i)
           =

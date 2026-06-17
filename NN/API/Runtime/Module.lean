@@ -193,16 +193,10 @@ Default dtype policy:
 def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
     Except String (ExecConfig × List String) := do
   let (dtype, args1) ← DType.parseAndStripWithDefault args defaultDType
-  let (backendV?, args2) ← CLI.takeFlagValueOnce args1 "backend"
-  let backend ←
-    match backendV? with
-    | none => pure .eager
-    | some v => parseBackend v
-  let (fastPrecisionV?, args3) ← CLI.takeFlagValueOnce args2 "fast-gpu-matmul-precision"
-  let fastGpuMatmulPrecision ←
-    match fastPrecisionV? with
-    | none => pure .fp32
-    | some v => parseFastGpuMatmulPrecision v
+  let (backend, args2) ←
+    CLI.takeParsedFlagDefault args1 "backend" "eager" parseBackend
+  let (fastGpuMatmulPrecision, args3) ←
+    CLI.takeParsedFlagDefault args2 "fast-gpu-matmul-precision" "fp32" parseFastGpuMatmulPrecision
   let rec go (useGpu fastKernels : Bool) (acc : List String) :
       List String → (Bool × Bool × List String)
     | [] => (useGpu, fastKernels, acc.reverse)
@@ -223,6 +217,14 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
     fastKernels := fastKernels,
     fastGpuMatmulPrecision := fastGpuMatmulPrecision
   }, rest)
+
+/-- Convert a parsed CLI execution config to runtime `Options`. -/
+def toOptions (cfg : ExecConfig) (seed : Nat := 0) : Options :=
+  { backend := cfg.backend
+    seed := seed
+    useGpu := cfg.useGpu
+    fastKernels := cfg.fastKernels
+    fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
 
 /-- Parse CLI flags with the standard TorchLean default dtype policy. -/
 def parseAndStrip (args : List String) : Except String (ExecConfig × List String) := do
@@ -261,11 +263,7 @@ def withRuntime
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options :=
-    { backend := cfg.backend
-      useGpu := cfg.useGpu
-      fastKernels := cfg.fastKernels
-      fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
+  let opts : Options := ExecConfig.toOptions cfg
   match (← DType.withRuntime cfg.dtype (fun {α} _ _ _ _ => do
         k (α := α) (API.Runtime.ofFloat (α := α)) opts rest
       )) with
@@ -292,11 +290,7 @@ def withModule
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options :=
-    { backend := cfg.backend
-      useGpu := cfg.useGpu
-      fastKernels := cfg.fastKernels
-      fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
+  let opts : Options := ExecConfig.toOptions cfg
   match cfg.dtype with
   | .float =>
       -- Keep the Float branch explicit. If this path is hidden behind the scalar-polymorphic
@@ -335,11 +329,7 @@ def withModuleRuntime
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options :=
-    { backend := cfg.backend
-      useGpu := cfg.useGpu
-      fastKernels := cfg.fastKernels
-      fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
+  let opts : Options := ExecConfig.toOptions cfg
   match cfg.dtype with
   | .float =>
       -- Same reason as `withModule`: CUDA module construction should see `α = Float` directly, so
@@ -408,6 +398,22 @@ inductive RunAction where
   -/
   | float (k : (opts : Options) → (rest : List String) → IO Unit)
 
+/-- Generic help text for executables built on `TorchLean.Module.run`. -/
+def runUsage (exeName : String) : String :=
+  String.intercalate "\n"
+    [ s!"Usage: {exeName} [runtime flags] [command flags]"
+    , ""
+    , "Runtime flags:"
+    , "  --cpu | --cuda"
+    , "  --dtype float|ieee754exec"
+    , "  --backend eager|compiled"
+    , "  --seed N"
+    , "  --fast-kernels"
+    , "  --fast-gpu-matmul-precision fp32|tf32"
+    , ""
+    , "Use the example documentation or `lake exe torchlean --help` for command-specific flags."
+    ]
+
 /--
 CLI entrypoint helper for executable `main` functions.
 
@@ -428,6 +434,9 @@ def run
     (runOpts : RunOptions := {}) :
     IO UInt32 := do
   let args := API.CLI.dropDashDash args
+  if args.contains "--help" || args.contains "-h" then
+    IO.println (runUsage exeName)
+    return 0
   let (seed, args) ←
     match API.CLI.takeSeed args 0 with
     | .ok v => pure v
@@ -458,12 +467,7 @@ def run
       if cfg.dtype != .float then
         throw <| IO.userError s!"{exeName}: this program only supports `--dtype float`"
       ExecConfig.log cfg
-      let opts : Options :=
-        { backend := cfg.backend
-          seed := seed
-          fastKernels := cfg.fastKernels
-          fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision
-          useGpu := cfg.useGpu }
+      let opts : Options := ExecConfig.toOptions cfg seed
       runOpts.printBanner opts
       k opts rest
       printOk

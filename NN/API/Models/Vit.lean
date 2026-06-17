@@ -70,7 +70,7 @@ def VitConfig.seqLen (cfg : VitConfig) : Nat :=
 
 /-- Flattened token representation size used before the classifier head. -/
 def VitConfig.flatDim (cfg : VitConfig) : Nat :=
-  -- Keep this in the same “shape-size” form used by `nn.flattenBatch`, so the API-level
+  -- Keep this in the same “shape-size” form used by `FlattenBatch`, so the API-level
   -- constructor typechecks without requiring `simp` reductions on concrete numerals.
   Spec.Shape.size (NN.Tensor.Shape.Mat cfg.seqLen cfg.dModel)
 
@@ -96,7 +96,8 @@ Patch-tokenization adapter: `N×C×H×W -> N×(H*W)×C`.
 This is the “low-hanging fruit” to move out of examples: the reshape needs a small size proof.
 -/
 def nchwToTokens (cfg : VitConfig) : nn.LayerDef (vitConvOutShape cfg) (vitTokensShape cfg) :=
-  { paramShapes := []
+  { kind := "NCHWToTokens"
+    paramShapes := []
     initParams := .nil
     paramRequiresGrad := []
     forward := fun _ {α} _ _ =>
@@ -131,7 +132,7 @@ def vit1 (cfg : VitConfig)
   letI : NeZero cfg.patchW := ⟨h_patchW⟩
   letI : NeZero cfg.seqLen := ⟨h_seqLen⟩
   letI : NeZero cfg.dModel := ⟨h_dModel⟩
-  nn.sequential![
+  nn.Sequential![
     nn.conv { outC := cfg.dModel, kH := cfg.patchH, kW := cfg.patchW, stride := cfg.stride, padding := cfg.padding },
     nn.lift (nn.of (nchwToTokens cfg)),
     nn.transformerEncoderBlock
@@ -140,8 +141,8 @@ def vit1 (cfg : VitConfig)
         ffnHidden := cfg.ffnHidden
         activation := .gelu
         dropout? := none },
-    nn.flattenBatch,
-    nn.linear cfg.flatDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    FlattenBatch,
+    Linear cfg.flatDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
   ]
 
 end models

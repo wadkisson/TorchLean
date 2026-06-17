@@ -212,7 +212,7 @@ def backwardOneLayer (state : BackwardState α)
   let ⟨wm, wn, matW⟩ := W
   let ⟨bn, vecB⟩ := bias
 
-  -- Check dimension compatibility
+  -- Check that the matrix, bias, and relaxation dimensions match.
   if h : wm = relax.dim ∧ bn = wm then
     -- Build diagonal slope matrices for the relaxation dimension
     let slopeLower := layerSlopesLower (n:=relax.dim) relax rfl

@@ -179,7 +179,7 @@ theorem approxT_safeLog_spec {s : Shape} (ε : ℝ) (hε : 0 < ε) :
                 simpa [safeLogBoundTensor, tensorToSpec, Spec.mapTensor, mapSpec, linfNorm,
                   RuntimeApprox.linfNorm, tensorDistance,
                     NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                  tensorLinfNorm, safeLog] using le_abs_self _
+                  tensorLinfNorm, MathFunctions.abs, safeLog] using le_abs_self _
               -- Wrap back into `approxT`.
               exact
                 (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -221,10 +221,10 @@ theorem approxT_safeLog_spec {s : Shape} (ε : ℝ) (hε : 0 < ε) :
                         (safeLogBoundTensor (β := β) (fexp := fexp) (rnd := rnd) (s := s) ε eps
                           (xRf i)) ≤
                       B := by
-                  simpa [B, safeLogBoundTensor, Spec.mapTensor] using
-                    (linf_norm_le_get_dim
-                      (t := safeLogBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
-                        (s := Shape.dim n s) ε eps (Tensor.dim xRf)) i)
+                    simpa [B, safeLogBoundTensor, tensorToSpec, Spec.mapTensor, mapSpec] using
+                      (linf_norm_le_get_dim
+                        (t := safeLogBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                          (s := Shape.dim n s) ε eps (Tensor.dim xRf)) i)
                 have hdist :
                     tensorDistance (α := SpecScalar) linfNorm
                         (mapSpec (s := s) (safeLog (ε := ε)) (xSf i))
@@ -266,10 +266,20 @@ theorem approxT_safeLog_spec {s : Shape} (ε : ℝ) (hε : 0 < ε) :
                         (mapSpec (s := Shape.dim n s) (safeLogR (β := β) (fexp := fexp) (rnd :=
                           rnd) ε)
                           (Tensor.dim xRf)))
-                    ≤ B := by
-                simpa [tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                  linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                    Spec.mapTensor, mapSpec] using hfold
+                      ≤ B := by
+                    change
+                      List.foldl
+                        (fun a i =>
+                          max a
+                            (tensorDistance (α := SpecScalar) linfNorm
+                              (mapSpec (s := s) (safeLog (ε := ε)) (xSf i))
+                              (tensorToSpec (α := R)
+                                (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                                (mapSpec (s := s)
+                                  (safeLogR (β := β) (fexp := fexp) (rnd := rnd) ε)
+                                  (xRf i)))))
+                        0 (List.finRange n) ≤ B
+                    exact hfold
               simpa [approxT, approxWith, B] using this
 end NFBackend
 
@@ -277,4 +287,3 @@ end
 
 end RuntimeApprox
 end Proofs
-

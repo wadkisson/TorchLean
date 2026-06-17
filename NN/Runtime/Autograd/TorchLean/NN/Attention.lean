@@ -52,7 +52,8 @@ def multiHeadAttention
     (seed := seedW + 2)
   let wo0 : Tensor Float wOShape := Torch.Init.xavierW (outDim := projDim) (inDim := dModel) (seed
     := seedW + 3)
-  { paramShapes := [wProjShape, wProjShape, wProjShape, wOShape]
+  { kind := s!"MultiHeadAttention(heads={numHeads}, headDim={headDim})"
+    paramShapes := [wProjShape, wProjShape, wProjShape, wOShape]
     initParams := Torch.tlist4 wq0 wk0 wv0 wo0
     paramRequiresGrad := [true, true, true, true]
     forward := fun _ {α} _ _ =>

@@ -12,7 +12,7 @@ public import NN.Runtime.RL.Boundary.Json
 /-!
 # RL Trust Boundary (Umbrella)
 
-Stable import for TorchLean's RL trust-boundary layer. The boundary has two parts:
+Umbrella import for TorchLean's RL trust-boundary layer. The boundary has two parts:
 
 - `NN.Runtime.RL.Boundary.Core`: contracts, executable checkers, and Prop-level validity predicates;
 - `NN.Runtime.RL.Boundary.Json`: a small JSON rollout schema plus parser/validator for external

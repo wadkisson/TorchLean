@@ -11,7 +11,7 @@ public import Mathlib.Algebra.Order.BigOperators.Group.Finset
 public import Mathlib.Analysis.Calculus.MeanValue
 public import Mathlib.Analysis.Normed.Group.Basic
 public import Mathlib.Data.Real.Basic
-public import Mathlib.Data.Real.Sqrt
+public import Mathlib.Analysis.Real.Sqrt
 public import NN.MLTheory.LearningTheory.Robustness.Spec
 public import NN.Proofs.Tensor.Basic
 public import NN.Spec.Core.Context
@@ -177,34 +177,11 @@ theorem tensor_linf_norm_le_tensor_l2_norm {n : Nat} (y : Tensor ℝ (.dim n .sc
       cases hvi : values i with
       | scalar v =>
         have hi := habs_toVec_le i
-        simpa [NN.MLTheory.Robustness.Spec.tensorLinfNorm, toVec, hvi] using hi
+        simpa [NN.MLTheory.Robustness.Spec.tensorLinfNorm, MathFunctions.abs, toVec, hvi] using hi
 
-    -- Fold-max preserves an upper bound.
     have h0 : (0 : ℝ) ≤ tensorL2Norm (Tensor.dim values : Tensor ℝ (.dim n .scalar)) := by
       -- Note: `tensor_l2_norm_nonneg` is defined later in this file; avoid forward references.
       simp [tensorL2Norm]
-
-    have foldl_max_le :
-        ∀ (l : List (Fin n)) (acc : ℝ),
-          acc ≤ tensorL2Norm (Tensor.dim values : Tensor ℝ (.dim n .scalar)) →
-            l.foldl
-                (fun acc i =>
-                  max acc (NN.MLTheory.Robustness.Spec.tensorLinfNorm (α := ℝ) (values i)))
-                acc
-              ≤ tensorL2Norm (Tensor.dim values : Tensor ℝ (.dim n .scalar)) := by
-      intro l
-      induction l with
-      | nil =>
-        intro acc hacc
-        simpa using hacc
-      | cons hd tl ih =>
-        intro acc hacc
-        have hacc' :
-            max acc (NN.MLTheory.Robustness.Spec.tensorLinfNorm (α := ℝ) (values hd)) ≤
-              tensorL2Norm (Tensor.dim values : Tensor ℝ (.dim n .scalar)) :=
-          max_le hacc (hval hd)
-        simpa [List.foldl] using
-          (ih (acc := max acc (NN.MLTheory.Robustness.Spec.tensorLinfNorm (α := ℝ) (values hd))) hacc')
 
     have hfold :
         (List.finRange n).foldl
@@ -212,7 +189,11 @@ theorem tensor_linf_norm_le_tensor_l2_norm {n : Nat} (y : Tensor ℝ (.dim n .sc
               max acc (NN.MLTheory.Robustness.Spec.tensorLinfNorm (α := ℝ) (values i)))
             0
           ≤ tensorL2Norm (Tensor.dim values : Tensor ℝ (.dim n .scalar)) := by
-      simpa using (foldl_max_le (l := List.finRange n) (acc := (0 : ℝ)) h0)
+      exact List.foldl_max_le_of_le (List.finRange n)
+        (fun i => NN.MLTheory.Robustness.Spec.tensorLinfNorm (α := ℝ) (values i)) h0
+        (by
+          intro i _hi
+          exact hval i)
 
     -- Unfold the `tensor_linf_norm` definition on vectors.
     simpa [NN.MLTheory.Robustness.Spec.tensorLinfNorm] using hfold
@@ -998,6 +979,7 @@ theorem sub_spec_zero_right {s : Shape} (t : Tensor ℝ s) :
       funext i
       exact ih (f i)
 
+set_option linter.auxLemma false in
 /--
 Matrix-vector multiplication sends the zero vector to the zero vector.
 

@@ -21,7 +21,7 @@ along with two induced “MDP views”:
   row-stochastic kernels.
 
 This is intended as a Lean-native testbed for RL algorithm development and proofs: small enough
-to be pleasant to reason about, but shaped like the objects used in standard RL theory.
+to keep the transition proof small, but shaped like the objects used in standard RL theory.
 
 References (high-level context only):
 - Sutton and Barto, *Reinforcement Learning: An Introduction* (2nd ed.), Chapter 3
@@ -42,9 +42,8 @@ open Tensor
 /-!
 ## State and Action Types
 
-We use a **coordinate** state `(row, col)` rather than a flattened index. This keeps the
-environment’s definition close to the textbook picture and makes “stays in bounds” properties
-stateable directly.
+We use a **coordinate** state `(row, col)` rather than a flattened index. The environment definition
+matches the textbook picture, and “stays in bounds” properties can be stated directly.
 
 The `FiniteMDP` / `FiniteStochastic.MDP` views flatten `(row, col)` to `Fin (height * width)` using
 mathlib’s canonical equivalence `Fin height × Fin width ≃ Fin (height * width)`.

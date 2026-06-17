@@ -182,7 +182,8 @@ lemma toVecE_mat_vec_mul_spec {m n : Nat}
   apply (euclideanEquiv m).injective
   funext i
   -- Both sides are equal as `Fin m → ℝ`; match them via the coordinate sum.
-  simpa [matCLM, tensorToMatrix, Matrix.mulVec, Matrix.mulVecLin_apply, euclideanEquiv_toVecE,
+  simpa [matCLM, tensorToMatrix, Matrix.mulVec, dotProduct, Matrix.mulVecLin_apply,
+    euclideanEquiv_toVecE,
     euclideanEquiv] using
     (Spec.toVec_mat_vec_mul_spec (A := A) (v := v) (i := i))
 
@@ -319,7 +320,12 @@ lemma hasFDerivAt_reluVec {n : Nat} (x : Vec n) (hx : ∀ i : Fin n, x i ≠ 0) 
         (reluFun (n := n) ((euclideanEquiv n) x)) :=
     (ContinuousLinearMap.hasFDerivAt (euclideanEquiv n).symm.toContinuousLinearMap)
   -- Compose `euclideanEquiv.symm ∘ reluFun ∘ euclideanEquiv`.
-  simpa [reluVec, reluDerivCLM, xF, Function.comp] using he'.comp x hmid
+  change HasFDerivAt
+    ((fun y : Fin n → ℝ => (euclideanEquiv n).symm y) ∘
+      fun x : Vec n => reluFun (n := n) ((euclideanEquiv n) x))
+    ((euclideanEquiv n).symm.toContinuousLinearMap ∘SL
+      (reluFunDeriv (x := (euclideanEquiv n) x) ∘SL (euclideanEquiv n).toContinuousLinearMap)) x
+  simpa [reluDerivCLM, xF, Function.comp] using he'.comp x hmid
 
 -- ---------------------------------------------------------------------------
 -- 2-layer MLP: Linear → ReLU → Linear
@@ -399,6 +405,11 @@ lemma hasFDerivAt_mlpVec {inDim hidDim outDim : Nat}
 
   have hcomp1 := hrelu.comp x hlin1
   have hcomp2 := hlin2.comp x hcomp1
+  change HasFDerivAt
+    ((affine (inDim := hidDim) (outDim := outDim) W2 b2) ∘
+      (reluVec (n := hidDim)) ∘ (affine (inDim := inDim) (outDim := hidDim) W1 b1))
+    (matCLM (m := outDim) (n := hidDim) W2 ∘SL
+      reluDerivCLM (n := hidDim) z1 ∘SL matCLM (m := hidDim) (n := inDim) W1) x
   simpa [z1, ContinuousLinearMap.comp_assoc] using hcomp2
 
 -- ---------------------------------------------------------------------------
@@ -585,7 +596,7 @@ theorem mlp_backward_eq_adjoint_fderiv {inDim hidDim outDim : Nat}
         Spec.dot dxT ((mlpOp (inDim := inDim) (hidDim := hidDim) (outDim := outDim) l1 l2).backward
           x δ) := by
     intro dxT
-    simpa [mlpCorrect, mlpOp] using
+    simpa [mlpCorrect, mlpOp, OpSpecCorrect.compose, linearCorrect, reluCorrect] using
       (mlpCorrect (inDim := inDim) (hidDim := hidDim) (outDim := outDim) l1 l2).correct x dxT δ
 
   -- Convert `dot` to `inner` and rewrite the JVP using the analytic derivative.
@@ -674,7 +685,7 @@ theorem mlp_backward_eq_adjoint_fderiv {inDim hidDim outDim : Nat}
       -- `⟪u - v, u - v⟫ = ⟪u - v, u⟫ - ⟪u - v, v⟫`.
       have hinnerSub :
           inner ℝ (u - v) (u - v) = inner ℝ (u - v) u - inner ℝ (u - v) v := by
-        simpa using (inner_sub_right (x := u - v) (y := u) (z := v))
+        rw [inner_sub_right]
       exact hinnerSub.trans hSub
     have : u - v = 0 := (inner_self_eq_zero (𝕜 := ℝ) (x := (u - v))).1 h0
     simpa [hu, hv] using sub_eq_zero.mp this

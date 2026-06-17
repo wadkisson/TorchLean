@@ -125,11 +125,11 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                   exact this⟩
                 have hx_s :
                     ((TList.toAnyArray (α := α) (ss := Γ) x)[n]'hidX).s = Γ.get i := by
-                  simpa [i] using congrArg Runtime.AnyTensor.s (TList.get_toAnyArray (α := α) (ss :=
-                    Γ) x i)
+                  simpa [i, Runtime.Autograd.AnyTensor.mk] using congrArg Runtime.AnyTensor.s
+                    (TList.get_toAnyArray (α := α) (ss := Γ) x i)
                 have hseed_s :
                     (seedArr[n]'hidSeed).s = Γ.get i := by
-                  simpa [seedArr, i] using congrArg Runtime.AnyTensor.s
+                  simpa [seedArr, i, Runtime.Autograd.AnyTensor.mk] using congrArg Runtime.AnyTensor.s
                     (TList.get_toAnyArray (α := α) (ss := Γ)
                       (TList.cast (α := α) (h := List.append_nil Γ) seed) i)
                 exact hseed_s.trans hx_s.symm
@@ -153,7 +153,8 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                 rfl
 
               -- Unfold one loop iteration and use the IH.
-              simpa [Runtime.Autograd.Tape.backwardDenseFromLoop, hstepn] using (ihn hnle')
+              simpa [Runtime.Autograd.Tape.backwardDenseFromLoop, hstepn, Bind.bind, Except.bind,
+                Pure.pure, Except.pure] using (ihn hnle')
 
         -- Specialize to `n = t.size`.
         simpa [t, seedArr] using loop_id t.nodes.size (le_rfl)
@@ -405,7 +406,7 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                     (Γ ++ ssPrev).get fi := by
                 -- `ctxPrev.get fi : Tensor α ((Γ ++ ssPrev).get fi)`, so the RHS shape is
                 -- definitional.
-                simpa [fi] using
+                simpa [fi, Runtime.Autograd.AnyTensor.mk] using
                   congrArg Runtime.AnyTensor.s
                     (TList.get_toAnyArray (α := α) (ss := Γ ++ ssPrev) ctxPrev fi)
               -- rewrite the LHS using `hnodeVal`
@@ -413,7 +414,7 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
             have hseed_s :
                 ((TList.toAnyArray (α := α) (ss := Γ ++ ssPrev) seedPrev)[i]'(by
                     simpa [TList.size_toAnyArray] using hi)).s = (Γ ++ ssPrev).get fi := by
-              simpa [fi] using congrArg Runtime.AnyTensor.s
+              simpa [fi, Runtime.Autograd.AnyTensor.mk] using congrArg Runtime.AnyTensor.s
                 (TList.get_toAnyArray (α := α) (ss := Γ ++ ssPrev) seedPrev fi)
             exact hnode_s.trans hseed_s.symm
 
@@ -466,7 +467,8 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
             -- Rewrite the `backward` call to its concrete list of contributions.
             rw [hbackLast]
             -- The remaining `foldlM` is exactly `hfoldLast`.
-            simpa [seedPrevArr, seedPrevArr', outAny] using hfoldLast
+            simpa [seedPrevArr, seedPrevArr', outAny, Bind.bind, Except.bind, Pure.pure,
+              Except.pure] using hfoldLast
 
         -- Run the remaining prefix loop (ids `< n`). This matches the IH on `g` and leaves `outAny`
         -- untouched.
@@ -731,7 +733,8 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                               have ih' :=
                                 ih (acc0 := acc1) (accOut := accOut) hsize1 hpids_tl
                               -- unfold the `foldlM` for the cons case on both sides
-                              simpa [List.foldlM, hret, hret', Except.map] using ih'
+                              simpa [List.foldlM, hret, hret', Except.map, Bind.bind, Except.bind,
+                                Pure.pure, Except.pure] using ih'
 
                     have hpids_n :
                         ∀ {pid : Nat} {pg : Runtime.AnyTensor α}, (pid, pg) ∈ contribs → pid < n :=
@@ -745,7 +748,8 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                     -- Unfold the step and rewrite using the fold lemma.
                     simpa [Runtime.Autograd.Tape.backwardDenseFromStep, hnodePrev, hnodeNext, hreq,
                       hgetAcc, hgetAccPush,
-                      hshape, dLdy, hback, Except.map, throw, throwThe, MonadExceptOf.throw] using
+                      hshape, dLdy, hback, Except.map, throw, throwThe, MonadExceptOf.throw,
+                      Bind.bind, Except.bind, Pure.pure, Except.pure] using
                         hfold
               · -- shape mismatch
                 simp [Runtime.Autograd.Tape.backwardDenseFromStep, hnodePrev, hnodeNext, hreq,
@@ -785,7 +789,8 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
                         (by simpa using hret)
                       simpa [hacc] using this
                     have ih' := ihm (acc := acc1) hm' hsize1
-                    simpa [Runtime.Autograd.Tape.backwardDenseFromLoop, hret, hstep', Except.map]
+                    simpa [Runtime.Autograd.Tape.backwardDenseFromLoop, hret, hstep', Except.map,
+                      Bind.bind, Except.bind, Pure.pure, Except.pure]
                       using ih'
 
         have hloopFinal :
@@ -802,7 +807,7 @@ theorem backwardDenseFrom_compileAux_eq_backpropAllCtx {α : Type} {Δ : Type} [
           -- Unfold the loop one step, then rewrite the step result via `hstepLast`.
           -- The remaining goal is exactly `hloopFinal`.
           simp [Runtime.Autograd.Tape.backwardDenseFromLoop, hstepLast]
-          simpa using hloopFinal
+          simpa [Bind.bind, Except.bind, Pure.pure, Except.pure] using hloopFinal
         simpa [n, htPrevSize, Nat.add_assoc] using hloopAll
 
       -- Finish: rewrite both sides back to the original statement.

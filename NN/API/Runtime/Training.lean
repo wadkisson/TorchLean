@@ -123,17 +123,26 @@ inductive OptimizerConfig where
   deriving Repr
 
 /--
-Step-based training configuration for `fit` / `fitDataset`.
+Step-based training configuration for `trainSamples` / `trainDataset`.
 
 Fields:
 - `steps`: number of parameter updates,
+- `batchSize`: number of samples consumed by one public step for in-memory datasets,
 - `optimizer`: optimizer hyperparameters,
 - `scheduler`: optional learning-rate schedule (applied per step),
 - `logEvery`: progress printing frequency (`0` disables logging).
 -/
-structure FitConfig where
+structure TrainConfig where
   /-- Number of training steps. -/
   steps : Nat
+  /--
+  Number of samples consumed by one public training step.
+
+  The in-memory supervised loop applies one optimizer update per sample in the group, while
+  reporting/logging at the outer step cadence. Loader-backed training uses the loader batches
+  directly.
+  -/
+  batchSize : Nat := 1
   /-- Optimizer configuration. -/
   optimizer : OptimizerConfig := .sgd 0.01
   /-- Scheduler configuration. -/
@@ -143,19 +152,19 @@ structure FitConfig where
   deriving Repr
 
 /--
-Small summary returned by `fit*` helpers.
+Small summary returned by lower training helpers.
 
 By default, `before` and `after` are mean loss values, but the type is polymorphic so callers can
 report other scalars in the same shape.
 -/
-structure FitReport (α : Type) where
+structure TrainReport (α : Type) where
   /-- Metrics before training. -/
   before : α
   /-- Metrics after training. -/
   after : α
 
 /--
-Epoch-based training configuration for `fitLoader` (data-loader training).
+Epoch-based training configuration for `trainLoader` (data-loader training).
 
 Fields:
 - `epochs`: number of epochs (each epoch iterates once over the loader),
@@ -163,7 +172,7 @@ Fields:
 - `scheduler`: optional learning-rate schedule (applied per step/epoch depending on helper),
 - `logEvery`: progress printing frequency (`0` disables logging).
 -/
-structure LoaderFitConfig where
+structure LoaderTrainConfig where
   /-- Number of epochs to train for. -/
   epochs : Nat
   /-- Optimizer configuration. -/
@@ -350,7 +359,7 @@ def run {σ τ : Spec.Shape} (task : SeqTask σ τ) (args : List String)
 def params {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     (runner : Runner α task) :
-    IO (API.TorchLean.TList α (paramShapes task)) :=
+    IO (API.TorchLean.TensorPack α (paramShapes task)) :=
   API.TorchLean.Module.params runner.module
 
 /-- Read the runner's current mode (`.train` or `.eval`). -/
@@ -410,7 +419,7 @@ for layers such as normalization. In `.eval` mode it is a no-op.
 -/
 def updateRunnerBuffers {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (runner : Runner α task) (sample : API.TorchLean.TList α [σ, τ]) : IO Unit := do
+    (runner : Runner α task) (sample : API.TorchLean.TensorPack α [σ, τ]) : IO Unit := do
   let currentMode ← mode runner
   if currentMode == .train then
     match sample with
@@ -429,8 +438,8 @@ the gradients explicitly instead of storing them in `.grad` fields.
 -/
 def backward {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (runner : Runner α task) (sample : API.TorchLean.TList α [σ, τ]) :
-    IO (API.TorchLean.TList α (paramShapes task)) := do
+    (runner : Runner α task) (sample : API.TorchLean.TensorPack α [σ, τ]) :
+    IO (API.TorchLean.TensorPack α (paramShapes task)) := do
   -- The instantiated scalar module always uses the training-mode program; keep the runner mode
   -- aligned so `updateRunnerBuffers` is not accidentally skipped.
   trainMode runner
@@ -458,7 +467,6 @@ def predictBatch {σ τ : Spec.Shape} {task : SeqTask σ τ}
 /-- For classification heads: run `predict`, then take `argmax` over the logits (if defined). -/
 def predictClass? {σ : Spec.Shape} {n : Nat} {task : SeqTask σ (.dim n .scalar)}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    [LT α] [DecidableRel ((· > ·) : α → α → Prop)]
     (runner : Runner α task) (x : Spec.Tensor α σ) :
     IO (Option (Fin n)) := do
   let logits ← predict runner x
@@ -467,11 +475,10 @@ def predictClass? {σ : Spec.Shape} {n : Nat} {task : SeqTask σ (.dim n .scalar
 /-- Compute `(correct, total)` for a one-hot classification dataset. -/
 def accuracyOneHot {σ : Spec.Shape} {n : Nat} {task : SeqTask σ (.dim n .scalar)}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    [LT α] [DecidableRel ((· > ·) : α → α → Prop)]
-    (runner : Runner α task) (samples : List (API.TorchLean.TList α [σ, .dim n .scalar])) :
+    (runner : Runner α task) (samples : List (API.TorchLean.TensorPack α [σ, .dim n .scalar])) :
     IO (Nat × Nat) := do
   let rec go (correct total : Nat) :
-      List (API.TorchLean.TList α [σ, .dim n .scalar]) → IO (Nat × Nat)
+      List (API.TorchLean.TensorPack α [σ, .dim n .scalar]) → IO (Nat × Nat)
     | [] => pure (correct, total)
     | sample :: rest =>
         do
@@ -485,14 +492,13 @@ def accuracyOneHot {σ : Spec.Shape} {n : Nat} {task : SeqTask σ (.dim n .scala
 
 /-- Mean scalar loss over a list of supervised samples (uses the runner's active mode). -/
 def meanLoss {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Add α] [Div α] [Zero
-      α] [Coe Nat α]
-    (runner : Runner α task) (samples : List (API.TorchLean.TList α [σ, τ])) :
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
+    (runner : Runner α task) (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
     IO α := do
   let compiled ← activeLoss runner
   let ps ← params runner
   let values ← samples.mapM (fun sample => do
-    let args : API.TorchLean.TList α (paramShapes task ++ [σ, τ]) :=
+    let args : API.TorchLean.TensorPack α (paramShapes task ++ [σ, τ]) :=
       _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append
         (α := α) (ss₁ := paramShapes task) (ss₂ := [σ, τ]) ps sample
     pure (Spec.Tensor.toScalar <| _root_.Runtime.Autograd.Torch.CompiledScalar.forward compiled
@@ -503,213 +509,157 @@ def meanLoss {σ τ : Spec.Shape} {task : SeqTask σ τ}
 
 /-- Mean scalar loss over a dataset (materialized via `dataset.toList`). -/
 def meanLossDataset {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Add α] [Div α] [Zero
-      α] [Coe Nat α]
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
     (runner : Runner α task)
-    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TList α [σ, τ])) :
+    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TensorPack α [σ, τ])) :
     IO α :=
   meanLoss runner dataset.toList
 
 /-- Scalar loss for one sample through the instantiated runtime module. -/
 def moduleLoss {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (runner : Runner α task) (sample : API.TorchLean.TList α [σ, τ]) : IO α := do
+    (runner : Runner α task) (sample : API.TorchLean.TensorPack α [σ, τ]) : IO α := do
   let loss ← API.TorchLean.Module.forward runner.module sample
   pure (Spec.Tensor.toScalar loss)
 
+/-- Treat `0` as the conservative single-sample step size. -/
+def effectiveTrainBatchSize (n : Nat) : Nat :=
+  if n = 0 then 1 else n
+
+/-- Take the next cyclic group of samples from an in-memory training set. -/
+def nextCyclicBatch {α : Type} (context : String)
+    (samples : List α) (restRef : IO.Ref (List α)) (batchSize : Nat) : IO (List α) := do
+  if samples.isEmpty then
+    throw <| IO.userError s!"{context}: empty sample cycle"
+  let mut batch : List α := []
+  for _ in [0:batchSize] do
+    let mut rest ← restRef.get
+    if rest.isEmpty then
+      rest := samples
+    match rest with
+    | [] => throw <| IO.userError s!"{context}: empty sample cycle"
+    | sample :: rest' =>
+        restRef.set rest'
+        batch := sample :: batch
+  pure batch.reverse
+
 /--
-Fit on a small in-memory list of supervised samples for a fixed number of steps.
+Train on a small in-memory list of supervised samples for a fixed number of steps.
 
 This is the simplest training-loop helper: it is intended for examples and small synthetic datasets.
-For loader-based training, see `fitLoader`.
+For loader-based training, see `trainLoader`.
 -/
-def fit {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Add α] [Div α] [Zero
-      α] [Coe Nat α]
+def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
     [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : FitConfig) (samples : List (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α) := do
+    (runner : Runner α task) (cfg : TrainConfig) (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α) := do
   trainMode runner
   let before ← meanLoss runner samples
-  let _ ←
+  unless samples.isEmpty do
+    let batchSize := effectiveTrainBatchSize cfg.batchSize
+    let restRef ← IO.mkRef samples
+    let nextBatch : IO (List (API.TorchLean.TensorPack α [σ, τ])) :=
+      nextCyclicBatch "Supervised.train" samples restRef batchSize
+    let logBatchLoss (stepIdx : Nat) (batch : List (API.TorchLean.TensorPack α [σ, τ])) :
+        IO Unit := do
+      if cfg.logEvery > 0 && stepIdx % cfg.logEvery = 0 then
+        let loss ← meanLoss runner batch
+        IO.println s!"step {stepIdx}: loss={loss}"
     match cfg.optimizer with
     | .sgd lr momentum =>
         if momentum == 0.0 then
-          if samples.isEmpty then
-            pure ()
-          else
-            let mut rest := samples
-            for stepIdx in [0:cfg.steps] do
-              if rest.isEmpty then
-                rest := samples
-              let sample ←
-                match rest with
-                | [] => throw <| IO.userError "Supervised.fit: empty sample cycle"
-                | sample :: rest' =>
-                    rest := rest'
-                    pure sample
+          for stepIdx in [0:cfg.steps] do
+            let batch ← nextBatch
+            let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
+            for sample in batch do
               updateRunnerBuffers runner sample
-              let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
               API.TorchLean.Module.step runner.module lrα sample
-              if cfg.logEvery > 0 && stepIdx % cfg.logEvery = 0 then
-                let loss ← API.TorchLean.Module.forward runner.module sample
-                IO.println s!"step {stepIdx}: loss={Spec.Tensor.toScalar loss}"
+            logBatchLoss stepIdx batch
         else
-          match cfg.scheduler with
-          | none =>
-              let opt := API.TorchLean.Optim.momentumSGD
-                (α := α) (lr := API.Runtime.ofFloat lr) (momentum := API.Runtime.ofFloat momentum)
-              let st0 ← API.TorchLean.Module.initOptim runner.module opt
-              let _ ← API.TorchLean.Module.trainWith runner.module opt st0 cfg.steps samples
-                (logEvery := cfg.logEvery)
-              pure ()
-          | some _ =>
-              let opt := API.TorchLean.Optim.momentumSGD
-                (α := α) (paramShapes := paramShapes task)
-                (lr := API.Runtime.ofFloat lr) (momentum := API.Runtime.ofFloat momentum)
-              let st0 : API.TorchLean.Optim.StateList _root_.Optim.MomentumSGD.State α (paramShapes
-                task) ←
-                API.TorchLean.Module.initOptim runner.module opt
-              let mut st := st0
-              if samples.isEmpty then
-                pure ()
-              else
-                let mut rest := samples
-                for stepIdx in [0:cfg.steps] do
-                  if rest.isEmpty then
-                    rest := samples
-                  let sample ←
-                    match rest with
-                  | [] => throw <| IO.userError "Supervised.fit: empty sample cycle"
-                  | sample :: rest' =>
-                      rest := rest'
-                      pure sample
-                  updateRunnerBuffers runner sample
-                  let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
-                  st := momentumSGDStateWithLR (paramShapes := paramShapes task) lrα st
-                  st ← API.TorchLean.Module.stepWith runner.module opt st sample
-                  if cfg.logEvery > 0 && stepIdx % cfg.logEvery = 0 then
-                    let loss ← API.TorchLean.Module.forward runner.module sample
-                    IO.println s!"step {stepIdx}: loss={Spec.Tensor.toScalar loss}"
+          let opt := API.TorchLean.Optim.momentumSGD
+            (α := α) (paramShapes := paramShapes task)
+            (lr := API.Runtime.ofFloat lr) (momentum := API.Runtime.ofFloat momentum)
+          let st0 : API.TorchLean.Optim.StateList _root_.Optim.MomentumSGD.State α
+            (paramShapes task) ←
+            API.TorchLean.Module.initOptim runner.module opt
+          let mut st := st0
+          for stepIdx in [0:cfg.steps] do
+            let batch ← nextBatch
+            let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
+            st := momentumSGDStateWithLR (paramShapes := paramShapes task) lrα st
+            for sample in batch do
+              updateRunnerBuffers runner sample
+              st ← API.TorchLean.Module.stepWith runner.module opt st sample
+            logBatchLoss stepIdx batch
     | .adam lr beta1 beta2 epsilon =>
-        match cfg.scheduler with
-        | none =>
-            let opt := API.TorchLean.Optim.adam
-              (α := α) (lr := API.Runtime.ofFloat lr)
-              (beta1 := API.Runtime.ofFloat beta1)
-              (beta2 := API.Runtime.ofFloat beta2)
-              (epsilon := API.Runtime.ofFloat epsilon)
-            let st0 ← API.TorchLean.Module.initOptim runner.module opt
-            let _ ← API.TorchLean.Module.trainWith runner.module opt st0 cfg.steps samples
-              (logEvery := cfg.logEvery)
-            pure ()
-        | some _ =>
-            let opt := API.TorchLean.Optim.adam
-              (α := α) (paramShapes := paramShapes task)
-              (lr := API.Runtime.ofFloat lr)
-              (beta1 := API.Runtime.ofFloat beta1)
-              (beta2 := API.Runtime.ofFloat beta2)
-              (epsilon := API.Runtime.ofFloat epsilon)
-            let st0 : API.TorchLean.Optim.StateList _root_.Optim.Adam.State α (paramShapes task) ←
-              API.TorchLean.Module.initOptim runner.module opt
-            let mut st := st0
-            if samples.isEmpty then
-              pure ()
-            else
-              let mut rest := samples
-              for stepIdx in [0:cfg.steps] do
-                if rest.isEmpty then
-                  rest := samples
-                let sample ←
-                  match rest with
-                | [] => throw <| IO.userError "Supervised.fit: empty sample cycle"
-                | sample :: rest' =>
-                    rest := rest'
-                    pure sample
-                updateRunnerBuffers runner sample
-                let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
-                st := adamStateWithLR (paramShapes := paramShapes task) lrα st
-                st ← API.TorchLean.Module.stepWith runner.module opt st sample
-                if cfg.logEvery > 0 && stepIdx % cfg.logEvery = 0 then
-                  let loss ← API.TorchLean.Module.forward runner.module sample
-                  IO.println s!"step {stepIdx}: loss={Spec.Tensor.toScalar loss}"
+        let opt := API.TorchLean.Optim.adam
+          (α := α) (paramShapes := paramShapes task)
+          (lr := API.Runtime.ofFloat lr)
+          (beta1 := API.Runtime.ofFloat beta1)
+          (beta2 := API.Runtime.ofFloat beta2)
+          (epsilon := API.Runtime.ofFloat epsilon)
+        let st0 : API.TorchLean.Optim.StateList _root_.Optim.Adam.State α (paramShapes task) ←
+          API.TorchLean.Module.initOptim runner.module opt
+        let mut st := st0
+        for stepIdx in [0:cfg.steps] do
+          let batch ← nextBatch
+          let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
+          st := adamStateWithLR (paramShapes := paramShapes task) lrα st
+          for sample in batch do
+            updateRunnerBuffers runner sample
+            st ← API.TorchLean.Module.stepWith runner.module opt st sample
+          logBatchLoss stepIdx batch
     | .adamw lr weightDecay beta1 beta2 epsilon =>
-        match cfg.scheduler with
-        | none =>
-            let opt := API.TorchLean.Optim.adamw
-              (α := α) (lr := API.Runtime.ofFloat lr) (weightDecay := API.Runtime.ofFloat
-                weightDecay)
-              (beta1 := API.Runtime.ofFloat beta1)
-              (beta2 := API.Runtime.ofFloat beta2)
-              (epsilon := API.Runtime.ofFloat epsilon)
-            let st0 ← API.TorchLean.Module.initOptim runner.module opt
-            let _ ← API.TorchLean.Module.trainWith runner.module opt st0 cfg.steps samples
-              (logEvery := cfg.logEvery)
-            pure ()
-        | some _ =>
-            let opt := API.TorchLean.Optim.adamw
-              (α := α) (paramShapes := paramShapes task)
-              (lr := API.Runtime.ofFloat lr) (weightDecay := API.Runtime.ofFloat weightDecay)
-              (beta1 := API.Runtime.ofFloat beta1)
-              (beta2 := API.Runtime.ofFloat beta2)
-              (epsilon := API.Runtime.ofFloat epsilon)
-            let st0 : API.TorchLean.Optim.StateList _root_.Optim.AdamW.State α (paramShapes task) ←
-              API.TorchLean.Module.initOptim runner.module opt
-            let mut st := st0
-            if samples.isEmpty then
-              pure ()
-            else
-              let mut rest := samples
-              for stepIdx in [0:cfg.steps] do
-                if rest.isEmpty then
-                  rest := samples
-                let sample ←
-                  match rest with
-                | [] => throw <| IO.userError "Supervised.fit: empty sample cycle"
-                | sample :: rest' =>
-                    rest := rest'
-                    pure sample
-                updateRunnerBuffers runner sample
-                let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
-                st := adamwStateWithLR (paramShapes := paramShapes task) lrα st
-                st ← API.TorchLean.Module.stepWith runner.module opt st sample
-                if cfg.logEvery > 0 && stepIdx % cfg.logEvery = 0 then
-                  let loss ← API.TorchLean.Module.forward runner.module sample
-                  IO.println s!"step {stepIdx}: loss={Spec.Tensor.toScalar loss}"
+        let opt := API.TorchLean.Optim.adamw
+          (α := α) (paramShapes := paramShapes task)
+          (lr := API.Runtime.ofFloat lr) (weightDecay := API.Runtime.ofFloat weightDecay)
+          (beta1 := API.Runtime.ofFloat beta1)
+          (beta2 := API.Runtime.ofFloat beta2)
+          (epsilon := API.Runtime.ofFloat epsilon)
+        let st0 : API.TorchLean.Optim.StateList _root_.Optim.AdamW.State α (paramShapes task) ←
+          API.TorchLean.Module.initOptim runner.module opt
+        let mut st := st0
+        for stepIdx in [0:cfg.steps] do
+          let batch ← nextBatch
+          let lrα := API.Runtime.ofFloat (stepLR cfg.scheduler cfg.optimizer stepIdx)
+          st := adamwStateWithLR (paramShapes := paramShapes task) lrα st
+          for sample in batch do
+            updateRunnerBuffers runner sample
+            st ← API.TorchLean.Module.stepWith runner.module opt st sample
+          logBatchLoss stepIdx batch
   let after ← meanLoss runner samples
   pure { before := before, after := after }
 
-/-- `fit` over a dataset (materialized as a list). -/
-def fitDataset {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Add α] [Div α] [Zero
-      α] [Coe Nat α]
+/-- Train over a dataset by materializing it as a list. -/
+def trainDataset {σ τ : Spec.Shape} {task : SeqTask σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
     [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : FitConfig)
-    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α) :=
-  fit runner cfg dataset.toList
+    (runner : Runner α task) (cfg : TrainConfig)
+    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α) :=
+  trainSamples runner cfg dataset.toList
 
 /--
-Fit over a `DataLoader` for `cfg.epochs` epochs, returning the final report and the updated loader.
+Train over a `DataLoader` for `cfg.epochs` epochs, returning the final report and updated loader.
 
 This corresponds to the common PyTorch pattern:
 `for epoch in ...: for batch in loader: step(batch)`.
 -/
-def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Add α] [Div α] [Zero
-      α] [Coe Nat α]
+def trainLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
     [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : LoaderFitConfig)
-    (dl : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α × _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) := do
+    (runner : Runner α task) (cfg : LoaderTrainConfig)
+    (dl : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α × _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) := do
   trainMode runner
   let nextEpoch
-      (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) :
-      IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]) ×
-        List (List (API.TorchLean.TList α [σ, τ]))) :=
-    match _root_.Runtime.Autograd.Train.DataLoader.epoch "Supervised.fitLoader" loader with
+      (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) :
+      IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]) ×
+        List (List (API.TorchLean.TensorPack α [σ, τ]))) :=
+    match _root_.Runtime.Autograd.Train.DataLoader.epoch "Supervised.trainLoader" loader with
     | .ok out => pure out
-    | .error msg => throw <| IO.userError s!"Supervised.fitLoader: {msg}"
+    | .error msg => throw <| IO.userError s!"Supervised.trainLoader: {msg}"
 
   let before ← meanLossDataset runner dl.dataset
 
@@ -718,7 +668,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
       if momentum == 0.0 then
         let rec trainSgdBatches
             (epoch : Nat)
-            (batches : List (List (API.TorchLean.TList α [σ, τ]))) :
+            (batches : List (List (API.TorchLean.TensorPack α [σ, τ]))) :
             IO Unit := do
           match batches with
           | [] => pure ()
@@ -731,8 +681,8 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
 
         let rec runSgdEpochs (remaining : Nat)
             (epoch : Nat)
-            (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) :
-            IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) := do
+            (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) :
+            IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) := do
           match remaining with
           | 0 => pure loader
           | n + 1 =>
@@ -749,7 +699,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
         let st0 ← API.TorchLean.Module.initOptim runner.module opt
 
         let rec trainMomSamples (epoch stepIdx : Nat) (state : opt.State)
-            (samples : List (API.TorchLean.TList α [σ, τ])) :
+            (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
             IO (opt.State × Nat) := do
           match samples with
           | [] => pure (state, stepIdx)
@@ -762,7 +712,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
               trainMomSamples epoch (stepIdx + 1) state' rest
 
         let rec trainMomBatches (epoch stepIdx : Nat) (state : opt.State)
-            (batches : List (List (API.TorchLean.TList α [σ, τ]))) :
+            (batches : List (List (API.TorchLean.TensorPack α [σ, τ]))) :
             IO (opt.State × Nat) := do
           match batches with
           | [] => pure (state, stepIdx)
@@ -771,9 +721,9 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
               trainMomBatches epoch stepIdx' state' rest
 
         let rec runMomEpochs (epoch remaining : Nat)
-            (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]))
+            (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]))
             (st : opt.State) :
-            IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]) × opt.State)
+            IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]) × opt.State)
               := do
           match remaining with
           | 0 => pure (loader, st)
@@ -803,7 +753,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
       let st0 ← API.TorchLean.Module.initOptim runner.module opt
 
       let rec trainAdamSamples (epoch stepIdx : Nat) (state : opt.State)
-          (samples : List (API.TorchLean.TList α [σ, τ])) :
+          (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
           IO (opt.State × Nat) := do
         match samples with
         | [] => pure (state, stepIdx)
@@ -816,7 +766,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
             trainAdamSamples epoch (stepIdx + 1) state' rest
 
       let rec trainAdamBatches (epoch stepIdx : Nat) (state : opt.State)
-          (batches : List (List (API.TorchLean.TList α [σ, τ]))) :
+          (batches : List (List (API.TorchLean.TensorPack α [σ, τ]))) :
           IO (opt.State × Nat) := do
         match batches with
         | [] => pure (state, stepIdx)
@@ -825,9 +775,9 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
             trainAdamBatches epoch stepIdx' state' rest
 
       let rec runAdamEpochs (epoch remaining : Nat)
-          (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]))
+          (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]))
           (st : opt.State) :
-          IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]) × opt.State)
+          IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]) × opt.State)
             := do
         match remaining with
         | 0 => pure (loader, st)
@@ -857,7 +807,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
       let st0 ← API.TorchLean.Module.initOptim runner.module opt
 
       let rec trainAdamWSamples (epoch stepIdx : Nat) (state : opt.State)
-          (samples : List (API.TorchLean.TList α [σ, τ])) :
+          (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
           IO (opt.State × Nat) := do
         match samples with
         | [] => pure (state, stepIdx)
@@ -870,7 +820,7 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
             trainAdamWSamples epoch (stepIdx + 1) state' rest
 
       let rec trainAdamWBatches (epoch stepIdx : Nat) (state : opt.State)
-          (batches : List (List (API.TorchLean.TList α [σ, τ]))) :
+          (batches : List (List (API.TorchLean.TensorPack α [σ, τ]))) :
           IO (opt.State × Nat) := do
         match batches with
         | [] => pure (state, stepIdx)
@@ -879,9 +829,9 @@ def fitLoader {σ τ : Spec.Shape} {task : SeqTask σ τ}
             trainAdamWBatches epoch stepIdx' state' rest
 
       let rec runAdamWEpochs (epoch remaining : Nat)
-          (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]))
+          (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]))
           (st : opt.State) :
-          IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]) × opt.State)
+          IO (_root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]) × opt.State)
             := do
         match remaining with
         | 0 => pure (loader, st)
@@ -913,9 +863,9 @@ structure Stepper (α : Type) [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
   /-- Underlying task runner (module + compiled predictors/losses). -/
   runner : Runner α task
   /-- Run a single optimization step on one supervised sample, returning the loss value. -/
-  stepSample : API.TorchLean.TList α [σ, τ] → IO α
+  stepSample : API.TorchLean.TensorPack α [σ, τ] → IO α
   /-- Run an epoch over an explicit list of samples, returning the per-step loss values. -/
-  epochSamples : List (API.TorchLean.TList α [σ, τ]) → IO (List α)
+  epochSamples : List (API.TorchLean.TensorPack α [σ, τ]) → IO (List α)
   /-- Read the total number of `stepSample` calls performed so far. -/
   stepCount : IO Nat
 
@@ -927,8 +877,7 @@ logic: call `stepper`, then choose `stepSample` for single batches or `epochSamp
 sample lists.
 -/
 def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
     (runner : Runner α task) (optimizer : OptimizerConfig)
     (scheduler : Option API.TorchLean.Schedulers.Config := none) :
     IO (Stepper α task) := do
@@ -937,7 +886,7 @@ def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
   match optimizer with
   | .sgd lr momentum =>
       if momentum == 0.0 then
-        let runStep := fun (sample : API.TorchLean.TList α [σ, τ]) => do
+        let runStep := fun (sample : API.TorchLean.TensorPack α [σ, τ]) => do
           trainMode runner
           let stepIdx ← stepRef.get
           let loss ← moduleLoss runner sample
@@ -960,7 +909,7 @@ def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
           ←
           API.TorchLean.Module.initOptim runner.module opt
         let stRef ← IO.mkRef st0
-        let runStep := fun (sample : API.TorchLean.TList α [σ, τ]) => do
+        let runStep := fun (sample : API.TorchLean.TensorPack α [σ, τ]) => do
           trainMode runner
           let stepIdx ← stepRef.get
           let loss ← moduleLoss runner sample
@@ -988,7 +937,7 @@ def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
       let st0 : API.TorchLean.Optim.StateList _root_.Optim.Adam.State α (paramShapes task) ←
         API.TorchLean.Module.initOptim runner.module opt
       let stRef ← IO.mkRef st0
-      let runStep := fun (sample : API.TorchLean.TList α [σ, τ]) => do
+      let runStep := fun (sample : API.TorchLean.TensorPack α [σ, τ]) => do
         trainMode runner
         let stepIdx ← stepRef.get
         let loss ← moduleLoss runner sample
@@ -1016,7 +965,7 @@ def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
       let st0 : API.TorchLean.Optim.StateList _root_.Optim.AdamW.State α (paramShapes task) ←
         API.TorchLean.Module.initOptim runner.module opt
       let stRef ← IO.mkRef st0
-      let runStep := fun (sample : API.TorchLean.TList α [σ, τ]) => do
+      let runStep := fun (sample : API.TorchLean.TensorPack α [σ, τ]) => do
         trainMode runner
         let stepIdx ← stepRef.get
         let loss ← moduleLoss runner sample
@@ -1038,13 +987,13 @@ def stepper {σ τ : Spec.Shape} {task : SeqTask σ τ}
 /-- Run one optimization step on a single supervised sample. -/
 def step {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (loop : Stepper α task) (sample : API.TorchLean.TList α [σ, τ]) : IO α :=
+    (loop : Stepper α task) (sample : API.TorchLean.TensorPack α [σ, τ]) : IO α :=
   loop.stepSample sample
 
 /-- Run one epoch over a list of supervised samples, returning the per-step losses. -/
 def epoch {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (loop : Stepper α task) (samples : List (API.TorchLean.TList α [σ, τ])) : IO (List α) :=
+    (loop : Stepper α task) (samples : List (API.TorchLean.TensorPack α [σ, τ])) : IO (List α) :=
   loop.epochSamples samples
 
 end Supervised
@@ -1056,14 +1005,14 @@ namespace Trainer
 
 Usage note:
 
-If you're writing model code, prefer the PyTorch-shaped entrypoint `NN.API.train`
-(available after `import NN`). This `API.TorchLean.Trainer` namespace is the underlying runtime
-layer that `API.train` delegates to, and it exposes more knobs than most users need.
+If you are writing ordinary model code, prefer the `NN` umbrella:
+`import NN; open TorchLean; Trainer.new ...`. This namespace is the lower runtime
+layer underneath that facade, and it exposes lower-level controls for custom training loops.
 
 The intended workflow is:
 - pick a `Task` (regression / classification),
 - call `instantiate` to get a `Runner` (parameters + buffers + backend state),
-- call `fit` / `fitDataset` / `fitLoader`, or build a `Stepper` for custom loops.
+- call `trainSamples` / `trainDataset` / `trainLoader`, or build a `Stepper` for custom loops.
 
 This API is backend-agnostic: the same code can run in `.eager` mode or via a compiled backend,
 depending on the `backend` argument passed to `instantiate`.
@@ -1075,23 +1024,23 @@ abbrev Task := Supervised.SeqTask
 abbrev Runner := Supervised.Runner
 @[inherit_doc Supervised.OptimizerConfig]
 abbrev Optimizer := Supervised.OptimizerConfig
-@[inherit_doc Supervised.FitConfig]
-abbrev FitConfig := Supervised.FitConfig
-@[inherit_doc Supervised.LoaderFitConfig]
-abbrev LoaderFitConfig := Supervised.LoaderFitConfig
-@[inherit_doc Supervised.FitReport]
-abbrev FitReport := Supervised.FitReport
+@[inherit_doc Supervised.TrainConfig]
+abbrev TrainConfig := Supervised.TrainConfig
+@[inherit_doc Supervised.LoaderTrainConfig]
+abbrev LoaderTrainConfig := Supervised.LoaderTrainConfig
+@[inherit_doc Supervised.TrainReport]
+abbrev TrainReport := Supervised.TrainReport
 @[inherit_doc Supervised.Stepper]
 abbrev Stepper := Supervised.Stepper
 
-/-- Regression task with mean-squared error loss by default. -/
-def regression {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+/-- Lower-runtime regression task with mean-squared error loss by default. -/
+def runtimeRegressionTask {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
     (reduction : API.TorchLean.Loss.Reduction := .mean) :
     Task σ τ :=
   Supervised.SeqTask.mse model reduction
 
-/-- One-hot classification task with cross-entropy loss by default. -/
-def classificationOneHot {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+/-- Lower-runtime classifier task with cross-entropy loss by default. -/
+def runtimeClassifierTask {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
     (reduction : API.TorchLean.Loss.Reduction := .mean) :
     Task σ τ :=
   Supervised.SeqTask.crossEntropyOneHot model reduction
@@ -1104,15 +1053,11 @@ PyTorch analogue: `torch.optim.SGD`
 -/
 def sgd (lr : Float) (momentum : Float := 0.0) : Optimizer := .sgd lr momentum
 
-/--
-Momentum SGD optimizer config (PyTorch-style default `momentum = 0.9`).
-
-This is just `sgd lr momentum` with a different default.
--/
+/-- Momentum SGD optimizer config. Pass `lr` and optionally override `momentum`. -/
 def momentumSGD (lr : Float) (momentum : Float := 0.9) : Optimizer := .sgd lr momentum
 
 /--
-Adam optimizer config with standard defaults.
+Adam optimizer config. Pass `lr`; override `beta1`, `beta2`, or `epsilon` when the run needs it.
 
 PyTorch analogue: `torch.optim.Adam`
   (`https://pytorch.org/docs/stable/generated/torch.optim.Adam.html`).
@@ -1122,7 +1067,7 @@ def adam (lr : Float) (beta1 : Float := 0.9) (beta2 : Float := 0.999) (epsilon :
   .adam lr beta1 beta2 epsilon
 
 /--
-AdamW optimizer config with standard defaults (PyTorch-style `weightDecay = 0.01`).
+AdamW optimizer config. Pass `lr`; override weight decay or moment parameters when the run needs it.
 
 PyTorch analogue: `torch.optim.AdamW`
   (`https://pytorch.org/docs/stable/generated/torch.optim.AdamW.html`).
@@ -1132,47 +1077,87 @@ def adamw (lr : Float) (weightDecay : Float := 0.01)
     Optimizer :=
   .adamw lr weightDecay beta1 beta2 epsilon
 
+/-- Optimizer algorithm accepted by simple CLI commands that expose a `--optim` flag. -/
+inductive OptimizerKind where
+  /-- Stochastic gradient descent. -/
+  | sgd
+  /-- Adam with TorchLean's usual public defaults. -/
+  | adam
+  /-- AdamW with decoupled weight decay. -/
+  | adamw
+deriving DecidableEq, Repr
+
+namespace OptimizerKind
+
+/-- Parse an optimizer name accepted by a command-line `--optim` flag. -/
+def parse (s : String) : Except String OptimizerKind :=
+  if s == "sgd" then
+    pure .sgd
+  else if s == "adam" then
+    pure .adam
+  else if s == "adamw" then
+    pure .adamw
+  else
+    throw s!"bad --optim {s}; expected sgd, adam, or adamw"
+
+/-- Human-readable optimizer name used in logs. -/
+def name : OptimizerKind → String
+  | .sgd => "SGD"
+  | .adam => "Adam"
+  | .adamw => "AdamW"
+
+/-- Build a public optimizer config for this optimizer kind and learning rate. -/
+def toOptimizer (kind : OptimizerKind) (lr : Float) : Optimizer :=
+  match kind with
+  | .sgd => Trainer.sgd lr
+  | .adam => Trainer.adam (lr := lr) (beta1 := 0.9) (beta2 := 0.95) (epsilon := 1e-8)
+  | .adamw =>
+      Trainer.adamw (lr := lr) (weightDecay := 0.1) (beta1 := 0.9) (beta2 := 0.95)
+        (epsilon := 1e-8)
+
+end OptimizerKind
+
 /-- Fixed-step training config over an in-memory sample list or dataset. -/
-def steps (count : Nat) (optimizer : Optimizer := sgd 0.01) (logEvery : Nat := 1) : FitConfig :=
+def steps (count : Nat) (optimizer : Optimizer := sgd 0.01) (logEvery : Nat := 1) : TrainConfig :=
   { steps := count, optimizer := optimizer, logEvery := logEvery }
 
 /-- Epoch-based training config over a data loader. -/
 def epochs (count : Nat) (optimizer : Optimizer := sgd 0.01) (logEvery : Nat := 1) :
-    LoaderFitConfig :=
+    LoaderTrainConfig :=
   { epochs := count, optimizer := optimizer, logEvery := logEvery }
 
 /-- Attach a scheduler to a step-based training config. -/
-def withScheduler (cfg : FitConfig) (scheduler : API.TorchLean.Schedulers.Config) : FitConfig :=
+def withScheduler (cfg : TrainConfig) (scheduler : API.TorchLean.Schedulers.Config) : TrainConfig :=
   { cfg with scheduler := some scheduler }
 
 /-- Attach a scheduler to an epoch-based loader training config. -/
-def withEpochScheduler (cfg : LoaderFitConfig) (scheduler : API.TorchLean.Schedulers.Config) :
-    LoaderFitConfig :=
+def withEpochScheduler (cfg : LoaderTrainConfig) (scheduler : API.TorchLean.Schedulers.Config) :
+    LoaderTrainConfig :=
   { cfg with scheduler := some scheduler }
 
 /-- Step-based constant learning-rate schedule. -/
-def constantLR (cfg : FitConfig) (lr : Float) : FitConfig :=
+def constantLR (cfg : TrainConfig) (lr : Float) : TrainConfig :=
   withScheduler cfg (.constant lr)
 
 /-- Step-based step-decay schedule. -/
-def stepLR (cfg : FitConfig) (base : Float) (stepSize : Nat) (gamma : Float := 0.1) : FitConfig :=
+def stepLR (cfg : TrainConfig) (base : Float) (stepSize : Nat) (gamma : Float := 0.1) : TrainConfig :=
   withScheduler cfg (.step base stepSize gamma)
 
 /-- Step-based exponential-decay schedule. -/
-def exponentialLR (cfg : FitConfig) (base : Float) (gamma : Float) : FitConfig :=
+def exponentialLR (cfg : TrainConfig) (base : Float) (gamma : Float) : TrainConfig :=
   withScheduler cfg (.exponential base gamma)
 
 /-- Epoch-based constant learning-rate schedule. -/
-def constantEpochLR (cfg : LoaderFitConfig) (lr : Float) : LoaderFitConfig :=
+def constantEpochLR (cfg : LoaderTrainConfig) (lr : Float) : LoaderTrainConfig :=
   withEpochScheduler cfg (.constant lr)
 
 /-- Epoch-based step-decay schedule. -/
-def stepEpochLR (cfg : LoaderFitConfig) (base : Float) (stepSize : Nat) (gamma : Float := 0.1) :
-    LoaderFitConfig :=
+def stepEpochLR (cfg : LoaderTrainConfig) (base : Float) (stepSize : Nat) (gamma : Float := 0.1) :
+    LoaderTrainConfig :=
   withEpochScheduler cfg (.step base stepSize gamma)
 
 /-- Epoch-based exponential-decay schedule. -/
-def exponentialEpochLR (cfg : LoaderFitConfig) (base : Float) (gamma : Float) : LoaderFitConfig :=
+def exponentialEpochLR (cfg : LoaderTrainConfig) (base : Float) (gamma : Float) : LoaderTrainConfig :=
   withEpochScheduler cfg (.exponential base gamma)
 
 /--
@@ -1218,7 +1203,7 @@ def run {σ τ : Spec.Shape} (task : Task σ τ) (args : List String)
 def params {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     (runner : Runner α task) :
-    IO (API.TorchLean.TList α (Supervised.paramShapes task)) :=
+    IO (API.TorchLean.TensorPack α (Supervised.paramShapes task)) :=
   Supervised.params runner
 
 /-- Read the current mode (train vs eval). -/
@@ -1254,8 +1239,8 @@ def isTraining {σ τ : Spec.Shape} {task : Task σ τ}
 /-- Run forward+backward on one supervised sample and return gradients for all parameters. -/
 def backward {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (runner : Runner α task) (sample : API.TorchLean.TList α [σ, τ]) :
-    IO (API.TorchLean.TList α (Supervised.paramShapes task)) :=
+    (runner : Runner α task) (sample : API.TorchLean.TensorPack α [σ, τ]) :
+    IO (API.TorchLean.TensorPack α (Supervised.paramShapes task)) :=
   Supervised.backward runner sample
 
 /--
@@ -1283,7 +1268,6 @@ It runs `predict` and then applies `Metrics.argmax?` to the output vector.
 -/
 def predictClass? {σ : Spec.Shape} {n : Nat} {task : Task σ (.dim n .scalar)}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    [LT α] [DecidableRel ((· > ·) : α → α → Prop)]
     (runner : Runner α task) (x : Spec.Tensor α σ) :
     IO (Option (Fin n)) :=
   Supervised.predictClass? (task := task) runner x
@@ -1291,57 +1275,53 @@ def predictClass? {σ : Spec.Shape} {n : Nat} {task : Task σ (.dim n .scalar)}
 /-- Count correct predictions in a one-hot labeled sample list (returns `(correct, total)`). -/
 def accuracyOneHot {σ : Spec.Shape} {n : Nat} {task : Task σ (.dim n .scalar)}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    [LT α] [DecidableRel ((· > ·) : α → α → Prop)]
-    (runner : Runner α task) (samples : List (API.TorchLean.TList α [σ, .dim n .scalar])) :
+    (runner : Runner α task) (samples : List (API.TorchLean.TensorPack α [σ, .dim n .scalar])) :
     IO (Nat × Nat) :=
   Supervised.accuracyOneHot (task := task) runner samples
 
 /-- Mean loss over an explicit list of samples. -/
 def meanLoss {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α]
-    (runner : Runner α task) (samples : List (API.TorchLean.TList α [σ, τ])) :
+    (runner : Runner α task) (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
     IO α :=
   Supervised.meanLoss runner samples
 
 /-- Mean loss over an entire `Dataset`. -/
 def meanLossDataset {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α]
     (runner : Runner α task)
-    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TList α [σ, τ])) :
+    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TensorPack α [σ, τ])) :
     IO α :=
   Supervised.meanLossDataset runner dataset
 
 /--
-Fit on an explicit list of samples for a fixed number of steps.
+Train on an explicit list of samples for a fixed number of steps.
 
 Returns a small report with mean loss before/after.
 -/
-def fit {σ τ : Spec.Shape} {task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : FitConfig) (samples : List (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α) :=
-  Supervised.fit runner cfg samples
+def trainSamples {σ τ : Spec.Shape} {task : Task σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (runner : Runner α task) (cfg : TrainConfig)
+    (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α) :=
+  Supervised.trainSamples runner cfg samples
 
-/-- Fit on a `Dataset` for a fixed number of steps. -/
-def fitDataset {σ τ : Spec.Shape} {task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : FitConfig)
-    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α) :=
-  Supervised.fitDataset runner cfg dataset
+/-- Train on a `Dataset` for a fixed number of steps. -/
+def trainDataset {σ τ : Spec.Shape} {task : Task σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (runner : Runner α task) (cfg : TrainConfig)
+    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α) :=
+  Supervised.trainDataset runner cfg dataset
 
-/-- Fit using a `DataLoader` for a fixed number of epochs. -/
-def fitLoader {σ τ : Spec.Shape} {task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (runner : Runner α task) (cfg : LoaderFitConfig)
-    (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) :
-    IO (FitReport α × _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) :=
-  Supervised.fitLoader runner cfg loader
+/-- Train using a `DataLoader` for a fixed number of epochs. -/
+def trainLoader {σ τ : Spec.Shape} {task : Task σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (runner : Runner α task) (cfg : LoaderTrainConfig)
+    (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) :
+    IO (TrainReport α ×
+      _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) :=
+  Supervised.trainLoader runner cfg loader
 
 /--
 Construct a stateful stepper for custom loops.
@@ -1354,8 +1334,7 @@ This is useful if you want to control:
 The returned `Stepper` still uses TorchLean's optimizer/scheduler implementations.
 -/
 def stepper {σ τ : Spec.Shape} {task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
     (runner : Runner α task) (optimizer : Optimizer)
     (scheduler : Option API.TorchLean.Schedulers.Config := none) :
     IO (Stepper α task) :=
@@ -1364,70 +1343,67 @@ def stepper {σ τ : Spec.Shape} {task : Task σ τ}
 /-- Run a single training step on one sample using a `Stepper`. -/
 def step {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (loop : Stepper α task) (sample : API.TorchLean.TList α [σ, τ]) : IO α :=
+    (loop : Stepper α task) (sample : API.TorchLean.TensorPack α [σ, τ]) : IO α :=
   Supervised.step loop sample
 
 /-- Run an epoch over a list of samples using a `Stepper` (returns the per-step losses). -/
 def epoch {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
-    (loop : Stepper α task) (samples : List (API.TorchLean.TList α [σ, τ])) : IO (List α) :=
+    (loop : Stepper α task) (samples : List (API.TorchLean.TensorPack α [σ, τ])) : IO (List α) :=
   Supervised.epoch loop samples
 
 /--
-Convenience: instantiate + fit on a list of samples.
+Convenience: instantiate + train on a list of samples.
 
-Returns both the `Runner` (so you can keep using the trained parameters) and the fit report.
+Returns both the `Runner` (so you can keep using the trained parameters) and the train report.
 -/
 def train {σ τ : Spec.Shape} {_task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (task : Task σ τ) (cfg : FitConfig)
-    (samples : List (API.TorchLean.TList α [σ, τ]))
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (task : Task σ τ) (cfg : TrainConfig)
+    (samples : List (API.TorchLean.TensorPack α [σ, τ]))
     (backend : API.TorchLean.Backend := .eager) :
-    IO (Runner α task × FitReport α) := do
+    IO (Runner α task × TrainReport α) := do
   let runner ← instantiate (task := task) (α := α) backend
-  let report ← fit runner cfg samples
+  let report ← trainSamples runner cfg samples
   pure (runner, report)
 
 /--
-Convenience: instantiate + fit on a `Dataset`.
+Convenience: instantiate a task and train on a `Dataset`.
 
-Returns both the `Runner` and the fit report.
+Returns both the `Runner` and the train report.
 -/
-def trainDataset {σ τ : Spec.Shape} {_task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (task : Task σ τ) (cfg : FitConfig)
-    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TList α [σ, τ]))
+def trainDatasetTask {σ τ : Spec.Shape} {_task : Task σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (task : Task σ τ) (cfg : TrainConfig)
+    (dataset : _root_.Runtime.Autograd.Train.Dataset (API.TorchLean.TensorPack α [σ, τ]))
     (backend : API.TorchLean.Backend := .eager) :
-    IO (Runner α task × FitReport α) := do
+    IO (Runner α task × TrainReport α) := do
   let runner ← instantiate (task := task) (α := α) backend
-  let report ← fitDataset runner cfg dataset
+  let report ← trainDataset runner cfg dataset
   pure (runner, report)
 
 /--
-Convenience: instantiate + fit using a `DataLoader`.
+Convenience: instantiate a task and train using a `DataLoader`.
 
-Returns the `Runner`, the fit report, and the updated loader state (shuffled epoch cursor).
+Returns the `Runner`, the train report, and the updated loader state (shuffled epoch cursor).
 -/
-def trainLoader {σ τ : Spec.Shape} {_task : Task σ τ}
-    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Add α] [Div α] [Zero α] [Coe Nat α] [API.Runtime.Scalar α]
-    (task : Task σ τ) (cfg : LoaderFitConfig)
-    (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ]))
+def trainLoaderTask {σ τ : Spec.Shape} {_task : Task σ τ}
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [API.Runtime.Scalar α]
+    (task : Task σ τ) (cfg : LoaderTrainConfig)
+    (loader : _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ]))
     (backend : API.TorchLean.Backend := .eager) :
-    IO (Runner α task × FitReport α ×
-      _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TList α [σ, τ])) := do
+    IO (Runner α task × TrainReport α ×
+      _root_.Runtime.Autograd.Train.DataLoader (API.TorchLean.TensorPack α [σ, τ])) := do
   let runner ← instantiate (task := task) (α := α) backend
-  let (report, loader') ← fitLoader runner cfg loader
+  let (report, loader') ← trainLoader runner cfg loader
   pure (runner, report, loader')
 
 end Trainer
 
 /-
-The remaining exports expose the imperative "session" interface.
+The remaining exports expose the imperative session interface.
 
-Most users should start from `NN.API.Public` or the runtime namespace above. These exports are for:
+Most code should start from `Trainer.new` and `trainer.train`. Use these exports when a file needs:
 - interactive/debug workflows that want mutable tape control, or
 - advanced tooling that needs the low-level session primitives.
 -/
@@ -1447,7 +1423,7 @@ namespace ScalarTrainer
 Re-export of the low-level imperative scalar trainer interface.
 
 This exposes `forwardT`/`backwardT`/`stepT` from `Runtime.Autograd.TorchLean.ScalarTrainer`.
-Most users should prefer the higher-level `NN.API.train` / `API.TorchLean.Trainer` APIs.
+Use the higher-level `TorchLean.Trainer` facade unless a file needs these lower-level training hooks.
 -/
 export _root_.Runtime.Autograd.TorchLean.ScalarTrainer (forwardT backwardT stepT)
 end ScalarTrainer

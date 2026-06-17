@@ -108,7 +108,8 @@ theorem approxT_softmax_spec {s : Shape} :
                           (Activation.Math.logisticSpec (α := R) xR) -
                         Activation.Math.logisticSpec (α := ℝ) x) ≤
                     softmaxBoundScalar (β := β) (fexp := fexp) (rnd := rnd) eps xR := by
-                simpa [Activation.Math.logisticSpec, softmaxBoundScalar, numR, denomR, y] using
+                simpa [Activation.Math.logisticSpec, softmaxBoundScalar, numR, denomR, y,
+                  MathFunctions.exp] using
                   hdiv
               have hle :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd)
@@ -118,7 +119,7 @@ theorem approxT_softmax_spec {s : Shape} :
                       (s := Shape.scalar) eps (Tensor.scalar xR)) := by
                 refine le_trans hb ?_
                 simpa [softmaxBoundTensor, Spec.mapTensor, linfNorm, RuntimeApprox.linfNorm,
-                  tensorLinfNorm] using
+                  tensorLinfNorm, MathFunctions.abs] using
                   (le_abs_self (softmaxBoundScalar (β := β) (fexp := fexp) (rnd := rnd) eps xR))
               exact
                 (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -197,9 +198,17 @@ theorem approxT_softmax_spec {s : Shape} :
                         (mapSpec (s := Shape.dim n s) (Activation.Math.logisticSpec (α := R))
                           (Tensor.dim xRf)))
                     ≤ B := by
-                simpa [tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-                  linfNorm, RuntimeApprox.linfNorm, tensorLinfNorm, tensorToSpec,
-                    Spec.mapTensor, mapSpec] using hfold
+                change
+                  List.foldl
+                    (fun a i =>
+                      max a
+                        (tensorDistance (α := SpecScalar) linfNorm
+                          (mapSpec (s := s) (Activation.Math.logisticSpec (α := ℝ)) (xSf i))
+                          (tensorToSpec (α := R)
+                            (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                            (mapSpec (s := s) (Activation.Math.logisticSpec (α := R)) (xRf i)))))
+                    0 (List.finRange n) ≤ B
+                exact hfold
               simpa [approxT, approxWith, B] using this
 end NFBackend
 

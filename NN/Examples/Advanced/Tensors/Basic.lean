@@ -13,8 +13,8 @@ meta import NN.Spec.Core.TensorBridge
 /-!
 # Advanced tensor basics
 
-This file is the advanced “tensor basics” map for TorchLean. It covers the core operations people
-usually ask about once they understand typed shapes:
+Advanced tensor work usually starts here. The examples cover the operations people ask about once
+typed shapes make sense:
 
 - constructing small tensors;
 - indexing and slicing through the shape-indexed `Spec.Tensor` representation;
@@ -37,7 +37,7 @@ TorchLean keeps two tensor representations because they serve different goals:
 The conversion boundary is where you want to be explicit about layout and conventions. TorchLean
 uses a *row-major* convention for flattening/unflattening, so that the last axis varies fastest.
 
-## How to read this file
+## How to read it
 
 The sections below are small "micro examples" you can copy into other scratch files:
 
@@ -231,8 +231,8 @@ flat = torch.tensor([1., 2., 3., 4., 5., 6.])
 reshaped = flat.reshape(2, 3)
 ```
 
-This section spells out the row-major index arithmetic. Most user code should prefer
-library reshape helpers when available, but this makes the layout convention completely explicit.
+This section spells out the row-major index arithmetic. Use library reshape helpers when available;
+the explicit calculation here fixes the layout convention.
 -/
 
 /-- A flat length-6 vector in `TensorArray`. -/

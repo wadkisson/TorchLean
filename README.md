@@ -29,7 +29,42 @@ runtime path and checks that the CUDA backend is available; it is not a trusted
 proof boundary.
 
 TorchLean is pinned by `lean-toolchain` and currently builds with
-`leanprover/lean4:v4.30.0`.
+`leanprover/lean4:v4.31.0`.
+
+The public code shape is:
+
+```lean
+import NN
+open TorchLean
+
+def model :=
+  nn.Sequential![
+    nn.Linear 2 8,
+    nn.ReLU,
+    nn.Linear 8 1
+  ]
+
+def xs : Tensor.T Float (shape![4, 2]) :=
+  tensorND! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+
+def ys : Tensor.T Float (shape![4, 1]) :=
+  tensorND! [4, 1] [0.2, 1.0, 1.0, 1.8]
+
+def data : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+  Data.tensorDataset xs ys
+
+def trainOnce : IO Unit := do
+  let trainer :=
+    Trainer.new model
+      { task := .regression
+        optimizer := optim.sgd { lr := 0.05 }
+        backend := .compiled
+        dtype := .float32 }
+  let y0 ← trainer.eval (tensorND! [2] [0.5, -0.25])
+  IO.println s!"initial={Tensor.pretty y0}"
+  let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
+  trained.printSummary
+```
 
 ## First Things To Try
 
@@ -74,17 +109,15 @@ lake exe cache get
 lake build
 ```
 
-Most downstream model and training files should start from the public facade:
+Use `import NN` for model, data, training, verification, and proof workflows. Focused imports such
+as `NN.API.*`, `NN.GraphSpec.*`, `NN.Runtime.*`, or `NN.Proofs.*` are for files that deliberately
+work inside one subsystem.
+
+Downstream model and training files should start from:
 
 ```lean
-import NN.API.Public
-```
-
-Use the broader umbrella when you want the maintained specification, IR, proof,
-verification, examples, and widget surface:
-
-```lean
-import NN.Library
+import NN
+open TorchLean
 ```
 
 For local development against a checkout, use a path dependency instead:
@@ -95,7 +128,9 @@ require TorchLean from "../TorchLean"
 
 ## Repository Map
 
-- `NN/API`: public facade for model, tensor, data, and training workflows.
+- `NN.lean`: canonical umbrella import for model, tensor, data, training, verification,
+  and proof workflows.
+- `NN/API`: subsystem APIs behind `import NN`.
 - `NN/Spec`: mathematical tensor, layer, model, and dynamical-system definitions.
 - `NN/Runtime`: executable autograd, optimizers, training loops, CUDA boundary,
   PyTorch import/export, and RL runtime support.

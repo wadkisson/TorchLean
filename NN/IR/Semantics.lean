@@ -36,7 +36,7 @@ Softmax and layer norm:
 - `layernorm axis` matches PyTorch's `F.layer_norm(x, normalized_shape=x.shape[axis:])` convention:
   `axis` selects the start of the **normalized suffix**. We implement this by reshaping the tensor
   into a 2D view `(seqLen, embedDim)`, applying the spec 2D LayerNorm (`Spec.layerNorm`), then
-  reshaping back. This keeps the spec primitive small while supporting arbitrary ranks.
+  reshaping back.
 
 How this relates to PyTorch:
 - `Graph.nodes` is analogous to a topologically-sorted IR like FX/TorchScript.
@@ -249,7 +249,7 @@ Evaluate a `const` node from the external payload.
 Constants are stored “flat” (1D) for convenience, so we check the flattened length matches
 `Shape.size s` and then `unflatten` to the requested shape.
 -/
-def evalConst {α : Type} [Context α] [Inhabited α]
+def evalConst {α : Type} [Context α]
     (payload : Payload α) (id : Nat) (s : Shape) : Except String (Tensor α s) := do
   match payload.const? id with
   | none => throw s!"IR eval: missing const payload for node {id}"
@@ -528,7 +528,7 @@ This function assumes the graph is structurally well-formed (ids are in bounds a
 strictly smaller ids). `denoteAll` performs that check up front.
 -/
 def evalAt
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (payload : Payload α) (input : DVal α) (vals : Array (DVal α)) (i : Nat) :
     Except String (DVal α) := do
   let n ← g.getNode i
@@ -1069,7 +1069,7 @@ This is written as a structurally recursive function so it is easy to reason abo
 (evaluation is “a simple loop over node ids”).
 -/
 def denoteAllFrom
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (payload : Payload α) (input : DVal α) (i : Nat) (vals : Array (DVal α)) :
     Except String (Array (DVal α)) := do
   if h : i < g.nodes.size then
@@ -1096,7 +1096,7 @@ The evaluator is total in the sense that it always returns either:
 - `.error msg` describing the first failure (malformed IR, missing payload, or a local shape error).
 -/
 def denoteAll
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (payload : Payload α) (input : DVal α) : Except String (Array (DVal α)) := do
   -- Fast path: compiler-produced graphs typically satisfy the boolean `wellFormed` discipline.
   if g.wellFormed then
@@ -1127,7 +1127,7 @@ scoped[IR] notation g "[[" payload ", " input "]]" =>
 
 /-- Evaluate the graph and return the value at `outputId`. -/
 def denote
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (g : Graph) (payload : Payload α) (input : DVal α) (outputId : Nat) : Except String (DVal α) :=
       do
   let vals ← denoteAll (α := α) (g := g) (payload := payload) (input := input)

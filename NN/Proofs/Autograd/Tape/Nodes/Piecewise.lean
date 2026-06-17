@@ -176,7 +176,7 @@ def maxElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec 
             (aCLM xV) :=
         (evalCLM (n := Shape.size s) i).hasFDerivAt (x := aCLM xV)
       have hcomp := houter.comp xV ha0
-      simpa [ContinuousLinearMap.comp_apply, evalCLM_apply] using hcomp
+      exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hb_i :
         HasFDerivAt (fun x : CtxVec Γ => bCLM x i) ((evalCLM (n := Shape.size s) i).comp bCLM) xV :=
           by
@@ -186,7 +186,7 @@ def maxElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec 
             (bCLM xV) :=
         (evalCLM (n := Shape.size s) i).hasFDerivAt (x := bCLM xV)
       have hcomp := houter.comp xV hb0
-      simpa [ContinuousLinearMap.comp_apply, evalCLM_apply] using hcomp
+      exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hlt : aCLM xV i < bCLM xV i ∨ aCLM xV i > bCLM xV i := lt_or_gt_of_ne hne
     cases hlt with
     | inr hgt =>
@@ -286,14 +286,14 @@ def minElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec 
         xV) :=
         (evalCLM (n := n) i).hasFDerivAt (x := aCLM xV)
       have hcomp := houter.comp xV ha0
-      simpa [ContinuousLinearMap.comp_apply, evalCLM_apply] using hcomp
+      exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hb_i :
         HasFDerivAt (fun x : CtxVec Γ => bCLM x i) ((evalCLM (n := n) i).comp bCLM) xV := by
       have houter : HasFDerivAt (fun v : Vec n => (evalCLM (n := n) i) v) (evalCLM (n := n) i) (bCLM
         xV) :=
         (evalCLM (n := n) i).hasFDerivAt (x := bCLM xV)
       have hcomp := houter.comp xV hb0
-      simpa [ContinuousLinearMap.comp_apply, evalCLM_apply] using hcomp
+      exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hcmp :
         CtxVec.get (Γ := Γ) (s := s) a xV i < CtxVec.get (Γ := Γ) (s := s) b xV i ∨
           CtxVec.get (Γ := Γ) (s := s) a xV i > CtxVec.get (Γ := Γ) (s := s) b xV i :=

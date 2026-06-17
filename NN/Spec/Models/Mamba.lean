@@ -18,7 +18,7 @@ models, the token controls discretization and input/output state parameters.
 
 This file exposes two layers:
 
-- `MambaBlockSpec`: a compact theorem-friendly diagonal SSM block kept for scan laws and kernel
+- `MambaBlockSpec`: a compact theorem-friendly diagonal SSM block for scan laws and kernel
   validation.
 - `SelectiveMambaBlockSpec`: a fuller Mamba-style block with input/gate projections, causal
   depthwise convolution, SiLU, token-dependent `Delta/B/C`, diagonal selective scan, gated output,

@@ -3,28 +3,26 @@ Copyright (c) 2026 TorchLean
 Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
-Device-agnostic real-data example:
+Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-  lake exe torchlean transformer --cpu --steps 1
-  lake build -R -K cuda=true && lake exe torchlean transformer --cuda --steps 1
+  lake build -R -K cuda=true && lake exe torchlean transformer --cuda --tiny-shakespeare --steps 1
 -/
 
 module
 
 
 public import NN
-public import NN.API.Models.Transformer
 public import NN.Examples.Models.Common.RealData
-public import NN.Examples.Models.Sequence.SimpleText
 
 /-!
 # Transformer Text Example
 
-Runnable `torchlean transformer` example. It reads a local text corpus, builds a byte-level
-sequence reconstruction sample, and trains one transformer encoder block on that real text window.
+Runnable `torchlean transformer` example. It reads a local text corpus, builds a short sequence
+reconstruction sample, and trains one transformer encoder block on that real text window.
 
-The reusable model wiring lives in `NN.API.Models.Transformer`
-(`nn.models.transformerEncoder`). This file is the runnable wrapper.
+The reusable model wiring is exposed as `TorchLean.nn.models.TransformerEncoder`. This command stays
+small so attention, normalization, the optimizer, logging, and CUDA execution remain easy to test
+regularly.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
@@ -34,8 +32,7 @@ lake build -R -K cuda=true && lake exe torchlean transformer --cuda --tiny-shake
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Sequence.Transformer
 
@@ -43,21 +40,21 @@ namespace NN.Examples.Models.Sequence.Transformer
 def exeName : String := "torchlean transformer"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "transformer"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "transformer"
 
 /-- Number of rows in the typed encoder batch. -/
-def batch : Nat := 4
+def batch : Nat := 1
 
-/-- Sequence length used by the encoder reconstruction sample. -/
-def seqLen : Nat := 8
+/-- Short reconstruction window for the quick encoder training run. -/
+def seqLen : Nat := 1
 /-- Transformer feature width. -/
-def dModel : Nat := 32
+def dModel : Nat := 2
 /-- Number of attention heads. -/
-def numHeads : Nat := 4
+def numHeads : Nat := 1
 /-- Per-head width; `numHeads * headDim` matches `dModel`. -/
-def headDim : Nat := 8
+def headDim : Nat := 2
 /-- Feed-forward hidden width inside the encoder block. -/
-def ffnHidden : Nat := 128
+def ffnHidden : Nat := 4
 
 /-- API-level encoder configuration shared by shapes and the constructor. -/
 def cfg : nn.models.TransformerEncoderConfig :=
@@ -69,50 +66,49 @@ def cfg : nn.models.TransformerEncoderConfig :=
     ffnHidden := ffnHidden }
 
 /-- Input shape: a batch of sequence rows with `dModel` features per token. -/
-abbrev σ : Shape :=
+abbrev σ :=
   nn.models.transformerEncoderShape cfg
 
 /-- Output shape matches the input because this command trains a reconstruction objective. -/
-abbrev τ : Shape :=
+abbrev τ :=
   σ
 
 /-- One reusable transformer encoder block from the public model API. -/
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.transformerEncoder cfg
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.TransformerEncoder cfg (by decide) (by decide)
 
-/--
-Build one encoder reconstruction batch from a real-text causal sample.
+/-- Build one reconstruction sample from the loaded corpus prefix. -/
+def sample (corpus : String) : SupervisedSample Float σ τ :=
+  let s := Data.textCausalBatchSample (α := Float) batch seqLen dModel
+    (corpus.take (seqLen + 1)).toString
+  Sample.mk (Spec.Tensor.materialize (Sample.x s)) (Spec.Tensor.materialize (Sample.y s))
 
-This command exercises the encoder block directly. The causal GPT/Mamba files cover
-language-model decoding; this file keeps the attention/norm/FFN path isolated.
--/
-def mkSample {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] (input : String) :
-    API.sample.Supervised α σ τ :=
-  let row : API.sample.Supervised α (NN.Tensor.Shape.Mat seqLen dModel)
-      (NN.Tensor.Shape.Mat seqLen dModel) :=
-    RealData.textCausalSample (α := α) seqLen dModel input
-  match row with
-  | .cons x (.cons y .nil) =>
-      API.sample.mk (Tensor.dim (fun _ => x)) (Tensor.dim (fun _ => y))
-
-/--
-Shared runner configuration for `torchlean transformer`.
-
-The RNN, LSTM, and Transformer commands use the same runner so differences in behavior come from
-the architecture rather than from separate CLI/runtime wrappers.
--/
-def runner : SimpleText.RunnerConfig σ τ :=
-  { exeName := exeName
-    defaultLogJson := defaultLogJson
-    modelName := "Transformer encoder"
-    logTitle := "Transformer text training"
-    mkModel := mkModel
-    mkSample := fun {α} _ _ input => mkSample (α := α) input
-    -- Attention + LayerNorm is more sensitive than the RNN/LSTM checks; keep the default LR small.
-    lr := 1e-4 }
+/-- Train the Transformer encoder with the public `Trainer` surface. -/
+def train (opts : Options) (corpusFlags : RealData.TextCorpusFlags)
+    (flags : ModelZoo.LoggedTrainFlags) : IO Unit := do
+  let corpus ← RealData.TextCorpusFlags.read exeName corpusFlags
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.sgd { lr := 1e-4 } })
+        .regression
+  let trainData := Data.floatSamples [sample corpus]
+  let trained ← trainer.train
+    trainData
+    (ModelZoo.LoggedTrainFlags.trainOptions flags
+      (title := "Transformer text training")
+      (notes := #[s!"corpus={corpusFlags.path}"]))
+  trained.printSummary
 
 /-- CLI entrypoint for the Transformer encoder text command. -/
 def main (args : List String) : IO UInt32 := do
-  SimpleText.main runner args
+  Trainer.Command.run
+    { exeName := exeName
+      defaultLogJson := defaultLogJson
+      defaultSteps := 1
+      description := "Transformer encoder"
+      parseData := RealData.TextCorpusFlags.parse
+      train := train }
+    args
 
 end NN.Examples.Models.Sequence.Transformer

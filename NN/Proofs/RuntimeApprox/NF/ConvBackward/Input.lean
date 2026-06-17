@@ -858,11 +858,14 @@ theorem approxT_conv2d_input_deriv_spec
     let bTicii := match bTic with | .dim f => f ii
     let bTiciijj := match bTicii with | .dim f => f jj
     have h0 : linfNorm bTic ≤ linfNorm bT := by
-      simpa [bTic] using (linf_norm_le_get_dim (t := bT) ic)
+      change linfNorm (match bT with | .dim f => f ic) ≤ linfNorm bT
+      exact linf_norm_le_get_dim (t := bT) ic
     have h1' : linfNorm bTicii ≤ linfNorm bTic := by
-      simpa [bTicii] using (linf_norm_le_get_dim (t := bTic) ii)
+      change linfNorm (match bTic with | .dim f => f ii) ≤ linfNorm bTic
+      exact linf_norm_le_get_dim (t := bTic) ii
     have h2' : linfNorm bTiciijj ≤ linfNorm bTicii := by
-      simpa [bTiciijj] using (linf_norm_le_get_dim (t := bTicii) jj)
+      change linfNorm (match bTicii with | .dim f => f jj) ≤ linfNorm bTicii
+      exact linf_norm_le_get_dim (t := bTicii) jj
     have hchain : linfNorm bTiciijj ≤ linfNorm bT :=
       le_trans (le_trans h2' h1') h0
     let bound :=
@@ -902,10 +905,10 @@ theorem approxT_conv2d_input_deriv_spec
       (linfNorm bT)
   have hEntryS :
       entryS = Tensor.scalar (getAtOrZero outS [ic.val, ii.val, jj.val]) := by
-    simpa [entryS] using (entry_eq_scalar_get_at_or_zero3 (t := outS) ic ii jj)
+    exact entry_eq_scalar_get_at_or_zero3 (t := outS) ic ii jj
   have hEntryR :
       entryR = Tensor.scalar (getAtOrZero outR [ic.val, ii.val, jj.val]) := by
-    simpa [entryR] using (entry_eq_scalar_get_at_or_zero3 (t := outR) ic ii jj)
+    exact entry_eq_scalar_get_at_or_zero3 (t := outR) ic ii jj
   have happ :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
         (Tensor.scalar (getAtOrZero outS [ic.val, ii.val, jj.val]))

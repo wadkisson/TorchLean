@@ -192,13 +192,13 @@ private lemma pluses_foldl_gt_of_energy_eq_of_ne
       have hne_sf : sf ≠ s := by
         intro hEq
         apply hne
-        simpa [hfold] using hEq
+        exact hfold.trans hEq
       have hle1 : energy (α := ℝ) p s1 ≤ energy (α := ℝ) p s :=
         by simpa [hs1] using energy_updateAt_le (n := n) p hsym hdiag s u
       have hleTail : energy (α := ℝ) p sf ≤ energy (α := ℝ) p s1 := by
         simpa [hsf] using energy_foldl_le (n := n) (p := p) hsym hdiag l s1
       have hEsf : energy (α := ℝ) p sf = energy (α := ℝ) p s := by
-        simpa [hfold] using hE
+        exact (congrArg (energy (α := ℝ) p) hfold.symm).trans hE
       have hge1 : energy (α := ℝ) p s ≤ energy (α := ℝ) p s1 := by
         simpa [hEsf] using hleTail
       have hE1 : energy (α := ℝ) p s1 = energy (α := ℝ) p s :=

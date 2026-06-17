@@ -70,9 +70,9 @@ on the CUDA backend.
 -/
 def mambaTextLm (cfg : MambaTextConfig) (seqLen : Nat) :
     nn.M (nn.Sequential (mambaTokenMat cfg seqLen) (mambaLogitMat cfg seqLen)) :=
-  nn.sequential![
+  nn.Sequential![
     nn.mamba seqLen cfg.vocab cfg.stateDim,
-    nn.linear cfg.stateDim cfg.vocab (pfx := NN.Tensor.Shape.Vec seqLen)
+    Linear cfg.stateDim cfg.vocab (pfx := NN.Tensor.Shape.Vec seqLen)
   ]
 
 /-- Small deterministic initializer for spec-level reference blocks. -/

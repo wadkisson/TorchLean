@@ -14,6 +14,3 @@ public import NN.API.Adapters.LoRA
 Small reusable adapters that can be attached to existing models without changing the model
 definition itself.
 -/
-
-@[expose] public section
-

@@ -79,7 +79,7 @@ This contract is focused:
 
 - it does not try to verify the environment dynamics,
 - it checks the syntactic and numeric properties that can be validated locally,
-- it is designed to fail fast with a human-readable error.
+- it is designed to fail fast with a clear error.
 -/
 
 /-- Contract for validating externally provided Gym-style transitions. -/

@@ -104,7 +104,7 @@ def idxDecoderHeadOut {seqLen dModel numHeads headDim : Nat} :
       (ΓDecoderCore seqLen dModel numHeads headDim ++
         MultiHeadAttention.ssMaskedCore seqLen numHeads headDim)
       (MultiHeadAttention.HeadsShape seqLen numHeads headDim) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := [MultiHeadAttention.ScoresShape seqLen numHeads,
       MultiHeadAttention.ScoresShape seqLen numHeads,
       MultiHeadAttention.ScoresShape seqLen numHeads,
@@ -118,7 +118,7 @@ def idxDecoderMergedAttention {seqLen dModel numHeads headDim : Nat} :
         MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
         [LayerNorm.MatShape seqLen dModel])
       (LayerNorm.MatShape seqLen dModel) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim)
     (τ := LayerNorm.MatShape seqLen dModel)
 
@@ -142,7 +142,7 @@ def idxDecoderAttentionResidual {seqLen dModel numHeads headDim : Nat} :
         MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
         [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel])
       (LayerNorm.MatShape seqLen dModel) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++ [LayerNorm.MatShape seqLen dModel])
     (τ := LayerNorm.MatShape seqLen dModel)
 
@@ -214,7 +214,7 @@ def idxDecoderNorm1Out {seqLen dModel numHeads headDim : Nat} :
         [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel,
           LayerNorm.MatShape seqLen dModel])
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
       [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel])
     (τ := LayerNorm.MatShape seqLen dModel)
@@ -244,7 +244,7 @@ def idxDecoderFfnHiddenPre {seqLen dModel numHeads headDim dFF : Nat} :
           LayerNorm.MatShape seqLen dModel] ++
         [SeqFFNHiddenShape seqLen dFF])
       (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
       [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel,
         LayerNorm.MatShape seqLen dModel])
@@ -259,7 +259,7 @@ def idxDecoderFfnHiddenAct {seqLen dModel numHeads headDim dFF : Nat} :
           LayerNorm.MatShape seqLen dModel] ++
         [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF])
       (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
       [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel,
         LayerNorm.MatShape seqLen dModel, SeqFFNHiddenShape seqLen dFF])
@@ -275,7 +275,7 @@ def idxDecoderFfnProjected {seqLen dModel numHeads headDim dFF : Nat} :
         [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF,
           SeqFFNModelShape seqLen dModel])
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
       [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel,
         LayerNorm.MatShape seqLen dModel, SeqFFNHiddenShape seqLen dFF,
@@ -291,7 +291,7 @@ def idxDecoderFfnResidual {seqLen dModel numHeads headDim dFF : Nat} :
           LayerNorm.MatShape seqLen dModel] ++
         ssSeqFFNResidual seqLen dModel dFF)
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓDecoderCore seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMaskedCore seqLen numHeads headDim ++
       [LayerNorm.MatShape seqLen dModel, LayerNorm.MatShape seqLen dModel,
         LayerNorm.MatShape seqLen dModel, SeqFFNHiddenShape seqLen dFF,

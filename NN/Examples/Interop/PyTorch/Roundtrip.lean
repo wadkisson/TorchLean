@@ -6,10 +6,9 @@ Authors: TorchLean Team
 
 module
 
-import NN.API.Common
-import NN.API.Json
 import NN.Examples.Interop.PyTorch.Export
 import NN.Examples.Interop.PyTorch.Import
+import NN
 
 /-!
 # PyTorch Round-Trip Driver
@@ -139,7 +138,7 @@ private def exportMLP : IO Unit := do
   writePy dir "TestMLP_PyTorch" stub
   -- If we have a JSON state_dict handy, also emit a runnable "with weights" helper.
   try
-    let j ← NN.API.Json.parseFile (jsonOf .mlp)
+    let j ← TorchLean.Json.parseFile (jsonOf .mlp)
     let some sd := Import.MLPPyTorch.loadMlpStateDict mlpInDim mlpHidDim mlpOutDim j
       | throw <| IO.userError "MLP JSON present but failed to parse as an MLP state_dict"
     let codeW := Export.MLPPyTorch.generateMLPWithWeights sd.w1 sd.b1 sd.w2 sd.b2 "TestMLP"
@@ -175,7 +174,7 @@ private def exportCNN : IO Unit := do
   writePy dir "TestCNN_PyTorch" stub
   -- If we have a JSON state_dict handy, also emit a runnable "with weights" helper.
   try
-    let j ← NN.API.Json.parseFile (jsonOf .cnn)
+    let j ← TorchLean.Json.parseFile (jsonOf .cnn)
     let some sd := Import.CNNPyTorch.loadCnnStateDict cnnInC cnnOutC cnnKH cnnKW cnnFlatSize j
       | throw <| IO.userError "CNN JSON present but failed to parse as a CNN state_dict"
     let codeW :=
@@ -201,7 +200,7 @@ private def exportTransformer : IO Unit := do
   writePy dir "TestTransformer_Encoder" stub
   -- If we have a JSON state_dict handy, also emit a runnable "with weights" helper.
   try
-    let j ← NN.API.Json.parseFile (jsonOf .transformer)
+    let j ← TorchLean.Json.parseFile (jsonOf .transformer)
     let some sd := Import.TransformerPyTorch.loadTransformerEncoderStateDict trEmbedDim trHeadCount
       trHiddenDim j
       | throw <| IO.userError "Transformer JSON present but failed to parse as a Transformer state_dict"
@@ -226,11 +225,11 @@ private def runExport (m : Model) : IO Unit := do
 /-! ## Import actions (Lean forward pass) -/
 
 private def importMLP : IO Unit := do
-  let j ← NN.API.Json.parseFile (jsonOf .mlp)
+  let j ← TorchLean.Json.parseFile (jsonOf .mlp)
   let some sd := Import.MLPPyTorch.loadMlpStateDict mlpInDim mlpHidDim mlpOutDim j
     | throw <| IO.userError "Failed to load MLP state dict"
 
-  let x : _root_.Spec.Tensor Float (NN.Tensor.Shape.Vec mlpInDim) := tensor! [0.5, 0.8]
+  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.vec mlpInDim) := tensor! [0.5, 0.8]
   let y := Import.MLPPyTorch.forward sd x
 
   IO.println "== MLP import example =="
@@ -239,7 +238,7 @@ private def importMLP : IO Unit := do
   NN.Tensor.print y
 
 private def importCNN : IO Unit := do
-  let j ← NN.API.Json.parseFile (jsonOf .cnn)
+  let j ← TorchLean.Json.parseFile (jsonOf .cnn)
   let some sd := Import.CNNPyTorch.loadCnnStateDict cnnInC cnnOutC cnnKH cnnKW cnnFlatSize j
     | throw <| IO.userError "Failed to load CNN state dict"
 
@@ -271,7 +270,7 @@ private def importCNN : IO Unit := do
       conv1 conv2 pool1 pool2 linear
 
   -- Deterministic input matching the Python training script: values 1..64 laid out row-major.
-  let x : _root_.Spec.Tensor Float (NN.Tensor.Shape.Image cnnInC cnnInH cnnInW) :=
+  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.image cnnInC cnnInH cnnInW) :=
     _root_.Spec.Tensor.dim (fun _ =>
       _root_.Spec.Tensor.dim (fun i =>
         _root_.Spec.Tensor.dim (fun j =>
@@ -285,7 +284,7 @@ private def importCNN : IO Unit := do
   NN.Tensor.print y
 
 private def importTransformer : IO Unit := do
-  let j ← NN.API.Json.parseFile (jsonOf .transformer)
+  let j ← TorchLean.Json.parseFile (jsonOf .transformer)
   let some sd := Import.TransformerPyTorch.loadTransformerEncoderStateDict trEmbedDim trHeadCount
     trHiddenDim j
     | throw <| IO.userError "Failed to load Transformer encoder state dict"
@@ -301,7 +300,7 @@ private def importTransformer : IO Unit := do
     :=
     { layers := [layer] }
 
-  let x : _root_.Spec.Tensor Float (NN.Tensor.Shape.Mat trSeqLen trEmbedDim) := tensor! [[1.5, 1.5]]
+  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.mat trSeqLen trEmbedDim) := tensor! [[1.5, 1.5]]
   let y := _root_.Spec.TransformerEncoder.forward (seqLen := trSeqLen) (embedDim := trEmbedDim)
     encoder x (by decide) (by decide)
 
@@ -319,12 +318,15 @@ private def runImport (m : Model) : IO Unit := do
 /-! ## Public entrypoint called from the examples zoo runner -/
 
 public def main (args : List String) : IO Unit := do
-  let args := NN.API.CLI.dropDashDash args
-  let (modelArg?, args) ← NN.API.Common.orThrow "PyTorch.Roundtrip" <|
-    NN.API.CLI.takeFlagValueOnce args "model"
-  let (actionArg?, args) ← NN.API.Common.orThrow "PyTorch.Roundtrip" <|
-    NN.API.CLI.takeFlagValueOnce args "action"
-  NN.API.Common.orThrow "PyTorch.Roundtrip" <| NN.API.CLI.requireNoArgs args
+  let args := _root_.TorchLean.CLI.dropDashDash args
+  if _root_.TorchLean.CLI.hasHelp args then
+    IO.println usage
+    return
+  let (modelArg?, args) ← _root_.TorchLean.ModelZoo.orThrow "PyTorch.Roundtrip" <|
+    _root_.TorchLean.CLI.takeFlagValueOnce args "model"
+  let (actionArg?, args) ← _root_.TorchLean.ModelZoo.orThrow "PyTorch.Roundtrip" <|
+    _root_.TorchLean.CLI.takeFlagValueOnce args "action"
+  _root_.TorchLean.CLI.requireNoArgs "PyTorch.Roundtrip" args
 
   let modelStr := modelArg?.getD "mlp"
   let actionStr := actionArg?.getD "export"

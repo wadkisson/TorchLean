@@ -26,18 +26,15 @@ The smallest case is a scalar valued tensor function.
 ```
 import NN
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
 
-def sumsq : autograd.fn1.Fn (Shape.Vec 2) Shape.scalar :=
+def sumsq : autograd.fn1.Fn (Shape.vec 2) Shape.scalar :=
   fun x => do
     let y ← nn.functional.square x
     nn.functional.mean y
 
 def example : IO Unit := do
-  let x : Tensor Float (Shape.Vec 2) := tensorND! [2] [0.5, -1.2]
+  let x : Tensor Float (Shape.vec 2) := tensorND! [2] [0.5, -1.2]
   let g ← autograd.fn1.grad (α := Float) sumsq x
   IO.println s!"grad = {Spec.pretty g}"
 ```
@@ -109,7 +106,7 @@ The usual calls are:
 - `autograd.model.gradInputs` for gradients with respect to input and target tensors,
 - `autograd.model.valueAndGradParams` when the loss value and parameter gradients are both needed.
 
-Those declarations live in [NN.API.Public](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean), while the lower runtime
+Those declarations live in [NN.API.Public](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean), while the runtime
 implementation lives in [NN.API.Runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime.lean) and
 [NN.Runtime.Autograd.TorchLean.Autodiff](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Autodiff.lean).
 
@@ -161,7 +158,8 @@ Use the smallest API that matches the question.
 - For a value and gradient together, start with `autograd.fn1.valueAndGrad`.
 - For a vector output with a chosen cotangent, start with `autograd.fn1.vjp`.
 - For a model loss gradient with respect to parameters, start with `autograd.model.gradParams`.
-- For minibatch training, start with `train.fitLoader` or the quickstart examples.
+- For minibatch training, start with `Trainer.Config`, `Trainer.TrainOptions`, `trainer.train`, and the
+  quickstart examples.
 
 For a runnable tour, open
 [NN.Examples.Quickstart.AutogradBasics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean). It prints

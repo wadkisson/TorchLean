@@ -91,10 +91,10 @@ This returns *lines* (not a single string) so callers can splice it into larger 
 def generateMLPPyTorchClassLines (inDim hidDim outDim : Nat) (className : String) : List String :=
   [
     s!"class {className}(nn.Module):",
-    (s!"\"\"\"Multi-Layer Perceptron with {inDim} input, {hidDim} hidden, " ++
+    indent2 (s!"\"\"\"Multi-Layer Perceptron with {inDim} input, {hidDim} hidden, " ++
       s!"{outDim} output dimensions\"\"\""),
     indent2 "",
-    (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
     indent4 "super().__init__()",
     indent4 "self.input_dim = input_dim",
@@ -195,7 +195,7 @@ def generateMLPWithSoftmax {inDim hidDim outDim : Nat} (className : String := "M
     s!"class {className}(nn.Module):",
     indent2 s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
     indent2 "",
-    (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
     indent4 "super().__init__()",
     indent4 "self.input_dim = input_dim",
@@ -238,7 +238,7 @@ def generateMLPWithSoftmaxLines {inDim hidDim outDim : Nat} (className : String)
     s!"class {className}(nn.Module):",
     indent2 s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
     indent2 "",
-    (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
     indent4 "super().__init__()",
     indent4 "self.input_dim = input_dim",

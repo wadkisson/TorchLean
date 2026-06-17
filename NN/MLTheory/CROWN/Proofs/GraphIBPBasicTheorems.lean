@@ -148,6 +148,7 @@ theorem valid_ofFlatBox_real (B : FlatBox ℝ) (hB : B.Valid) :
 /-- Validity is preserved by interval addition on `FlatBox` (over `ℝ`). -/
 theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid) :
     (box_add (α := ℝ) B1 B2).Valid := by
+  letI : BoundOps ℝ := instBoundOpsDefault ℝ
   cases B1 with
   | mk n1 lo1 hi1 =>
     cases B2 with
@@ -160,8 +161,8 @@ theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
                 { dim := n1, lo := lo1, hi := hi1 }
                 { dim := n1, lo := lo2, hi := hi2 } =
               { dim := n1
-                lo := Tensor.addSpec (α := ℝ) lo1 lo2
-                hi := Tensor.addSpec (α := ℝ) hi1 hi2 } := by
+                lo := Tensor.map2Spec BoundOps.addDown lo1 lo2
+                hi := Tensor.map2Spec BoundOps.addUp hi1 hi2 } := by
           simpa using (NN.MLTheory.CROWN.Graph.Theorems.box_add_on_eq (α := ℝ) n1 lo1 hi1 lo2 hi2)
         -- reduce the goal to scalar arithmetic
         rw [hEq]
@@ -190,9 +191,11 @@ theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
                           simpa [NN.MLTheory.CROWN.FlatBox.Valid,
                             NN.MLTheory.CROWN.FlatBox.getScalar, hL2, hU2]
                             using (h2 i)
+                        have hdown : BoundOps.addDown l1 l2 = l1 + l2 := rfl
+                        have hup : BoundOps.addUp u1 u2 = u1 + u2 := rfl
                         -- unfold the scalar projections through `Tensor.add_spec`
                         simpa [NN.MLTheory.CROWN.FlatBox.Valid, NN.MLTheory.CROWN.FlatBox.getScalar,
-                          Tensor.addSpec, Tensor.map2Spec, hL1, hU1, hL2, hU2]
+                          Tensor.map2Spec, hL1, hU1, hL2, hU2, hdown, hup]
                           using add_le_add h1i h2i
       · -- mismatch branch: returns B1 unchanged
         have hEq :
@@ -206,6 +209,7 @@ theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
 /-- Validity is preserved by interval subtraction on `FlatBox` (over `ℝ`). -/
 theorem valid_box_sub_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid) :
     (box_sub (α := ℝ) B1 B2).Valid := by
+  letI : BoundOps ℝ := instBoundOpsDefault ℝ
   cases B1 with
   | mk n1 lo1 hi1 =>
     cases B2 with
@@ -217,8 +221,8 @@ theorem valid_box_sub_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
                 { dim := n1, lo := lo1, hi := hi1 }
                 { dim := n1, lo := lo2, hi := hi2 } =
               { dim := n1
-                lo := Tensor.subSpec (α := ℝ) lo1 hi2
-                hi := Tensor.subSpec (α := ℝ) hi1 lo2 } := by
+                lo := Tensor.map2Spec BoundOps.subDown lo1 hi2
+                hi := Tensor.map2Spec BoundOps.subUp hi1 lo2 } := by
           simpa using (NN.MLTheory.CROWN.Graph.Theorems.box_sub_on_eq (α := ℝ) n1 lo1 hi1 lo2 hi2)
         rw [hEq]
         intro i
@@ -248,8 +252,10 @@ theorem valid_box_sub_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
                             using (h2 i)
                         have hneg : -u2 ≤ -l2 := neg_le_neg h2i
                         have hadd : l1 + (-u2) ≤ u1 + (-l2) := add_le_add h1i hneg
+                        have hdown : BoundOps.subDown l1 u2 = l1 - u2 := rfl
+                        have hup : BoundOps.subUp u1 l2 = u1 - l2 := rfl
                         simpa [NN.MLTheory.CROWN.FlatBox.Valid, NN.MLTheory.CROWN.FlatBox.getScalar,
-                          Tensor.subSpec, Tensor.map2Spec, hL1, hU1, hL2, hU2,
+                          Tensor.map2Spec, hL1, hU1, hL2, hU2, hdown, hup,
                           sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
                           using hadd
       ·

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 import TorchLeanBlueprint.Guide.Ch1_Introduction.Overview
 import TorchLeanBlueprint.Guide.Ch1_Introduction.Motivation
 import TorchLeanBlueprint.Guide.Ch1_Introduction.API_Tour
@@ -48,7 +47,6 @@ import TorchLeanBlueprint.Guide.Ch5_Advanced.CLI
 import TorchLeanBlueprint.Guide.Ch6_Conclusion.Conclusion
 
 open Verso.Genre Manual
-open Informal
 
 #doc (Manual) "TorchLean Guide" =>
 %%%

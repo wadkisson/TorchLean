@@ -54,7 +54,7 @@ theorem wellFormed_push
     (hArity : n.hasValidArity = true)
     (hParentsBelow : n.parentsBelow = true) :
     ({ nodes := g.nodes.push n } : NN.IR.Graph).wellFormed = true := by
-  classical
+    classical
   -- Work with the underlying boolean predicates (and avoid `simp` rewriting `List.all = true`
   -- into a `∀` too early).
   let pOld : Fin g.nodes.size → Bool := fun i =>
@@ -159,89 +159,89 @@ theorem wellFormed_push
     (node : Node α paramShapes inShape ss out) :
     (compileNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := out)
         id node params ps).1.parentsBelow = true := by
-  -- All parent indices come from typed `Idx`s into the context; hence they are < `id`.
-  subst hId
-  cases node with
-  | const =>
+    -- All parent indices come from typed `Idx`s into the context; hence they are < `id`.
+    subst hId
+    cases node with
+    | const =>
       simp [compileNode, NN.IR.Node.parentsBelow]
-  | paramConst =>
+    | paramConst =>
       simp [compileNode, NN.IR.Node.parentsBelow]
-  | add a b =>
+    | add a b =>
       have ha : a.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) a
       have hb : b.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) b
       have : a.id ≤ ss.length ∧ b.id ≤ ss.length :=
         ⟨Nat.lt_succ_iff.mp ha, Nat.lt_succ_iff.mp hb⟩
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, ha, hb] using this
-  | sub a b =>
+    | sub a b =>
       have ha : a.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) a
       have hb : b.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) b
       have : a.id ≤ ss.length ∧ b.id ≤ ss.length :=
         ⟨Nat.lt_succ_iff.mp ha, Nat.lt_succ_iff.mp hb⟩
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, ha, hb] using this
-  | mulElem a b =>
+    | mulElem a b =>
       have ha : a.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) a
       have hb : b.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) b
       have : a.id ≤ ss.length ∧ b.id ≤ ss.length :=
         ⟨Nat.lt_succ_iff.mp ha, Nat.lt_succ_iff.mp hb⟩
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, ha, hb] using this
-  | relu x =>
+    | relu x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | exp x =>
+    | exp x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | log x =>
+    | log x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | inv x =>
+    | inv x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | matmul2d _m _n _p a b =>
+    | matmul2d _m _n _p a b =>
       have ha : a.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) a
       have hb : b.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) b
       have : a.id ≤ ss.length ∧ b.id ≤ ss.length :=
         ⟨Nat.lt_succ_iff.mp ha, Nat.lt_succ_iff.mp hb⟩
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, ha, hb] using this
-  | bmm _batch _m _n _p a b =>
+    | bmm _batch _m _n _p a b =>
       have ha : a.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) a
       have hb : b.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) b
       have : a.id ≤ ss.length ∧ b.id ≤ ss.length :=
         ⟨Nat.lt_succ_iff.mp ha, Nat.lt_succ_iff.mp hb⟩
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, ha, hb] using this
-  | reshape _inS _outS _h x =>
+    | reshape _inS _outS _h x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | swap_first_two _m _n _rest x =>
+    | swap_first_two _m _n _rest x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | transpose3dLastTwo _a _b _c x =>
+    | transpose3dLastTwo _a _b _c x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | softmaxLast _hRank x =>
+    | softmaxLast _hRank x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | layernorm2d _seqLen _embedDim _hSeq _hEmb x =>
+    | layernorm2d _seqLen _embedDim _hSeq _hEmb x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | linear _inDim _outDim _w _b x =>
+    | linear _inDim _outDim _w _b x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | conv2d _inC _outC _kH _kW _stride _padding _inH _inW _hIn _hKH _hKW _hHeight _hWidth _kernel
-      _bias x =>
+    | conv2d _inC _outC _kH _kW _stride _padding _inH _inW _hIn _hKH _hKW _hHeight _hWidth _kernel
+        _bias x =>
       have hx : x.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) x
       have : x.id ≤ ss.length := Nat.lt_succ_iff.mp hx
       simpa [compileNode, NN.IR.Node.parentsBelow, List.all, hx] using this
-  | mseLoss yhat target =>
+    | mseLoss yhat target =>
       have hy : yhat.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) yhat
       have ht : target.id < ss.length + 1 := idx_id_lt_ctxLen (inShape := inShape) (ss := ss) target
       have : yhat.id ≤ ss.length ∧ target.id ≤ ss.length :=
@@ -263,11 +263,11 @@ theorem wellFormed_push
     (compileFGraph (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out :=
       out)
         g params c).graph.wellFormed = true := by
-  classical
-  induction g generalizing c with
-  | ret y =>
+    classical
+    induction g generalizing c with
+    | ret y =>
       simpa [compileFGraph] using hWF
-  | @let1 ss₀ mid₀ out₀ node gNext ih =>
+    | @let1 ss₀ mid₀ out₀ node gNext ih =>
       let id := c.graph.nodes.size
       let res :=
         compileNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss₀) (out :=
@@ -316,7 +316,7 @@ theorem compileVerifiedForward1_wellFormed
     (compileVerifiedForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape :=
       outShape)
         p params).graph.wellFormed = true := by
-  classical
+    classical
   let input : NN.IR.Node := { id := 0, parents := [], kind := .input, outShape := inShape }
   let c0 : NN.Verification.TorchLean.CompiledIR α :=
     { graph := { nodes := #[input] }, ps := {}, inputId := 0, outputId := 0 }

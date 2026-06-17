@@ -520,10 +520,11 @@ def convTransposeBackwardSpec
   (d_kernel, d_bias, d_input)
 
 /-!
-## 2D specializations (compat)
+## 2D specializations
 
-TorchLean also exposes compatibility names for 2D convolution specs. They are implemented as
-specializations of the generic N-D convolution spec above.
+TorchLean exposes 2D convolution specs as first-class names because the model and proof layers use
+these shapes directly. They share the same indexing conventions as the generic N-D convolution spec
+above.
 -/
 
 /-- Parameters for a 2D convolution: this is `ConvSpec` specialized to `d = 2`. -/
@@ -729,10 +730,10 @@ def conv2dBackwardSpec
         conv2dInputDerivSpec (α := α) (layer := layer) (input := input) (grad_output := grad_output))
 
 /-!
-## ConvTranspose2D (compat)
+## ConvTranspose2D specializations
 
-We keep the transpose-convolution *names* for compatibility, but implement them as specializations
-of the generic N-D transpose convolution spec above.
+The transpose-convolution definitions below are the 2D specialization of the generic N-D transpose
+convolution spec above.
 -/
 
 /-- Kernel layout for transpose-convolution: `(inC, outC, kH, kW)`. -/

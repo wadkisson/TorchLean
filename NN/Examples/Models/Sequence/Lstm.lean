@@ -7,32 +7,30 @@ Device-agnostic example:
   lake exe torchlean lstm --cpu
   lake build -R -K cuda=true && lake exe torchlean lstm --cuda
 
-This is a real-data sequence run:
-- reads a local text corpus selected by the shared `--tiny-shakespeare` / `--data-file` flags,
-- builds a byte-level causal-LM one-hot window,
-- trains `nn.lstm` plus a time-distributed linear head for one or more steps.
+This example trains a tiny byte-level LSTM on real text:
+- load a corpus through `--tiny-shakespeare` or `--data-file`,
+- turn the first few bytes into a next-token training window,
+- train `nn.lstm` plus a time-distributed linear head.
 -/
 
 module
 
 public import NN
-public import NN.API.Models.SimpleSeq
-public import NN.Examples.Models.Sequence.SimpleText
+public import NN.Examples.Models.Common.RealData
 
 /-!
 # LSTM Text Example
 
-Runnable `torchlean lstm` example. It reads a local text corpus, creates a byte-level
-causal-language-model window, and trains an LSTM plus time-distributed linear head.
+Runnable `torchlean lstm` example. It reads a local text corpus, takes a short byte window from the
+front, and trains an LSTM plus a time-distributed linear head.
 
-The model constructor lives in `NN.API.Models.SimpleSeq` so other examples can reuse it. This file
-keeps only the architecture-specific declarations; the shared corpus loading, CLI parsing, logging,
-and train loop live in `NN.Examples.Models.Sequence.SimpleText`.
+The model constructor is exposed as `TorchLean.nn.models.LSTMWithLinearHead`. The local code names the
+architecture, builds the text dataset, and trains through the public `Trainer` surface.
 
 ## Scope
 
-This command is the focused LSTM path: one real corpus window, one gated recurrent cell, and the same
-training/logging interface used by the other sequence examples. For autoregressive sampling and
+This is the gated recurrent baseline. It keeps the text window short so the example stays focused on
+the LSTM cell, the time-distributed head, and the public `Trainer` API. For generation and
 longer-context language-model behavior, use one of:
 - `torchlean chargpt` (Karpathy-style, single-file char-level GPT),
 - `torchlean gpt2` (byte-level GPT-2-style model + save/reload),
@@ -46,8 +44,7 @@ lake build -R -K cuda=true && lake exe torchlean lstm --cuda --tiny-shakespeare 
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.Sequence.Lstm
 
@@ -55,53 +52,62 @@ namespace NN.Examples.Models.Sequence.Lstm
 def exeName : String := "torchlean lstm"
 
 /-- Default JSON loss-curve path for this command. -/
-def defaultLogJson : System.FilePath := Common.modelZooTrainLog "lstm"
+def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "lstm"
 
-/-- Byte-window length used by the typed recurrent sample. -/
-def seqLen : Nat := 8
-/--
-Byte vocabulary size.
-
-This example uses byte-level tokens (`0..255`) rather than hashing bytes into a reduced bucket
-count. The full byte vocabulary avoids unnecessary aliasing and keeps the sample semantics clear.
--/
-def inputSize : Nat := 256
+/-- Number of byte-level timesteps in the training window. -/
+def seqLen : Nat := 2
+/-- Tiny one-hot token width for the example dataset. -/
+def inputSize : Nat := 4
 /-- Hidden state width of the LSTM cell. -/
-def hiddenSize : Nat := 64
+def hiddenSize : Nat := 2
 
-/-- Shared shape/config record consumed by the reusable API constructor. -/
+/-- Shared shape/config record for the reusable LSTM-with-head constructor. -/
 def cfg : nn.models.SeqRnnHeadConfig :=
   { seqLen := seqLen, inputSize := inputSize, hiddenSize := hiddenSize }
 
-/-- Input shape: one byte-level one-hot vector per timestep. -/
-abbrev σ : Shape :=
+/-- Input shape: one token vector per timestep. -/
+abbrev σ :=
   nn.models.seqRnnHeadInShape cfg
 
-/-- Output shape: one logit row per input timestep. -/
-abbrev τ : Shape :=
+/-- Output shape: one prediction row per timestep. -/
+abbrev τ :=
   nn.models.seqRnnHeadOutShape cfg
 
 /-- LSTM followed by a time-distributed linear output head. -/
-def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.lstmWithLinearHead cfg
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.LSTMWithLinearHead cfg
 
-/-- Convert corpus text into one supervised causal sequence window. -/
-def mkSample {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] (input : String) :
-    API.sample.Supervised α σ τ :=
-  RealData.textCausalSample (α := α) seqLen inputSize input
+/-- Build one next-token training sample from the loaded corpus prefix. -/
+def sample (corpus : String) : SupervisedSample Float σ τ :=
+  let s := Data.textCausalSample (α := Float) seqLen inputSize (corpus.take (seqLen + 1)).toString
+  Sample.mk (Spec.Tensor.materialize (Sample.x s)) (Spec.Tensor.materialize (Sample.y s))
 
-/-- Shared runner configuration for `torchlean lstm`. -/
-def runner : SimpleText.RunnerConfig σ τ :=
-  { exeName := exeName
-    defaultLogJson := defaultLogJson
-    modelName := "LSTM"
-    logTitle := "LSTM text training"
-    mkModel := mkModel
-    mkSample := fun {α} _ _ input => mkSample (α := α) input
-    lr := 1e-2 }
+/-- Train the LSTM with the public `Trainer` surface. -/
+def train (opts : Options) (corpusFlags : RealData.TextCorpusFlags)
+    (flags : ModelZoo.LoggedTrainFlags) : IO Unit := do
+  let corpus ← RealData.TextCorpusFlags.read exeName corpusFlags
+  let trainer :=
+    Trainer.new model <|
+      Trainer.Config.fromRunConfig
+        (Trainer.runConfig opts { optimizer := optim.sgd { lr := 1e-2 } })
+        .regression
+  let trainData := Data.floatSamples [sample corpus]
+  let trained ← trainer.train
+    trainData
+    (ModelZoo.LoggedTrainFlags.trainOptions flags
+      (title := "LSTM text training")
+      (notes := #[s!"corpus={corpusFlags.path}"]))
+  trained.printSummary
 
 /-- CLI entrypoint for the LSTM text command. -/
 def main (args : List String) : IO UInt32 := do
-  SimpleText.main runner args
+  Trainer.Command.run
+    { exeName := exeName
+      defaultLogJson := defaultLogJson
+      defaultSteps := 1
+      description := "LSTM"
+      parseData := RealData.TextCorpusFlags.parse
+      train := train }
+    args
 
 end NN.Examples.Models.Sequence.Lstm

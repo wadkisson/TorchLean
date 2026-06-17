@@ -70,14 +70,41 @@ export _root_.Runtime.Autograd.TorchLean
 export _root_.Runtime.Autograd.TorchLean
   (scalarOf tlist1 tlist2 tlist3 tlist4 trainCycleSGD trainCycleOptim meanLoss)
 
+/-- Public name for TorchLean's shape-indexed tensor-pack / typed tuple representation. -/
+abbrev TensorPack (α : Type) (shapes : List Spec.Shape) := TList α shapes
+
+/-- Construct a one-tensor pack. -/
+abbrev tensorpack1 {α : Type} {s1 : Spec.Shape} (x1 : Spec.Tensor α s1) :
+    TensorPack α [s1] :=
+  tlist1 x1
+
+/-- Construct a two-tensor pack. -/
+abbrev tensorpack2 {α : Type} {s1 s2 : Spec.Shape}
+    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2) :
+    TensorPack α [s1, s2] :=
+  tlist2 x1 x2
+
+/-- Construct a three-tensor pack. -/
+abbrev tensorpack3 {α : Type} {s1 s2 s3 : Spec.Shape}
+    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2) (x3 : Spec.Tensor α s3) :
+    TensorPack α [s1, s2, s3] :=
+  tlist3 x1 x2 x3
+
+/-- Construct a four-tensor pack. -/
+abbrev tensorpack4 {α : Type} {s1 s2 s3 s4 : Spec.Shape}
+    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2)
+    (x3 : Spec.Tensor α s3) (x4 : Spec.Tensor α s4) :
+    TensorPack α [s1, s2, s3, s4] :=
+  tlist4 x1 x2 x3 x4
+
 /-
 `TList` is a *typed list of tensors* whose shape list lives in the type.
 
 It is great for safety (the compiler tracks parameter order/shapes), but raw destructuring
 with `.cons ... .nil` is noisy in examples.
 
-For tuple-like constructors/accessors (`tlist.unpack2`, `tlist.get1`, etc.), see:
-`NN/API/TList.lean` (`namespace NN.API.tlist`).
+For tuple-like constructors/accessors (`tensorpack.unpack2`, `tensorpack.get1`, etc.), see
+`NN/API/Public/TensorPack.lean`.
 -/
 
 namespace RefList

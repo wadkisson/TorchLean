@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.API.CLI
 public import NN.Verification.PINN.PyTorch
 public import NN.Verification.ODE.Parse
 public import NN.Verification.TorchLean.Compile
@@ -157,14 +158,6 @@ private def addMatmulW {α : Type} [Context α] (ps : ParamStore α) (id : Nat) 
   ParamStore α :=
   { ps with matmulW := ps.matmulW.insert id p }
 
-/-!
-Build a derivative graph `d/dt` for a 1D-input graph `g`.
-
-This is a structural AD pass over the IR: for each node we build a new node computing the
-derivative w.r.t. the single scalar input.
-
-Supported ops are exactly those used by the imported corridor networks.
--/
 /--
 Build a derivative graph `d/dt` for a 1D-input graph `g`.
 
@@ -175,9 +168,13 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
     (g : Graph) (ps0 : ParamStore α) (outId : Nat) : IO (Graph × ParamStore α × Nat) := do
   if g.nodes.isEmpty then
     throw <| IO.userError "buildDerivativeGraph1D: empty graph"
-  match (g.nodes[0]!).kind with
-  | .input => pure ()
-  | _ => throw <| IO.userError "buildDerivativeGraph1D: expected node 0 to be `.input`"
+  match g.nodes[0]? with
+  | some node =>
+    match node.kind with
+    | .input => pure ()
+    | _ => throw <| IO.userError "buildDerivativeGraph1D: expected node 0 to be `.input`"
+  | none =>
+    throw <| IO.userError "buildDerivativeGraph1D: empty graph"
 
   let pushNode : List Nat → OpKind → Shape → DerivBuildM α Nat := fun parents kind outShape => do
     let st ← get
@@ -192,45 +189,69 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
       { st with ps := addConstVal (α := α) st.ps id (constVecFill (α := α) (Shape.size outShape) x) }
     pure id
 
+  let setDerivativeId : Nat → Nat → DerivBuildM α Unit := fun i did => do
+    let st ← get
+    if h : i < st.dId.size then
+      set { st with dId := st.dId.set i did h }
+    else
+      throw <| IO.userError s!"buildDerivativeGraph1D: derivative slot out of bounds at node {i}"
+
+  let derivativeId : DerivBuildState α → Nat → Nat → DerivBuildM α Nat :=
+    fun st nodeId parentId => do
+      match st.dId[parentId]? with
+      | some did => pure did
+      | none =>
+          throw <| IO.userError <|
+            s!"buildDerivativeGraph1D: derivative parent {parentId} out of bounds at node {nodeId}"
+
   let init : DerivBuildState α :=
     { nodes := g.nodes, ps := ps0, dId := Array.replicate g.nodes.size 0 }
 
   let (_, st) ← (show DerivBuildM α Unit from do
     for i in [0:g.nodes.size] do
-      let node := g.nodes[i]!
+      let node ←
+        match g.nodes[i]? with
+        | some node => pure node
+        | none => throw <| IO.userError s!"buildDerivativeGraph1D: node {i} out of bounds"
       let outShape := node.outShape
       match node.kind with
       | .input =>
           let did ← mkConstFill outShape Numbers.one
-          modify fun st => { st with dId := st.dId.set! i did }
+          setDerivativeId i did
       | .const _ =>
           let did ← mkConstFill outShape Numbers.zero
-          modify fun st => { st with dId := st.dId.set! i did }
+          setDerivativeId i did
       | .detach =>
           let did ← mkConstFill outShape Numbers.zero
-          modify fun st => { st with dId := st.dId.set! i did }
+          setDerivativeId i did
       | .add =>
           match node.parents with
           | p1 :: p2 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!, st.dId[p2]!] .add outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let d2 ← derivativeId st i p2
+              let did ← pushNode [d1, d2] .add outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at add node {i}"
       | .sub =>
           match node.parents with
           | p1 :: p2 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!, st.dId[p2]!] .sub outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let d2 ← derivativeId st i p2
+              let did ← pushNode [d1, d2] .sub outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at sub node {i}"
       | .mul_elem =>
           match node.parents with
           | p1 :: p2 :: _ =>
               let st ← get
-              let t1 ← pushNode [st.dId[p1]!, p2] .mul_elem outShape
-              let t2 ← pushNode [p1, st.dId[p2]!] .mul_elem outShape
+              let d1 ← derivativeId st i p1
+              let d2 ← derivativeId st i p2
+              let t1 ← pushNode [d1, p2] .mul_elem outShape
+              let t2 ← pushNode [p1, d2] .mul_elem outShape
               let did ← pushNode [t1, t2] .add outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at mul_elem node {i}"
       | .linear =>
           match node.parents with
@@ -241,10 +262,11 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
                   throw <| IO.userError <|
                     s!"buildDerivativeGraph1D: missing linearWB params at node {i}"
               | some p =>
-                  let did ← pushNode [st.dId[p1]!] .matmul outShape
+                  let d1 ← derivativeId st i p1
+                  let did ← pushNode [d1] .matmul outShape
                   modify fun st =>
                     { st with ps := addMatmulW (α := α) st.ps did { m := p.m, n := p.n, w := p.w } }
-                  modify fun st => { st with dId := st.dId.set! i did }
+                  setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at linear node {i}"
       | .matmul =>
           match node.parents with
@@ -255,111 +277,125 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
                   throw <| IO.userError <|
                     s!"buildDerivativeGraph1D: missing matmulW params at node {i}"
               | some p =>
-                  let did ← pushNode [st.dId[p1]!] .matmul outShape
+                  let d1 ← derivativeId st i p1
+                  let did ← pushNode [d1] .matmul outShape
                   modify fun st => { st with ps := addMatmulW (α := α) st.ps did p }
-                  modify fun st => { st with dId := st.dId.set! i did }
+                  setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at matmul node {i}"
       | .tanh =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
+              let d1 ← derivativeId st i p1
               let y2 ← pushNode [i, i] .mul_elem outShape
               let one ← mkConstFill outShape Numbers.one
               let fac ← pushNode [one, y2] .sub outShape
-              let did ← pushNode [fac, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let did ← pushNode [fac, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at tanh node {i}"
       | .sigmoid =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
+              let d1 ← derivativeId st i p1
               let one ← mkConstFill outShape Numbers.one
               let oneMy ← pushNode [one, i] .sub outShape
               let yFac ← pushNode [i, oneMy] .mul_elem outShape
-              let did ← pushNode [yFac, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let did ← pushNode [yFac, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at sigmoid node {i}"
       | .exp =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [i, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [i, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at exp node {i}"
       | .log =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
+              let d1 ← derivativeId st i p1
               let invz ← pushNode [p1] .inv outShape
-              let did ← pushNode [invz, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let did ← pushNode [invz, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at log node {i}"
       | .sin =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
+              let d1 ← derivativeId st i p1
               let cosz ← pushNode [p1] .cos outShape
-              let did ← pushNode [cosz, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let did ← pushNode [cosz, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at sin node {i}"
       | .cos =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
+              let d1 ← derivativeId st i p1
               let sinz ← pushNode [p1] .sin outShape
               let neg1 ← mkConstFill outShape Numbers.neg_one
               let negsin ← pushNode [neg1, sinz] .mul_elem outShape
-              let did ← pushNode [negsin, st.dId[p1]!] .mul_elem outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let did ← pushNode [negsin, d1] .mul_elem outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at cos node {i}"
       | .sum =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] .sum outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] .sum outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at sum node {i}"
       | .reshape inS outS =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.reshape inS outS) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.reshape inS outS) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at reshape node {i}"
       | .flatten s =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.flatten s) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.flatten s) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at flatten node {i}"
       | .permute perm =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.permute perm) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.permute perm) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at permute node {i}"
       | .broadcastTo s₁ s₂ =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.broadcastTo s₁ s₂) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.broadcastTo s₁ s₂) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at broadcastTo node {i}"
       | .reduceSum axis =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.reduceSum axis) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.reduceSum axis) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at reduce_sum node {i}"
       | .reduceMean axis =>
           match node.parents with
           | p1 :: _ =>
               let st ← get
-              let did ← pushNode [st.dId[p1]!] (.reduceMean axis) outShape
-              modify fun st => { st with dId := st.dId.set! i did }
+              let d1 ← derivativeId st i p1
+              let did ← pushNode [d1] (.reduceMean axis) outShape
+              setDerivativeId i did
           | _ => throw <| IO.userError s!"buildDerivativeGraph1D: bad arity at reduce_mean node {i}"
       | k =>
           throw <| IO.userError
@@ -367,7 +403,11 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
   ).run init
 
   let dg : Graph := { nodes := st.nodes }
-  let dOutId := st.dId[outId]!
+  let dOutId ←
+    match st.dId[outId]? with
+    | some did => pure did
+    | none =>
+        throw <| IO.userError s!"buildDerivativeGraph1D: output node {outId} out of bounds"
   pure (dg, st.ps, dOutId)
 
 /--
@@ -381,9 +421,7 @@ private def seedInput1D {α : Type} [Context α]
   let tC := ofFloat tCenter
   let tR := ofFloat tRad
   let t0 : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar tC)
-  let rad := Spec.fill (α:=α) tR (.dim 1 .scalar)
-  let tB : Box α (.dim 1 .scalar) := { lo := Tensor.subSpec t0 rad, hi := Tensor.addSpec t0 rad }
-  { ps with inputBoxes := ps.inputBoxes.insert 0 { dim := 1, lo := tB.lo, hi := tB.hi } }
+  ps.seedLInfBall 0 t0 tR
 
 /--
 Compute bounds for `u(t)` and `du/dt` on a time interval.
@@ -397,10 +435,16 @@ private def boundsOn {α : Type} [Context α] [DecidableEq Shape]
     throw <| IO.userError s!"ODE verifier expects inputDim=1, got {m.inDim}"
   let ps := seedInput1D (α := α) m.ps0 ofFloat I.center I.radius
   let ibp := runIBP (α:=α) m.dg ps
-  let some outB := ibp[m.outId]! | throw <| IO.userError "IBP failed at output"
+  let outB ←
+    match NN.MLTheory.CROWN.Graph.outputBox? ibp m.outId with
+    | .ok outB => pure outB
+    | .error msg => throw <| IO.userError s!"IBP failed at output: {msg}"
   let uLo := Spec.Tensor.sumSpec outB.lo
   let uHi := Spec.Tensor.sumSpec outB.hi
-  let some dB := ibp[m.dOutId]! | throw <| IO.userError "IBP failed at derivative output"
+  let dB ←
+    match NN.MLTheory.CROWN.Graph.outputBox? ibp m.dOutId with
+    | .ok dB => pure dB
+    | .error msg => throw <| IO.userError s!"IBP failed at derivative output: {msg}"
   let duLo := Spec.Tensor.sumSpec dB.lo
   let duHi := Spec.Tensor.sumSpec dB.hi
   pure { u := (uLo, uHi), du := (duLo, duHi) }
@@ -420,11 +464,17 @@ inductive ModelBackend where
 instance : ToString ModelBackend :=
   ⟨fun b => match b with | .direct => "direct" | .torchlean => "torchlean"⟩
 
-/-- Parse a `--model=...` argument into a `ModelBackend` choice. -/
-private def parseModelBackendArg (s : String) : Option ModelBackend :=
-  if s = "--model=torchlean" ∨ s = "--model torchlean" then some .torchlean
-  else if s = "--model=direct" ∨ s = "--model direct" then some .direct
+/-- Parse the model backend name used by CLI flags and certificate settings. -/
+private def parseModelBackendName (s : String) : Option ModelBackend :=
+  if s = "torchlean" then some .torchlean
+  else if s = "direct" then some .direct
   else none
+
+/-- Parse a model backend name and report a CLI-friendly error on failure. -/
+private def parseModelBackendNameE (s : String) : Except String ModelBackend :=
+  match parseModelBackendName s with
+  | some backend => pure backend
+  | none => throw s!"--model: expected direct or torchlean; got `{s}`"
 
 /-- Load PINN weights exported from PyTorch (JSON state dict). -/
 private def loadPinnState (path : String) : IO Import.PINNPyTorch.PinnState := do
@@ -659,23 +709,10 @@ structure ODECertificate where
   settings : ODEVerifierSettings := {}
   deriving Repr
 
-/-- Parse a `Float` from JSON (expects a JSON number). -/
-private def parseFloatFromJson (j : Json) : Except String Float :=
-  match j with
-  | .num n => .ok n.toFloat
-  | _ => .error "expected JSON number"
-
-/-- Parse a `String` from JSON (expects a JSON string). -/
-private def parseStrFromJson (j : Json) : Except String String :=
-  match j with
-  | .str s => .ok s
-  | _ => .error "expected JSON string"
-
 /-- Parse an interval object `{ lo: ..., hi: ... }` from JSON. -/
 private def parseIntervalObj (j : Json) : Except String Interval := do
-  let o ← j.getObj?
-  let lo ← (o.get? "lo").getD Json.null |> parseFloatFromJson
-  let hi ← (o.get? "hi").getD Json.null |> parseFloatFromJson
+  let lo ← NN.Verification.Json.expectFieldFloatE "interval" "lo" j
+  let hi ← NN.Verification.Json.expectFieldFloatE "interval" "hi" j
   if hi < lo then throw "interval: hi < lo" else
   pure { lo := lo, hi := hi }
 
@@ -720,60 +757,32 @@ private def parseSettings (j : Json) : Except String ODEVerifierSettings := do
 
 /-- Parse a single segment object from the certificate JSON. -/
 private def parseSegment (j : Json) : Except String ODECertificateSegment := do
-  let o ← j.getObj?
-  let t0 ← (o.get? "t0").getD Json.null |> parseFloatFromJson
-  let t1 ← (o.get? "t1").getD Json.null |> parseFloatFromJson
-  let initJ := (o.get? "init").getD Json.null
+  let _ ← NN.API.Json.expectObjE "segment" j
+  let t0 ← NN.Verification.Json.expectFieldFloatE "segment" "t0" j
+  let t1 ← NN.Verification.Json.expectFieldFloatE "segment" "t1" j
+  let initJ ← NN.API.Json.expectFieldE "segment" "init" j
   let init ←
     match initJ with
     | .obj _ => parsePairObj initJ
     | .num n => pure (n.toFloat, n.toFloat)
     | _ => throw "segment.init must be number or {lo,hi}"
-  let lw ← (o.get? "lowerWeights").getD Json.null |> parseStrFromJson
-  let uw ← (o.get? "upperWeights").getD Json.null |> parseStrFromJson
+  let lw ← NN.Verification.Json.expectFieldStringE "segment" "lowerWeights" j
+  let uw ← NN.Verification.Json.expectFieldStringE "segment" "upperWeights" j
   if t1 < t0 then throw "segment: t1 < t0" else
   pure { t := { lo := t0, hi := t1 }, init := init, lowerWeights := lw, upperWeights := uw }
 
 /-- Parse the top-level certificate JSON object into an `ODECertificate`. -/
 def parseODECertificate (j : Json) : Except String ODECertificate := do
-  let o ← j.getObj?
-  let rhs ← (o.get? "rhs").getD Json.null |> parseStrFromJson
-  let segArr ← (o.get? "segments").getD Json.null |>.getArr?
+  let o ← NN.API.Json.expectObjE "ode certificate" j
+  let rhs ← NN.Verification.Json.expectFieldStringE "ode certificate" "rhs" j
+  let segArr ← NN.API.Json.expectArrayE "ode certificate.segments" <|
+    ← NN.API.Json.expectFieldE "ode certificate" "segments" j
   let segs ← segArr.toList.mapM parseSegment
-  let settings ← parseSettings ((o.get? "settings").getD Json.null)
+  let settings ←
+    match Std.TreeMap.Raw.get? o "settings" with
+    | some settingsJ => parseSettings settingsJ
+    | none => parseSettings Json.null
   pure { rhs := rhs, segments := segs, settings := settings }
-
-/-- Parse a `Float` literal from a CLI argument (must consume the whole string). -/
-private def parseFloatArg (s : String) : Option Float :=
-  match NN.Verification.ODE.Parse.parseNumber { s := s } with
-  | .ok (v, st) => if st.i = s.rawEndPos then some v else none
-  | .error _ => none
-
-/-- `List.findMap` specialized to `Option` for the local flag parser below. -/
-private def findMap? {α β : Type} (f : α → Option β) : List α → Option β
-  | [] => none
-  | x :: xs =>
-    match f x with
-    | some y => some y
-    | none => findMap? f xs
-
-/-- Read `--key=value` from an argument list. -/
-private def getFlag? (args : List String) (key : String) : Option String :=
-  let pref := s!"--{key}="
-  findMap? (fun a => if a.startsWith pref then some (toString (a.drop pref.length)) else none) args
-
-/-- Read `--key value` from an argument list. -/
-private def getPositional? (args : List String) (key : String) : Option String :=
-  let rec go : List String → Option String
-    | [] => none
-    | a :: b :: rest =>
-      if a = s!"--{key}" then some b else go (b :: rest)
-    | [_] => none
-  go args
-
-/-- Read either `--key=value` or `--key value` (prefers the `--key=value` form if both appear). -/
-private def argOrFlag? (args : List String) (key : String) : Option String :=
-  getFlag? args key <|> getPositional? args key
 
 /-- Boolean `<=` on scalars, defined in terms of the backend's `gtBool`. -/
 def leBool {α : Type} [Context α] (x y : α) : Bool :=
@@ -902,6 +911,12 @@ private def parseScalarName (s : String) : Option ScalarBackend :=
   else if s = "ieee32exec" then some .ieee32exec
   else none
 
+/-- Parse a scalar backend name and report a CLI-friendly error on failure. -/
+private def parseScalarNameE (s : String) : Except String ScalarBackend :=
+  match parseScalarName s with
+  | some sc => pure sc
+  | none => throw s!"--scalar: expected float or ieee32exec; got `{s}`"
+
 /--
 Run verification for a parsed certificate file.
 
@@ -956,90 +971,48 @@ Parse CLI arguments and either:
 - verify a single segment specified inline via `--rhs`, `--t0`, `--t1`, etc.
 -/
 def runArgs (args : List String) : IO Unit := do
-  let (backendOverride, args) :=
-    match args with
-    | a :: rest =>
-      match parseModelBackendArg a with
-      | some mb => (some mb, rest)
-      | none => (none, args)
-    | [] => (none, [])
-  let scalarOverride :=
-    match argOrFlag? args "scalar" with
-    | some s => parseScalarName s
-    | none => none
-  match argOrFlag? args "cert" with
-  | some p => runCertificate p backendOverride scalarOverride
+  let args := NN.API.CLI.dropDashDash args
+  let backendParsed :=
+    NN.API.CLI.takeParsedFlagDefault args "model" "direct" parseModelBackendNameE
+  let (backend, args) ← NN.API.CLI.orThrow backendParsed
+  let scalarParsed :=
+    NN.API.CLI.takeParsedFlagDefault args "scalar" "float" parseScalarNameE
+  let (scalarBackend, args) ← NN.API.CLI.orThrow scalarParsed
+  let (cert?, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFlagValueOnce args "cert"
+  match cert? with
+  | some p => do
+      NN.API.CLI.orThrow (NN.API.CLI.requireNoArgs args)
+      runCertificate p (some backend) (some scalarBackend)
   | none =>
-    let rhsS ←
-      match argOrFlag? args "rhs" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --rhs=<expr>"
-    let t0S ←
-      match argOrFlag? args "t0" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --t0=<float>"
-    let t1S ←
-      match argOrFlag? args "t1" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --t1=<float>"
-    let initS ←
-      match argOrFlag? args "init" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --init=<float>"
-    let lw ←
-      match argOrFlag? args "lower" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --lower=<weights.json>"
-    let uw ←
-      match argOrFlag? args "upper" with
-      | some s => pure s
-      | none => throw <| IO.userError "missing --upper=<weights.json>"
-    let t0 ←
-      match parseFloatArg t0S with
-      | some x => pure x
-      | none => throw <| IO.userError s!"bad --t0: {t0S}"
-    let t1 ←
-      match parseFloatArg t1S with
-      | some x => pure x
-      | none => throw <| IO.userError s!"bad --t1: {t1S}"
-    let init ←
-      match parseFloatArg initS with
-      | some x => pure (x, x)
-      | none => throw <| IO.userError s!"bad --init: {initS}"
-    let maxDepth :=
-      match argOrFlag? args "maxDepth" with
-      | some s => (parseFloatArg s).map (fun f => f.toUInt64.toNat) |>.getD 18
-      | none => 18
-    let minWidth :=
-      match argOrFlag? args "minWidth" with
-      | some s => (parseFloatArg s).getD 1e-3
-      | none => 1e-3
-    let slack :=
-      match argOrFlag? args "slack" with
-      | some s => (parseFloatArg s).getD 0.0
-      | none => 0.0
-    let verbose :=
-      match argOrFlag? args "verbose" with
-      | some "true" => true
-      | some "1" => true
-      | some "false" => false
-      | some "0" => false
-      | _ => false
+    let (rhsS, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFlagValue args "rhs" (some "missing --rhs=<expr>")
+    let (t0, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFloatFlag args "t0" (some "missing --t0=<float>")
+    let (t1, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFloatFlag args "t1" (some "missing --t1=<float>")
+    let (initF, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFloatFlag args "init" (some "missing --init=<float>")
+    let (lw, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFlagValue args "lower" (some "missing --lower=<weights.json>")
+    let (uw, args) ← NN.API.CLI.orThrow <|
+      NN.API.CLI.takeRequiredFlagValue args "upper" (some "missing --upper=<weights.json>")
+    let (maxDepth, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeNatFlagDefault args "maxDepth" 18
+    let (minWidth, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFloatFlagDefault args "minWidth" 1e-3
+    let (slack, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFloatFlagDefault args "slack" 0.0
+    let (verbose, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolValueFlagDefault args "verbose" false
+    NN.API.CLI.orThrow (NN.API.CLI.requireNoArgs args)
+    let init := (initF, initF)
     let rhsAst ←
       match Parse.parseExpr rhsS with
       | .ok e => pure e
       | .error msg => throw <| IO.userError s!"RHS parse error: {msg}"
-    let mb := backendOverride.getD .direct
     let cfg0 : ODEVerifierSettings :=
       { maxDepth := maxDepth
         minWidth := minWidth
         slack := slack
         verbose := verbose
-        modelBackend := mb }
-    let cfg :=
-      match scalarOverride with
-      | some sc => { cfg0 with scalar := sc }
-      | none => cfg0
+        modelBackend := backend }
+    let cfg := { cfg0 with scalar := scalarBackend }
     let seg : ODECertificateSegment :=
       { t := { lo := t0, hi := t1 }, init := init, lowerWeights := lw, upperWeights := uw }
     match cfg.scalar with

@@ -191,7 +191,7 @@ macro "#gpt2_train_log_file_view " path:term : command =>
           </div>
           <div style={json% {"margin-top": "6px", "opacity": "0.9"}}>
             {.text "Tip: create this file by running "}
-            {monospace "lake exe torchlean gpt2 --cuda --log <path> ..."}
+            {monospace "lake exe -K cuda=true torchlean gpt2 --cuda --log <path> ..."}
             {.text "."}
           </div>
           <div style={json% {"margin-top": "6px"}}>{monospace (toString e)}</div>

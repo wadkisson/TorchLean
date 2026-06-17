@@ -27,7 +27,7 @@ The checkpoint format is compact and explicit:
 
 - **Scalar backend:** `Float` (Lean `Float`).
 - **Encoding:** exact bitwise round-trip via `Float.toBits` (`UInt64`) stored in JSON.
-- **Payload:** a shape-indexed parameter pack `Torch.TList Float paramShapes`.
+- **Payload:** shape-indexed parameter tensors for the model.
 
 This is enough to checkpoint *any* TorchLean runtime model implemented as a
 `TorchLean.Module.ScalarModule` over `Float`, independent of architecture.
@@ -48,15 +48,15 @@ open Spec
 /--
 Write a parameter pack to a JSON bits checkpoint.
 
-This is the lowest-level API entrypoint: it is useful when you already have a
-`TList Float paramShapes` (for example from `nn.evalParams`) and just want to persist it.
+This is the lowest-level API entrypoint: it is useful when you already have a model's
+shape-indexed parameter tensors and just want to persist them.
 -/
-def saveTListBits
+def saveParamBits
     {paramShapes : List Shape}
     (path : System.FilePath)
-    (ps : _root_.Runtime.Autograd.Torch.TList Float paramShapes)
-    (pretty : Bool := true) : IO Unit := do
-  _root_.Runtime.Autograd.TorchLean.ParamIO.writeTListBits (ss := paramShapes) path ps pretty
+  (ps : _root_.Runtime.Autograd.Torch.TList Float paramShapes)
+  (pretty : Bool := true) : IO Unit := do
+  _root_.Runtime.Autograd.TorchLean.ParamIO.writeParamBits (ss := paramShapes) path ps pretty
 
 /--
 Save the current parameter values of a TorchLean runtime module to a JSON bits file.
@@ -69,7 +69,7 @@ def saveModuleParamsBits
     (path : System.FilePath) : IO Unit := do
   let ps ← _root_.Runtime.Autograd.Torch.ParamList.valuesSynced (α := Float) (ss := paramShapes)
     m.trainer.params
-  _root_.Runtime.Autograd.TorchLean.ParamIO.writeTListBits (ss := paramShapes) path ps
+  _root_.Runtime.Autograd.TorchLean.ParamIO.writeParamBits (ss := paramShapes) path ps
 
 /--
 Load a JSON bits checkpoint and overwrite the module's parameter values.
@@ -81,7 +81,7 @@ def loadModuleParamsBits
     {paramShapes inputShapes : List Shape}
     (m : _root_.Runtime.Autograd.TorchLean.Module.ScalarModule Float paramShapes inputShapes)
     (path : System.FilePath) : IO Unit := do
-  let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readTListBits (ss := paramShapes) path
+  let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
   match psRes with
   | Except.error e =>
       throw <| IO.userError s!"ParamIO: load failed for {path}: {e}"
@@ -95,10 +95,10 @@ Load a JSON bits checkpoint as a parameter list (without mutating a module).
 This is useful when you want to run inference with `nn.evalParams` directly and never instantiate a
 trainer.
 -/
-def loadTListBits
+def loadParamBits
     {paramShapes : List Shape}
     (path : System.FilePath) : IO (_root_.Runtime.Autograd.Torch.TList Float paramShapes) := do
-  let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readTListBits (ss := paramShapes) path
+  let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
   match psRes with
   | Except.error e =>
       throw <| IO.userError s!"ParamIO: load failed for {path}: {e}"
@@ -110,10 +110,10 @@ Read a JSON bits checkpoint, returning an error string instead of throwing an ex
 
 This is useful in batch tools or CI-style runs where you want to keep going and report failures.
 -/
-def readTListBits
+def readParamBits
     {paramShapes : List Shape}
     (path : System.FilePath) : IO (Except String (_root_.Runtime.Autograd.Torch.TList Float paramShapes)) :=
-  _root_.Runtime.Autograd.TorchLean.ParamIO.readTListBits (ss := paramShapes) path
+  _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
 
 end ParamIO
 end TorchLean

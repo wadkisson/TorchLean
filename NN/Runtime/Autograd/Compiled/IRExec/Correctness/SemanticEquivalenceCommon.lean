@@ -81,11 +81,16 @@ theorem applySwapsTensor_eq_foldl_applySwapDepth
   | nil =>
       simp [swapShapeBySwaps, applySwapsTensor]
   | cons d ds ih =>
-      -- Expand one swap step (foldl) and apply the IH to the updated shape/tensor.
-      simp [List.foldl, swapShapeBySwaps, applySwapsTensor, NN.IR.Graph.applySwapDepth]
-      -- The accumulator after one `applySwapDepth` is definitional.
-      simpa using (ih (s := s.swapAdjacentAtDepth d) (t := Tensor.swapAtDepthHelper (tensor := t)
-        d))
+      -- Expand one swap step on both sides, then use the induction hypothesis at the updated
+      -- shape.  The explicit `change` keeps this proof stable across small simplifier changes.
+      change
+        (ds.foldl (fun acc d => NN.IR.Graph.applySwapDepth (α := α) acc d)
+            (NN.IR.DVal.mk (α := α) (s.swapAdjacentAtDepth d)
+              (Tensor.swapAtDepthHelper (tensor := t) d))) =
+          NN.IR.DVal.mk (α := α) (swapShapeBySwaps (s.swapAdjacentAtDepth d) ds)
+            (applySwapsTensor (α := α) (s := s.swapAdjacentAtDepth d) (swaps := ds)
+              (Tensor.swapAtDepthHelper (tensor := t) d))
+      exact ih (s := s.swapAdjacentAtDepth d) (t := Tensor.swapAtDepthHelper (tensor := t) d)
 
 /--
 Specialize `NN.IR.Graph.permuteDVal` to the swap-based implementation used by this compiler.

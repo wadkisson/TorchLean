@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 import NN.Entrypoint.Widgets
 import NN.Spec.Core.Tensor.Core
 import NN.IR.Graph
@@ -348,8 +347,8 @@ This widget family pairs particularly well with:
 
 - the CSV loader training example,
 - the NPY loader training example,
-- the ResNet basic block training example,
-- and the callback/reporting helpers under `API.train`.
+- the CNN and ViT model commands,
+- and the callback/reporting helpers exposed through `Trainer` reports.
 
 # Runtime Context Viewer
 
@@ -417,7 +416,7 @@ What it shows:
 Open:
 
 - [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-- [TorchLean IBP fixture API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanIBP.lean)
+- [TorchLean IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean)
 
 ## 3. Shape inference view
 
@@ -432,7 +431,7 @@ What it shows:
 Open:
 
 - [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
-- [TorchLean Transformer IBP fixture API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanTransformerIBP.lean)
+- [TorchLean Transformer IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/TransformerIBPWorkflow.lean)
 
 ## 4. Float32 viewers
 
@@ -463,8 +462,8 @@ What they show:
 
 Open:
 
-- [CROWN ops fixture](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanCrownOps.lean)
-- [IBP fixture](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Verification/TorchLean/TorchLeanIBP.lean)
+- [CROWN ops workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/CrownOpsWorkflow.lean)
+- [IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean)
 
 ## 6. Tape and gradient views
 
@@ -495,7 +494,7 @@ Open:
 
 - [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
 - [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
-- [ResNet basic block training](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/ResnetBasicblockTrain.lean)
+- [CNN quickstart training](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
 
 ## 8. Runtime context views
 

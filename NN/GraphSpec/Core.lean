@@ -21,7 +21,7 @@ The important design decision is:
 - `Graph ps σ τ` is compact syntax for the common special case where the model is just a chain
   of layers.
 
-So `Graph` is not a competing graph IR. It is a pleasant way to write:
+So `Graph` is not a competing graph IR. It is a compact way to write:
 
 ```lean
 Linear >>> ReLU >>> Linear
@@ -186,7 +186,7 @@ Type indices:
 - `σ τ : Shape` are input/output tensor shapes.
 -/
 structure Primitive (ps : List Shape) (σ τ : Shape) where
-  /-- Human-readable name used mainly for debugging / error messages. -/
+  /-- Short name used mainly for debugging and error messages. -/
   name : String
   /--
   Pure reference semantics (forward pass).

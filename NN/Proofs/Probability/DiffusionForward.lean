@@ -64,11 +64,13 @@ lemma forwardNoising_eq_map (a b : ℝ) (x : E) :
     forwardNoising (E := E) a b x =
       (ProbabilityTheory.stdGaussian E).map (fun z ↦ a • x + b • z) := by
   unfold forwardNoising
-  simpa [Function.comp] using
-    (Measure.map_map (μ := ProbabilityTheory.stdGaussian E)
+  rw [Measure.map_map (μ := ProbabilityTheory.stdGaussian E)
       (g := fun y : E ↦ a • x + y)
       (f := (b • (ContinuousLinearMap.id ℝ E) : E →L[ℝ] E))
-      (by fun_prop) (by fun_prop))
+      (by fun_prop) (by fun_prop)]
+  apply Measure.map_congr
+  filter_upwards with z
+  simp [Function.comp]
 
 /-- Affine images of a finite-dimensional standard Gaussian are Gaussian. -/
 instance (a b : ℝ) (x : E) : ProbabilityTheory.IsGaussian (forwardNoising (E := E) a b x) := by
@@ -113,14 +115,17 @@ lemma forwardKernel_apply (a b : ℝ) (x : E) :
   classical
   have hg : Measurable (fun p : E × E ↦ a • p.1 + b • p.2) := by fun_prop
   have hmk : Measurable (Prod.mk x : E → E × E) := by fun_prop
-  have hf' : Measurable (b • (id : E → E)) := by fun_prop
+  have hf' : Measurable (((b • (ContinuousLinearMap.id ℝ E) : E →L[ℝ] E) : E → E)) := by
+    fun_prop
   have hh : Measurable (fun y : E ↦ a • x + y) := by fun_prop
   unfold forwardKernel forwardNoising
   simp [Kernel.map_apply, hg, Kernel.prod_apply, Kernel.id_apply, Kernel.const_apply,
     Measure.dirac_prod]
-  rw [Measure.map_map hg hmk]
   rw [Measure.map_map hh hf']
-  rfl
+  rw [Measure.map_map hg hmk]
+  apply Measure.map_congr
+  filter_upwards with z
+  simp [Function.comp]
 
 /-- Each transition distribution of the forward kernel is Gaussian. -/
 lemma isGaussian_forwardKernel (a b : ℝ) (x : E) :

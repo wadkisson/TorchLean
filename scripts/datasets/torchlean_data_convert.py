@@ -15,7 +15,7 @@ The output is always `.npy`, optionally accompanied by a small JSON manifest.
 That keeps TorchLean examples and training code simple:
 
     python3 scripts/datasets/torchlean_data_convert.py tensor --input data.pt --key x --output X.npy
-    lake exe torchlean cnn --cuda --x X.npy --y y.npy --n-total 1000
+    lake exe -K cuda=true torchlean cnn --cuda --x X.npy --y y.npy --n-total 1000
 """
 
 from __future__ import annotations
@@ -114,20 +114,20 @@ def load_csv_array(path: Path, *, skip_header: int = 0) -> np.ndarray:
     return arr
 
 
-def load_torch_artifact(path: Path, *, trusted_legacy_pickle: bool) -> Any:
+def load_torch_artifact(path: Path, *, trusted_pickle: bool) -> Any:
     """Load a PyTorch artifact with pickle disabled unless explicitly requested."""
     try:
         import torch  # type: ignore
     except ImportError:
         die("PyTorch checkpoint conversion requires torch: python3 -m pip install torch")
-    if trusted_legacy_pickle:
+    if trusted_pickle:
         return torch.load(path, map_location="cpu", weights_only=False)
     try:
         return torch.load(path, map_location="cpu", weights_only=True)
     except TypeError:
         die(
             "installed PyTorch does not support weights_only=True; upgrade PyTorch or pass "
-            "--trusted-legacy-pickle only for files you trust."
+            "--trusted-pickle only for files you trust."
         )
 
 
@@ -136,7 +136,7 @@ def load_tensor(
     key: str | None,
     *,
     csv_skip_header: int = 0,
-    trusted_legacy_pickle: bool = False,
+    trusted_pickle: bool = False,
 ) -> Any:
     """Load one tensor-like artifact from `.npy`, `.npz`, `.mat`, `.pt`, `.pth`, or CSV."""
     suffix = path.suffix.lower()
@@ -151,7 +151,7 @@ def load_tensor(
             die("MATLAB .mat conversion requires scipy: python3 -m pip install scipy")
         return select_key(scipy.io.loadmat(path), key, source=path)
     if suffix in {".pt", ".pth"}:
-        obj = load_torch_artifact(path, trusted_legacy_pickle=trusted_legacy_pickle)
+        obj = load_torch_artifact(path, trusted_pickle=trusted_pickle)
         return select_key(obj, key, source=path)
     if suffix == ".csv":
         return load_csv_array(path, skip_header=csv_skip_header)
@@ -167,7 +167,7 @@ def cmd_tensor(args: argparse.Namespace) -> None:
         inp,
         args.key,
         csv_skip_header=args.skip_header,
-        trusted_legacy_pickle=args.trusted_legacy_pickle,
+        trusted_pickle=args.trusted_pickle,
     )
     arr = cast_array(to_numpy(obj, source=inp), args.dtype)
     np.save(out, arr)
@@ -185,7 +185,7 @@ def cmd_pair(args: argparse.Namespace) -> None:
         dtype=args.dtype,
         manifest=args.manifest,
         skip_header=0,
-        trusted_legacy_pickle=args.trusted_legacy_pickle,
+        trusted_pickle=args.trusted_pickle,
     )
     y_args = argparse.Namespace(
         input=args.y_input,
@@ -194,7 +194,7 @@ def cmd_pair(args: argparse.Namespace) -> None:
         dtype=args.label_dtype,
         manifest=args.manifest,
         skip_header=0,
-        trusted_legacy_pickle=args.trusted_legacy_pickle,
+        trusted_pickle=args.trusted_pickle,
     )
     cmd_tensor(x_args)
     cmd_tensor(y_args)
@@ -227,7 +227,7 @@ def cmd_labels(args: argparse.Namespace) -> None:
             inp,
             args.key,
             csv_skip_header=args.skip_header,
-            trusted_legacy_pickle=args.trusted_legacy_pickle,
+            trusted_pickle=args.trusted_pickle,
         )
         labels = cast_array(to_numpy(obj, source=inp), args.dtype).reshape(-1)
     if args.classes is not None:
@@ -313,9 +313,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dtype", default="float32", help="float32, float64, int64, or preserve")
     p.add_argument("--manifest", action="store_true", help="write OUTPUT.npy.json metadata")
     p.add_argument(
-        "--trusted-legacy-pickle",
+        "--trusted-pickle",
         action="store_true",
-        help="allow pickle-based torch.load for trusted legacy .pt/.pth files",
+        help="allow pickle-based torch.load for trusted .pt/.pth files",
     )
     p.set_defaults(func=cmd_tensor)
 
@@ -330,9 +330,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--label-dtype", default="float32")
     p.add_argument("--manifest", action="store_true")
     p.add_argument(
-        "--trusted-legacy-pickle",
+        "--trusted-pickle",
         action="store_true",
-        help="allow pickle-based torch.load for trusted legacy .pt/.pth files",
+        help="allow pickle-based torch.load for trusted .pt/.pth files",
     )
     p.set_defaults(func=cmd_pair)
 
@@ -346,9 +346,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dtype", default="float32")
     p.add_argument("--manifest", action="store_true")
     p.add_argument(
-        "--trusted-legacy-pickle",
+        "--trusted-pickle",
         action="store_true",
-        help="allow pickle-based torch.load for trusted legacy .pt/.pth files",
+        help="allow pickle-based torch.load for trusted .pt/.pth files",
     )
     p.set_defaults(func=cmd_labels)
 

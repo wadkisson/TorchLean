@@ -7,7 +7,7 @@ open Verso.Genre Manual
 tag := "graphspec"
 %%%
 
-GraphSpec sits between the public model builders and the low-level IR. The public `nn` API is the
+GraphSpec sits between the public model builders and the verifier-facing IR. The public `nn` API is the
 easiest way to write small training examples. `NN.IR.Graph` is the operation-tagged graph consumed
 by verifiers and graph tools. GraphSpec fills the gap between them: it is a typed architecture
 language for models whose parameter layout, sharing structure, and pure semantics should be explicit
@@ -15,8 +15,8 @@ before lowering.
 
 # Why GraphSpec Exists
 
-A raw IR graph is excellent for a verifier, but it is not the nicest way to author a ResNet block.
-A public `nn.Sequential` model is nice for tutorials, but it does not always expose the
+A raw IR graph is excellent for a verifier, but it is not the right authoring surface for every
+architecture. A public `nn.Sequential` model is direct enough for tutorials, but it does not always expose the
 architecture-level facts we want to reason about: ordered parameter shapes, reused intermediates,
 residual branches, and paired pure/executable interpretations.
 
@@ -43,7 +43,7 @@ That authoring layer adds three things that a raw IR graph does not try to provi
 - paired interpreters, so the same architecture object has a pure `Spec` meaning and an executable
   TorchLean program.
 
-In short: GraphSpec records architecture facts before the model becomes a lower-level artifact.
+In short: GraphSpec records architecture facts before the model becomes a runtime or verifier artifact.
 
 # Two Authoring Surfaces
 
@@ -127,7 +127,7 @@ Use the smallest surface that still says what you need to say.
 - Use GraphSpec DAG models when the architecture has sharing, residual branches, or multiple inputs.
 - Use `NN.IR.Graph` when the consumer is a verifier, exporter, or graph level analysis pass.
 
-This keeps each layer explicit: architecture authoring stays readable, while verifier-facing code
+Each layer stays explicit: architecture authoring stays readable, while verifier-facing code
 still receives a precise op-level graph after lowering.
 
 # Two Semantics From One Model
@@ -219,7 +219,7 @@ GraphSpec supports several lowering paths. They are not competing APIs; they ans
 questions about the same architecture.
 
 The names below are not meant to be memorized. They are the bridges to look for when debugging how a
-GraphSpec model becomes a runnable TorchLean program or a lower-level DAG.
+GraphSpec model becomes a runnable TorchLean program or a verifier-facing DAG.
 
 ## Sequential Graph To DAG Model
 
@@ -244,7 +244,7 @@ Important name:
 
 This path is used by the runnable
 [GraphSpec tutorial](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/GraphSpec/Tutorial.lean): author once in GraphSpec,
-then plug the lowered model into the same `train.*` API used elsewhere in the guide.
+then plug the lowered model into the same `Trainer` API used elsewhere in the guide.
 
 ## DAG Model To Runtime Model Zoo Wrappers
 
@@ -262,7 +262,7 @@ These wrappers show how GraphSpec feeds the runtime-facing model zoo:
 For model definitions used in examples and examples, `NN.GraphSpec.Models` is the most convenient
 single import surface.
 
-The current zoo intentionally includes both sequential and DAG-native models:
+The current zoo includes both sequential and DAG-native models:
 
 - `Models.mlp` for the smallest sequential path,
 - `Models.cnn2` and `cnn2DAGModelZeroInit` for "same model, different representation" comparisons,
@@ -334,7 +334,7 @@ To inspect the implementation, start with the [GraphSpec README](https://github.
 move to the sequential and DAG cores, then to the model zoo. The
 [GraphSpec to TorchLean API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/ToTorchLean.lean) gives the lowering path into
 TorchLean `Seq`, and the
-[GraphSpec TorchLean wrappers](https://github.com/lean-dojo/TorchLean/tree/main/NN/GraphSpec/Models/TorchLean/) expose runtime model wrappers.
+[GraphSpec TorchLean models](https://github.com/lean-dojo/TorchLean/tree/main/NN/GraphSpec/Models/TorchLean/) expose runtime model programs.
 
 Next: *Runtime and Autograd* (execution), *Graphs and IR* (shared op-level graph), *Verification*
 (certificates and bounds).

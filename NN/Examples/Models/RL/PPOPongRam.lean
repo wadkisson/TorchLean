@@ -9,8 +9,6 @@ End-to-end PPO example: train an actor-critic on Atari Pong (ALE) using TorchLea
 module
 
 public import NN
-public import NN.API.Models.PPO
-public import NN.API.RL.Cli
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
@@ -36,7 +34,7 @@ The key TorchLean interface remains the same:
 Atari/ALE environments require `ale-py` and a recent `gymnasium`:
 
 ```bash
-python3 -m pip install --user gymnasium>=1.0 ale-py
+python3 -m pip install --user 'gymnasium>=1.0' ale-py
 ```
 
 ## CLI flags
@@ -48,12 +46,13 @@ python3 -m pip install --user gymnasium>=1.0 ale-py
 - `--eval-max-steps <n>`: maximum steps per evaluation episode.
 - `--log <path>`: write the widget log JSON to a custom path.
 
-Run (from the repo root):
+This module is optional. It depends on a compatible external ALE/Gymnasium installation and is not
+part of the default `torchlean` runner quick-check list.
+
+Dependency setup:
 
 ```bash
-python3 -m pip install --user gymnasium>=1.0 ale-py
-lake exe torchlean ppo_pong_ram
-lake build -R -K cuda=true && lake exe torchlean ppo_pong_ram --cuda
+python3 -m pip install --user 'gymnasium>=1.0' ale-py
 ```
 
 Artifacts:
@@ -74,13 +73,30 @@ References (primary):
 
 @[expose] public section
 
-open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.RL.PPOPongRam
 
-/-- Name of this executable target (used in CLI error messages and banners). -/
+/-- Name used in CLI error messages and banners when the optional runner is wired in. -/
 def exeName : String := "torchlean ppo_pong_ram"
+
+/-- Help text for the optional ALE/Pong RAM PPO runner. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "Usage:"
+    , "  lake exe -K cuda=true torchlean ppo_pong_ram --cuda [PPO flags]"
+    , ""
+    , "PPO flags:"
+    , "  --updates N          number of PPO updates"
+    , "  --eval-every N       evaluate every N updates"
+    , "  --eval-episodes N    evaluation episodes per checkpoint"
+    , "  --eval-max-steps N   maximum steps per evaluation episode"
+    , "  --log PATH|off       training-curve JSON path, or disable logging"
+    , "  --check-env-only     start ALE, reset once, take one checked step, then exit"
+    , ""
+    , "External dependency:"
+    , "  python3 -m pip install --user 'gymnasium>=1.0' ale-py"
+    ]
 
 /-!
 ## Configuration
@@ -141,9 +157,9 @@ def sLogitsBatch : Shape := rl.ppo.LogitsBatchShape horizon nActions
 def sScalarBatch : Shape := rl.ppo.ScalarBatchShape horizon
 def sValueBatch : Shape := rl.ppo.ValueBatchShape horizon
 
-def sState1 : Shape := Shape.scalar.appendDim stateDim
-def sLogits1 : Shape := Shape.scalar.appendDim nActions
-def sValue1 : Shape := Shape.scalar.appendDim 1
+def sState1 : Shape := obsShape
+def sLogits1 : Shape := shape![nActions]
+def sValue1 : Shape := shape![1]
 
 /-!
 ## Model (Actor + Critic)
@@ -157,11 +173,11 @@ def modelCfg : nn.models.PPOActorCriticConfig :=
 
 /-- Construct the actor network as an MLP mapping RAM observations to action logits. -/
 def actorMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim nActions)) :=
-  nn.models.ppoActor modelCfg pfx
+  nn.models.PPOActor modelCfg pfx
 
 /-- Construct the critic network as an MLP mapping RAM observations to a scalar value estimate. -/
 def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim 1)) :=
-  nn.models.ppoCritic modelCfg pfx
+  nn.models.PPOCritic modelCfg pfx
 
 /-!
 ## Gymnasium / ALE bridge
@@ -177,22 +193,59 @@ def contract : rl.boundary.Contract obsShape nActions :=
   { checkObsFinite := true
     checkRewardFinite := true
     -- RAM bytes live in `[0,255]` by construction. This range check guards
-    -- against protocol bugs or unexpected wrappers.
+    -- against protocol bugs or unexpected adapters.
     obsRange? := some (0, 255)
     rewardRange? := none
     requireExclusiveDoneFlags := false }
+
+/--
+Run the smallest useful ALE smoke check.
+
+This exercises the same Gymnasium subprocess, ALE registration, RAM observation shape handshake,
+and Lean-side boundary contract as the full PPO runner, but avoids collecting a 128-step rollout.
+-/
+def checkEnvOnly : IO Unit := do
+  IO.eprintln s!"  starting env: {envId} (obs_type=ram)"
+  let gym ←
+    rl.gym.client.spawn (obsShape := obsShape) (nActions := nActions) gymServerScript envId contract
+      (makeKwargs := makeKwargs)
+  try
+    let _obs ← rl.gym.client.reset gym (seed? := some 0)
+    let (_obs', reward, terminated, truncated) ← Runtime.RL.Gymnasium.Client.stepRaw gym 0
+    IO.println
+      s!"{exeName}: env check ok reward={reward} terminated={terminated} truncated={truncated}"
+  finally
+    rl.gym.client.close gym
 
 /-!
 ## Main Training Loop
 -/
 
 def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
-      let (ppo, rest) ← Common.orThrow exeName <|
+  if args.contains "--help" || args.contains "-h" then
+    IO.println usage
+    return 0
+  if args.contains "--check-env-only" then
+    let args := args.erase "--check-env-only"
+    return ←
+      ModelZoo.runFloat exeName args
+        (banner := ModelZoo.bannerWithDeviceDetails
+          exeName
+          s!"PPO on {envId} (obs=ram, env check only)"
+          "  env: Python Gymnasium subprocess (ALE) + Lean boundary contract")
+        (k := fun _opts rest => do
+          ModelZoo.orThrow exeName <| CLI.checkNoArgs rest
+          checkEnvOnly)
+  ModelZoo.runFloat exeName args
+    (banner := ModelZoo.bannerWithDeviceDetails
+      exeName
+      s!"PPO on {envId} (obs=ram, horizon={horizon})"
+      "  env: Python Gymnasium subprocess (ALE) + Lean boundary contract")
+    (k := fun opts rest => do
+      let (ppo, rest) ← ModelZoo.orThrow exeName <|
         rl.cli.parsePpoFlags exeName rest Runtime.RL.Artifacts.DefaultPaths.ppoPongRamTrainLog
           updatesMax evalEvery evalEpisodes 10000
-      Common.orThrow exeName <| CLI.requireNoArgs rest
+      ModelZoo.orThrow exeName <| CLI.checkNoArgs rest
 
       let updates : Nat := ppo.updates
       let evalEvery : Nat := ppo.evalEvery
@@ -208,27 +261,27 @@ def main (args : List String) : IO UInt32 := do
         let seedActor ← nn.freshSeed
         let seedCritic ← nn.freshSeed
         let actorObs : nn.Sequential sState1 sLogits1 :=
-          nn.build seedActor (actorMk (pfx := .scalar))
+          nn.run seedActor (actorMk .scalar)
         let criticObs : nn.Sequential sState1 sValue1 :=
-          nn.build seedCritic (criticMk (pfx := .scalar))
+          nn.run seedCritic (criticMk .scalar)
         let actorRollout : nn.Sequential sStateBatch sLogitsBatch :=
-          nn.build seedActor (actorMk (pfx := pfxBatch))
+          nn.run seedActor (actorMk pfxBatch)
         let criticRollout : nn.Sequential sStateBatch sValueBatch :=
-          nn.build seedCritic (criticMk (pfx := pfxBatch))
+          nn.run seedCritic (criticMk pfxBatch)
 
         IO.eprintln "  compiling actor/critic..."
         let actorC ← nn.compileOut actorObs
         let criticC ← nn.compileOut criticObs
 
         IO.eprintln "  initializing module + optimizer..."
-        let modDef :=
-          API.TorchLean.RL.Autograd.ppoActorCriticScalarModuleDef (stateShape := sStateBatch)
-            (batch := horizon) (nActions := nActions) actorRollout criticRollout
-        let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+        let m ← rl.ppo.instantiateActorCritic
+          (α := Float) (opts := opts)
+          (batch := horizon) (nActions := nActions)
+          actorRollout criticRollout
         IO.eprintln "  module ready"
 
-        let opt := TorchLean.Optim.adam (α := Float) lr 0.9 0.999 1e-8
-        let optH ← TorchLean.Optim.handle (α := Float) m opt
+        let stepSample ←
+          rl.ppo.optimizerInputs m (.adam lr 0.9 0.999 1e-8 : optim.Optimizer)
         IO.eprintln "  optimizer ready"
 
         let mut rngSeed : Nat := opts.seed
@@ -244,13 +297,10 @@ def main (args : List String) : IO UInt32 := do
         -- Evaluate once before training (step=0).
         do
           IO.eprintln "  evaluating initial policy..."
-          let psAll0 ← TorchLean.Module.params (α := Float) m
-          let (psActor0, _psCritic0) :=
-            rl.ppo.splitActorCriticParams actorRollout criticRollout psAll0
-          let psActorObs0 : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-            simpa using psActor0
-          let policyLogits0 : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-            fun obs => nn.predict1 actorObs actorC psActorObs0 (Spec.mapTensor (fun x => x / 255.0) obs)
+          let psAll0 ← rl.ppo.params (α := Float) m
+          let policy0 := rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll0
+          let policyLogits0 : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
+            fun obs => policy0 (Tensor.map (fun x => x / 255.0) obs)
           let avg0 ←
             rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
               mkSession policyLogits0 (baseSeed := 9000) (episodes := evalEpisodes)
@@ -259,19 +309,11 @@ def main (args : List String) : IO UInt32 := do
           IO.eprintln s!"  eval(step=0) avg_return={avg0}"
 
         for update in [0:updates] do
-          let psAll ← TorchLean.Module.params (α := Float) m
-          let (psActor, psCritic) :=
-            rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
-          let psActorObs : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-            simpa using psActor
-          let psCriticObs : Runtime.Autograd.Torch.TList Float (nn.paramShapes criticObs) := by
-            simpa using psCritic
-
-          let predictLogits : Tensor Float obsShape → Tensor Float sLogits1 :=
-            fun obs => nn.predict1 actorObs actorC psActorObs obs
-          let predictValue : Tensor Float obsShape → Float :=
-            fun obs =>
-              Tensor.vecGet (nn.predict1 criticObs criticC psCriticObs obs) ⟨0, by decide⟩
+          let psAll ← rl.ppo.params (α := Float) m
+          let predictLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
+            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll
+          let predictValue : Tensor.T Float obsShape → Float :=
+            rl.ppo.criticValueFromParams criticObs criticC actorRollout criticRollout psAll
 
           let (rollout, rngCounter') ←
             rl.ppo.collectRolloutWith (α := Float) (obsShape := obsShape) (nActions := nActions)
@@ -285,16 +327,13 @@ def main (args : List String) : IO UInt32 := do
             rollout.toActorCriticSample (α := Float) (obsShape := obsShape) (nActions := nActions)
               (horizon := horizon) gamma lam
           for _e in [0:updateEpochs] do
-            optH.step sample
+            stepSample sample
 
           if update % evalEvery == 0 then
-            let psAll' ← TorchLean.Module.params (α := Float) m
-            let (psActor', _psCritic') :=
-              rl.ppo.splitActorCriticParams actorRollout criticRollout psAll'
-            let psActorObs' : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-              simpa using psActor'
-            let policyLogits : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-              fun obs => nn.predict1 actorObs actorC psActorObs' (Spec.mapTensor (fun x => x / 255.0) obs)
+            let psAll' ← rl.ppo.params (α := Float) m
+            let policy := rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll'
+            let policyLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
+              fun obs => policy (Tensor.map (fun x => x / 255.0) obs)
             let avg ←
               rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
                 mkSession policyLogits (baseSeed := 9000 + update) (episodes := evalEpisodes)
@@ -304,30 +343,26 @@ def main (args : List String) : IO UInt32 := do
 
           rngSeed := rand.nextSeed rngSeed update
 
-        let trainLog : rl.train.TrainLog :=
-          curve.toTrainLog
-            (title := s!"PPO {envId} (RAM, TorchLean)")
-            (seriesName := "avg_return")
-            (color := "#f28e2b")
-            (notes := #[
-              s!"env_id={envId}",
-              s!"obs_type=ram",
-              s!"horizon={horizon}",
-              s!"gamma={gamma}",
-              s!"lambda={lam}",
-              s!"lr={lr}",
-              s!"eval_every={evalEvery}",
-              s!"eval_episodes={evalEpisodes}",
-              s!"device={(if opts.useGpu then "cuda" else "cpu")}"
-            ])
-        Common.writeTrainLogTo ppo.log trainLog
+        ModelZoo.writeCurveTrainLog
+          ppo.log
+          s!"PPO {envId} (RAM, TorchLean)"
+          curve
+          "avg_return"
+          "#f28e2b"
+          #[
+            s!"env_id={envId}",
+            s!"obs_type=ram",
+            s!"horizon={horizon}",
+            s!"gamma={gamma}",
+            s!"lambda={lam}",
+            s!"lr={lr}",
+            s!"eval_every={evalEvery}",
+            s!"eval_episodes={evalEpisodes}",
+            ModelZoo.deviceNote opts
+          ]
         IO.eprintln s!"{exeName}: done"
       finally
         gym.close
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: PPO on {envId} (obs=ram, horizon={horizon}, device={if opts.useGpu then "cuda" else "cpu"})\n" ++
-        "  env: Python Gymnasium subprocess (ALE) + Lean boundary contract")
-      printOk := true }
+    )
 
 end NN.Examples.Models.RL.PPOPongRam

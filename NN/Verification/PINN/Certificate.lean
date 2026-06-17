@@ -52,6 +52,10 @@ open _root_.Spec.Tensor
 open Lean
 open Json
 
+/-- Bundled PINN certificate sample used by `lake exe verify -- pinn-cert`. -/
+def defaultCertPath : String :=
+  "NN/Examples/Verification/PINN/pinn_cert.json"
+
 /-- IO entry that reads the cert, recomputes bounds, and prints comparisons. -/
 def verifyCert (path : String) : IO Unit := do
   let j ← NN.Verification.Json.readJsonFile path
@@ -59,6 +63,7 @@ def verifyCert (path : String) : IO Unit := do
   | .error msg => throw <| IO.userError s!"Bad Cert JSON: {msg}"
   | .ok (cfg, residPairs, residPairsDeriv, _uTriples) => do
     let g := buildGraph
+    let outId := g.nodes.size - 1
     let basePs := seedParamsFloat
     let residA := residPairs.toArray
     let residDerivA := residPairsDeriv.toArray
@@ -71,35 +76,48 @@ def verifyCert (path : String) : IO Unit := do
       for xi in xs do
         let ps := seedInputFloat basePs xi cfg.eps
         let boxes := NN.MLTheory.CROWN.Graph.runIBP (α:=Float) g ps
-        let some outB := boxes[5]! | throw <| IO.userError "PINN IBP failed"
+        let outB ←
+          match NN.MLTheory.CROWN.Graph.outputBox? boxes outId with
+          | .ok outB => pure outB
+          | .error msg => throw <| IO.userError s!"PINN IBP failed: {msg}"
         let loVal := Spec.Tensor.sumSpec outB.lo
         let hiVal := Spec.Tensor.sumSpec outB.hi
         uTrip := uTrip ++ [(loVal, hiVal)]
         let dboxes := NN.MLTheory.CROWN.Graph.runDeriv1D (α:=Float) g ps boxes
-        match dboxes[5]! with
-        | some (dB : FlatBox Float) =>
+        match NN.MLTheory.CROWN.Graph.outputBox? dboxes outId with
+        | .ok dB =>
           let dlo := Spec.Tensor.sumSpec dB.lo
           let dhi := Spec.Tensor.sumSpec dB.hi
           duTrip := duTrip ++ [(dlo, dhi)]
-        | none =>
+        | .error _ =>
           duTrip := duTrip ++ [(0.0, 0.0)]
         let d2boxes := NN.MLTheory.CROWN.Graph.runDeriv2D (α:=Float) g ps boxes dboxes
-        match d2boxes[5]! with
-        | some (d2B : FlatBox Float) =>
+        match NN.MLTheory.CROWN.Graph.outputBox? d2boxes outId with
+        | .ok d2B =>
           let d2lo := Spec.Tensor.sumSpec d2B.lo
           let d2hi := Spec.Tensor.sumSpec d2B.hi
           d2uTrip := d2uTrip ++ [(d2lo, d2hi)]
-        | none =>
+        | .error _ =>
           d2uTrip := d2uTrip ++ [(0.0, 0.0)]
       match uTrip with
       | [(lm, hm), (l0, h0), (lp, hp)] =>
         let (rlo, rhi) := fdResidualBounds (lm,hm) (l0,h0) (lp,hp) cfg.h
-        let (eradLo, eradHi) := residA[i.1]!
+        let (eradLo, eradHi) ←
+          match residA[i.1]? with
+          | some pair => pure pair
+          | none =>
+              throw <| IO.userError
+                s!"PINN certificate residual list missing index {i.1} (size={residA.size})"
         if ¬(approxEq rlo eradLo) ∨ ¬(approxEq rhi eradHi) then
           IO.println s!"FD residual mismatch at x={x}: Lean ({rlo},{rhi}) vs Py ({eradLo},{eradHi})"
         else
           pure ()
-        let (dLoPy, dHiPy) := residDerivA[i.1]!
+        let (dLoPy, dHiPy) ←
+          match residDerivA[i.1]? with
+          | some pair => pure pair
+          | none =>
+              throw <| IO.userError
+                s!"PINN certificate derivative-residual list missing index {i.1} (size={residDerivA.size})"
         match d2uTrip with
         | [_, (_d2l, _d2h), _] =>
           IO.println s!"u''(x) residual bound (derivative-based, Py): [{dLoPy},{dHiPy}]"

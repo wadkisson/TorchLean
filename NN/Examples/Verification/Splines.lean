@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.Splines.PiecewiseLinearVerify
+public import NN.Verification.Splines.PiecewiseLinearCLI
 
 /-!
 # Spline Verification Examples

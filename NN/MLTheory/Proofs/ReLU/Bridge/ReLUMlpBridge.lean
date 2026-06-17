@@ -126,6 +126,7 @@ lemma mat_vec_mul_spec_dim1 {m : Nat} (A : Tensor ℝ (.dim m (.dim 1 .scalar)))
           simpa using hcol
         simp [matDim1Get, hfin, hrow, hcol0, List.foldl, Tensor.toScalar]
 
+set_option linter.auxLemma false in
 /--
 General matrix-vector multiplication for `matrixMN` and a vector written as `Tensor.dim`.
 

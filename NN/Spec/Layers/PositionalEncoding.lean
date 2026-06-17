@@ -106,8 +106,6 @@ Frequency denominator used by both sinusoidal PE and RoPE:
 implemented as:
 
 `exp(log(10000) * (2*i / d))`
-
-This keeps the definition in terms of the scalar `Context` operations.
 -/
 def posencFreqDenomSpec (i d : Nat) : α :=
   MathFunctions.exp (Numbers.log10000 * ((Numbers.two * (i : α)) / (d : α)))

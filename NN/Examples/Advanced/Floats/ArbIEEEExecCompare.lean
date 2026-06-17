@@ -9,6 +9,7 @@ module
 public import NN.Floats.Arb.Oracle
 public import NN.Floats.Interval.IEEEExec32ArbTrans
 public import NN.Floats.Interval.Comparison
+public import NN.API.CLI.Core
 public import Std
 
 /-!
@@ -314,7 +315,7 @@ def runSignedZeroDiv : IO Unit := do
   IO.println ""
 
 /-- Run a small fixed set of comparisons (unary funcs + a polynomial + some edge cases). -/
-def main (_args : List String) : IO UInt32 := do
+def run : IO UInt32 := do
   let precBits := 200
   let digits := 50
 
@@ -337,8 +338,26 @@ end TorchLean.Floats.Interval.ComparisonTutorial
 
 namespace NN.Examples.Advanced.Floats.ArbIEEEExecCompare
 
+/-- Command-line help for the Arb-vs-IEEE32 interval tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean Arb vs IEEE32Exec interval tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean floats_arb_ieee_compare"
+    , ""
+    , "This command runs a fixed set of interval comparisons. It has no tutorial-specific flags."
+    ]
+
 /-- Entrypoint: run the Arb-vs-`IEEE32Exec` interval tutorial. -/
-def main (args : List String) : IO UInt32 :=
-  TorchLean.Floats.Interval.ComparisonTutorial.main args
+def main (args : List String) : IO UInt32 := do
+  let args := _root_.NN.API.CLI.dropDashDash args
+  if _root_.NN.API.CLI.hasHelp args then
+    IO.println usage
+    return 0
+  match _root_.NN.API.CLI.requireNoArgs args with
+  | .ok () => pure ()
+  | .error e => throw <| IO.userError s!"floats_arb_ieee_compare: {e}"
+  TorchLean.Floats.Interval.ComparisonTutorial.run
 
 end NN.Examples.Advanced.Floats.ArbIEEEExecCompare

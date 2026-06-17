@@ -98,8 +98,8 @@ open NN.Verification.TorchLean
           evalFGraphVals (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out
             := out)
             g params vals
-        let v : DVal α := vals'[(outIdx (α := α) (paramShapes := paramShapes) (inShape := inShape)
-          (ss := ss) (out := out) g).id]!
+        let v : DVal α ← getDVal? vals' ((outIdx (α := α) (paramShapes := paramShapes)
+          (inShape := inShape) (ss := ss) (out := out) g).id)
         if h : v.shape = out then
           pure (h ▸ v.tensor)
         else
@@ -121,9 +121,28 @@ open NN.Verification.TorchLean
         | ok vOut =>
             have hIH := ih (vals := vals.push vOut)
             -- Reduce the outer `evalNode` bind and then apply the IH on the extended `vals`.
-            simpa [evalFGraph, evalFGraphVals, outIdx, hNode, Pure.pure, Except.pure, Except.bind,
-              Except.instMonad]
-              using hIH
+            simp [evalFGraph, evalFGraphVals, outIdx, hNode, Pure.pure, Except.pure, Except.bind,
+              bind, pure]
+            cases hVals :
+                evalFGraphVals (α := α) (paramShapes := paramShapes) (inShape := inShape)
+                  (ss := ss₀ ++ [mid₀]) (out := out₀) gNext params (vals.push vOut) with
+            | error e =>
+                simp [hVals] at hIH ⊢
+                exact hIH
+            | ok valsNext =>
+                cases hGet :
+                    getDVal? valsNext
+                      ((outIdx (α := α) (paramShapes := paramShapes) (inShape := inShape)
+                        (ss := ss₀ ++ [mid₀]) (out := out₀) gNext).id) with
+                | error e =>
+                    simp [hVals] at hIH ⊢
+                    exact hIH
+                | ok v =>
+                    by_cases hShape : v.shape = out₀
+                    · simp [hVals] at hIH ⊢
+                      exact hIH
+                    · simp [hVals] at hIH ⊢
+                      exact hIH
 
   /--
   Shape-invariant for `evalFGraphVals`.
@@ -178,11 +197,11 @@ open NN.Verification.TorchLean
                     gNext params (vals.push vOut)
                   =
                 Except.ok vals' := by
-              simpa [evalFGraphVals, hNode] using hOk
+              simpa [evalFGraphVals, hNode, Pure.pure, Except.pure, Except.bind, Except.instMonad,
+                bind, pure] using hOk
             -- Apply IH to the suffix.
             simpa [finalSs, evalFGraphVals, hNode] using
               ih (vals := vals.push vOut) (vals' := vals') (hShapes := hShapes') (hOk := hOk')
 end Correctness
 
 end NN.Verification.TorchLean.Proved
-

@@ -42,10 +42,12 @@ private lemma toSpec_one_bound :
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (1 : R) - (1 : ℝ)) ≤
       neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2 := by
   -- `1 : R` is `NF.ofReal 1`, so this is the standard single-step rounding error bound.
-  simpa [NFBackend.toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.ofReal,
-    TorchLean.Floats.NF.roundR,
-    Proofs.RuntimeRoundingApprox.roundR] using
-      (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ))
+  convert
+    (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ))
+    using 1
+  · simp [NFBackend.toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR]
+    exact congrArg (fun x => abs (x - (1 : ℝ)))
+      (show (1 : R).val = neuralRound (β := β) (fexp := fexp) rnd 1 from rfl)
 
 omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
 lemma approxT_fill_const {cS : ℝ} {cR : R} {eps : ℝ} (h : abs (toSpec (β := β) (fexp := fexp) (rnd
@@ -66,7 +68,7 @@ lemma approxT_fill_const {cS : ℝ} {cR : R} {eps : ℝ} (h : abs (toSpec (β :=
           simpa [Spec.fill, approxT, approxWith, tensorToSpec, linfNorm,
             RuntimeApprox.linfNorm,
             tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-            tensorLinfNorm, Spec.mapTensor] using heps
+            tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec, Spec.mapTensor] using heps
       | succ n =>
           -- Each component satisfies the IH; take the `foldl max` upper bound.
           have heps : 0 ≤ eps := le_trans (abs_nonneg _) h
@@ -96,7 +98,7 @@ lemma approxT_fill_const {cS : ℝ} {cR : R} {eps : ℝ} (h : abs (toSpec (β :=
           simpa [Spec.fill, approxT, approxWith, tensorToSpec, linfNorm,
             RuntimeApprox.linfNorm,
             tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-            tensorLinfNorm, Spec.mapTensor] using hfold
+            tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec, Spec.mapTensor] using hfold
 
 lemma approxT_fill_one :
     ∀ {s : Shape}, approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))

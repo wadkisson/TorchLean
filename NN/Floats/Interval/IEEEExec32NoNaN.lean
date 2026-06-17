@@ -104,21 +104,11 @@ theorem compare_ne_none_of_isNaN_eq_false (x y : IEEE32Exec)
     compare x y ≠ none := by
   intro hcmp
   unfold compare at hcmp
+  have hnan : isNaN x || isNaN y = false := by
+    simp [hx, hy]
+  simp at hcmp
   -- eliminate the NaN guard first
-  have hcmp' :
-      (if isInf x then
-          if isInf y then
-            if signBit x == signBit y then some .eq
-            else if signBit x then some .lt else some .gt
-          else if signBit x then some .lt else some .gt
-        else if isInf y then
-          if signBit y then some .gt else some .lt
-        else
-          match toDyadic? x, toDyadic? y with
-          | some dx, some dy => some (cmpDyadic dx dy)
-          | _, _ => none) =
-        (none : Option Ordering) := by
-    simpa [hx, hy] using hcmp
+  have hcmp' := hcmp hx hy
   clear hcmp
   -- show this cannot happen by splitting on the remaining cases
   cases hxInf : isInf x with

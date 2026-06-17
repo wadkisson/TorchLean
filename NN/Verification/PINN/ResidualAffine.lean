@@ -15,8 +15,7 @@ Helpers for assembling PDE residual bounds using affine CROWN relaxations
 where available.
 
 This module provides:
-- Eval of an affine upper/lower bound on the network output u(x) using runAffine
-  and AffineVec.eval_on_box, given the current input box.
+- Evaluation of affine upper/lower bounds on the network output `u(x)`.
 - McCormick-style linear upper/lower envelopes for scalar products over
   independent intervals (for Burgers-type residuals).
 - A compact branch-and-bound splitter on the 1D input box to tighten bounds by
@@ -40,12 +39,6 @@ open NN.MLTheory.CROWN.Graph
 open _root_.Spec
 open _root_.Spec.Tensor
 
-/-- Cast a dimension-indexed vector box across definitional equality of Nats. -/
-def castBoxDimEq {n n' : Nat}
-  (h : n = n')
-  (B : Box Float (.dim n .scalar)) : Box Float (.dim n' .scalar) := by
-  simpa [h] using B
-
 /-- Forward CROWN/DeepPoly bounds for the scalar output `u` (or sum of outputs). -/
 def crownUBoundsForward (g : Graph) (ps : ParamStore Float)
   (ibp : Array (Option (FlatBox Float))) : Option (Float × Float) :=
@@ -55,19 +48,12 @@ def crownUBoundsForward (g : Graph) (ps : ParamStore Float)
     let ctx : AffineCtx := { inputId := 0, inputDim := inB.dim }
     let crown := runCROWN (α:=Float) g ps ctx ibp
     let outId : Nat := g.nodes.size - 1
-    match crown[outId]! with
-    | some bout =>
-      let inB0 : Box Float (.dim inB.dim .scalar) := { lo := inB.lo, hi := inB.hi }
-      if hdim : inB.dim = bout.inDim then
-        let inB1 := castBoxDimEq (h:=hdim) inB0
-        let outLoBox := NN.MLTheory.CROWN.AffineVec.evalOnBox (α:=Float) bout.loAff inB1
-        let outHiBox := NN.MLTheory.CROWN.AffineVec.evalOnBox (α:=Float) bout.hiAff inB1
-        let ulo := Spec.Tensor.sumSpec outLoBox.lo
-        let uhi := Spec.Tensor.sumSpec outHiBox.hi
+    match evalCROWNOutputBox? (α := Float) crown inB outId inB.dim with
+    | .ok outB =>
+        let ulo := Spec.Tensor.sumSpec outB.lo
+        let uhi := Spec.Tensor.sumSpec outB.hi
         some (ulo, uhi)
-      else
-        none
-    | none => none
+    | .error _ => none
 
 /-- Objective-dependent (backward/dual) CROWN bounds for the scalar output `u` (or sum of outputs).
   -/
@@ -79,25 +65,18 @@ def crownUBoundsBackward (g : Graph) (ps : ParamStore Float)
     let ctx : AffineCtx := { inputId := 0, inputDim := inB.dim }
     let outId : Nat := g.nodes.size - 1
     let outDim : Nat :=
-      match ibp[outId]! with
-      | some B => B.dim
-      | none => 0
+      match outputBox? ibp outId with
+      | .ok B => B.dim
+      | .error _ => 0
     let objV : Tensor Float (.dim outDim .scalar) := Spec.fill (α := Float) 1.0 (.dim outDim
       .scalar)
     let obj : FlatVec Float := { n := outDim, v := objV }
-    match runCROWNBackwardObjective (α := Float) g ps ctx ibp outId obj with
-    | some bout =>
-      let inB0 : Box Float (.dim inB.dim .scalar) := { lo := inB.lo, hi := inB.hi }
-      if hdim : inB.dim = bout.inDim then
-        let inB1 := castBoxDimEq (h:=hdim) inB0
-        let outLoBox := NN.MLTheory.CROWN.AffineVec.evalOnBox (α:=Float) bout.loAff inB1
-        let outHiBox := NN.MLTheory.CROWN.AffineVec.evalOnBox (α:=Float) bout.hiAff inB1
-        let ulo := Spec.Tensor.sumSpec outLoBox.lo
-        let uhi := Spec.Tensor.sumSpec outHiBox.hi
+    match backwardObjectiveBox? (α := Float) g ps ctx ibp inB outId obj with
+    | .ok outB =>
+        let ulo := Spec.Tensor.sumSpec outB.lo
+        let uhi := Spec.Tensor.sumSpec outB.hi
         some (ulo, uhi)
-      else
-        none
-    | none => none
+    | .error _ => none
 
 /-- Scalar product upper envelope over rectangles using McCormick.
     Given u∈[lx,ux], v∈[ly,uy], returns an affine upper bound of the form

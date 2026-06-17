@@ -33,9 +33,8 @@ We still keep the source files split by semantic layer:
   already useful as reusable autograd programs.
 - `NN.Examples.Models.*` contains runnable scripts and training examples.
 
-That split avoids circular dependencies and keeps proofs honest, while this umbrella gives users a
-single architecture-facing import that includes both the broad spec catalog and the graph-authored
-coverage ladder.
+That split avoids circular dependencies. This umbrella is the architecture-facing import that
+includes both the broad spec catalog and the graph-authored coverage ladder.
 
 The current set is intentionally a coverage ladder, not an exhaustive catalog:
 

@@ -145,9 +145,10 @@ private lemma toReal_posMinSubnormal :
     toReal (posMinSubnormal : IEEE32Exec) = bpow (-149) := by
   have hexp : (0 : Nat) < 255 := by decide
   have hfrac : (1 : Nat) < 2 ^ 23 := by decide
+  have hbits : mkBits false 0 1 = 0x00000001 := by decide
   have hdy :
       toDyadic? posMinSubnormal = some { sign := false, mant := 1, exp := (-149 : Int) } := by
-    simpa [posMinSubnormal] using
+    simpa [posMinSubnormal, hbits] using
       (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 0) (frac := 1) hexp hfrac)
   simp [toReal_eq, hdy, dyadicToReal]
 
@@ -168,10 +169,11 @@ private lemma toReal_posMaxFinite_lt_bpow128 :
   have hfrac : (pow2 23 - 1) < 2 ^ 23 := by
     have h : (pow2 23 - 1) < pow2 23 := Nat.sub_lt (pow2_pos 23) (by decide)
     exact lt_of_lt_of_eq h (pow2_eq_two_pow 23)
+  have hbits : mkBits false 254 (pow2 23 - 1) = 0x7F7FFFFF := by decide
   have hdy :
       toDyadic? posMaxFinite =
         some { sign := false, mant := pow2 23 + (pow2 23 - 1), exp := (Int.ofNat 254) - 150 } := by
-    simpa [posMaxFinite] using
+    simpa [posMaxFinite, hbits] using
       (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 254) (frac := (pow2 23 - 1)) hexp hfrac)
   have hto :
       toReal posMaxFinite = ((pow2 24 - 1 : Nat) : ℝ) * bpow (104 : Int) := by

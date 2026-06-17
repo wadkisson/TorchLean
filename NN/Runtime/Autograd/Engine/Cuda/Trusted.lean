@@ -18,9 +18,10 @@ module
 /-!
 # Trusted CUDA Runtime Boundary
 
-This module contains the opaque CUDA buffer type and the single inhabitance axiom needed to make the
-external FFI type usable from Lean. It is kept compact: all declarations here are part of the
-TorchLean trusted computing base for CUDA execution.
+This module contains the opaque CUDA buffer type used by the native runtime. Buffers are created by
+explicit FFI allocation/copy functions. The nonemptiness witness below is only what Lean needs to
+declare extern functions returning `Buffer`; it is not a default CUDA allocation and should not be
+used as one.
 -/
 
 @[expose] public section
@@ -39,7 +40,13 @@ Implementation:
 -/
 opaque Buffer : Type
 
--- External code constructs `Buffer` values, so we assume the type is inhabited.
+/--
+Lean requires a nonempty result type for opaque extern declarations such as
+`Buffer.zeros : UInt32 -> Buffer`.
+
+This witness is part of the FFI trust boundary. It does not allocate a runtime buffer; real CUDA
+buffers still come only from explicit native constructors/copy operations.
+-/
 axiom instNonemptyBuffer : Nonempty Buffer
 attribute [instance] instNonemptyBuffer
 

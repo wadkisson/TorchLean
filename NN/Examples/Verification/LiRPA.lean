@@ -6,11 +6,11 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.LiRPA.AttentionVerify
-public import NN.Examples.Verification.LiRPA.CnnVerify
-public import NN.Examples.Verification.LiRPA.GruVerify
-public import NN.Examples.Verification.LiRPA.MlpVerify
-public import NN.Examples.Verification.LiRPA.TransformerEncoderVerify
+public import NN.Verification.LiRPA.Attention
+public import NN.Verification.LiRPA.Cnn
+public import NN.Verification.LiRPA.Gru
+public import NN.Verification.LiRPA.Mlp
+public import NN.Verification.LiRPA.TransformerEncoder
 
 /-!
 # LiRPA Verification Examples

@@ -78,7 +78,7 @@ Least-squares discriminator loss:
 
 `MSE(D(x_real), 1) + MSE(D(G(z)), 0)`.
 -/
-def discriminatorLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def discriminatorLoss
     (model : Model α latent obs) (xReal : Tensor α obs)
     (z : Tensor α latent) : α :=
   Spec.mseSpec (s := .scalar) (realScore model xReal) (realTarget (α := α)) +
@@ -89,7 +89,7 @@ Least-squares generator loss:
 
 `MSE(D(G(z)), 1)`.
 -/
-def generatorLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def generatorLoss
     (model : Model α latent obs) (z : Tensor α latent) : α :=
   Spec.mseSpec (s := .scalar) (fakeScore model z) (realTarget (α := α))
 
@@ -101,7 +101,6 @@ def generatorLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
 
 /-- The LSGAN discriminator objective is the sum of real and fake score-regression terms. -/
 @[simp] theorem discriminatorLoss_eq
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α latent obs) (xReal : Tensor α obs) (z : Tensor α latent) :
     discriminatorLoss model xReal z =
       Spec.mseSpec (s := .scalar) (realScore model xReal) (realTarget (α := α)) +

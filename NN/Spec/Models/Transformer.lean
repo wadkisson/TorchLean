@@ -642,7 +642,7 @@ def TransformerEncoderLayer.backward
 
   let h3 : seqLen ≠ 0 := by apply Shape.gt_pos_to_ne_zero h1
 
-  -- Reconstruct forward intermediates (this keeps the backward spec local and compositional).
+  -- Reconstruct forward intermediates locally for this backward spec.
   let mhaOut := MultiHeadAttention.forward seqLen h3 layer.mha x none
   let res1 := addSpec x mhaOut
   let norm1 := layerNorm res1 layer.norm1_gamma layer.norm1_beta h1 h2

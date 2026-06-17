@@ -154,7 +154,9 @@ theorem measurable_ofFn : Measurable (ofFn (n := n) (Z := Z) : (Fin n → Z) →
   simpa [Function.comp, ofFn, toFn] using
     (measurable_comap_iff (f := (ofFn (n := n) (Z := Z) : (Fin n → Z) → Dataset n Z))
       (g := (toFn (n := n) (Z := Z) : Dataset n Z → (Fin n → Z)))).2
-      (by simpa using (measurable_id : Measurable (fun x : Fin n → Z => x)))
+      (by
+        change Measurable (fun x : Fin n → Z => x)
+        exact measurable_id)
 
 end Measure
 

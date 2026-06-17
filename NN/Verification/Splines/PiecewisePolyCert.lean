@@ -182,6 +182,12 @@ def parsePolynomialPiece (ctx : String) (j : Json) : IO PolynomialPiece := do
 
 end Internal
 
+/-- Require an array entry at a certificate-checking boundary, with a schema-oriented error. -/
+def requireArrayEntry {α : Type} (ctx : String) (xs : Array α) (i : Nat) : IO α := do
+  match xs[i]? with
+  | some x => pure x
+  | none => throw <| IO.userError s!"{ctx}: missing entry at index {i} (size={xs.size})"
+
 /-- Parse the `piecewise_poly_v0` JSON payload into a structured certificate. -/
 def parsePiecewisePolyCertificate (j : Json) : IO PiecewisePolyCertificate := do
   let top ← expectObj j "top-level"
@@ -236,15 +242,15 @@ def checkCertificateRat (cert : PiecewisePolyCertificate) : IO Unit := do
   let ys := cert.ys.data
 
   for i in [0:n - 1] do
-    let a := xs[i]!
-    let b := xs[i + 1]!
+    let a ← requireArrayEntry "xs" xs i
+    let b ← requireArrayEntry "xs" xs (i + 1)
     unless a < b do
       throw <| IO.userError s!"xs not strictly increasing at i={i}: {a} !< {b}"
 
   for i in [0:cert.pieces.size] do
-    let p := cert.pieces[i]!
-    let lo := xs[i]!
-    let hi := xs[i + 1]!
+    let p ← requireArrayEntry "pieces" cert.pieces i
+    let lo ← requireArrayEntry "xs" xs i
+    let hi ← requireArrayEntry "xs" xs (i + 1)
     unless p.lo == lo do
       throw <| IO.userError s!"piece[{i}].lo mismatch: {p.lo} ≠ xs[{i}]={lo}"
     unless p.hi == hi do
@@ -254,8 +260,8 @@ def checkCertificateRat (cert : PiecewisePolyCertificate) : IO Unit := do
         IO.userError
           s!"piece[{i}].coeffs length mismatch: {p.coeffs.size} ≠ degree+1={cert.degree + 1}"
 
-    let yLo := ys[i]!
-    let yHi := ys[i + 1]!
+    let yLo ← requireArrayEntry "ys" ys i
+    let yHi ← requireArrayEntry "ys" ys (i + 1)
     let tHi : Rat := hi - lo
     let pLo := evalPolyHorner p.coeffs 0
     let pHi := evalPolyHorner p.coeffs tHi
@@ -315,11 +321,11 @@ def checkCertificateIEEE32ExecExact (cert : PiecewisePolyCertificate) : IO Unit 
   let ys ← ysQ.mapIdxM (fun i q => ratToIEEE32ExecExact (ctx := s!"ys[{i}]") q)
 
   for i in [0:cert.pieces.size] do
-    let p := cert.pieces[i]!
-    let lo32 := xs[i]!
-    let hi32 := xs[i + 1]!
-    let yLo32 := ys[i]!
-    let yHi32 := ys[i + 1]!
+    let p ← requireArrayEntry "pieces" cert.pieces i
+    let lo32 ← requireArrayEntry "xs" xs i
+    let hi32 ← requireArrayEntry "xs" xs (i + 1)
+    let yLo32 ← requireArrayEntry "ys" ys i
+    let yHi32 ← requireArrayEntry "ys" ys (i + 1)
 
     let coeffs32 ←
       p.coeffs.mapIdxM (fun k q => ratToIEEE32ExecExact (ctx := s!"pieces[{i}].coeffs[{k}]") q)

@@ -57,15 +57,11 @@ lemma toVec_mul_spec {n : Nat} (a b : Tensor ℝ (.dim n .scalar)) (i : Fin n) :
 /-- Dot product of vectors is the coordinate-wise sum `∑ i, a[i] * b[i]`. -/
 lemma dot_vec_eq_sum {n : Nat} (a b : Tensor ℝ (.dim n .scalar)) :
   dot a b = ∑ i : Fin n, toVec a i * toVec b i := by
-  simp [dot]
-  have hsum := sum_spec_vec (v := mulSpec a b)
   calc
-    sumSpec (mulSpec a b) = ∑ i : Fin n, toVec (mulSpec a b) i := by
-      simpa using hsum
+    dot a b = Proofs.TensorAlgebra.dot (α := ℝ) a b := by
+      exact dot_eq_tensorAlgebra_dot (a := a) (b := b)
     _ = ∑ i : Fin n, toVec a i * toVec b i := by
-      refine Finset.sum_congr rfl ?_
-      intro i _
-      simpa using (toVec_mul_spec (a := a) (b := b) (i := i))
+      simpa using Proofs.TensorAlgebra.dot_vec_eq_sum (α := ℝ) (a := a) (b := b)
 
 -- Converting the spec-level `List.finRange` fold for `vec_mat_mul_spec` into a `Finset.univ` sum.
 /-- Coordinate formula for `vec_mat_mul_spec` as a `Finset` sum: `(v @ A)[j] = ∑ i, v[i] * A[i,j]`.
@@ -74,56 +70,8 @@ lemma toVec_vec_mat_mul_spec {m n : Nat}
   (v : Tensor ℝ (.dim m .scalar))
   (A : Tensor ℝ (.dim m (.dim n .scalar))) (j : Fin n) :
   toVec (vecMatMulSpec v A) j = ∑ i : Fin m, (toVec v i) * (get2 A i j) := by
-  classical
-  cases v with
-  | dim valuesV =>
-    cases A with
-    | dim rowsA =>
-      simp [vecMatMulSpec, toVec, get2_eq, get_eq]
-      let f : Fin m → ℝ := fun i =>
-        vecMatMulSpec.match_3
-          (motive := fun _ _ => ℝ)
-          (valuesV i) (rowsA i)
-          (fun vi colsA =>
-            vecMatMulSpec.match_1
-              (motive := fun _ => ℝ)
-              (colsA j)
-              (fun aij => vi * aij))
-
-      have hfun :
-          (fun (s : ℝ) (i : Fin m) =>
-              vecMatMulSpec.match_3
-                (motive := fun _ _ => ℝ)
-                (valuesV i) (rowsA i)
-                (fun vi colsA =>
-                  vecMatMulSpec.match_1
-                    (motive := fun _ => ℝ)
-                    (colsA j)
-                    (fun aij => s + vi * aij)))
-            =
-            (fun s i => s + f i) := by
-        funext s i
-        cases hv : valuesV i with
-        | scalar vi =>
-          cases hrow : rowsA i with
-          | dim colsA =>
-            cases hcol : colsA j with
-            | scalar aij =>
-              simp [f, hv, hrow, hcol]
-
-      have hsum : (List.finRange m).foldl (fun s i => s + f i) 0 = ∑ i : Fin m, f i :=
-        finRange_foldl_add_eq_finset_sum (f := f)
-
-      rw [hfun, hsum]
-      refine Finset.sum_congr rfl ?_
-      intro i _
-      cases hv : valuesV i with
-      | scalar vi =>
-        cases hrow : rowsA i with
-        | dim colsA =>
-          cases hcol : colsA j with
-          | scalar aij =>
-            simp [f, hv, hrow, hcol]
+  simpa using
+    (Proofs.TensorAlgebra.toVec_vec_mat_mul_spec (α := ℝ) (v := v) (A := A) (j := j))
 
 /--
 Adjointness of matrix-vector and vector-matrix multiplication under the `dot` product:
@@ -138,55 +86,15 @@ theorem dot_mat_linear_adjoint
   (dx : Tensor ℝ (.dim inDim .scalar)) :
   dot dLdy (matVecMulSpec W dx)
   = dot (vecMatMulSpec dLdy W) dx := by
-  -- This is the key adjoint property: ⟨y, Wx⟩ = ⟨W^T y, x⟩
-  -- Essential for gradient computation in neural networks
-  classical
   calc
     dot dLdy (matVecMulSpec W dx)
-        = ∑ i : Fin outDim, (toVec dLdy i) * (toVec (matVecMulSpec W dx) i) := by
-            simpa using (dot_vec_eq_sum (a := dLdy) (b := matVecMulSpec W dx))
-    _ = ∑ i : Fin outDim, (toVec dLdy i) * (∑ k : Fin inDim, (get2 W i k) * (toVec dx k)) := by
-            refine Finset.sum_congr rfl ?_
-            intro i _
-            simp [toVec_mat_vec_mul_spec]
-    _ = ∑ i : Fin outDim, ∑ k : Fin inDim,
-          (toVec dLdy i) * ((get2 W i k) * (toVec dx k)) := by
-            refine Finset.sum_congr rfl ?_
-            intro i _
-            simpa using
-              (Finset.mul_sum (s := (Finset.univ : Finset (Fin inDim)))
-                (f := fun k : Fin inDim => (get2 W i k) * (toVec dx k))
-                (a := toVec dLdy i))
-    _ = ∑ k : Fin inDim, ∑ i : Fin outDim,
-          (toVec dLdy i) * ((get2 W i k) * (toVec dx k)) := by
-            simpa using
-              (Finset.sum_comm
-                (s := (Finset.univ : Finset (Fin outDim)))
-                (t := (Finset.univ : Finset (Fin inDim)))
-                (f := fun i k => (toVec dLdy i) * ((get2 W i k) * (toVec dx k))))
-    _ = ∑ k : Fin inDim,
-          (∑ i : Fin outDim, (toVec dLdy i) * (get2 W i k)) * (toVec dx k) := by
-            refine Finset.sum_congr rfl ?_
-            intro k _
-            calc
-              (∑ i : Fin outDim, (toVec dLdy i) * ((get2 W i k) * (toVec dx k)))
-                  = ∑ i : Fin outDim, ((toVec dLdy i) * (get2 W i k)) * (toVec dx k) := by
-                      refine Finset.sum_congr rfl ?_
-                      intro i _
-                      simp [mul_assoc]
-              _ = (∑ i : Fin outDim, (toVec dLdy i) * (get2 W i k)) * (toVec dx k) := by
-                      symm
-                      simpa using
-                        (Finset.sum_mul (s := (Finset.univ : Finset (Fin outDim)))
-                          (f := fun i : Fin outDim => (toVec dLdy i) * (get2 W i k))
-                          (a := toVec dx k))
-    _ = ∑ k : Fin inDim, (toVec (vecMatMulSpec dLdy W) k) * (toVec dx k) := by
-            refine Finset.sum_congr rfl ?_
-            intro k _
-            simp [toVec_vec_mat_mul_spec]
+        = Proofs.TensorAlgebra.dot (α := ℝ) dLdy (matVecMulSpec W dx) := by
+          exact dot_eq_tensorAlgebra_dot (a := dLdy) (b := matVecMulSpec W dx)
+    _ = Proofs.TensorAlgebra.dot (α := ℝ) (vecMatMulSpec dLdy W) dx := by
+          exact Proofs.TensorAlgebra.dot_mat_linear_adjoint (α := ℝ) (W := W) (dLdy := dLdy)
+            (dx := dx)
     _ = dot (vecMatMulSpec dLdy W) dx := by
-            symm
-            simpa using (dot_vec_eq_sum (a := vecMatMulSpec dLdy W) (b := dx))
+          exact (dot_eq_tensorAlgebra_dot (a := vecMatMulSpec dLdy W) (b := dx)).symm
 
 /--
 `shapeOf` recovers the shape already tracked in the tensor type.

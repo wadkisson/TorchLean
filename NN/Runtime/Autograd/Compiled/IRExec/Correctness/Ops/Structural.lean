@@ -182,10 +182,27 @@ theorem buildFrom_denoteAllFrom_detach
                         throw_eq_error, Except.instMonad, Except.bind, Except.pure]
 
                     have hTail := ih st1 hRec
+                    have hEvalForTail :
+                        NN.IR.Graph.evalAt (α := α) (g := g) (payload := payload)
+                            (input := NN.IR.DVal.mk (α := α) inShape x)
+                            (vals := denoteAllState (α := α) inShape
+                              (st := (⟨ss, gd⟩ : State α inShape)) x)
+                            (i := i) =
+                          .ok (NN.IR.DVal.mk (α := α) n.outShape
+                            (nodeData.forward
+                              (GraphData.eval (α := α) (Δ := Unit) (Γ := [inShape])
+                                (ss := ss) gd (.cons x .nil) ())
+                              ())) := by
+                      change
+                        NN.IR.Graph.evalAt (α := α) (g := g) (payload := payload)
+                            (input := input) (vals := vals0) (i := i) =
+                          .ok (NN.IR.DVal.mk (α := α) n.outShape
+                            (nodeData.forward ctx ()))
+                      exact hEval
                     exact buildFrom_denoteAllFrom_nodeData_exact (α := α) (g := g)
                       (payload := payload)
                       (gd := gd) (i := i) (st' := st') (x := x) (hi := hi)
-                      (τ := n.outShape) (nodeData := nodeData) hTail (by simpa using hEval)
+                      (τ := n.outShape) (nodeData := nodeData) hTail hEvalForTail
                   · simp [hOut] at hBuild
                     try cases hBuild
 

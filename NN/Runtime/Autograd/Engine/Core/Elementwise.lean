@@ -12,7 +12,7 @@ public import NN.Runtime.Autograd.Engine.Core.Indexing
 /-!
 Elementwise eager-engine operations.
 
-This file contains scalar-lifted tensor nodes and their runtime/autograd plumbing, including
+This file contains scalar-lifted tensor nodes and their runtime/autograd implementation, including
 arithmetic, comparisons, activations, and loss-adjacent pointwise operations.
 -/
 

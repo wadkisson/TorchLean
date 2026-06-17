@@ -43,8 +43,7 @@ Optional testing command:
 
 - Inline SVG sparklines render quickly in the infoview.
 - We avoid custom JavaScript so widget files stay easy to import and review.
-- For saved logs, we render an error panel instead of throwing hard failures; this keeps viewer
-  files robust even when artifacts are missing.
+- For saved logs, missing artifacts render as an error panel rather than throwing a hard failure.
 
 ## References
 

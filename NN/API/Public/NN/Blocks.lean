@@ -8,12 +8,13 @@ Authors: TorchLean Team
 module
 
 public import NN.API.Public.NN.VisionLayers
+public import NN.API.Public.TensorPack
 
 /-!
 Reusable neural-network blocks.
 
 This module defines public block constructors such as residual, convolutional, and MLP-style
-compositions built from the lower-level layer API.
+compositions built from the public layer-building API.
 -/
 
 @[expose] public section
@@ -97,7 +98,7 @@ def mlpGo (act : Activation) (dropout? : Option Float) :
 /--
 Build an MLP as a sequential stack of linear layers and activations.
 
-This is a small "PyTorch-shaped" helper: a typical call looks like:
+This is a small PyTorch-shaped constructor: a typical call looks like:
 `API.nn.blocks.mlp 784 10 { hidden := [128, 128], activation := .relu }`.
 -/
 def mlp (inDim outDim : Nat) (cfg : MLP := {}) :
@@ -107,7 +108,7 @@ def mlp (inDim outDim : Nat) (cfg : MLP := {}) :
 /--
 Conv2d + activation (+ optional dropout) block configuration (CHW layout).
 
-This compact helper is used by vision examples before moving to larger curated blocks.
+This compact block is used by vision examples before moving to larger curated blocks.
 -/
 structure Conv2dAct where
   /-- Conv hyperparameters and seeds. -/
@@ -305,7 +306,7 @@ def conv2dNormActPool {n inC inH inW : Nat} (cfg : Conv2dNormActPool)
   seq! core, pool
 
 /--
-Residual/skip-connection wrapper as a single `LayerDef`.
+Residual/skip-connection layer as a single `LayerDef`.
 
 Given `inner : Seq s s`, this builds a layer that computes `x |-> inner(x) + x`.
 
@@ -313,7 +314,8 @@ PyTorch analogue: `x + f(x)` blocks used throughout ResNets and Transformers.
 -/
 def residualLayer {s : Spec.Shape} (inner : Sequential s s) : LayerDef s s :=
   let ps := TorchLean.NN.Seq.paramShapes inner
-  { paramShapes := ps
+  { kind := "Residual"
+    paramShapes := ps
     initParams := TorchLean.NN.Seq.initParams inner
     paramRequiresGrad := TorchLean.NN.Seq.paramRequiresGrad inner
     updateBuffers := some (fun mode {α} _ _ ps x =>
@@ -361,17 +363,18 @@ Parameters are concatenated as `params(f) ++ params(g)`.
 def addBranchesLayer {σ τ : Spec.Shape} (f g : Sequential σ τ) : LayerDef σ τ :=
   let psF := TorchLean.NN.Seq.paramShapes f
   let psG := TorchLean.NN.Seq.paramShapes g
-  { paramShapes := psF ++ psG
+  { kind := "AddBranches"
+    paramShapes := psF ++ psG
     initParams :=
-      tlist.append (α := Float) (ss₁ := psF) (ss₂ := psG)
+      NN.API.tensorpack.append (α := Float) (ss₁ := psF) (ss₂ := psG)
         (TorchLean.NN.Seq.initParams f) (TorchLean.NN.Seq.initParams g)
     paramRequiresGrad := TorchLean.NN.Seq.paramRequiresGrad f ++ TorchLean.NN.Seq.paramRequiresGrad
       g
     updateBuffers := some (fun mode {α} _ _ ps x => do
-      let (psFv, psGv) := tlist.split (α := α) (ss₁ := psF) (ss₂ := psG) ps
+      let (psFv, psGv) := NN.API.tensorpack.split (α := α) (ss₁ := psF) (ss₂ := psG) ps
       let psFv' ← TorchLean.NN.Seq.updateBuffers (α := α) (model := f) mode psFv x
       let psGv' ← TorchLean.NN.Seq.updateBuffers (α := α) (model := g) mode psGv x
-      pure <| tlist.append (α := α) (ss₁ := psF) (ss₂ := psG) psFv' psGv'
+      pure <| NN.API.tensorpack.append (α := α) (ss₁ := psF) (ss₂ := psG) psFv' psGv'
     )
     forward := fun mode {α} _ _ =>
       fun {m} _ _ =>
@@ -408,7 +411,7 @@ def addBranchesLayer {σ τ : Spec.Shape} (f g : Sequential σ τ) : LayerDef σ
 /--
 Combine two models with the same input/output shapes by summing their outputs.
 
-This is a typed “residual add” helper: `addBranches f g` represents the model `x ↦ f(x) + g(x)`,
+This is a typed residual-add block: `addBranches f g` represents the model `x ↦ f(x) + g(x)`,
 and its parameter list is the concatenation of the two branches’ parameter lists.
 -/
 def addBranches {σ τ : Spec.Shape} (f g : Sequential σ τ) : Sequential σ τ :=

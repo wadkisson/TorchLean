@@ -1,0 +1,118 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.API.Public.Facade
+
+/-!
+# TorchLean MLP Train-Then-Verify Workflow
+
+This is a native TorchLean workflow: the model is built, trained, compiled to verifier IR, and
+checked without importing an external certificate.
+
+Training:
+- build a 2-layer ReLU MLP with a scalar MSE loss
+- train it for a few SGD steps under the compiled TorchLean backend
+
+Verification:
+- compile the trained model's forward pass to the verifier IR
+- run public IBP bounds on a small input box around one sample
+
+Run:
+  `lake exe verify -- torchlean-mlp-workflow --dtype float`
+  `lake exe verify -- torchlean-mlp-workflow --dtype float32`
+-/
+
+@[expose] public section
+
+
+namespace NN.Verification.TorchLean.MlpTrainVerifyWorkflow
+
+open _root_.Spec
+open _root_.Spec.Tensor
+open _root_.TorchLean
+
+/-- Input dimension for the workflow model. -/
+def inDim : Nat := 2
+/-- Hidden width for the workflow model. Kept as local config, not as part of the public name. -/
+def hiddenDim : Nat := 100
+/-- Output dimension for the workflow model. -/
+def outDim : Nat := 1
+
+/-- Input shape for the workflow model. -/
+def xShape : Shape := Shape.vec inDim
+/-- Output shape for the workflow model. -/
+def yShape : Shape := Shape.vec outDim
+
+/-- Batched inputs for training. -/
+def XFloat : Spec.Tensor Float (.dim 3 xShape) :=
+  tensor! [[1.0, 0.0],
+           [0.0, 1.0],
+           [1.0, 1.0]]
+
+/-- Batched targets for training. -/
+def YFloat : Spec.Tensor Float (.dim 3 yShape) :=
+  Samples.regression2to1Float XFloat (Samples.affine2 2.0 (-3.0) 0.0)
+
+/-- TorchLean model used for training and verification. -/
+def mkModel : nn.M (nn.Sequential xShape yShape) :=
+  nn.Sequential![
+    nn.Linear inDim hiddenDim,
+    nn.ReLU,
+    nn.Linear hiddenDim outDim
+  ]
+
+def model : nn.Sequential xShape yShape :=
+  nn.run 0 mkModel
+
+/--
+Run training and verification under a chosen scalar backend `α`.
+
+The trained result owns the trained parameters. Calling `trained.verifyRobustLInf` therefore checks the
+model that was actually trained, without reopening a polymorphic low-level callback in this example
+file.
+-/
+def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+    [Runtime.Scalar α] (opts : Options) : IO Unit := do
+  let dataset := Data.tensorDataset XFloat YFloat
+  let trainer := Trainer.new model <|
+    Trainer.Config.fromRunConfig
+      (Trainer.runConfig opts { optimizer := optim.sgd { lr := 0.05 } })
+      .regression
+
+  IO.println s!"== TorchLean MLP workflow ({inDim} → {hiddenDim} → {outDim}) =="
+  IO.println s!"Training with backend={reprStr opts.backend}, {ModelZoo.deviceNote opts}"
+  let trained ← trainer.train dataset { steps := 10 }
+  IO.println s!"avg_loss(on samples)={trained.report.after}"
+  IO.println "Checking public IBP bounds on a small input box"
+  let center := _root_.Spec.get XFloat ⟨0, by decide⟩
+  let cert ← trained.verifyRobustLInf center 0.05
+  cert.printSummary
+
+/-- Runtime-selected typed runner used by the CLI entrypoint. -/
+def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+    [Runtime.Scalar α] (opts : Options) (rest : List String) : IO Unit := do
+  CLI.requireNoArgs "torchlean-mlp-workflow" rest
+  if opts.useGpu then
+    throw <| IO.userError
+      "torchlean-mlp-workflow: CUDA eager training is not used here; this workflow keeps trained parameters as Lean tensors so the verifier can compile and check them. Use the model-training examples for CUDA runtime training, or run this verifier workflow without --cuda."
+  runOnce (α := α) opts
+
+/--
+CLI entry point for the native TorchLean MLP workflow.
+
+This is wired into `lake exe verify -- torchlean-mlp-workflow`.
+-/
+def main (args : List String) : IO Unit := do
+  let args :=
+    if CLI.hasFlagValue args "backend" then
+      args
+    else
+      "--backend=compiled" :: args
+  Runtime.withOptionsNoCast args (@runMain)
+
+end NN.Verification.TorchLean.MlpTrainVerifyWorkflow

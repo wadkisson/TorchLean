@@ -24,7 +24,7 @@ PyTorch analogue: a forward Conv2D op (typically `torch.nn.functional.conv2d`) p
 https://pytorch.org/docs/stable/generated/torch.nn.functional.conv2d.html
 
 ## Map of this file
-- Small fold/indexing lemmas (`foldl_flatMap`, `entry_eq_scalar_get_at_or_zero3`) used to align the
+- Small indexing lemmas (`entry_eq_scalar_get_at_or_zero3`) used to align the
   spec definition of convolution with the bound-generating replay in the runtime proof.
 - `approx_conv2d_point`: elementwise forward error bound for a single `(out_ch, i, j)` output.
 - `approxT_conv2d_spec`: tensor-level `approxT` statement obtained by lifting the pointwise bound.
@@ -59,18 +59,6 @@ variable {rnd : ℝ → ℤ} [NeuralValidRndToNearest rnd]
 local notation "R" => TorchLean.Floats.NF β fexp rnd
 
 set_option maxHeartbeats 8000000
-
--- ---------------------------------------------------------------------------
--- Small list-fold lemma: `foldl` over `flatMap` corresponds to nested `foldl`.
--- ---------------------------------------------------------------------------
-
-lemma foldl_flatMap {α β γ : Type} (l : List α) (g : α → List β) (f : γ → β → γ) (init : γ) :
-    (l.flatMap g).foldl f init = l.foldl (fun acc a => (g a).foldl f acc) init := by
-  induction l generalizing init with
-  | nil =>
-      simp
-  | cons a tl ih =>
-      simp [List.flatMap_cons, List.foldl_append, ih]
 
 private lemma foldl_finRange3_eq_flat_foldl
     {γ : Type} [Zero γ] [Add γ] {inC kH kW : Nat} (term : Fin inC × Fin kH × Fin kW → γ) :
@@ -411,7 +399,12 @@ theorem approx_conv2d_point
                 (getAtOrZero layerR.kernel [out_ch.val, in_ch.val, di.val, dj.val]) -
               getAtOrZero layerS.kernel [out_ch.val, in_ch.val, di.val, dj.val]) ≤ epsK := by
     intro in_ch di dj
-    simpa using
+    change
+      abs
+          (toSpec (β := β) (fexp := fexp) (rnd := rnd)
+              (getAtOrZero kernelR [out_ch.val, in_ch.val, di.val, dj.val]) -
+            getAtOrZero kernelS [out_ch.val, in_ch.val, di.val, dj.val]) ≤ epsK
+    exact
       (approx_get_at_or_zero (β := β) (fexp := fexp) (rnd := rnd)
         (s := .dim outC (.dim inC (.dim kH (.dim kW .scalar))))
         (xS := kernelS) (xR := kernelR) (eps := epsK) hK
@@ -760,18 +753,27 @@ theorem approxT_conv2d_spec
       match bTocoi with
       | .dim f => f oj
     have h0 : linfNorm bToc ≤ linfNorm bT := by
-      simpa [bToc] using (linf_norm_le_get_dim (t := bT) oc)
+      change linfNorm (match bT with | .dim f => f oc) ≤ linfNorm bT
+      exact linf_norm_le_get_dim (t := bT) oc
     have h1' : linfNorm bTocoi ≤ linfNorm bToc := by
-      simpa [bTocoi] using (linf_norm_le_get_dim (t := bToc) oi)
+      change linfNorm (match bToc with | .dim f => f oi) ≤ linfNorm bToc
+      exact linf_norm_le_get_dim (t := bToc) oi
     have h2' : linfNorm bTocoiW ≤ linfNorm bTocoi := by
-      simpa [bTocoiW] using (linf_norm_le_get_dim (t := bTocoi) oj)
+      change linfNorm (match bTocoi with | .dim f => f oj) ≤ linfNorm bTocoi
+      exact linf_norm_le_get_dim (t := bTocoi) oj
     have hchain : linfNorm bTocoiW ≤ linfNorm bT := le_trans (le_trans h2' h1') h0
+    have hbTentry :
+        bTocoiW =
+          Tensor.scalar (abs (conv2dPointBound (β := β) (fexp := fexp) (rnd := rnd)
+            (layerR := layerR) (inputR := inputR) (epsK := epsK) (epsB := epsB) (epsX := epsX) oc
+            oi oj)) := by
+      rfl
     have hdouble' :
         (MathFunctions.abs (abs (conv2dPointBound (β := β) (fexp := fexp) (rnd := rnd)
               (layerR := layerR) (inputR := inputR) (epsK := epsK) (epsB := epsB) (epsX := epsX) oc
                 oi oj)) : ℝ)
           ≤ linfNorm bT := by
-      simpa [bT, bToc, bTocoi, bTocoiW, conv2dBoundTensor, linfNorm, RuntimeApprox.linfNorm,
+      simpa [hbTentry, linfNorm, RuntimeApprox.linfNorm,
         tensorLinfNorm] using
         hchain
     have habs :
@@ -839,7 +841,9 @@ theorem approxT_conv2d_spec
     rw [hEntryS, hEntryR]
     exact happ
 
-  simpa [outSentry, outRentry] using happ'
+  change approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+    outSentry outRentry (linfNorm bT)
+  exact happ'
 
 -- ---------------------------------------------------------------------------
 -- `FwdNode` packaging for Conv2D.
@@ -900,7 +904,7 @@ by
           hctx biasIdx
         have hX := approxCtx_getIdx (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
           hctx inputIdx
-        simpa using
+        simpa [conv2dOutH, conv2dOutW] using
           (approxT_conv2d_spec (β := β) (fexp := fexp) (rnd := rnd)
             (inC := inC) (outC := outC) (kH := kH) (kW := kW) (stride := stride) (padding :=
               padding) (inH := inH) (inW := inW)

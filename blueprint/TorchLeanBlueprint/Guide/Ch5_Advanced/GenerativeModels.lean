@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -22,7 +21,7 @@ KL nonnegativity, nearest code facts, and generator/discriminator objective deco
 
 # Runtime Examples And Theory Statements
 
-The generative stack is split by role. The runnable examples exercise the training and data
+The generative stack is split by role. The runnable examples cover the training and data
 path; the theorem declarations state the objective or sampler facts that can be checked in Lean.
 
 - *Diffusion*: the [diffusion command](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean) has
@@ -71,13 +70,14 @@ constructor is in [NN.API.Models.Diffusion API](https://github.com/lean-dojo/Tor
 uses a compact residual convolutional epsilon predictor because it gives users a real noising and
 denoising training loop with an inspectable sampling artifact.
 
-A small CPU runtime check looks like:
+A compact CUDA runtime check looks like:
 
 ```
-lake exe torchlean diffusion --cpu --steps 5
+python3 scripts/datasets/download_example_data.py --cifar10
+lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
-The richer path uses prepared image arrays:
+For a longer image run, increase `--n-total`, `--steps`, `--hidden-c`, and the diffusion horizon:
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10

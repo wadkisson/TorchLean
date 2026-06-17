@@ -9,8 +9,6 @@ End-to-end PPO example: train an actor-critic on a Lean-native GridWorld environ
 module
 
 public import NN
-public import NN.API.Models.PPO
-public import NN.API.RL.Cli
 public import NN.Runtime.RL.Artifacts.GridWorld
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
@@ -37,7 +35,7 @@ environment or an external sampler.
    proof that it is well-formed (row-stochastic transition rows, `0 ≤ γ < 1`).
 2. The boundary checker can be turned into a Prop-level hypothesis via
    `Proofs.RL.Boundary.contractHolds_of_checkTransitionFin_eq_ok` (see `NN/Proofs/RL/Boundary.lean`), or you can
-   use the proof-layer Gymnasium wrapper `Runtime.RL.Gymnasium.Session.stepCheckedWithProof`
+   use the proof-layer Gymnasium checked step `Runtime.RL.Gymnasium.Session.stepCheckedWithProof`
    (`NN/Proofs/RL/Gymnasium.lean`) for external environments.
 
 ## CLI flags
@@ -52,16 +50,15 @@ environment or an external sampler.
 Run (from the repo root):
 
 ```bash
-lake exe torchlean ppo_gridworld
-lake build -R -K cuda=true && lake exe torchlean ppo_gridworld --cuda
-lake exe torchlean ppo_gridworld --updates 200
+lake build -R -K cuda=true
+lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 Artifacts:
 - The executable writes widget-friendly JSON snapshots to `data/rl/` by default:
   `ppo_gridworld_trainlog.json`, `ppo_gridworld_policy.json`, `ppo_gridworld_path.json`
   (override with `--log`, `--policy`, `--path`).
-- You can also tune runtime cost with:
+- You can tune runtime cost with:
   `--updates`, `--eval-every`, `--eval-episodes`, `--eval-max-steps`.
 - Visualize them in the editor via `NN/Examples/RL/PPOGridWorldView.lean`.
 
@@ -89,7 +86,7 @@ References (primary):
 @[expose] public section
 
 open Spec Tensor
-open NN.API
+open TorchLean
 
 namespace NN.Examples.Models.RL.PPOGridWorld
 
@@ -174,7 +171,7 @@ def goalPos : Spec.RL.Envs.GridWorld.State width height :=
 
 noncomputable section
 
-/-- A discount factor in `[0,1)` at the proof layer (`ℝ`), used to build an MDP instance. -/
+/-- A discount factor in `[0,1)` at the proof layer (`ℝ`) for the MDP instance. -/
 def discountR : ℝ := (99 : ℝ) / 100
 
 /-- Proof-layer GridWorld instance over `ℝ` rewards/discounts. -/
@@ -201,8 +198,8 @@ end
 We implement a Gym-style environment (`Spec.RL.Env`) whose observations are **one-hot** vectors
 over the flattened finite state space `Fin nStates`.
 
-This keeps the PPO code identical to the Gymnasium example: the policy consumes tensors and
-produces logits over a finite action set.
+The policy sees the same tensor shape as the Gymnasium-backed example and produces logits over a
+finite action set.
 -/
 
 /-- Start state encoded as `Fin nStates`. -/
@@ -289,11 +286,11 @@ def modelCfg : nn.models.PPOActorCriticConfig :=
 
 /-- Construct the actor network as an MLP mapping one-hot observations to action logits. -/
 def actorMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim nActions)) :=
-  nn.models.ppoActor modelCfg pfx
+  nn.models.PPOActor modelCfg pfx
 
 /-- Construct the critic network as an MLP mapping one-hot observations to a scalar value estimate. -/
 def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim 1)) :=
-  nn.models.ppoCritic modelCfg pfx
+  nn.models.PPOCritic modelCfg pfx
 
 /-!
 ## Rollout collection (Lean-native environment)
@@ -301,7 +298,7 @@ def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.ap
 
 /-- Collect a fixed-horizon PPO rollout from the Lean-native environment using a checked session.
 
-This is an example-local wrapper around `rl.ppo.collectRolloutCheckedSessionWith` that packages:
+This is an example-local rollout operation around `rl.ppo.collectRolloutCheckedSessionWith` that packages:
 - a `Spec.RL.Env` as a `rl.session.CheckedSession`, and
 - the (actor, critic) prediction functions at observation shape.
 -/
@@ -322,7 +319,7 @@ def collectRolloutNativeWith
 /-!
 ## Evaluation
 
-Evaluation helpers live in `NN.API.rl.eval` (runtime module `NN.Runtime.RL.Eval`).
+Evaluation APIs live in `rl.eval`.
 -/
 
 /-!
@@ -337,23 +334,25 @@ This executable:
 - writes widget-friendly JSON artifacts (training curve, greedy policy snapshot, greedy path snapshot).
 -/
 def main (args : List String) : IO UInt32 := do
-  TorchLean.Module.run exeName args
-    (.float (fun opts rest => do
-      let (policyPath?, rest) ← Common.orThrow exeName <| CLI.takePathFlagOnce rest "policy"
-      let (pathPath?, rest) ← Common.orThrow exeName <| CLI.takePathFlagOnce rest "path"
-      let (ppo, rest) ← Common.orThrow exeName <|
+  ModelZoo.runFloat exeName args
+    (banner := ModelZoo.bannerWithDeviceDetails
+      exeName
+      s!"PPO on Lean-native GridWorld ({width}x{height}, horizon={horizon})"
+      "  env: pure Lean dynamics + boundary contract check + formal MDP validity proof available")
+    (k := fun opts rest => do
+      let (policyPath, rest) ← ModelZoo.orThrow exeName <|
+        CLI.takePathFlagDefault rest "policy" Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldPolicy
+      let (pathPath, rest) ← ModelZoo.orThrow exeName <|
+        CLI.takePathFlagDefault rest "path" Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldPath
+      let (ppo, rest) ← ModelZoo.orThrow exeName <|
         rl.cli.parsePpoFlags exeName rest Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldTrainLog
           updatesMax evalEvery evalEpisodes 128
-      Common.orThrow exeName <| CLI.requireNoArgs rest
+      ModelZoo.orThrow exeName <| CLI.checkNoArgs rest
 
       let updates : Nat := ppo.updates
       let evalEvery : Nat := ppo.evalEvery
       let evalEpisodes : Nat := ppo.evalEpisodes
       let evalMaxSteps : Nat := ppo.evalMaxSteps
-      let policyPath : System.FilePath :=
-        policyPath?.getD Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldPolicy
-      let pathPath : System.FilePath :=
-        pathPath?.getD Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldPath
 
       -- Touch the formal theorem so it stays reachable from this example module.
       have _ : True := by
@@ -363,24 +362,24 @@ def main (args : List String) : IO UInt32 := do
       let seedActor ← nn.freshSeed
       let seedCritic ← nn.freshSeed
       let actorObs : nn.Sequential sState1 sLogits1 :=
-        nn.build seedActor (actorMk (pfx := .scalar))
+        nn.run seedActor (actorMk .scalar)
       let criticObs : nn.Sequential sState1 sValue1 :=
-        nn.build seedCritic (criticMk (pfx := .scalar))
+        nn.run seedCritic (criticMk .scalar)
       let actorRollout : nn.Sequential sStateBatch sLogitsBatch :=
-        nn.build seedActor (actorMk (pfx := pfxBatch))
+        nn.run seedActor (actorMk pfxBatch)
       let criticRollout : nn.Sequential sStateBatch sValueBatch :=
-        nn.build seedCritic (criticMk (pfx := pfxBatch))
+        nn.run seedCritic (criticMk pfxBatch)
 
       let actorC ← nn.compileOut actorObs
       let criticC ← nn.compileOut criticObs
 
-      let modDef :=
-        API.TorchLean.RL.Autograd.ppoActorCriticScalarModuleDef (stateShape := sStateBatch)
-          (batch := horizon) (nActions := nActions) actorRollout criticRollout
-      let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
+        let m ← rl.ppo.instantiateActorCritic
+          (α := Float) (opts := opts)
+          (batch := horizon) (nActions := nActions)
+          actorRollout criticRollout
 
-      let opt := TorchLean.Optim.adam (α := Float) lr 0.9 0.999 1e-8
-      let optH ← TorchLean.Optim.handle (α := Float) m opt
+        let stepSample ←
+          rl.ppo.optimizerInputs m (.adam lr 0.9 0.999 1e-8 : optim.Optimizer)
 
       let mut rngSeed : Nat := opts.seed
       let mut rngCounter : Nat := 0
@@ -396,13 +395,9 @@ def main (args : List String) : IO UInt32 := do
             env contract (resetOnDone := false)
 
       -- Evaluate + snapshot the untrained policy.
-      let psAll0 ← TorchLean.Module.params (α := Float) m
-      let (psActor0, _psCritic0) :=
-        rl.ppo.splitActorCriticParams actorRollout criticRollout psAll0
-      let psActorObs0 : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-        simpa using psActor0
+      let psAll0 ← rl.ppo.params (α := Float) m
       let policyLogits0 : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-        fun obs => nn.predict1 actorObs actorC psActorObs0 obs
+        rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll0
       let avg0 ←
         rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
           mkSession policyLogits0 (baseSeed := opts.seed) (episodes := evalEpisodes)
@@ -424,19 +419,11 @@ def main (args : List String) : IO UInt32 := do
           (p.1.val, p.2.val))
 
       for update in [0:updates] do
-        let psAll ← TorchLean.Module.params (α := Float) m
-        let (psActor, psCritic) :=
-          rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
-        let psActorObs : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-          simpa using psActor
-        let psCriticObs : Runtime.Autograd.Torch.TList Float (nn.paramShapes criticObs) := by
-          simpa using psCritic
-
+        let psAll ← rl.ppo.params (α := Float) m
         let predictLogits : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-          fun obs => nn.predict1 actorObs actorC psActorObs obs
+          rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll
         let predictValue : Tensor Float obsShape → Float :=
-          fun obs =>
-            Tensor.vecGet (nn.predict1 criticObs criticC psCriticObs obs) ⟨0, by decide⟩
+          rl.ppo.criticValueFromParams criticObs criticC actorRollout criticRollout psAll
 
         let (rollout, rngCounter') ←
           collectRolloutNativeWith predictLogits predictValue
@@ -447,16 +434,12 @@ def main (args : List String) : IO UInt32 := do
           rollout.toActorCriticSample (α := Float) (obsShape := obsShape) (nActions := nActions)
             (horizon := horizon) gamma lam
         for _e in [0:updateEpochs] do
-          optH.step sample
+          stepSample sample
 
         if update % evalEvery == 0 then
-          let psAll' ← TorchLean.Module.params (α := Float) m
-          let (psActor', _psCritic') :=
-            rl.ppo.splitActorCriticParams actorRollout criticRollout psAll'
-          let psActorObs' : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-            simpa using psActor'
+          let psAll' ← rl.ppo.params (α := Float) m
           let policyLogits : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-            fun obs => nn.predict1 actorObs actorC psActorObs' obs
+            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll'
           let avg ←
             rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
               mkSession policyLogits (baseSeed := opts.seed) (episodes := evalEpisodes)
@@ -467,13 +450,9 @@ def main (args : List String) : IO UInt32 := do
           rngSeed := rand.nextSeed rngSeed update
 
       -- Snapshot the final greedy policy and a single episode path.
-      let psAllF ← TorchLean.Module.params (α := Float) m
-      let (psActorF, _psCriticF) :=
-        rl.ppo.splitActorCriticParams actorRollout criticRollout psAllF
-      let psActorObsF : Runtime.Autograd.Torch.TList Float (nn.paramShapes actorObs) := by
-        simpa using psActorF
+      let psAllF ← rl.ppo.params (α := Float) m
       let policyLogitsF : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-        fun obs => nn.predict1 actorObs actorC psActorObsF obs
+        rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAllF
       let policyAfter : Array Nat :=
         Array.ofFn (fun (s : Fin nStates) =>
           let obs := obsOfState s
@@ -487,25 +466,25 @@ def main (args : List String) : IO UInt32 := do
           let p := Spec.RL.Envs.GridWorld.decode (width := width) (height := height) s
           (p.1.val, p.2.val))
 
-      let trainLog : rl.train.TrainLog :=
-        curve.toTrainLog
-          (title := s!"PPO GridWorld {width}x{height} (TorchLean)")
-          (seriesName := "avg_return")
-          (color := "#4e79a7")
-          (notes := #[
-            s!"width={width}",
-            s!"height={height}",
-            s!"horizon={horizon}",
-            s!"gamma={gamma}",
-            s!"lambda={lam}",
-            s!"lr={lr}",
-            s!"updates={updates}",
-            s!"eval_every={evalEvery}",
-            s!"eval_episodes={evalEpisodes}",
-            s!"eval_max_steps={evalMaxSteps}",
-            s!"device={(if opts.useGpu then "cuda" else "cpu")}"
-          ])
-      Common.writeTrainLogTo ppo.log trainLog
+      ModelZoo.writeCurveTrainLog
+        ppo.log
+        s!"PPO GridWorld {width}x{height} (TorchLean)"
+        curve
+        "avg_return"
+        "#4e79a7"
+        #[
+          s!"width={width}",
+          s!"height={height}",
+          s!"horizon={horizon}",
+          s!"gamma={gamma}",
+          s!"lambda={lam}",
+          s!"lr={lr}",
+          s!"updates={updates}",
+          s!"eval_every={evalEvery}",
+          s!"eval_episodes={evalEpisodes}",
+          s!"eval_max_steps={evalMaxSteps}",
+          ModelZoo.deviceNote opts
+        ]
 
       let polDiff : _root_.Runtime.RL.Artifacts.GridWorld.PolicyDiff :=
         { width := width, height := height, before := policyBefore, after := policyAfter
@@ -520,10 +499,6 @@ def main (args : List String) : IO UInt32 := do
       IO.println s!"{exeName}: wrote path snapshot to {pathPath}"
 
       IO.println s!"{exeName}: done"
-    ))
-    { banner? := some (fun opts =>
-        s!"{exeName}: PPO on Lean-native GridWorld ({width}x{height}, horizon={horizon}, device={if opts.useGpu then "cuda" else "cpu"})\n" ++
-        "  env: pure Lean dynamics + boundary contract check + formal MDP validity proof available")
-      printOk := true }
+    )
 
 end NN.Examples.Models.RL.PPOGridWorld

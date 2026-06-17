@@ -16,7 +16,6 @@ public import NN.Examples.Interop.PyTorch
 public import NN.Examples.Advanced
 public import NN.Examples.Verification
 public import NN.Examples.Data.Loaders.Cifar10Images
-public import NN.Examples.Quickstart.ResnetBasicblockTrain
 public import NN.Verification.Cert.AbCrownLeafCert
 public import NN.Verification.PINN.CLI
 public import NN.Verification.PINN.Certificate
@@ -46,7 +45,7 @@ Typical usage:
 * Run model examples through the CLI:
   `lake exe torchlean mlp -- --steps 10`
 * Run standalone executables directly when they define their own root `main`
-  (for example `lake exe torchlean gpt_adder --steps 1000`).
+  (for example `lake exe torchlean gpt_adder --steps 1`).
 
 The heavier examples remain in their subdirectories so users can still build or run one example at a
 time. This umbrella avoids importing standalone executable roots that would collide on the global

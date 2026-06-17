@@ -32,8 +32,8 @@ namespace tensor
 ## Flattened Prefix View
 
 For bounded examples, it is often useful to treat an arbitrary `source` shape as a flattened feature
-vector and keep only the first `takeDim` coordinates. This keeps runnable examples fast without
-baking dataset-specific flattening logic into every model file.
+vector and keep only the first `takeDim` coordinates. Runnable examples use this when they need a
+small fixed feature vector from a larger tensor.
 -/
 
 /--

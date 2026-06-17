@@ -97,7 +97,7 @@ def idxEncoderMhaResidual {seqLen dModel numHeads headDim : Nat} :
       (ΓEncoderBlock seqLen dModel numHeads headDim ++
         ssMHAResidual seqLen dModel numHeads headDim)
       (LayerNorm.MatShape seqLen dModel) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := MultiHeadAttention.ssMHA seqLen dModel numHeads headDim)
     (τ := MultiHeadAttention.XShape seqLen dModel)
 
@@ -137,7 +137,7 @@ def idxEncoderNorm1Out {seqLen dModel numHeads headDim : Nat} :
       (ΓEncoderBlock seqLen dModel numHeads headDim ++
         ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel])
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := ssMHAResidual seqLen dModel numHeads headDim)
     (τ := LayerNorm.MatShape seqLen dModel)
 
@@ -161,7 +161,7 @@ def idxEncoderFfnHiddenPre {seqLen dModel numHeads headDim dFF : Nat} :
         ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel] ++
         [SeqFFNHiddenShape seqLen dFF])
       (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel])
     (τ := SeqFFNHiddenShape seqLen dFF)
 
@@ -172,7 +172,7 @@ def idxEncoderFfnHiddenAct {seqLen dModel numHeads headDim dFF : Nat} :
         ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel] ++
         [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF])
       (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel,
       SeqFFNHiddenShape seqLen dFF])
     (τ := SeqFFNHiddenShape seqLen dFF)
@@ -185,7 +185,7 @@ def idxEncoderFfnProjected {seqLen dModel numHeads headDim dFF : Nat} :
         [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF,
           SeqFFNModelShape seqLen dModel])
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel,
       SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF])
     (τ := SeqFFNModelShape seqLen dModel)
@@ -197,7 +197,7 @@ def idxEncoderFfnResidual {seqLen dModel numHeads headDim dFF : Nat} :
         ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel] ++
         ssSeqFFNResidual seqLen dModel dFF)
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
+  Idx.last (Γ := ΓEncoderBlock seqLen dModel numHeads headDim)
     (ss := ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel,
       SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF, SeqFFNModelShape seqLen dModel])
     (τ := SeqFFNModelShape seqLen dModel)

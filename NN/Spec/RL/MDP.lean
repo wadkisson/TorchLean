@@ -23,8 +23,8 @@ Design choices:
 - the action space is `Fin nActions`,
 - Bellman operators are defined directly on typed value tensors.
 
-This keeps the first formalization manageable while still supporting the core objects used by RL
-theory: policies, value functions, state-action values, and Bellman operators.
+This first formalization supports the core objects used by RL theory: policies, value functions,
+state-action values, and Bellman operators.
 
 References:
 

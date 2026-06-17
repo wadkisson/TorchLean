@@ -103,8 +103,7 @@ def actVec {α : Type} [One α] [Neg α] {n : Nat} (s : State n) : Fin n → α 
 
 /-- Dot product on vectors indexed by `Fin n`.
 
-We define this directly as a `Fin`-indexed sum. This keeps the model independent from any concrete
-matrix representation.
+This is a `Fin`-indexed sum, independent from any concrete matrix representation.
 -/
 def dot {α : Type} [AddCommMonoid α] [Mul α] {n : Nat} (x y : Fin n → α) : α :=
   ∑ i : Fin n, x i * y i
@@ -245,7 +244,7 @@ non-commutative in general. So for runtime execution we provide a “plain loop�
 - requires only the operations from `[Context α]`,
 - uses explicit `List.foldl` iteration over `Fin n`.
 
-This is the same model, just written in a way that stays honest about runtime arithmetic.
+This is the same model, written with the runtime arithmetic assumptions exposed.
 
 References:
 - IEEE 754-2019 (why NaNs/rounding break algebraic laws):

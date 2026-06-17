@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -44,7 +43,7 @@ This gives each later layer a concrete obligation:
 - graph compilers must say which spec-level function their graph denotes;
 - verifiers must say which spec-level function their bounds or certificates concern.
 
-Most users do not need to write specs by hand. The point is that the project has a named
+Model code does not need to write specs by hand. The point is that the project has a named
 mathematical object before execution speed, CUDA kernels, certificate formats, or export tools enter
 the discussion.
 
@@ -92,13 +91,13 @@ code may overapproximate them; but the spec declaration is where the target comp
 
 # Parameter Records Are Semantic Objects
 
-The public model builder page explains how `nn.linear` allocates parameters. The spec layer explains
+The public model builder page explains how `nn.Linear` allocates parameters. The spec layer explains
 what those parameters *mean*. For a dense layer, the semantic object is `LinearSpec α inDim outDim`:
 it contains a weight matrix and a bias vector with the shapes required by the formula `W x + b`.
 
 That distinction matters when moving between layers:
 
-- `nn.linear` is a user-facing model builder.
+- `nn.Linear` is a user-facing model builder.
 - `LinearSpec` is the mathematical parameter record.
 - `linearSpec` is the forward function over that record.
 - `linearBackwardSpec` is the reference backward contract for that layer.
@@ -109,7 +108,7 @@ spec layer gives those parameters their mathematical roles.
 
 For a dense layer, the roles line up like this:
 
-- `nn.linear` is the user-facing layer builder.
+- `nn.Linear` is the user-facing layer builder.
 - `LinearSpec` is the parameter record.
 - `linearSpec` is the forward mathematical meaning.
 - `linearBackwardSpec` is the backward reference rule.
@@ -186,7 +185,7 @@ open Spec
 
 def affine2 {α : Type} [Context α]
     (w11 w12 w21 w22 b1 b2 : α) :
-    Spec.Tensor α (Shape.Vec 2) -> Spec.Tensor α (Shape.Vec 2)
+    Spec.Tensor α (Shape.vec 2) -> Spec.Tensor α (Shape.vec 2)
   | x =>
       let y1 := w11 * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
               + w12 * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)

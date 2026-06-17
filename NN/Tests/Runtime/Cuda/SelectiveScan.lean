@@ -12,8 +12,8 @@ public import NN.Runtime.Autograd.Engine.Cuda.Kernels
 /-!
 # CUDA kernel coverage: diagonal selective scan
 
-This exercises the low-level buffer primitive backing the first Mamba/SSM runtime path.  The test
-runs both with real CUDA (`lake test -K cuda=true`) and with the CPU stub backend.
+This checks the low-level buffer primitive backing the first Mamba/SSM runtime path. The test runs
+both with real CUDA (`lake test -K cuda=true`) and with the CPU stub backend.
 -/
 
 @[expose] public section

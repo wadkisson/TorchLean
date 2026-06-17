@@ -18,7 +18,7 @@ This tutorial mirrors a classic PyTorch recipe:
 1. Load a labeled image dataset from disk (`.npy` exported from NumPy/PyTorch).
 2. Split into train/test.
 3. Build a small CNN by explicitly stacking layers.
-4. Train for multiple epochs over shuffled minibatches and report loss.
+4. Train for multiple epochs over shuffled minibatches through the public `Trainer` API.
 
 To keep this runnable without network downloads, generate a small deterministic
 "CIFAR10-shaped" dataset locally:
@@ -34,7 +34,7 @@ Build:
 
 - `lake build NN.Examples.Data.Loaders.Cifar10Images`
 
-For command-line CIFAR training, use `torchlean cnn`, `torchlean resnet`, or `torchlean vit` with
+For command-line CIFAR training, use `torchlean cnn` or `torchlean vit` with
 `--x`, `--y`, and `--n-total`.
 
 Optional flags (tutorial-specific):
@@ -48,16 +48,19 @@ Optional flags (tutorial-specific):
 - `--batch N`
 - `--epochs E`
 - `--lr LR` (default: `0.001`)
-- `--log-every N` (default: `1`; pass `0` to silence per-step loss)
 - `--train-size N` (default: 160)
 - `--check-only` (validate paths, tensor shapes, and dataset splitting without training)
 
 Why this tutorial matters:
 
-- it shows the public `API.Data` file-loading path rather than only in-memory tensors;
+- it shows the public `Data` file-loading path rather than only in-memory tensors;
 - it keeps the model architecture familiar (Conv/ReLU/Pool stack + classifier head);
-- it shows the "offline artifact" workflow many PyTorch users already have, where arrays
+ - it shows the "offline artifact" workflow many PyTorch users already have, where arrays
   have been pre-exported to `.npy` and training happens without any dataset download step.
+- it stays on the same public `Trainer` surface as the model examples instead of dropping to the
+  callback runner API.
+- it shows that the trained result is still usable for immediate inference, not only for a terminal
+  loss summary.
 -/
 
 @[expose] public section
@@ -65,10 +68,7 @@ Why this tutorial matters:
 
 namespace NN.Examples.Data.Loaders.Cifar10Images
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
 
 abbrev classes : Nat := 10
 abbrev channels : Nat := 3
@@ -78,7 +78,7 @@ abbrev nTotal : Nat := 200
 
 /-- Small CNN (no BatchNorm): Conv -> ReLU -> Pool -> Conv -> ReLU -> Pool -> Linear(10). -/
 def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (Shape.Images batch channels height width) (shape![batch, classes])) :=
+    nn.M (nn.Sequential (Shape.images batch channels height width) (shape![batch, classes])) :=
   let outC1 : Nat := 16
   let outC2 : Nat := 32
   let conv1 : nn.Conv :=
@@ -95,72 +95,98 @@ def mkModel {batch : Nat} :
   let w3 : Nat := (w2 + 2 * conv2.padding - conv2.kW) / conv2.stride + 1
   let h4 : Nat := (h3 - pool.kH) / pool.stride + 1
   let w4 : Nat := (w3 - pool.kW) / pool.stride + 1
-  let featInner : Shape := Shape.Image outC2 h4 w4
-  let featSize : Nat := Spec.Shape.size featInner
-  nn.sequential![
-    nn.conv (n := batch) (inC := channels) (inH := height) (inW := width) conv1,
-    nn.relu,
-    nn.maxPool (n := batch) (inC := outC1) (inH := h1) (inW := w1) pool,
-    nn.conv (n := batch) (inC := outC1) (inH := h2) (inW := w2) conv2,
-    nn.relu,
-    nn.maxPool (n := batch) (inC := outC2) (inH := h3) (inW := w3) pool,
-    nn.flattenBatch,
-    nn.linear featSize classes (pfx := Shape.Vec batch)
+  nn.Sequential![
+    nn.Conv2d (n := batch) (inC := channels) (inH := height) (inW := width) conv1,
+    nn.ReLU,
+    nn.MaxPool2d (n := batch) (inC := outC1) (inH := h1) (inW := w1) pool,
+    nn.Conv2d (n := batch) (inC := outC1) (inH := h2) (inW := w2) conv2,
+    nn.ReLU,
+    nn.MaxPool2d (n := batch) (inC := outC2) (inH := h3) (inW := w3) pool,
+    nn.ClassifierBatch (n := batch) (s := Shape.image outC2 h4 w4) classes
   ]
 
-/-- Load the offline CIFAR10-like `.npy` dataset at the runtime-selected scalar type `α`. -/
-def loadDataset (xPath yPath : System.FilePath) (n : Nat)
-    {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] :
-    IO (Except String (Data.Dataset (sample.Supervised α (Shape.Image channels height width)
-      (Shape.Vec classes)))) :=
-  Data.fromNpyLabeled (α := α) xPath yPath n [channels, height, width] classes
+/-- Shared offline CIFAR10-like tensor source used by this tutorial. -/
+def source (xPath yPath : System.FilePath) (nRows : Nat) : Data.LabeledSource :=
+  Data.LabeledSource.ofPaths .npy xPath yPath nRows [channels, height, width] classes
+
+def trainDataset (xPath yPath : System.FilePath) (nRows trainSize seed : Nat) :
+    Trainer.Dataset (Shape.image channels height width) (Shape.vec classes) :=
+  (Data.randomSplitDataset trainSize (Data.labeledDataset (source xPath yPath nRows)) seed).1
+
+/-- Runtime-polymorphic test split used for `--check-only` reporting. -/
+def testDataset (xPath yPath : System.FilePath) (nRows trainSize seed : Nat) :
+    Trainer.Dataset (Shape.image channels height width) (Shape.vec classes) :=
+  (Data.randomSplitDataset trainSize (Data.labeledDataset (source xPath yPath nRows)) seed).2
+
+/-- Command-line help for the CIFAR10-style NPY loader tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean CIFAR10-style NPY loader tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean data_cifar10 [options]"
+    , ""
+    , "Options:"
+    , "  --data-dir PATH"
+    , "  --real-cifar10"
+    , "  --x PATH"
+    , "  --y PATH"
+    , "  --n-total N"
+    , "  --train-size N"
+    , "  --seed N"
+    , "  --epochs N"
+    , "  --batch N"
+    , "  --lr LR"
+    , "  --check-only"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    ]
 
 def main (args : List String) : IO Unit := do
-  let args0 := API.CLI.dropDashDash args
+  let args0 := CLI.dropDashDash args
+  if CLI.hasHelp args0 then
+    IO.println usage
+    return
   let checkOnly := args0.contains "--check-only"
   let realCifar10 := args0.contains "--real-cifar10"
   let args := args0.filter (fun a => a != "--check-only" && a != "--real-cifar10")
 
   let label := "Data.Loaders.Cifar10Images"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir
+  let (dataDir, args) ← CLI.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir
     args
-  let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
-  let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 5 20
-  let (trainSize?, args) ← API.Common.orThrow label <| API.CLI.takeNatFlagOnce args
-    "train-size"
-  let (nTotal?, args) ← API.Common.orThrow label <| API.CLI.takeNatFlagOnce args
-    "n-total"
-  let (lr?, args) ← API.Common.orThrow label <| API.CLI.takeFloatFlagOnce args "lr"
-  let (logEvery?, args) ← API.Common.orThrow label <| API.CLI.takeNatFlagOnce args "log-every"
-  let (x?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "x"
-  let (y?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "y"
-
-  if eb.batch = 0 then
-    throw <| IO.userError s!"{label}: --batch must be > 0"
-
-  let xPath :=
-    match x? with
-    | some p => p
-    | none =>
-        if realCifar10 then
-          _root_.NN.Examples.Data.RealPaths.cifar10TrainX
-        else
-          _root_.NN.Examples.Data.SamplePaths.cifar10likeXNpy dataDir
-  let yPath :=
-    match y? with
-    | some p => p
-    | none =>
-        if realCifar10 then
-          _root_.NN.Examples.Data.RealPaths.cifar10TrainY
-        else
-          _root_.NN.Examples.Data.SamplePaths.cifar10likeYNpy dataDir
-  let nRows := nTotal?.getD nTotal
-  let trainSize := trainSize?.getD (if checkOnly then Nat.min 16 nRows else Nat.min 160 nRows)
-  let lr := lr?.getD 0.001
-  let logEvery := logEvery?.getD 1
-
-  let task : train.Task (Shape.Images eb.batch channels height width) (shape![eb.batch, classes]) :=
-    train.classificationOneHot (nn.build seed (mkModel (batch := eb.batch)))
+  let (seed, args) ← CLI.orThrow label <| CLI.takeSeed args 0
+  let (eb, args) ← CLI.orThrow label <| CLI.takePositiveEpochBatch args label 5 20
+  let (trainSize0, args) ← CLI.orThrow label <| CLI.takeNatFlagDefault args
+    "train-size" 0
+  let (nRows0, args) ← CLI.orThrow label <| CLI.takeNatFlagDefault args
+    "n-total" nTotal
+  let (lr, args) ← CLI.orThrow label <| CLI.takeFloatFlagDefault args "lr" 0.001
+  let defaultX :=
+    if realCifar10 then
+      _root_.NN.Examples.Data.RealPaths.cifar10TrainX
+    else
+      _root_.NN.Examples.Data.SamplePaths.cifar10likeXNpy dataDir
+  let defaultY :=
+    if realCifar10 then
+      _root_.NN.Examples.Data.RealPaths.cifar10TrainY
+    else
+      _root_.NN.Examples.Data.SamplePaths.cifar10likeYNpy dataDir
+  let (paths, args) ← CLI.orThrow label <|
+    _root_.NN.Examples.Data.SamplePaths.takeXyPaths args defaultX defaultY
+  let xPath := paths.xPath
+  let yPath := paths.yPath
+  let nRows := nRows0
+  let trainSize :=
+    if trainSize0 = 0 then
+      (if checkOnly then Nat.min 16 nRows else Nat.min 160 nRows)
+    else
+      trainSize0
+  let trainSteps : Nat := eb.epochs * (trainSize / eb.batch)
+  let run ← Trainer.RunConfig.parseRuntimeArgsOrThrow label args
+    { optimizer := optim.adam { lr := lr } }
+  let trainer := Trainer.new (mkModel (batch := eb.batch)) <|
+    Trainer.Config.fromRunConfig run .classification (seed := seed)
 
   IO.println "== CIFAR10-style NPY CNN tutorial =="
   IO.println s!"data_dir   = {dataDir}"
@@ -169,61 +195,42 @@ def main (args : List String) : IO Unit := do
   IO.println s!"rows       = {nRows}"
   IO.println s!"seed       = {seed}"
   IO.println s!"train_size = {trainSize} / {nRows}"
-  IO.println s!"model      = Conv -> ReLU -> Pool -> Conv -> ReLU -> Pool -> Linear({classes})"
+  trainer.printInfo
   IO.println <|
     (s!"train      = Adam(lr={lr}), epochs={eb.epochs}, " ++
-      s!"batch_size={eb.batch}, shuffle=true, drop_last=true, log_every={logEvery}")
+      s!"batch_size={eb.batch}, shuffle=true, drop_last=true, steps={trainSteps}")
   if checkOnly then
     IO.println "mode       = --check-only (validate paths, tensor shapes, and dataset split)"
   (← IO.getStdout).flush
+  let dsAll ←
+    CLI.orThrow label <|
+      (← Data.LabeledSource.load (α := Float) (source xPath yPath nRows))
 
-  let _exitCode ← TorchLean.Module.run label args (.float (fun opts rest => do
-    API.Common.orThrow label <| API.CLI.requireNoArgs rest
-    let module ← TorchLean.Module.instantiateWithOptions (α := Float) task.moduleDef id opts
+  if trainSize > dsAll.size then
+    throw <| IO.userError
+      s!"{label}: --train-size {trainSize} exceeds dataset size {dsAll.size}"
 
-    let dsE ← loadDataset (xPath := xPath) (yPath := yPath) (n := nRows) (α := Float)
-    let dsAll ← API.Common.orThrow label dsE
+  let (_seed', (dsTrain, dsTest)) := Data.randomSplitAt (seed := seed) trainSize dsAll
 
-    if trainSize > dsAll.size then
-      throw <| IO.userError
-        s!"{label}: --train-size {trainSize} exceeds dataset size {dsAll.size}"
-
-    let (_seed', (dsTrain, dsTest)) := Data.randomSplitAt (seed := seed) trainSize dsAll
-
-    if checkOnly then
-      IO.println s!"loaded     = {dsAll.size} image rows"
-      IO.println s!"split      = train {dsTrain.size}, test {dsTest.size}"
-      IO.println "check      = dataset shape/path runtime check passed"
-      pure ()
-    else
-
-      let trainLoader := Data.batchLoader dsTrain eb.batch (shuffle := true) (seed := seed)
-        (dropLast := true)
-
-      let testLoader := Data.batchLoader dsTest eb.batch (shuffle := false) (seed := seed)
-        (dropLast := true)
-      let opt := TorchLean.Optim.adam (α := Float)
-        (paramShapes := TorchLean.Supervised.paramShapes task)
-        (lr := lr) (beta1 := 0.9) (beta2 := 0.999) (epsilon := 1e-8)
-
-      -- The CIFAR tutorial uses the same public module-loader loop as the rest of the model
-      -- zoo.  `Data.batchLoader` owns shuffling and epoch state; `train.fitModuleLoaderWith`
-      -- streams raw minibatches, collates each one into typed tensors, and calls the runtime
-      -- module's forward/backward/optimizer step.  That keeps this file focused on the dataset and
-      -- model definition instead of carrying a local training loop.
-      let hooks : train.Callbacks Float :=
-        (train.onTrainStart (α := Float) do
-          train.Report.reportMeanLossModuleLoader module trainLoader "train(before)"
-          train.Report.reportMeanLossModuleLoader module testLoader "test(before)")
-        ++ train.logLossEvery (α := Float) logEvery
-        ++ train.onEpochEnd (α := Float) (fun ev =>
-          train.Report.reportMeanLossModuleLoader module testLoader s!"test(epoch {ev.epoch + 1})")
-        ++ train.onTrainEnd (α := Float) (fun _ => do
-          train.Report.reportMeanLossModuleLoader module trainLoader "train(after)"
-          train.Report.reportMeanLossModuleLoader module testLoader "test(after)")
-
-      let (_report, _loader') ← train.fitModuleLoaderWith module opt eb.epochs trainLoader hooks
-      pure ())) { printOk := false }
-  pure ()
+  if checkOnly then
+    IO.println s!"loaded     = {dsAll.size} image rows"
+    IO.println s!"split      = train {dsTrain.size}, test {dsTest.size}"
+    IO.println "check      = dataset shape/path runtime check passed"
+    pure ()
+  else
+    let trainData :=
+      Data.batchDataset eb.batch (trainDataset xPath yPath nRows trainSize seed)
+        (shuffle := true) (seed := seed) (dropLast := true)
+    let trained ← trainer.train trainData
+      { steps := trainSteps
+        title := "CIFAR10-style NPY CNN tutorial"
+        notes :=
+          #[s!"x={xPath}", s!"y={yPath}", s!"rows={nRows}",
+            s!"train_size={trainSize}", s!"test_size={dsTest.size}",
+            s!"epochs={eb.epochs}", s!"batch={eb.batch}", s!"lr={lr}"] }
+    trained.printSummary
+    let blank : Tensor.T Float (Shape.image channels height width) :=
+      Tensor.fill 0.0 (Shape.image channels height width)
+    trained.printPrediction "blank" (Tensor.repeatBatch eb.batch blank)
 
 end NN.Examples.Data.Loaders.Cifar10Images

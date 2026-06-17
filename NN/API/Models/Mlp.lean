@@ -53,10 +53,10 @@ Build a single-hidden-layer MLP with ReLU activation:
 -/
 def mlp1Relu (cfg : Mlp1Config) :
     nn.M (nn.Sequential (mlp1InShape cfg) (mlp1OutShape cfg)) :=
-  nn.sequential![
-    nn.linear cfg.inDim cfg.hidDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    nn.relu,
-    nn.linear cfg.hidDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+  nn.Sequential![
+    Linear cfg.inDim cfg.hidDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    ReLU,
+    Linear cfg.hidDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
   ]
 
 end models

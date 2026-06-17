@@ -6,10 +6,10 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.TorchLean.TorchLeanCrownOps
-public import NN.Examples.Verification.TorchLean.TorchLeanIBP
-public import NN.Examples.Verification.TorchLean.TorchLeanMlpWorkflow
-public import NN.Examples.Verification.TorchLean.TorchLeanTransformerIBP
+public import NN.Verification.TorchLean.CrownOpsWorkflow
+public import NN.Verification.TorchLean.IBPWorkflow
+public import NN.Verification.TorchLean.MlpTrainVerifyWorkflow
+public import NN.Verification.TorchLean.TransformerIBPWorkflow
 
 /-!
 # TorchLean Verification Workflows

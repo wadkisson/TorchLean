@@ -7,6 +7,8 @@ Authors: TorchLean Team
 module
 
 public import NN.Entrypoint.Spec
+public import NN.API.Macros
+public import NN.API.Public.TensorPack
 public import NN.MLTheory.CROWN.Core
 public import NN.MLTheory.CROWN.Graph
 public import NN.MLTheory.CROWN.Lyapunov.TwoStage.Core
@@ -86,7 +88,7 @@ def lossProg (width : Nat) :
       TorchLean.Program β (paramShapes width ++ [xShape]) Shape.scalar :=
   Core.lossProgram width
 
-def initParamsF (width : Nat) : TorchLean.TList Float (paramShapes width) :=
+def initParamsF (width : Nat) : NN.API.TensorPack Float (paramShapes width) :=
   let wC : Tensor Float (.dim uDim (.dim xDim .scalar)) :=
     _root_.Runtime.Autograd.Torch.Init.xavierW uDim xDim (seed := 0)
   let bC : Tensor Float (.dim uDim .scalar) :=
@@ -99,7 +101,7 @@ def initParamsF (width : Nat) : TorchLean.TList Float (paramShapes width) :=
     _root_.Runtime.Autograd.Torch.Init.xavierW 1 width (seed := 4)
   let b2 : Tensor Float (.dim 1 .scalar) :=
     _root_.Runtime.Autograd.Torch.Init.tensor (s := .dim 1 .scalar) (sch := .zeros) (seed := 5)
-  .cons wC (.cons bC (.cons w1 (.cons b1 (.cons w2 (.cons b2 .nil)))))
+  tensorpack! wC, bC, w1, b1, w2, b2
 
 def moduleDef (width : Nat) : TorchLean.Module.ScalarModuleDef (paramShapes width) [xShape]
   :=
@@ -117,14 +119,14 @@ then clamp to the training box `[-rad, rad]^2`.
 def pgdStepCompiled
     (width : Nat)
     (cLoss : _root_.Runtime.Autograd.Torch.CompiledScalar α (lossΓ width))
-    (params : TorchLean.TList α (paramShapes width))
+    (params : NN.API.TensorPack α (paramShapes width))
     (x : Tensor α xShape) : Tensor α xShape :=
-  let args : TorchLean.TList α (lossΓ width) :=
+  let args : NN.API.TensorPack α (lossΓ width) :=
     _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) params (.cons x .nil)
-  let gAll : TorchLean.TList α (lossΓ width) :=
+  let gAll : NN.API.TensorPack α (lossΓ width) :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.backward (α := α) (Γ := lossΓ width) cLoss args
-  let gx : TorchLean.TList α [xShape] :=
+  let gx : NN.API.TensorPack α [xShape] :=
     (_root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) gAll).2
   let .cons g .nil := gx
@@ -135,7 +137,7 @@ def pgdStepCompiled
 Final post-check: compile the TorchLean loss to the shared verifier IR, then run IBP and CROWN
 over a small box around the origin.
 -/
-def checkBox (width : Nat) (params : TorchLean.TList α (paramShapes width)) (eps : α :=
+def checkBox (width : Nat) (params : NN.API.TensorPack α (paramShapes width)) (eps : α :=
   epsCheck) : IO Unit := do
   IO.println "Stage 2 check: IBP + CROWN on the scalar loss over a small box"
   let compiled ←
@@ -148,34 +150,20 @@ def checkBox (width : Nat) (params : TorchLean.TList α (paramShapes width)) (ep
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α xShape := Spec.zeros (α := α) xShape
-  let radT : Tensor α xShape := Spec.fill (α := α) eps xShape
-  let xB : FlatBox α :=
-    { dim := xDim
-      lo := Tensor.subSpec x0 radT
-      hi := Tensor.addSpec x0 radT }
-
-  let ps : ParamStore α :=
-    { compiled.ps with inputBoxes := compiled.ps.inputBoxes.insert compiled.inputId xB }
+  let xB : FlatBox α := NN.MLTheory.CROWN.FlatBox.lInfBall (α := α) x0 eps
+  let ps : ParamStore α := compiled.seedInputBox xB
 
   let ibp := runIBP (α := α) compiled.graph ps
-  let some outB := ibp[compiled.outputId]! | throw <| IO.userError "IBP produced no output box"
+  let outB ← compiled.outputBoxOrThrow ibp
   IO.println s!"[IBP] scalar loss box dim={outB.dim}"
 
-  let ctx : AffineCtx := { inputId := compiled.inputId, inputDim := xDim }
-  let crown := runCROWN (α := α) compiled.graph ps ctx ibp
-  match crown[compiled.outputId]! with
-  | none => IO.println "[CROWN] no affine bounds for scalar loss"
-  | some outAff =>
-      if hIn : outAff.inDim = xDim then
-        let xBox : Box α (.dim outAff.inDim .scalar) :=
-          { lo := Tensor.castVecDim (α := α) (n := xDim) (m := outAff.inDim) hIn.symm xB.lo
-            hi := Tensor.castVecDim (α := α) (n := xDim) (m := outAff.inDim) hIn.symm xB.hi }
-        let outLo := NN.MLTheory.CROWN.AffineVec.evalOnBox (α := α) outAff.loAff xBox
-        let outHi := NN.MLTheory.CROWN.AffineVec.evalOnBox (α := α) outAff.hiAff xBox
-        IO.println s!"[CROWN] loss lo = {pretty outLo.lo}"
-        IO.println s!"[CROWN] loss hi = {pretty outHi.hi}"
-      else
-        IO.println s!"[CROWN] unexpected input dim {outAff.inDim} (expected {xDim})"
+  match NN.MLTheory.CROWN.Graph.outputBoxCROWN? compiled.graph ps xB
+      compiled.inputId compiled.outputId xDim with
+  | .ok outB =>
+      IO.println s!"[CROWN] loss lo = {pretty outB.lo}"
+      IO.println s!"[CROWN] loss hi = {pretty outB.hi}"
+  | .error msg =>
+      IO.println s!"[CROWN] {msg}"
 
 /-- Main entrypoint for the all-in-Lean pipeline (width is a parameter; CLI default is
   `defaultWidth`). -/
@@ -203,7 +191,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
   for i in [0:stage1Steps] do
     let (seed', x) := sampleVec2 seed rad
     seed := seed'
-    let xs : TorchLean.TList α [xShape] := .cons x .nil
+    let xs : NN.API.TensorPack α [xShape] := tensorpack! x
     let loss0 := _root_.Runtime.Autograd.Torch.scalarOf (←
       _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr xs)
     _root_.Runtime.Autograd.Torch.ScalarTrainer.stepT tr lr xs
@@ -218,7 +206,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
     let mut x := x0
     for _k in [0:pgdSteps] do
       x := pgdStepCompiled width cLoss params x
-    let xs : TorchLean.TList α [xShape] := .cons x .nil
+    let xs : NN.API.TensorPack α [xShape] := tensorpack! x
     let lossFound := _root_.Runtime.Autograd.Torch.scalarOf (←
       _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr xs)
     _root_.Runtime.Autograd.Torch.ScalarTrainer.stepT tr lr xs

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -24,7 +23,9 @@ certificate, and the assumptions around external code. As model code, exported g
 and GPU kernels become easier to generate, the hard question is no longer only whether an artifact
 runs. It is whether the artifact still means what we think it means.
 
-The broad user import is [NN root API](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean). Narrower entry points include
+The ordinary user import is [`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean).
+The implementation umbrella remains
+[NN](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean), and narrower entry points include
 [NN.Entrypoint.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/API.lean),
 [NN.Entrypoint.GraphSpec](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/GraphSpec.lean),
 [NN.Entrypoint.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/IR.lean), and
@@ -36,8 +37,9 @@ At a high level, TorchLean provides three layers.
 
 First, it gives a familiar ML surface: tensors, layers, datasets, optimizers, losses, autograd,
 logging, import/export, optional CUDA-backed execution, and examples ranging from small MLPs to
-CNNs, ResNets, ViTs, GPT-style models, Mamba-style sequence models, diffusion, operator learning,
-reinforcement learning, and scientific ML.
+CNNs, ViTs, GPT-style models, Mamba-style sequence models, diffusion, operator learning,
+reinforcement learning, and scientific ML. Residual/ResNet-style models are represented in the
+API, spec, and GraphSpec layers.
 
 Second, it gives these programs a semantic core. Tensor shapes can appear in types. Architectures
 can be lowered to a shared op-tagged graph IR. Scalar meanings can be real valued, executable
@@ -77,7 +79,7 @@ not as a comment beside a script.
 # Three Views Of One Model
 
 At the top level, TorchLean provides a PyTorch-style API over a shared internal model.
-User code mostly starts from `import NN` and `open NN.API`, then works with familiar concepts:
+User code starts from `import NN` and `open TorchLean`, then works with familiar concepts:
 layers, datasets, optimizers, losses, and training loops.
 
 Under the hood, the same model appears in three representations:

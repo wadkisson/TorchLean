@@ -451,7 +451,7 @@ theorem toReal_hinge_fun_ieee_eq_fp32_val {n : ℕ}
               (0 : FP32)).val := by
         simpa [hingeSumIeee, hingeSumStepIeee, hstart] using hfold
     -- Finish by rewriting the FP32 fold back to `hinge_sum_fp32`.
-    simpa [hsumFold] using hfold'
+    simpa [hingeSumIeee, hsumFold] using hfold'
   -- Finally refine the last `+ b`.
   have haddR :
       IEEE32Exec.toReal (IEEE32Exec.add (hingeSumIeee (c := c) (t := t) x) b) =

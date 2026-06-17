@@ -17,8 +17,8 @@ public import NN.API.SelfSupervised
 This entrypoint re-exports the primary user-facing API surface, `NN.API.Public`, beside the other
 curated `NN.Entrypoint.*` imports.
 
-Most users should still prefer `import NN`; use this module when you want only the public
-PyTorch-shaped API without the broader library umbrella.
+Ordinary model and training files should use `import NN`. Import this module when you want
+the same public API surface under the `NN.Entrypoint.*` tree, without the broader library umbrella.
 -/
 
 @[expose] public section

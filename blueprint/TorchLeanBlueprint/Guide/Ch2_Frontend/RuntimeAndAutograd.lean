@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -35,7 +34,8 @@ TorchLean keeps the rhythm but changes where the objects live:
 - parameters and modules become explicit typed values and parameter bundles;
 - the dynamic autograd tape becomes a Lean `Tape`;
 - `.grad` accumulation becomes explicit gradient values returned by reverse mode;
-- `optimizer.step()` becomes `train.step`, `train.stepper`, or a session-level update helper;
+- the normal user-facing loop is `trainer.train`; manual `optimizer.step()`-style loops live behind
+  `Trainer.Advanced.step`/`stepper` for runtime work;
 - eager mode produces a tape, while compiled mode produces a reusable graph-shaped artifact.
 
 That mapping is useful because it lets a PyTorch reader recognize the workflow without treating the
@@ -88,7 +88,7 @@ Spec tensors are indexed by shape, but realistic training loops need registries:
 - gradient maps such as `"w1" ↦ dL/dw1`;
 - named values for debugging and widgets.
 
-TorchLean therefore uses an existential wrapper, `Runtime.AnyTensor α`, which pairs a `Shape` with
+TorchLean therefore uses an existential container, `Runtime.AnyTensor α`, which pairs a `Shape` with
 the corresponding tensor. That preserves the strongly typed spec layer while still supporting
 runtime-style tooling.
 

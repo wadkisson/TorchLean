@@ -39,7 +39,8 @@ theorem sigmoid_mono_real : Monotone (Activation.Math.sigmoidSpec (α := ℝ)) :
   intro a b hab
   -- rewrite to `Real.sigmoid` and apply `Real.sigmoid_monotone`
   -- `Real.sigmoid x = (1 + exp (-x))⁻¹` and our definition is `1 / (1 + exp (-x))`.
-  simpa [Activation.Math.sigmoidSpec, Real.sigmoid, div_eq_mul_inv] using Real.sigmoid_monotone hab
+  simpa [Activation.Math.sigmoidSpec, Real.sigmoid, MathFunctions.exp, div_eq_mul_inv] using
+    Real.sigmoid_monotone hab
 
 /-!
 ### Tanh monotonicity (proved from calculus in Mathlib)
@@ -57,7 +58,7 @@ theorem hasDerivAt_tanh_real (x : ℝ) :
     HasDerivAt Real.tanh (1 / (Real.cosh x) ^ 2) x := by
   -- Start from `sinh / cosh` and use the quotient rule.
   have hdiv :
-      HasDerivAt (fun y : ℝ => Real.sinh y / Real.cosh y)
+      HasDerivAt (Real.sinh * Real.cosh⁻¹)
         ((Real.cosh x * Real.cosh x - Real.sinh x * Real.sinh x) / (Real.cosh x) ^ 2) x := by
     simpa [div_eq_mul_inv] using
       (Real.hasDerivAt_sinh x).div (Real.hasDerivAt_cosh x) (by exact (Real.cosh_pos x).ne')
@@ -68,7 +69,10 @@ theorem hasDerivAt_tanh_real (x : ℝ) :
   have ht' :
       HasDerivAt (fun y : ℝ => Real.tanh y)
         ((Real.cosh x * Real.cosh x - Real.sinh x * Real.sinh x) / (Real.cosh x) ^ 2) x := by
-    simpa [ht] using hdiv
+    rw [ht]
+    change HasDerivAt (Real.sinh * Real.cosh⁻¹)
+      ((Real.cosh x * Real.cosh x - Real.sinh x * Real.sinh x) / (Real.cosh x) ^ 2) x
+    exact hdiv
   -- Simplify `(cosh*cosh - sinh*sinh)` to `1`, yielding the stated derivative.
   have hId : Real.cosh x * Real.cosh x - Real.sinh x * Real.sinh x = 1 := by
     -- `cosh x ^ 2 - sinh x ^ 2 = 1` is in Mathlib.
@@ -254,9 +258,23 @@ lemma ibp_sin_sound_real {n : Nat} (xB : Box ℝ (.dim n .scalar)) (x : Tensor �
                   max_le_iff.2 ⟨hsinRange.1, hmidLo⟩
                 have hhi : Real.sin v ≤ min (1 : ℝ) (Real.sin m + r) :=
                   le_min_iff.2 ⟨hsinRange.2, hmidHi⟩
-                simpa [NN.MLTheory.CROWN.Runtime.Ops.IBP.sin, Tensor.mapSpec,
-                  NN.MLTheory.CROWN.Box.contains,
-                  hL, hU, hX, m, r] using And.intro hlo hhi
+                have hmidLo' :
+                    Real.sin ((l + u) / 2) ≤ Real.sin v + (u - l) / 2 := by
+                  dsimp [m, r] at hmidLo
+                  linarith
+                have hmidHi' :
+                    Real.sin v ≤ Real.sin ((l + u) / 2) + (u - l) / 2 := by
+                  dsimp [m, r] at hmidHi
+                  exact hmidHi
+                simp [Tensor.mapSpec, NN.MLTheory.CROWN.Box.contains,
+                  MathFunctions.sin, Numbers.neg_one, Numbers.one, Numbers.two,
+                  Context.neg_one, Context.two, One.one,
+                  hL, hU, hX]
+                exact ⟨⟨hsinRange.1, hmidLo'⟩,
+                  ⟨by
+                    change Real.sin v ≤ (1 : ℝ)
+                    exact hsinRange.2,
+                   hmidHi'⟩⟩
 
 lemma ibp_cos_sound_real {n : Nat} (xB : Box ℝ (.dim n .scalar)) (x : Tensor ℝ (.dim n
   .scalar))
@@ -305,9 +323,23 @@ lemma ibp_cos_sound_real {n : Nat} (xB : Box ℝ (.dim n .scalar)) (x : Tensor �
                   max_le_iff.2 ⟨hcosRange.1, hmidLo⟩
                 have hhi : Real.cos v ≤ min (1 : ℝ) (Real.cos m + r) :=
                   le_min_iff.2 ⟨hcosRange.2, hmidHi⟩
-                simpa [NN.MLTheory.CROWN.Runtime.Ops.IBP.cos, Tensor.mapSpec,
-                  NN.MLTheory.CROWN.Box.contains,
-                  hL, hU, hX, m, r] using And.intro hlo hhi
+                have hmidLo' :
+                    Real.cos ((l + u) / 2) ≤ Real.cos v + (u - l) / 2 := by
+                  dsimp [m, r] at hmidLo
+                  linarith
+                have hmidHi' :
+                    Real.cos v ≤ Real.cos ((l + u) / 2) + (u - l) / 2 := by
+                  dsimp [m, r] at hmidHi
+                  exact hmidHi
+                simp [Tensor.mapSpec, NN.MLTheory.CROWN.Box.contains,
+                  MathFunctions.cos, Numbers.neg_one, Numbers.one, Numbers.two,
+                  Context.neg_one, Context.two, One.one,
+                  hL, hU, hX]
+                exact ⟨⟨hcosRange.1, hmidLo'⟩,
+                  ⟨by
+                    change Real.cos v ≤ (1 : ℝ)
+                    exact hcosRange.2,
+                   hmidHi'⟩⟩
 
 end
 

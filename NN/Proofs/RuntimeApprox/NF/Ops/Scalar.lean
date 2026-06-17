@@ -75,8 +75,8 @@ private lemma NF_roundR_zero : TorchLean.Floats.NF.roundR (β := β) (fexp := fe
 /-- `toSpec` of runtime `0` is the spec scalar `0`. -/
 @[simp] lemma toSpec_zero : toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) = (0 : ℝ) := by
   -- `0 : R` is `NF.ofReal 0`, so `toSpec 0` is `NF.roundR 0`.
-  simpa [toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.instZero,
-    TorchLean.Floats.NF.ofReal] using
+  change (TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ)).val = (0 : ℝ)
+  simpa [TorchLean.Floats.NF.ofReal] using
     (NF_roundR_zero (β := β) (fexp := fexp) (rnd := rnd))
 
 omit [NeuralValidRndToNearest rnd] in
@@ -468,7 +468,8 @@ lemma approx_abs_nf {x : ℝ} {xR : R} {eps : ℝ}
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.abs xR) - abs xhat) ≤
         neuralUlp β fexp (abs xhat) TrainingPhase.forward / 2 := by
     -- `toSpec (abs xR)` is a single rounding of `|xhat|`.
-    simpa [xhat, toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
+    simpa [xhat, toSpec, MathFunctions.abs, TorchLean.Floats.NF.instMathFunctions,
+      TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
       TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal] using
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (abs
         xhat))
@@ -630,7 +631,7 @@ lemma approx_tanh_nf {x : ℝ} {xR : R} {eps : ℝ}
         _ = 2 + neuralUlp β fexp (Real.tanh xhat) TrainingPhase.forward / 2 := by ring
     exact this
 
-  -- `hx` is not needed for the range-based bound, but kept for uniformity with other unary lemmas.
+  -- `hx` is not needed for the range-based bound; the statement mirrors the other unary lemmas.
   simpa [xhat, toSpec_tanh (β := β) (fexp := fexp) (rnd := rnd) xR, add_assoc, add_left_comm,
     add_comm]
     using htotal

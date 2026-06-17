@@ -46,7 +46,7 @@ used only for inference).
 structure Variable (α : Type) (s : Shape) where
   /-- Unique numeric id (allocated by the runtime context). -/
   id : Nat
-  /-- Human-readable name (often a parameter name like `"layer1.weight"`). -/
+  /-- Display name, often a parameter name such as `"layer1.weight"`. -/
   name : String
   /-- The current tensor value. -/
   value : Tensor α s
@@ -100,7 +100,7 @@ Accumulate a gradient contribution into the variable.
 If no gradient was set yet, this behaves like assignment. Otherwise it adds into the existing
 gradient (analogue of PyTorch `param.grad += ...`).
 -/
-def accumulateGradient {α : Type} [Context α] {s : Shape} [Add α]
+def accumulateGradient {α : Type} [Context α] {s : Shape}
     (v : Variable α s) (grad : Tensor α s) : Variable α s :=
   match v.gradient with
   | none => setGradient v grad

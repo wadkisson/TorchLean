@@ -266,7 +266,9 @@ def bceWithLogitsFderiv {Γ : List Shape} {s : Shape} (logits target : Idx Γ s)
           ((elemwiseDerivCLM (n := n) (f' := Activation.Math.softplusDerivSpec (α := ℝ)) (logitsV
             xV)).comp logitsCLM)
           xV := by
-      simpa using (hsoftplus.comp xV hlogits)
+      have hcomp := hsoftplus.comp xV hlogits
+      refine hcomp.congr_of_eventuallyEq ?_
+      exact Filter.Eventually.of_forall fun _ => rfl
     have hsumSp :
         HasFDerivAt (fun x => sumCLM (n := n)
               (elemwiseVec (n := n) (f := Activation.Math.softplusSpec (α := ℝ)) (logitsV x)))
@@ -429,7 +431,7 @@ def bceWithLogitsFderiv {Γ : List Shape} {s : Shape} (logits target : Idx Γ s)
       calc
         D dxV
             = c * (sumSpDeriv dxV - innerDeriv dxV) := by
-                simp [D, ContinuousLinearMap.smul_apply, ContinuousLinearMap.sub_apply, smul_eq_mul]
+                simp [D, smul_eq_mul]
         _ = c * (sumCLM (n := n) A - (inner ℝ dt x + inner ℝ t dx)) := by
               simp [hsumSp, hinter, A]
         _ = c * sumCLM (n := n) (A - (vecOfFun (n := n) fun j => dt j * x j + t j * dx j)) := by

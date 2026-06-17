@@ -60,14 +60,14 @@ theorem approxT_tanhMlp3_fp32 {d0 d1 d2 d3 : Nat}
     ∃ eps : ℝ,
       approxT (α := R) (toSpec := toSpec)
         (let z0 := Spec.linearSpec (α := ℝ) L0S xS
-         let a0 := Activation.tanhSpec (α := ℝ) z0
+         let a0 := mapSpec MathFunctions.tanh z0
          let z1 := Spec.linearSpec (α := ℝ) L1S a0
-         let a1 := Activation.tanhSpec (α := ℝ) z1
+         let a1 := mapSpec MathFunctions.tanh z1
          Spec.linearSpec (α := ℝ) L2S a1)
         (let z0 := Spec.linearSpec (α := R) L0R xR
-         let a0 := Activation.tanhSpec (α := R) z0
+         let a0 := mapSpec MathFunctions.tanh z0
          let z1 := Spec.linearSpec (α := R) L1R a0
-         let a1 := Activation.tanhSpec (α := R) z1
+         let a1 := mapSpec MathFunctions.tanh z1
          Spec.linearSpec (α := R) L2R a1)
         eps := by
   -- First linear layer: propagate input/weight/bias error to the first pre-activation.
@@ -86,50 +86,50 @@ theorem approxT_tanhMlp3_fp32 {d0 d1 d2 d3 : Nat}
       (Spec.linearSpec (α := R) L0R xR))
   have hA0' :
       approxT (α := R) (toSpec := toSpec)
-        (Activation.tanhSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))
-        (Activation.tanhSpec (α := R) (Spec.linearSpec (α := R) L0R xR))
+        (mapSpec MathFunctions.tanh (Spec.linearSpec (α := ℝ) L0S xS))
+        (mapSpec MathFunctions.tanh (Spec.linearSpec (α := R) L0R xR))
         eA0 := by
-    simpa [Activation.tanhSpec, eA0] using hA0
+      simpa [toSpec, NFBackend.toSpec, eA0] using hA0
 
   -- Second linear layer: use the tanh activation bound as this layer's input bound.
   rcases approxT_linear_fp32
     (WS := L1S) (WR := L1R)
-    (xS := Activation.tanhSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))
-    (xR := Activation.tanhSpec (α := R) (Spec.linearSpec (α := R) L0R xR))
+    (xS := mapSpec MathFunctions.tanh (Spec.linearSpec (α := ℝ) L0S xS))
+    (xR := mapSpec MathFunctions.tanh (Spec.linearSpec (α := R) L0R xR))
     (epsW := e1W) (epsb := e1b) (epsx := eA0) h1W h1b hA0' with ⟨eZ1, hZ1⟩
   have hA1 :=
     Proofs.RuntimeApprox.NFBackend.approxT_tanh_spec
       (β := β) (fexp := fexp) (rnd := rnd) (s := Shape.dim d2 .scalar)
-      (xS := Spec.linearSpec (α := ℝ) L1S (Activation.tanhSpec (α := ℝ) (Spec.linearSpec (α := ℝ)
+      (xS := Spec.linearSpec (α := ℝ) L1S (mapSpec MathFunctions.tanh (Spec.linearSpec (α := ℝ)
         L0S xS)))
-      (xR := Spec.linearSpec (α := R) L1R (Activation.tanhSpec (α := R) (Spec.linearSpec (α := R)
+      (xR := Spec.linearSpec (α := R) L1R (mapSpec MathFunctions.tanh (Spec.linearSpec (α := R)
         L0R xR)))
       (eps := eZ1) hZ1
   let eA1 : ℝ :=
     linfNorm (Proofs.RuntimeApprox.NFBackend.tanhBoundTensor
       (β := β) (fexp := fexp) (rnd := rnd) (s := Shape.dim d2 .scalar) eZ1
-      (Spec.linearSpec (α := R) L1R (Activation.tanhSpec (α := R) (Spec.linearSpec (α := R) L0R
+      (Spec.linearSpec (α := R) L1R (mapSpec MathFunctions.tanh (Spec.linearSpec (α := R) L0R
         xR))))
   have hA1' :
       approxT (α := R) (toSpec := toSpec)
-        (Activation.tanhSpec (α := ℝ)
+        (mapSpec MathFunctions.tanh
           (Spec.linearSpec (α := ℝ) L1S
-            (Activation.tanhSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))))
-        (Activation.tanhSpec (α := R)
+            (mapSpec MathFunctions.tanh (Spec.linearSpec (α := ℝ) L0S xS))))
+        (mapSpec MathFunctions.tanh
           (Spec.linearSpec (α := R) L1R
-            (Activation.tanhSpec (α := R) (Spec.linearSpec (α := R) L0R xR))))
+            (mapSpec MathFunctions.tanh (Spec.linearSpec (α := R) L0R xR))))
         eA1 := by
-    simpa [Activation.tanhSpec, eA1] using hA1
+      simpa [toSpec, NFBackend.toSpec, eA1] using hA1
 
   -- Final linear layer: produces the network-level output approximation.
   rcases approxT_linear_fp32
     (WS := L2S) (WR := L2R)
-    (xS := Activation.tanhSpec (α := ℝ)
+    (xS := mapSpec MathFunctions.tanh
       (Spec.linearSpec (α := ℝ) L1S
-        (Activation.tanhSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))))
-    (xR := Activation.tanhSpec (α := R)
+        (mapSpec MathFunctions.tanh (Spec.linearSpec (α := ℝ) L0S xS))))
+    (xR := mapSpec MathFunctions.tanh
       (Spec.linearSpec (α := R) L1R
-        (Activation.tanhSpec (α := R) (Spec.linearSpec (α := R) L0R xR))))
+        (mapSpec MathFunctions.tanh (Spec.linearSpec (α := R) L0R xR))))
     (epsW := e2W) (epsb := e2b) (epsx := eA1) h2W h2b hA1' with ⟨eOut, hOut⟩
 
   exact ⟨eOut, by
@@ -166,7 +166,7 @@ theorem approxT_reluMlp2_fp32 {d0 d1 d2 : Nat}
     ∃ eps : ℝ,
       approxT (α := R) (toSpec := toSpec)
         (let z0 := Spec.linearSpec (α := ℝ) L0S xS
-         let a0 := Activation.reluSpec (α := ℝ) z0
+         let a0 := mapSpec (fun x => max x 0) z0
          Spec.linearSpec (α := ℝ) L1S a0)
         (let z0 := Spec.linearSpec (α := R) L0R xR
          let a0 := mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) z0
@@ -190,16 +190,16 @@ theorem approxT_reluMlp2_fp32 {d0 d1 d2 : Nat}
       (Spec.linearSpec (α := R) L0R xR))
   have hA0' :
       approxT (α := R) (toSpec := toSpec)
-        (Activation.reluSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))
+        (mapSpec (fun x => max x 0) (Spec.linearSpec (α := ℝ) L0S xS))
         (mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) (Spec.linearSpec (α := R) L0R xR))
         eA0 := by
     -- `relu_spec` is `map_spec (max · 0)` on ℝ.
-    simpa [Activation.reluSpec, Activation.Math.reluSpec, eA0] using hA0
+      simpa [toSpec, NFBackend.toSpec, eA0] using hA0
 
   -- Final linear layer: propagate the activation error to the network output.
   rcases approxT_linear_fp32
     (WS := L1S) (WR := L1R)
-    (xS := Activation.reluSpec (α := ℝ) (Spec.linearSpec (α := ℝ) L0S xS))
+    (xS := mapSpec (fun x => max x 0) (Spec.linearSpec (α := ℝ) L0S xS))
     (xR := mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) (Spec.linearSpec (α := R) L0R xR))
     (epsW := e1W) (epsb := e1b) (epsx := eA0) h1W h1b hA0' with ⟨eOut, hOut⟩
 

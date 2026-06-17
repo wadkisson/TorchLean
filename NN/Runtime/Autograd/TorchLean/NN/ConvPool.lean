@@ -49,7 +49,8 @@ def conv
   let bShape : Shape := NN.Tensor.Shape.Vec outC
   let k0 : Tensor Float KShape := Torch.Init.tensor (s := KShape) (sch := kInit) (seed := seedK)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [KShape, bShape]
+  { kind := s!"Conv{d}d({inC}, {outC})"
+    paramShapes := [KShape, bShape]
     initParams := Torch.tlist2 k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -89,7 +90,8 @@ def convTranspose
   let bShape : Shape := NN.Tensor.Shape.Vec outC
   let k0 : Tensor Float KShape := Torch.Init.tensor (s := KShape) (sch := kInit) (seed := seedK)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [KShape, bShape]
+  { kind := s!"ConvTranspose{d}d({inC}, {outC})"
+    paramShapes := [KShape, bShape]
     initParams := Torch.tlist2 k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -117,7 +119,8 @@ def maxPool
     LayerDef (.dim batch (Shape.ofList (C :: inSpatial.toList)))
       (.dim batch (Shape.ofList (C :: (Spec.poolOutSpatialPad inSpatial kernel stride padding).toList)))
       :=
-  { paramShapes := []
+  { kind := s!"MaxPool{d}d"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -142,7 +145,8 @@ def avgPool
     LayerDef (.dim batch (Shape.ofList (C :: inSpatial.toList)))
       (.dim batch (Shape.ofList (C :: (Spec.poolOutSpatialPad inSpatial kernel stride padding).toList)))
       :=
-  { paramShapes := []
+  { kind := s!"AvgPool{d}d"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -179,7 +183,8 @@ def conv2d
   let bShape : Shape := NN.Tensor.Shape.Vec outC
   let k0 : Tensor Float KShape := Torch.Init.tensor (s := KShape) (sch := kInit) (seed := seedK)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [KShape, bShape]
+  { kind := s!"Conv2d({inC}, {outC}, {kH}x{kW})"
+    paramShapes := [KShape, bShape]
     initParams := Torch.tlist2 k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -215,7 +220,8 @@ def convTranspose2d
   let bShape : Shape := NN.Tensor.Shape.Vec outC
   let k0 : Tensor Float KShape := Torch.Init.tensor (s := KShape) (sch := kInit) (seed := seedK)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
-  { paramShapes := [KShape, bShape]
+  { kind := s!"ConvTranspose2d({inC}, {outC}, {kH}x{kW})"
+    paramShapes := [KShape, bShape]
     initParams := Torch.tlist2 k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
@@ -239,7 +245,8 @@ def maxPool2d
     {h1 : kH ≠ 0} {h2 : kW ≠ 0} :
     LayerDef (NN.Tensor.Shape.CHW inC inH inW)
       (NN.Tensor.Shape.CHW inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1)) :=
-  { paramShapes := []
+  { kind := s!"MaxPool2d({kH}x{kW})"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -260,7 +267,8 @@ def maxPool2dPad
     LayerDef (NN.Tensor.Shape.CHW inC inH inW)
       (NN.Tensor.Shape.CHW inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
         stride + 1)) :=
-  { paramShapes := []
+  { kind := s!"MaxPool2d({kH}x{kW}, padding={padding})"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -280,7 +288,8 @@ def avgPool2d
     (h1 : kH ≠ 0) (h2 : kW ≠ 0) :
     LayerDef (NN.Tensor.Shape.CHW inC inH inW)
       (NN.Tensor.Shape.CHW inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1)) :=
-  { paramShapes := []
+  { kind := s!"AvgPool2d({kH}x{kW})"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -301,7 +310,8 @@ def avgPool2dPad
     LayerDef (NN.Tensor.Shape.CHW inC inH inW)
       (NN.Tensor.Shape.CHW inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
         stride + 1)) :=
-  { paramShapes := []
+  { kind := s!"AvgPool2d({kH}x{kW}, padding={padding})"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -326,7 +336,8 @@ def globalAvgPool2dChw
     (c h w : Nat)
     {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0} :
     LayerDef (NN.Tensor.Shape.CHW c h w) (NN.Tensor.Shape.Vec c) :=
-  { paramShapes := []
+  { kind := "GlobalAvgPool2d"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -346,7 +357,8 @@ def globalAvgPool2dNchw
     (n c h w : Nat)
     {h_n_pos : n > 0} {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0} :
     LayerDef (NN.Tensor.Shape.NCHW n c h w) (.dim n (.dim c .scalar)) :=
-  { paramShapes := []
+  { kind := "GlobalAvgPool2d"
+    paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

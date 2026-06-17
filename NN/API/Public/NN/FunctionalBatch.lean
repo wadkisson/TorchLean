@@ -44,21 +44,22 @@ end functional
 `batchDim0 n model` wraps a *single-example* model `σ → τ` into a batched model
 `(dim n σ) → (dim n τ)` by running the underlying model once per batch element.
 
-This is a correctness-first helper used to expose PyTorch-like `N×...` APIs even when a primitive
+This is the correctness-first batch lift used to expose PyTorch-like `N×...` APIs even when a primitive
 only exists for the unbatched shape.
 -/
 
 /--
 Lift a single-example `LayerDef σ τ` to operate on a dimension-0 batch.
 
-This is a correctness-first helper: it runs the underlying layer independently on each batch
+This is a correctness-first batch lift: it runs the underlying layer independently on each batch
 element. Prefer a primitive batched layer when one exists.
 -/
 def batchLayerDim0 (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
     LayerDef (.dim n σ) (.dim n τ) :=
   let inSize : Nat := Spec.Shape.size σ
   let outSize : Nat := Spec.Shape.size τ
-  { paramShapes := l.paramShapes
+  { kind := l.kind
+    paramShapes := l.paramShapes
     initParams := l.initParams
     paramRequiresGrad := l.paramRequiresGrad
     updateBuffers := none

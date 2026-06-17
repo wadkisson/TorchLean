@@ -96,6 +96,20 @@ def asFloat? (j : Json) : Option Float :=
       | _ => none
   | _ => none
 
+/-- Require a floating-point value in an `Except` parser. -/
+def expectFloatE (ctx : String) (j : Json) : Except String Float :=
+  match asFloat? j with
+  | some x => pure x
+  | none => throw s!"{ctx}: expected float"
+
+/-- Extract a floating-point-valued field in an `Except` parser. -/
+def expectFieldFloatE (ctx key : String) (j : Json) : Except String Float := do
+  expectFloatE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
+/-- Extract a string-valued field in an `Except` parser. -/
+def expectFieldStringE (ctx key : String) (j : Json) : Except String String := do
+  NN.API.Json.expectStringE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
 /-- Decode a JSON boolean if the value is exactly `true` or `false`. -/
 def parseBool? (j : Json) : Option Bool :=
   match j with
@@ -120,11 +134,23 @@ def parseFloatArray (j : Json) : Option (Array Float) :=
   | .arr xs => xs.mapM asFloat?
   | _ => none
 
+/-- Parse a JSON matrix represented as an array of float arrays. -/
+def parseFloatMatrix (j : Json) : Option (Array (Array Float)) := do
+  match j with
+  | .arr rows => rows.mapM parseFloatArray
+  | _ => none
+
 /-- Parse a JSON array of floats with contextual errors. -/
 def expectFloatArray (j : Json) (ctx : String) : IO (Array Float) := do
   match parseFloatArray j with
   | some xs => pure xs
   | none => throw <| IO.userError s!"{ctx}: expected float array"
+
+/-- Parse a JSON matrix of floats with contextual errors. -/
+def expectFloatMatrix (j : Json) (ctx : String) : IO (Array (Array Float)) := do
+  match parseFloatMatrix j with
+  | some rows => pure rows
+  | none => throw <| IO.userError s!"{ctx}: expected array of float arrays"
 
 /-- Extract an object-valued field. -/
 def expectFieldObj (j : Json) (k : String) (ctx : String) : IO Json := do
@@ -143,9 +169,23 @@ def expectFieldNat (j : Json) (k : String) (ctx : String) : IO Nat := do
 def expectFieldArray (j : Json) (k : String) (ctx : String) : IO (Array Json) := do
   expectArray (← expectField j k ctx) s!"{ctx}.{k}"
 
+/-- Extract an optional array-valued field in an `Except` parser, using `#[]` when absent/null. -/
+def optionalFieldArrayD (ctx key : String) (j : Json) : Except String (Array Json) := do
+  let o ← NN.API.Json.expectObjE ctx j
+  match Std.TreeMap.Raw.get? o key with
+  | none => pure #[]
+  | some .null => pure #[]
+  | some (.arr xs) => pure xs
+  | some _ => throw s!"{ctx}.{key}: expected array"
+
 /-- Extract a float-array-valued field. -/
 def expectFieldFloatArray (j : Json) (k : String) (ctx : String) : IO (Array Float) := do
   expectFloatArray (← expectField j k ctx) s!"{ctx}.{k}"
+
+/-- Extract a float-matrix-valued field. -/
+def expectFieldFloatMatrix (j : Json) (k : String) (ctx : String) :
+    IO (Array (Array Float)) := do
+  expectFloatMatrix (← expectField j k ctx) s!"{ctx}.{k}"
 
 /-- Extract an optional string-valued field. -/
 def optionalFieldString? (j : Json) (k : String) (ctx : String) : IO (Option String) := do
@@ -178,15 +218,27 @@ def expectFormat (j : Json) (expected : String) (ctx : String := "top-level") : 
 
 /-- Pointwise `all` on two float arrays of equal length. -/
 def all2 (a b : Array Float) (p : Float → Float → Bool) : Bool :=
-  if _h : a.size = b.size then
-    (List.finRange a.size).all (fun i => p (a[i]!) (b[i]!))
+  if hSize : a.size = b.size then
+    (List.finRange a.size).all (fun (i : Fin a.size) =>
+      let bi :=
+        have h : i.1 < b.size := by
+          rw [← hSize]
+          exact i.2
+        b[i.1]'h
+      p (a[i.1]'i.2) bi)
   else
     false
 
 /-- Pointwise `any` on two float arrays of equal length. -/
 def any2 (a b : Array Float) (p : Float → Float → Bool) : Bool :=
-  if _h : a.size = b.size then
-    (List.finRange a.size).any (fun i => p (a[i]!) (b[i]!))
+  if hSize : a.size = b.size then
+    (List.finRange a.size).any (fun (i : Fin a.size) =>
+      let bi :=
+        have h : i.1 < b.size := by
+          rw [← hSize]
+          exact i.2
+        b[i.1]'h
+      p (a[i.1]'i.2) bi)
   else
     false
 

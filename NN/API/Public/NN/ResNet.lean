@@ -40,7 +40,7 @@ lemma down2_pos (h : Nat) : down2 h > 0 := by
   simp [down2]
 
 /--
-Shape arithmetic helper: `3×3` conv with stride `1` and padding `1` preserves a positive spatial
+Shape arithmetic fact: `3×3` conv with stride `1` and padding `1` preserves a positive spatial
   size.
 
 This matches the standard conv output formula used by `conv2dCHW`.
@@ -51,7 +51,7 @@ lemma conv3_same_out_eq {h : Nat} (hh : h > 0) : ((h + 2 * 1 - 3) / 1 + 1) = h :
   | succ _n => simp
 
 /--
-Shape arithmetic helper: `1×1` conv with stride `1` and padding `0` preserves a positive spatial
+Shape arithmetic fact: `1×1` conv with stride `1` and padding `0` preserves a positive spatial
   size.
 -/
 lemma conv1_same_out_eq {h : Nat} (hh : h > 0) : ((h + 2 * 0 - 1) / 1 + 1) = h := by
@@ -60,7 +60,7 @@ lemma conv1_same_out_eq {h : Nat} (hh : h > 0) : ((h + 2 * 0 - 1) / 1 + 1) = h :
   | succ _n => simp
 
 /--
-ResNet helper: `3×3` convolution with padding `1`, stride `1` (shape-preserving), over CHW images.
+ResNet `3×3` convolution with padding `1`, stride `1` (shape-preserving), over CHW images.
 -/
 def conv3x3Same {inC outC h w : Nat}
     [NeZero inC] [NeZero h] [NeZero w]
@@ -73,14 +73,8 @@ def conv3x3Same {inC outC h w : Nat}
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hh : h > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := h))
   have hw : w > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := w))
-  have hH : h - 1 + 1 = h := by
-    cases h with
-    | zero => cases (Nat.lt_irrefl 0 hh)
-    | succ _n => simp
-  have hW : w - 1 + 1 = w := by
-    cases w with
-    | zero => cases (Nat.lt_irrefl 0 hw)
-    | succ _n => simp
+  have hH : ((h + 2 * 1 - 3) / 1 + 1) = h := conv3_same_out_eq hh
+  have hW : ((w + 2 * 1 - 3) / 1 + 1) = w := conv3_same_out_eq hw
   have hShape :
       NN.Tensor.Shape.Image outC ((h + 2 * 1 - 3) / 1 + 1) ((w + 2 * 1 - 3) / 1 + 1) =
         NN.Tensor.Shape.Image outC h w := by
@@ -89,7 +83,7 @@ def conv3x3Same {inC outC h w : Nat}
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
 /--
-ResNet helper: `3×3` convolution with padding `1`, stride `2` (spatial downsampling via `down2`),
+ResNet `3×3` convolution with padding `1`, stride `2` (spatial downsampling via `down2`),
   over CHW images.
 -/
 def conv3x3Down {inC outC h w : Nat} [NeZero inC]
@@ -108,7 +102,7 @@ def conv3x3Down {inC outC h w : Nat} [NeZero inC]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
-/-- ResNet helper: `1×1` convolution with stride `1` (shape-preserving), over CHW images. -/
+/-- ResNet `1×1` convolution with stride `1` (shape-preserving), over CHW images. -/
 def conv1x1Same {inC outC h w : Nat}
     [NeZero inC] [NeZero h] [NeZero w]
     (seedK seedB : Nat := 0)
@@ -120,14 +114,8 @@ def conv1x1Same {inC outC h w : Nat}
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hh : h > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := h))
   have hw : w > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := w))
-  have hH : h - 1 + 1 = h := by
-    cases h with
-    | zero => cases (Nat.lt_irrefl 0 hh)
-    | succ _n => simp
-  have hW : w - 1 + 1 = w := by
-    cases w with
-    | zero => cases (Nat.lt_irrefl 0 hw)
-    | succ _n => simp
+  have hH : ((h + 2 * 0 - 1) / 1 + 1) = h := conv1_same_out_eq hh
+  have hW : ((w + 2 * 0 - 1) / 1 + 1) = w := conv1_same_out_eq hw
   have hShape :
       NN.Tensor.Shape.Image outC ((h + 2 * 0 - 1) / 1 + 1) ((w + 2 * 0 - 1) / 1 + 1) =
         NN.Tensor.Shape.Image outC h w := by
@@ -135,7 +123,7 @@ def conv1x1Same {inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
-/-- ResNet helper: `1×1` convolution with stride `2` (spatial downsampling via `down2`), over CHW
+/-- ResNet `1×1` convolution with stride `2` (spatial downsampling via `down2`), over CHW
   images. -/
 def conv1x1Down {inC outC h w : Nat} [NeZero inC]
     (seedK seedB : Nat := 0)
@@ -153,7 +141,7 @@ def conv1x1Down {inC outC h w : Nat} [NeZero inC]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
-/-- ResNet helper: `3×3` convolution over batched images (`NCHW`-style), preserving spatial size. -/
+/-- ResNet `3×3` convolution over batched images (`NCHW`-style), preserving spatial size. -/
 def conv3x3SameImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC] [NeZero h] [NeZero w]
     (seedK seedB : Nat := 0)
@@ -174,7 +162,7 @@ def conv3x3SameImages {n inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
-/-- ResNet helper: `3×3` convolution over batched images (`NCHW`-style), downsampling via `down2`.
+/-- ResNet `3×3` convolution over batched images (`NCHW`-style), downsampling via `down2`.
   -/
 def conv3x3DownImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC]
@@ -193,7 +181,7 @@ def conv3x3DownImages {n inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
-/-- ResNet helper: `1×1` convolution over batched images (`NCHW`-style), preserving spatial size. -/
+/-- ResNet `1×1` convolution over batched images (`NCHW`-style), preserving spatial size. -/
 def conv1x1SameImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC] [NeZero h] [NeZero w]
     (seedK seedB : Nat := 0)
@@ -214,7 +202,7 @@ def conv1x1SameImages {n inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
-/-- ResNet helper: `1×1` convolution over batched images (`NCHW`-style), downsampling via `down2`.
+/-- ResNet `1×1` convolution over batched images (`NCHW`-style), downsampling via `down2`.
   -/
 def conv1x1DownImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC]

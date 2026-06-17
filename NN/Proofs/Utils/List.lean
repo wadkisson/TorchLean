@@ -7,15 +7,17 @@ Authors: TorchLean Team
 module
 
 public import Mathlib.Algebra.Order.Group.MinMax
+public import Mathlib.Algebra.Ring.Basic
+public import Mathlib.Data.Fintype.BigOperators
 public import Mathlib.Data.List.FinRange
+public import Mathlib.Data.List.Fold
 
 /-!
 # List Utils
 
-Small list-fold lemmas used throughout TorchLean proof files.
-
-These are intentionally generic (not NN-specific) and live in a single place so large proofs do not
-accumulate many near-duplicate "foldl max" / "foldl add" helper lemmas.
+Small list-fold lemmas used throughout TorchLean proof files.  They are generic, not NN-specific,
+so tensor, runtime-approximation, and RL proofs can share the same fold facts instead of carrying
+local copies.
 -/
 
 @[expose] public section
@@ -79,6 +81,30 @@ lemma le_foldl_max_of_mem {ι β : Type} [LinearOrder β] (l : List ι) (f : ι 
 -- Left-fold addition lemmas used to normalize finite sums in later proofs.
 
 /--
+Pointwise congruence for left folds of the shape `acc + f x`.
+
+Many tensor and autograd proofs use executable folds for sums; this lemma lets them rewrite the
+per-coordinate summand without re-proving a list induction locally.
+-/
+lemma foldl_add_congr {α β : Type} [Add α] (l : List β) (f g : β → α) (a : α)
+    (h : ∀ x, f x = g x) :
+    l.foldl (fun s x => s + f x) a = l.foldl (fun s x => s + g x) a := by
+  induction l generalizing a with
+  | nil =>
+      simp
+  | cons hd tl ih =>
+      simp [List.foldl, h hd, ih]
+
+/-- Folding `(+ 0)` over a list leaves the accumulator unchanged. -/
+lemma foldl_add_const_zero {α β : Type} [AddMonoid α] (l : List β) (a : α) :
+    l.foldl (fun s _ => s + (0 : α)) a = a := by
+  induction l generalizing a with
+  | nil =>
+      simp
+  | cons _ tl ih =>
+      simp [List.foldl, add_zero]
+
+/--
 Turn `foldl (fun a x => a + f x) acc` into `acc + foldl (fun a x => a + f x) 0`.
 
 This is the standard "peel off the initial accumulator" lemma for left folds over `+`.
@@ -101,5 +127,97 @@ lemma foldl_add_init {α β : Type} [AddMonoid β] (l : List α) (f : α → β)
 lemma add_foldl_add0 {α β : Type} [AddMonoid β] (l : List α) (f : α → β) (acc : β) :
     acc + l.foldl (fun a x => a + f x) 0 = l.foldl (fun a x => a + f x) acc := by
   simpa using (foldl_add_init (l := l) (f := f) (acc := acc)).symm
+
+/--
+Distribute a fold of `g1 x + g2 x` into the sum of two folds.
+
+This is the list-level form of “finite sum distributes over addition”.
+-/
+lemma foldl_add_distrib2 {α β : Type} [AddCommMonoid α] (l : List β) (g1 g2 : β → α) :
+    ∀ a1 a2,
+      l.foldl (fun s x => s + (g1 x + g2 x)) (a1 + a2) =
+        l.foldl (fun s x => s + g1 x) a1 + l.foldl (fun s x => s + g2 x) a2 := by
+  intro a1 a2
+  induction l generalizing a1 a2 with
+  | nil =>
+      simp
+  | cons hd tl ih =>
+      simp [List.foldl]
+      have hacc :
+          (a1 + a2) + (g1 hd + g2 hd) = (a1 + g1 hd) + (a2 + g2 hd) := by
+        simp [add_left_comm, add_comm]
+      simpa [hacc, add_assoc, add_left_comm, add_comm] using
+        (ih (a1 := a1 + g1 hd) (a2 := a2 + g2 hd))
+
+/-- Pull multiplication by a fixed scalar through an additive left fold. -/
+lemma foldl_add_mul_right {α β : Type} [Semiring α] (l : List β) (g : β → α) (a k : α) :
+    l.foldl (fun acc x => acc + g x * k) (a * k) =
+      (l.foldl (fun acc x => acc + g x) a) * k := by
+  induction l generalizing a with
+  | nil =>
+      simp
+  | cons hd tl ih =>
+      have hstart : a * k + g hd * k = (a + g hd) * k := by
+        simp [add_mul]
+      simpa [List.foldl, hstart] using (ih (a := a + g hd))
+
+/--
+Length of the second component when a left fold prepends exactly one output per input.
+
+This captures the common "right-to-left scan implemented as `reverse.foldl`" proof pattern used by
+return/advantage computations: the first accumulator evolves by `step`, while the second accumulator
+records one new value with `::` at every iteration.
+-/
+lemma foldl_cons_snd_length {α β : Type} (l : List β) (step : α → β → α)
+    (accScalar : α) (accList : List α) :
+    (((l.foldl
+      (fun (acc : α × List α) x =>
+        let y := step acc.1 x
+        (y, y :: acc.2))
+      (accScalar, accList)).2).length = accList.length + l.length) := by
+  induction l generalizing accScalar accList with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      simp [List.foldl, ih, Nat.add_left_comm, Nat.add_comm]
+
+/--
+Rewrite the canonical `List.finRange` addition fold into a `Finset.univ` sum.
+
+Specs use `List.foldl` because it computes well; proofs usually want `Finset.sum` so standard
+big-operator lemmas apply.
+-/
+lemma finRange_foldl_add_eq_finset_sum {β : Type} [AddCommMonoid β] {n : Nat} (f : Fin n → β) :
+    (List.finRange n).foldl (fun s i => s + f i) 0 = (Finset.univ : Finset (Fin n)).sum f := by
+  classical
+  have hmap :
+      (List.finRange n).foldl (fun s i => s + f i) 0 =
+        List.foldl (fun s x => s + x) 0 ((List.finRange n).map f) := by
+    simpa using
+      (List.foldl_map (f := f) (g := fun s x => s + x) (l := List.finRange n)
+        (init := (0 : β))).symm
+  have hfold :
+      List.foldl (fun s x : β => s + x) 0 ((List.finRange n).map f) =
+        ((List.finRange n).map f).sum := by
+    simpa [List.sum] using
+      (List.foldl_eq_foldr (f := fun s x : β => s + x) (a := (0 : β))
+        (l := (List.finRange n).map f))
+  have hsum :
+      (Finset.univ : Finset (Fin n)).sum f = ((List.finRange n).map f).sum := by
+    simp [Finset.sum, Finset.val_univ_fin, Multiset.map_coe, Multiset.sum_coe]
+  exact hmap.trans (hfold.trans hsum.symm)
+
+/--
+Accumulator form of `finRange_foldl_add_eq_finset_sum`.
+
+This avoids re-proving "peel off the initial accumulator, then rewrite the zero fold" in large
+finite-sum proofs.
+-/
+lemma finRange_foldl_add_acc {β : Type} [AddCommMonoid β] {n : Nat} (f : Fin n → β) (acc : β) :
+    (List.finRange n).foldl (fun s i => s + f i) acc =
+      acc + (Finset.univ : Finset (Fin n)).sum f := by
+  have h1 := foldl_add_init (l := List.finRange n) (f := f) (acc := acc)
+  have h2 := finRange_foldl_add_eq_finset_sum (n := n) (f := f)
+  simpa [h2] using h1
 
 end List

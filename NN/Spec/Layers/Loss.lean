@@ -35,7 +35,7 @@ open Tensor
 open MathFunctions
 open Numbers
 
-variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+variable {α : Type} [Context α]
 
 /-- Enumeration of supported loss families used by configuration records. -/
 inductive LossType

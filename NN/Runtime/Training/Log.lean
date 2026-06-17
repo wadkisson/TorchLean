@@ -55,7 +55,7 @@ service or background process.
 structure ConfigEntry where
   /-- Config key, for example `"lr"`, `"optimizer"`, or `"dataset"`. -/
   key : String
-  /-- Human-readable value. Keep this stringly-typed so JSON artifacts stay tool-agnostic. -/
+  /-- Display value. Keep this stringly-typed so JSON artifacts stay tool-agnostic. -/
   value : String
   deriving Inhabited
 
@@ -67,7 +67,7 @@ structure Artifact where
   path : System.FilePath
   /-- Optional kind, such as `"model"`, `"plot"`, `"dataset"`, or `"report"`. -/
   kind : String := "file"
-  /-- Optional human-readable description. -/
+  /-- Optional description shown beside the metric. -/
   description : String := ""
   deriving Inhabited
 
@@ -204,9 +204,8 @@ def empty (metrics : Array (String × String)) : MetricHistory :=
 /--
 Append one row of metric values.
 
-If `values.size` does not match `series.size`, the update is ignored.  This keeps the function
-total and avoids manufacturing malformed logs; callers that want a hard error can check sizes
-before calling.
+If `values.size` does not match `series.size`, the update is ignored. Callers that want a hard
+error can check sizes before calling.
 -/
 def push (h : MetricHistory) (step : Nat) (values : Array Float) : MetricHistory :=
   if values.size = h.series.size then
@@ -373,7 +372,7 @@ end LogDestination
 ## JSON Codec
 
 Training logs are often produced by executable examples and then rendered later by widgets. The
-codec below is stable and human-readable:
+codec below is stable and easy to inspect:
 - finite floats are JSON numbers;
 - non-finite floats are string sentinels (`"NaN"`, `"Infinity"`, `"-Infinity"`);
 - missing optional fields fall back to the same defaults as the Lean structures.
@@ -395,8 +394,8 @@ def floatToJson (x : Float) : Json :=
 /--
 Decode a `Float` from JSON.
 
-TrainLog files normally store finite floats as JSON numbers. We also accept Lean's non-finite
-string sentinels and numeric strings so previously generated logs remain readable.
+TrainLog files store finite floats as JSON numbers. The decoder also accepts Lean's non-finite
+string sentinels and numeric strings.
 -/
 def floatOfJsonE (field : String) (j : Json) : Except String Float :=
   match j with

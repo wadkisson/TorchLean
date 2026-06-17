@@ -42,7 +42,7 @@ open _root_.Spec.Tensor
 /-- Error-reporting monad used by the pure TorchLean spec evaluator. -/
 abbrev SpecM := Except String
 
-instance {α : Type} [Context α] [DecidableEq Shape] [Inhabited α] : Runtime.Autograd.Torch.Ops (m :=
+instance {α : Type} [Context α] [DecidableEq Shape] : Runtime.Autograd.Torch.Ops (m :=
   SpecM) α where
   Ref := fun s => Tensor α s
 
@@ -247,7 +247,7 @@ def refListOfTList {α : Type} [Context α] :
 
 /-- Spec semantics for `compileForward1`-style models (one distinguished input, last argument). -/
 def evalForward1Spec
-    {α : Type} [Context α] [DecidableEq Shape] [Inhabited α]
+    {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes)

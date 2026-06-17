@@ -101,7 +101,7 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
   let idxScores :
       Idx (ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads])
         (ScoresShape n numHeads) :=
-    idxLast (Γ := ΓMaskedCore n numHeads headDim) (ss := []) (τ := ScoresShape n numHeads)
+    Idx.last (Γ := ΓMaskedCore n numHeads headDim) (ss := []) (τ := ScoresShape n numHeads)
   let nodeScaled :
       Node (ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads])
         (ScoresShape n numHeads) :=
@@ -117,7 +117,7 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
   let idxScaled :
       Idx (ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads, ScoresShape n numHeads])
         (ScoresShape n numHeads) :=
-    idxLast (Γ := ΓMaskedCore n numHeads headDim) (ss := [ScoresShape n numHeads])
+    Idx.last (Γ := ΓMaskedCore n numHeads headDim) (ss := [ScoresShape n numHeads])
       (τ := ScoresShape n numHeads)
   let nodeMasked :
       Node (ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads, ScoresShape n numHeads])
@@ -143,7 +143,7 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
       Idx (ΓMaskedCore n numHeads headDim ++
         [ScoresShape n numHeads, ScoresShape n numHeads, ScoresShape n numHeads])
         (ScoresShape n numHeads) :=
-    idxLast (Γ := ΓMaskedCore n numHeads headDim)
+    Idx.last (Γ := ΓMaskedCore n numHeads headDim)
       (ss := [ScoresShape n numHeads, ScoresShape n numHeads])
       (τ := ScoresShape n numHeads)
   let nodeProbs :
@@ -166,7 +166,7 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
         [ScoresShape n numHeads, ScoresShape n numHeads, ScoresShape n numHeads,
           ScoresShape n numHeads])
         (ScoresShape n numHeads) :=
-    idxLast (Γ := ΓMaskedCore n numHeads headDim)
+    Idx.last (Γ := ΓMaskedCore n numHeads headDim)
       (ss := [ScoresShape n numHeads, ScoresShape n numHeads, ScoresShape n numHeads])
       (τ := ScoresShape n numHeads)
   let nodeOut :
@@ -262,7 +262,19 @@ theorem maskedCoreAfterProjection_hasFDerivAt
         (projectPack x) = Dcore := by
     simpa using hDcore.fderiv
   rw [hFderiv]
-  simpa [core] using hDcore.comp x hProject
+  have hfun :
+      (fun z : E =>
+        Graph.evalVec
+          (Γ := ΓMaskedCore n numHeads headDim)
+          (ss := ssMaskedCore n numHeads headDim)
+          core.g
+          (projectPack z)) =
+        (Graph.evalVec
+          (Γ := ΓMaskedCore n numHeads headDim)
+          (ss := ssMaskedCore n numHeads headDim)
+          core.g ∘ projectPack) := by
+    rfl
+  exact (hDcore.comp x hProject).congr_of_eventuallyEq hfun.eventuallyEq
 
 /--
 Full masked-attention composition contract.

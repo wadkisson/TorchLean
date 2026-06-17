@@ -11,16 +11,15 @@ public import NN
 /-!
 # Quickstart: Autograd Basics
 
-Tour of the public autograd APIs beyond `.backward()`:
+Tour of the public autograd APIs beyond ordinary training:
 
-- `API.autograd.model.*` for model-level VJP / jacobian / loss gradients.
-- `API.autograd.model.OutputLoss.*` for reusable scalar losses on model outputs.
-- `API.autograd.fn1.*` for Jacobian / Hessian helpers on single-input tensor functions.
-- `API.nn.functional.detach` for stop-gradient behavior.
+- `autograd.model.*` for model-level VJP, Jacobian, and loss gradients.
+- `autograd.model.OutputLoss.*` for reusable scalar losses on model outputs.
+- `autograd.fn1.*` for Jacobian / Hessian APIs on single-input tensor functions.
+- `nn.functional.detach` for stop-gradient behavior.
 
 Run:
-  `lake exe torchlean quickstart_autograd --dtype float --backend eager`
-  `lake exe torchlean quickstart_autograd --dtype float32 --backend compiled`
+  `lake exe torchlean quickstart_autograd`
 -/
 
 @[expose] public section
@@ -28,65 +27,97 @@ Run:
 
 namespace NN.Examples.Quickstart.AutogradBasics
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
+
+abbrev XShape := Shape.scalar.appendDim 2
+abbrev YShape := Shape.scalar.appendDim 3
+abbrev WShape := Shape.mat 3 2
+abbrev BShape := Shape.vec 3
 
 /-!
-This file is a curated "autodiff API tour". It avoids:
+The tour stays on the public Float autodiff surface. It avoids:
 
-- low-level runtime tape/session code,
+- runtime tape/session code,
 - hand-written parameter-shape bookkeeping,
-- noisy `castTensor` helpers.
+- runtime scalar dispatch.
 
-Instead, it uses the public `API.autograd.*` surface and `tensorF! cast ...` to build deterministic
-constants for any runtime scalar `α`.
+Instead, it uses `TorchLean.autograd.*` directly on a tiny fixed payload.
 -/
 
-def model : nn.Sequential (Shape.Vec 2) (Shape.Vec 3) :=
-  -- One Linear layer: y = x ↦ W*x + b
-  nn.build 0 <| nn.linear 2 3 (pfx := Spec.Shape.scalar)
+def model : nn.Sequential XShape YShape :=
+  -- One Linear layer: y = x ↦ W*x + b.
+  nn.linear 2 3 0 1
 
-def mseLoss : autograd.model.OutputLoss (Shape.Vec 3) (Shape.Vec 3) :=
+def mseLoss : autograd.model.OutputLoss YShape YShape :=
   -- Reusable scalar loss on model outputs: MSE(pred, target).
-  autograd.model.OutputLoss.mse (τ := Shape.Vec 3)
+  autograd.model.OutputLoss.mse (τ := YShape)
 
-def detachedMSELoss : autograd.model.OutputLoss (Shape.Vec 3) (Shape.Vec 3) :=
+def detachedMSELoss : autograd.model.OutputLoss YShape YShape :=
   -- Same forward value as `mseLoss`, but all gradients are zero (stop-gradient / detach).
   autograd.model.OutputLoss.detach mseLoss
 
-def squareFn : autograd.fn1.Fn (Shape.Vec 2) (Shape.Vec 2) :=
+def squareFn : autograd.fn1.Fn XShape XShape :=
   fun x => nn.functional.square x
 
-def sumsqFn : autograd.fn1.Fn (Shape.Vec 2) Spec.Shape.scalar :=
+def sumsqFn : autograd.fn1.Fn XShape Shape.scalar :=
   fun x => do
     let y ← nn.functional.square x
     -- `mean` is a convenient scalar reduction, like `torch.mean`.
     nn.functional.mean y
 
-def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
-    (cast : Float → α) : IO Unit := do
+namespace Internal
 
-  -- Deterministic parameters + a single (x, y_target) sample.
-  --
-  -- `tensorF! cast ...` lets us write Float literals once and then map them into any runtime scalar
-  -- `α`.
-  let W : Spec.Tensor α (Shape.Mat 3 2) :=
-    tensorF! cast [3, 2] [
+/--
+Deterministic model/sample payload for the autograd walkthrough.
+
+The example stays small: one Linear layer, one input vector, one target vector, and one
+fixed parameter-direction for JVP/HVP queries.
+-/
+structure DemoPayload (α : Type) where
+  W : Tensor.T α WShape
+  b : Tensor.T α BShape
+  x : Tensor.T α XShape
+  y : Tensor.T α YShape
+  vW : Tensor.T α WShape
+  vb : Tensor.T α BShape
+
+/-- Fixed Float tensors used by the walkthrough. -/
+def demoPayloadF : DemoPayload Float :=
+  { W := tensorND! [3, 2] [
       0.2, -0.1,
       0.0,  0.3,
      -0.4,  0.1
     ]
-  let b : Spec.Tensor α (Shape.Vec 3) := tensorF! cast [3] [0.01, -0.02, 0.03]
-  let x : Spec.Tensor α (Shape.Vec 2) := tensorF! cast [2] [0.5, -1.2]
-  let y : Spec.Tensor α (Shape.Vec 3) := tensorF! cast [3] [0.7, 0.1, -0.5]
+    b := tensorND! [3] [0.01, -0.02, 0.03]
+    x := tensorND! [2] [0.5, -1.2]
+    y := tensorND! [3] [0.7, 0.1, -0.5]
+    vW := Tensor.fill 0.1 WShape
+    vb := Tensor.fill (-0.2) BShape }
 
-  -- `autograd.model.linearParams` builds parameters for the *bare* `TorchLean.Layers.linear` layer.
-  -- Here `model` is the public `API.nn.linear` sequential wrapper, so we construct its parameter
-  -- record directly as the expected `TList` shape.
-  let params : autograd.model.Params model α := by
-    simpa [autograd.model.Params, model] using (tlist! W, b)
+/-- Parameter pack for the single Linear layer in `model`. -/
+def modelParams {α : Type} (payload : DemoPayload α) :
+    autograd.model.Params model α := by
+  simpa [model] using
+    autograd.model.linearParams (inDim := 2) (outDim := 3) (seedW := 0) (seedB := 1)
+      payload.W payload.b
+
+/-- Direction vector in parameter space used for JVP/HVP examples. -/
+def paramDirection {α : Type} (payload : DemoPayload α) :
+    autograd.model.Params model α := by
+  simpa [model] using
+    autograd.model.linearParams (inDim := 2) (outDim := 3) (seedW := 0) (seedB := 1)
+      payload.vW payload.vb
+
+/-- Unpack this tutorial's single Linear-layer parameter pack. -/
+def unpackLinearParams {α : Type} (params : autograd.model.Params model α) :
+    Tensor.T α WShape × Tensor.T α BShape := by
+  simpa [autograd.model.Params, model, BShape] using tensorpack.unpack2 params
+
+/-- Run the Float autograd walkthrough. -/
+def runDemo : IO Unit := do
+  let payload := demoPayloadF
+  let params := modelParams payload
+  let vparams := paramDirection payload
 
   -- ------------------------------------------------------------
   -- 1) Tensor-output compilation: VJP with an explicit output seed
@@ -97,24 +128,24 @@ def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString
   --
   -- Here the model output is `Vec 3`, and we choose `seedOut = ones`.
   -- Intuition: we backprop `sum(y)` w.r.t. parameters.
-  let seedOut : Spec.Tensor α (Shape.Vec 3) := Spec.fill (α := α) (cast 1.0) (Shape.Vec 3)
+  let seedOut : Tensor.T Float YShape := Tensor.fill 1.0 YShape
   let vjpParams ←
-    autograd.model.vjpParams (α := α) model params x seedOut
+    autograd.model.vjpParams (α := Float) model params payload.x seedOut
 
-  let (dW, db) := tlist.unpack2 vjpParams
-  IO.println s!"vjpOutParams (seed=ones) dW = {Spec.pretty dW}"
-  IO.println s!"vjpOutParams (seed=ones) db = {Spec.pretty db}"
+  let (dW, db) := unpackLinearParams vjpParams
+  IO.println s!"vjpOutParams (seed=ones) dW = {Tensor.pretty dW}"
+  IO.println s!"vjpOutParams (seed=ones) db = {Tensor.pretty db}"
 
   -- `jacrevParams` returns the full Jacobian of the model output w.r.t. parameters:
   -- one row per output coordinate. Each row is itself a typed list matching the parameter
   -- structure.
   let jacRows ←
-    autograd.model.jacrevParams (α := α) model params x
+    autograd.model.jacrevParams (α := Float) model params payload.x
   IO.println s!"jacrevOutParams rows = {jacRows.size} (should be size(out)=3)"
   for i in List.finRange jacRows.size do
     let row := jacRows[i.1]'i.2
-    let (dWi, dbi) := tlist.unpack2 row
-    IO.println s!"  row[{i.1}] dW = {Spec.pretty dWi}; db = {Spec.pretty dbi}"
+    let (dWi, dbi) := unpackLinearParams row
+    IO.println s!"  row[{i.1}] dW = {Tensor.pretty dWi}; db = {Tensor.pretty dbi}"
 
   -- ------------------------------------------------------------
   -- 2) Reverse-mode grad for scalar loss
@@ -125,11 +156,11 @@ def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString
   -- - the scalar loss value
   -- - parameter gradients (same typed-list structure/order as `params`)
   let (lossMSE, gParams) ←
-    autograd.model.valueAndGradParamsScalar (α := α) model mseLoss params x y
-  let (gW, gb) := tlist.unpack2 gParams
+    autograd.model.valueAndGradParamsScalar (α := Float) model mseLoss params payload.x payload.y
+  let (gW, gb) := unpackLinearParams gParams
   IO.println s!"loss(mse) = {lossMSE}"
-  IO.println s!"gradParams (mse) gW = {Spec.pretty gW}"
-  IO.println s!"gradParams (mse) gb = {Spec.pretty gb}"
+  IO.println s!"gradParams (mse) gW = {Tensor.pretty gW}"
+  IO.println s!"gradParams (mse) gb = {Tensor.pretty gb}"
 
   -- ------------------------------------------------------------
   -- 3) Detach semantics: same forward value, zero gradient
@@ -137,79 +168,91 @@ def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString
   --
   -- This matches PyTorch `detach()`: stop-gradient on the loss computation.
   let (lossDetached, gParamsDetached) ←
-    autograd.model.valueAndGradParamsScalar (α := α) model detachedMSELoss params x y
-  let (gW0, gb0) := tlist.unpack2 gParamsDetached
+    autograd.model.valueAndGradParamsScalar
+      (α := Float) model detachedMSELoss params payload.x payload.y
+  let (gW0, gb0) := unpackLinearParams gParamsDetached
   IO.println s!"loss(mse ∘ detach) = {lossDetached}"
-  IO.println s!"gradParams (mse ∘ detach) gW = {Spec.pretty gW0}"
-  IO.println s!"gradParams (mse ∘ detach) gb = {Spec.pretty gb0}"
+  IO.println s!"gradParams (mse ∘ detach) gW = {Tensor.pretty gW0}"
+  IO.println s!"gradParams (mse ∘ detach) gb = {Tensor.pretty gb0}"
 
   -- ------------------------------------------------------------
   -- 4) Forward-mode JVP of the scalar loss along a parameter direction
   -- ------------------------------------------------------------
   --
-  -- JVP = Jacobian-vector product (forward-mode). Here we compute the directional derivative of the
-  -- scalar loss along a parameter perturbation direction `vparams`.
-  let vW : Spec.Tensor α (Shape.Mat 3 2) :=
-    Spec.fill (α := α) (cast 0.1) (Shape.Mat 3 2)
-  let vb : Spec.Tensor α (Shape.Vec 3) :=
-    Spec.fill (α := α) (cast (-0.2)) (Shape.Vec 3)
-  let vparams : autograd.model.Params model α := tlist! vW, vb
+  -- JVP = Jacobian-vector product (forward-mode). Here we compute the directional derivative
+  -- of the scalar loss along a parameter perturbation direction `vparams`.
   let dl ←
-    autograd.model.jvpParams (α := α) model mseLoss params x y vparams
+    autograd.model.jvpParams (α := Float) model mseLoss params payload.x payload.y vparams
   IO.println s!"jvpLossParams dl = {dl}"
 
   -- ------------------------------------------------------------
   -- 5) Hessian-vector product (HVP) w.r.t. parameters
   -- ------------------------------------------------------------
   --
-  -- HVP = (Hessian of loss) applied to a direction vector, without materializing the full Hessian.
+  -- HVP = (Hessian of loss) applied to a direction vector, without materializing the full
+  -- Hessian.
   let hvp ←
-    autograd.model.hvpParams (α := α) model mseLoss params x y vparams
-  let (hW, hb) := tlist.unpack2 hvp
-  IO.println s!"hvpParams hW = {Spec.pretty hW}"
-  IO.println s!"hvpParams hb = {Spec.pretty hb}"
+    autograd.model.hvpParams (α := Float) model mseLoss params payload.x payload.y vparams
+  let (hW, hb) := unpackLinearParams hvp
+  IO.println s!"hvpParams hW = {Tensor.pretty hW}"
+  IO.println s!"hvpParams hb = {Tensor.pretty hb}"
 
   -- ------------------------------------------------------------
   -- 6) jacfwd/jacrev/hessian for a function of a single tensor input
   -- ------------------------------------------------------------
-  let jacCols ← autograd.fn1.jacfwd (α := α) squareFn x
+  let jacCols ← autograd.fn1.jacfwd (α := Float) squareFn payload.x
   IO.println s!"jacfwd1(square) cols = {jacCols.size} (should be size(in)=2)"
   for i in List.finRange jacCols.size do
     let col := jacCols[i.1]'i.2
-    IO.println s!"  col[{i.1}] = {Spec.pretty col}"
+    IO.println s!"  col[{i.1}] = {Tensor.pretty col}"
 
-  let hessCols ← autograd.fn1.hessian (α := α) sumsqFn x
+  let hessCols ← autograd.fn1.hessian (α := Float) sumsqFn payload.x
   IO.println s!"hessian1(mean(x^2)) cols = {hessCols.size} (should be size(in)=2)"
   for i in List.finRange hessCols.size do
     let col := hessCols[i.1]'i.2
-    IO.println s!"  H*e[{i.1}] = {Spec.pretty col}"
+    IO.println s!"  H*e[{i.1}] = {Tensor.pretty col}"
 
   -- ------------------------------------------------------------
   -- 7) One-liners: vjp / jacrev / grad / valueAndGrad
   -- ------------------------------------------------------------
   --
-  -- These wrappers are "no `TList` noise" helpers for the common case of a single tensor input.
-  let seedSq : Spec.Tensor α (Shape.Vec 2) :=
-    Spec.fill (α := α) (cast 1.0) (Shape.Vec 2)
-  let vjpSq ← autograd.fn1.vjp (α := α) squareFn x seedSq
-  IO.println s!"vjp(square, seed=ones) = {Spec.pretty vjpSq}"
+  -- These entrypoints cover the common case of a single tensor input.
+  let seedSq : Tensor.T Float XShape := Tensor.fill 1.0 XShape
+  let vjpSq ← autograd.fn1.vjp (α := Float) squareFn payload.x seedSq
+  IO.println s!"vjp(square, seed=ones) = {Tensor.pretty vjpSq}"
 
-  let jacRowsSq ← autograd.fn1.jacrev (α := α) squareFn x
+  let jacRowsSq ← autograd.fn1.jacrev (α := Float) squareFn payload.x
   IO.println s!"jacrev1(square) rows = {jacRowsSq.size} (should be size(out)=2)"
   for i in List.finRange jacRowsSq.size do
     let row := jacRowsSq[i.1]'i.2
-    IO.println s!"  row[{i.1}] = {Spec.pretty row}"
+    IO.println s!"  row[{i.1}] = {Tensor.pretty row}"
 
-  let gSumsq ← autograd.fn1.grad (α := α) sumsqFn x
-  IO.println s!"grad1(mean(x^2)) = {Spec.pretty gSumsq}"
+  let gSumsq ← autograd.fn1.grad (α := Float) sumsqFn payload.x
+  IO.println s!"grad1(mean(x^2)) = {Tensor.pretty gSumsq}"
 
-  let (valSumsq, gSumsq2) ← autograd.fn1.valueAndGradScalar (α := α) sumsqFn x
-  IO.println s!"valueAndGradScalar(mean(x^2)) value = {valSumsq}, grad = {Spec.pretty gSumsq2}"
+  let (valSumsq, gSumsq2) ← autograd.fn1.valueAndGradScalar (α := Float) sumsqFn payload.x
+  IO.println s!"valueAndGradScalar(mean(x^2)) value = {valSumsq}, grad = {Tensor.pretty gSumsq2}"
 
+end Internal
+
+/-- Command-line help for the Float autograd quickstart. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean autograd quickstart"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean quickstart_autograd"
+    , ""
+    , "This demo has no tutorial-specific flags."
+    ]
+
+/-- CLI entrypoint for the Float autograd quickstart. -/
 def main (args : List String) : IO Unit := do
-  let args := API.CLI.dropDashDash args
-  _root_.NN.API.TorchLean.Module.withRuntime args (fun {α} _ _ _ _ cast _opts rest => do
-    API.Common.orThrow "quickstart_autograd" <| API.CLI.requireNoArgs rest
-    runOnce (α := α) cast)
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
+  CLI.requireNoArgs "quickstart_autograd" args
+  Internal.runDemo
 
 end NN.Examples.Quickstart.AutogradBasics

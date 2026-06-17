@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.VNNComp.MnistFcVerify
+public import NN.Verification.VNNComp.MnistFC
 
 /-!
 # VNN-COMP Verification Examples

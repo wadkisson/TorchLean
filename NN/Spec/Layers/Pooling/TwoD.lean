@@ -429,7 +429,7 @@ def adaptiveMaxPool2dSpec {inH inW inC : ℕ} (outH outW : ℕ)
 
         -- Find max in the region
         -- We seed the fold with the first element instead of using a sentinel like `-1000`.
-        -- This keeps the spec correct for arbitrary scalar types and scales.
+        -- That choice works for arbitrary scalar types and scales.
         let init : Tensor α .scalar :=
           -- `getValueAtPosition` performs the bounds check for us, so we don't have to thread a
           -- proof that `start_i < inH` and `start_j < inW` through the code.

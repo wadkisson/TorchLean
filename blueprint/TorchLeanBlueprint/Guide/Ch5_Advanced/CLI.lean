@@ -111,7 +111,7 @@ Model examples use the `torchlean` runner:
 
 ```
 lake exe torchlean --help
-lake exe torchlean cnn --cpu --n-total 20 --steps 1
+lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
 ```
 
 Some tutorial and advanced examples are ordinary Lean `--run` programs under `NN/Examples/*`. Pick

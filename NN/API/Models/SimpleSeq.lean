@@ -56,9 +56,9 @@ Vanilla RNN core plus time-distributed linear head:
 -/
 def rnnWithLinearHead (cfg : SeqRnnHeadConfig) :
     nn.M (nn.Sequential (seqRnnHeadInShape cfg) (seqRnnHeadOutShape cfg)) :=
-  nn.sequential![
+  nn.Sequential![
     nn.rnn cfg.seqLen cfg.inputSize cfg.hiddenSize,
-    nn.linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
+    Linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
   ]
 
 /--
@@ -68,9 +68,9 @@ LSTM core plus time-distributed linear head:
 -/
 def lstmWithLinearHead (cfg : SeqRnnHeadConfig) :
     nn.M (nn.Sequential (seqRnnHeadInShape cfg) (seqRnnHeadOutShape cfg)) :=
-  nn.sequential![
+  nn.Sequential![
     nn.lstm cfg.seqLen cfg.inputSize cfg.hiddenSize,
-    nn.linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
+    Linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
   ]
 
 end models
@@ -78,4 +78,3 @@ end nn
 
 end API
 end NN
-

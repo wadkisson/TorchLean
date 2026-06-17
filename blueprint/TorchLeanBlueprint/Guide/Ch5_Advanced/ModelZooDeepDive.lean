@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -36,9 +35,9 @@ Most examples are dispatched by [NN.Examples.Models.Runner API](https://github.c
 lake exe torchlean <example> [flags...]
 ```
 
-That runner keeps the public surface stable while each model file owns its data path, model
-constructor, optimizer, logs, and caveats. When the docs say "run `gpt2`", the code path is not
-hidden in a script; it ends in a namespaced Lean `main`.
+That runner dispatches to model files that own their data path, model constructor, optimizer, logs,
+and caveats. When the docs say "run `gpt2`", the code path is not hidden in a script; it ends in a
+namespaced Lean `main`.
 
 The zoo is organized by stressor:
 
@@ -48,8 +47,8 @@ The zoo is organized by stressor:
   and CUDA paths for selective scan.
 - *RNN/LSTM/GRU style recurrence*: recurrent text and forecasting examples stress recurrent state,
   gated cells, short text windows, and forecasting data.
-- *ResNet*: the residual vision classifier stresses residual wiring, convolution, batch data, and
-  graph shape discipline.
+- *Residual/ResNet specs*: residual blocks stress skip wiring, convolution shape facts, and graph
+  shape discipline. The runnable vision commands currently stay with CNN and ViT.
 - *ViT*: the patch-token vision transformer stresses image patches, token sequences, and attention
   blocks.
 - *FNO*: the Burgers operator learning example stresses scientific data, spectral kernels, and a CUDA
@@ -100,14 +99,14 @@ A typical small run is:
 ```
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
 lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels \
-  --tiny-shakespeare --steps 100 --windows 128 --prompt "ROMEO:"
+  --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
 ```
 
 For CharGPT:
 
 ```
 lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare \
-  --steps 200 --prompt "ROMEO:"
+  --steps 1 --batch 1 --seq-len 1 --generate 0 --prompt "ROMEO:"
 ```
 
 These examples stress the API in a way MLPs do not. The model shape depends on vocabulary, sequence
@@ -145,7 +144,7 @@ the public Mamba API:
 ```
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
 lake exe -K cuda=true torchlean mamba --cuda --fast-kernels \
-  --tiny-shakespeare --steps 200 --windows 128 --prompt "ROMEO:"
+  --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
 ```
 
 The specification side includes state space material that later theorems can use in
@@ -220,18 +219,13 @@ https://arxiv.org/abs/1406.1078) for GRU style gating.
 
 # ResNet
 
-[NN.Examples.Models.Vision.Resnet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/Resnet.lean) trains a
-compact ResNet style classifier over CIFAR arrays:
+The spec side in [NN.Spec.Models.Resnet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Resnet.lean) defines residual blocks
+with identity/projection shortcuts, proves well formedness facts for ResNet style configs, records
+convolution output size facts, and gives forward/backward structure for a basic residual block.
 
-```
-python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean resnet --cuda --n-total 20 --steps 1
-```
-
-The spec side in [NN.Spec.Models.Resnet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Resnet.lean) is richer than a
-runtime-check command. It defines residual blocks with identity/projection shortcuts, proves well formedness
-facts for ResNet style configs, records convolution output size facts, and gives forward/backward
-structure for a basic residual block.
+The executable model zoo currently keeps runnable vision checks to `cnn` and `vit`. ResNet remains
+an API/spec component until the residual/BatchNorm runtime path is fast enough for a normal
+`lake exe torchlean ...` command.
 
 ResNet stresses the graph boundary because residual connections create branching structure that later rejoins.
 A linear stack can postpone many mistakes; a residual add makes shape agreement explicit. If the
@@ -256,7 +250,7 @@ ViT style CIFAR classifier:
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean vit --cuda --n-total 20 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 ```
 
 The corresponding spec material in [NN.Spec.Models.Vit API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Vit.lean) names
@@ -319,12 +313,12 @@ Equations" (ICLR 2021, https://arxiv.org/abs/2010.08895).
 The generative commands are:
 
 ```
-lake exe torchlean autoencoder --steps 10
-lake exe torchlean mae --steps 10
-lake exe torchlean vae --steps 10
-lake exe torchlean vqvae --steps 10
-lake exe torchlean gan --steps 10
-lake exe torchlean diffusion --steps 5
+lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 These examples stress stochastic and reconstruction oriented training. Diffusion adds timestep
@@ -395,11 +389,11 @@ The model zoo is best read as five overlapping tests:
 - *Verification*: can examples point to specs used by theorems and make any remaining producer or
   runtime assumptions explicit?
 
-The answer is layered. MLP, CNN, ResNet, ViT, GPT, Mamba, FNO, diffusion, and RL
-commands all exercise real runtime surfaces. Some model families also have dedicated spec or theory
-declarations with citeable theorem names. Not every command has full verification. Not every CUDA
-kernel has a fully proved equivalence to a high level spec. Not every external data source is
-trusted.
+The answer is layered. MLP, KAN, CNN, ViT, GPT, Mamba, FNO, diffusion, and RL commands exercise
+real runtime surfaces. ResNet is currently an API/spec and GraphSpec example rather than a model-zoo
+command. Some model families also have dedicated spec or theory declarations with citeable theorem
+names. Not every command has full verification. Not every CUDA kernel has a fully proved
+equivalence to a high level spec. Not every external data source is trusted.
 
 That layered view is a feature of the zoo. Readers can see where TorchLean is already a proof
 artifact, where it is a runnable ML artifact, and where the bridge between those two worlds is still

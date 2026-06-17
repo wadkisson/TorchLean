@@ -110,7 +110,7 @@ lemma dot_conv2d_input
                   getAtOrZero
                     (paddedInput (inC := inC) (inH := inH) (inW := inW) (padding := padding) dInput)
                     [ic.val, oi.val * stride + di.val, oj.val * stride + dj.val] := by
-        simpa using hEntry
+        exact hEntry
       -- Multiply by `δ[oc,oi,oj]` and distribute across the nested sums.
       have hMul :
           (getAtOrZero (Spec.conv2dSpec (α := ℝ) (layer := layer0) dInput) [oc.val, oi.val,

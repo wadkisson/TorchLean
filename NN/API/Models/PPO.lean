@@ -49,19 +49,19 @@ abbrev ppoCriticOutShape (_cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
 /-- Actor MLP mapping observations to action logits. -/
 def ppoActor (cfg : PPOActorCriticConfig) (pfx : Shape) :
     nn.M (nn.Sequential (ppoActorInShape cfg pfx) (ppoActorOutShape cfg pfx)) :=
-  nn.sequential![
-    nn.linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
+  nn.Sequential![
+    Linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
     nn.tanh,
-    nn.linear cfg.hiddenDim cfg.nActions (pfx := pfx)
+    Linear cfg.hiddenDim cfg.nActions (pfx := pfx)
   ]
 
 /-- Critic MLP mapping observations to a scalar value estimate. -/
 def ppoCritic (cfg : PPOActorCriticConfig) (pfx : Shape) :
     nn.M (nn.Sequential (ppoActorInShape cfg pfx) (ppoCriticOutShape cfg pfx)) :=
-  nn.sequential![
-    nn.linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
+  nn.Sequential![
+    Linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
     nn.tanh,
-    nn.linear cfg.hiddenDim 1 (pfx := pfx)
+    Linear cfg.hiddenDim 1 (pfx := pfx)
   ]
 
 end models

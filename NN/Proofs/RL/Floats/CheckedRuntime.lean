@@ -49,7 +49,7 @@ If `Runtime.RL.Numerics.Float32.discountedBackupIEEE32ExecChecked` returns `.ok`
 meaning of the result agrees with the standard “real-op + round-to-float32” model (`fp32Round`)
 at each primitive operation.
 
-This is the `checked boundary ⇒ semantics theorem applies` wrapper most users want.
+This is the direct `checked boundary ⇒ semantics theorem applies` wrapper.
 -/
 theorem toReal_discountedBackupIEEE32ExecChecked_eq_fp32Round_chain
     (reward gamma bootstrap : TorchLean.Floats.IEEE754.IEEE32Exec) (done : Bool)

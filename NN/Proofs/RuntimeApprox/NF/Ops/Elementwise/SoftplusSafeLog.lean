@@ -117,16 +117,41 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
 
   -- Step 2: `1 + exp x` approximation.
   let oneR : R := (1 : R)
+  have hOneVal :
+      oneR.val = oneHat (β := β) (fexp := fexp) (rnd := rnd) := by
+    change
+      (TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ)).val =
+        oneHat (β := β) (fexp := fexp) (rnd := rnd)
+    rfl
   have hone :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) oneR - (1 : ℝ)) ≤
         oneEps (β := β) (fexp := fexp) := by
-    simpa [oneEps, NFBackend.toSpec, TorchLean.Floats.NF.toReal,
-      Proofs.RuntimeRoundingApprox.roundR,
-      TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal, TorchLean.Floats.NF.instOne] using
+    change abs (oneR.val - (1 : ℝ)) ≤ oneEps (β := β) (fexp := fexp)
+    rw [hOneVal]
+    simpa [oneEps, oneHat, NFBackend.toSpec, TorchLean.Floats.NF.toReal,
+      Proofs.RuntimeRoundingApprox.roundR] using
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ))
 
   let yR : R := oneR + MathFunctions.exp xR
   let y : ℝ := (1 : ℝ) + Real.exp x
+  have hExpVal :
+      (MathFunctions.exp xR).val =
+        expHat (β := β) (fexp := fexp) (rnd := rnd)
+          (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) := by
+    simp [expHat, NFBackend.toSpec, TorchLean.Floats.NF.toReal,
+      Proofs.RuntimeRoundingApprox.roundR, TorchLean.Floats.NF.roundR,
+      TorchLean.Floats.NF.ofReal, MathFunctions.exp]
+  have hYVal :
+      yR.val =
+        addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd)
+          (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) := by
+    change
+      (TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd)
+        (oneR.val + (MathFunctions.exp xR).val)).val =
+        addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd)
+          (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
+    rw [hOneVal, hExpVal]
+    rfl
 
   have hy :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR - y) ≤
@@ -141,9 +166,11 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
           rnd) xR) eps)
         hone hexp
     -- Rewrite to match the local definitions.
-    simpa [yR, y, addBoundSoftplus, expBoundScalar, oneHat, expHat,
+    simpa [oneR, yR, y, addBoundSoftplus, expBoundScalar, oneHat, expHat,
+      hOneVal, hExpVal,
       NFBackend.toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
       TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal, TorchLean.Floats.NF.instOne,
+      TorchLean.Floats.NF.instAdd, One.one, MathFunctions.exp,
       toSpec_exp (β := β) (fexp := fexp) (rnd := rnd) xR] using hadd
 
   -- Step 3: `safeLog 1` turns this into `softplus`.
@@ -152,6 +179,18 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
       (x := y) (xR := yR) (eps := addBoundSoftplus (β := β) (fexp := fexp) (rnd := rnd) (toSpec (β
         := β) (fexp := fexp) (rnd := rnd) xR) eps)
       (ε := (1 : ℝ)) (hε := by norm_num) hy
+  have hlog' :
+      abs (toSpec (β := β) (fexp := fexp) (rnd := rnd)
+        (safeLogR (β := β) (fexp := fexp) (rnd := rnd) (ε := (1 : ℝ)) yR) -
+          safeLog (ε := (1 : ℝ)) y) ≤
+        addBoundSoftplus (β := β) (fexp := fexp) (rnd := rnd)
+          (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) eps +
+          neuralUlp β fexp
+            (safeLog (ε := (1 : ℝ))
+              (addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd)
+                (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)))
+            TrainingPhase.forward / 2 := by
+    simpa [NFBackend.toSpec, TorchLean.Floats.NF.toReal, hYVal] using hlog
 
   have hy_ge : (1 : ℝ) ≤ y := by
     have : 0 ≤ Real.exp x := by simpa using (Real.exp_nonneg x)
@@ -166,7 +205,12 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
       _ = Activation.Math.softplusSpec (α := ℝ) x := rfl
 
   -- `softplusR` is exactly `safeLogR 1 (1 + exp xR)`.
-  simpa [softplusR, yR, hsimp, softplusBoundScalar, addHatSoftplus] using hlog
+  simpa [oneR, softplusR, yR, hsimp, softplusBoundScalar, addHatSoftplus,
+    hYVal,
+    NFBackend.toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
+    TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal, TorchLean.Floats.NF.instOne,
+    TorchLean.Floats.NF.instAdd, One.one, MathFunctions.exp,
+    toSpec_exp (β := β) (fexp := fexp) (rnd := rnd) xR] using hlog'
 
 /--
 Per-entry bound tensor for `softplusR`.
@@ -244,7 +288,7 @@ private lemma softplus_spec_nonneg (x : ℝ) :
   simp [Proofs.mathfunc_exp_eq_rexp]
   have h1 : (1 : ℝ) ≤ (1 : ℝ) + Real.exp x := by
     linarith [Real.exp_pos x]
-  simpa using (Real.log_nonneg h1)
+  simpa [MathFunctions.log] using (Real.log_nonneg h1)
 
 /--
 `safe_log_spec` is `(1/ε)`-Lipschitz for `ε > 0`.
@@ -464,4 +508,3 @@ end
 
 end RuntimeApprox
 end Proofs
-

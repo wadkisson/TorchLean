@@ -226,7 +226,7 @@ Reduce-mean along a given `axis`.
 
 PyTorch comparison: `torch.mean(x, dim=axis)`.
 -/
-def reduceMean {α : Type} {Δ : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+def reduceMean {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {s : Shape} (axis : Nat)
   [valid : Shape.valid_axis_inst axis s] [wf : Shape.WellFormed s]
   (x : Var s) : MWith α Δ Γ (Var (shapeAfterSum s axis)) := do

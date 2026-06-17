@@ -7,6 +7,10 @@ Authors: TorchLean Team
 module
 
 public import NN.Verification.Robustness.Digits
+public import NN.Verification.Robustness.MarginCert
+public import NN.Verification.Robustness.MarginCertCLI
+public import NN.Verification.Robustness.TopLabel
+public import NN.Verification.Robustness.TorchLean
 
 /-!
 # Robustness verification

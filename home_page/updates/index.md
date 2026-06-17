@@ -16,7 +16,8 @@ For source-level provenance and third-party notes, use
 ## Index
 
 - [May 2026: Repository Modularization and Comment Cleanup](#may-2026-repository-modularization-and-comment-cleanup)
-- [May 2026: Lean 4.30 and Runtime API Update](#may-2026-lean-430-and-runtime-api-update)
+- [June 2026: Lean 4.31 Migration](#june-2026-lean-431-migration)
+- [May 2026: Runtime API Update](#may-2026-runtime-api-update)
 - [May 2026: CUDA Training Stability Update](#may-2026-cuda-training-stability-update)
 - [May 2026: Introductory Data Note](#may-2026-introductory-data-note)
 - [May 2026: TorchLean Released](#may-2026-torchlean-released)
@@ -41,14 +42,24 @@ to TorchLean's mathematical or runtime semantics:
 This pass does not change model semantics, verification claims, CUDA behavior,
 or trusted boundaries.
 
-## May 2026: Lean 4.30 and Runtime API Update
+## June 2026: Lean 4.31 Migration
 
-TorchLean now builds with `leanprover/lean4:v4.30.0`. The Lake manifests, the
-Verso guide package, and the website build metadata have been updated together
-so the README, guide, and generated site agree about the toolchain.
+TorchLean now builds with `leanprover/lean4:v4.31.0`. The root Lake manifest,
+Mathlib pin, documentation generator pin, Verso blueprint toolchain, website
+metadata, README, and formalization metadata were moved together so the public
+repository state agrees about the Lean version.
 
-This update also documents the runtime pieces that were added while tightening
-long CUDA runs:
+The migration fixed proof-term breakages in differentiability and autograd
+composition files where Lean 4.31 became stricter about composed functions and
+eventual equality. The full repository build was rerun on 4.31.
+
+## May 2026: Runtime API Update
+
+This earlier update added runtime pieces that were needed for longer training
+runs and a cleaner public API. The current Lean toolchain is recorded in the
+repository root, the blueprint package, and the formalization metadata.
+
+The runtime pieces added in that pass were:
 
 - runtime-side Float initializers for large CPU/CUDA modules;
 - shape-indexed initializer plans, so each parameter receives exactly one

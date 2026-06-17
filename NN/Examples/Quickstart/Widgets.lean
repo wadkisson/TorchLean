@@ -9,8 +9,7 @@ module
 public import NN.Entrypoint.Widgets
 public import NN.Floats.IEEEExec.Exec32
 public import NN.IR.Graph
-public import NN.Runtime.Training.Log
-public import NN.Tensor.API
+public import NN
 
 /-!
 # Quickstart: Widgets
@@ -18,7 +17,7 @@ public import NN.Tensor.API
 TorchLean widgets are editor-side inspection tools. They are not part of the runtime semantics and
 they do not change proofs; they simply render the values you already have in Lean.
 
-Use this file in the editor:
+Try these commands in the editor:
 
 - put the cursor on a `#tensor_view`, `#float32_view`, `#ir_view`, or `#train_log_view` command;
 - put the cursor on `#pytorch_translate_file` to preview a PyTorch-to-TorchLean skeleton;
@@ -33,15 +32,15 @@ This quickstart keeps only the smallest useful examples; the full widget gallery
 
 namespace NN.Examples.Quickstart.Widgets
 
-open Spec
+open TorchLean
 open TorchLean.Floats.IEEE754
 
 /-- A small vector, built with the same typed tensor constructor used in ordinary code. -/
-def vector : Spec.Tensor Float (shape![4]) :=
+def vector : Tensor.T Float (shape![4]) :=
   tensor! [1.0, 2.0, 3.0, 4.0]
 
 /-- A small matrix where the shape is visible both in the type and in the widget. -/
-def matrix : Spec.Tensor Int (shape![2, 3]) :=
+def matrix : Tensor.T Int (shape![2, 3]) :=
   tensor! [
     [1, 2, 3],
     [4, 5, 6]
@@ -59,8 +58,8 @@ def addGraph : NN.IR.Graph :=
       { id := 2, parents := [0, 1], kind := .add, outShape := shape![2] }
     ] }
 
-/-- A minimal train log; real training examples can write the same structure as JSON. -/
-def tinyTrainLog : Runtime.Training.TrainLog :=
+/-- A minimal training log; runtime examples can write the same structure as JSON. -/
+def tinyTrainLog : Training.TrainLog :=
   { title := "Quickstart loss"
     steps := #[0, 1, 2, 3]
     series := #[
@@ -69,10 +68,10 @@ def tinyTrainLog : Runtime.Training.TrainLog :=
     notes := #["editor-only visualization; runtime training logs use the same schema"] }
 
 /-!
-The commands below are ordinary Lean commands that render editor panels through ProofWidgets.
-They do not alter the definitions above and they are not part of any proof. This is why widgets are
-safe to keep in introductory examples: deleting the commands leaves the same tensors, graphs, logs, and Python
-source files behind.
+The commands below are ordinary Lean commands that render editor panels through ProofWidgets. They
+do not alter the definitions above and they are not part of any proof. This is why widgets are safe
+to keep in introductory examples: deleting the commands leaves the same tensors, graphs, logs, and
+Python source files behind.
 -/
 
 #tensor_view vector

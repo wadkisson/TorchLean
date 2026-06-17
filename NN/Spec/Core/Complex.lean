@@ -92,8 +92,7 @@ instance [BEq α] : BEq (Complex α) :=
 Order is only used in TorchLean for branchy ops like ReLU/max/min. Complex numbers do not have a
 canonical order, so we pick a simple *real-part* order: compare `re` and ignore `im`.
 
-This keeps the instance local to TorchLean’s branchy tensor operations and avoids changing
-mathlib’s `ℂ`.
+This instance is local to TorchLean’s branchy tensor operations and does not change mathlib’s `ℂ`.
 -/
 instance [LT α] : LT (Complex α) := ⟨fun x y => x.re < y.re⟩
 instance [LE α] : LE (Complex α) := ⟨fun x y => x.re ≤ y.re⟩

@@ -138,16 +138,16 @@ def tListFromJsonBits (tag : String) :
       let tail ← tListFromJsonBits (tag := tag) (ss := ss) tailJ
       pure (.cons head tail)
 
-/-- Write a Float parameter list using exact IEEE bit patterns rather than decimal floats. -/
-def writeTListBits (path : System.FilePath) {ss : List Shape}
+/-- Write Float parameters using exact IEEE bit patterns rather than decimal floats. -/
+def writeParamBits (path : System.FilePath) {ss : List Shape}
     (ps : Torch.TList Float ss) (pretty : Bool := true) : IO Unit := do
   let top : Lean.Json :=
     Lean.Json.mkObj [("format", Lean.Json.str formatTag), ("params", tListToJsonBits ps)]
   let s := if pretty then top.pretty else top.compress
   IO.FS.writeFile path s
 
-/-- Read a Float parameter list previously written by `writeTListBits`. -/
-def readTListBits (path : System.FilePath) {ss : List Shape} :
+/-- Read Float parameters previously written by `writeParamBits`. -/
+def readParamBits (path : System.FilePath) {ss : List Shape} :
     IO (Except String (Torch.TList Float ss)) := do
   let s ← IO.FS.readFile path
   match Lean.Json.parse s with

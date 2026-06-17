@@ -92,7 +92,7 @@ theorem toReal_roundDyadicToIEEE32_eq_fp32Round (d : Dyadic)
         simp [roundDyadicToIEEE32, hmbeq, hlogdef]
         intro hkLe
         have hkLe' : k ≤ 127 := by
-          simpa [hkdef] using hkLe
+          simpa [hkdef.symm] using hkLe
         exact (False.elim ((not_lt_of_ge hkLe') hkHi))
       have hfalse : isFinite (roundDyadicToIEEE32 d) = false := by
         rw [hround]
@@ -265,7 +265,7 @@ theorem toReal_roundDyadicToIEEE32_eq_fp32Round (d : Dyadic)
                   have hroundInt :
                       TorchLean.Floats.neuralNearestEven ((Nat.shiftLeft d.mant sh : Nat) : ℝ) =
                         Int.ofNat (Nat.shiftLeft d.mant sh) := by
-                    simpa using
+                    simpa [Nat.shiftLeft_eq] using
                       (TorchLean.Floats.NeuralValidRnd.id (rnd :=
                         TorchLean.Floats.neuralNearestEven)
                         (Int.ofNat (Nat.shiftLeft d.mant sh)))
@@ -332,7 +332,7 @@ theorem toReal_roundDyadicToIEEE32_eq_fp32Round (d : Dyadic)
                     have hroundInt :
                         TorchLean.Floats.neuralNearestEven ((Nat.shiftLeft d.mant sh : Nat) : ℝ) =
                           Int.ofNat (Nat.shiftLeft d.mant sh) := by
-                      simpa using
+                      simpa [Nat.shiftLeft_eq] using
                         (TorchLean.Floats.NeuralValidRnd.id (rnd :=
                           TorchLean.Floats.neuralNearestEven)
                           (Int.ofNat (Nat.shiftLeft d.mant sh)))
@@ -944,7 +944,7 @@ theorem toReal_roundDyadicToIEEE32_eq_fp32Round (d : Dyadic)
                     have hid :
                         TorchLean.Floats.neuralNearestEven ((Nat.shiftLeft d.mant sh : Nat) : ℝ) =
                           Int.ofNat (Nat.shiftLeft d.mant sh) := by
-                      simpa using
+                      simpa [Nat.shiftLeft_eq] using
                         (TorchLean.Floats.NeuralValidRnd.id (rnd :=
                           TorchLean.Floats.neuralNearestEven)
                           (Int.ofNat (Nat.shiftLeft d.mant sh)))
@@ -1102,4 +1102,3 @@ theorem toReal_roundDyadicToIEEE32_eq_fp32Round (d : Dyadic)
 end IEEE32Exec
 
 end TorchLean.Floats.IEEE754
-

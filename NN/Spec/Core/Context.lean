@@ -13,7 +13,7 @@ public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 public import Mathlib.Analysis.SpecialFunctions.Pow.Real
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
 public import Mathlib.Data.Real.Basic
-public import Mathlib.Data.Real.Sqrt
+public import Mathlib.Analysis.Real.Sqrt
 public import Mathlib.Logic.Basic
 
 /-!
@@ -35,8 +35,7 @@ Why we designed it this way:
   run verification bounds. Rewriting each model for each phase is error-prone.
 - A single scalar-polymorphic spec gives one source of truth for layers/models, while letting us
   swap numeric meaning by changing the scalar instance.
-- This keeps cross-checking honest: if behavior changes between backends, the difference is visible
-  at the scalar semantics layer, not hidden inside duplicated model definitions.
+- Cross-checking happens at the scalar semantics layer, not inside duplicated model definitions.
 - The tradeoff is a slightly larger scalar interface (`Context α`), but we accept that complexity
   to keep architecture-level duplication low and proofs/reuse high.
 

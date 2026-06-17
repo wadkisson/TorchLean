@@ -137,14 +137,12 @@ def matmulBilin {h m n p : Nat} :
           intro a1 a2
           ext bH head ip
           simp [ContinuousLinearMap.pi_apply, ContinuousLinearMap.proj_apply,
-            ContinuousLinearMap.comp_apply,
-            B, ContinuousLinearMap.add_apply, Pi.add_apply]
+            ContinuousLinearMap.comp_apply, B, Pi.add_apply]
         map_smul' := by
           intro r a1
           ext bH head ip
           simp [ContinuousLinearMap.pi_apply, ContinuousLinearMap.proj_apply,
-            ContinuousLinearMap.comp_apply,
-            B, ContinuousLinearMap.smul_apply, Pi.smul_apply, smul_eq_mul] }
+            ContinuousLinearMap.comp_apply, B, Pi.smul_apply, smul_eq_mul] }
     refine ⟨fLin, ?_⟩
     exact LinearMap.continuous_of_finiteDimensional (f := fLin)
 
@@ -179,7 +177,7 @@ def matmulBilin {h m n p : Nat} :
           congrArg (fun F => F (heads (h := h) (n := Matmul.matSize n p) bFlat q.1)) hB'
         have hBcoord := congrArg (fun v => v q.2) hBapp
         -- Expand the `unheads` projection at `ip` and finish.
-        simp [heads, q, ContinuousLinearMap.add_apply] at hBcoord
+        simp [heads, q] at hBcoord
         exact hBcoord
       map_smul' := by
         intro r a1
@@ -201,7 +199,7 @@ def matmulBilin {h m n p : Nat} :
         have hBapp :=
           congrArg (fun F => F (heads (h := h) (n := Matmul.matSize n p) bFlat q.1)) hB'
         have hBcoord := congrArg (fun v => v q.2) hBapp
-        simp [heads, q, ContinuousLinearMap.smul_apply, smul_eq_mul] at hBcoord
+        simp [heads, q, smul_eq_mul] at hBcoord
         exact hBcoord }
 
   refine ⟨fLin, ?_⟩
@@ -390,7 +388,8 @@ def softmaxLastFderiv {Γ : List Shape} {h m n : Nat}
       have happly :
           HasFDerivAt (fun r : (Fin h → Vec (m * n)) => r head)
             (ContinuousLinearMap.proj (R := ℝ) head) r0 := by
-        simpa using ((ContinuousLinearMap.proj (R := ℝ) head).hasFDerivAt (x := r0))
+        exact ((ContinuousLinearMap.proj (R := ℝ) head).hasFDerivAt (x := r0)).congr_of_eventuallyEq
+          (Filter.Eventually.of_forall fun _ => rfl)
       exact hsoft.comp r0 happly
 
     -- Linear reshapes/casts around the middle map.
@@ -424,7 +423,12 @@ def softmaxLastFderiv {Γ : List Shape} {h m n : Nat}
       -- chain `headsCLM` → `G` → `unheadsCLM`
       have hG' := hG.comp x0 hheads
       have hcomp := hunheads.comp x0 hG'
-      simpa [deriv0, G, r0] using hcomp
+      change HasFDerivAt
+        ((unheadsCLM (h := h) (n := m * n)) ∘
+          G ∘ (headsCLM (h := h) (n := m * n)))
+        (deriv0 x0) x0
+      simpa [deriv0, G, r0]
+        using hcomp
 
     have hcastOut :
         HasFDerivAt (fun y : Vec (h * (m * n)) => castVec hsz.symm y)

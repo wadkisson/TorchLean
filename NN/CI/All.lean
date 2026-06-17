@@ -17,7 +17,6 @@ public import NN.API.Public
 public import NN.API.Runtime
 public import NN.API.Samples
 public import NN.API.Samples.Bands
-public import NN.API.TList
 public import NN.API.TorchLean.Optimizers
 public import NN.API.TorchLean.Schedulers
 public import NN.Entrypoint.Floats
@@ -87,7 +86,6 @@ public import NN.Floats.NeuralFloat.Metadata
 public import NN.Floats.NeuralFloat.NF
 public import NN.Floats.NeuralFloat.NNOps
 public import NN.Floats.NeuralFloat.Rounding
-public import NN.Entrypoint.GraphSpec
 public import NN.Entrypoint.IR
 public import NN.MLTheory.API
 public import NN.MLTheory.CROWN.BoundOps
@@ -119,6 +117,7 @@ public import NN.MLTheory.CROWN.Proofs.AlphaBetaReLUScalarSoundness
 public import NN.MLTheory.CROWN.Proofs.Distillation
 public import NN.MLTheory.CROWN.Proofs.GraphAlphaCrownTransferSoundness
 public import NN.MLTheory.CROWN.Proofs.GraphCertSoundness
+
 public import NN.MLTheory.CROWN.Proofs.GraphCrownCertSoundness
 public import NN.MLTheory.CROWN.Proofs.GraphIBPBasicTheorems
 public import NN.MLTheory.CROWN.Proofs.GraphRunibpEndToEnd
@@ -336,37 +335,24 @@ public import NN.Verification.TorchLean.CompileExec
 public import NN.Verification.TorchLean.Correctness
 public import NN.Verification.TorchLean.Verified
 public import NN.Verification.TorchLean.SpecEval
+public import NN.Verification.Util.Array
 public import NN.Verification.Util.FloatApprox
 public import NN.Verification.Util.Json
+public import NN.Verification.Util.Tensor
 public import NN.Entrypoint.Widgets
 
 /-!
-CI-facing import sweep.
+# Broad CI Import Surface
 
-This file imports the public and internal surfaces that should remain buildable together in the
-continuous-integration configuration.
--/
+CI-only umbrella: import the maintained API, example, verification, floating-point, CROWN, and
+runtime surfaces that should stay buildable together. Use this as a build target, not as the default
+import for model code.
 
-/-!
-# All
+Local usage:
 
-CI-only umbrella: import (almost) everything under `NN/`.
-
-This module exists for CI. It pulls in the full library plus the curated examples so we can
-catch “works in one corner but not the other” breakage early.
-
-Developer tooling may refresh this file as new modules are added.
-
-What’s excluded:
-- A handful of *very slow* proofs (build them explicitly when you want CI coverage).
-- Any module that defines a top-level `main` (importing two executable roots into the same
-  environment causes a `main` name clash). Those are checked by building `lake exe …` targets
-  directly instead.
-
-Local usage (slow):
-- `lake build NN.CI.All`
-
-Please don’t import this from user-facing modules (`import NN`).
+```bash
+lake build NN.CI.All
+```
 -/
 
 @[expose] public section

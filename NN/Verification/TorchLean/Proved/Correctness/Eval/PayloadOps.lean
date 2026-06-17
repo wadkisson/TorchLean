@@ -60,7 +60,7 @@ def constGraph (s : Shape) : Graph :=
 
 /-- Local IR semantics for a payload-backed flat `const` node. -/
 theorem evalConst_eq_unflatten
-    {α : Type} [Context α] [Inhabited α]
+    {α : Type} [Context α]
     (id : Nat) (s : Shape)
     (v : Tensor α (.dim (Shape.size s) .scalar)) :
     let c : ConstFlat α := { n := Shape.size s, v := v }
@@ -71,7 +71,7 @@ theorem evalConst_eq_unflatten
 
 /-- Local IR semantics for a payload-backed flat `const` node. -/
 theorem evalAt_const_eq_unflatten
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Shape]
     (s : Shape)
     (v : Tensor α (.dim (Shape.size s) .scalar)) :
     let c : ConstFlat α := { n := Shape.size s, v := v }
@@ -87,7 +87,7 @@ theorem evalAt_const_eq_unflatten
 
 /-- Missing constant payloads are rejected before unflattening. -/
 theorem evalConst_missing_payload
-    {α : Type} [Context α] [Inhabited α]
+    {α : Type} [Context α]
     (payload : Payload α) (id : Nat) (s : Shape)
     (hMissing : payload.const? id = none) :
     Graph.evalConst (α := α) (payload := payload) (id := id) (s := s)

@@ -97,10 +97,9 @@ def gymnasium {obsShape : Shape} {nActions : Nat}
 /--
 Build a `CheckedSession` from a pure Lean-native environment (`Spec.RL.Env`).
 
-Even though the dynamics are defined in Lean, we keep the same trust-boundary contract checker in
-the loop. This keeps the downstream training code uniform: it consumes the same
-`Spec.RL.ObservedTransition`-shaped data regardless of whether the environment is external or
-internal.
+Even though the dynamics are defined in Lean, we use the same trust-boundary contract checker in
+the loop. Downstream training consumes the same `Spec.RL.ObservedTransition`-shaped data for
+external and internal environments.
 -/
 def ofEnv {State : Type} {obsShape : Shape} {nActions : Nat}
     (env : Spec.RL.Env State (Fin nActions) (Tensor Float obsShape) Float)

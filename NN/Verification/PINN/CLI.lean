@@ -6,9 +6,11 @@ Authors: TorchLean Team
 
 module
 
+public import NN.API.CLI
 public import NN.Verification.PINN.Core
 public import NN.Verification.PINN.PdeParse
 public import NN.Verification.PINN.PyTorch
+public import NN.Verification.Util.Json
 
 /-!
 # PINN CLI
@@ -81,7 +83,10 @@ noncomputable def computePrimsAtNF (g : Graph) {β : NeuralRadix} {fexp : ℤ �
     (ps : ParamStore (NF β fexp rnd)) (_useAffineU : Bool := false) : IO Prims := do
   let outId := NN.Verification.PINN.SequentialPINNArch.graphOutputId g
   let ibp := runIBP (α:=NF β fexp rnd) g ps
-  let some outB := ibp[outId]! | throw <| IO.userError "IBP failed at output (NF)"
+  let outB ←
+    match NN.MLTheory.CROWN.Graph.outputBox? ibp outId with
+    | .ok outB => pure outB
+    | .error msg => throw <| IO.userError s!"IBP failed at output (NF): {msg}"
   let uLoA := Spec.Tensor.sumSpec outB.lo
   let uHiA := Spec.Tensor.sumSpec outB.hi
   let uLo := realToFloat (NF.toReal uLoA)
@@ -96,8 +101,8 @@ noncomputable def computePrimsAtNF (g : Graph) {β : NeuralRadix} {fexp : ℤ �
   let seedX := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 0)
   let d1x := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedX
   let d2x := runDeriv2D (α:=NF β fexp rnd) g ps ibp d1x
-  let d1xOpt := d1x[outId]!
-  let d2xOpt := d2x[outId]!
+  let d1xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d1x outId).toOption
+  let d2xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d2x outId).toOption
   let (duX, d2uX) :=
     match d1xOpt, d2xOpt with
     | some dxB, some d2xB =>
@@ -112,24 +117,24 @@ noncomputable def computePrimsAtNF (g : Graph) {β : NeuralRadix} {fexp : ℤ �
     if hasY then
       let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 1)
       let d1y := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedY
-      match d1y[outId]! with
-      | some dyB =>
+      match NN.MLTheory.CROWN.Graph.outputBox? d1y outId with
+      | .ok dyB =>
         let l := realToFloat (NF.toReal (Spec.Tensor.sumSpec dyB.lo))
         let h := realToFloat (NF.toReal (Spec.Tensor.sumSpec dyB.hi))
         some (l, h)
-      | none => none
+      | .error _ => none
     else none
   let d2uY : Option (Float × Float) :=
     if hasY then
       let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 1)
       let d1y := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedY
       let d2y := runDeriv2D (α:=NF β fexp rnd) g ps ibp d1y
-      match d2y[outId]! with
-      | some d2yB =>
+      match NN.MLTheory.CROWN.Graph.outputBox? d2y outId with
+      | .ok d2yB =>
         let l := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2yB.lo))
         let h := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2yB.hi))
         some (l, h)
-      | none => none
+      | .error _ => none
     else none
   let base : Prims := { u := some (uLo, uHi), duX := duX, duY := duY, d2uX := d2uX, d2uY := d2uY }
   pure base
@@ -144,20 +149,15 @@ inductive Backend where
   | neuralfloat
 
 /-- Parse the backend flag used by the PINN residual CLI. -/
-def parseBackendArg (s : String) : Option Backend :=
+def parseBackendVal (s : String) : Option Backend :=
   match s with
-  | "--backend=float" => some .float
-  | "--backend=neuralfloat" => some .neuralfloat
+  | "float" => some .float
+  | "neuralfloat" => some .neuralfloat
   | _ => none
 
-private def parseWeightsArg (s : String) : Option String :=
-  if s.startsWith "--weights=" then some ((s.drop 10).toString) else none
-
-/-- Parse a JSON-style Float literal, rejecting trailing characters. -/
-def parseFloat (s : String) : Option Float :=
-  match parseNumber { s := s } with
-  | .ok (v, st) => if st.i = s.rawEndPos then some v else none
-  | .error _ => none
+/-- Parse a decimal Float literal used by CLI flags. -/
+def parseFloat : String → Option Float :=
+  NN.API.CLI.parseFloatLit
 
 /-- Parse a non-scientific decimal string into a generic numeric α using Numbers and Context.
   Supports optional leading '-' and a single '.'. -/
@@ -225,7 +225,10 @@ def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod 
         ("[PINN] backend=neuralfloat: using Float propagation; rounding-aware " ++
           "routines will be used where available.")
       pure (runIBP (α:=Float) g ps)
-  let some outB := ibp[outId]! | throw <| IO.userError "IBP failed at output"
+  let outB ←
+    match NN.MLTheory.CROWN.Graph.outputBox? ibp outId with
+    | .ok outB => pure outB
+    | .error msg => throw <| IO.userError s!"IBP failed at output: {msg}"
   let uLo := Spec.Tensor.sumSpec outB.lo
   let uHi := Spec.Tensor.sumSpec outB.hi
   -- Determine input dimension from graph's input node shape
@@ -242,8 +245,8 @@ def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod 
   let seedX := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := Float) inDim 0)
   let d1x := runDerivDirectional (α:=Float) g ps ibp seedX
   let d2x := runDeriv2D (α:=Float) g ps ibp d1x
-  let d1xOpt := d1x[outId]!
-  let d2xOpt := d2x[outId]!
+  let d1xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d1x outId).toOption
+  let d2xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d2x outId).toOption
   let (duX, d2uX) :=
     match d1xOpt, d2xOpt with
     | some dxB, some d2xB =>
@@ -255,18 +258,18 @@ def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod 
     if hasY then
       let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := Float) inDim 1)
       let d1y := runDerivDirectional (α:=Float) g ps ibp seedY
-      match d1y[outId]! with
-      | some dyB => some (Spec.Tensor.sumSpec dyB.lo, Spec.Tensor.sumSpec dyB.hi)
-      | none => none
+      match NN.MLTheory.CROWN.Graph.outputBox? d1y outId with
+      | .ok dyB => some (Spec.Tensor.sumSpec dyB.lo, Spec.Tensor.sumSpec dyB.hi)
+      | .error _ => none
     else none
   let d2uY : Option (Float × Float) :=
     if hasY then
       let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := Float) inDim 1)
       let d1y := runDerivDirectional (α:=Float) g ps ibp seedY
       let d2y := runDeriv2D (α:=Float) g ps ibp d1y
-      match d2y[outId]! with
-      | some d2yB => some (Spec.Tensor.sumSpec d2yB.lo, Spec.Tensor.sumSpec d2yB.hi)
-      | none => none
+      match NN.MLTheory.CROWN.Graph.outputBox? d2y outId with
+      | .ok d2yB => some (Spec.Tensor.sumSpec d2yB.lo, Spec.Tensor.sumSpec d2yB.hi)
+      | .error _ => none
     else none
   let base : Prims := { u := some (uLo, uHi), duX := duX, duY := duY, d2uX := d2uX, d2uY := d2uY }
   match uMethod with
@@ -279,6 +282,42 @@ def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod 
     match crownUBoundsBackward g ps ibp with
     | some (al, ah) => pure { base with u := some (al, ah) }
     | none => pure base
+
+/--
+Load optional PyTorch-exported PINN weights for the exploratory CLI.
+
+Malformed files or mismatched input dimensions fall back to the provided built-in graph and
+parameters. That permissive behavior is intentional here: `pinn-cli` is an interactive inspection
+tool. Stable certificate checkers should reject bad artifacts instead.
+-/
+def loadWeightsOrDefault
+    (weights? : Option String)
+    (expectedInputDim : Nat)
+    (defaultGraph : Graph)
+    (defaultParams : ParamStore Float) :
+    IO (Graph × ParamStore Float) := do
+  match weights? with
+  | none => pure (defaultGraph, defaultParams)
+  | some path => do
+      try
+        let j ← NN.Verification.Json.readJsonFile path
+        match Import.PINNPyTorch.loadPinnState j with
+        | some sd =>
+            if sd.arch.inputDim ≠ expectedInputDim then
+              IO.eprintln <|
+                (s!"[PINN] Loaded weights expect input dim={sd.arch.inputDim}; using " ++
+                  s!"built-in {expectedInputDim}D weights.")
+              pure (defaultGraph, defaultParams)
+            else
+              pure (Import.PINNPyTorch.buildGraph sd, Import.PINNPyTorch.toParamStore sd)
+        | none =>
+            IO.eprintln <|
+              ("[PINN] Weights JSON did not match expected shapes; falling back to " ++
+                "built-in weights")
+            pure (defaultGraph, defaultParams)
+      catch e =>
+        IO.eprintln s!"[PINN] Failed to parse weights JSON: {e}; falling back to built-in weights"
+        pure (defaultGraph, defaultParams)
 
 /-- User-facing bound method selected by `--method`. -/
 inductive Method
@@ -313,40 +352,21 @@ structure Opts where
   splitDepth : Nat := 0
 
 /-- Parse recognized flags and return the remaining positional arguments. -/
-partial def parseFlags (opts : Opts) (args : List String) : Opts × List String :=
-  match args with
-  | [] => (opts, [])
-  | s :: xs =>
-    if s.startsWith "--weights=" then
-      parseFlags { opts with weights? := some ((s.drop 10).toString) } xs
-    else if s.startsWith "--split-depth=" then
-      match ((s.drop 14).toString).toNat? with
-      | some n => parseFlags { opts with splitDepth := n } xs
-      | none => parseFlags opts xs
-    else if s.startsWith "--method=" then
-      match parseMethodVal ((s.drop 9).toString) with
-      | some m => parseFlags { opts with method := m } xs
-      | none => parseFlags opts xs
-    else if s = "--method" then
-      match xs with
-      | v :: rest =>
-        match parseMethodVal v with
-        | some m => parseFlags { opts with method := m } rest
-        | none => parseFlags opts xs
-      | [] => (opts, [])
-    else
-      match parseBackendArg s with
-      | some b => parseFlags { opts with backend := b } xs
-      | none =>
-        if s = "--backend" then
-          match xs with
-          | v :: rest =>
-            match parseBackendArg ("--backend=" ++ v) with
-            | some b => parseFlags { opts with backend := b } rest
-            | none => (opts, args)
-          | [] => (opts, [])
-        else
-          (opts, args)
+def parseFlags (args : List String) : Except String (Opts × List String) := do
+  let args := NN.API.CLI.dropDashDash args
+  let (weights?, args) ← NN.API.CLI.takeFlagValueOnce args "weights"
+  let (splitDepth, args) ← NN.API.CLI.takeNatFlagDefault args "split-depth" 0
+  let (method, args) ←
+    NN.API.CLI.takeParsedFlagDefault args "method" "ibp" fun s =>
+      match parseMethodVal s with
+      | some method => pure method
+      | none => throw s!"--method: expected ibp, crown, crown-fwd, or crown-bwd; got `{s}`"
+  let (backend, args) ←
+    NN.API.CLI.takeParsedFlagDefault args "backend" "float" fun s =>
+      match parseBackendVal s with
+      | some backend => pure backend
+      | none => throw s!"--backend: expected float or neuralfloat; got `{s}`"
+  pure ({ method := method, backend := backend, weights? := weights?, splitDepth := splitDepth }, args)
 
 /--
 Entry point for the PINN residual-bounding CLI.
@@ -364,7 +384,10 @@ or (2D):
 `lake exe verify -- pinn-cli -- [flags] "<PDE>" x y eps`
 -/
 def main (args : List String) : IO Unit := do
-  let (opts, rest) := parseFlags {} args
+  let (opts, rest) ←
+    match parseFlags args with
+    | .ok parsed => pure parsed
+    | .error e => throw <| IO.userError e
   let method := opts.method
   let backend := opts.backend
   let weights? := opts.weights?
@@ -412,30 +435,7 @@ def main (args : List String) : IO Unit := do
           match parseExpr (fun _ => none) pdeStr with
           | .ok e => pure e
           | .error msg => throw <| IO.userError s!"Parse error: {msg}"
-        let (g, ps0) ← match weights? with
-          | some path => do
-            let jsonStr ← IO.FS.readFile path
-            match Lean.Json.parse jsonStr with
-            | Except.error msg =>
-              IO.eprintln
-                s!"[PINN] Failed to parse weights JSON: {msg}; falling back to built-in weights"
-              pure (buildGraph, seedParamsFloat)
-            | Except.ok j =>
-              match Import.PINNPyTorch.loadPinnState j with
-              | some sd =>
-                if sd.arch.inputDim ≠ 1 then
-                  IO.eprintln <|
-                    (s!"[PINN] Loaded weights expect input dim={sd.arch.inputDim}; using " ++
-                      "built-in 1D weights.")
-                  pure (buildGraph, seedParamsFloat)
-                else
-                  pure (Import.PINNPyTorch.buildGraph sd, Import.PINNPyTorch.toParamStore sd)
-              | none =>
-                IO.eprintln <|
-                  ("[PINN] Weights JSON did not match expected shapes; falling back to " ++
-                    "built-in weights")
-                pure (buildGraph, seedParamsFloat)
-          | none => pure (buildGraph, seedParamsFloat)
+        let (g, ps0) ← loadWeightsOrDefault weights? 1 buildGraph seedParamsFloat
         let evalAt : Float → Float → IO (Float × Float) :=
           fun xc epsc => do
             let ps := seedInputFloat ps0 xc epsc
@@ -475,30 +475,7 @@ def main (args : List String) : IO Unit := do
           match parseExpr (fun _ => none) pdeStr with
           | .ok e => pure e
           | .error msg => throw <| IO.userError s!"Parse error: {msg}"
-        let (g, ps0) ← match weights? with
-          | some path => do
-            let jsonStr ← IO.FS.readFile path
-            match Lean.Json.parse jsonStr with
-            | Except.error msg =>
-              IO.eprintln
-                s!"[PINN] Failed to parse weights JSON: {msg}; falling back to built-in weights"
-              pure (buildGraph2D, seedParamsFloat2D)
-            | Except.ok j =>
-              match Import.PINNPyTorch.loadPinnState j with
-              | some sd =>
-                if sd.arch.inputDim ≠ 2 then
-                  IO.eprintln <|
-                    (s!"[PINN] Loaded weights expect input dim={sd.arch.inputDim}; using " ++
-                      "built-in 2D weights.")
-                  pure (buildGraph2D, seedParamsFloat2D)
-                else
-                  pure (Import.PINNPyTorch.buildGraph sd, Import.PINNPyTorch.toParamStore sd)
-              | none =>
-                IO.eprintln <|
-                  ("[PINN] Weights JSON did not match expected shapes; falling back to " ++
-                    "built-in weights")
-                pure (buildGraph2D, seedParamsFloat2D)
-          | none => pure (buildGraph2D, seedParamsFloat2D)
+        let (g, ps0) ← loadWeightsOrDefault weights? 2 buildGraph2D seedParamsFloat2D
         let evalAt : Float → Float → Float → IO (Float × Float) :=
           fun xc yc epsc => do
             let ps := seedInputFloat2D ps0 xc yc epsc

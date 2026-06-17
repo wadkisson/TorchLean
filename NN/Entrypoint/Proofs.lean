@@ -81,8 +81,7 @@ Proof-facing landmarks:
 References / context:
 - PyTorch autograd background:
   https://pytorch.org/docs/stable/autograd.html
-- The theorem bundles re-exported here document the math/model references they rely on locally, so
-  this file stays a stable import surface rather than duplicating long bibliographies.
+- The theorem bundles re-exported here document the math/model references they rely on locally.
 -/
 
 @[expose] public section

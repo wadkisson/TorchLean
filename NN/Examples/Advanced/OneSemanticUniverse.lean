@@ -46,7 +46,7 @@ namespace NN.Examples.Advanced.OneSemanticUniverse
 open Spec
 open Tensor
 open NN.Tensor
-open NN.API
+open _root_.TorchLean
 
 open NN.IR
 open NN.MLTheory.CROWN
@@ -54,18 +54,30 @@ open NN.MLTheory.CROWN.Graph
 
 open TorchLean.Floats
 
+/-- Command-line help for the one-semantics tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean one semantic universe tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean one_semantic_universe [options]"
+    , ""
+    , "Options:"
+    , "  --samples N"
+    ]
+
 def inDim : Nat := 4
 def hidDim : Nat := 5
 def outDim : Nat := 3
 
-def xShape : Spec.Shape := NN.Tensor.Shape.Vec inDim
-def hShape : Spec.Shape := NN.Tensor.Shape.Vec hidDim
-def yShape : Spec.Shape := NN.Tensor.Shape.Vec outDim
+def xShape : Shape := Shape.vec inDim
+def hShape : Shape := Shape.vec hidDim
+def yShape : Shape := Shape.vec outDim
 
-def W1Shape : Spec.Shape := NN.Tensor.Shape.Mat hidDim inDim
-def b1Shape : Spec.Shape := NN.Tensor.Shape.Vec hidDim
-def W2Shape : Spec.Shape := NN.Tensor.Shape.Mat outDim hidDim
-def b2Shape : Spec.Shape := NN.Tensor.Shape.Vec outDim
+def W1Shape : Shape := Shape.mat hidDim inDim
+def b1Shape : Shape := Shape.vec hidDim
+def W2Shape : Shape := Shape.mat outDim hidDim
+def b2Shape : Shape := Shape.vec outDim
 
 structure Params (α : Type) where
   /-- Weight matrix for layer 1. -/
@@ -102,8 +114,10 @@ def g : NN.IR.Graph :=
   let n1 : NN.IR.Node := { id := 1, parents := [0], kind := .linear, outShape := hShape }
   let n2 : NN.IR.Node := { id := 2, parents := [1], kind := .relu, outShape := hShape }
   let n3 : NN.IR.Node := { id := 3, parents := [2], kind := .linear, outShape := yShape }
-  let n4 : NN.IR.Node := { id := 4, parents := [3], kind := .sum, outShape := Spec.Shape.scalar }
-  let n5 : NN.IR.Node := { id := 5, parents := [4], kind := .tanh, outShape := Spec.Shape.scalar }
+  let n4 : NN.IR.Node :=
+    { id := 4, parents := [3], kind := .sum, outShape := _root_.TorchLean.Shape.scalar }
+  let n5 : NN.IR.Node :=
+    { id := 5, parents := [4], kind := .tanh, outShape := _root_.TorchLean.Shape.scalar }
   { nodes := #[n0, n1, n2, n3, n4, n5] }
 
 def mkPayload {α : Type} [Context α] (p : Params α) : NN.IR.Payload α :=
@@ -123,13 +137,14 @@ def mkParamStore {α : Type} [Context α] (p : Params α) (xB : FlatBox α) : Pa
         |>.insert 3 { m := outDim, n := hidDim, w := p.W2, b := p.b2 } }
 
 def evalOut
-    {α : Type} [Context α] [Inhabited α] [DecidableEq Spec.Shape]
-    (p : Params α) (x : Spec.Tensor α xShape) : Except String (Spec.Tensor α Spec.Shape.scalar) :=
+    {α : Type} [Context α] [DecidableEq Shape]
+    (p : Params α) (x : Spec.Tensor α xShape) :
+    Except String (Spec.Tensor α _root_.TorchLean.Shape.scalar) :=
       do
   let payload := mkPayload (α := α) p
   let input : DVal α := DVal.mk (α := α) xShape x
   let v ← NN.IR.Graph.denote (α := α) (g := g) (payload := payload) (input := input) (outputId := 5)
-  NN.IR.Graph.expectShape (α := α) (expected := Spec.Shape.scalar) v
+  NN.IR.Graph.expectShape (α := α) (expected := _root_.TorchLean.Shape.scalar) v
 
 /-!
 ### Proof-only instantiations (typechecks)
@@ -146,11 +161,11 @@ section ProofOnly
 noncomputable example : True := by
   have _ :
       ∀ (p : Params ℝ) (x : Spec.Tensor ℝ xShape),
-        Except String (Spec.Tensor ℝ Spec.Shape.scalar) :=
+        Except String (Spec.Tensor ℝ _root_.TorchLean.Shape.scalar) :=
     fun p x => evalOut (α := ℝ) p x
   have _ :
       ∀ (p : Params TorchLean.Floats.FP32) (x : Spec.Tensor TorchLean.Floats.FP32 xShape),
-        Except String (Spec.Tensor TorchLean.Floats.FP32 Spec.Shape.scalar) :=
+        Except String (Spec.Tensor TorchLean.Floats.FP32 _root_.TorchLean.Shape.scalar) :=
     fun p x => evalOut (α := TorchLean.Floats.FP32) p x
   have _ :
       ∀ (ps : ParamStore ℝ), Array (Option (FlatBox ℝ)) :=
@@ -166,8 +181,8 @@ end ProofOnly
 def x0Float : Spec.Tensor Float xShape :=
   tensorND! (ty := Float) [inDim] [0.3, -0.2, 0.1, 0.4]
 
-def xBoxOf (α : Type) [Semantics.Scalar α] [Runtime.Scalar α] (eps : Float) : Box α xShape :=
-  let x0 : Spec.Tensor α xShape := Common.castTensor Runtime.ofFloat x0Float
+def xBoxOf (α : Type) [Runtime.SemanticScalar α] [Runtime.Scalar α] (eps : Float) : Box α xShape :=
+  let x0 : Spec.Tensor α xShape := Tensor.castFloat Runtime.ofFloat x0Float
   let r : α := Runtime.ofFloat eps
   let rad : Spec.Tensor α xShape := Spec.fill (α := α) r xShape
   { lo := Spec.Tensor.subSpec (α := α) x0 rad
@@ -176,12 +191,13 @@ def xBoxOf (α : Type) [Semantics.Scalar α] [Runtime.Scalar α] (eps : Float) :
 def toFlatXBox {α : Type} [Context α] (B : Box α xShape) : FlatBox α :=
   { dim := inDim, lo := B.lo, hi := B.hi }
 
-def scalarBoxOfFlat (B : FlatBox IEEE32Exec) : Except String (Box IEEE32Exec Spec.Shape.scalar) :=
+def scalarBoxOfFlat (B : FlatBox IEEE32Exec) :
+    Except String (Box IEEE32Exec _root_.TorchLean.Shape.scalar) :=
   do
   if h : B.dim = 1 then
-    let loT : Spec.Tensor IEEE32Exec (Shape.Vec 1) :=
+    let loT : Spec.Tensor IEEE32Exec (Shape.vec 1) :=
       Spec.Tensor.castVecDim (α := IEEE32Exec) (n := B.dim) (m := 1) h B.lo
-    let hiT : Spec.Tensor IEEE32Exec (Shape.Vec 1) :=
+    let hiT : Spec.Tensor IEEE32Exec (Shape.vec 1) :=
       Spec.Tensor.castVecDim (α := IEEE32Exec) (n := B.dim) (m := 1) h B.hi
     let l : IEEE32Exec := Spec.Tensor.vecGet (α := IEEE32Exec) loT fin0!
     let u : IEEE32Exec := Spec.Tensor.vecGet (α := IEEE32Exec) hiT fin0!
@@ -208,7 +224,7 @@ def showIEEECheck (samples : Nat) : IO Unit := do
   let xBIEEE : FlatBox IEEE32Exec := toFlatXBox (α := IEEE32Exec) BIEEE
 
   -- Evaluate at the center point.
-  let x0IEEE : Spec.Tensor IEEE32Exec xShape := Common.castTensor Runtime.ofFloat x0Float
+  let x0IEEE : Spec.Tensor IEEE32Exec xShape := Tensor.castFloat Runtime.ofFloat x0Float
   match evalOut (α := IEEE32Exec) pIEEE x0IEEE with
   | .error msg => throw <| IO.userError msg
   | .ok y0 =>
@@ -217,7 +233,11 @@ def showIEEECheck (samples : Nat) : IO Unit := do
   -- Compute IBP box (IEEE endpoints with directed rounding via `BoundOps IEEE32Exec`).
   let ps := mkParamStore (α := IEEE32Exec) pIEEE xBIEEE
   let ibp := runIBP (α := IEEE32Exec) g ps
-  let some outFlat := ibp[5]! | throw <| IO.userError "IBP produced no output box at node 5"
+  let outEntry ←
+    match ibp[5]? with
+    | some outEntry => pure outEntry
+    | none => throw <| IO.userError "IBP did not produce an entry for node 5"
+  let some outFlat := outEntry | throw <| IO.userError "IBP produced no output box at node 5"
   let outBox ←
     match scalarBoxOfFlat outFlat with
     | .error msg => throw <| IO.userError msg
@@ -235,7 +255,8 @@ def showIEEECheck (samples : Nat) : IO Unit := do
     match evalOut (α := IEEE32Exec) pIEEE x with
     | .error msg => throw <| IO.userError msg
     | .ok y =>
-        let outOk := Box.containsDecBool (α := IEEE32Exec) (s := Spec.Shape.scalar) outBox y
+        let outOk :=
+          Box.containsDecBool (α := IEEE32Exec) (s := _root_.TorchLean.Shape.scalar) outBox y
         if outOk then
           okCount := okCount + 1
         else
@@ -247,9 +268,12 @@ def showIEEECheck (samples : Nat) : IO Unit := do
 
 def main (args : List String) : IO Unit := do
   let args := CLI.dropDashDash args
-  let (samples?, rest) ← Common.orThrow "OneSemanticUniverse" <| CLI.takeNatFlagOnce args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
+  let (samples?, rest) ← CLI.orThrow "OneSemanticUniverse" <| CLI.takeNatFlagOnce args
     "samples"
-  Common.orThrow "OneSemanticUniverse" <| CLI.requireNoArgs rest
+  CLI.requireNoArgs "OneSemanticUniverse" rest
   showIEEECheck (samples := samples?.getD 50)
 
 end NN.Examples.Advanced.OneSemanticUniverse

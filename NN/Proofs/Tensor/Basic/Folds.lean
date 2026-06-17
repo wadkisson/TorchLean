@@ -40,7 +40,7 @@ theorem mul_spec_assoc {s : Shape} (a b c : Tensor ℝ s) :
           | dim fc =>
             simp [mulSpec, map2Spec]
             funext i
-            simpa using ih (a := fa i) (b := fb i) (c := fc i)
+            simpa [mulSpec, map2Spec] using ih (a := fa i) (b := fb i) (c := fc i)
 
 /-- Elementwise multiplication is commutative (`mul_spec` is pointwise `(*)`). -/
 theorem mul_spec_comm {s : Shape}
@@ -57,7 +57,7 @@ theorem mul_spec_comm {s : Shape}
         | dim fb =>
           simp [mulSpec, map2Spec]
           funext i
-          simpa using ih (a := fa i) (b := fb i)
+          simpa [mulSpec, map2Spec] using ih (a := fa i) (b := fb i)
 
 /-- Elementwise addition is commutative (`add_spec` is pointwise `(+)`). -/
 theorem add_spec_comm {s : Shape}
@@ -74,7 +74,7 @@ theorem add_spec_comm {s : Shape}
         | dim fb =>
           simp [addSpec, map2Spec]
           funext i
-          simpa using ih (a := fa i) (b := fb i)
+          simpa [addSpec, map2Spec] using ih (a := fa i) (b := fb i)
 
 /-- Elementwise multiplication of two all-zero tensors is the all-zero tensor. -/
 theorem mul_spec_fill_zero {s : Shape} :
@@ -85,7 +85,7 @@ theorem mul_spec_fill_zero {s : Shape} :
   | dim n s ih =>
     simp [mulSpec, map2Spec, fill]
     funext i
-    simpa using ih
+    simpa [mulSpec, map2Spec] using ih
 
 /-! ## Real dot product and fold bridges -/
 
@@ -286,6 +286,7 @@ lemma toVec_mat_vec_mul_spec {m n : Nat}
   simpa using
     (Proofs.TensorAlgebra.toVec_mat_vec_mul_spec (α := ℝ) (A := A) (v := v) (i := i))
 
+set_option linter.auxLemma false in
 /--
 Coordinate formula for `mat_mul_spec` (matrix-matrix multiplication).
 
@@ -459,5 +460,54 @@ lemma sum_spec_dim {n : Nat} {s : Shape} (t : Tensor ℝ (.dim n s)) :
               simpa using h0
         _ = ∑ i : Fin n, sumSpec (get (Tensor.dim values) i) := by
               simp [f, hget]
+
+/--
+The real-analysis `Spec.dot` agrees with the backend-generic recursive dot.
+
+`Spec.dot` is defined as `sumSpec (mulSpec a b)`, which is the proof-facing version of the
+PyTorch idiom `(a * b).sum()`.  `Proofs.TensorAlgebra.dot` is recursive over the tensor shape so it
+works over arbitrary semiring-like scalar models.  This bridge lets real proofs reuse generic
+algebra instead of repeating finite-sum rearrangements.
+-/
+theorem dot_eq_tensorAlgebra_dot {s : Shape} (a b : Tensor ℝ s) :
+    dot a b = Proofs.TensorAlgebra.dot (α := ℝ) a b := by
+  induction s with
+  | scalar =>
+      cases a
+      cases b
+      simp [dot, Proofs.TensorAlgebra.dot, sumSpec, tensorFoldlSpec, mulSpec, map2Spec]
+  | dim n s ih =>
+      cases a with
+      | dim fa =>
+        cases b with
+        | dim fb =>
+          have hsum :
+              sumSpec (mulSpec (Tensor.dim fa) (Tensor.dim fb)) =
+                ∑ i : Fin n, sumSpec (mulSpec (fa i) (fb i)) := by
+            have h := sum_spec_dim (t := mulSpec (Tensor.dim fa) (Tensor.dim fb))
+            simpa [mulSpec, map2Spec, get_eq] using h
+          have hrec :
+              (∑ i : Fin n, sumSpec (mulSpec (fa i) (fb i))) =
+                ∑ i : Fin n, Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i) := by
+            refine Finset.sum_congr rfl ?_
+            intro i _
+            simpa [dot] using ih (a := fa i) (b := fb i)
+          have hfold :
+              (List.finRange n).foldl
+                  (fun acc i => acc + Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i)) 0 =
+                ∑ i : Fin n, Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i) := by
+            simpa using
+              (finRange_foldl_add_eq_finset_sum
+                (f := fun i : Fin n => Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i)))
+          calc
+            dot (Tensor.dim fa) (Tensor.dim fb)
+                = sumSpec (mulSpec (Tensor.dim fa) (Tensor.dim fb)) := rfl
+            _ = ∑ i : Fin n, sumSpec (mulSpec (fa i) (fb i)) := hsum
+            _ = ∑ i : Fin n, Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i) := hrec
+            _ = (List.finRange n).foldl
+                  (fun acc i => acc + Proofs.TensorAlgebra.dot (α := ℝ) (fa i) (fb i)) 0 :=
+                hfold.symm
+            _ = Proofs.TensorAlgebra.dot (α := ℝ) (Tensor.dim fa) (Tensor.dim fb) := by
+              simp [Proofs.TensorAlgebra.dot]
 
 end Spec

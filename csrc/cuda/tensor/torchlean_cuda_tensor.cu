@@ -583,7 +583,7 @@ static inline dim3 torchlean_blocks_for(size_t n) {
 
 static inline unsigned int torchlean_det_reduce_blocks_for(size_t n) {
   // Deterministic reductions cap the number of blocks.
-  // This keeps scratch allocations bounded while still covering all elements via grid-stride loops.
+  // Grid-stride loops still cover every element with bounded scratch allocation.
   size_t blocks = (n + (size_t)kBlockSize - 1) / (size_t)kBlockSize;
   if (blocks == 0) {
     blocks = 1;

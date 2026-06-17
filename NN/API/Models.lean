@@ -1,0 +1,33 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.API.Models.Mlp
+public import NN.API.Models.KAN
+public import NN.API.Models.Cnn
+public import NN.API.Models.Resnet
+public import NN.API.Models.Vit
+public import NN.API.Models.SimpleSeq
+public import NN.API.Models.Transformer
+public import NN.API.Models.Gpt2
+public import NN.API.Models.Mamba
+public import NN.API.Models.Generative
+public import NN.API.Models.SelfSupervised
+public import NN.API.Models.Diffusion
+public import NN.API.Models.Fno1d
+public import NN.API.Models.PPO
+public import NN.API.Models.TrainFixed
+
+/-!
+# TorchLean Model API
+
+Umbrella import for reusable model constructors and their configuration records.
+
+Individual files under `NN/API/Models/*` own the implementation of each architecture family.
+Examples should import this API layer, then add only dataset loading, CLI parsing, and reporting.
+-/
+

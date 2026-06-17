@@ -127,7 +127,7 @@ theorem alphaCrown_transfer_sound
         -- Prove enclosure of the point box at `x`.
         refine ⟨rfl, ?_⟩
         dsimp [CrownCertSoundness.EnclosesAtInput]
-        simp [castDimScalar]
+        simp [Cert.boundsIdentity]
         refine ⟨hdim.symm, ?_⟩
         -- `v.v` is definitionally `x` by `InputsMatch`.
         have hx : castDimScalar (α := ℝ) hdim v.v = x := by
@@ -152,52 +152,13 @@ theorem alphaCrown_transfer_sound
               (x := x)).2 ?_
           intro i
           constructor <;> simp [affineEvalAt, hMat, hC]
-        have hxInput :
-            boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim)
-              (castDimScalar (α := ℝ) hdim v.v)
-              =
-            boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim) x := by
-          exact congrArg (fun t => boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim) t)
-            hx
-        have hGoalV :
+        have hGoalCast :
             Theorems.Semantics.encloses (α := ℝ)
-              (boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim)
-                (castDimScalar (α := ℝ) hdim v.v))
-              (castDimScalar (α := ℝ) hdim v.v) := by
-          have hGoalX' :=
-            sem_encloses_value_eq
-              (B := boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim) x)
-              (hxy := hx.symm) hGoalX
-          have hGoalV0 :=
-            sem_encloses_of_eq (h := hxInput.symm) (x := castDimScalar (α := ℝ) hdim v.v) hGoalX'
-          have hDim : congrArg FlatBox.dim hxInput.symm = rfl := by
-            exact Subsingleton.elim _ _
-          cases hDim
-          exact hGoalV0
-        have hAtCast :
-            ∀ {hIn : ctx.inputDim = ctx.inputDim},
-              Theorems.Semantics.encloses (α := ℝ)
-                (boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim)
-                  (castDimScalar (α := ℝ) hIn x))
-                (castDimScalar (α := ℝ) hdim v.v) := by
-          intro hIn
-          cases hIn
-          exact sem_encloses_value_eq
-            (B := boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim) x)
-            (hxy := hx.symm) hGoalX
-        have hAtCastOut :
-            ∀ {hIn : ctx.inputDim = ctx.inputDim} {hOut : v.n = ctx.inputDim},
-              Theorems.Semantics.encloses (α := ℝ)
-                (boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim)
-                  (castDimScalar (α := ℝ) hIn x))
-                (castDimScalar (α := ℝ) hOut v.v) := by
-          intro hIn hOut
-          exact sem_encloses_value_eq
-            (B := boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim)
-              (castDimScalar (α := ℝ) hIn x))
-            (hxy := (castDimScalar_proof_irrel (h₁ := hdim) (h₂ := hOut) (t := v.v)).symm)
-            (hAtCast (hIn := hIn))
-        simpa [castDimScalar] using (hAtCastOut (hIn := rfl) (hOut := hdim))
+              (boundsEvalAt (α := ℝ) (Cert.boundsIdentity (α := ℝ) ctx.inputDim) x)
+              (castDimScalar (α := ℝ) hdim v.v) :=
+          sem_encloses_value_eq (B := boundsEvalAt (α := ℝ)
+            (Cert.boundsIdentity (α := ℝ) ctx.inputDim) x) hx.symm hGoalX
+        simpa [Cert.boundsIdentity] using hGoalCast
 
     | .const _ => by
         -- Both semantics and the step read `ps.constVals[id]?`.
@@ -222,9 +183,7 @@ theorem alphaCrown_transfer_sound
             -- Now `b` is the constant affine enclosure and `v = vc`.
             refine ⟨rfl, ?_⟩
             dsimp [CrownCertSoundness.EnclosesAtInput]
-            simp [castDimScalar]
-            refine ⟨rfl, ?_⟩
-            simp [castDimScalar]
+            refine ⟨by simp [boundsEvalAt, Cert.boundsConst], ?_⟩
             -- The evaluated affine bounds are the point box `{vc.v}`.
             have hGoalV : Theorems.Semantics.encloses (α := ℝ)
                 (boundsEvalAt (α := ℝ) (Cert.boundsConst (α := ℝ) ctx.inputDim vc.n vc.v vc.v) x) vc.v
@@ -241,7 +200,16 @@ theorem alphaCrown_transfer_sound
                   (x := vc.v)).2 ?_
               intro i
               constructor <;> simp [affineEvalAt, mat_vec_mul_spec_fill_zero]
-            simpa using hGoalV
+            have hGoalVCast :
+                ∀ hOut : vc.n = vc.n,
+                  Theorems.Semantics.encloses (α := ℝ)
+                    (boundsEvalAt (α := ℝ)
+                      (Cert.boundsConst (α := ℝ) ctx.inputDim vc.n vc.v vc.v) x)
+                    (castDimScalar (α := ℝ) hOut vc.v) := by
+              intro hOut
+              exact sem_encloses_value_eq
+                (hxy := (castDimScalar_self hOut vc.v).symm) hGoalV
+            exact hGoalVCast _
 
     | .detach => by
         cases hps : (g.nodes[id]!).parents with
@@ -517,11 +485,13 @@ theorem alphaCrown_transfer_sound
 
                             -- Identify `l/u` as in `boundsEvalAt_linear_bounds_from_affine`.
                             let l : Tensor ℝ (.dim p.n .scalar) :=
-                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n) (by simpa
-                                [hout] using xin.loAff) x'
+                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n)
+                                (NN.MLTheory.CROWN.Cert.castAffineOut (α := ℝ) (n := xin.inDim)
+                                  (m := xin.outDim) (m' := p.n) hout xin.loAff) x'
                             let u : Tensor ℝ (.dim p.n .scalar) :=
-                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n) (by simpa
-                                [hout] using xin.hiAff) x'
+                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n)
+                                (NN.MLTheory.CROWN.Cert.castAffineOut (α := ℝ) (n := xin.inDim)
+                                  (m := xin.outDim) (m' := p.n) hout xin.hiAff) x'
                             -- Cast the parent box to dimension `p.n` (using `hout`), and rewrite it
                             -- into `[l,u]`.
                             have hxCast :
@@ -544,9 +514,10 @@ theorem alphaCrown_transfer_sound
                                     castDimScalar (α := ℝ) hout (castDimScalar (α := ℝ) hdimB.symm
                                       vp.v) =
                                       castDimScalar (α := ℝ) (Eq.trans hdimB.symm hout) vp.v := by
-                                  simpa using (castDimScalar_trans (h₁ := hdimB.symm) (h₂ := hout)
+                                  exact (castDimScalar_trans (h₁ := hdimB.symm) (h₂ := hout)
                                     (t := vp.v)).symm
-                                simpa [hvIn'] using hx1
+                                exact hx1.trans (castDimScalar_proof_irrel (Eq.trans hdimB.symm hout)
+                                  hvIn vp.v)
                               have hl :
                                   castDimScalar (α := ℝ) hout (boundsEvalAt (α := ℝ) xin x').lo = l
                                     := by
@@ -603,8 +574,7 @@ theorem alphaCrown_transfer_sound
                                             (NN.MLTheory.CROWN.IBP.matNeg (α := ℝ) (m := p.m) (n :=
                                               p.n) p.w) l))
                                         p.b }
-                                  (Spec.linearSpec (α := ℝ) { weights := p.w, bias := p.b } xv) :=
-                                    by
+                                  (Spec.linearSpec (α := ℝ) { weights := p.w, bias := p.b } xv) := by
                               -- `encloses_linear_signSplit` encloses `W·x + b`, and `linear_spec`
                               -- is definitional.
                               simpa [Spec.linearSpec, xv] using
@@ -655,18 +625,8 @@ theorem alphaCrown_transfer_sound
                               sem_encloses_of_eq (h := hBE.symm)
                                 (x := Spec.linearSpec (α := ℝ) { weights := p.w, bias := p.b } xv)
                                   hy
-                            have hdim : congrArg FlatBox.dim hBE.symm = rfl := by
-                              exact Subsingleton.elim _ _
-                            have hyBout :
-                                Theorems.Semantics.encloses (α := ℝ)
-                                  (boundsEvalAt (α := ℝ)
-                                    (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xin.inDim) (n :=
-                                      p.n) (m := p.m) p.w p.b xin hout)
-                                    x')
-                                  (Spec.linearSpec (α := ℝ) { weights := p.w, bias := p.b } xv) :=
-                                    by
-                              simpa [hdim, castDimScalar] using hyCast
-                            simpa [castDimScalar, Spec.linearSpec, xv] using hyBout
+                            exact sem_encloses_value_eq
+                              (hxy := castDimScalar_proof_irrel _ _ _) hyCast
                           ·
                             have : False := by
                               simp [hvIn] at hEval'
@@ -702,8 +662,8 @@ theorem alphaCrown_transfer_sound
                       have hbEq :
                           some (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xin.inDim) (n := p.n)
                             (m := p.m) p.w
-                            (Spec.fill (α := ℝ) 0 (.dim p.m .scalar)) xin hout) = some b := by
-                        simpa [hxin, hwb, hout] using hs'
+                            (Spec.fill (α := ℝ) Zero.zero (.dim p.m .scalar)) xin hout) = some b := by
+                        simpa [hxin, hwb, hout, Numbers.zero] using hs'
                       cases hbEq
 
                       have hEval' := hEvalSome
@@ -758,11 +718,13 @@ theorem alphaCrown_transfer_sound
                             let z : Tensor ℝ (.dim p.m .scalar) := Spec.fill (α := ℝ) 0 (.dim p.m
                               .scalar)
                             let l : Tensor ℝ (.dim p.n .scalar) :=
-                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n) (by simpa
-                                [hout] using xin.loAff) x'
+                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n)
+                                (NN.MLTheory.CROWN.Cert.castAffineOut (α := ℝ) (n := xin.inDim)
+                                  (m := xin.outDim) (m' := p.n) hout xin.loAff) x'
                             let u : Tensor ℝ (.dim p.n .scalar) :=
-                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n) (by simpa
-                                [hout] using xin.hiAff) x'
+                              affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := p.n)
+                                (NN.MLTheory.CROWN.Cert.castAffineOut (α := ℝ) (n := xin.inDim)
+                                  (m := xin.outDim) (m' := p.n) hout xin.hiAff) x'
                             have hxCast :
                                 Theorems.Semantics.encloses (α := ℝ) { dim := p.n, lo := l, hi := u
                                   }
@@ -783,9 +745,10 @@ theorem alphaCrown_transfer_sound
                                     castDimScalar (α := ℝ) hout (castDimScalar (α := ℝ) hdimB.symm
                                       vp.v) =
                                       castDimScalar (α := ℝ) (Eq.trans hdimB.symm hout) vp.v := by
-                                  simpa using (castDimScalar_trans (h₁ := hdimB.symm) (h₂ := hout)
+                                  exact (castDimScalar_trans (h₁ := hdimB.symm) (h₂ := hout)
                                     (t := vp.v)).symm
-                                simpa [hvIn'] using hx1
+                                exact hx1.trans (castDimScalar_proof_irrel (Eq.trans hdimB.symm hout)
+                                  hvIn vp.v)
                               have hl :
                                   castDimScalar (α := ℝ) hout (boundsEvalAt (α := ℝ) xin x').lo = l
                                     := by
@@ -884,19 +847,10 @@ theorem alphaCrown_transfer_sound
                             have hyCast :=
                               sem_encloses_of_eq (h := hBE.symm)
                                 (x := Spec.linearSpec (α := ℝ) { weights := p.w, bias := z } xv) hy
-                            have hdim : congrArg FlatBox.dim hBE.symm = rfl := by
-                              exact Subsingleton.elim _ _
-                            have hyBout :
-                                Theorems.Semantics.encloses (α := ℝ)
-                                  (boundsEvalAt (α := ℝ)
-                                    (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xin.inDim) (n :=
-                                      p.n) (m := p.m) p.w z xin hout)
-                                    x')
-                                  (Spec.linearSpec (α := ℝ) { weights := p.w, bias := z } xv) := by
-                              simpa [hdim, castDimScalar] using hyCast
                             -- Keep the `linear_spec` form (it matches the semantic evaluator for
                             -- `.matmul`).
-                            simpa [castDimScalar, xv, z] using hyBout
+                            exact sem_encloses_value_eq
+                              (hxy := castDimScalar_proof_irrel _ _ _) hyCast
                           ·
                             have : False := by
                               simp [hvIn] at hEval'
@@ -925,16 +879,16 @@ theorem alphaCrown_transfer_sound
             | some xin =>
                 -- Step forces `b` to be `linear_bounds_from_affine onesRow 0 xin`.
                 let onesRow : Tensor ℝ (.dim 1 (.dim xin.outDim .scalar)) :=
-                  Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim xin.outDim .scalar))
+                  Spec.fill (α := ℝ) (Numbers.one : ℝ) (.dim 1 (.dim xin.outDim .scalar))
                 let zb : Tensor ℝ (.dim 1 .scalar) :=
-                  Spec.fill (α := ℝ) (0 : ℝ) (.dim 1 .scalar)
+                  Spec.fill (α := ℝ) (Numbers.zero : ℝ) (.dim 1 .scalar)
                 have hbEq :
                     some
                         (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xin.inDim) (n := xin.outDim)
                           (m := 1)
                           onesRow zb xin (by rfl)) =
                       some b := by
-                  simpa [hxin, onesRow, zb] using hs'
+                  simpa [hxin, onesRow, zb, Numbers.zero, Numbers.one] using hs'
                 cases hbEq
 
                 -- Semantic-side: extract the parent value.
@@ -986,9 +940,13 @@ theorem alphaCrown_transfer_sound
                     let x' : Tensor ℝ (.dim xin.inDim .scalar) :=
                       castDimScalar (α := ℝ) (n := ctx.inputDim) (n' := xin.inDim) hinDim.symm x
                     let l : Tensor ℝ (.dim xin.outDim .scalar) :=
-                      affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := xin.outDim) xin.loAff x'
+                      affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := xin.outDim)
+                        (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                          (m' := xin.outDim) rfl xin.loAff) x'
                     let u : Tensor ℝ (.dim xin.outDim .scalar) :=
-                      affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := xin.outDim) xin.hiAff x'
+                      affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := xin.outDim)
+                        (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                          (m' := xin.outDim) rfl xin.hiAff) x'
                     let xv : Tensor ℝ (.dim xin.outDim .scalar) :=
                       castDimScalar (α := ℝ) (n := vp.n) (n' := xin.outDim) hdimB.symm vp.v
 
@@ -996,8 +954,8 @@ theorem alphaCrown_transfer_sound
                         Theorems.Semantics.encloses (α := ℝ)
                           { dim := xin.outDim, lo := l, hi := u } xv := by
                       -- `boundsEvalAt` is definitional in terms of `affineEvalAt`.
-                      simpa [CrownCertSoundness.boundsEvalAt, CrownCertSoundness.affineEvalAt, l, u,
-                        xv, x'] using hencB
+                      simpa [CrownCertSoundness.boundsEvalAt, CrownCertSoundness.affineEvalAt,
+                        Cert.castAffineOut, l, u, xv, x'] using hencB
 
                     -- Apply sign-splitting enclosure (bias is zero, so use the mat-vec form).
                     have hy0 :
@@ -1051,9 +1009,14 @@ theorem alphaCrown_transfer_sound
                                     (NN.MLTheory.CROWN.IBP.matNeg (α := ℝ) (m := 1) (n :=
                                       xin.outDim) onesRow) l))
                                 zb }
-                          (Spec.matVecMulSpec (α := ℝ) onesRow xv) := by
+                            (Spec.matVecMulSpec (α := ℝ) onesRow xv) := by
                       -- Convert `linear_spec` to mat-vec since the bias is zero.
-                      simpa [onesRow, zb, linear_spec_bias_zero_eq_matvec] using hy0
+                      have hlin :
+                          Spec.linearSpec (α := ℝ) { weights := onesRow, bias := zb } xv =
+                            Spec.matVecMulSpec (α := ℝ) onesRow xv := by
+                        simpa [onesRow, zb, Numbers.zero] using
+                          (linear_spec_bias_zero_eq_matvec (W := onesRow) (x := xv))
+                      exact sem_encloses_value_eq (hxy := hlin) hy0
 
                     -- Rewrite the computed bounds to `boundsEvalAt (linear_bounds_from_affine ...)
                     -- x'`.
@@ -1091,12 +1054,6 @@ theorem alphaCrown_transfer_sound
                     refine ⟨hinDim, ?_⟩
                     dsimp [CrownCertSoundness.EnclosesVec]
                     refine ⟨rfl, ?_⟩
-                    -- Transport the enclosure across `hBE` without rewriting in a dependent motive.
-                    have hyCast :=
-                      sem_encloses_of_eq (h := hBE.symm) (x := Spec.matVecMulSpec (α := ℝ)
-                        onesRow xv) hy
-                    have hdim : congrArg FlatBox.dim hBE.symm = rfl := by
-                      exact Subsingleton.elim _ _
                     -- Finally, match the semantic evaluator's `onesRow` (built from `vp.n`).
                     have hvOut :
                         Spec.matVecMulSpec (α := ℝ) onesRow xv =
@@ -1104,22 +1061,56 @@ theorem alphaCrown_transfer_sound
                             (Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim vp.n .scalar))) vp.v := by
                       have hdn : xin.outDim = vp.n := by
                         simpa [CrownCertSoundness.boundsEvalAt] using hdimB
-                      have hxv : xv = castDimScalar (α := ℝ) (n := vp.n) (n' := xin.outDim) hdn.symm
-                        vp.v := by
+                      have hxv :
+                          xv = castDimScalar (α := ℝ) (n := vp.n) (n' := xin.outDim) hdn.symm vp.v := by
                         have : hdimB.symm = hdn.symm := by exact Subsingleton.elim _ _
                         simp [xv]
                       have hcast :=
                         mat_vec_mul_fill1_castDimScalar (h := hdn.symm) (v := vp.v)
-                      simpa [onesRow, hxv] using hcast.symm
+                      simpa [onesRow, Numbers.one, hxv] using hcast.symm
+                    have hyVal :
+                        Theorems.Semantics.encloses (α := ℝ)
+                          { dim := 1
+                            lo :=
+                              Tensor.addSpec (α := ℝ)
+                                (Tensor.addSpec (α := ℝ)
+                                  (Spec.matVecMulSpec (α := ℝ)
+                                    (NN.MLTheory.CROWN.IBP.matPos (α := ℝ) (m := 1) (n :=
+                                      xin.outDim) onesRow) l)
+                                  (Spec.matVecMulSpec (α := ℝ)
+                                    (NN.MLTheory.CROWN.IBP.matNeg (α := ℝ) (m := 1) (n :=
+                                      xin.outDim) onesRow) u))
+                                zb
+                            hi :=
+                              Tensor.addSpec (α := ℝ)
+                                (Tensor.addSpec (α := ℝ)
+                                  (Spec.matVecMulSpec (α := ℝ)
+                                    (NN.MLTheory.CROWN.IBP.matPos (α := ℝ) (m := 1) (n :=
+                                      xin.outDim) onesRow) u)
+                                  (Spec.matVecMulSpec (α := ℝ)
+                                    (NN.MLTheory.CROWN.IBP.matNeg (α := ℝ) (m := 1) (n :=
+                                      xin.outDim) onesRow) l))
+                                zb }
+                          (Spec.matVecMulSpec (α := ℝ)
+                            (Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim vp.n .scalar))) vp.v) :=
+                      sem_encloses_value_eq (hxy := hvOut) hy
                     have hyBout :
                         Theorems.Semantics.encloses (α := ℝ)
                           (boundsEvalAt (α := ℝ)
                             (Cert.linearBoundsFromAffine (α := ℝ) (inDim := xin.inDim) (n :=
                               xin.outDim) (m := 1)
                               onesRow zb xin (by rfl)) x')
-                          (Spec.matVecMulSpec (α := ℝ)
-                            (Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim vp.n .scalar))) vp.v) := by
-                      simpa [x', hvOut] using hyCast
+                            (Spec.matVecMulSpec (α := ℝ)
+                              (Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim vp.n .scalar))) vp.v) := by
+                        let yv : Tensor ℝ (.dim 1 .scalar) :=
+                          Spec.matVecMulSpec (α := ℝ)
+                            (Spec.fill (α := ℝ) (1 : ℝ) (.dim 1 (.dim vp.n .scalar))) vp.v
+                        have hyBoxCast :=
+                          sem_encloses_of_eq (h := hBE.symm) (x := yv) hyVal
+                        have hcastY :
+                            castDimScalar (α := ℝ) (congrArg FlatBox.dim hBE.symm) yv = yv := by
+                          exact castDimScalar_self _ yv
+                        exact sem_encloses_value_eq (hxy := hcastY) hyBoxCast
                     exact hyBout
 
     | .relu => by
@@ -1212,24 +1203,29 @@ theorem alphaCrown_transfer_sound
                                       (inDim := xin.inDim) (hidDim := preB.dim)
                                       (alphaRelaxLowerVec (α := ℝ) (n := preB.dim) preB.lo preB.hi
                                         αt)
-                                      (by simpa [hout] using xin.loAff)
+                                      (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                        (m' := preB.dim) hout xin.loAff)
                                   hiAff :=
                                     NN.MLTheory.CROWN.Runtime.Ops.ReLU.propagateAffine (α := ℝ)
                                       (inDim := xin.inDim) (hidDim := preB.dim)
                                       (NN.MLTheory.CROWN.Runtime.Ops.ReLU.relaxVector (α := ℝ) (n :=
                                         preB.dim) preB.lo preB.hi)
-                                      (by simpa [hout] using xin.hiAff) }
+                                      (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                        (m' := preB.dim) hout xin.hiAff) }
                               have hbEq : some bout = some b := by
-                                simpa [hxin, hpre, hαopt, hout, bout, αt] using hs'
+                                simpa [hxin, hpre, hαopt, hout, bout, αt, Cert.castAffineOut] using
+                                  hs'
                               have hb : b = bout := (Option.some.inj hbEq).symm
 
                               let x' : Tensor ℝ (.dim xin.inDim .scalar) :=
                                 castDimScalar (α := ℝ) (n := ctx.inputDim) (n' := xin.inDim)
                                   hinDim.symm x
                               let xLo : AffineVec ℝ xin.inDim preB.dim := by
-                                simpa [hout] using xin.loAff
+                                exact Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                  (m' := preB.dim) hout xin.loAff
                               let xHi : AffineVec ℝ xin.inDim preB.dim := by
-                                simpa [hout] using xin.hiAff
+                                exact Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                  (m' := preB.dim) hout xin.hiAff
                               let lAff : Tensor ℝ (.dim preB.dim .scalar) :=
                                 affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := preB.dim) xLo
                                   x'
@@ -1481,8 +1477,10 @@ theorem alphaCrown_transfer_sound
                                     Activation.Math.reluSpec (α := ℝ) zi := by
                                   simpa [zi] using (toVec_relu_spec (t := z) (i := i))
                                 constructor
-                                · simpa [hrelu] using hlo
-                                · simpa [hrelu] using hhi
+                                · rw [hrelu]
+                                  exact hlo
+                                · rw [hrelu]
+                                  exact hhi
                               -- Apply `hreluCast` to match the required casted value.
                               have this' :
                                   Theorems.Semantics.encloses (boundsEvalAt (α := ℝ) bout x')
@@ -1511,15 +1509,18 @@ theorem alphaCrown_transfer_sound
                                       (inDim := xin.inDim) (hidDim := preB.dim)
                                       (alphaRelaxLowerVec (α := ℝ) (n := preB.dim) preB.lo preB.hi
                                         αt)
-                                      (by simpa [hout] using xin.loAff)
+                                      (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                        (m' := preB.dim) hout xin.loAff)
                                   hiAff :=
                                     NN.MLTheory.CROWN.Runtime.Ops.ReLU.propagateAffine (α := ℝ)
                                       (inDim := xin.inDim) (hidDim := preB.dim)
                                       (NN.MLTheory.CROWN.Runtime.Ops.ReLU.relaxVector (α := ℝ) (n :=
                                         preB.dim) preB.lo preB.hi)
-                                      (by simpa [hout] using xin.hiAff) }
+                                      (Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                        (m' := preB.dim) hout xin.hiAff) }
                               have hbEq : some bout = some b := by
-                                simpa [hxin, hpre, hαopt, hout, bout, αt] using hs'
+                                simpa [hxin, hpre, hαopt, hout, bout, αt, Cert.castAffineOut] using
+                                  hs'
                               have hb : b = bout := (Option.some.inj hbEq).symm
                               have hαrange : ∀ i : Fin preB.dim, (0 : ℝ) ≤ toVec αt i ∧ toVec αt i ≤
                                 (1 : ℝ) := by
@@ -1557,9 +1558,11 @@ theorem alphaCrown_transfer_sound
                                 castDimScalar (α := ℝ) (n := ctx.inputDim) (n' := xin.inDim)
                                   hinDim.symm x
                               let xLo : AffineVec ℝ xin.inDim preB.dim := by
-                                simpa [hout] using xin.loAff
+                                exact Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                  (m' := preB.dim) hout xin.loAff
                               let xHi : AffineVec ℝ xin.inDim preB.dim := by
-                                simpa [hout] using xin.hiAff
+                                exact Cert.castAffineOut (α := ℝ) (n := xin.inDim) (m := xin.outDim)
+                                  (m' := preB.dim) hout xin.hiAff
                               let lAff : Tensor ℝ (.dim preB.dim .scalar) :=
                                 affineEvalAt (α := ℝ) (inDim := xin.inDim) (outDim := preB.dim) xLo
                                   x'
@@ -1789,8 +1792,10 @@ theorem alphaCrown_transfer_sound
                                     Activation.Math.reluSpec (α := ℝ) zi := by
                                   simpa [zi] using (toVec_relu_spec (t := z) (i := i))
                                 constructor
-                                · simpa [hrelu] using hlo
-                                · simpa [hrelu] using hhi
+                                · rw [hrelu]
+                                  exact hlo
+                                · rw [hrelu]
+                                  exact hhi
                               have this' :
                                   Theorems.Semantics.encloses (boundsEvalAt (α := ℝ) bout x')
                                     (Activation.reluSpec (α := ℝ) z) := by
@@ -1807,28 +1812,25 @@ theorem alphaCrown_transfer_sound
       .inv
     | .maxElem | .minElem | .maxPool2d .. | .maxPool2dPad .. | .avgPool2d .. | .avgPool2dPad
       ..
-    | .broadcastTo .. | .reduceSum _ | .reduceMean _ | .conv2d .. | .tanh | .sigmoid | .exp | .log
-      | .sin | .cos
+    | .broadcastTo .. | .reduceSum _ | .reduceMean _ | .conv2d .. | .batchNorm2dNchwEval _
+      | .tanh | .sigmoid | .exp | .log | .sin | .cos
     | .softmax _ | .layernorm _ | .concat _ | .swap_first_two | .transpose3dLastTwo | .mseLoss =>
       by
         -- Unsupported ops: `alphaCrownStepNode?` can only succeed via the IBP-derived constant
         -- enclosure.
-        have hibpHere :
-            match ibp[id]!, vals[id]! with
-            | some B0, some v0 => CertSoundness.EnclosesBox B0 v0
-            | _, _ => True := by
-              have : id < vals.size := by simpa [hsem.1] using hid
-              simpa using hibp id this
         cases hib : ibp[id]!
         · simp [stepAlpha, alphaCrownStepNode?, hk, hib] at hs
         · rename_i B0
-          have hEnc : CertSoundness.EnclosesBox B0 v := by simpa [hib, hv] using hibpHere
+          have hEnc : CertSoundness.EnclosesBox B0 v := by
+            have hlt : id < vals.size := by simpa [hsem.1] using hid
+            have hraw := hibp id hlt
+            simpa [hib, hv] using hraw
           have hbEq : some (Cert.boundsConst (α := ℝ) ctx.inputDim B0.dim B0.lo B0.hi) = some b := by
             simpa [stepAlpha, alphaCrownStepNode?, hk, hib] using hs
           cases hbEq
           refine ⟨rfl, ?_⟩
           dsimp [CrownCertSoundness.EnclosesAtInput]
-          simp [castDimScalar]
+          simp [Cert.boundsConst]
           rcases hEnc with ⟨hdim, hbox⟩
           refine ⟨hdim, ?_⟩
           have hBoxEq :
@@ -1846,9 +1848,12 @@ theorem alphaCrown_transfer_sound
             simpa using hBoxEq
           have hbox' :=
             sem_encloses_of_eq (h := hBoxEval.symm) (x := castDimScalar (α := ℝ) hdim.symm v.v) hbox
-          have hdim' : congrArg FlatBox.dim hBoxEval.symm = rfl := by
-            exact Subsingleton.elim _ _
-          simpa [hdim', castDimScalar] using hbox'
+          have hcast :
+              castDimScalar (α := ℝ) (congrArg FlatBox.dim hBoxEval.symm)
+                  (castDimScalar (α := ℝ) hdim.symm v.v) =
+                castDimScalar (α := ℝ) hdim.symm v.v := by
+            exact castDimScalar_self _ (castDimScalar (α := ℝ) hdim.symm v.v)
+          exact sem_encloses_value_eq (hxy := hcast) hbox'
     )
 
 

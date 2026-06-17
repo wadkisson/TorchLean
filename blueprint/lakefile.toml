@@ -4,16 +4,17 @@ defaultTargets = ["TorchLeanBlueprint", "blueprint-gen"]
 [[require]]
 name = "verso"
 git = "https://github.com/leanprover/verso"
-rev = "v4.30.0"
+rev = "v4.31.0"
 
 [[require]]
-name = "VersoBlueprint"
-git = "https://github.com/leanprover/verso-blueprint"
-rev = "v4.30.0"
+name = "subverso"
+git = "https://github.com/leanprover/subverso"
+rev = "0bd508e8362f56d4a05cbf63614d4c97db954041"
 
 [[require]]
 name = "TorchLean"
 path = ".."
+options = { cuda = "false" }
 
 [[lean_lib]]
 name = "TorchLeanBlueprint"

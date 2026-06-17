@@ -16,9 +16,9 @@ This file proves the standard position-wise Transformer feed-forward sublayer, a
 
 `x ↦ x + W₂ GELU(W₁ x + b₁) + b₂`.
 
-The theorem is intentionally about one token/vector. Batched sequence application is a map over
-positions, and the full Transformer encoder block additionally composes this FFN residual with MHA
-and LayerNorm. This file gives the clean proof component for the FFN half of that block.
+The theorem is about one token/vector. Batched sequence application is a map over positions, and
+the full Transformer encoder block additionally composes this FFN residual with MHA and LayerNorm.
+This file gives the proof component for the FFN half of that block.
 
 References:
 
@@ -56,26 +56,21 @@ def ffnIdxX {dModel : Nat} {ss : List Shape} :
     Idx (ΓFFN dModel ++ ss) (FFNModelShape dModel) :=
   ⟨⟨0, by simp [ΓFFN]⟩, by simp [ΓFFN, FFNModelShape]⟩
 
-/-- Most recently appended tensor helper. -/
-def idxLast {Γ : List Shape} {ss : List Shape} {τ : Shape} :
-    Idx (Γ ++ ss ++ [τ]) τ :=
-  _root_.Proofs.Autograd.Idx.last (Γ := Γ) (ss := ss) (τ := τ)
-
 /-- First affine output index. -/
 def ffnIdxHiddenPre {dModel dFF : Nat} :
     Idx (ΓFFN dModel ++ [FFNHiddenShape dFF]) (FFNHiddenShape dFF) :=
-  idxLast (Γ := ΓFFN dModel) (ss := []) (τ := FFNHiddenShape dFF)
+  Idx.last (Γ := ΓFFN dModel) (ss := []) (τ := FFNHiddenShape dFF)
 
 /-- GELU activation output index. -/
 def ffnIdxHiddenAct {dModel dFF : Nat} :
     Idx (ΓFFN dModel ++ [FFNHiddenShape dFF, FFNHiddenShape dFF]) (FFNHiddenShape dFF) :=
-  idxLast (Γ := ΓFFN dModel) (ss := [FFNHiddenShape dFF]) (τ := FFNHiddenShape dFF)
+  Idx.last (Γ := ΓFFN dModel) (ss := [FFNHiddenShape dFF]) (τ := FFNHiddenShape dFF)
 
 /-- Second affine output index. -/
 def ffnIdxProjected {dModel dFF : Nat} :
     Idx (ΓFFN dModel ++ [FFNHiddenShape dFF, FFNHiddenShape dFF, FFNModelShape dModel])
       (FFNModelShape dModel) :=
-  idxLast (Γ := ΓFFN dModel) (ss := [FFNHiddenShape dFF, FFNHiddenShape dFF])
+  Idx.last (Γ := ΓFFN dModel) (ss := [FFNHiddenShape dFF, FFNHiddenShape dFF])
     (τ := FFNModelShape dModel)
 
 /--
@@ -190,13 +185,13 @@ def seqFfnIdxX {seqLen dModel : Nat} {ss : List Shape} :
 def seqFfnIdxHiddenPre {seqLen dModel dFF : Nat} :
     Idx (ΓSeqFFN seqLen dModel ++ [SeqFFNHiddenShape seqLen dFF])
       (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓSeqFFN seqLen dModel) (ss := []) (τ := SeqFFNHiddenShape seqLen dFF)
+  Idx.last (Γ := ΓSeqFFN seqLen dModel) (ss := []) (τ := SeqFFNHiddenShape seqLen dFF)
 
 /-- Index of the saved sequence-shaped GELU activation output. -/
 def seqFfnIdxHiddenAct {seqLen dModel dFF : Nat} :
     Idx (ΓSeqFFN seqLen dModel ++ [SeqFFNHiddenShape seqLen dFF,
       SeqFFNHiddenShape seqLen dFF]) (SeqFFNHiddenShape seqLen dFF) :=
-  idxLast (Γ := ΓSeqFFN seqLen dModel) (ss := [SeqFFNHiddenShape seqLen dFF])
+  Idx.last (Γ := ΓSeqFFN seqLen dModel) (ss := [SeqFFNHiddenShape seqLen dFF])
     (τ := SeqFFNHiddenShape seqLen dFF)
 
 /-- Second sequence affine output. -/
@@ -204,7 +199,7 @@ def seqFfnIdxProjected {seqLen dModel dFF : Nat} :
     Idx (ΓSeqFFN seqLen dModel ++ [SeqFFNHiddenShape seqLen dFF,
       SeqFFNHiddenShape seqLen dFF, SeqFFNModelShape seqLen dModel])
       (SeqFFNModelShape seqLen dModel) :=
-  idxLast (Γ := ΓSeqFFN seqLen dModel)
+  Idx.last (Γ := ΓSeqFFN seqLen dModel)
     (ss := [SeqFFNHiddenShape seqLen dFF, SeqFFNHiddenShape seqLen dFF])
     (τ := SeqFFNModelShape seqLen dModel)
 
@@ -213,9 +208,9 @@ Proof-carrying graph for the sequence-shaped residual FFN:
 
 `X ↦ X + A₂(GELU(A₁ X + b₁)) + b₂`.
 
-The affine maps are supplied explicitly over flattened sequence tensors. This keeps the theorem
-usable for shared-weight position-wise FFNs, fused FFN kernels, and future compiler-generated
-linearizations, as long as they expose the same affine map.
+The affine maps are supplied explicitly over flattened sequence tensors. The theorem applies to
+shared-weight position-wise FFNs, fused FFN kernels, and future compiler-generated linearizations
+as long as they expose the same affine map.
 -/
 def seqFfnResidualDGraph {seqLen dModel dFF : Nat}
     (fc1 :

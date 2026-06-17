@@ -97,6 +97,7 @@ equivariance without reasoning about how the stabilizing shift `m` is chosen.
 
 namespace SoftmaxEquivariance
 
+set_option linter.auxLemma false in
 /-- Eliminate a scalar tensor using the same matcher as `Activation.softmax_vec_spec`. -/
 private abbrev scalarElim {β : Sort _} (t : Tensor ℝ .scalar) (k : ℝ → β) : β :=
   Activation.softmaxVecSpec.match_1 (motive := fun _ => β) t k
@@ -237,7 +238,7 @@ private theorem softmax_vec_spec_eq_plain {n : Nat} (t : Tensor ℝ (.dim (Nat.s
             -- Replace the finite-sum denominator (`denomShift`) with the list-fold denominator used
             -- by the spec definition.
             rw [← hden] at htmp
-            simpa [denomPlain, x, m, first, scalarVal, scalarElim] using htmp
+            simpa [denomPlain, x, m, first, scalarVal, scalarElim, MathFunctions.exp] using htmp
           -- Normalized form of `hgoal` matching the shape produced by the `simp`-unfolding below.
           have hgoal' :
               MathFunctions.exp
@@ -268,7 +269,7 @@ private theorem softmax_vec_spec_eq_plain {n : Nat} (t : Tensor ℝ (.dim (Nat.s
           simp [hi, scalarVal, scalarElim, Spec.replicate, Spec.Tensor.mapSpec, Spec.Tensor.map2Spec,
             Spec.Tensor.subSpec, Spec.Tensor.expSpec]
           -- `simp` has unfolded the tensor combinators, so the goal is a scalar identity.
-          simpa [scalarVal, scalarElim] using hgoal'
+          simpa [scalarVal, scalarElim, MathFunctions.exp] using hgoal'
 
 /-- Plain softmax commutes with reindexing (permuting coordinates). -/
 private theorem softmaxVecPlain_reindexOuter {n : Nat} (σ : Equiv.Perm (Fin n))

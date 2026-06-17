@@ -487,7 +487,7 @@ theorem toReal_sqrt_eq_fp32Round (x : IEEE32Exec) {dx : Dyadic}
               intro h0
               have : expField x = expAllOnes := by
                 apply UInt32.toNat_inj.1
-                simpa [UInt32.toNat_ofNat] using h0
+                simpa [show expAllOnes.toNat = 255 by decide, UInt32.toNat_ofNat] using h0
               exact hexpAll this
             have hexp_lt255 : (expField x).toNat < 255 := lt_of_le_of_ne hexp_le255 hexp_ne255
             have hexp_le254 : (expField x).toNat ≤ 254 := Nat.le_of_lt_succ (by simpa using
@@ -954,7 +954,8 @@ theorem toReal_sqrt_eq_fp32Round (x : IEEE32Exec) {dx : Dyadic}
                                 simp [TorchLean.Floats.neuralBpow, binaryRadix,
                                   NeuralRadix.toReal]
                         _ = (2 : ℝ) ^ (t + 1 : Nat) := by
-                                simpa using (zpow_ofNat (2 : ℝ) (t + 1))
+                                simpa [Int.ofNat_eq_natCast] using
+                                  (zpow_natCast (2 : ℝ) (t + 1))
                         _ = ((2 ^ (t + 1) : Nat) : ℝ) := by
                                 simp
                         _ = (pow2 (t + 1) : ℝ) := by
@@ -1143,4 +1144,3 @@ theorem toReal_sqrt_eq_fp32Round (x : IEEE32Exec) {dx : Dyadic}
 end IEEE32Exec
 
 end TorchLean.Floats.IEEE754
-

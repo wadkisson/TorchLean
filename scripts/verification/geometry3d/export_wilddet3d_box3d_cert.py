@@ -191,7 +191,7 @@ def project_corners(camera_p: list[float], corners3d: list[float]) -> list[tuple
     """Project flat eight-corner camera-frame coordinates with the exported `3x4` camera matrix.
 
     The Lean checker repeats this computation on the exported artifact.  The Python version is only
-    used to build metadata and, when requested, a projected-footprint bbox; Lean's accept/reject
+    build metadata and, when requested, a projected-footprint bbox; Lean's accept/reject
     result does not rely on trusting this helper.
     """
     projected: list[tuple[float, float, float]] = []

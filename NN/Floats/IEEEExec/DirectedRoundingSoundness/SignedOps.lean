@@ -269,9 +269,9 @@ theorem toDyadic?_roundDyadicPosDown_some (mant : Nat) (exp : Int) :
       exact h
     have hdy :
         toDyadic? (posMaxFinite : IEEE32Exec) =
-          some { sign := false, mant := pow2 23 + (pow2 23 - 1), exp := (Int.ofNat 254) - 150 } :=
-            by
-      simpa [posMaxFinite] using
+          some { sign := false, mant := pow2 23 + (pow2 23 - 1), exp := (Int.ofNat 254) - 150 } := by
+      have hbits : mkBits false 254 (pow2 23 - 1) = 0x7F7FFFFF := by decide
+      simpa [posMaxFinite, hbits] using
         (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 254) (frac := pow2 23 - 1) hexp hfrac)
     simpa [hOut] using hdy
   ·
@@ -288,9 +288,9 @@ theorem toDyadic?_roundDyadicPosDown_some (mant : Nat) (exp : Int) :
         simp (config := { zeta := true }) [roundDyadicPosDown, hkHiExp, hkUnderExp, hlog2m.symm]
       have hexp : (0 : Nat) < 255 := by decide
       have hfrac : (0 : Nat) < 2 ^ 23 := by decide
-      have hdy : toDyadic? (posZero : IEEE32Exec) = some { sign := false, mant := 0, exp := 0 } :=
-        by
-        simpa [posZero] using
+      have hdy : toDyadic? (posZero : IEEE32Exec) = some { sign := false, mant := 0, exp := 0 } := by
+        have hbits : mkBits false 0 0 = 0 := by decide
+        simpa [posZero, hbits] using
           (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 0) (frac := 0) hexp hfrac)
       simpa [hOut] using hdy
     ·
@@ -325,18 +325,19 @@ theorem toDyadic?_roundDyadicPosDown_some (mant : Nat) (exp : Int) :
                     | Int.ofNat sh => mant <<< sh
                     | Int.negSucc sh => mant >>> (sh + 1)) =
                     0 := by
-                have : fracNat = 0 := (beq_iff_eq).1 hZero
-                simpa [hfracNat] using this
-              -- Reduce to the final subnormal `if` and discharge the remaining obligation by
-              -- contradiction.
+                  have : fracNat = 0 := (beq_iff_eq).1 hZero
+                  simpa [hfracNat] using this
+                -- Reduce to the final subnormal `if` and discharge the remaining obligation by
+                -- contradiction.
               simp (config := { zeta := true }) [roundDyadicPosDown, hkHiExp, hkUnderExp, hkSubExp,
                 hlog2m.symm, posZero]
               intro hne
               exact False.elim (hne hZeroEq)
-            have hdy : toDyadic? (posZero : IEEE32Exec) = some { sign := false, mant := 0, exp := 0
-              } := by
+            have hdy :
+                toDyadic? (posZero : IEEE32Exec) = some { sign := false, mant := 0, exp := 0 } := by
               have hfrac0 : (0 : Nat) < 2 ^ 23 := by decide
-              simpa [posZero] using
+              have hbits : mkBits false 0 0 = 0 := by decide
+              simpa [posZero, hbits] using
                 (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 0) (frac := 0) hexp0 hfrac0)
             simpa [hOut] using hdy
         | false =>
@@ -390,14 +391,16 @@ theorem toDyadic?_roundDyadicPosDown_some (mant : Nat) (exp : Int) :
                             | Int.ofNat sh => mant <<< sh
                             | Int.negSucc sh => mant >>> (sh + 1)) %
                             pow2 23)) =
-                    ofBits (mkBits false 0 0) := by
-                          simpa using congrArg ofBits hmk
-                    _ = ofBits 0 := by
-                          simp [hbits]
-              have hdy : toDyadic? (posZero : IEEE32Exec) = some { sign := false, mant := 0, exp :=
-                0 } := by
+                        ofBits (mkBits false 0 0) := by
+                              simpa using congrArg ofBits hmk
+                        _ = ofBits 0 := by
+                              simp [hbits]
+              have hdy :
+                  toDyadic? (posZero : IEEE32Exec) =
+                    some { sign := false, mant := 0, exp := 0 } := by
                 have hfrac0 : (0 : Nat) < 2 ^ 23 := by decide
-                simpa [posZero] using
+                have hbits : mkBits false 0 0 = 0 := by decide
+                simpa [posZero, hbits] using
                   (toDyadic?_ofBits_mkBits_fin (sign := false) (exp := 0) (frac := 0) hexp0 hfrac0)
               simpa [hOut] using hdy
             ·

@@ -164,14 +164,14 @@ theorem square_deriv_correct (x : ℝ) :
 /-- Correctness of the hyperbolic-sine derivative spec: `sinh' = cosh`. -/
 theorem sinh_deriv_correct (x : ℝ) :
     HasDerivAt Activation.Math.sinhSpec (Activation.Math.sinhDerivSpec x) x := by
-  simpa [Activation.Math.sinhSpec, Activation.Math.sinhDerivSpec, mathfunc_sinh_eq_rsinh,
-    mathfunc_cosh_eq_rcosh] using Real.hasDerivAt_sinh x
+  change HasDerivAt (fun y : ℝ => Real.sinh y) (Real.cosh x) x
+  exact Real.hasDerivAt_sinh x
 
 /-- Correctness of the hyperbolic-cosine derivative spec: `cosh' = sinh`. -/
 theorem cosh_deriv_correct (x : ℝ) :
     HasDerivAt Activation.Math.coshSpec (Activation.Math.coshDerivSpec x) x := by
-  simpa [Activation.Math.coshSpec, Activation.Math.coshDerivSpec, mathfunc_sinh_eq_rsinh,
-    mathfunc_cosh_eq_rcosh] using Real.hasDerivAt_cosh x
+  change HasDerivAt (fun y : ℝ => Real.cosh y) (Real.sinh x) x
+  exact Real.hasDerivAt_cosh x
 
 /--
 Correctness of the ELU derivative spec away from the kink at `0`.
@@ -221,8 +221,6 @@ PyTorch correspondence: `torch.sigmoid`.
 -/
 theorem sigmoid_deriv_correct (x : ℝ) :
   HasDerivAt Activation.Math.sigmoidSpec (Activation.Math.sigmoidDerivSpec x) x := by
-  unfold Activation.Math.sigmoidSpec Activation.Math.sigmoidDerivSpec
-
   -- Show denominator ≠ 0
   have h_denom_ne_zero : 1 + Real.exp (-x) ≠ 0 := by
     linarith [Real.exp_pos (-x)]
@@ -237,8 +235,7 @@ theorem sigmoid_deriv_correct (x : ℝ) :
     apply HasDerivAt.const_add
     have h_neg : HasDerivAt (fun y ↦ -y) (-1) x := hasDerivAt_neg x
     have h_comp := (Real.hasDerivAt_exp (-x)).comp x h_neg
-    convert h_comp using 1
-    ring
+    simpa [Function.comp_def] using h_comp
 
   -- Use inverse function derivative and chain rule
   have h_main : HasDerivAt (fun y ↦ (1 + Real.exp (-y))⁻¹)
@@ -252,12 +249,14 @@ theorem sigmoid_deriv_correct (x : ℝ) :
 
   rw [h_simplified] at h_main
 
-  -- Show this equals sigmoidDerivative
-  convert h_main using 1
-  unfold Activation.Math.sigmoidSpec
-  rw [mathfunc_exp_eq_rexp (-x)]
-  field_simp [h_denom_ne_zero]
-  ring
+  -- Show this equals the sigmoid derivative spec.
+  have h_deriv_target :
+      Real.exp (-x) / (1 + Real.exp (-x)) ^ 2 = Activation.Math.sigmoidDerivSpec x := by
+    rw [Activation.Math.sigmoidDerivSpec, sigmoid_eq_inv_exp]
+    field_simp [h_denom_ne_zero]
+    ring
+  exact (h_main.congr_deriv h_deriv_target).congr_of_eventuallyEq
+    (Filter.Eventually.of_forall (fun y => by rw [sigmoid_eq_inv_exp]))
 
 /--
 Correctness of the derivative spec for `Activation.Math.logisticSpec`.
@@ -283,7 +282,13 @@ theorem logistic_deriv_correct (x : ℝ) :
           x) /
           ((MathFunctions.exp x + 1) * (MathFunctions.exp x + 1)))
         x := by
-    simpa [Pi.div_apply, pow_two] using hdiv
+    change HasDerivAt
+      ((fun y : ℝ => MathFunctions.exp y) / fun y : ℝ => MathFunctions.exp y + 1)
+      ((MathFunctions.exp x * (MathFunctions.exp x + 1) - MathFunctions.exp x * MathFunctions.exp
+        x) /
+        ((MathFunctions.exp x + 1) * (MathFunctions.exp x + 1)))
+      x
+    simpa [pow_two] using hdiv
   have hsimp :
       (MathFunctions.exp x * (MathFunctions.exp x + 1) - MathFunctions.exp x * MathFunctions.exp x)
         /
@@ -303,7 +308,9 @@ theorem logistic_deriv_correct (x : ℝ) :
         (Activation.Math.logisticDerivSpec x) x := by
     simpa [hsimp, hderiv] using hdiv'
   -- Rewrite the function to `Activation.Math.logisticSpec`.
-  simpa [Activation.Math.logisticSpec] using hdiv''
+  change HasDerivAt (fun y : ℝ => MathFunctions.exp y / (MathFunctions.exp y + 1))
+    (Activation.Math.logisticDerivSpec x) x
+  exact hdiv''
 
 
 lemma mathfunc_tanh_eq_rtanh (x : ℝ) : MathFunctions.tanh x = Real.tanh x := rfl
@@ -390,8 +397,7 @@ theorem tanh_deriv_correct (x : ℝ) :
   have h_exp_neg : HasDerivAt (fun t => Real.exp (-t)) (-Real.exp (-x)) x := by
     have h_neg : HasDerivAt (fun t ↦ -t) (-1) x := hasDerivAt_neg x
     have h_comp := (Real.hasDerivAt_exp (-x)).comp x h_neg
-    convert h_comp using 1
-    ring_nf
+    simpa [Function.comp_def] using h_comp
 
   have hf : HasDerivAt f (Real.exp x + Real.exp (-x)) x := by
     rw [← sub_neg_eq_add]
@@ -483,7 +489,9 @@ theorem gelu_deriv_correct (x : ℝ) :
 
   have hpoly : HasDerivAt (fun y : ℝ => y + coeff * y * y * y)
       ((1 : ℝ) + three * coeff * x * x) x := by
-    simpa using hid.add hcoeff_y3
+    change HasDerivAt ((fun y : ℝ => y) + fun y : ℝ => coeff * y * y * y)
+      ((1 : ℝ) + three * coeff * x * x) x
+    exact hid.add hcoeff_y3
   have hu : HasDerivAt u inner_deriv x := by
     have h := hpoly.const_mul sqrt_two_over_pi
     simpa [u, inner_deriv, mul_assoc] using h
@@ -493,7 +501,7 @@ theorem gelu_deriv_correct (x : ℝ) :
   have htanh : HasDerivAt (fun y : ℝ => Activation.Math.tanhSpec (u y))
       (sech_term * inner_deriv) x := by
     have h := htanh0.comp x hu
-    simpa [Function.comp, Activation.Math.tanhDerivSpec, sech_term, tanh_term] using h
+    simpa [Function.comp_def, Activation.Math.tanhDerivSpec, sech_term, tanh_term] using h
   have hA : HasDerivAt (fun y : ℝ => (1 : ℝ) + Activation.Math.tanhSpec (u y))
       (sech_term * inner_deriv) x := by
     simpa using htanh.const_add (1 : ℝ)
@@ -501,7 +509,11 @@ theorem gelu_deriv_correct (x : ℝ) :
       (fun y : ℝ => y * ((1 : ℝ) + Activation.Math.tanhSpec (u y)))
       ((1 : ℝ) * ((1 : ℝ) + Activation.Math.tanhSpec (u x)) +
         x * (sech_term * inner_deriv)) x := by
-    simpa [Pi.mul_apply] using hid.mul hA
+    change HasDerivAt
+      ((fun y : ℝ => y) * fun y : ℝ => (1 : ℝ) + Activation.Math.tanhSpec (u y))
+      ((1 : ℝ) * ((1 : ℝ) + Activation.Math.tanhSpec (u x)) +
+        x * (sech_term * inner_deriv)) x
+    exact hid.mul hA
   have hdiv : HasDerivAt
       (fun y : ℝ => y * ((1 : ℝ) + Activation.Math.tanhSpec (u y)) / two)
       (((1 : ℝ) * ((1 : ℝ) + Activation.Math.tanhSpec (u x)) +
@@ -534,7 +546,7 @@ theorem softplus_deriv_correct (x : ℝ) :
   have h_comp :
       HasDerivAt (fun y : ℝ => Real.log ((1 : ℝ) + Real.exp y)) ((1 + Real.exp x)⁻¹ * Real.exp x) x
         := by
-    simpa [Function.comp, mul_assoc, mul_left_comm, mul_comm, add_comm, add_left_comm, add_assoc]
+    simpa [Function.comp_def, mul_assoc, mul_left_comm, mul_comm, add_comm, add_left_comm, add_assoc]
       using h_comp'
   -- rewrite the target derivative to match the chain-rule form
   have hsig : (Activation.Math.sigmoidSpec (α := ℝ) x) = (Real.exp x) * (1 + Real.exp x)⁻¹ := by
@@ -566,7 +578,9 @@ theorem silu_deriv_correct (x : ℝ) :
   have hprod' :
       HasDerivAt (fun y : ℝ => y * Activation.Math.sigmoidSpec y)
         (1 * Activation.Math.sigmoidSpec x + x * Activation.Math.sigmoidDerivSpec x) x := by
-    simpa [Pi.mul_apply] using hprod
+    change HasDerivAt ((fun y : ℝ => y) * Activation.Math.sigmoidSpec)
+      (1 * Activation.Math.sigmoidSpec x + x * Activation.Math.sigmoidDerivSpec x) x
+    exact hprod
   have hderiv :
       1 * Activation.Math.sigmoidSpec x + x * Activation.Math.sigmoidDerivSpec x =
         (let s := Activation.Math.sigmoidSpec x; s + x * s * (1 - s)) := by
@@ -605,7 +619,8 @@ theorem safe_log_deriv_correct (x ε : ℝ) (hε : 0 < ε) :
     exact ne_of_gt this
   have h_comp := (Real.hasDerivAt_log hx0).comp x h_inner
   -- `log' u = 1/u`
-  simpa [one_div, div_eq_mul_inv, mul_assoc, mul_left_comm, mul_comm] using h_comp
+  simpa [Function.comp_def, MathFunctions.log, Activation.Math.softplusDerivSpec, one_div,
+    div_eq_mul_inv, mul_assoc, mul_left_comm, mul_comm] using h_comp
 
 /--
 Correctness of the `smooth_abs` derivative spec (a smooth absolute-value surrogate).
@@ -629,8 +644,8 @@ theorem smooth_abs_deriv_correct (x ε : ℝ) (hε : 0 < ε) :
     have hid : HasDerivAt (fun y : ℝ => y) (1 : ℝ) x := hasDerivAt_id' x
     have hmul : HasDerivAt (fun y : ℝ => y * y) (x + x) x := by
       -- product rule on `y ↦ y * y` gives derivative `x + x`
-      simpa [add_comm, add_left_comm, add_assoc, mul_assoc, mul_left_comm, mul_comm] using hid.mul
-        hid
+      change HasDerivAt ((fun y : ℝ => y) * fun y : ℝ => y) (x + x) x
+      exact (hid.mul hid).congr_deriv (by ring)
     have htwo : x + x = 2 * x := by ring
     have hsq : HasDerivAt (fun y : ℝ => y * y) (2 * x) x :=
       hmul.congr_deriv htwo
@@ -639,7 +654,7 @@ theorem smooth_abs_deriv_correct (x ε : ℝ) (hε : 0 < ε) :
   -- simplify `(1 / (2 * sqrt u)) * (2 * x)` to `x / sqrt u`
   have : (1 / (2 * Real.sqrt (x * x + ε))) * (2 * x) = x / Real.sqrt (x * x + ε) := by
     field_simp
-  simpa [Activation.Math.smoothAbsSpec, MathFunctions.sqrt, this, div_eq_mul_inv,
+  simpa [Function.comp_def, Activation.Math.smoothAbsSpec, MathFunctions.sqrt, this, div_eq_mul_inv,
     mul_assoc, mul_left_comm, mul_comm, add_assoc, add_left_comm, add_comm] using h_comp
 
 end Proofs

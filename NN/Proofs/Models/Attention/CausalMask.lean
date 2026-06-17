@@ -154,10 +154,16 @@ theorem hardMaskedSoftmaxSpec_blocked_eq_zero
               Spec.Tensor.vecGet
                 (Spec.hardMaskedSoftmaxVecSpec (scoreRows i) (maskRows i)) j = 0 := by
             apply hardMaskedSoftmaxVecSpec_blocked_eq_zero
-            simpa [Spec.get2, Spec.get, Spec.getAtSpec, Spec.Tensor.vecGet, hmaskRow]
+            simpa [Spec.get2, Spec.get, Spec.getAtSpec, Spec.Tensor.vecGet,
+              Spec.Tensor.toScalar, hmaskRow]
               using hblocked
-          simpa [Spec.hardMaskedSoftmaxSpec, Spec.get2, Spec.get, Spec.getAtSpec,
-            Spec.Tensor.vecGet, hscoreRow, hmaskRow] using hvec
+          simp [Spec.hardMaskedSoftmaxSpec, Spec.get2, Spec.get, Spec.getAtSpec, hscoreRow,
+            hmaskRow]
+          change
+            Spec.Tensor.vecGet
+                (Spec.hardMaskedSoftmaxVecSpec (Spec.Tensor.dim scoreCols)
+                  (Spec.Tensor.dim maskCols)) j = 0
+          simpa [hscoreRow, hmaskRow] using hvec
 
 /-- In exact hard-masked causal softmax, every strict-future attention weight is exactly zero. -/
 theorem hardMaskedSoftmaxSpec_causal_future_zero

@@ -114,8 +114,10 @@ def vitMaskedAutoencoder (cfg : VitMaeConfig)
   letI : NeZero cfg.patchW := ⟨h_patchW⟩
   letI : NeZero vitCfg.seqLen := ⟨h_seqLen⟩
   letI : NeZero cfg.dModel := ⟨h_dModel⟩
-  letI : NeZero vitCfg.dModel := ⟨by simpa [VitMaeConfig.toVitConfig] using h_dModel⟩
-  nn.sequential![
+  letI : NeZero vitCfg.dModel := ⟨by
+    change cfg.dModel ≠ 0
+    exact h_dModel⟩
+  nn.Sequential![
     nn.conv { outC := cfg.dModel, kH := cfg.patchH, kW := cfg.patchW, stride := cfg.stride, padding := cfg.padding },
     nn.lift (nn.of (nchwToTokens vitCfg)),
     nn.transformerEncoderBlock
@@ -124,8 +126,8 @@ def vitMaskedAutoencoder (cfg : VitMaeConfig)
         ffnHidden := cfg.ffnHidden
         activation := .gelu
         dropout? := none },
-    nn.flattenBatch,
-    nn.linear cfg.flatDim cfg.reconDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    FlattenBatch,
+    Linear cfg.flatDim cfg.reconDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
   ]
 
 /--

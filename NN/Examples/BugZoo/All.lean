@@ -28,7 +28,7 @@ contracts.
 
 Each submodule follows the same pattern:
 - cite the paper or incident class that motivates the bug;
-- state the TorchLean boundary honestly (`prevents`, `detects`, or `requires external conformance`);
+- state the TorchLean boundary (`prevents`, `detects`, or `requires external conformance`);
 - expose a small checked theorem or definition tied to the real spec/proof stack.
 
 This is not a separate theory fork. The examples re-export the actual TorchLean

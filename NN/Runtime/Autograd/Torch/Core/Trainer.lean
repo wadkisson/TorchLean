@@ -590,7 +590,7 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
         CurriedRef (fun s => Ops.Ref (m := m) (α := α) s) (paramShapes ++ inputShapes)
           (m (Ops.Ref (m := m) (α := α) Shape.scalar))) :
     Curried.Fn α paramShapes (IO (ScalarTrainer α paramShapes inputShapes)) :=
-  Curried.curry (α := α) (ss := paramShapes) (β := IO (ScalarTrainer α paramShapes inputShapes))
+    Curried.curry (α := α) (ss := paramShapes) (β := IO (ScalarTrainer α paramShapes inputShapes))
     (fun initParams => do
     let ps ← ParamList.ofTListWithRequiresGrad (α := α) initParams initRequiresGrad
     match opts.backend with

@@ -79,8 +79,9 @@ Practical checklist:
 6. Hook it into the public spec entrypoint
    - Add an import in the relevant focused umbrella, usually `NN/Spec/Models.lean`.
    - If it should be part of the whole spec doorway, make sure `NN/Entrypoint/Spec.lean` reaches that
-     umbrella so users can access it through `import NN.Entrypoint.Spec`, `import NN.Library`, or
-     `import NN`.
+     umbrella.
+   - If it should be part of ordinary model code, also expose a clean root spelling through
+     `NN.lean` or the public model API.
 
 7. Add a short runtime check (recommended)
    - Put a small compile only / small eval test in `NN/Tests/Runtime/Floats/ModelsCheck.lean`.

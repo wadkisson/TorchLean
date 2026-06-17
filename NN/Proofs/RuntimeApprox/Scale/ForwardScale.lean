@@ -106,7 +106,8 @@ theorem eval_scale {Γ : List Shape} {ss : List Shape} (g : FwdGraphScale (α :=
   induction g generalizing xS xR epsIn bIn with
   | nil =>
       -- `eval*` are casts along `Γ = Γ ++ []`.
-      simpa [evalSpec, evalRuntime, evalScales] using
+      simpa [evalSpec, evalRuntime, evalScales, toFwdGraph, FwdGraph.evalSpec,
+        FwdGraph.evalRuntime] using
         (scaleCtx_cast (α := α) (toSpec := toSpec) (h := (List.append_nil Γ).symm) hB)
   | snoc g node ih =>
       rename_i ssPrev τ
@@ -147,7 +148,8 @@ theorem eval_scale {Γ : List Shape} {ss : List Shape} (g : FwdGraphScale (α :=
           hb
 
       -- Cast to match the `Γ ++ (ssPrev ++ [τ])` shape.
-      simpa [evalSpec, evalRuntime, evalScales, ctxS, ctxR, epsPrev, bPrev, List.append_assoc] using
+      simpa [evalSpec, evalRuntime, evalScales, toFwdGraph, FwdGraph.evalSpec,
+        FwdGraph.evalRuntime, ctxS, ctxR, epsPrev, bPrev, List.append_assoc] using
         (scaleCtx_cast (α := α) (toSpec := toSpec) (h := List.append_assoc Γ ssPrev [τ]) hSnoc)
 
 end FwdGraphScale

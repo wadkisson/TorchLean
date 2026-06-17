@@ -115,7 +115,8 @@ theorem bellmanPolicy_monotone
     (state : Fin nStates) :
     valueAt (Spec.RL.FiniteStochastic.bellmanPolicy mdp policy values₁) state ≤
       valueAt (Spec.RL.FiniteStochastic.bellmanPolicy mdp policy values₂) state := by
-  simpa [Spec.RL.FiniteStochastic.bellmanPolicy, valueAt] using
+  simpa [Spec.RL.FiniteStochastic.bellmanPolicy, valueAt, Spec.Tensor.vecGet, Spec.get,
+    Spec.getAtSpec, Spec.Tensor.toScalar] using
     actionValue_monotone mdp valid values₁ values₂ hValues state (policy state)
 
 /-- Optimal Bellman operators are pointwise monotone. -/
@@ -266,8 +267,11 @@ theorem bellmanPolicy_contraction
       |valueAt (Spec.RL.FiniteStochastic.bellmanPolicy mdp policy values₁) state -
           valueAt (Spec.RL.FiniteStochastic.bellmanPolicy mdp policy values₂) state|) ?_
   intro state _
-  simpa [Spec.RL.FiniteStochastic.bellmanPolicy, valueAt] using
-    actionValue_abs_sub_le mdp valid values₁ values₂ state (policy state)
+  change
+    |Spec.RL.FiniteStochastic.actionValue mdp values₁ state (policy state) -
+        Spec.RL.FiniteStochastic.actionValue mdp values₂ state (policy state)|
+      ≤ mdp.discount * valueSupDist values₁ values₂
+  exact actionValue_abs_sub_le mdp valid values₁ values₂ state (policy state)
 
 /-- Every particular action-value is bounded by Bellman optimality. -/
 theorem actionValue_le_bellmanOptimality
@@ -291,7 +295,8 @@ theorem bellmanPolicy_le_bellmanOptimality
     (state : Fin nStates) :
     valueAt (Spec.RL.FiniteStochastic.bellmanPolicy mdp policy values) state ≤
       valueAt (Spec.RL.FiniteStochastic.bellmanOptimality mdp values) state := by
-  simpa [Spec.RL.FiniteStochastic.bellmanPolicy, valueAt] using
+  simpa [Spec.RL.FiniteStochastic.bellmanPolicy, valueAt, Spec.Tensor.vecGet, Spec.get,
+    Spec.getAtSpec, Spec.Tensor.toScalar] using
     actionValue_le_bellmanOptimality mdp values state (policy state)
 
 /-- At a fixed state, Bellman optimality is a contraction with modulus `γ`. -/
@@ -332,7 +337,8 @@ theorem bellmanOptimality_abs_sub_le
         ≤ bound := by
     exact abs_sub_le_iff.mpr
       ⟨sub_le_iff_le_add'.mpr hs1, sub_le_iff_le_add'.mpr hs2⟩
-  simpa [Spec.RL.FiniteStochastic.bellmanOptimality, valueAt, f, g, bound] using habs
+  simpa [Spec.RL.FiniteStochastic.bellmanOptimality, valueAt, Spec.Tensor.vecGet, Spec.get,
+    Spec.getAtSpec, Spec.Tensor.toScalar, f, g, bound] using habs
 
 /-- Bellman optimality is a contraction with modulus `γ` in the sup metric:
 

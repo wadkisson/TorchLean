@@ -151,7 +151,7 @@ def score {α : Type} [Context α] (m : Model) (input : List String) (lbl : Stri
   let cond := input.foldl (fun acc f => acc + logCond (α := α) m lbl f) 0
   prior + cond
 
-/-- Predict a label using a fitted model. -/
+/-- Predict a label using a trained Naive Bayes model. -/
 def predictModel
   (m : Model)
   (input : List String)
@@ -195,7 +195,7 @@ private def logSumExp {α : Type} [Context α] (xs : List α) : α :=
       let s := listSum (xs.map (fun x => MathFunctions.exp (x - m)))
       m + logProb s
 
-/-- Negative log-likelihood of the dataset under the fitted model. -/
+/-- Negative log-likelihood of the dataset under the trained Naive Bayes model. -/
 def negLogLikelihood {α : Type} [Context α] (m : Model) (data : List Example) : α :=
   data.foldl (fun acc ex =>
     match m.labels with

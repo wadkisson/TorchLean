@@ -31,9 +31,9 @@ pure helpers in `NN.Runtime.RL.Algorithms.PolicyGradient`:
 ## Action Encoding
 
 We assume **categorical** (finite-action) policies parameterized by logits, and we represent the
-chosen action as a **one-hot** tensor with the same shape as the logits. This keeps the selected
-log-probability differentiable with respect to the logits without introducing a separate integer
-index type into the `Ops` surface.
+chosen action as a **one-hot** tensor with the same shape as the logits. The selected
+log-probability remains differentiable with respect to the logits without introducing a separate
+integer index type into the `Ops` surface.
 
 ## Primary References
 

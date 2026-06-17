@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Export a deterministic GRU-gate interval certificate."""
-import json
 import math
-from typing import List, Dict, Any, Tuple
+from typing import Any
+
+from common import affine_interval, centered_box, write_json
 
 # GRU gate graph: 0=input(3) -> 1=linear -> 2=sigmoid; 0 -> 3=linear -> 4=tanh; 5=mul_elem
 
@@ -19,31 +20,10 @@ def seed_params():
 def seed_input_box(eps: float = 0.5):
     """Return the input interval box centered at `[1, 2, 3]`."""
     x0 = [float(i + 1) for i in range(n)]
-    lo = [xi - eps for xi in x0]
-    hi = [xi + eps for xi in x0]
-    return lo, hi
+    return centered_box(x0, eps)
 
 
-def ibp_linear(W: List[List[float]], b: List[float], lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]]:
-    """Propagate interval bounds through an affine layer."""
-    m, n = len(W), len(W[0])
-    out_lo = []
-    out_hi = []
-    for i in range(m):
-        lo_i = b[i]
-        hi_i = b[i]
-        for j in range(n):
-            a = W[i][j]
-            p = a * lo[j]
-            q = a * hi[j]
-            lo_i += min(p, q)
-            hi_i += max(p, q)
-        out_lo.append(lo_i)
-        out_hi.append(hi_i)
-    return out_lo, out_hi
-
-
-def ibp_sigmoid(lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]]:
+def ibp_sigmoid(lo: list[float], hi: list[float]) -> tuple[list[float], list[float]]:
     """Propagate interval bounds through elementwise sigmoid."""
     def s(x: float) -> float:
         """Evaluate the logistic sigmoid at one scalar."""
@@ -57,7 +37,7 @@ def ibp_sigmoid(lo: List[float], hi: List[float]) -> Tuple[List[float], List[flo
     return out_lo, out_hi
 
 
-def ibp_tanh(lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]]:
+def ibp_tanh(lo: list[float], hi: list[float]) -> tuple[list[float], list[float]]:
     """Propagate interval bounds through elementwise tanh."""
     def t(x: float) -> float:
         """Evaluate tanh at one scalar."""
@@ -71,7 +51,12 @@ def ibp_tanh(lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]
     return out_lo, out_hi
 
 
-def ibp_mul_elem(x_lo: List[float], x_hi: List[float], y_lo: List[float], y_hi: List[float]) -> Tuple[List[float], List[float]]:
+def ibp_mul_elem(
+    x_lo: list[float],
+    x_hi: list[float],
+    y_lo: list[float],
+    y_hi: list[float],
+) -> tuple[list[float], list[float]]:
     """Propagate interval bounds through elementwise multiplication."""
     lo = []
     hi = []
@@ -85,13 +70,13 @@ def ibp_mul_elem(x_lo: List[float], x_hi: List[float], y_lo: List[float], y_hi: 
     return lo, hi
 
 
-def run_ibp() -> Dict[str, Any]:
+def run_ibp() -> dict[str, Any]:
     """Compute the GRU-gate certificate payload consumed by Lean."""
     W, b = seed_params()
     x_lo, x_hi = seed_input_box(0.5)
-    a_lo, a_hi = ibp_linear(W, b, x_lo, x_hi)  # node 1
+    a_lo, a_hi = affine_interval(W, b, x_lo, x_hi)  # node 1
     s_lo, s_hi = ibp_sigmoid(a_lo, a_hi)       # node 2
-    b_lo, b_hi = ibp_linear(W, b, x_lo, x_hi)  # node 3
+    b_lo, b_hi = affine_interval(W, b, x_lo, x_hi)  # node 3
     t_lo, t_hi = ibp_tanh(b_lo, b_hi)          # node 4
     y_lo, y_hi = ibp_mul_elem(s_lo, s_hi, t_lo, t_hi)  # node 5
     return {
@@ -105,9 +90,8 @@ def main():
     """Write the GRU-gate certificate to the bundled examples directory."""
     cert = run_ibp()
     out_path = "NN/Examples/Verification/LiRPA/gru_gate_cert.json"
-    with open(out_path, "w") as f:
-        json.dump(cert, f, indent=2)
-    print(f"Wrote certificate to {out_path}")
+    out = write_json(out_path, cert)
+    print(f"Wrote certificate to {out}")
 
 
 if __name__ == "__main__":

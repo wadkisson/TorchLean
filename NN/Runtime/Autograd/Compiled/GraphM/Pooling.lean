@@ -35,7 +35,7 @@ the spatial rank `d`.
 Forward-mode status: implemented. The JVP follows the primal argmax selected by
 `Spec.maxPoolJvpSpec`, including the documented first-winner tie convention.
 -/
-def maxPool {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def maxPool {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {d C : Nat}
   {inSpatial kernel stride padding : Vector Nat d}
   {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
@@ -80,7 +80,7 @@ the spatial rank `d`.
   Forward-mode status: implemented. Average pooling is linear, so the JVP is the same average-pool
   map applied to the input tangent.
 -/
-def avgPool {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def avgPool {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {d C : Nat}
   {inSpatial kernel stride padding : Vector Nat d}
   (hKernel : ∀ i : Fin d, kernel.get i ≠ 0)
@@ -123,7 +123,7 @@ max pooling.
 Forward-mode status: implemented. The JVP is the softmax-weighted tangent of the
 log-sum-exp pooling window.
 -/
-def smoothMaxPool {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def smoothMaxPool {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {d C : Nat}
   {inSpatial kernel stride padding : Vector Nat d}
   {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
@@ -168,7 +168,7 @@ Forward-mode status: implemented. The JVP routes each output tangent through the
 argmax selected by the primal input.
 -/
 
-def maxPool2d {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def maxPool2d {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
   MWith α Δ Γ (Var (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
@@ -208,7 +208,7 @@ PyTorch comparison: `torch.nn.functional.max_pool2d` with padding.
 Forward-mode status: implemented. Padding is fixed and the JVP follows the real primal winner,
 ignoring padded cells just like the forward pass.
 -/
-def maxPool2dPad {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def maxPool2dPad {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
   MWith α Δ Γ
@@ -248,7 +248,7 @@ This is a differentiable approximation to max-pooling.
 Forward-mode status: implemented. The JVP is the softmax-weighted tangent of the
 log-sum-exp pooling window.
 -/
-def smoothMaxPool2d {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def smoothMaxPool2d {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Var (.dim inC (.dim inH (.dim inW .scalar)))) (beta : α) :
   MWith α Δ Γ (Var (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
@@ -287,7 +287,7 @@ PyTorch comparison: `torch.nn.functional.avg_pool2d` (without a batch dimension)
 Forward-mode status: implemented. Average pooling is linear, so the JVP is average pooling of the
 input tangent.
 -/
-def avgPool2d {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def avgPool2d {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
   MWith α Δ Γ (Var (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
@@ -325,7 +325,7 @@ PyTorch comparison: `torch.nn.functional.avg_pool2d` with padding.
   Forward-mode status: implemented. Padding is fixed and average pooling is linear, so the JVP is
   the padded average-pool map applied to the input tangent.
 -/
-def avgPool2dPad {α : Type} {Δ : Type} [Context α] [Add α] [Zero α] [DecidableEq Shape]
+def avgPool2dPad {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride padding : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
   MWith α Δ Γ

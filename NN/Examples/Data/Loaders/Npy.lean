@@ -8,7 +8,6 @@ module
 
 public import NN
 public import NN.Examples.Data.SamplePaths
-public import NN.API.Data.Transforms
 
 /-!
 # NPY loader tutorial (NumPy/PyTorch interop)
@@ -38,15 +37,17 @@ Optional flags (tutorial-specific):
 - `--x PATH`, `--y PATH` (override the `.npy` files)
 - `--seed S` (controls shuffling and model initialization)
 - `--batch N`
-- `--epochs E`
+- `--steps N`
 
 Public API used here:
 
 - `Data.fromNpy` (metadata)
-- `Data.fromNpySupervised` (typed dataset from disk)
-- `Data.Transforms.Compose`
-- `Data.batchLoader`
-- `train.fitLoaderWith`
+- `Data.supervisedDataset`
+- `Data.batchDataset`
+- `Trainer.new`
+- `Trainer.RunConfig`
+- `Trainer.TrainOptions`
+- `trainer.train`
 -/
 
 @[expose] public section
@@ -54,117 +55,82 @@ Public API used here:
 
 namespace NN.Examples.Data.Loaders.Npy
 
-open Spec
-open Tensor
-open NN.Tensor
-open NN.API
+open TorchLean
 
 def nSamples : Nat := 25
 def inDim : Nat := 2
 def outDim : Nat := 1
 
-/-- A small 2-layer MLP `2 -> 8 -> 1`. -/
-def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.Mat batch inDim) (Shape.Mat batch outDim)) :=
-  nn.sequential![
-    nn.linear inDim 8 (pfx := NN.Tensor.Shape.Vec batch),
-    nn.relu,
-    nn.linear 8 outDim (pfx := NN.Tensor.Shape.Vec batch)
-  ]
+/-- A small 2-layer batched MLP `2 -> 8 -> 1`. -/
+def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
+  nn.models.Mlp1ReLU
+    { batch := batch, inDim := inDim, hidDim := 8, outDim := outDim }
 
-/--
-Load the `.npy` tensors, print their metadata, then apply a small input transform.
-
-This file follows the interop path from NumPy/PyTorch exports on disk to TorchLean's normal
-training API.
--/
-def loadDataset (xPath yPath : System.FilePath)
-    {α : Type} [Semantics.Scalar α] [Runtime.Scalar α] :
-    IO (Except String (Data.Dataset (sample.Supervised α (Shape.Vec inDim) (Shape.Vec outDim)))) :=
-      do
-  let xMeta ← Data.fromNpy xPath
-  let yMeta ← Data.fromNpy yPath
-  match xMeta with
-  | .error e => pure (.error e)
-  | .ok xMeta =>
-      match yMeta with
-      | .error e => pure (.error e)
-      | .ok yMeta => do
-          IO.println s!"X.npy dtype={xMeta.dtype} shape={xMeta.shape}"
-          IO.println s!"y.npy dtype={yMeta.dtype} shape={yMeta.shape}"
-
-          let ds0 ← Data.fromNpySupervised (α := α) xPath yPath nSamples [inDim] [outDim]
-
-          let xShape : Spec.Shape := Shape.Vec inDim
-          let yShape : Spec.Shape := Shape.Vec outDim
-
-          -- Example transform: scale inputs down a bit.
-          let xTransform : Spec.Tensor α xShape → Spec.Tensor α xShape :=
-            Data.Transforms.Compose
-              [ Data.Transforms.Lambda (Data.Transforms.mapTensor (α := α) (s := xShape)
-                  (fun v => v * Runtime.ofFloat (α := α) 0.5))
-              ]
-
-          pure <|
-            ds0.map (fun ds =>
-              Data.Transforms.onSupervisedDatasetInput (α := α) (σ := xShape) (τ := yShape)
-                xTransform ds)
+/-- Command-line help for the NPY loader tutorial. -/
+def usage : String :=
+  String.intercalate "\n"
+    [ "TorchLean NPY loader tutorial"
+    , ""
+    , "Usage:"
+    , "  lake exe torchlean data_npy [options]"
+    , ""
+    , "Options:"
+    , "  --data-dir PATH"
+    , "  --x PATH"
+    , "  --y PATH"
+    , "  --seed N"
+    , "  --batch N"
+    , "  --steps N"
+    , "  --dtype float|ieee32"
+    , "  --backend eager|compiled"
+    , "  --cpu | --cuda"
+    ]
 
 def main (args : List String) : IO Unit := do
-  let args := API.CLI.dropDashDash args
+  let args := CLI.dropDashDash args
+  if CLI.hasHelp args then
+    IO.println usage
+    return
 
   let label := "Data.Loaders.Npy"
-  let (dataDir, args) ← API.Common.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
-  let (seed, args) ← API.Common.orThrow label <| API.CLI.takeSeed args 0
-  let (eb, args) ← API.Common.orThrow label <| API.CLI.takeEpochBatch args 20 5
+  let (dataDir, args) ← CLI.orThrow label <| _root_.NN.Examples.Data.SamplePaths.takeDataDir args
+  let (seed, args) ← CLI.orThrow label <| CLI.takeSeed args 0
+  let (steps, args) ← CLI.orThrow label <| CLI.takeStepsFlagDefault args 20
+  let (batch, args) ← CLI.orThrow label <| CLI.takePositiveNatFlagDefault args label "batch" 5
+  let (paths, args) ← CLI.orThrow label <|
+    _root_.NN.Examples.Data.SamplePaths.takeXyPaths args
+      (_root_.NN.Examples.Data.SamplePaths.regressionXNpy dataDir)
+      (_root_.NN.Examples.Data.SamplePaths.regressionYNpy dataDir)
+  let xPath := paths.xPath
+  let yPath := paths.yPath
 
-  let (x?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "x"
-  let (y?, args) ← API.Common.orThrow label <| API.CLI.takePathFlagOnce args "y"
-
-  let xPath := x?.getD (_root_.NN.Examples.Data.SamplePaths.regressionXNpy dataDir)
-  let yPath := y?.getD (_root_.NN.Examples.Data.SamplePaths.regressionYNpy dataDir)
-  if eb.batch = 0 then
-    throw <| IO.userError s!"{label}: --batch must be > 0"
-
-  -- Train with a batched task: the model is written directly over `batch × Vec inDim` tensors.
-  let task : train.Task (shape![eb.batch, inDim]) (shape![eb.batch, outDim]) :=
-    train.regression (nn.build seed (mkModel (batch := eb.batch)))
+  let model := mkModel (batch := batch)
+  let run ← Trainer.RunConfig.parseRuntimeArgsOrThrow label args
+    { optimizer := optim.adam { lr := 0.05 } }
+  let trainer := Trainer.new model <|
+    Trainer.Config.fromRunConfig run .regression (seed := seed)
 
   IO.println "== NPY loader training tutorial =="
+  trainer.printInfo
   IO.println s!"data_dir = {dataDir}"
   IO.println s!"x_path   = {xPath}"
   IO.println s!"y_path   = {yPath}"
   IO.println s!"seed     = {seed}"
-  IO.println s!"model    = MLP(2 -> 8 -> 1)"
-  IO.println (s!"train    = Adam(lr=0.05), epochs={eb.epochs}, batch_size={eb.batch}, " ++
+  IO.println (s!"train    = Adam(lr=0.05), steps={steps}, batch_size={batch}, " ++
     s!"shuffle=true, drop_last=true")
-  IO.println "scheduler = ExponentialLR(gamma=0.9)"
+  let xMeta ← CLI.orThrow label <| (← Data.fromNpy xPath)
+  let yMeta ← CLI.orThrow label <| (← Data.fromNpy yPath)
+  IO.println s!"X.npy dtype={xMeta.dtype} shape={xMeta.shape}"
+  IO.println s!"y.npy dtype={yMeta.dtype} shape={yMeta.shape}"
 
-  let _exitCode ← TorchLean.Module.run label args (.float (fun opts rest => do
-    API.Common.orThrow label <| API.CLI.requireNoArgs rest
-    let runner ← train.instantiateWithOptions (task := task) (α := Float) opts
-
-    let dsE ← loadDataset (xPath := xPath) (yPath := yPath) (α := Float)
-    let ds ← API.Common.orThrow label dsE
-
-    let loader := Data.batchLoader ds eb.batch (shuffle := true) (seed := seed) (dropLast := true)
-    let batchedDs ← API.Common.orThrow label <| Data.BatchLoader.batchDataset loader
-
-    let opt := optim.adam 0.05
-    let cfg0 : train.LoaderFitConfig := { (train.epochs eb.epochs (optimizer := opt)) with logEvery
-      := 0 }
-    let cfg := train.exponentialEpochLR cfg0 (base := 0.05) (gamma := 0.9)
-
-    let hooks : train.Callbacks Float :=
-      (train.onTrainStart do
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "before")
-      ++ train.logLossEvery 5
-      ++ (train.onTrainEnd (fun _ =>
-        train.withMode runner .eval do
-          train.Report.reportMeanLoss (task := task) runner batchedDs "after"))
-
-    let (_report, _loader') ← train.fitLoaderWith (task := task) runner cfg loader hooks
-    pure ())) { printOk := false }
-  pure ()
+  let src : Data.SupervisedSource :=
+    Data.SupervisedSource.ofPaths .npy xPath yPath nSamples [inDim] [outDim]
+  let data0 := Data.supervisedDataset src
+  let data := Data.batchDataset batch data0 (shuffle := true) (seed := seed)
+  let trained ← trainer.train data { steps := steps }
+  trained.printSummary
+  let heldout : Tensor.T Float (Shape.mat batch inDim) :=
+    Tensor.fill 0.25 (Shape.mat batch inDim)
+  trained.printPrediction "predict(batch=heldout)" heldout
 
 end NN.Examples.Data.Loaders.Npy

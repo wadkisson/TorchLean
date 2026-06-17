@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Core
+public import NN
 
 /-!
 # Real Dataset Paths
@@ -32,8 +32,7 @@ def defaultDataDir : System.FilePath :=
 /-- Parse an optional `--data-dir PATH` flag for real-data examples. -/
 def takeDataDir (args : List String) (default : System.FilePath := defaultDataDir) :
     Except String (System.FilePath × List String) := do
-  let (dir?, rest) ← NN.API.CLI.takePathFlagOnce args "data-dir"
-  pure (dir?.getD default, rest)
+  TorchLean.CLI.takePathFlagDefault args "data-dir" default
 
 /-- Directory containing prepared CIFAR-10 `.npy` arrays. -/
 def cifar10Dir (dataDir : System.FilePath := defaultDataDir) : System.FilePath :=

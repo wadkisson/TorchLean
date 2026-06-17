@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -35,13 +34,17 @@ TorchLean packages that idea with the public `Data` and `sample` namespaces. In 
 the dataset is built from two batched tensors:
 
 ```
-let X : Spec.Tensor Float (shape![25, 2]) :=
-  API.Samples.grid2Square (-1.0) 1.0 5
+import NN
+open TorchLean
 
-let Y : Spec.Tensor Float (shape![25, 1]) :=
-  API.Samples.regression2to1Float X target
+def X : Tensor.T Float (shape![25, 2]) :=
+  Samples.grid2Square (-1.0) 1.0 5
 
-Data.supervisedDim0F (α := α) X Y
+def Y : Tensor.T Float (shape![25, 1]) :=
+  Samples.regression2to1Float X target
+
+def dataset : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+  Data.tensorDataset X Y
 ```
 
 The leading dimension is the sample dimension. The loader then turns per sample shapes into batched
@@ -53,15 +56,16 @@ For small tutorials, the simplest path is fully in memory:
 
 ```
 let dataset :=
-  Data.labeled (α := α) (σ := Shape.CHW 1 4 4) 2 samplesF
+  Data.Bands.dataset
 ```
 
 This is the TorchLean analogue of a small PyTorch `TensorDataset`: a finite dataset whose elements
 are already tensors. It is excellent for introductory examples, tests, and examples where the point is the
 model or proof interface rather than file IO.
 
-The image band dataset used by the CNN tutorial lives in
-[NN.API.Samples.Bands](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Samples/Bands.lean).
+The image band dataset used by the CNN tutorial is exposed through the public `Data` API and is
+used directly by
+[NN.Examples.Quickstart.SimpleCnnTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean).
 
 # File Sources
 
@@ -114,22 +118,23 @@ choice.
 
 In PyTorch, a final batch of size `3` after several batches of size `8` is usually fine. In
 TorchLean, the batch dimension can appear in the type. If the model is written for
-`Shape.Mat 8 inDim`, then a final `Shape.Mat 3 inDim` batch is not the same type. `dropLast := true`
+`Shape.mat 8 inDim`, then a final `Shape.mat 3 inDim` batch is not the same type. `dropLast := true`
 keeps the tutorial simple by making every batch have the same static shape.
 
 More flexible loaders can still be written, but then the file has to say how it handles the changing
 batch dimension. That is the tradeoff: less implicit convenience, more visible shape information.
 
 When a full epoch is needed directly, `Data.BatchLoader.epoch` materializes the batches and returns
-the updated loader state. Most examples call the higher level training helpers instead:
+the updated loader state. Most public examples stay one level higher and batch the dataset first:
 
 ```
-let cfg := train.epochs epochs (optimizer := optim.adam 0.05)
-let (_report, _loader') <- train.fitLoaderWith (task := task) runner cfg loader hooks
+let data := Data.batchDataset batch baseData (shuffle := true) (seed := seed)
+let trained ← trainer.train data { steps := 200, batchSize := 16 }
+trained.printSummary
 ```
 
-That is the standard multi epoch path. It is not repeated training on one fixed batch. Each epoch
-uses the loader, optionally reshuffles, and feeds the minibatches to the same task.
+That is the standard user-facing path. The loader still exists under the hood, but the public
+example does not need to own runner state, callbacks, or a separate epoch loop.
 
 # A Complete Minibatch Shape
 
@@ -142,44 +147,51 @@ Suppose a CSV row has:
 The per sample task is:
 
 ```
-Shape.Vec 2 -> Shape.Vec 1
+Shape.vec 2 -> Shape.vec 1
 ```
 
 The minibatch model is:
 
 ```
-Shape.Mat 5 2 -> Shape.Mat 5 1
+Shape.mat 5 2 -> Shape.mat 5 1
 ```
 
 That is why the quickstart writes:
 
 ```
 def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (Shape.Mat batch inDim) (Shape.Mat batch outDim)) :=
-  nn.sequential![
-    nn.linear inDim hidDim (pfx := Shape.Vec batch),
-    nn.relu,
-    nn.linear hidDim outDim (pfx := Shape.Vec batch)
+    nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
+  nn.Sequential![
+    nn.Linear inDim hidDim,
+    nn.ReLU,
+    nn.Linear hidDim outDim
   ]
 ```
 
 The model says it consumes a batch. The dataset says it contains individual samples. The loader
 connects those two views.
 
-# Hooks and Curves
+# Hooks And Curves
 
-Good examples should show training progress. TorchLean uses callbacks for that:
-
-```
-let hooks : train.Callbacks alpha :=
-  train.logLossEvery 5
-```
-
-More structured examples attach reports at the start, end, or after each epoch:
+Good runnable commands should still leave an artifact behind. The public trainer result writes a
+two-point TrainLog when JSON logging is enabled, and it still exposes that same before/after summary
+as its quick terminal report.
 
 ```
-train.onTrainStart do
-  train.Report.reportMeanLoss (task := task) runner dataset "before"
+let trained ← trainer.train data
+  { steps := 200
+    log := .json outPath }
+```
+
+The returned `trained` value is not only a string summary. It also keeps the trained runtime handle alive,
+so public examples can immediately run `trained.eval ...` without reopening the advanced runner
+API.
+
+Lower-level callbacks still exist for runtime-module tutorials and custom training loops:
+
+```
+Trainer.Advanced.onTrainStart do
+  Trainer.Advanced.Report.reportMeanLoss (task := task) runner dataset "before"
 ```
 
 The model zoo examples also accept a log path through the shared CLI flags. The JSON log is meant to

@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -17,11 +16,11 @@ are visible before the model runs.
 model : Tensor alpha inputShape -> Tensor alpha outputShape
 ```
 
-The three names to remember are `nn.M`, `nn.Sequential`, and `nn.build`.
+The three names to remember are `nn.M`, `nn.Sequential`, and `Trainer.new`.
 
 - `nn.M` is the model builder. It allocates parameter seeds and assembles layers.
 - `nn.Sequential sigma tau` is a model from shape `sigma` to shape `tau`.
-- `nn.build seed mkModel` fixes the initialization seed and returns the trainable model package.
+- `Trainer.new mkModel { task := .regression, seed := seed }` fixes initialization and chooses the training task.
 
 The result still feels close to PyTorch's `nn.Sequential`, but the input and output shapes are part
 of the Lean type.
@@ -31,23 +30,22 @@ of the Lean type.
 The smallest useful pattern is a multilayer perceptron:
 
 ```
-open Spec
-open NN.Tensor
-open NN.API
+import NN
+open TorchLean
 
 def inDim : Nat := 2
 def hidden : Nat := 8
 def outDim : Nat := 1
 
-def mkModel : nn.M (nn.Sequential (Shape.Vec inDim) (Shape.Vec outDim)) :=
-  nn.sequential![
-    nn.linear inDim hidden (pfx := Spec.Shape.scalar),
-    nn.relu,
-    nn.linear hidden outDim (pfx := Spec.Shape.scalar)
+def mkModel : nn.M (nn.Sequential (Shape.vec inDim) (Shape.vec outDim)) :=
+  nn.Sequential![
+    nn.Linear inDim hidden,
+    nn.ReLU,
+    nn.Linear hidden outDim
   ]
 
 def task (seed : Nat) :=
-  train.regression (nn.build seed mkModel)
+  Trainer.new mkModel { task := .regression, seed := seed }
 ```
 
 There are three things to notice.
@@ -55,15 +53,15 @@ There are three things to notice.
 First, the model type says exactly what the model accepts and returns:
 
 ```
-nn.Sequential (Shape.Vec 2) (Shape.Vec 1)
+nn.Sequential (Shape.vec 2) (Shape.vec 1)
 ```
 
-Second, `nn.linear inDim hidden` is not just a runtime operation. It also describes the parameter
-shapes for the weight and bias. A layer `nn.linear 2 8` introduces the usual affine parameters for
-mapping two features to eight features under the selected prefix convention. When `nn.build` runs,
-it creates the initial parameter bundle for that layer.
+Second, `nn.Linear inDim hidden` is not just a runtime operation. It also describes the parameter
+shapes for the weight and bias. A layer `nn.Linear 2 8` introduces the usual affine parameters for
+mapping two features to eight features under the selected prefix convention. When the trainer is
+created with a seed, it builds the initial parameter bundle for that layer.
 
-Third, `train.regression` attaches a loss convention to the model. The model definition and the
+Third, `Trainer.new` attaches a loss convention to the model. The model definition and the
 training task are separate: the same model shape can appear in a regression task, a classification
 task, an export path, or a proof statement.
 
@@ -80,26 +78,26 @@ you to name that prefix.
 For one vector:
 
 ```
-nn.linear 2 8 (pfx := Spec.Shape.scalar)
--- Shape.Vec 2 -> Shape.Vec 8
+nn.Linear 2 8
+-- Shape.vec 2 -> Shape.vec 8
 ```
 
 For a minibatch:
 
 ```
-nn.linear 2 8 (pfx := Shape.Vec batch)
--- Shape.Mat batch 2 -> Shape.Mat batch 8
+nn.Linear 2 8
+-- Shape.mat batch 2 -> Shape.mat batch 8
 ```
 
 That prefix is why the minibatch MLP can be written with the same layer vocabulary:
 
 ```
 def mkBatched {batch : Nat} :
-    nn.M (nn.Sequential (Shape.Mat batch 2) (Shape.Mat batch 1)) :=
-  nn.sequential![
-    nn.linear 2 8 (pfx := Shape.Vec batch),
-    nn.relu,
-    nn.linear 8 1 (pfx := Shape.Vec batch)
+    nn.M (nn.Sequential (Shape.mat batch 2) (Shape.mat batch 1)) :=
+  nn.Sequential![
+    nn.Linear 2 8,
+    nn.ReLU,
+    nn.Linear 8 1
   ]
 ```
 
@@ -109,37 +107,74 @@ applied across a batch.
 The runnable minibatch example is
 [NN.Examples.Quickstart.MinibatchMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/MinibatchMlpTrain.lean).
 
-# Images and CNNs
+# KANs: Models Still Stay Task-Agnostic
 
-Image models use the same `nn.sequential!` style, but the input shape is now an image batch:
+Kolmogorov-Arnold Networks fit the same pattern. A KAN is a model family: each scalar edge is
+expanded through a one-dimensional basis, and the layer learns coefficients on those edge features.
+Regression or classification is still selected by the trainer.
 
 ```
-Shape.Images batch channels height width
+def edge :=
+  nn.models.KANPiecewiseLinear.edgeFamily { gridSize := 8, inputScale := 7 }
+
+def cfg : nn.models.KANConfig :=
+  { batch := 4
+    inDim := 2
+    hidden := [8]
+    outDim := 1
+    edge := edge
+    seedBase := 10 }
+
+def mkKan : nn.M (nn.Sequential (nn.models.kanInShape cfg) (nn.models.kanOutShape cfg)) :=
+  nn.models.KAN cfg
+
+def task :=
+  Trainer.new mkKan { task := .regression, optimizer := optim.adam { lr := 0.01 } }
+```
+
+The edge slot is the important abstraction. The built-in triangular basis is deliberately small:
+it is piecewise linear, so interval and branch-style reasoning can stay explicit. A cubic spline,
+polynomial, or rational edge basis should provide another `nn.models.KANEdgeFamily`; the same
+`Trainer.new` surface then decides the task.
+
+This follows the KAN idea from Liu et al. (2024), where learned univariate edge functions replace
+ordinary scalar weights. For the spline background, de Boor's *A Practical Guide to Splines* is the
+standard reference.
+
+The runnable example is
+[NN.Examples.Models.Supervised.Kan](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Supervised/Kan.lean).
+
+# Images and CNNs
+
+Image models use the same `nn.Sequential!` style, but the input shape is now an image batch:
+
+```
+Shape.images batch channels height width
 ```
 
 A small CNN looks like this:
 
 ```
 def mkCnn {batch : Nat} :
-    nn.M (nn.Sequential (Shape.Images batch 1 4 4) (shape![batch, 2])) :=
+    nn.M (nn.Sequential (Shape.images batch 1 4 4) (shape![batch, 2])) :=
   let outC : Nat := 3
   let outH : Nat := (4 - 2) / 1 + 1
   let outW : Nat := (4 - 2) / 1 + 1
-  let featInner : Shape := Shape.Image outC outH outW
-  let featSize : Nat := Spec.Shape.size featInner
-  nn.sequential![
-    nn.conv (n := batch) (inC := 1) (inH := 4) (inW := 4)
+  let featInner : Shape := Shape.image outC outH outW
+  let featSize : Nat := Shape.size featInner
+  nn.Sequential![
+    nn.Conv2d (n := batch) (inC := 1) (inH := 4) (inW := 4)
       { outC := outC, kH := 2, kW := 2, stride := 1, padding := 0 },
-    nn.relu,
-    nn.flattenBatch,
-    nn.linear featSize 2 (pfx := Shape.Vec batch)
+    nn.ReLU,
+    nn.FlattenBatch,
+    nn.Linear featSize 2
   ]
 ```
 
 Here the shape bookkeeping is part of the model definition:
 
 - the convolution maps `N x 1 x 4 x 4` to `N x 3 x 3 x 3`;
-- `nn.flattenBatch` keeps the batch axis and flattens the feature axes;
+- `nn.FlattenBatch` keeps the batch axis and flattens the feature axes;
 - the final linear layer maps each flattened image to two logits.
 
 The CNN example is valuable because the axes are no longer implicit. The type records that a batch
@@ -158,10 +193,10 @@ Residual models are useful because they force the API to express a shape preserv
 input -> block(input) + skip(input)
 ```
 
-The public builder for the small ResNet tutorial is `nn.resnetBasicBlock`. A typical shape is:
+The public builder for a residual block is `nn.ResNetBasicBlock`. A typical shape is:
 
 ```
-nn.resnetBasicBlock (n := batch) (inC := 8) (h := 4) (w := 4)
+nn.ResNetBasicBlock (n := batch) (inC := 8) (h := 4) (w := 4)
   { outC := 8, stride := 1 }
 ```
 
@@ -169,9 +204,8 @@ Read the type as a contract: if the block is used in the no downsample case, the
 the main path have compatible output shapes. If a downsample is requested, the block records the
 shape change explicitly.
 
-The tutorial file is
-[NN.Examples.Quickstart.ResnetBasicblockTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/ResnetBasicblockTrain.lean).
-The larger model wrappers live under [NN/API/Models/Resnet.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Resnet.lean).
+The block itself lives in the public `TorchLean.nn` surface, and the ResNet model constructors live
+under [NN/API/Models/Resnet.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Resnet.lean).
 
 # Transformer Shaped Blocks
 
@@ -185,22 +219,22 @@ The public constructors include:
 
 - `nn.multiheadAttention`,
 - `nn.layerNorm`,
-- `nn.transformerEncoderBlock`,
-- and model wrappers under [NN/API/Models/Transformer.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Transformer.lean),
+- `nn.TransformerEncoderBlock`,
+- and model constructors under [NN/API/Models/Transformer.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Transformer.lean),
   [NN/API/Models/Gpt2.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Gpt2.lean), and
   [NN/API/Models/Vit.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Vit.lean).
 
 A small block reads as:
 
 ```
-nn.transformerEncoderBlock
+nn.TransformerEncoderBlock
   (batch := batch) (n := seqLen) (dModel := dModel)
   { numHeads := 2, headDim := dModel / 2, ffnHidden := 4 * dModel }
 ```
 
 The advanced-model chapters give the longer model zoo tour. Here the lesson is simpler: MLPs, CNNs,
-ResNets, and transformer blocks all enter through the same typed model-building path. State the
-shape, choose the layers, build parameters, then train or inspect the resulting task.
+residual blocks, and transformer blocks all enter through the same typed model-building path. State the
+shape, choose the layers, create a trainer with a seed, then train or inspect the resulting task.
 
 # Parameters Are Explicit
 
@@ -210,30 +244,25 @@ choice makes the training loop and the verification path much easier to read.
 Informally:
 
 ```
-nn.build seed mkModel
--- produces a model structure together with initialized parameters
+Trainer.new mkModel { task := .regression, seed := seed }
+-- produces a supervised task with initialized parameters
 ```
 
-That package is what `train.regression`, `train.classificationOneHot`, and the other task builders
-consume. Training updates the parameter bundle. Prediction evaluates the same structure with the
-current parameter values.
+The trainer owns the initial parameter bundle for the chosen task. Training updates that bundle.
+Prediction evaluates the same structure with the current parameter values.
 
 If this looks verbose for a two-layer MLP, remember that the same structure is what later lets us
 lower the model to a graph and check a certificate without rediscovering the parameter shapes.
 
-# Choosing a Task
+# Choosing The Trainer
 
-After a model is built, choose the task that matches the target:
+After a model is built, choose the public trainer that matches the target:
 
-- use `train.regression` for mean squared error style vector targets;
-- use `train.classificationOneHot` for one hot classification targets;
-- use the model zoo wrappers when a family has a specialized objective or data shape.
+- use `Trainer.new model { task := .regression }` for mean squared error style vector targets;
+- use `Trainer.new model { task := .classification }` for one-hot classification targets;
+- use the model-zoo command layer when a family has a specialized objective or data shape.
 
-The shape of the task matches the shape of the model:
-
-```
-train.Task inputShape targetShape
-```
-
-That is the bridge between model building and training. The next page explains how datasets and
-loaders produce samples with those same shapes.
+The public trainer records the same shape contract as the model and target data. Advanced runtime
+code can still look at the checked runtime task object directly. The public path normally stops
+one layer higher: build the model, choose the trainer with `Trainer.new`, then pass a dataset plus
+per-training `Trainer.TrainOptions`.

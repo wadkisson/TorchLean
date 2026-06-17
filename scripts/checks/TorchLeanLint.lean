@@ -18,7 +18,7 @@ This is wired into Lake as `lintDriver := "torchlean_lint"`, so you can run:
 
 Unlike mathlib’s `#lint`-heavy pipeline, TorchLean’s “lint” is primarily **repo policy**:
 forbidden constructs (unverified proof stubs, unexpected axioms, native decision procedures, etc.),
-whitespace hygiene, and consistent file headers. This keeps the signal high while the library is
+whitespace hygiene, and consistent file headers. The goal is high-signal feedback while the library is
 still evolving quickly.
 -/
 

@@ -44,8 +44,8 @@ evidence; this file spells out the contract shape so that â€œwe tested it onceâ€
 semantic guarantee.
 
 The full TorchLean compiler-correctness chapter contains the stronger IR-specific theorem. This
-BugZoo card stays local so that importing the examples chapter does not force every heavy
-compiler proof to elaborate.
+example stays local so that importing the examples chapter does not force every heavy compiler
+proof to elaborate.
 -/
 
 @[expose] public section

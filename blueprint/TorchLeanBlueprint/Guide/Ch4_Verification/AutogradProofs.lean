@@ -1,5 +1,4 @@
 import VersoManual
-import VersoBlueprint
 
 open Verso.Genre Manual
 
@@ -78,7 +77,8 @@ proof data carried by each node.
 
 The important objects are:
 
-- `TList`: heterogeneous tensor context indexed by a list of shapes.
+- `TensorPack`: public typed tensor payloads indexed by a list of shapes; internally, the
+  autograd algebra still has a small context datatype with the same shape-indexed structure.
 - `Idx`: pointer into a context, carrying the needed proof data.
 - `NodeData`: forward, JVP, and VJP data for one local operation.
 - `Node`: a node plus the local inner product soundness law.
@@ -113,7 +113,7 @@ guide should also say what function is being differentiated. The
 
 That file vectorizes shaped tensor contexts into Euclidean spaces and connects three views:
 
-- shaped tensors: `Tensor Real s`, `TList Real Gamma`;
+- shaped tensors: `Tensor Real s`, `TensorPack Real Gamma`;
 - flat Euclidean vectors: `CtxVec Gamma`, `flattenCtx`, `unflattenCtx`;
 - analytic derivatives: `HasFDerivAt`, `fderiv`, and `ContinuousLinearMap.adjoint`.
 

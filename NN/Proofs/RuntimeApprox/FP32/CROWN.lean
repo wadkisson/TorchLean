@@ -224,7 +224,14 @@ theorem ibpBound_contains_reluMlp2_fp32 {inDim hidDim outDim : Nat}
        Spec.linearSpec (α := R) l2R a1R))
     (eps := epsOut) hyS ?_
   -- Match the MLP approximation conclusion to the `CROWN.forward`/`reluR` expressions.
-  simpa [NN.MLTheory.CROWN.forward, l1S, l2S, l1R, l2R] using hOut
+  change approxT (α := R) (toSpec := toSpec)
+    (Spec.linearSpec (α := ℝ) l2S
+      (mapSpec (fun x => max x 0) (Spec.linearSpec (α := ℝ) l1S xS)))
+    (Spec.linearSpec (α := R) l2R
+      (mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd))
+        (Spec.linearSpec (α := R) l1R xR)))
+    epsOut
+  simpa [l1S, l2S, l1R, l2R] using hOut
 
 end
 

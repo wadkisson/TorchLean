@@ -31,8 +31,7 @@ namespace Eval
 /--
 Add two metric lists pointwise.
 
-We require that names match (same metric in the same position). This keeps aggregation honest and
-avoids silently averaging unrelated quantities.
+Names must match, so unrelated quantities are not silently averaged.
 -/
 def addMetrics {a : Type} [Add a]
   (tag : String) (xs ys : List (Metric a)) : Result (List (Metric a)) :=

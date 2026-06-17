@@ -66,7 +66,7 @@ def matrixTensor {α : Type} {m n : Nat} (values : Fin m → Fin n → α) : Ten
   .scalar)) :=
   Tensor.dim (fun i => vectorTensor (fun j => values i j))
 
-/-- Generic `dim` constructor (kept for clarity at call sites). -/
+/-- Generic `dim` constructor for call sites that build tensors one axis at a time. -/
 def nDArrayTensor {α : Type} : ∀ {n : Nat} {s : Shape}, (Fin n → Tensor α s) → Tensor α (.dim n
   s)
   | _, _, values => Tensor.dim values
@@ -126,8 +126,8 @@ def padLeft {α : Type} [Context α]
 /--
 Build a vector tensor from an array.
 
-We require an explicit proof that the target length matches the array size. This keeps the spec
-construction honest and makes mismatches obvious at call sites.
+The caller provides an explicit proof that the target length matches the array size, so mismatches
+are visible at call sites.
 -/
 def Tensor.ofArray1D {α : Type} {n : Nat} (xs : Array α) (h : n = xs.size) :
     Tensor α (.dim n .scalar) :=

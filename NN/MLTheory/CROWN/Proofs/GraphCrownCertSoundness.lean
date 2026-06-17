@@ -88,7 +88,7 @@ def boundsEvalAt {α : Type} [Context α]
 We reuse `Semantics.encloses` from `NN.MLTheory.CROWN.Graph` for componentwise enclosure.
 -/
 
-def EnclosesVec {α : Type} [Context α] [Preorder α]
+def EnclosesVec {α : Type} [Context α]
     (B : FlatBox α) (v : FlatVec α) : Prop :=
   ∃ h : B.dim = v.n,
     Theorems.Semantics.encloses (α := α) B (castDimScalar (α := α) (n := v.n) (n' := B.dim) h.symm
@@ -102,7 +102,7 @@ dimension `b.inDim`.
 In a well-formed CROWN certificate, every bound satisfies `b.inDim = ctx.inputDim`, so the guard
 branch is the one that matters.
 -/
-def EnclosesAtInput {α : Type} [Context α] [Preorder α]
+def EnclosesAtInput {α : Type} [Context α]
     (ctx : AffineCtx) (x : Tensor α (.dim ctx.inputDim .scalar))
     (b : FlatAffineBounds α) (v : FlatVec α) : Prop :=
   ∃ h : b.inDim = ctx.inputDim,

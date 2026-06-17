@@ -48,7 +48,7 @@ model by accident.
 
 # What Lean Checks On Import
 
-The importer is intentionally strict. It checks the payload before constructing the typed parameter
+The importer is strict by design. It checks the payload before constructing the typed parameter
 bundle used by the rest of TorchLean.
 
 The checks include:
@@ -175,7 +175,6 @@ This example compiles a TorchLean model to the shared IR and then emits runnable
 curated set of architectures:
 
 - `linear`, `mlp`, `sum`, `autoencoder`
-- `cnn`, `conv-mlp`
 - `mha`, `mha-mask`
 - `transformer`
 
@@ -194,7 +193,7 @@ This is useful for two reasons:
 
 # A Small Python View
 
-The Python half is intentionally ordinary. The goal is not to replace the PyTorch workflow; the
+The Python half stays ordinary. The goal is not to replace the PyTorch workflow; the
 goal is to make the boundary between PyTorch and Lean explicit enough that it can be audited.
 
 ```
@@ -227,7 +226,7 @@ next step is to inspect the model as an IR object or connect it to a theorem.
 
 When the round trip succeeds, the result is a controlled bridge between Lean and Python:
 
-- Lean can emit a model skeleton and helper files.
+- Lean can emit a model skeleton and companion files.
 - Python can train or export weights using a matching layout.
 - Lean can read the exported payload back in and continue on the proof or verification side.
 

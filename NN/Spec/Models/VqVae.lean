@@ -71,25 +71,25 @@ def forward (model : Model α obs latent numCodes) (_x : Tensor α obs)
   model.decoder.forward (quantized model idx)
 
 /-- Reconstruction term `||dec(z_q)-x||²`. -/
-def reconstructionLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def reconstructionLoss
     (model : Model α obs latent numCodes) (x : Tensor α obs)
     (idx : Fin numCodes) : α :=
   Spec.mseSpec (s := obs) (forward model x idx) x
 
 /-- Codebook term `||z_q-z_e||²`, written symmetrically at spec level. -/
-def codebookLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def codebookLoss
     (model : Model α obs latent numCodes) (x : Tensor α obs)
     (idx : Fin numCodes) : α :=
   Spec.mseSpec (s := latent) (quantized model idx) (encode model x)
 
 /-- Commitment term `||z_e-z_q||²`, weighted by `β` in the total objective. -/
-def commitmentLoss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def commitmentLoss
     (model : Model α obs latent numCodes) (x : Tensor α obs)
     (idx : Fin numCodes) : α :=
   Spec.mseSpec (s := latent) (encode model x) (quantized model idx)
 
 /-- VQ-VAE objective: reconstruction + codebook + β commitment. -/
-def loss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
+def loss
     (model : Model α obs latent numCodes) (beta : α) (x : Tensor α obs)
     (idx : Fin numCodes) : α :=
   reconstructionLoss model x idx + codebookLoss model x idx + beta * commitmentLoss model x idx
@@ -102,7 +102,6 @@ def loss [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
 
 /-- The VQ-VAE objective decomposes into the three standard terms. -/
 @[simp] theorem loss_eq_reconstruction_add_codebook_add_commitment
-    [DecidableRel ((· > ·) : α → α → Prop)] [LE α]
     (model : Model α obs latent numCodes) (beta : α) (x : Tensor α obs) (idx : Fin numCodes) :
     loss model beta x idx =
       reconstructionLoss model x idx + codebookLoss model x idx +

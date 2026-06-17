@@ -569,8 +569,8 @@ The rule follows the same computational graph as `MultiHeadAttention.forward`:
 3. apply `scaledDotProductAttentionJvp` head-wise,
 4. combine head tangents, then differentiate the final output projection.
 
-This keeps attention forward-mode AD explicit at the spec layer instead of hiding it behind a
-runtime-only implementation.
+Attention forward-mode AD is explicit at the spec layer rather than hidden behind a runtime-only
+implementation.
 -/
 def MultiHeadAttentionJvp
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]

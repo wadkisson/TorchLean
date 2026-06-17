@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Examples.Models.Supervised.Mlp
+public import NN.Examples.Models.Supervised.Kan
 public import NN.Examples.Models.Supervised.LstmRegression
 
 /-!
@@ -17,6 +18,7 @@ Supervised examples for ordinary input/target training tasks.
 This folder is for examples whose main structure is a labeled or paired target:
 
 - `Mlp`: tabular supervised regression on the small UCI Auto MPG CSV path.
+- `Kan`: the same Auto MPG path, using KAN edge-basis functions instead of dense MLP layers.
 - `LstmRegression`: real time-series forecasting on UCI household-power windows.
 
 Sequence architectures can still appear here when the task is supervised forecasting. The
