@@ -197,6 +197,8 @@ the checker.
   the robustness checker.
 - `verification/pinn/train_pinn_1d.py`, `verification/pinn/train_pinn_2d.py`: configurable
   PyTorch PINN trainers.
+- `verification/pinn/pinn_common.py`: shared dataset/model/export utilities used by the PINN
+  trainers.
 - `verification/pinn/export_pinn_cert.py`, `verification/pinn/export_pinn_weights.py`,
   `verification/pinn/import_burgers_shock_mat.py`: PINN certificate, weight, and dataset producers.
 - `verification/pinn/safe_expr.py`: restricted expression evaluator shared by the PINN trainers.

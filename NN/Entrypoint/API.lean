@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.API.Public
+public import NN.API.Public.Facade
 public import NN.API.Adapters
 public import NN.API.Models.Generative
 public import NN.API.SelfSupervised
@@ -14,8 +15,8 @@ public import NN.API.SelfSupervised
 /-!
 # API entrypoint
 
-This entrypoint re-exports the primary user-facing API surface, `NN.API.Public`, beside the other
-curated `NN.Entrypoint.*` imports.
+This entrypoint re-exports the focused user-facing API surface, including the `TorchLean.*`
+facade namespaces, beside the other curated `NN.Entrypoint.*` imports.
 
 Ordinary model and training files should use `import NN`. Import this module when you want
 the same public API surface under the `NN.Entrypoint.*` tree, without the broader library umbrella.

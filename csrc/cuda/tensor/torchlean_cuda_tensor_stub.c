@@ -131,7 +131,9 @@ torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
   b->size = n;
   b->data = NULL;
   if (n > 0) {
-    b->data = (float*)malloc(n * sizeof(float));
+    const size_t bytes =
+        checked_bytes_size(n, sizeof(float), "torchlean_cuda_buffer_alloc_stub: byte size overflow");
+    b->data = (float*)malloc(bytes);
     if (!b->data) {
       free(b);
       lean_internal_panic_out_of_memory();

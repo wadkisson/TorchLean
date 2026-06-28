@@ -31,193 +31,19 @@ rebuilds the architecture from the exported metadata.
 from __future__ import annotations
 
 import argparse
-import json
-import math
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Optional
 
-import numpy as np
-from safe_expr import eval_expr
-
-try:
-    import torch
-    import torch.nn as nn
-except Exception as exc:  # pragma: no cover - fail fast when torch missing
-    raise SystemExit("PyTorch is required: pip install torch") from exc
-
-
-class Dataset2D:
-    """Optional sampled dataset for 2D PINN training."""
-
-    def __init__(self, device: torch.device):
-        self.device = device
-        self.collocation: Optional[torch.Tensor] = None
-        self.boundary: Optional[torch.Tensor] = None
-        self.data: Optional[torch.Tensor] = None
-
-    @staticmethod
-    def _read_entries(entries, keys, device) -> Optional[torch.Tensor]:
-        """Read one JSON dataset section into a float tensor with selected keys."""
-        if entries is None:
-            return None
-        if not isinstance(entries, list):
-            raise ValueError("Dataset sections must be lists of objects.")
-        rows: list[list[float]] = []
-        for idx, entry in enumerate(entries):
-            if not isinstance(entry, dict):
-                raise ValueError(f"Dataset entry {idx} is not an object.")
-            try:
-                row = [float(entry[k]) for k in keys]
-            except KeyError as exc:
-                raise ValueError(f"Dataset entry {idx} missing key '{exc.args[0]}'") from exc
-            rows.append(row)
-        if not rows:
-            return None
-        return torch.tensor(rows, dtype=torch.float32, device=device)
-
-    @classmethod
-    def load(cls, path: str, device: torch.device) -> "Dataset2D":
-        """Load collocation, boundary, and data sections from JSON."""
-        import json
-        payload = json.loads(Path(path).read_text())
-        data = cls(device)
-        data.collocation = cls._read_entries(payload.get("collocation"), ["x", "y"], device)
-        data.boundary = cls._read_entries(payload.get("boundary"), ["x", "y", "u"], device)
-        data.data = cls._read_entries(payload.get("data"), ["x", "y", "u"], device)
-        return data
-
-    def _sample_rows(self, mat: torch.Tensor, count: int) -> torch.Tensor:
-        """Sample rows with replacement from one dataset tensor."""
-        if mat is None or mat.shape[0] == 0:
-            raise ValueError("Dataset section is empty; cannot sample.")
-        idx = torch.randint(0, mat.shape[0], (count,), device=self.device, dtype=torch.long)
-        return mat.index_select(0, idx)
-
-    def sample_collocation(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor]]:
-        """Sample `(x, y)` collocation points if available."""
-        if self.collocation is None:
-            return None
-        samples = self._sample_rows(self.collocation, count)
-        return samples[:, :1], samples[:, 1:]
-
-    def sample_boundary(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Sample boundary triples `(x, y, u)` if available."""
-        if self.boundary is None:
-            return None
-        samples = self._sample_rows(self.boundary, count)
-        return samples[:, :1], samples[:, 1:2], samples[:, 2:]
-
-    def sample_data(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Sample supervised data triples `(x, y, u)` if available."""
-        if self.data is None:
-            return None
-        samples = self._sample_rows(self.data, count)
-        return samples[:, :1], samples[:, 1:2], samples[:, 2:]
-
-
-def _activation_factory(name: str) -> nn.Module:
-    """Build the requested activation module."""
-    if name == "tanh":
-        return nn.Tanh()
-    if name == "relu":
-        return nn.ReLU()
-    raise ValueError(f"Unsupported activation '{name}'")
-
-
-def parse_hidden_widths(raw: str) -> List[int]:
-    """Convert a comma-separated width string into a validated list."""
-    tokens = [tok.strip() for tok in raw.split(",")]
-    widths: List[int] = []
-    for tok in tokens:
-        if not tok:
-            continue
-        try:
-            width = int(tok)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(f"Invalid hidden width '{tok}'") from exc
-        if width <= 0:
-            raise argparse.ArgumentTypeError(f"Hidden width must be positive, got {width}")
-        widths.append(width)
-    if not widths:
-        raise argparse.ArgumentTypeError("Provide at least one hidden layer width (e.g., '16,16').")
-    return widths
-
-
-def build_model(in_dim: int, hidden_widths: Iterable[int], activation: str) -> nn.Sequential:
-    """Build the sequential MLP used by the 2D PINN trainer."""
-    layers: List[nn.Module] = []
-    prev = in_dim
-    act = activation.lower()
-    for width in hidden_widths:
-        lin = nn.Linear(prev, width)
-        nn.init.xavier_uniform_(lin.weight)
-        nn.init.zeros_(lin.bias)
-        layers.append(lin)
-        layers.append(_activation_factory(act))
-        prev = width
-    out = nn.Linear(prev, 1)
-    nn.init.xavier_uniform_(out.weight)
-    nn.init.zeros_(out.bias)
-    layers.append(out)
-    return nn.Sequential(*layers)
-
-
-def to_json_dict(model: nn.Sequential, *, meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Serialize a sequential PINN model plus metadata into JSON."""
-    state = model.state_dict()
-    exported: Dict[str, Any] = {}
-    for name, tensor in state.items():
-        if name.endswith(".weight") or name.endswith(".bias"):
-            exported[f"layers.{name}"] = tensor.detach().cpu().numpy().tolist()
-    exported["meta"] = meta
-    return exported
-
-
-def gradients(output: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
-    """Compute `d(output)/d(inputs)` with autograd."""
-    return torch.autograd.grad(
-        output,
-        inputs,
-        grad_outputs=torch.ones_like(output),
-        retain_graph=True,
-        create_graph=True,
-    )[0]
-
-
-def _eval_expr(expr: str, **tensors):
-    """Evaluate one restricted PDE/data expression and attach context to errors."""
-    try:
-        value = eval_expr(expr, tensors)
-    except Exception as exc:  # pragma: no cover - surfaced to caller
-        raise ValueError(f"Failed to evaluate expression '{expr}': {exc}") from exc
-    return value
-
-
-def _ensure_tensor(val, like: torch.Tensor) -> torch.Tensor:
-    """Broadcast scalar expression results to match a reference tensor."""
-    if isinstance(val, torch.Tensor):
-        return val.to(like)
-    arr = torch.as_tensor(val, dtype=like.dtype, device=like.device)
-    if arr.numel() == 1:
-        return torch.full_like(like, arr.item())
-    return arr.reshape_as(like)
-
-
-def _parse_const_flags(items) -> Dict[str, float]:
-    """Parse repeated `--const name=value` flags into a numeric environment."""
-    constants: Dict[str, float] = {}
-    for raw in items:
-        if "=" not in raw:
-            raise ValueError(f"--const expects name=value, got '{raw}'")
-        name, value = raw.split("=", 1)
-        name = name.strip()
-        if not name:
-            raise ValueError(f"Invalid constant name in '{raw}'")
-        try:
-            constants[name] = float(value)
-        except ValueError as exc:
-            raise ValueError(f"Invalid constant value in '{raw}'") from exc
-    return constants
+from pinn_common import (
+    PinnDataset,
+    build_model,
+    ensure_tensor,
+    eval_pinn_expr,
+    export_model,
+    gradients,
+    parse_const_flags,
+    parse_hidden_widths,
+    torch,
+)
 
 
 def train(args):
@@ -234,17 +60,25 @@ def train(args):
     N_b = args.boundary_points
     N_d = args.data_points
 
-    constants = _parse_const_flags(args.const or [])
+    constants = parse_const_flags(args.const or [])
 
-    dataset: Optional[Dataset2D] = None
+    dataset: Optional[PinnDataset] = None
     if args.dataset_json:
-        dataset = Dataset2D.load(args.dataset_json, device)
+        dataset = PinnDataset.load(
+            args.dataset_json,
+            {
+                "collocation": ["x", "y"],
+                "boundary": ["x", "y", "u"],
+                "data": ["x", "y", "u"],
+            },
+            device,
+        )
         print(f"Loaded dataset from {args.dataset_json}")
 
     def sample_collocation():
         """Sample collocation points from JSON data or the default square."""
         if dataset:
-            sampled = dataset.sample_collocation(N_c)
+            sampled = dataset.sample_columns("collocation", N_c, 2)
             if sampled is not None:
                 return sampled
         x = torch.empty(N_c, 1, device=device).uniform_(x_lo, x_hi)
@@ -254,7 +88,7 @@ def train(args):
     def sample_boundary():
         """Sample boundary points from JSON data or `--bc-expr`."""
         if dataset:
-            sampled = dataset.sample_boundary(N_b)
+            sampled = dataset.sample_columns("boundary", N_b, 3)
             if sampled is not None:
                 return sampled
         m = max(1, N_b // 4)
@@ -274,20 +108,20 @@ def train(args):
 
         x = torch.cat([x_left, x_right, x_bottom, x_top], dim=0)
         y = torch.cat([y_left, y_right, y_bottom, y_top], dim=0)
-        u_b = _ensure_tensor(_eval_expr(args.bc_expr, x=x, y=y, **constants), x)
+        u_b = ensure_tensor(eval_pinn_expr(args.bc_expr, x=x, y=y, **constants), x)
         return x, y, u_b
 
     def sample_data():
         """Sample optional supervised data points."""
         if dataset:
-            sampled = dataset.sample_data(N_d if N_d > 0 else 1)
+            sampled = dataset.sample_columns("data", N_d if N_d > 0 else 1, 3)
             if sampled is not None:
                 return sampled
         if N_d <= 0 or args.data_expr is None:
             return None
         x = torch.empty(N_d, 1, device=device).uniform_(x_lo, x_hi)
         y = torch.empty(N_d, 1, device=device).uniform_(y_lo, y_hi)
-        u_d = _ensure_tensor(_eval_expr(args.data_expr, x=x, y=y, **constants), x)
+        u_d = ensure_tensor(eval_pinn_expr(args.data_expr, x=x, y=y, **constants), x)
         return x, y, u_d
 
     model.train()
@@ -329,7 +163,7 @@ def train(args):
         }
         pde_env.update(constants)
 
-        res_raw = _eval_expr(args.pde_expr, **pde_env)
+        res_raw = eval_pinn_expr(args.pde_expr, **pde_env)
         if isinstance(res_raw, torch.Tensor):
             res = res_raw.to(device=u_c.device, dtype=u_c.dtype)
         else:
@@ -362,21 +196,13 @@ def train(args):
                 f"(c={loss_c.item():.3e}, b={loss_b.item():.3e}, d={loss_d.item():.3e})"
             )
 
-    out_ckpt = Path(args.out_ckpt)
-    out_ckpt.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), str(out_ckpt))
-    print(f"Saved checkpoint: {out_ckpt}")
-
-    out_json = Path(args.out_json)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    meta = {
-        "input_dim": 2,
-        "output_dim": 1,
-        "hidden_layers": list(args.hidden_widths),
-        "activation": args.activation,
-    }
-    out_json.write_text(json.dumps(to_json_dict(model, meta=meta)))
-    print(f"Exported weights JSON: {out_json}")
+    export_model(
+        model,
+        out_ckpt=args.out_ckpt,
+        out_json=args.out_json,
+        hidden_widths=args.hidden_widths,
+        activation=args.activation,
+    )
 
 
 def main():

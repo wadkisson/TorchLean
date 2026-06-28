@@ -13,8 +13,12 @@ import math
 import operator
 from typing import Any, Mapping
 
-import numpy as np
 import torch
+
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - optional expression aliases
+    np = None
 
 
 _ALLOWED_BINOPS = {
@@ -45,16 +49,6 @@ _ALLOWED_ATTRS = {
         "log": math.log,
         "sqrt": math.sqrt,
     },
-    "np": {
-        "pi": np.pi,
-        "e": np.e,
-        "sin": np.sin,
-        "cos": np.cos,
-        "tanh": np.tanh,
-        "exp": np.exp,
-        "log": np.log,
-        "sqrt": np.sqrt,
-    },
     "torch": {
         "pi": torch.pi,
         "sin": torch.sin,
@@ -69,6 +63,18 @@ _ALLOWED_ATTRS = {
         "ones_like": torch.ones_like,
     },
 }
+
+if np is not None:
+    _ALLOWED_ATTRS["np"] = {
+        "pi": np.pi,
+        "e": np.e,
+        "sin": np.sin,
+        "cos": np.cos,
+        "tanh": np.tanh,
+        "exp": np.exp,
+        "log": np.log,
+        "sqrt": np.sqrt,
+    }
 
 
 class _SafeExprEvaluator(ast.NodeVisitor):

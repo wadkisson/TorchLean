@@ -329,24 +329,18 @@ def boundIbp {inDim hidDim outDim : Nat}
   IBP.linear net.W2 a1B b2B
 
 /--
-Single-pass affine (CROWN/DeepPoly-style) bounds for the 2-layer ReLU MLP.
+Construct the lower and upper affine forms used by `boundAffineCrown`.
 
-This constructs upper and lower affine forms by combining:
-- pre-activation intervals from IBP,
-- per-neuron ReLU relaxations, and
-- sign-splitting of the second-layer weights.
-
-Note: this is the direct MLP-specialized implementation; the graph-level engine in
-`NN.MLTheory.CROWN.Graph` is the long-term home for fully-general CROWN.
+The pair is `(lower, upper)`: evaluating the first form on the input box supplies the returned
+lower endpoint, and evaluating the second supplies the returned upper endpoint.
 -/
-def boundAffineCrown {inDim hidDim outDim : Nat}
+def affineCrownForms {inDim hidDim outDim : Nat}
   (net : MLP2 α inDim hidDim outDim)
-  (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
+  (xB : Box α (.dim inDim .scalar)) : AffineVec α inDim outDim × AffineVec α inDim outDim :=
   -- Basic CROWN for 2-layer MLP:
   -- 1) Use IBP to get pre-activation bounds [l,u].
   -- 2) Build ReLU upper and lower linear relaxations per hidden unit.
-  -- 3) Combine them with sign-splitting of W2 to obtain both an affine lower and upper bound,
-  --    then evaluate those on the input box.
+  -- 3) Combine them with sign-splitting of W2 to obtain both an affine lower and upper form.
   let b1B : Box α (.dim hidDim .scalar) := { lo := net.b1, hi := net.b1 }
   let z1B := IBP.linear (α:=α) net.W1 xB b1B
   let relaxU := ReLU.relaxVector (α:=α) (n:=hidDim) z1B.lo z1B.hi
@@ -387,8 +381,25 @@ def boundAffineCrown {inDim hidDim outDim : Nat}
 
   let affU : AffineVec α inDim outDim := AffineVec.ofLinear (α:=α) AU cU
   let affL : AffineVec α inDim outDim := AffineVec.ofLinear (α:=α) AL cL
-  let BU := AffineVec.evalOnBox (α:=α) affU xB
-  let BL := AffineVec.evalOnBox (α:=α) affL xB
+  (affL, affU)
+
+/--
+Single-pass affine (CROWN/DeepPoly-style) bounds for the 2-layer ReLU MLP.
+
+This constructs upper and lower affine forms by combining:
+- pre-activation intervals from IBP,
+- per-neuron ReLU relaxations, and
+- sign-splitting of the second-layer weights.
+
+Note: this is the direct MLP-specialized implementation; the graph-level engine in
+`NN.MLTheory.CROWN.Graph` is the long-term home for fully-general CROWN.
+-/
+def boundAffineCrown {inDim hidDim outDim : Nat}
+  (net : MLP2 α inDim hidDim outDim)
+  (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
+  let forms := affineCrownForms (α:=α) net xB
+  let BL := AffineVec.evalOnBox (α:=α) forms.1 xB
+  let BU := AffineVec.evalOnBox (α:=α) forms.2 xB
   { lo := BL.lo, hi := BU.hi }
 
 /--
@@ -413,6 +424,24 @@ properties of mat-vec interval arithmetic.
 namespace Theorems
 
 open NN.MLTheory.CROWN
+
+/--
+`boundAffineCrown` is exactly the input-box evaluation of the affine forms constructed by
+`affineCrownForms`.
+
+This theorem is intentionally structural: the full semantic soundness proof for those forms is
+separate from, and larger than, the definitional fact that this entrypoint is using the affine CROWN
+forms rather than delegating to IBP.
+-/
+theorem bound_affine_crown_eq_affine_forms_eval {inDim hidDim outDim : Nat}
+  (net : MLP2 ℝ inDim hidDim outDim)
+  (xB : Box ℝ (.dim inDim .scalar)) :
+  boundAffineCrown (α:=ℝ) net xB =
+    let forms := affineCrownForms (α:=ℝ) net xB
+    let BL := AffineVec.evalOnBox (α:=ℝ) forms.1 xB
+    let BU := AffineVec.evalOnBox (α:=ℝ) forms.2 xB
+    { lo := BL.lo, hi := BU.hi } := by
+  rfl
 
 
 /--

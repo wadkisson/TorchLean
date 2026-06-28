@@ -1664,10 +1664,10 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_conv2d_fwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t kElems = (size_t)outC * (size_t)inC * (size_t)kH * (size_t)kW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t kElems = checked_mul4_size((size_t)outC, (size_t)inC, (size_t)kH, (size_t)kW, "torchlean_cuda_conv_pool: kernel size overflow");
   size_t bElems = (size_t)outC;
-  size_t outElems = (size_t)outC * (size_t)outH * (size_t)outW;
+  size_t outElems = checked_mul3_size((size_t)outC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_conv2d_fwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_conv2d_fwd: kernel.size mismatch");
@@ -1705,9 +1705,9 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_conv2d_bwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t kElems = (size_t)outC * (size_t)inC * (size_t)kH * (size_t)kW;
-  size_t outElems = (size_t)outC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t kElems = checked_mul4_size((size_t)outC, (size_t)inC, (size_t)kH, (size_t)kW, "torchlean_cuda_conv_pool: kernel size overflow");
+  size_t outElems = checked_mul3_size((size_t)outC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_conv2d_bwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_conv2d_bwd: kernel.size mismatch");
@@ -1778,10 +1778,10 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_convtranspose2d_fwd(
   uint32_t outH = outDimTranspose(inH, kH, stride, padding);
   uint32_t outW = outDimTranspose(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t kElems = (size_t)inC * (size_t)outC * (size_t)kH * (size_t)kW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t kElems = checked_mul4_size((size_t)inC, (size_t)outC, (size_t)kH, (size_t)kW, "torchlean_cuda_conv_pool: kernel size overflow");
   size_t bElems = (size_t)outC;
-  size_t outElems = (size_t)outC * (size_t)outH * (size_t)outW;
+  size_t outElems = checked_mul3_size((size_t)outC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_convtranspose2d_fwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_convtranspose2d_fwd: kernel.size mismatch");
@@ -1825,9 +1825,9 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_convtranspose2d_bwd(
   uint32_t outH = outDimTranspose(inH, kH, stride, padding);
   uint32_t outW = outDimTranspose(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t kElems = (size_t)inC * (size_t)outC * (size_t)kH * (size_t)kW;
-  size_t outElems = (size_t)outC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t kElems = checked_mul4_size((size_t)inC, (size_t)outC, (size_t)kH, (size_t)kW, "torchlean_cuda_conv_pool: kernel size overflow");
+  size_t outElems = checked_mul3_size((size_t)outC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_convtranspose2d_bwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_convtranspose2d_bwd: kernel.size mismatch");
@@ -1884,8 +1884,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_maxpool2d_fwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_maxpool2d_fwd: input.size mismatch");
 
@@ -1920,8 +1920,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_maxpool2d_bwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_maxpool2d_bwd: input.size mismatch");
   checkBufSize(gradOutput, outElems, "torchlean_cuda_maxpool2d_bwd: gradOutput.size mismatch");
@@ -1973,8 +1973,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_smooth_maxpool2d_fwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_smooth_maxpool2d_fwd: input.size mismatch");
 
@@ -2012,8 +2012,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_smooth_maxpool2d_bwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_smooth_maxpool2d_bwd: input.size mismatch");
   checkBufSize(gradOutput, outElems, "torchlean_cuda_smooth_maxpool2d_bwd: gradOutput.size mismatch");
@@ -2070,8 +2070,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_avgpool2d_fwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_avgpool2d_fwd: input.size mismatch");
 
@@ -2105,8 +2105,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_avgpool2d_bwd(
   uint32_t outH = outDim(inH, kH, stride, padding);
   uint32_t outW = outDim(inW, kW, stride, padding);
 
-  size_t inElems = (size_t)inC * (size_t)inH * (size_t)inW;
-  size_t outElems = (size_t)inC * (size_t)outH * (size_t)outW;
+  size_t inElems = checked_mul3_size((size_t)inC, (size_t)inH, (size_t)inW, "torchlean_cuda_conv_pool: input size overflow");
+  size_t outElems = checked_mul3_size((size_t)inC, (size_t)outH, (size_t)outW, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(gradOutput, outElems, "torchlean_cuda_avgpool2d_bwd: gradOutput.size mismatch");
 
@@ -2192,10 +2192,10 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_conv_fwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t kElems = (size_t)outC * (size_t)inC * kSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t kElems = checked_conv_kernel_size(outC, inC, kSpatialSize, "torchlean_cuda_conv_pool: kernel size overflow");
   const size_t bElems = (size_t)outC;
-  const size_t outElems = (size_t)outC * outSpatialSize;
+  const size_t outElems = checked_channel_spatial_size(outC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_conv_fwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_conv_fwd: kernel.size mismatch");
@@ -2267,9 +2267,9 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_conv_bwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t kElems = (size_t)outC * (size_t)inC * kSpatialSize;
-  const size_t outElems = (size_t)outC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t kElems = checked_conv_kernel_size(outC, inC, kSpatialSize, "torchlean_cuda_conv_pool: kernel size overflow");
+  const size_t outElems = checked_channel_spatial_size(outC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_conv_bwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_conv_bwd: kernel.size mismatch");
@@ -2364,10 +2364,10 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_convtranspose_fwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t kElems = (size_t)inC * (size_t)outC * kSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t kElems = checked_conv_kernel_size(inC, outC, kSpatialSize, "torchlean_cuda_conv_pool: kernel size overflow");
   const size_t bElems = (size_t)outC;
-  const size_t outElems = (size_t)outC * outSpatialSize;
+  const size_t outElems = checked_channel_spatial_size(outC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_convtranspose_fwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_convtranspose_fwd: kernel.size mismatch");
@@ -2451,9 +2451,9 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_convtranspose_bwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t kElems = (size_t)inC * (size_t)outC * kSpatialSize;
-  const size_t outElems = (size_t)outC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t kElems = checked_conv_kernel_size(inC, outC, kSpatialSize, "torchlean_cuda_conv_pool: kernel size overflow");
+  const size_t outElems = checked_channel_spatial_size(outC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_convtranspose_bwd: input.size mismatch");
   checkBufSize(kernel, kElems, "torchlean_cuda_convtranspose_bwd: kernel.size mismatch");
@@ -2545,8 +2545,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_maxpool_fwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_maxpool_fwd: input.size mismatch");
 
@@ -2615,8 +2615,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_maxpool_bwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_maxpool_bwd: input.size mismatch");
   checkBufSize(gradOutput, outElems, "torchlean_cuda_maxpool_bwd: gradOutput.size mismatch");
@@ -2701,8 +2701,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_avgpool_fwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_avgpool_fwd: input.size mismatch");
 
@@ -2770,8 +2770,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_avgpool_bwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(gradOutput, outElems, "torchlean_cuda_avgpool_bwd: gradOutput.size mismatch");
 
@@ -2855,8 +2855,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_smooth_maxpool_fwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_smooth_maxpool_fwd: input.size mismatch");
 
@@ -2928,8 +2928,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_smooth_maxpool_bwd(
   const size_t kSpatialSize = prod_u32(hKSpatial, rank);
   const size_t outSpatialSize = prod_u32(hOutSpatial, rank);
 
-  const size_t inElems = (size_t)inC * inSpatialSize;
-  const size_t outElems = (size_t)inC * outSpatialSize;
+  const size_t inElems = checked_channel_spatial_size(inC, inSpatialSize, "torchlean_cuda_conv_pool: input size overflow");
+  const size_t outElems = checked_channel_spatial_size(inC, outSpatialSize, "torchlean_cuda_conv_pool: output size overflow");
 
   checkBufSize(input, inElems, "torchlean_cuda_smooth_maxpool_bwd: input.size mismatch");
   checkBufSize(gradOutput, outElems, "torchlean_cuda_smooth_maxpool_bwd: gradOutput.size mismatch");

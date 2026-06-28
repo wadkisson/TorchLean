@@ -75,10 +75,14 @@ struct HostBroadcastArrays {
 };
 
 static inline HostBroadcastArrays alloc_host_broadcast_arrays(size_t rankIn, size_t rankOut) {
+  const size_t inBytes = checked_bytes_size(
+      rankIn, sizeof(uint32_t), "alloc_host_broadcast_arrays: inDims byte size overflow");
+  const size_t outBytes = checked_bytes_size(
+      rankOut, sizeof(uint32_t), "alloc_host_broadcast_arrays: outDims byte size overflow");
   HostBroadcastArrays h = {
-      rankIn == 0 ? nullptr : (uint32_t*)malloc(rankIn * sizeof(uint32_t)),
-      rankOut == 0 ? nullptr : (uint32_t*)malloc(rankOut * sizeof(uint32_t)),
-      rankOut == 0 ? nullptr : (uint32_t*)malloc(rankOut * sizeof(uint32_t)),
+      rankIn == 0 ? nullptr : (uint32_t*)malloc(inBytes),
+      rankOut == 0 ? nullptr : (uint32_t*)malloc(outBytes),
+      rankOut == 0 ? nullptr : (uint32_t*)malloc(outBytes),
   };
   if ((rankIn != 0 && !h.inDims) || (rankOut != 0 && (!h.outDims || !h.axisMap))) {
     free(h.inDims);
@@ -107,7 +111,9 @@ static inline uint32_t* upload_nat_indices(
     const char* natMsg,
     const char* mallocMsg,
     const char* memcpyMsg) {
-  uint32_t* hIdx = count == 0 ? nullptr : (uint32_t*)malloc(count * sizeof(uint32_t));
+  const size_t bytes =
+      checked_bytes_size(count, sizeof(uint32_t), "upload_nat_indices: byte size overflow");
+  uint32_t* hIdx = count == 0 ? nullptr : (uint32_t*)malloc(bytes);
   if (count != 0 && !hIdx) {
     lean_internal_panic_out_of_memory();
   }
@@ -116,8 +122,12 @@ static inline uint32_t* upload_nat_indices(
   }
 
   uint32_t* dIdx = torchlean_cuda_scratch_alloc<uint32_t>(count, mallocMsg);
-  checkCuda(cudaMemcpy(dIdx, hIdx, count * sizeof(uint32_t), cudaMemcpyHostToDevice), memcpyMsg);
+  cudaError_t copyErr = cudaMemcpy(dIdx, hIdx, bytes, cudaMemcpyHostToDevice);
   free(hIdx);
+  if (copyErr != cudaSuccess) {
+    torchlean_cuda_scratch_free(&dIdx, count, "cudaFree indices after upload failure failed");
+    checkCuda(copyErr, memcpyMsg);
+  }
   return dIdx;
 }
 
@@ -1259,36 +1269,30 @@ static inline void validate_spectral_conv1d_sizes(torchlean_cuda_buffer* x,
   *freqOut = Freq;
 }
 
-static inline cufftHandle make_spectral_conv1d_r2c_plan(uint32_t grid, uint32_t width,
-                                                        uint32_t freq) {
+static inline cufftResult try_make_spectral_conv1d_r2c_plan(uint32_t grid, uint32_t width,
+                                                            uint32_t freq, cufftHandle* plan) {
   const int nInt = checked_cufft_int(grid, "spectralConv1dRfft: grid exceeds cuFFT int range");
   const int widthInt =
       checked_cufft_int(width, "spectralConv1dRfft: width exceeds cuFFT int range");
   const int freqInt = checked_cufft_int(freq, "spectralConv1dRfft: freq exceeds cuFFT int range");
-  cufftHandle plan;
   int nPlan[1] = {nInt};
   int inembed[1] = {nInt};
   int onembed[1] = {freqInt};
-  checkCufft(cufftPlanMany(&plan, 1, nPlan, inembed, widthInt, 1, onembed, widthInt, 1,
-                           CUFFT_R2C, widthInt),
-             "spectralConv1dRfft: cufftPlanMany R2C failed");
-  return plan;
+  return cufftPlanMany(plan, 1, nPlan, inembed, widthInt, 1, onembed, widthInt, 1,
+                       CUFFT_R2C, widthInt);
 }
 
-static inline cufftHandle make_spectral_conv1d_c2r_plan(uint32_t grid, uint32_t width,
-                                                        uint32_t freq) {
+static inline cufftResult try_make_spectral_conv1d_c2r_plan(uint32_t grid, uint32_t width,
+                                                            uint32_t freq, cufftHandle* plan) {
   const int nInt = checked_cufft_int(grid, "spectralConv1dRfft: grid exceeds cuFFT int range");
   const int widthInt =
       checked_cufft_int(width, "spectralConv1dRfft: width exceeds cuFFT int range");
   const int freqInt = checked_cufft_int(freq, "spectralConv1dRfft: freq exceeds cuFFT int range");
-  cufftHandle plan;
   int nPlan[1] = {nInt};
   int inembed[1] = {freqInt};
   int onembed[1] = {nInt};
-  checkCufft(cufftPlanMany(&plan, 1, nPlan, inembed, widthInt, 1, onembed, widthInt, 1,
-                           CUFFT_C2R, widthInt),
-             "spectralConv1dRfft: cufftPlanMany C2R failed");
-  return plan;
+  return cufftPlanMany(plan, 1, nPlan, inembed, widthInt, 1, onembed, widthInt, 1,
+                       CUFFT_C2R, widthInt);
 }
 
 extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_spectral_conv1d_rfft_fwd(
@@ -1306,21 +1310,72 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_spectral_conv1d_rfft_f
   cufftComplex* Z = nullptr;
   X = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft: malloc X failed");
   Z = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft: malloc Z failed");
-  checkCuda(cudaMemset(Z, 0, specSz * sizeof(cufftComplex)), "spectralConv1dRfft: memset Z failed");
+  cudaError_t zErr = cudaMemset(
+      Z, 0, checked_bytes_size(specSz, sizeof(cufftComplex), "spectralConv1dRfft: Z byte overflow"));
+  if (zErr != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after memset failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after memset failed");
+    checkCuda(zErr, "spectralConv1dRfft: memset Z failed");
+  }
 
-  cufftHandle r2c = make_spectral_conv1d_r2c_plan(grid, width, (uint32_t)Freq);
-  cufftHandle c2r = make_spectral_conv1d_c2r_plan(grid, width, (uint32_t)Freq);
-  checkCufft(cufftExecR2C(r2c, (cufftReal*)x->data, X), "spectralConv1dRfft: R2C failed");
-  spectral_conv1d_mul_f32<<<blocks_for((size_t)modes * (size_t)width), dim3(kBlockSize)>>>(
+  cufftHandle r2c = 0;
+  cufftHandle c2r = 0;
+  cufftResult r2cPlan = try_make_spectral_conv1d_r2c_plan(grid, width, (uint32_t)Freq, &r2c);
+  if (r2cPlan != CUFFT_SUCCESS) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after R2C plan failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after R2C plan failed");
+    checkCufft(r2cPlan, "spectralConv1dRfft: cufftPlanMany R2C failed");
+  }
+  cufftResult c2rPlan = try_make_spectral_conv1d_c2r_plan(grid, width, (uint32_t)Freq, &c2r);
+  if (c2rPlan != CUFFT_SUCCESS) {
+    cufftDestroy(r2c);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after C2R plan failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after C2R plan failed");
+    checkCufft(c2rPlan, "spectralConv1dRfft: cufftPlanMany C2R failed");
+  }
+  cufftResult execR2C = cufftExecR2C(r2c, (cufftReal*)x->data, X);
+  if (execR2C != CUFFT_SUCCESS) {
+    cufftDestroy(r2c);
+    cufftDestroy(c2r);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after R2C failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after R2C failed");
+    checkCufft(execR2C, "spectralConv1dRfft: R2C failed");
+  }
+  const size_t mulElems =
+      checked_mul_size((size_t)modes, (size_t)width, "spectralConv1dRfft: mul launch size overflow");
+  spectral_conv1d_mul_f32<<<blocks_for(mulElems), dim3(kBlockSize)>>>(
       X, wRe->data, wIm->data, Z, width, modes);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft: multiply kernel failed");
-  checkCufft(cufftExecC2R(c2r, Z, (cufftReal*)out->data), "spectralConv1dRfft: C2R failed");
+  cudaError_t mulErr = cudaGetLastError();
+  if (mulErr != cudaSuccess) {
+    cufftDestroy(r2c);
+    cufftDestroy(c2r);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after multiply failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after multiply failed");
+    checkCuda(mulErr, "spectralConv1dRfft: multiply kernel failed");
+  }
+  cufftResult execC2R = cufftExecC2R(c2r, Z, (cufftReal*)out->data);
+  if (execC2R != CUFFT_SUCCESS) {
+    cufftDestroy(r2c);
+    cufftDestroy(c2r);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after C2R failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after C2R failed");
+    checkCufft(execC2R, "spectralConv1dRfft: C2R failed");
+  }
   scale_f32<<<blocks_for(xSz), dim3(kBlockSize)>>>(out->data, xSz, 1.0f / (float)grid);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft: scale kernel failed");
-  checkCufft(cufftDestroy(r2c), "spectralConv1dRfft: destroy R2C failed");
-  checkCufft(cufftDestroy(c2r), "spectralConv1dRfft: destroy C2R failed");
+  cudaError_t scaleErr = cudaGetLastError();
+  if (scaleErr != cudaSuccess) {
+    cufftDestroy(r2c);
+    cufftDestroy(c2r);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: cleanup X after scale failed");
+    torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: cleanup Z after scale failed");
+    checkCuda(scaleErr, "spectralConv1dRfft: scale kernel failed");
+  }
+  cufftResult destroyR2C = cufftDestroy(r2c);
+  cufftResult destroyC2R = cufftDestroy(c2r);
   torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft: free X failed");
   torchlean_cuda_scratch_free(&Z, specSz, "spectralConv1dRfft: free Z failed");
+  checkCufft(destroyR2C, "spectralConv1dRfft: destroy R2C failed");
+  checkCufft(destroyC2R, "spectralConv1dRfft: destroy C2R failed");
   return torchlean_cuda_buffer_box(out);
 }
 
@@ -1334,13 +1389,51 @@ static inline void spectral_conv1d_make_x_dz(torchlean_cuda_buffer* x, torchlean
   X = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft bwd: malloc X failed");
   G = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft bwd: malloc G failed");
   dZ = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft bwd: malloc dZ failed");
-  checkCuda(cudaMemset(dZ, 0, specSz * sizeof(cufftComplex)), "spectralConv1dRfft bwd: memset dZ failed");
-  cufftHandle r2c = make_spectral_conv1d_r2c_plan(grid, width, grid / 2 + 1);
-  checkCufft(cufftExecR2C(r2c, (cufftReal*)x->data, X), "spectralConv1dRfft bwd: R2C x failed");
-  checkCufft(cufftExecR2C(r2c, (cufftReal*)dY->data, G), "spectralConv1dRfft bwd: R2C dY failed");
-  spectral_conv1d_dz_from_dy_f32<<<blocks_for((size_t)modes * (size_t)width), dim3(kBlockSize)>>>(
+  cudaError_t dzMemset = cudaMemset(
+      dZ, 0,
+      checked_bytes_size(specSz, sizeof(cufftComplex), "spectralConv1dRfft bwd: dZ byte overflow"));
+  if (dzMemset != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd: cleanup X after memset failed");
+    torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: cleanup G after memset failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd: cleanup dZ after memset failed");
+    checkCuda(dzMemset, "spectralConv1dRfft bwd: memset dZ failed");
+  }
+  cufftHandle r2c = 0;
+  cufftResult planRes = try_make_spectral_conv1d_r2c_plan(grid, width, grid / 2 + 1, &r2c);
+  if (planRes != CUFFT_SUCCESS) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd: cleanup X after R2C plan failed");
+    torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: cleanup G after R2C plan failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd: cleanup dZ after R2C plan failed");
+    checkCufft(planRes, "spectralConv1dRfft bwd: cufftPlanMany R2C failed");
+  }
+  cufftResult xExec = cufftExecR2C(r2c, (cufftReal*)x->data, X);
+  if (xExec != CUFFT_SUCCESS) {
+    cufftDestroy(r2c);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd: cleanup X after R2C x failed");
+    torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: cleanup G after R2C x failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd: cleanup dZ after R2C x failed");
+    checkCufft(xExec, "spectralConv1dRfft bwd: R2C x failed");
+  }
+  cufftResult dyExec = cufftExecR2C(r2c, (cufftReal*)dY->data, G);
+  if (dyExec != CUFFT_SUCCESS) {
+    cufftDestroy(r2c);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd: cleanup X after R2C dY failed");
+    torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: cleanup G after R2C dY failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd: cleanup dZ after R2C dY failed");
+    checkCufft(dyExec, "spectralConv1dRfft bwd: R2C dY failed");
+  }
+  const size_t modeWidth =
+      checked_mul_size((size_t)modes, (size_t)width, "spectralConv1dRfft bwd: mode*width overflow");
+  spectral_conv1d_dz_from_dy_f32<<<blocks_for(modeWidth), dim3(kBlockSize)>>>(
       G, dZ, grid, width, modes);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft bwd: dZ kernel failed");
+  cudaError_t dzKernel = cudaGetLastError();
+  if (dzKernel != cudaSuccess) {
+    cufftDestroy(r2c);
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd: cleanup X after dZ failed");
+    torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: cleanup G after dZ failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd: cleanup dZ after dZ failed");
+    checkCuda(dzKernel, "spectralConv1dRfft bwd: dZ kernel failed");
+  }
   checkCufft(cufftDestroy(r2c), "spectralConv1dRfft bwd: destroy R2C failed");
   torchlean_cuda_scratch_free(&G, specSz, "spectralConv1dRfft bwd: free G failed");
   *XOut = X;
@@ -1364,14 +1457,36 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_spectral_conv1d_rfft_b
   spectral_conv1d_make_x_dz(x, dY, grid, width, modes, specSz, &X, &dZ);
   cufftComplex* dX = nullptr;
   dX = torchlean_cuda_scratch_alloc<cufftComplex>(specSz, "spectralConv1dRfft bwd_x: malloc dX failed");
-  checkCuda(cudaMemset(dX, 0, specSz * sizeof(cufftComplex)), "spectralConv1dRfft bwd_x: memset dX failed");
-  spectral_conv1d_bwd_xspec_f32<<<blocks_for((size_t)modes * (size_t)width), dim3(kBlockSize)>>>(
+  cudaError_t dxMemset = cudaMemset(
+      dX, 0,
+      checked_bytes_size(specSz, sizeof(cufftComplex), "spectralConv1dRfft bwd_x: dX byte overflow"));
+  if (dxMemset != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_x: cleanup X after dX memset failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_x: cleanup dZ after dX memset failed");
+    torchlean_cuda_scratch_free(&dX, specSz, "spectralConv1dRfft bwd_x: cleanup dX after dX memset failed");
+    checkCuda(dxMemset, "spectralConv1dRfft bwd_x: memset dX failed");
+  }
+  const size_t modeWidth =
+      checked_mul_size((size_t)modes, (size_t)width, "spectralConv1dRfft bwd_x: mode*width overflow");
+  spectral_conv1d_bwd_xspec_f32<<<blocks_for(modeWidth), dim3(kBlockSize)>>>(
       dZ, wRe->data, wIm->data, dX, width, modes);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft bwd_x: dXspec kernel failed");
+  cudaError_t xSpecErr = cudaGetLastError();
+  if (xSpecErr != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_x: cleanup X after dXspec failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_x: cleanup dZ after dXspec failed");
+    torchlean_cuda_scratch_free(&dX, specSz, "spectralConv1dRfft bwd_x: cleanup dX after dXspec failed");
+    checkCuda(xSpecErr, "spectralConv1dRfft bwd_x: dXspec kernel failed");
+  }
   torchlean_cuda_buffer* dx = torchlean_cuda_buffer_alloc(xSz);
   spectral_conv1d_irfft_adjoint_f32<<<blocks_for(xSz), dim3(kBlockSize)>>>(dX, dx->data, grid,
                                                                             width, modes);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft bwd_x: irfft adjoint kernel failed");
+  cudaError_t irfftErr = cudaGetLastError();
+  if (irfftErr != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_x: cleanup X after irfft failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_x: cleanup dZ after irfft failed");
+    torchlean_cuda_scratch_free(&dX, specSz, "spectralConv1dRfft bwd_x: cleanup dX after irfft failed");
+    checkCuda(irfftErr, "spectralConv1dRfft bwd_x: irfft adjoint kernel failed");
+  }
   torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_x: free X failed");
   torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_x: free dZ failed");
   torchlean_cuda_scratch_free(&dX, specSz, "spectralConv1dRfft bwd_x: free dX failed");
@@ -1397,7 +1512,14 @@ static inline lean_obj_res spectral_conv1d_bwd_weight_common(
   torchlean_cuda_buffer* dWIm = torchlean_cuda_buffer_alloc(wSz);
   spectral_conv1d_bwd_weights_f32<<<blocks_for(wSz), dim3(kBlockSize)>>>(X, dZ, dWRe->data,
                                                                           dWIm->data, width, modes);
-  checkCuda(cudaGetLastError(), "spectralConv1dRfft bwd_w: weights kernel failed");
+  cudaError_t weightsErr = cudaGetLastError();
+  if (weightsErr != cudaSuccess) {
+    torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_w: cleanup X after weights failed");
+    torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_w: cleanup dZ after weights failed");
+    torchlean_cuda_buffer_drop_unboxed(dWRe);
+    torchlean_cuda_buffer_drop_unboxed(dWIm);
+    checkCuda(weightsErr, "spectralConv1dRfft bwd_w: weights kernel failed");
+  }
   torchlean_cuda_scratch_free(&X, specSz, "spectralConv1dRfft bwd_w: free X failed");
   torchlean_cuda_scratch_free(&dZ, specSz, "spectralConv1dRfft bwd_w: free dZ failed");
   torchlean_cuda_buffer* keep = imag ? dWIm : dWRe;
@@ -1428,10 +1550,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_selective_scan_diag_fw
 
   const size_t T = (size_t)seqLen;
   const size_t D = (size_t)stateDim;
-  if (D != 0 && T > SIZE_MAX / D) {
-    lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_fwd: seqLen*state overflow");
-  }
-  const size_t total = T * D;
+  const size_t total = checked_mul_size(
+      T, D, "torchlean_cuda_buffer_selective_scan_diag_fwd: seqLen*state overflow");
 
   if (A->size != D) {
     lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_fwd: A.size mismatch");
@@ -1471,10 +1591,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_selective_scan_diag_bw
 
   const size_t T = (size_t)seqLen;
   const size_t D = (size_t)stateDim;
-  if (D != 0 && T > SIZE_MAX / D) {
-    lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_bwd: seqLen*state overflow");
-  }
-  const size_t total = T * D;
+  const size_t total = checked_mul_size(
+      T, D, "torchlean_cuda_buffer_selective_scan_diag_bwd: seqLen*state overflow");
 
   if (A->size != D) lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_bwd: A.size mismatch");
   if (B->size != D) lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_bwd: B.size mismatch");
@@ -1510,10 +1628,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_selective_scan_diag_va
 
   const size_t T = (size_t)seqLen;
   const size_t D = (size_t)stateDim;
-  if (D != 0 && T > SIZE_MAX / D) {
-    lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_var_fwd: seqLen*state overflow");
-  }
-  const size_t total = T * D;
+  const size_t total = checked_mul_size(
+      T, D, "torchlean_cuda_buffer_selective_scan_diag_var_fwd: seqLen*state overflow");
 
   if (A->size != total) {
     lean_internal_panic("torchlean_cuda_buffer_selective_scan_diag_var_fwd: A.size mismatch");
@@ -1740,8 +1856,12 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_flash_attention_fwd(
   torchlean_cuda_buffer* K = torchlean_cuda_buffer_unbox(KObj);
   torchlean_cuda_buffer* V = torchlean_cuda_buffer_unbox(VObj);
   torchlean_cuda_buffer* mask = torchlean_cuda_buffer_unbox(MaskObj);
-  const size_t qkvSz = (size_t)batch * (size_t)n * (size_t)d;
-  const size_t maskSz = (size_t)batch * (size_t)n * (size_t)n;
+  const size_t qkvSz =
+      checked_mul3_size((size_t)batch, (size_t)n, (size_t)d,
+                        "torchlean_cuda_buffer_flash_attention_fwd: Q/K/V size overflow");
+  const size_t maskSz =
+      checked_mul3_size((size_t)batch, (size_t)n, (size_t)n,
+                        "torchlean_cuda_buffer_flash_attention_fwd: mask size overflow");
   if (Q->size != qkvSz || K->size != qkvSz || V->size != qkvSz) {
     lean_internal_panic("torchlean_cuda_buffer_flash_attention_fwd: Q/K/V size mismatch");
   }
@@ -1771,8 +1891,10 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_flash_attention_fwd(
     torchlean_cuda_buffer* V = torchlean_cuda_buffer_unbox(VObj);                                  \
     torchlean_cuda_buffer* mask = torchlean_cuda_buffer_unbox(MaskObj);                            \
     torchlean_cuda_buffer* dOut = torchlean_cuda_buffer_unbox(DOutObj);                            \
-    const size_t qkvSz = (size_t)batch * (size_t)n * (size_t)d;                                    \
-    const size_t maskSz = (size_t)batch * (size_t)n * (size_t)n;                                   \
+    const size_t qkvSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)d,                    \
+                                           label ": Q/K/V/dOut size overflow");                   \
+    const size_t maskSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)n,                   \
+                                           label ": mask size overflow");                         \
     if (Q->size != qkvSz || K->size != qkvSz || V->size != qkvSz || dOut->size != qkvSz) {         \
       lean_internal_panic(label ": Q/K/V/dOut size mismatch");                                    \
     }                                                                                              \
@@ -1947,7 +2069,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_broadcast_to(b_lean_ob
       lean_internal_panic("torchlean_cuda_buffer_broadcast_to: inDims contains big Nat");
     }
     h.inDims[i] = d;
-    inSize *= (size_t)d;
+    inSize = checked_mul_acc_size(
+        inSize, (size_t)d, "torchlean_cuda_buffer_broadcast_to: input shape overflow");
   }
   size_t outSize = 1;
   for (size_t i = 0; i < rankOut; ++i) {
@@ -1957,7 +2080,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_broadcast_to(b_lean_ob
       lean_internal_panic("torchlean_cuda_buffer_broadcast_to: outDims contains big Nat");
     }
     h.outDims[i] = d;
-    outSize *= (size_t)d;
+    outSize = checked_mul_acc_size(
+        outSize, (size_t)d, "torchlean_cuda_buffer_broadcast_to: output shape overflow");
 
     b_lean_obj_res mNat = lean_array_get_core(AxisMapObj, i);
     uint32_t mv =
@@ -1995,16 +2119,36 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_broadcast_to(b_lean_ob
   uint32_t* dMap = nullptr;
   if (rankIn != 0) {
     dInDims = torchlean_cuda_scratch_alloc<uint32_t>(rankIn, "cudaMalloc inDims failed");
-    checkCuda(cudaMemcpy(dInDims, h.inDims, rankIn * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy inDims failed");
+    const size_t inDimBytes = checked_bytes_size(
+        rankIn, sizeof(uint32_t), "torchlean_cuda_buffer_broadcast_to: inDims byte overflow");
+    cudaError_t copyInDims = cudaMemcpy(dInDims, h.inDims, inDimBytes, cudaMemcpyHostToDevice);
+    if (copyInDims != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn, "cudaFree broadcastTo inDims after copy failed");
+      checkCuda(copyInDims, "cudaMemcpy inDims failed");
+    }
   }
   if (rankOut != 0) {
     dOutDims = torchlean_cuda_scratch_alloc<uint32_t>(rankOut, "cudaMalloc outDims failed");
     dMap = torchlean_cuda_scratch_alloc<uint32_t>(rankOut, "cudaMalloc axisMap failed");
-    checkCuda(cudaMemcpy(dOutDims, h.outDims, rankOut * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy outDims failed");
-    checkCuda(cudaMemcpy(dMap, h.axisMap, rankOut * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy axisMap failed");
+    const size_t outDimBytes = checked_bytes_size(
+        rankOut, sizeof(uint32_t), "torchlean_cuda_buffer_broadcast_to: outDims byte overflow");
+    cudaError_t copyOutDims = cudaMemcpy(dOutDims, h.outDims, outDimBytes, cudaMemcpyHostToDevice);
+    if (copyOutDims != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn, "cudaFree broadcastTo inDims after outDims copy failed");
+      torchlean_cuda_scratch_free(&dOutDims, rankOut, "cudaFree broadcastTo outDims after copy failed");
+      torchlean_cuda_scratch_free(&dMap, rankOut, "cudaFree broadcastTo axisMap after outDims copy failed");
+      checkCuda(copyOutDims, "cudaMemcpy outDims failed");
+    }
+    cudaError_t copyMap = cudaMemcpy(dMap, h.axisMap, outDimBytes, cudaMemcpyHostToDevice);
+    if (copyMap != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn, "cudaFree broadcastTo inDims after axisMap copy failed");
+      torchlean_cuda_scratch_free(&dOutDims, rankOut, "cudaFree broadcastTo outDims after axisMap copy failed");
+      torchlean_cuda_scratch_free(&dMap, rankOut, "cudaFree broadcastTo axisMap after copy failed");
+      checkCuda(copyMap, "cudaMemcpy axisMap failed");
+    }
   }
   free_host_broadcast_arrays(&h);
 
@@ -2051,7 +2195,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_from_broadcast(
       lean_internal_panic("torchlean_cuda_buffer_reduce_from_broadcast: inDims contains big Nat");
     }
     h.inDims[i] = d;
-    inSize *= (size_t)d;
+    inSize = checked_mul_acc_size(
+        inSize, (size_t)d, "torchlean_cuda_buffer_reduce_from_broadcast: input shape overflow");
   }
   size_t outSize = 1;
   for (size_t i = 0; i < rankOut; ++i) {
@@ -2060,7 +2205,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_from_broadcast(
       lean_internal_panic("torchlean_cuda_buffer_reduce_from_broadcast: outDims contains big Nat");
     }
     h.outDims[i] = d;
-    outSize *= (size_t)d;
+    outSize = checked_mul_acc_size(
+        outSize, (size_t)d, "torchlean_cuda_buffer_reduce_from_broadcast: output shape overflow");
 
     uint32_t mv =
         nat_to_u32_or_panic(lean_array_get_core(AxisMapObj, i),
@@ -2105,16 +2251,45 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_from_broadcast(
   uint32_t* dMap = nullptr;
   if (rankIn != 0) {
     dInDims = torchlean_cuda_scratch_alloc<uint32_t>(rankIn, "cudaMalloc inDims failed");
-    checkCuda(cudaMemcpy(dInDims, h.inDims, rankIn * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy inDims failed");
+    const size_t inDimBytes = checked_bytes_size(
+        rankIn, sizeof(uint32_t),
+        "torchlean_cuda_buffer_reduce_from_broadcast: inDims byte overflow");
+    cudaError_t copyInDims = cudaMemcpy(dInDims, h.inDims, inDimBytes, cudaMemcpyHostToDevice);
+    if (copyInDims != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn,
+                                  "cudaFree reduceFromBroadcast inDims after copy failed");
+      checkCuda(copyInDims, "cudaMemcpy inDims failed");
+    }
   }
   if (rankOut != 0) {
     dOutDims = torchlean_cuda_scratch_alloc<uint32_t>(rankOut, "cudaMalloc outDims failed");
     dMap = torchlean_cuda_scratch_alloc<uint32_t>(rankOut, "cudaMalloc axisMap failed");
-    checkCuda(cudaMemcpy(dOutDims, h.outDims, rankOut * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy outDims failed");
-    checkCuda(cudaMemcpy(dMap, h.axisMap, rankOut * sizeof(uint32_t), cudaMemcpyHostToDevice),
-              "cudaMemcpy axisMap failed");
+    const size_t outDimBytes = checked_bytes_size(
+        rankOut, sizeof(uint32_t),
+        "torchlean_cuda_buffer_reduce_from_broadcast: outDims byte overflow");
+    cudaError_t copyOutDims = cudaMemcpy(dOutDims, h.outDims, outDimBytes, cudaMemcpyHostToDevice);
+    if (copyOutDims != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn,
+                                  "cudaFree reduceFromBroadcast inDims after outDims copy failed");
+      torchlean_cuda_scratch_free(&dOutDims, rankOut,
+                                  "cudaFree reduceFromBroadcast outDims after copy failed");
+      torchlean_cuda_scratch_free(&dMap, rankOut,
+                                  "cudaFree reduceFromBroadcast axisMap after outDims copy failed");
+      checkCuda(copyOutDims, "cudaMemcpy outDims failed");
+    }
+    cudaError_t copyMap = cudaMemcpy(dMap, h.axisMap, outDimBytes, cudaMemcpyHostToDevice);
+    if (copyMap != cudaSuccess) {
+      free_host_broadcast_arrays(&h);
+      torchlean_cuda_scratch_free(&dInDims, rankIn,
+                                  "cudaFree reduceFromBroadcast inDims after axisMap copy failed");
+      torchlean_cuda_scratch_free(&dOutDims, rankOut,
+                                  "cudaFree reduceFromBroadcast outDims after axisMap copy failed");
+      torchlean_cuda_scratch_free(&dMap, rankOut,
+                                  "cudaFree reduceFromBroadcast axisMap after copy failed");
+      checkCuda(copyMap, "cudaMemcpy axisMap failed");
+    }
   }
   free_host_broadcast_arrays(&h);
 
@@ -2169,7 +2344,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_swap_adjacent_at_depth
       lean_internal_panic("torchlean_cuda_buffer_swap_adjacent_at_depth: dims contains big Nat");
     }
     hDims[i] = d;
-    total *= (size_t)d;
+    total = checked_mul_acc_size(
+        total, (size_t)d, "torchlean_cuda_buffer_swap_adjacent_at_depth: shape overflow");
   }
   if (x->size != total) {
     lean_internal_panic("torchlean_cuda_buffer_swap_adjacent_at_depth: input size mismatch");
@@ -2182,8 +2358,13 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_swap_adjacent_at_depth
 
   uint32_t* dDims = nullptr;
   dDims = torchlean_cuda_scratch_alloc<uint32_t>(rank, "cudaMalloc dims failed");
-  checkCuda(cudaMemcpy(dDims, hDims, rank * sizeof(uint32_t), cudaMemcpyHostToDevice),
-            "cudaMemcpy dims failed");
+  const size_t dimBytes = checked_bytes_size(
+      rank, sizeof(uint32_t), "torchlean_cuda_buffer_reduce_sum_axis: dims byte overflow");
+  cudaError_t copyDims = cudaMemcpy(dDims, hDims, dimBytes, cudaMemcpyHostToDevice);
+  if (copyDims != cudaSuccess) {
+    torchlean_cuda_scratch_free(&dDims, rank, "cudaFree reduceSumAxis dims after copy failed");
+    checkCuda(copyDims, "cudaMemcpy dims failed");
+  }
 
   dim3 blocks = blocks_for(total);
   dim3 threads = dim3(kBlockSize);
@@ -2224,7 +2405,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis(
       lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis: dims contains big Nat");
     }
     hDims[i] = d;
-    inSize *= (size_t)d;
+    inSize = checked_mul_acc_size(
+        inSize, (size_t)d, "torchlean_cuda_buffer_reduce_sum_axis: input shape overflow");
   }
   if (x->size != inSize) {
     lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis: input size mismatch");
@@ -2233,7 +2415,8 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis(
   size_t outSize = 1;
   for (size_t i = 0; i < rank; ++i) {
     if (i != (size_t)axis) {
-      outSize *= (size_t)hDims[i];
+      outSize = checked_mul_acc_size(
+          outSize, (size_t)hDims[i], "torchlean_cuda_buffer_reduce_sum_axis: output shape overflow");
     }
   }
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(outSize);
@@ -2248,8 +2431,13 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis(
 
   uint32_t* dDims = nullptr;
   dDims = torchlean_cuda_scratch_alloc<uint32_t>(rank, "cudaMalloc dims failed");
-  checkCuda(cudaMemcpy(dDims, hDims, rank * sizeof(uint32_t), cudaMemcpyHostToDevice),
-            "cudaMemcpy dims failed");
+  const size_t dimBytes = checked_bytes_size(
+      rank, sizeof(uint32_t), "torchlean_cuda_buffer_swap_adjacent_at_depth: dims byte overflow");
+  cudaError_t copyDims = cudaMemcpy(dDims, hDims, dimBytes, cudaMemcpyHostToDevice);
+  if (copyDims != cudaSuccess) {
+    torchlean_cuda_scratch_free(&dDims, rank, "cudaFree swapAdjacentAtDepth dims after copy failed");
+    checkCuda(copyDims, "cudaMemcpy dims failed");
+  }
 
   dim3 threads = dim3(kBlockSize);
   if (torchlean_cuda_get_deterministic_reductions()) {

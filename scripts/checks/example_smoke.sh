@@ -8,6 +8,7 @@ Usage: scripts/checks/example_smoke.sh [options]
 Run a sequential smoke test over the public `lake exe torchlean ...` example surface.
 
 Default:
+  - verify the focused public API import exposes documented `TorchLean.*` facade names;
   - verify every registered subcommand accepts `--help`;
   - run a compact CPU/tutorial/interop smoke set.
 
@@ -87,13 +88,30 @@ run() {
   "$@"
 }
 
+public_api_smoke="$tmp_dir/public_api_smoke.lean"
+cat > "$public_api_smoke" <<'LEAN'
+import NN.Entrypoint.API
+
+open TorchLean
+
+#check TorchLean.nn.Linear
+#check TorchLean.optim.adam
+#check TorchLean.Trainer.new
+#check TorchLean.Data.tensorDataset
+#check TorchLean.Loss.mse
+#check TorchLean.Metrics.argmax?
+LEAN
+run "$LAKE" build +NN.Entrypoint.API
+run "$LAKE" env lean "$public_api_smoke"
+
 if [[ "$run_help" == true ]]; then
-  run python3 - <<'PY'
+  run python3 - "$LAKE" <<'PY'
 from pathlib import Path
 import re
 import subprocess
 import sys
 
+lake = sys.argv[1]
 runner = Path("NN/Examples/Models/Runner.lean").read_text()
 commands = re.findall(r'^\s*\| "([^"]+)" =>', runner, re.M)
 print(f"help audit: {len(commands)} registered torchlean subcommands")
@@ -101,7 +119,7 @@ print(f"help audit: {len(commands)} registered torchlean subcommands")
 bad = []
 for cmd in commands:
     proc = subprocess.run(
-        ["lake", "exe", "torchlean", cmd, "--help"],
+        [lake, "exe", "torchlean", cmd, "--help"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

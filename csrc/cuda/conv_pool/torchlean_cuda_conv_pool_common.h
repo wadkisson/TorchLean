@@ -1,6 +1,7 @@
 #pragma once
 
 #include "torchlean_cuda_buffer.h"
+#include "torchlean_size_common.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -42,6 +43,13 @@ static inline uint32_t outDim(uint32_t in, uint32_t k, uint32_t stride, uint32_t
   uint64_t inPad = (uint64_t)in + 2ull * (uint64_t)padding;
   uint64_t numer = (inPad >= (uint64_t)k) ? (inPad - (uint64_t)k) : 0ull;
   uint64_t out = numer / (uint64_t)stride + 1ull;
+  if (out > (uint64_t)UINT32_MAX) {
+#if defined(__CUDACC__)
+    lean_internal_panic("torchlean_cuda_conv_pool: outDim overflow");
+#else
+    lean_internal_panic("torchlean_cuda_conv_pool_stub: outDim overflow");
+#endif
+  }
   return (uint32_t)out;
 }
 
@@ -104,9 +112,20 @@ static inline int read_rank_checked(b_lean_obj_arg arrObj, const char* msg) {
 static inline size_t prod_u32(const uint32_t* dims, int n) {
   size_t p = 1;
   for (int i = 0; i < n; ++i) {
-    p *= (size_t)dims[i];
+    p = checked_mul_size(p, (size_t)dims[i], "torchlean_cuda_conv_pool: dimension product overflow");
   }
   return p;
+}
+
+static inline size_t checked_channel_spatial_size(uint32_t channels, size_t spatialSize,
+                                                  const char* msg) {
+  return checked_mul_size((size_t)channels, spatialSize, msg);
+}
+
+static inline size_t checked_conv_kernel_size(uint32_t outerC, uint32_t innerC,
+                                              size_t spatialSize, const char* msg) {
+  return checked_mul_size(
+      checked_mul_size((size_t)outerC, (size_t)innerC, msg), spatialSize, msg);
 }
 
 #if defined(__CUDACC__)

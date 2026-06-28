@@ -6,7 +6,10 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public
+public import NN.API.Public.NN
+public import NN.API.Public.TensorPack
+public import NN.API.Public.Seeded
+public import NN.API.Public.Autograd
 public import NN.API.Data
 public import NN.API.Data.Transforms
 public import NN.API.Runtime

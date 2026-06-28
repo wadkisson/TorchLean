@@ -30,6 +30,9 @@ open Spec
 open Tensor
 open Runtime.Autograd
 
+def floatArrayOfList (xs : List Float) : FloatArray :=
+  FloatArray.mk xs.toArray
+
 /-- Assert that a raw FloatArray has the expected size and contains only zeros. -/
 def assertFloatArrayAllZero (msg : String) (a : FloatArray) (expectedSize : Nat) : IO Unit := do
   if a.size != expectedSize then
@@ -38,6 +41,65 @@ def assertFloatArrayAllZero (msg : String) (a : FloatArray) (expectedSize : Nat)
     let x := a.get! i
     if x != 0.0 then
       throw <| IO.userError s!"{msg}[{i}]: got {x}, expected 0.0"
+
+def assertFloatArrayApprox (msg : String) (a b : FloatArray) (tol : Float := 1e-5) : IO Unit := do
+  if a.size != b.size then
+    throw <| IO.userError s!"{msg}: size mismatch ({a.size} vs {b.size})"
+  for i in [:a.size] do
+    Utils.assertApprox s!"{msg}[{i}]" (a.get! i) (b.get! i) tol
+
+def runRankPolymorphicProductCoverage : IO Unit := do
+  IO.println "== rank-polymorphic native product coverage =="
+  let x := Runtime.Autograd.Cuda.Buffer.ofFloatArray <| floatArrayOfList [
+    0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+    6.0, 7.0, 8.0, 9.0, 10.0, 11.0
+  ]
+  let b := Runtime.Autograd.Cuda.Buffer.broadcastTo x #[2, 1, 3, 2] #[2, 4, 3, 2] #[1, 2, 3, 4]
+  assertFloatArrayApprox "broadcastTo rank-4"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray b)
+    (floatArrayOfList [
+      0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+      0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+      0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+      0.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+      6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+      6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+      6.0, 7.0, 8.0, 9.0, 10.0, 11.0,
+      6.0, 7.0, 8.0, 9.0, 10.0, 11.0
+    ])
+
+  let dOut := Runtime.Autograd.Cuda.Buffer.full 48 1.0
+  let reduced := Runtime.Autograd.Cuda.Buffer.reduceFromBroadcastTo dOut #[2, 1, 3, 2] #[2, 4, 3, 2] #[1, 2, 3, 4]
+  assertFloatArrayApprox "reduceFromBroadcastTo rank-4"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray reduced)
+    (floatArrayOfList (List.replicate 12 4.0))
+
+  let x24 := Runtime.Autograd.Cuda.Buffer.ofFloatArray <| floatArrayOfList [
+    0.0, 1.0, 2.0, 3.0,
+    4.0, 5.0, 6.0, 7.0,
+    8.0, 9.0, 10.0, 11.0,
+    12.0, 13.0, 14.0, 15.0,
+    16.0, 17.0, 18.0, 19.0,
+    20.0, 21.0, 22.0, 23.0
+  ]
+  let sumLast := Runtime.Autograd.Cuda.Buffer.reduceSumAxis x24 #[2, 3, 4] 2
+  assertFloatArrayApprox "reduceSumAxis rank-3"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray sumLast)
+    (floatArrayOfList [6.0, 22.0, 38.0, 54.0, 70.0, 86.0])
+
+  let swapped := Runtime.Autograd.Cuda.Buffer.swapAdjacentAtDepth x24 #[2, 3, 4] 1
+  assertFloatArrayApprox "swapAdjacentAtDepth rank-3"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray swapped)
+    (floatArrayOfList [
+      0.0, 4.0, 8.0,
+      1.0, 5.0, 9.0,
+      2.0, 6.0, 10.0,
+      3.0, 7.0, 11.0,
+      12.0, 16.0, 20.0,
+      13.0, 17.0, 21.0,
+      14.0, 18.0, 22.0,
+      15.0, 19.0, 23.0
+    ])
 
 def runReduceSumAxisEmptyReducedDim : IO Unit := do
   IO.println "== reduce_sum_axis empty reduced dimension =="
@@ -242,6 +304,7 @@ def run : IO Unit := do
 
   Utils.assertTensorApprox (s := sOut) "reduce_mean forward" yCudaMean yCpuMean (tol := 2e-3)
   Utils.assertTensorApprox (s := sR) "reduce_mean backward" dxCudaMean dxCpuMean (tol := 2e-3)
+  runRankPolymorphicProductCoverage
   runReduceSumAxisEmptyReducedDim
   runReduceMaxAxisEmptyReducedDim
 

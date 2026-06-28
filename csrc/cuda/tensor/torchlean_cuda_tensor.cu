@@ -290,10 +290,12 @@ extern "C" torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
     b->data = torchlean_cuda_take_cached_block(n);
   }
   if (n > 0 && !b->data) {
-    cudaError_t err = cudaMalloc((void**)&b->data, n * sizeof(float));
+    const size_t bytes =
+        checked_bytes_size(n, sizeof(float), "torchlean_cuda_buffer_alloc: byte size overflow");
+    cudaError_t err = cudaMalloc((void**)&b->data, bytes);
     if (err != cudaSuccess) {
       torchlean_cuda_flush_cached_blocks();
-      err = cudaMalloc((void**)&b->data, n * sizeof(float));
+      err = cudaMalloc((void**)&b->data, bytes);
       if (err != cudaSuccess) {
         free(b);
         torchlean_cuda_panic_malloc_failed(n, err);
@@ -605,8 +607,10 @@ static void torchlean_reduce_sum_deterministic(const float* in, size_t n, float*
   // Stage 1: partials over the original input.
   unsigned int blocks = torchlean_det_reduce_blocks_for(n);
   float* partial = nullptr;
-  partial = (float*)torchlean_cuda_scratch_alloc_bytes((size_t)blocks * sizeof(float),
-            "cudaMalloc deterministic reduceSum partials failed");
+  partial = (float*)torchlean_cuda_scratch_alloc_bytes(
+      checked_bytes_size((size_t)blocks, sizeof(float),
+                         "cudaMalloc deterministic reduceSum partials failed"),
+      "cudaMalloc deterministic reduceSum partials failed");
   torchlean_reduce_sum_partials_f32<<<dim3(blocks), dim3(kBlockSize)>>>(in, partial, n);
   checkCuda(cudaGetLastError(), "cuda deterministic reduceSum partial kernel launch failed");
 
@@ -615,20 +619,28 @@ static void torchlean_reduce_sum_deterministic(const float* in, size_t n, float*
   while (curSize > 1) {
     unsigned int nextBlocks = torchlean_det_reduce_blocks_for(curSize);
     float* next = nullptr;
-    next = (float*)torchlean_cuda_scratch_alloc_bytes((size_t)nextBlocks * sizeof(float),
-              "cudaMalloc deterministic reduceSum next partials failed");
+    next = (float*)torchlean_cuda_scratch_alloc_bytes(
+        checked_bytes_size((size_t)nextBlocks, sizeof(float),
+                           "cudaMalloc deterministic reduceSum next partials failed"),
+        "cudaMalloc deterministic reduceSum next partials failed");
     torchlean_reduce_sum_partials_f32<<<dim3(nextBlocks), dim3(kBlockSize)>>>(partial, next, curSize);
     checkCuda(cudaGetLastError(), "cuda deterministic reduceSum next partial kernel launch failed");
-    torchlean_cuda_scratch_free_bytes((void**)&partial, curSize * sizeof(float),
-                                      "cudaFree deterministic reduceSum partials failed");
+    torchlean_cuda_scratch_free_bytes(
+        (void**)&partial,
+        checked_bytes_size(curSize, sizeof(float),
+                           "cudaFree deterministic reduceSum partials failed"),
+        "cudaFree deterministic reduceSum partials failed");
     partial = next;
     curSize = (size_t)nextBlocks;
   }
 
   checkCuda(cudaMemcpy(outScalar, partial, sizeof(float), cudaMemcpyDeviceToDevice),
             "cudaMemcpy deterministic reduceSum final copy failed");
-  torchlean_cuda_scratch_free_bytes((void**)&partial, curSize * sizeof(float),
-                                    "cudaFree deterministic reduceSum final partial failed");
+  torchlean_cuda_scratch_free_bytes(
+      (void**)&partial,
+      checked_bytes_size(curSize, sizeof(float),
+                         "cudaFree deterministic reduceSum final partial failed"),
+      "cudaFree deterministic reduceSum final partial failed");
 }
 
 // --- Exports -----------------------------------------------------------------
@@ -798,16 +810,18 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_of_float_array(b_lean_
     return torchlean_cuda_buffer_box(out);
   }
 
-  float* tmp = (float*)malloc(n * sizeof(float));
+  const size_t bytes =
+      checked_bytes_size(n, sizeof(float), "torchlean_cuda_buffer_of_float_array: tmp size overflow");
+  float* tmp = (float*)malloc(bytes);
   if (!tmp) {
     lean_internal_panic_out_of_memory();
   }
   for (size_t i = 0; i < n; ++i) {
     tmp[i] = (float)src[i];
   }
-  checkCuda(cudaMemcpy(out->data, tmp, n * sizeof(float), cudaMemcpyHostToDevice),
-            "cudaMemcpy H2D failed");
+  cudaError_t err = cudaMemcpy(out->data, tmp, bytes, cudaMemcpyHostToDevice);
   free(tmp);
+  checkCuda(err, "cudaMemcpy H2D failed");
   return torchlean_cuda_buffer_box(out);
 }
 
@@ -829,12 +843,17 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_to_float_array(b_lean_
     return out;
   }
 
-  float* tmp = (float*)malloc(n * sizeof(float));
+  const size_t bytes =
+      checked_bytes_size(n, sizeof(float), "torchlean_cuda_buffer_to_float_array: tmp size overflow");
+  float* tmp = (float*)malloc(bytes);
   if (!tmp) {
     lean_internal_panic_out_of_memory();
   }
-  checkCuda(cudaMemcpy(tmp, b->data, n * sizeof(float), cudaMemcpyDeviceToHost),
-            "cudaMemcpy D2H failed");
+  cudaError_t err = cudaMemcpy(tmp, b->data, bytes, cudaMemcpyDeviceToHost);
+  if (err != cudaSuccess) {
+    free(tmp);
+    checkCuda(err, "cudaMemcpy D2H failed");
+  }
   for (size_t i = 0; i < n; ++i) {
     dst[i] = (double)tmp[i];
   }

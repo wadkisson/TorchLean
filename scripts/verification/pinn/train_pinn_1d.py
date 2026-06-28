@@ -42,203 +42,19 @@ Notes:
 from __future__ import annotations
 
 import argparse
-import json
-import math
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Optional
 
-import numpy as np
-from safe_expr import eval_expr
-
-try:
-    import torch
-    import torch.nn as nn
-except Exception as exc:  # pragma: no cover - fail fast when torch missing
-    raise SystemExit("PyTorch is required: pip install torch") from exc
-
-
-class Dataset1D:
-    """Optional sampled dataset for 1D space-time PINN training."""
-
-    def __init__(self, device: torch.device):
-        self.device = device
-        self.collocation: Optional[torch.Tensor] = None
-        self.initial: Optional[torch.Tensor] = None
-        self.boundary: Optional[torch.Tensor] = None
-        self.data: Optional[torch.Tensor] = None
-
-    @staticmethod
-    def _read_entries(entries, keys, device) -> Optional[torch.Tensor]:
-        """Read one JSON dataset section into a float tensor with selected keys."""
-        if entries is None:
-            return None
-        if not isinstance(entries, list):
-            raise ValueError("Dataset sections must be lists of objects.")
-        rows: list[list[float]] = []
-        for idx, entry in enumerate(entries):
-            if not isinstance(entry, dict):
-                raise ValueError(f"Dataset entry {idx} is not an object.")
-            try:
-                row = [float(entry[k]) for k in keys]
-            except KeyError as exc:
-                raise ValueError(f"Dataset entry {idx} missing key '{exc.args[0]}'") from exc
-            rows.append(row)
-        if not rows:
-            return None
-        return torch.tensor(rows, dtype=torch.float32, device=device)
-
-    @classmethod
-    def load(cls, path: str, device: torch.device) -> "Dataset1D":
-        """Load collocation, initial, boundary, and data sections from JSON."""
-        import json
-        data = cls(device)
-        payload = json.loads(Path(path).read_text())
-        data.collocation = cls._read_entries(payload.get("collocation"), ["x", "t"], device)
-        data.initial = cls._read_entries(payload.get("initial"), ["x", "t", "u"], device)
-        data.boundary = cls._read_entries(payload.get("boundary"), ["x", "t", "u"], device)
-        data.data = cls._read_entries(payload.get("data"), ["x", "t", "u"], device)
-        return data
-
-    def _sample_rows(self, mat: torch.Tensor, count: int) -> torch.Tensor:
-        """Sample rows with replacement from one dataset tensor."""
-        if mat is None or mat.shape[0] == 0:
-            raise ValueError("Dataset section is empty; cannot sample.")
-        idx = torch.randint(0, mat.shape[0], (count,), device=self.device, dtype=torch.long)
-        return mat.index_select(0, idx)
-
-    def sample_collocation(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor]]:
-        """Sample `(x, t)` collocation points if the dataset provides them."""
-        if self.collocation is None:
-            return None
-        samples = self._sample_rows(self.collocation, count)
-        return samples[:, :1], samples[:, 1:]
-
-    def sample_initial(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Sample initial-condition triples `(x, t, u)`."""
-        if self.initial is None:
-            return None
-        samples = self._sample_rows(self.initial, count)
-        return samples[:, :1], samples[:, 1:2], samples[:, 2:]
-
-    def sample_boundary(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Sample boundary-condition triples `(x, t, u)`."""
-        if self.boundary is None:
-            return None
-        samples = self._sample_rows(self.boundary, count)
-        return samples[:, :1], samples[:, 1:2], samples[:, 2:]
-
-    def sample_data(self, count: int) -> Optional[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
-        """Sample supervised data triples `(x, t, u)`."""
-        if self.data is None:
-            return None
-        samples = self._sample_rows(self.data, count)
-        return samples[:, :1], samples[:, 1:2], samples[:, 2:]
-
-
-def _activation_factory(name: str) -> nn.Module:
-    """Build the requested activation module."""
-    if name == "tanh":
-        return nn.Tanh()
-    if name == "relu":
-        return nn.ReLU()
-    raise ValueError(f"Unsupported activation '{name}'")
-
-
-def parse_hidden_widths(raw: str) -> List[int]:
-    """Convert a comma-separated width string into a validated list."""
-    tokens = [tok.strip() for tok in raw.split(",")]
-    widths: List[int] = []
-    for tok in tokens:
-        if not tok:
-            continue
-        try:
-            width = int(tok)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(f"Invalid hidden width '{tok}'") from exc
-        if width <= 0:
-            raise argparse.ArgumentTypeError(f"Hidden width must be positive, got {width}")
-        widths.append(width)
-    if not widths:
-        raise argparse.ArgumentTypeError("Provide at least one hidden layer width (e.g., '16,16').")
-    return widths
-
-
-def build_model(in_dim: int, hidden_widths: Iterable[int], activation: str) -> nn.Sequential:
-    """Construct a Sequential network with user-defined widths and nonlinearity."""
-    layers: List[nn.Module] = []
-    prev = in_dim
-    act = activation.lower()
-    for width in hidden_widths:
-        lin = nn.Linear(prev, width)
-        nn.init.xavier_uniform_(lin.weight)
-        nn.init.zeros_(lin.bias)
-        layers.append(lin)
-        layers.append(_activation_factory(act))
-        prev = width
-    out = nn.Linear(prev, 1)
-    nn.init.xavier_uniform_(out.weight)
-    nn.init.zeros_(out.bias)
-    layers.append(out)
-    return nn.Sequential(*layers)
-
-
-def to_json_dict(model: nn.Sequential, *, meta: Dict[str, Any]) -> Dict[str, Any]:
-    """Serialize a sequential PINN model plus metadata into JSON."""
-    state = model.state_dict()
-
-    exported: Dict[str, Any] = {}
-    for name, tensor in state.items():
-        if name.endswith(".weight") or name.endswith(".bias"):
-            exported[f"layers.{name}"] = tensor.detach().cpu().numpy().tolist()
-    exported["meta"] = meta
-    return exported
-
-
-def gradients(output: torch.Tensor, inputs: torch.Tensor) -> torch.Tensor:
-    """Compute d(output)/d(inputs) with autograd."""
-    return torch.autograd.grad(
-        output,
-        inputs,
-        grad_outputs=torch.ones_like(output),
-        retain_graph=True,
-        create_graph=True,
-    )[0]
-
-
-def _eval_expr(expr: str, **tensors):
-    """Evaluate one restricted PDE/data expression and attach context to errors."""
-    try:
-        value = eval_expr(expr, tensors)
-    except Exception as exc:  # pragma: no cover - surfaced to caller
-        raise ValueError(f"Failed to evaluate expression '{expr}': {exc}") from exc
-    return value
-
-
-def _ensure_tensor(val, like: torch.Tensor) -> torch.Tensor:
-    """Broadcast scalar expression results to match a reference tensor."""
-    if isinstance(val, torch.Tensor):
-        return val.to(like)
-    arr = torch.as_tensor(val, dtype=like.dtype, device=like.device)
-    if arr.numel() == 1:
-        return torch.full_like(like, arr.item())
-    return arr.reshape_as(like)
-
-
-def _parse_const_flags(items) -> Dict[str, float]:
-    """Parse repeated `--const name=value` flags into a numeric environment."""
-    constants: Dict[str, float] = {}
-    for raw in items:
-        if "=" not in raw:
-            raise ValueError(f"--const expects name=value, got '{raw}'")
-        name, value = raw.split("=", 1)
-        name = name.strip()
-        if not name:
-            raise ValueError(f"Invalid constant name in '{raw}'")
-        try:
-            constants[name] = float(value)
-        except ValueError as exc:
-            raise ValueError(f"Invalid constant value in '{raw}'") from exc
-    return constants
+from pinn_common import (
+    PinnDataset,
+    build_model,
+    ensure_tensor,
+    eval_pinn_expr,
+    export_model,
+    gradients,
+    parse_const_flags,
+    parse_hidden_widths,
+    torch,
+)
 
 
 def train(args):
@@ -257,17 +73,26 @@ def train(args):
     N_d = args.data_points
 
     constants = {"nu": args.nu}
-    constants.update(_parse_const_flags(args.const or []))
+    constants.update(parse_const_flags(args.const or []))
 
-    dataset: Optional[Dataset1D] = None
+    dataset: Optional[PinnDataset] = None
     if args.dataset_json:
-        dataset = Dataset1D.load(args.dataset_json, device)
+        dataset = PinnDataset.load(
+            args.dataset_json,
+            {
+                "collocation": ["x", "t"],
+                "initial": ["x", "t", "u"],
+                "boundary": ["x", "t", "u"],
+                "data": ["x", "t", "u"],
+            },
+            device,
+        )
         print(f"Loaded dataset from {args.dataset_json}")
 
     def sample_collocation():
         """Sample collocation points from JSON data or the default box."""
         if dataset:
-            sampled = dataset.sample_collocation(N_c)
+            sampled = dataset.sample_columns("collocation", N_c, 2)
             if sampled is not None:
                 return sampled
         x = torch.empty(N_c, 1, device=device).uniform_(x_lo, x_hi)
@@ -277,18 +102,18 @@ def train(args):
     def sample_initial():
         """Sample initial-condition points from JSON data or `--ic-expr`."""
         if dataset:
-            sampled = dataset.sample_initial(N_i)
+            sampled = dataset.sample_columns("initial", N_i, 3)
             if sampled is not None:
                 return sampled
         x = torch.empty(N_i, 1, device=device).uniform_(x_lo, x_hi)
         t = torch.zeros(N_i, 1, device=device)
-        u0 = _ensure_tensor(_eval_expr(args.ic_expr, x=x, t=t, **constants), x)
+        u0 = ensure_tensor(eval_pinn_expr(args.ic_expr, x=x, t=t, **constants), x)
         return x, t, u0
 
     def sample_boundary():
         """Sample boundary-condition points from JSON data or `--bc-expr`."""
         if dataset:
-            sampled = dataset.sample_boundary(N_b)
+            sampled = dataset.sample_columns("boundary", N_b, 3)
             if sampled is not None:
                 return sampled
         t1 = torch.empty(N_b // 2, 1, device=device).uniform_(t_lo, t_hi)
@@ -297,7 +122,7 @@ def train(args):
         x2 = torch.full_like(t2, x_hi)
         x = torch.cat([x1, x2], dim=0)
         t = torch.cat([t1, t2], dim=0)
-        u_b = _ensure_tensor(_eval_expr(args.bc_expr, x=x, t=t, **constants), x)
+        u_b = ensure_tensor(eval_pinn_expr(args.bc_expr, x=x, t=t, **constants), x)
         return x, t, u_b
 
     def sample_data():
@@ -306,7 +131,7 @@ def train(args):
             return None
         if not dataset:
             raise ValueError("--data-points > 0 requires --dataset-json with a 'data' section.")
-        sampled = dataset.sample_data(N_d)
+        sampled = dataset.sample_columns("data", N_d, 3)
         if sampled is None:
             raise ValueError("Dataset has no 'data' entries to sample.")
         return sampled
@@ -357,7 +182,7 @@ def train(args):
         }
         pde_env.update(constants)
 
-        res_raw = _eval_expr(args.pde_expr, **pde_env)
+        res_raw = eval_pinn_expr(args.pde_expr, **pde_env)
         if isinstance(res_raw, torch.Tensor):
             res = res_raw.to(device=u_c.device, dtype=u_c.dtype)
         else:
@@ -394,21 +219,13 @@ def train(args):
                 f"(c={loss_c.item():.3e}, i={loss_i.item():.3e}, b={loss_b.item():.3e}, d={loss_d.item():.3e})"
             )
 
-    out_ckpt = Path(args.out_ckpt)
-    out_ckpt.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(model.state_dict(), str(out_ckpt))
-    print(f"Saved checkpoint: {out_ckpt}")
-
-    out_json = Path(args.out_json)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    meta = {
-        "input_dim": 2,
-        "output_dim": 1,
-        "hidden_layers": list(args.hidden_widths),
-        "activation": args.activation,
-    }
-    out_json.write_text(json.dumps(to_json_dict(model, meta=meta)))
-    print(f"Exported weights JSON: {out_json}")
+    export_model(
+        model,
+        out_ckpt=args.out_ckpt,
+        out_json=args.out_json,
+        hidden_widths=args.hidden_widths,
+        activation=args.activation,
+    )
 
 
 def main():

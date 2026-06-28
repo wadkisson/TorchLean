@@ -55,8 +55,14 @@ static size_t g_torchlean_cuda_scratch_cap = 0;
 static inline void torchlean_cuda_scratch_push(torchlean_cuda_scratch_block block) {
   if (g_torchlean_cuda_scratch_count == g_torchlean_cuda_scratch_cap) {
     size_t new_cap = g_torchlean_cuda_scratch_cap == 0 ? 16 : g_torchlean_cuda_scratch_cap * 2;
+    if (new_cap < g_torchlean_cuda_scratch_cap) {
+      lean_internal_panic("torchlean_cuda_scratch_push: capacity overflow");
+    }
+    const size_t bytes = checked_bytes_size(
+        new_cap, sizeof(torchlean_cuda_scratch_block),
+        "torchlean_cuda_scratch_push: cache byte size overflow");
     void* next = realloc(g_torchlean_cuda_scratch_cache,
-                         new_cap * sizeof(torchlean_cuda_scratch_block));
+                         bytes);
     if (!next) {
       lean_internal_panic_out_of_memory();
     }
@@ -145,10 +151,10 @@ static inline void torchlean_cuda_scratch_free_bytes(void** ptr, size_t bytes, c
 
 template <typename T>
 static inline T* torchlean_cuda_scratch_alloc(size_t count, const char* msg) {
-  return (T*)torchlean_cuda_scratch_alloc_bytes(count * sizeof(T), msg);
+  return (T*)torchlean_cuda_scratch_alloc_bytes(checked_bytes_size(count, sizeof(T), msg), msg);
 }
 
 template <typename T>
 static inline void torchlean_cuda_scratch_free(T** ptr, size_t count, const char* msg) {
-  torchlean_cuda_scratch_free_bytes((void**)ptr, count * sizeof(T), msg);
+  torchlean_cuda_scratch_free_bytes((void**)ptr, checked_bytes_size(count, sizeof(T), msg), msg);
 }

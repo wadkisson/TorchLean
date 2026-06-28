@@ -15,12 +15,75 @@ For source-level provenance and third-party notes, use
 
 ## Index
 
-- [May 2026: Repository Modularization and Comment Cleanup](#may-2026-repository-modularization-and-comment-cleanup)
+- [June 2026: CUDA, CROWN, and PINN Reliability Update](#june-2026-cuda-crown-and-pinn-reliability-update)
 - [June 2026: Lean 4.31 Migration](#june-2026-lean-431-migration)
+- [May 2026: Repository Modularization and Comment Cleanup](#may-2026-repository-modularization-and-comment-cleanup)
 - [May 2026: Runtime API Update](#may-2026-runtime-api-update)
 - [May 2026: CUDA Training Stability Update](#may-2026-cuda-training-stability-update)
 - [May 2026: Introductory Data Note](#may-2026-introductory-data-note)
 - [May 2026: TorchLean Released](#may-2026-torchlean-released)
+
+## June 2026: CUDA, CROWN, and PINN Reliability Update
+
+This update tightens several runtime and proof-facing edges that matter for
+longer local validation runs and downstream users of the public API surface.
+
+On the native side, CUDA and CPU-stub shape arithmetic now share checked size
+helpers for products, byte counts, and additions that are computed at the Lean
+FFI boundary. Rank-polymorphic broadcast, reduce, swap, gather/scatter, flash
+attention, convolution/pooling, tensor-copy, and spectral-convolution paths now
+reject impossible sizes before allocation or kernel launch. cuFFT and metadata
+upload failure paths also clean up scratch buffers and plans before reporting
+the boundary failure.
+
+The CUDA test suite now includes value-checking coverage for higher-rank
+`broadcastTo`, `reduceFromBroadcastTo`, `reduceSumAxis`, and
+`swapAdjacentAtDepth` cases. These tests exercise the rank-polymorphic native
+paths instead of only checking that output buffers have the expected length.
+
+On the proof side, the graph CROWN certificate theorem now exposes a concrete
+non-vacuous result: callers provide the actual certificate and semantic value
+entries for the node being enclosed. The IEEE32 statement remains
+evaluator-parametric, but it now requires a no-self-dependency side condition
+for the evaluator trace, so the old identity-evaluator hook cannot be used as a
+semantic bridge. The 2-layer MLP CROWN implementation also exposes the affine
+forms used by `boundAffineCrown`, making the structural relation between the
+forms and the returned box explicit.
+
+The Python PINN trainers were refactored to share dataset loading, MLP
+construction, expression evaluation, gradient, constant parsing, and export
+helpers through `scripts/verification/pinn/pinn_common.py`. The restricted
+expression evaluator no longer requires NumPy merely to import; NumPy aliases
+are enabled when NumPy is installed.
+
+The focused public API entrypoint now imports the facade namespaces directly, so
+`import NN.Entrypoint.API` exposes the documented `TorchLean.nn`,
+`TorchLean.optim`, `TorchLean.Trainer`, `TorchLean.Data`, `TorchLean.Loss`, and
+`TorchLean.Metrics` names without requiring the broader `NN` umbrella import.
+
+Validation for this update included:
+
+- `lake test`
+- `lake build NN.CI.All`
+- `lake lint -R -K cuda=true -K cuda_home=/usr/local/cuda-13.0`
+- `scripts/checks/check.sh --cuda --cuda-home /usr/local/cuda-13.0`
+- `scripts/checks/cuda_sanitize_tests.sh --cuda-home /usr/local/cuda-13.0 --all-tools`
+- focused Lean checks for the CROWN MLP and graph CROWN certificate modules
+- PyTorch CUDA smoke tests for the PINN trainers on an A100 GPU
+
+CUDA sanitizer reported zero memcheck/initcheck/synccheck errors and zero
+racecheck hazards on the exercised runtime suite.
+
+## June 2026: Lean 4.31 Migration
+
+TorchLean now builds with `leanprover/lean4:v4.31.0`. The root Lake manifest,
+Mathlib pin, documentation generator pin, Verso blueprint toolchain, website
+metadata, README, and formalization metadata were moved together so the public
+repository state agrees about the Lean version.
+
+The migration fixed proof-term breakages in differentiability and autograd
+composition files where Lean 4.31 became stricter about composed functions and
+eventual equality. The full repository build was rerun on 4.31.
 
 ## May 2026: Repository Modularization and Comment Cleanup
 
@@ -41,17 +104,6 @@ to TorchLean's mathematical or runtime semantics:
 
 This pass does not change model semantics, verification claims, CUDA behavior,
 or trusted boundaries.
-
-## June 2026: Lean 4.31 Migration
-
-TorchLean now builds with `leanprover/lean4:v4.31.0`. The root Lake manifest,
-Mathlib pin, documentation generator pin, Verso blueprint toolchain, website
-metadata, README, and formalization metadata were moved together so the public
-repository state agrees about the Lean version.
-
-The migration fixed proof-term breakages in differentiability and autograd
-composition files where Lean 4.31 became stricter about composed functions and
-eventual equality. The full repository build was rerun on 4.31.
 
 ## May 2026: Runtime API Update
 

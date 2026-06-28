@@ -198,7 +198,7 @@ This theorem is deliberately generic: it does **not** commit to a particular cer
 producer (plain CROWN vs α/β-CROWN) nor to a particular transcendental backend.
 -/
 
-theorem crown_checker_encloses_semantics
+theorem crown_checker_encloses_semantics_match
     (g : Graph) (ps : ParamStore ℝ)
     (step : Array (Option (FlatAffineBounds ℝ)) → Nat → Option (FlatAffineBounds ℝ))
     (cert : Array (Option (FlatAffineBounds ℝ)))
@@ -258,6 +258,31 @@ theorem crown_checker_encloses_semantics
             -- Rewrite the matches using the concrete `some` witnesses.
             simpa [hcertk, hvalk, hstepk] using h
 
+theorem crown_checker_encloses_semantics
+    (g : Graph) (ps : ParamStore ℝ)
+    (step : Array (Option (FlatAffineBounds ℝ)) → Nat → Option (FlatAffineBounds ℝ))
+    (cert : Array (Option (FlatAffineBounds ℝ)))
+    (inputs : Std.HashMap Nat Val)
+    (vals : Array (Option Val))
+    (ctx : AffineCtx) (x : Tensor ℝ (.dim ctx.inputDim .scalar))
+    (htopo : TopoSorted g)
+    (hsem : SemLocalOK (g := g) (ps := ps) (inputs := inputs) vals)
+    (hcert : CrownCertLocalOK (g := g) (step := step) cert)
+    (hsound :
+        CrownTransferSound (g := g) (_ps := ps) (_inputs := inputs) (vals := vals)
+          (ctx := ctx) (x := x) (step := step) (cert := cert)) :
+    ∀ id : Nat, id < g.nodes.size →
+      ∀ (b : FlatAffineBounds ℝ) (v : Val),
+        cert[id]! = some b →
+        vals[id]! = some v →
+        EnclosesAtInput (α := ℝ) ctx x b v := by
+  intro id hid b v hcertId hvalId
+  have hmatch :=
+    crown_checker_encloses_semantics_match
+      (g := g) (ps := ps) (step := step) (cert := cert) (inputs := inputs) (vals := vals)
+      (ctx := ctx) (x := x) htopo hsem hcert hsound id hid
+  simpa [hcertId, hvalId] using hmatch
+
 /-!
 ## IEEE32Exec specialization (statement only)
 
@@ -265,28 +290,60 @@ The repository has a rich IEEE32 executable semantics (`IEEE32Exec`) and directe
 for interval endpoints. However, a *full* end-to-end theorem connecting the float-running CROWN
 engine to IEEE32Exec execution requires a separate refinement theorem (rounding + libm/oracle).
 
-For the paper, the right way to expose that dependency is to keep the theorem schematic:
-instantiate `CrownTransferSound` with the appropriate backend assumptions (e.g. Arb for
-transcendentals), and then the generic checker theorem applies.
+For the paper, the right way to expose that dependency is to keep the theorem evaluator-parametric:
+the caller must supply an IEEE32 node evaluator, prove that the value array is the trace produced by
+that evaluator, and show that the evaluator does not depend on the value slot it is currently
+checking. This prevents the old vacuous self-equality hook while still leaving the concrete
+IEEE32Exec graph evaluator/refinement theorem as a separate dependency.
 -/
 
-theorem crown_checker_encloses_semantics_ieee32exec
+abbrev IEEE32Val := FlatVec TorchLean.Floats.IEEE754.IEEE32Exec
+
+abbrev IEEE32EvalNode? :=
+  Array Node →
+    ParamStore TorchLean.Floats.IEEE754.IEEE32Exec →
+    Std.HashMap Nat IEEE32Val →
+    Array (Option IEEE32Val) →
+    Nat →
+    Option IEEE32Val
+
+/--
+The IEEE32 node evaluator may inspect already-computed values, but it must not define node `id` by
+reading `vals[id]!` itself. The identity evaluator
+`fun _ _ _ vals id => vals[id]!` therefore cannot discharge this guard.
+-/
+def IEEE32EvalNoSelfDependency (evalNode? : IEEE32EvalNode?) : Prop :=
+  ∀ (nodes : Array Node) (ps : ParamStore TorchLean.Floats.IEEE754.IEEE32Exec)
+    (inputs : Std.HashMap Nat IEEE32Val)
+    (vals vals' : Array (Option IEEE32Val)) (id : Nat),
+      vals.size = vals'.size →
+      (∀ j : Nat, j ≠ id → vals[j]! = vals'[j]!) →
+      evalNode? nodes ps inputs vals id = evalNode? nodes ps inputs vals' id
+
+def IEEE32SemLocalOK
+    (evalNode? : IEEE32EvalNode?)
+    (g : Graph) (ps : ParamStore TorchLean.Floats.IEEE754.IEEE32Exec)
+    (inputs : Std.HashMap Nat IEEE32Val)
+    (vals : Array (Option IEEE32Val)) : Prop :=
+  IEEE32EvalNoSelfDependency evalNode? ∧
+    vals.size = g.nodes.size ∧
+    ∀ id : Nat, id < g.nodes.size →
+      vals[id]! = evalNode? g.nodes ps inputs vals id
+
+theorem crown_checker_encloses_semantics_ieee32exec_match
     (g : Graph) (_ps : ParamStore TorchLean.Floats.IEEE754.IEEE32Exec)
     (step : Array (Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec)) → Nat →
         Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec))
     (cert : Array (Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec)))
-    (_inputs : Std.HashMap Nat (FlatVec TorchLean.Floats.IEEE754.IEEE32Exec))
-    (vals : Array (Option (FlatVec TorchLean.Floats.IEEE754.IEEE32Exec)))
+    (evalNode? : IEEE32EvalNode?)
+    (inputs : Std.HashMap Nat IEEE32Val)
+    (vals : Array (Option IEEE32Val))
     (ctx : AffineCtx)
     (x : Tensor TorchLean.Floats.IEEE754.IEEE32Exec (.dim ctx.inputDim .scalar))
     [Preorder TorchLean.Floats.IEEE754.IEEE32Exec]
     (htopo : TopoSorted g)
-    (_hsem : vals.size = g.nodes.size ∧
-      ∀ id : Nat, id < g.nodes.size →
-        vals[id]! = (by
-          -- Schematic hook: a concrete IEEE evaluator can be plugged in here.
-          -- We keep the statement evaluator-parametric instead of choosing one runtime definition.
-          exact vals[id]!))
+    (_hsem : IEEE32SemLocalOK (evalNode? := evalNode?) (g := g) (ps := _ps) (inputs := inputs)
+      (vals := vals))
     (hcert : CrownCertLocalOK (g := g) (step := step) cert)
     (hsound :
       ∀ id : Nat, id < g.nodes.size →
@@ -344,6 +401,44 @@ theorem crown_checker_encloses_semantics_ieee32exec
               simpa using this.symm
             have h := hsound k hk hparents
             simpa [hcertk, hvalk, hstepk] using h
+
+theorem crown_checker_encloses_semantics_ieee32exec
+    (g : Graph) (ps : ParamStore TorchLean.Floats.IEEE754.IEEE32Exec)
+    (step : Array (Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec)) → Nat →
+        Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec))
+    (cert : Array (Option (FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec)))
+    (evalNode? : IEEE32EvalNode?)
+    (inputs : Std.HashMap Nat IEEE32Val)
+    (vals : Array (Option IEEE32Val))
+    (ctx : AffineCtx)
+    (x : Tensor TorchLean.Floats.IEEE754.IEEE32Exec (.dim ctx.inputDim .scalar))
+    [Preorder TorchLean.Floats.IEEE754.IEEE32Exec]
+    (htopo : TopoSorted g)
+    (hsem : IEEE32SemLocalOK (evalNode? := evalNode?) (g := g) (ps := ps) (inputs := inputs)
+      (vals := vals))
+    (hcert : CrownCertLocalOK (g := g) (step := step) cert)
+    (hsound :
+      ∀ id : Nat, id < g.nodes.size →
+        (∀ p : Nat, p ∈ (g.nodes[id]!).parents →
+          match cert[p]!, vals[p]! with
+          | some bp, some vp =>
+              EnclosesAtInput (α := TorchLean.Floats.IEEE754.IEEE32Exec) ctx x bp vp
+          | _, _ => True) →
+        match step cert id, vals[id]! with
+        | some b, some v =>
+            EnclosesAtInput (α := TorchLean.Floats.IEEE754.IEEE32Exec) ctx x b v
+        | _, _ => True) :
+    ∀ id : Nat, id < g.nodes.size →
+      ∀ (b : FlatAffineBounds TorchLean.Floats.IEEE754.IEEE32Exec) (v : IEEE32Val),
+        cert[id]! = some b →
+        vals[id]! = some v →
+        EnclosesAtInput (α := TorchLean.Floats.IEEE754.IEEE32Exec) ctx x b v := by
+  intro id hid b v hcertId hvalId
+  have hmatch :=
+    crown_checker_encloses_semantics_ieee32exec_match
+      (g := g) (_ps := ps) (step := step) (cert := cert) (evalNode? := evalNode?)
+      (inputs := inputs) (vals := vals) (ctx := ctx) (x := x) htopo hsem hcert hsound id hid
+  simpa [hcertId, hvalId] using hmatch
 
 end
 
