@@ -107,7 +107,7 @@ TorchLean owns the pieces that should be typed, inspectable, or connected to ver
     <strong>Typed data loading</strong>
     <em>The <code>.npy</code> arrays become fixed-shape supervised samples: one grid input, one grid target.</em>
   </a>
-  <a href="https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Operators/Fno1dBurgers.lean">
+  <a href="{{ '/docs/NN/Examples/Models/Operators/Fno1dBurgers.html' | relative_url }}">
     <span>02</span>
     <strong>Model shape contract</strong>
     <em>The FNO config fixes the grid, channel width, Fourier modes, block count, and parameter shapes.</em>
