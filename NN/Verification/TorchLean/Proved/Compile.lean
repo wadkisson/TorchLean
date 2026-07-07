@@ -163,9 +163,9 @@ def compileFGraph
 Compile a proved forward fragment program into the verifier IR.
 
 The resulting `CompiledIR` can be executed by the IR evaluator, and we prove (in this file) that
-its denotation agrees with `evalForward1`.
+its denotation agrees with `evalForward`.
 -/
-def compileVerifiedForward1
+def compileVerifiedForward
     {α : Type} [Context α]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Program α paramShapes inShape outShape)

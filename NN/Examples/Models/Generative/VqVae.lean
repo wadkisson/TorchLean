@@ -19,8 +19,8 @@ public import NN.MLTheory.Generative.Latent.VQVAE
 # VQ-VAE-Style CIFAR Example
 
 Trains a compact vector reconstruction model with a narrow `tanh` bottleneck, paired with the
-VQ-VAE spec/theory modules. The theorem-facing codebook objective lives in `NN.Spec.Models.VqVae`;
-this runtime example is the executable reconstruction path.
+VQ-VAE spec/theory modules. The codebook objective is stated in `NN.Spec.Models.VqVae`; this runtime
+example is the executable reconstruction path.
 -/
 
 @[expose] public section

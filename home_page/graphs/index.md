@@ -4,17 +4,29 @@ title: Graphs
 
 <div class="graph-actions">
   <a class="primary-link" href="{{ '/importgraph/' | relative_url }}">Open interactive graph</a>
-  <a class="secondary-link" href="{{ '/graphs/dependency-audit.md' | relative_url }}">Read audit summary</a>
+  <a class="secondary-link" href="{{ '/graphs/dependency-audit.html' | relative_url }}">Read audit summary</a>
   <a class="secondary-link" href="{{ '/graphs/dependency-audit.json' | relative_url }}">Download JSON</a>
 </div>
+
+TorchLean uses the word graph in three different places, and the distinction matters.
+
+The page below is about the Lean import graph: which source modules import which other modules.
+It shows whether the codebase has the shape we intend. The runtime graph IR is a different object:
+it represents a neural-network computation and has a denotation. Proof dependencies are different
+again: they live at the declaration level after Lean elaborates a file.
+
+Use this page for architecture questions. Does `NN.Spec` stay independent of runtime code? Which
+modules are central hubs? Which layers are growing? Where does a new example or verifier import
+from? For runtime semantics, use the graph-IR chapters of the guide. For theorem statements, read
+the proof modules themselves.
 
 <div class="dep-dashboard" id="dep-dashboard">
   <section class="dep-panel dep-summary graph-overview">
     <div>
-      <h2>Repository Shape</h2>
+      <h2>Import Graph</h2>
       <p class="dep-panel-intro">
-        Import edges show file-level Lean dependencies. They are useful for architecture review;
-        theorem-level proof dependencies are a different measurement.
+        Each edge means one Lean module directly imports another. This map is about source ownership
+        and layer boundaries; runtime dataflow lives in the TorchLean IR.
       </p>
     </div>
     <div class="dep-stat-grid" id="dep-summary-cards">
@@ -22,56 +34,16 @@ title: Graphs
     </div>
   </section>
 
-  <section class="dep-panel graph-map-panel">
-    <div class="graph-map-head">
-      <div>
-        <h2>Layer Map</h2>
-        <p class="dep-panel-intro">
-          Use a layer below to filter the module explorer. The map is organized by the names that
-          appear in the Lean import tree.
-        </p>
-      </div>
-      <button class="secondary-link graph-layer-button" type="button" data-layer-filter="">Show all</button>
-    </div>
-    <div class="graph-layer-map" aria-label="TorchLean layer filters">
-      <button type="button" data-layer-filter="NN.API">
-        <strong>API</strong>
-        <span>Public facade and user-facing names</span>
-      </button>
-      <button type="button" data-layer-filter="NN.Spec">
-        <strong>Spec</strong>
-        <span>Tensor, layer, model, and shape contracts</span>
-      </button>
-      <button type="button" data-layer-filter="NN.Runtime">
-        <strong>Runtime</strong>
-        <span>Autograd, training, CUDA, and interop paths</span>
-      </button>
-      <button type="button" data-layer-filter="NN.Proofs">
-        <strong>Proofs</strong>
-        <span>Autograd, approximation, and semantic lemmas</span>
-      </button>
-      <button type="button" data-layer-filter="NN.Verification">
-        <strong>Verification</strong>
-        <span>Bounds, certificates, geometry, and checkers</span>
-      </button>
-      <button type="button" data-layer-filter="NN.Floats">
-        <strong>Floats</strong>
-        <span>IEEE-style executable and interval semantics</span>
-      </button>
-    </div>
-  </section>
-
   <section class="dep-panel">
-    <h2>Codebase Snapshot</h2>
+    <h2>Source Snapshot</h2>
     <p class="dep-panel-intro">
-      These counts are generated from the Lean source tree during the site build. They are useful
-      scale indicators, not semantic proof-dependency measurements.
+      These counts are generated from the Lean source tree during the site build. They give a quick
+      sense of repository scale while keeping proof coverage and semantic dependency questions at
+      the declaration level, where Lean records them.
     </p>
     <div class="dep-stat-grid" id="dep-code-cards">
       <div class="dep-loading">Loading codebase statistics…</div>
     </div>
-    <h3>Largest Layers By Source Lines</h3>
-    <div id="dep-layer-size" class="dep-layer-flow"></div>
   </section>
 
   <section class="dep-panel">
@@ -152,7 +124,6 @@ title: Graphs
     const stats = report.code_stats;
     if (!stats) {
       $("dep-code-cards").innerHTML = `<div class="dep-error">No code statistics found in audit JSON.</div>`;
-      $("dep-layer-size").innerHTML = "";
       return;
     }
     $("dep-code-cards").innerHTML = [
@@ -169,15 +140,6 @@ title: Graphs
       </div>
     `).join("");
 
-    const layers = (stats.layer_sizes || []).slice(0, 16);
-    const max = Math.max(1, ...layers.map(x => x.lines));
-    $("dep-layer-size").innerHTML = layers.map(item => `
-      <div class="dep-layer-row">
-        <span class="dep-layer-label">${esc(item.layer)}</span>
-        <span class="dep-layer-bar"><span style="width:${(100 * item.lines / max).toFixed(1)}%"></span></span>
-        <span class="dep-count">${esc(fmt(item.lines))} lines · ${esc(fmt(item.files))} files</span>
-      </div>
-    `).join("");
   }
 
   function buildIndex(report) {
@@ -237,17 +199,6 @@ title: Graphs
         renderDetail();
       });
     });
-  }
-
-  function setLayerFilter(layer) {
-    $("dep-src-layer").value = layer;
-    state.selected = null;
-    renderModuleList();
-    renderDetail();
-    document.querySelectorAll("[data-layer-filter]").forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.layerFilter === layer);
-    });
-    document.getElementById("dep-dashboard")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function edgeList(title, edges, side) {
@@ -312,9 +263,6 @@ title: Graphs
       $("dep-search").addEventListener("input", renderModuleList);
       $("dep-src-layer").addEventListener("change", renderModuleList);
       $("dep-dst-layer").addEventListener("change", renderModuleList);
-      document.querySelectorAll("[data-layer-filter]").forEach(btn => {
-        btn.addEventListener("click", () => setLayerFilter(btn.dataset.layerFilter));
-      });
       renderModuleList();
     })
     .catch(err => {

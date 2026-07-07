@@ -489,14 +489,11 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
                     (input := DVal.mk (α := α) inShape x)
                     (vals := vals) (i := id)
                   =
-                Except.ok
-                  (DVal.mk (α := α) mid₀
-                    (if Tensor.allSpec (α := α) (s := mid₀) (fun v => decide (0 < v)) tx then
-                      Tensor.logSpec (α := α) tx
-                    else
-                      panic!
-                        ("IR eval: log: input contains values <= 0 (or NaN); " ++
-                          "use `safe_log` if you want epsilon protection"))) := by
+                if Tensor.allSpec (α := α) (s := mid₀) (fun v => decide (0 < v)) tx then
+                  Except.ok (DVal.mk (α := α) mid₀ (Tensor.logSpec (α := α) tx))
+                else
+                  throw
+                    "IR eval: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection" := by
               unfold NN.IR.Graph.evalAt
               simp [hGetNode, hnKind, hnParents, DVal.shape, DVal.tensor, DVal.mk,
                 throw, throwThe, MonadExceptOf.throw]

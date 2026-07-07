@@ -11,7 +11,7 @@ public import NN.MLTheory.CROWN.Graph.Backward
 /-!
 # CROWN Graph Theorems
 
-Shape, dimension, and enclosure lemmas for the graph CROWN engine. Keeping these proof-facing facts
+Shape, dimension, and enclosure lemmas for the graph CROWN engine. Keeping these proof layer facts
 separate from the executable propagation passes makes the implementation files easier to browse.
 -/
 

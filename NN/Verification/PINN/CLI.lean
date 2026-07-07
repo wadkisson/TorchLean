@@ -435,10 +435,10 @@ def main (args : List String) : IO Unit := do
           match parseExpr (fun _ => none) pdeStr with
           | .ok e => pure e
           | .error msg => throw <| IO.userError s!"Parse error: {msg}"
-        let (g, ps0) ← loadWeightsOrDefault weights? 1 buildGraph seedParamsFloat
+        let (g, baseParams) ← loadWeightsOrDefault weights? 1 buildGraph seedParamsFloat
         let evalAt : Float → Float → IO (Float × Float) :=
           fun xc epsc => do
-            let ps := seedInputFloat ps0 xc epsc
+            let ps := seedInputFloat baseParams xc epsc
             let prims ← computePrimsAt g ps uMethod backend
             match eval prims expr with
             | some (lo, hi) => pure (lo, hi)
@@ -475,10 +475,10 @@ def main (args : List String) : IO Unit := do
           match parseExpr (fun _ => none) pdeStr with
           | .ok e => pure e
           | .error msg => throw <| IO.userError s!"Parse error: {msg}"
-        let (g, ps0) ← loadWeightsOrDefault weights? 2 buildGraph2D seedParamsFloat2D
+        let (g, baseParams) ← loadWeightsOrDefault weights? 2 buildGraph2D seedParamsFloat2D
         let evalAt : Float → Float → Float → IO (Float × Float) :=
           fun xc yc epsc => do
-            let ps := seedInputFloat2D ps0 xc yc epsc
+            let ps := seedInputFloat2D baseParams xc yc epsc
             let prims ← computePrimsAt g ps uMethod backend
             match eval prims expr with
             | some (lo, hi) => pure (lo, hi)

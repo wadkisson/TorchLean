@@ -549,7 +549,7 @@ def propagateAffineNode
             (ofFlatBox preB)
           let sum_lo := Spec.Tensor.sumSpec preB'.lo
           let sum_hi := Spec.Tensor.sumSpec preB'.hi
-          -- For `n = 0` the output vector is empty; use a nonzero dummy denominator so the
+          -- For `n = 0` the output vector is empty; use denominator 1 so the
           -- vacuous affine form does not evaluate `1 / 0`.
           let nDen : Nat := if n = 0 then 1 else n
           let nA : α := (nDen : Nat)

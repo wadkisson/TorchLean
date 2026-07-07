@@ -109,14 +109,14 @@ def runReduceSumAxisEmptyReducedDim : IO Unit := do
 
 def runReduceMaxAxisEmptyReducedDim : IO Unit := do
   IO.println "== reduce_max_axis empty reduced dimension =="
-  let inputAxis0 := Runtime.Autograd.Cuda.Buffer.zeros 0
-  let outAxis0 := Runtime.Autograd.Cuda.Buffer.reduceMaxAxis0 inputAxis0 0 5
-  assertFloatArrayAllZero "reduce_max_axis0 rows=0 cols=5"
-    (Runtime.Autograd.Cuda.Buffer.toFloatArray outAxis0) 5
-  let inputAxis1 := Runtime.Autograd.Cuda.Buffer.zeros 0
-  let outAxis1 := Runtime.Autograd.Cuda.Buffer.reduceMaxAxis1 inputAxis1 3 0
-  assertFloatArrayAllZero "reduce_max_axis1 rows=3 cols=0"
-    (Runtime.Autograd.Cuda.Buffer.toFloatArray outAxis1) 3
+  let emptyByColumnInput := Runtime.Autograd.Cuda.Buffer.zeros 0
+  let outByColumn := Runtime.Autograd.Cuda.Buffer.reduceMaxByColumn emptyByColumnInput 0 5
+  assertFloatArrayAllZero "reduce_max_by_column rows=0 cols=5"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray outByColumn) 5
+  let emptyByRowInput := Runtime.Autograd.Cuda.Buffer.zeros 0
+  let outByRow := Runtime.Autograd.Cuda.Buffer.reduceMaxByRow emptyByRowInput 3 0
+  assertFloatArrayAllZero "reduce_max_by_row rows=3 cols=0"
+    (Runtime.Autograd.Cuda.Buffer.toFloatArray outByRow) 3
 
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: views/broadcast/reduce ==="

@@ -281,8 +281,7 @@ def flatBoxStrictlyAbove (B : FlatBox Float) (eps : Float) : Bool :=
 
 /--
 Domain and shape preconditions that must hold before a node-wise certificate checker replays a
-bound step. These are not proof shortcuts; they are the executable version of the side conditions
-that the mathematical rules need.
+bound step. These executable checks mirror the side conditions that the mathematical rules need.
 -/
 def ibpNodePreconditionsOk
     (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=

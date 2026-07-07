@@ -18,7 +18,7 @@ typically wants **directed rounding** at interval endpoints:
 - `up x` is a representable value with `x ≤ up x`.
 
 In IEEE-754 hardware this corresponds to rounding modes “toward -∞” and “toward +∞”. In TorchLean’s
-proof-oriented stack we model this with Flocq-style rounding on `ℝ` via `neural_round` together with
+proof-oriented model we represent this with Flocq-style rounding on `ℝ` via `neural_round` together with
 the floor/ceil rounding functions from `NN/Floats/NeuralFloat/Rounding.lean`.
 
 This file is *format-generic*: it works for any radix `β` and exponent selection

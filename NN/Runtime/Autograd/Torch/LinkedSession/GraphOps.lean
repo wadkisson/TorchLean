@@ -314,14 +314,14 @@ Concatenate two tensors along dimension 0.
 
 PyTorch comparison: `torch.cat([a, b], dim=0)`.
 -/
-def concatDim0 {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
+def concatLeadingAxis {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
   {n m : Nat} {sh : Shape}
   (a : TensorRef α (.dim n sh))
   (b : TensorRef α (.dim m sh)) :
   IO (TensorRef α (.dim (n + m) sh)) :=
   commitGraphM (α := α) s (β := TensorRef α (.dim (n + m) sh)) (fun {Γ} {ss} x nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
-      (Runtime.Autograd.Compiled.GraphM.concatDim0 (α := α) (Γ := Γ) (n := n) (m := m) (s := sh)
+      (Runtime.Autograd.Compiled.GraphM.concatLeadingAxis (α := α) (Γ := Γ) (n := n) (m := m) (s := sh)
         { id := a.id } { id := b.id })
       ss g
     let ⟨ss', g'⟩ := st'
@@ -334,13 +334,13 @@ Slice a tensor along dimension 0.
 This returns `x[start : start+len]`. The proof argument `h` enforces bounds.
 PyTorch comparison: `x[start:start+len]` for tensors with a leading dimension.
 -/
-def sliceRange0 {α : Type} (s : SessionIR α) [Zero α] [DecidableEq Shape]
+def sliceLeadingAxisRange {α : Type} (s : SessionIR α) [Zero α] [DecidableEq Shape]
   {n : Nat} {sh : Shape}
   (x : TensorRef α (.dim n sh)) (start len : Nat) (h : len + start ≤ n) :
   IO (TensorRef α (.dim len sh)) :=
   commitGraphM (α := α) s (β := TensorRef α (.dim len sh)) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
-      (Runtime.Autograd.Compiled.GraphM.sliceRange0 (α := α) (Γ := Γ) (n := n) (s := sh) { id :=
+      (Runtime.Autograd.Compiled.GraphM.sliceLeadingAxisRange (α := α) (Γ := Γ) (n := n) (s := sh) { id :=
         x.id } start len h)
       ss g
     let ⟨ss', g'⟩ := st'

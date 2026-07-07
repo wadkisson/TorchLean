@@ -21,7 +21,7 @@ Unlike a typical Python RL environment, this interface is purely functional and 
 state explicit. That makes it much easier to state and prove safety / invariant properties.
 
 References:
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`):
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`):
   https://gymnasium.farama.org/
 - TorchRL documentation (environment transforms, rollout collection, and TensorDict interface):
   https://pytorch.org/rl/

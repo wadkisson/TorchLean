@@ -16,7 +16,7 @@ public import NN.API.Public.NN.Transformer
 public import NN.API.Public.NN.Heads
 
 /-!
-Public neural-network API surface.
+Public neural-network API.
 
 This import point exposes blocks, heads, ResNet/Vision layers, and Transformer components through
 the user-facing `NN.API.nn` namespace.

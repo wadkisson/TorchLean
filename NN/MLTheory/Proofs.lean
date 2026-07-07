@@ -22,7 +22,7 @@ by mathematical theme:
 - Hopfield energy descent and convergence;
 - ReLU algebra and compact-set approximation;
 - state-space / Mamba scan and causality laws; and
-- verification-facing robustness theorems.
+- robustness theorems used by verification workflows.
 
 We keep this as a proof chapter rather than mixing it into model definitions. The model/spec layer
 defines semantics; this chapter proves reusable mathematical properties about those semantics.

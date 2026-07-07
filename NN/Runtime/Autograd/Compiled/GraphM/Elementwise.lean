@@ -472,8 +472,9 @@ def log {α : Type} [Context α] [DecidableEq Shape]
   let node : NodeData α Δ (Γ ++ ss) s :=
     { forward := fun ctx _d =>
         let xval := getIdx (α := α) (xs := ctx) ix
-        -- Keep runtime behavior consistent with the eager autograd engine:
-        -- `log` rejects non-positive inputs; use `safe_log` for epsilon protection.
+        -- This compiled graph closure is pure, so it cannot return the eager engine's `Except`
+        -- error. A bad raw-log domain reaches a runtime panic; use `safe_log` for total epsilon
+        -- protection.
         if Tensor.allSpec (α := α) (s := s) (fun v => decide (v > (0 : α))) xval then
           logSpec (α := α) (s := s) xval
         else
@@ -759,7 +760,7 @@ def mseLoss {α : Type}
 
   PyTorch comparison: `torch.cat([a, b], dim=0)`.
   -/
-  def concatDim0 {α : Type} {Δ : Type} [Add α] [Zero α] [DecidableEq Shape]
+  def concatLeadingAxis {α : Type} {Δ : Type} [Add α] [Zero α] [DecidableEq Shape]
     {Γ : List Shape} {n m : Nat} {s : Shape}
     (a : Var (.dim n s)) (b : Var (.dim m s)) :
     MWith α Δ Γ (Var (.dim (n + m) s)) := do
@@ -773,11 +774,11 @@ def mseLoss {α : Type}
     { forward := fun ctx _d =>
         let av := getIdx (α := α) (xs := ctx) ia
         let bv := getIdx (α := α) (xs := ctx) ib
-        Spec.Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := s) av bv
+        Spec.Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := s) av bv
       jvp := fun _ctx dctx _d =>
         let da := getIdx (α := α) (xs := dctx) ia
         let db := getIdx (α := α) (xs := dctx) ib
-        Spec.Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := s) da db
+        Spec.Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := s) da db
       vjp := fun _ctx _d dLdy =>
         let dA := Spec.sliceRangeSpec (α := α) (n := n + m) (s := s) dLdy 0 n
           (by simp)
@@ -793,7 +794,7 @@ def mseLoss {α : Type}
 
   PyTorch comparison: `x[start : start+len]` for tensors where the leading dimension is indexed.
   -/
-  def sliceRange0 {α : Type} {Δ : Type} [Zero α] [DecidableEq Shape]
+  def sliceLeadingAxisRange {α : Type} {Δ : Type} [Zero α] [DecidableEq Shape]
     {Γ : List Shape} {n : Nat} {s : Shape}
     (x : Var (.dim n s)) (start len : Nat) (h : len + start ≤ n) :
     MWith α Δ Γ (Var (.dim len s)) := do
@@ -810,7 +811,7 @@ def mseLoss {α : Type}
         Spec.sliceRangeSpec (α := α) (n := n) (s := s) dx start len h
       vjp := fun _ctx _d δ =>
         TList.single (α := α) (Γ := Γ ++ ss) (s := inS) ix
-          (Spec.Tensor.sliceRange0BackwardSpec (α := α) (n := n) (s := s) start len h δ) }
+          (Spec.Tensor.sliceLeadingAxisRangeBackwardSpec (α := α) (n := n) (s := s) start len h δ) }
   push (α := α) (Δ := Δ) (Γ := Γ) (ss := ss) (s := outS) g node
 
 end GraphM

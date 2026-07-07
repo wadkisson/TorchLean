@@ -60,10 +60,9 @@ def ibp_conv2d_preact(kernel, bias, lo, hi) -> tuple[list[list[list[float]]], li
                                     xlo = lo[ic][ii][jj]
                                     xhi = hi[ic][ii][jj]
                                     a = kernel[oc][ic][di][dj]
-                                    p1 = a * xlo
-                                    p2 = a * xhi
-                                    acc_lo += min(p1, p2)
-                                    acc_hi += max(p1, p2)
+                                    products = [a * xlo, a * xhi]
+                                    acc_lo += min(products)
+                                    acc_hi += max(products)
                 ylo[oc][i][j] = acc_lo + bias[oc]
                 yhi[oc][i][j] = acc_hi + bias[oc]
     return ylo, yhi

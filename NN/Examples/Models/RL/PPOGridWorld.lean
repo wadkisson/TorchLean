@@ -21,7 +21,7 @@ public import NN.Proofs.RL.Envs.GridWorld
 This example complements `torchlean ppo_cartpole`:
 
 - `torchlean ppo_cartpole` uses an external Python Gymnasium environment and checks every step
-  against a Lean-side trust-boundary contract (`Runtime.RL.Boundary.Contract`).
+  against a Lean side trust-boundary contract (`Runtime.RL.Boundary.Contract`).
 - This example uses a **Lean-native** GridWorld and still runs the same PPO update in Lean.
 
 Even though the environment is defined in Lean, we *still* validate every transition with the
@@ -148,9 +148,9 @@ def sLogitsBatch : Shape := rl.ppo.LogitsBatchShape horizon nActions
 def sScalarBatch : Shape := rl.ppo.ScalarBatchShape horizon
 def sValueBatch : Shape := rl.ppo.ValueBatchShape horizon
 
-def sState1 : Shape := obsShape
-def sLogits1 : Shape := shape![nActions]
-def sValue1 : Shape := shape![1]
+def stateShape : Shape := obsShape
+def logitsShape : Shape := shape![nActions]
+def valueShape : Shape := shape![1]
 
 /-!
 ## Formal GridWorld model (spec/proof layer)
@@ -334,7 +334,7 @@ This executable:
 - writes widget-friendly JSON artifacts (training curve, greedy policy snapshot, greedy path snapshot).
 -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDeviceDetails
       exeName
       s!"PPO on Lean-native GridWorld ({width}x{height}, horizon={horizon})"
@@ -361,17 +361,17 @@ def main (args : List String) : IO UInt32 := do
 
       let seedActor ← nn.freshSeed
       let seedCritic ← nn.freshSeed
-      let actorObs : nn.Sequential sState1 sLogits1 :=
+      let actorObs : nn.Sequential stateShape logitsShape :=
         nn.run seedActor (actorMk .scalar)
-      let criticObs : nn.Sequential sState1 sValue1 :=
+      let criticObs : nn.Sequential stateShape valueShape :=
         nn.run seedCritic (criticMk .scalar)
       let actorRollout : nn.Sequential sStateBatch sLogitsBatch :=
         nn.run seedActor (actorMk pfxBatch)
       let criticRollout : nn.Sequential sStateBatch sValueBatch :=
         nn.run seedCritic (criticMk pfxBatch)
 
-      let actorC ← nn.compileOut actorObs
-      let criticC ← nn.compileOut criticObs
+      let actorC ← actorObs.compile
+      let criticC ← criticObs.compile
 
         let m ← rl.ppo.instantiateActorCritic
           (α := Float) (opts := opts)
@@ -397,7 +397,7 @@ def main (args : List String) : IO UInt32 := do
       -- Evaluate + snapshot the untrained policy.
       let psAll0 ← rl.ppo.params (α := Float) m
       let policyLogits0 : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-        rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll0
+        rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll0
       let avg0 ←
         rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
           mkSession policyLogits0 (baseSeed := opts.seed) (episodes := evalEpisodes)
@@ -421,9 +421,9 @@ def main (args : List String) : IO UInt32 := do
       for update in [0:updates] do
         let psAll ← rl.ppo.params (α := Float) m
         let predictLogits : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-          rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll
+          rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll
         let predictValue : Tensor Float obsShape → Float :=
-          rl.ppo.criticValueFromParams criticObs criticC actorRollout criticRollout psAll
+          rl.ppo.criticValueFromParams criticC actorRollout criticRollout psAll
 
         let (rollout, rngCounter') ←
           collectRolloutNativeWith predictLogits predictValue
@@ -439,7 +439,7 @@ def main (args : List String) : IO UInt32 := do
         if update % evalEvery == 0 then
           let psAll' ← rl.ppo.params (α := Float) m
           let policyLogits : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll'
+            rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll'
           let avg ←
             rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
               mkSession policyLogits (baseSeed := opts.seed) (episodes := evalEpisodes)
@@ -452,7 +452,7 @@ def main (args : List String) : IO UInt32 := do
       -- Snapshot the final greedy policy and a single episode path.
       let psAllF ← rl.ppo.params (α := Float) m
       let policyLogitsF : Tensor Float obsShape → Tensor Float (shape![nActions]) :=
-        rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAllF
+        rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAllF
       let policyAfter : Array Nat :=
         Array.ofFn (fun (s : Fin nStates) =>
           let obs := obsOfState s

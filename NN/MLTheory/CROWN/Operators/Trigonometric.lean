@@ -278,7 +278,7 @@ def derivAtan {n : Nat} (xB : Box α (.dim n .scalar))
     { lo := outLo, hi := outHi }
 
 /-- Second derivative bounds for sin: d²(sin)/dx² = -sin. -/
-def deriv2Sin {n : Nat} (xB : Box α (.dim n .scalar))
+def secondDerivSin {n : Nat} (xB : Box α (.dim n .scalar))
     (dB d2B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   -- y'' = f''(x) * (dx)² + f'(x) * d²x
   -- where f'(x) = cos(x) and f''(x) = -sin(x)

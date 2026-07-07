@@ -12,11 +12,10 @@ public import NN.Examples.Quickstart.Common
 /-!
 # Simple CNN training example
 
-This is the image-classification companion to the small MLP tutorial.
-
-The code is meant to look like normal model code: define the layers, choose a trainer, batch the
-small dataset, and call `trainer.train`. The shape-indexed tensors and checked training task are
-still there underneath, but they are not the first thing a new reader has to fight.
+This is the image-classification companion to the small MLP tutorial. The file shows the public
+training path in its simplest CNN form: define the layers, choose a trainer, batch the small dataset,
+and call `trainer.train`. Shape-indexed tensors and the checked training task remain present, but
+the first read follows the model code rather than subsystem plumbing.
 
 Check this tutorial module directly:
 
@@ -25,7 +24,7 @@ Check this tutorial module directly:
 For the maintained command-line CNN trainer, use `NN/Examples/Models/Vision/Cnn.lean`:
 
 - `python3 scripts/datasets/download_example_data.py --cifar10`
-- `lake build -R -K cuda=true && lake exe torchlean cnn --cuda --n-total 1 --steps 1`
+- `lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1`
 
 Optional flags:
 
@@ -69,7 +68,7 @@ def usage : String :=
     , "  --seed N"
     , "  --batch N"
     , "  --steps N"
-    , "  --dtype float|ieee32"
+    , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
     , "  --cpu | --cuda"
     , "  --log PATH"

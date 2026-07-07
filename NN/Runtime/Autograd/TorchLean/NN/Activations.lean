@@ -183,7 +183,7 @@ def dropout {s : Shape} (p : Float) (seed : Nat := 0) : LayerDef s s :=
   let p0 : Tensor Float pShape := Tensor.scalar p
   { kind := s!"Dropout(p={p})"
     paramShapes := [pShape]
-    initParams := Torch.tlist1 p0
+    initParams := Torch.tlistSingleton p0
     paramRequiresGrad := [false]
     forward := fun mode {α} _ _ =>
       fun {m} _ _ =>

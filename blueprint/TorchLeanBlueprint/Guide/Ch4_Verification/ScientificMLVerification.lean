@@ -29,9 +29,9 @@ finite object, Lean checks the object, and a theorem states what follows.
 # ODE Enclosures
 
 An ODE enclosure certificate is a finite description of a corridor around a trajectory. The checker
-does not depend on an external integrator's narrative. It parses the ODE expression, evaluates
-interval bounds over each segment, and checks that the claimed tube is closed under the vector
-field with the required margins.
+does not depend on an external integrator's explanation of the run. It parses the ODE expression,
+evaluates interval bounds over each segment, and checks that the claimed tube is closed under the
+vector field with the required margins.
 
 The mathematical object is an ODE
 
@@ -49,6 +49,17 @@ The executable side is exposed through the
 [ODE checker API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/ODE/Verify.lean). The core pieces are the expression AST,
 the interval evaluator, the segment certificate, and the final checker result.
 
+The concrete executable declarations are small enough to audit:
+
+```
+#check NN.Verification.ODE.Expr
+#check NN.Verification.ODE.eval
+#check NN.Verification.ODE.Verify.ODECertificateSegment
+#check NN.Verification.ODE.Verify.ODECertificate
+#check NN.Verification.ODE.Verify.checkSub
+#check NN.Verification.ODE.Verify.checkSuper
+```
+
 The theorem side is the real mathematical statement. In the
 [ODE enclosure API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Verification/ODE/Enclosure.lean), a corridor theorem says, in
 plain language:
@@ -65,6 +76,15 @@ statement through explicit interpretation maps.
 Lean has a local enclosure theorem, and the executable checker puts imported ODE or PINN artifacts
 into the shape that theorem expects. Broader neural ODE and integrator claims need their own
 enclosure conditions and agreement evidence.
+
+The trusted boundary is therefore:
+
+```
+external integrator/search -> proposed tube JSON
+Lean parser/checker        -> interval side conditions for the tube
+ODE theorem                -> statement about true trajectories, if theorem hypotheses match
+runtime bridge             -> needed for a claim about a concrete finite-precision integrator
+```
 
 # PINN Certificates
 
@@ -106,11 +126,30 @@ $$`\forall z\in\partial\Omega,\qquad |u_\theta(z)-g(z)|\le\varepsilon_b.`
 
 The [PINN certificate API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/Certificate.lean), the
 [dataset checker API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/DatasetCheck.lean), and the
-[PINN command API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/CLI.lean) are the user surfaces for that path.
+[PINN command API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/CLI.lean) are the user-facing pieces for that path.
+
+Important Lean objects:
+
+```
+#check NN.Verification.PINN.SequentialPINNArch
+#check NN.Verification.PINN.buildGraph
+#check NN.Verification.PINN.PdeAst.Expr
+#check NN.Verification.PINN.PdeAst.eval
+#check NN.Verification.PINN.ResidualAffine.crownUBoundsForward
+#check NN.Verification.PINN.DatasetCheck.DatasetCheckOpts
+```
 
 PINNs are a good stress test because the model is only part of the claim. The PDE residual, the
 domain, the boundary data, and the imported parameters all matter. TorchLean's design makes those
 pieces explicit in the certificate object.
+
+The reference point for the application is Raissi, Perdikaris, and Karniadakis,
+["Physics-informed neural networks"](https://www.sciencedirect.com/science/article/pii/S0021999118307125)
+(Journal of Computational Physics 2019; arXiv preprint
+[1711.10561](https://arxiv.org/abs/1711.10561)). That paper motivates the residual objective.
+TorchLean's checker makes a narrower claim: for an exported architecture, parameters, PDE
+expression, and domain boxes, the certificate's residual and dataset checks pass the predicates
+implemented in Lean.
 
 # Piecewise Polynomial and Spline Certificates
 
@@ -127,12 +166,30 @@ The checker validates interval claims such as:
 
 $$`\forall x\in I_i,\qquad p_i(x)\in[\ell_i,u_i].`
 
-This is one of the cleanest examples of the external tool philosophy:
+The example follows the external-tool pattern:
 
 1. another system may generate a piecewise polynomial artifact;
 2. the artifact is serialized into a small explicit certificate format;
 3. Lean parses and checks that format;
 4. any remaining producer hypothesis is named instead of hidden.
+
+# Artifact Boundary Examples
+
+The same scientific artifact can support different strengths of claim depending on what it exports.
+
+- If a PINN JSON contains only sampled residuals, Lean can check those samples; it cannot infer a
+  uniform residual bound over the domain.
+- If a PINN certificate contains interval or affine residual bounds over domain boxes, Lean can
+  check those box obligations and state a uniform residual claim for the boxes covered by the
+  certificate.
+- If an ODE artifact contains a proposed trajectory but no interval enclosure condition, Lean can
+  parse the trajectory but does not get an enclosure theorem.
+- If a piecewise polynomial artifact contains rational coefficients and interval bounds for each
+  piece, Lean can check the finite polynomial obligations directly.
+
+This is the same checked/proved/assumed distinction used for robustness certificates. The producer
+may be a numerical solver; the theorem applies only to the artifact fields that Lean checked or to
+producer hypotheses named in the statement.
 
 # Scientific Artifacts In The Same Trust Story
 
@@ -145,3 +202,10 @@ models. These sections give readers a clear place to start when their question i
 
 The answer is the same pattern we use elsewhere: small certificate formats, explicit parsers,
 checked predicates, and theorem statements that say exactly which mathematical claim follows.
+
+# References
+
+- Maziar Raissi, Paris Perdikaris, and George Em Karniadakis,
+  ["Physics-informed neural networks"](https://www.sciencedirect.com/science/article/pii/S0021999118307125),
+  Journal of Computational Physics 2019; preprint
+  [arXiv:1711.10561](https://arxiv.org/abs/1711.10561).

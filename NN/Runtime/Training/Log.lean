@@ -125,12 +125,12 @@ Build a two-point loss log from an initial and final scalar loss.
 This is useful for any training routine that records a baseline loss at step `0` and another
 loss after `steps` updates. More detailed loops should use `Curve` or `MetricHistory` below.
 -/
-def beforeAfterLoss (title : String) (steps : Nat) (loss0 loss1 : Float)
+def beforeAfterLoss (title : String) (steps : Nat) (beforeLoss afterLoss : Float)
     (notes : Array String := #[]) (color : String := "#4e79a7") : TrainLog :=
   { title := title
     steps := #[0, steps]
     series := #[
-      { name := "loss", values := #[loss0, loss1], color := color }
+      { name := "loss", values := #[beforeLoss, afterLoss], color := color }
     ]
     notes := notes }
 

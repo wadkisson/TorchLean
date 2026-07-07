@@ -28,7 +28,7 @@ This file gives the TorchLean `Program` interface a pure *spec semantics* backen
   instead of silently choosing a meaningless semantics.
 
 This backend is meant as the “reference” semantics when stating compiler-correctness theorems
-for `NN.Verification.TorchLean.compileForward1`.
+for `NN.Verification.TorchLean.compileForward`.
 -/
 
 @[expose] public section
@@ -100,10 +100,10 @@ instance {α : Type} [Context α] [DecidableEq Shape] : Runtime.Autograd.Torch.O
   bmm := fun {_batch _mDim _nDim _pDim} a b => pure (Tensor.bmmSpec (α := α) a b)
 
   concatVectors := fun {_nDim _mDim} a b => pure (Tensor.concatVectorsSpec (α := α) a b)
-  concatDim0 := fun {_nDim _mDim} {s} a b => pure (Tensor.concatDim0Spec (α := α) (s := s) a b)
+  concatLeadingAxis := fun {_nDim _mDim} {s} a b => pure (Tensor.concatLeadingAxisSpec (α := α) (s := s) a b)
 
-  sliceRange0 := fun {_nDim} {_s} _start _len _h _x =>
-    throw "TorchLeanSpecEval: slice_range0 not supported in spec backend"
+  sliceLeadingAxisRange := fun {_nDim} {_s} _start _len _h _x =>
+    throw "TorchLeanSpecEval: slice_leading_axis_range not supported in spec backend"
 
   maxPool := fun {d C} {inSpatial kernel stride padding} {hKernel} x =>
     if hStride : (∀ i : Fin d, stride.get i ≠ 0) then
@@ -245,8 +245,8 @@ def refListOfTList {α : Type} [Context α] :
   | [], .nil => .nil
   | _s :: ss, .cons t ts => .cons t (refListOfTList (ss := ss) ts)
 
-/-- Spec semantics for `compileForward1`-style models (one distinguished input, last argument). -/
-def evalForward1Spec
+/-- Spec semantics for `compileForward`-style models (one distinguished input, last argument). -/
+def evalForwardSpec
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)

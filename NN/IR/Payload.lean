@@ -16,7 +16,7 @@ public import NN.Spec.Layers.Normalization
 
 Shared payload records for IR evaluators and verifier backends.
 
-The graph stores operation tags and edges. Tensor-valued constants, weights, convolution kernels,
+The graph stores operation names and edges. Tensor-valued constants, weights, convolution kernels,
 and BatchNorm running statistics live in a separate payload keyed by node id, matching the way
 formats such as ONNX keep graph structure separate from initializers.
 -/
@@ -109,7 +109,7 @@ structure BatchNorm2DNchwEvalParams (α : Type) [Context α] where
 External parameter payloads keyed by IR node id.
 
 This is focused on denotational IR evaluation. Runtime backends may store tensors differently, but
-their proof-facing semantics pass through this shape-indexed boundary.
+their proof layer semantics pass through this shape-indexed boundary.
 -/
 structure Payload (α : Type) [Context α] where
   /-- Flat constants keyed by the `const` node id. -/

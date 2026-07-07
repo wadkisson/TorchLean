@@ -6,8 +6,9 @@ usemathjax: true
 <div class="hero home-hero">
   <div class="hero-text">
     <p class="lede">
-      TorchLean is a Lean 4 library for executable neural networks with formal specifications,
-      verified graph semantics, CUDA trust boundaries, and proof-checkable ML artifacts.
+      TorchLean is a Lean 4 library for neural-network code that needs to run and be reasoned
+      about. A model can train, lower to a graph, choose a backend, and still point to the Lean
+      object a theorem or checker is talking about.
     </p>
 
     <div class="home-actions" aria-label="Primary links">
@@ -18,40 +19,14 @@ usemathjax: true
   </div>
 </div>
 
-## What TorchLean Is
-
-<div class="home-pillars">
-  <section>
-    <h3>Specifications</h3>
-    <p>
-      Typed tensors, layer contracts, losses, attention, normalization, and model definitions live
-      in Lean as mathematical objects.
-    </p>
-  </section>
-  <section>
-    <h3>Runtime</h3>
-    <p>
-      Executable autograd, graph IR lowering, PyTorch-style interop, and CUDA kernels are exposed
-      through explicit trust boundaries.
-    </p>
-  </section>
-  <section>
-    <h3>Verification</h3>
-    <p>
-      Proof-backed compiler pieces, CROWN and IBP certificates, floating-point models, and bug-zoo
-      contracts make ML behavior inspectable.
-    </p>
-  </section>
-</div>
-
 <div class="home-overview">
   <img
     src="{{ '/assets/media/figures/torchlean-layout.png' | relative_url }}"
-    alt="TorchLean overview: typed tensors, shared graph IR, verified reverse mode autograd, IEEE-754 semantics, certificate checking, PyTorch round trip, CUDA trust boundary, approximation theorems, and Lean verification."
+    alt="TorchLean overview: typed tensors, shared graph IR, selected reverse-mode autograd proofs, IEEE-754 semantics, certificate checking, PyTorch round trip, CUDA trust boundary, approximation theorems, and Lean verification."
     loading="lazy" />
 </div>
 
-## Workflows
+## Working Paths
 
 <div class="workflow-list">
   <a href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Autograd-Walkthrough/' | relative_url }}">
@@ -64,13 +39,18 @@ usemathjax: true
     <strong>Lower to graph IR</strong>
     <em>Inspect shapes, payloads, graph semantics, and executable traces.</em>
   </a>
-  <a href="{{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}">
+  <a href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}">
     <span>03</span>
-    <strong>Name the trusted boundary</strong>
-    <em>Separate proved specs from floating-point, PyTorch, and CUDA runtime assumptions.</em>
+    <strong>Choose a backend</strong>
+    <em>Keep one model while choosing eager, compiled, CUDA, or external kernel providers.</em>
+  </a>
+  <a href="{{ '/blueprint/Verification-and-Certificates/' | relative_url }}">
+    <span>04</span>
+    <strong>Check verification artifacts</strong>
+    <em>Replay bounds and certificates, then read the Lean statements they support.</em>
   </a>
   <a href="{{ '/examples/bug-zoo/' | relative_url }}">
-    <span>04</span>
+    <span>05</span>
     <strong>Turn bugs into contracts</strong>
     <em>Study small checked examples for masks, losses, normalization, caches, and runtime edges.</em>
   </a>

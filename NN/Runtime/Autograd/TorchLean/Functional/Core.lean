@@ -25,7 +25,7 @@ namespace F
 /-!
 # Functional Core
 
-Small functional helpers built from the primitive `TorchLean.Ops` surface.
+Small functional helpers built from the primitive `TorchLean.Ops` API.
 
 These definitions are shared by eager and compiled execution, so they stay close to the primitive
 operation names: elementwise helpers, broadcasting, embedding lookup, reductions, and seeded RNG.
@@ -49,15 +49,13 @@ def square {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
   mul (m := m) (α := α) (s := s) x x
 
-/-! ## Elementwise transcendentals (scientific forward-model ops)
+/-! ## Elementwise transcendentals for scientific forward models
 
-These lift the primitive `Ops.{exp,log}` and the scalar-affine
-`Ops.scale`/`Ops.const` into the functional surface, so geophysical / scientific
-forward models — which lean on `exp`/`log` of an affine argument rather than the
-NN-flavoured `relu`/`square`/`softmax` ops — can be written directly as a pure
-`Function1.Fn` and differentiated by the autograd engine. Each wraps a primitive
-that already carries a registered backward, so reverse-mode `jacrev`/`grad`
-works through them unchanged.
+Scientific forward models often use affine terms together with `exp` or `log`.
+These helpers expose the corresponding primitives through `nn.functional`, so the
+forward equation can be written once as a pure `Function.Fn` and differentiated
+by the autograd engine. Each helper wraps a primitive with a registered backward
+rule, so reverse-mode `jacrev` and `grad` work through the expression.
 
 PyTorch analogues: `torch.exp`, `torch.log`, and `c·x` / `c·x + k` via
 `torch.mul`/`torch.add` against scalars. -/
@@ -68,20 +66,23 @@ def exp {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
   _root_.Runtime.Autograd.Torch.exp (m := m) (α := α) (s := s) x
 
-/-- Elementwise natural log `x ↦ ln x`.  PyTorch: `torch.log`.
+/-- Elementwise natural log `x ↦ ln x`. PyTorch: `torch.log`.
 
-Domain: for real-valued reasoning, assume positive inputs — this is the real
-natural log only on `x > 0`.  At the runtime/`Float` boundary, nonpositive inputs
-follow backend behavior (e.g. `nan` / `-inf`) rather than a safe total
-real-valued log. -/
+Domain: for real-valued reasoning, assume positive inputs. This is the real
+natural log only on `x > 0`. TorchLean's eager CPU tape, IR evaluator, and proved
+forward-fragment evaluator reject nonpositive inputs explicitly; compiled pure
+closures hit a runtime panic on a bad raw-log domain, and CUDA follows the native
+buffer operation. Use `safeLog` when the model needs a total epsilon-protected
+log-like operation. -/
 def log {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
   _root_.Runtime.Autograd.Torch.log (m := m) (α := α) (s := s) x
 
-/-- Multiply by a compile-time-or-runtime constant scalar `c`: `x ↦ c · x`.
-A re-export of the primitive `Ops.scale` onto the functional surface (it powers
-`mean`, but was not itself exposed as `nn.functional.*`). -/
+/-- Multiply by a scalar `c`: `x ↦ c · x`.
+A re-export of the primitive `Ops.scale` through the functional API. `Ops.scale`
+already powers `mean`; this definition gives users the direct
+`nn.functional.*` name too. -/
 def scale {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) s) (c : α) : m (RefTy (m := m) (α := α) s) :=
@@ -99,9 +100,10 @@ def shift {α : Type} [Context α] [DecidableEq Shape]
     (s₁ := Shape.scalar) (s₂ := s) (Shape.CanBroadcastTo.scalar_to_any s) cs
   _root_.Runtime.Autograd.Torch.add (m := m) (α := α) (s := s) x cb
 
-/-- Scalar affine map `x ↦ c · x + k`.  The single most common building block of
-linearised physical forward models (e.g. the SMAP-NISAR AVS surface/vegetation
-terms).  Composes `scale` then `shift`. -/
+/-- Scalar affine map `x ↦ c · x + k`.
+
+This is a common building block in physical forward models, including the
+SMAP-NISAR AVS surface and vegetation terms. It composes `scale` and `shift`. -/
 def affine {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) s) (c k : α) : m (RefTy (m := m) (α := α) s) := do
@@ -111,7 +113,7 @@ def affine {α : Type} [Context α] [DecidableEq Shape]
 /-! ## Checkpointing (semantics-first identity wrapper) -/
 
 /--
-Checkpoint wrapper for API parity with PyTorch-style memory-saving patterns.
+Checkpoint wrapper matching PyTorch's memory saving pattern.
 
 In this codebase, checkpointing is a semantic identity wrapper (`checkpoint f x = f x`). Backends
 that implement recomputation can refine this hook without changing the mathematical meaning.

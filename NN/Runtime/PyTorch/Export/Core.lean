@@ -68,7 +68,7 @@ structure PyTorchExportMetadata (α : Type) (s t : Shape) where
   outputShape : Shape
   /-- Count of primitive layers/ops in the model (exporter-specific). -/
   layerCount : Nat
-  /-- A list of operation tags used for summary reporting in examples. -/
+  /-- A list of operation names used for summary reporting in examples. -/
   operationTypes : List String
   /-- Whether the exporter embedded a `state_dict` literal in the emitted Python. -/
   hasWeights : Bool
@@ -85,13 +85,13 @@ def indent (n : Nat) (s : String) : String :=
   -- Use a computable definition (Lean's `String.replicate` is `meta` in some imports).
   String.ofList (List.replicate n ' ') ++ s
 /-- Indent a line by 2 spaces (common for Python). -/
-def indent2 (s : String) : String := indent 2 s
+def indentTwo (s : String) : String := indent 2 s
 /-- Indent a line by 4 spaces (common for Python block bodies). -/
-def indent4 (s : String) : String := indent 4 s
+def indentFour (s : String) : String := indent 4 s
 /-- Indent a line by 6 spaces (used in nested Python blocks). -/
-def indent6 (s : String) : String := indent 6 s
+def indentSix (s : String) : String := indent 6 s
 /-- Indent a line by 8 spaces (used for nested `nn.Sequential` strings). -/
-def indent8 (s : String) : String := indent 8 s
+def indentEight (s : String) : String := indent 8 s
 
 /-!
 ## Common boilerplate fragments
@@ -122,14 +122,14 @@ def generateGetModelInfoMethodLines (modelName : String)
     | [] => []
     | [kv] =>
         let (k, v) := kv
-        [indent6 s!"\"{k}\": {v}"]
+        [indentSix s!"\"{k}\": {v}"]
     | kv :: rest =>
         let (k, v) := kv
-        indent6 s!"\"{k}\": {v}," :: renderItems rest
-  [ indent2 "def get_model_info(self) -> dict:"
-  , indent4 "return {"
+        indentSix s!"\"{k}\": {v}," :: renderItems rest
+  [ indentTwo "def get_model_info(self) -> dict:"
+  , indentFour "return {"
   ] ++ renderItems items ++
-  [ indent4 "}"
+  [ indentFour "}"
   ]
 
 /-- Flatten a `Shape` into a list of dimension sizes (outermost-first). -/
@@ -158,7 +158,7 @@ def countLayers {α : Type} {s t : Shape} : SpecChain α s t → Nat
 | .comp a b => countLayers a + countLayers b
 
 /-- Convert a 1D float tensor into a Lean list (outermost dimension order). -/
-def tensor1DToList {n : Nat} (t : Tensor Float (.dim n .scalar)) : List Float :=
+def vectorTensorToList {n : Nat} (t : Tensor Float (.dim n .scalar)) : List Float :=
   match t with
   | .dim f =>
       (List.finRange n).map fun i =>
@@ -166,11 +166,11 @@ def tensor1DToList {n : Nat} (t : Tensor Float (.dim n .scalar)) : List Float :=
         | .scalar x => x
 
 /-- Render a 1D float tensor as a Python list literal (e.g. `[1.0, 2.0]`). -/
-def tensor1DToPy {n : Nat} (t : Tensor Float (.dim n .scalar)) : String :=
-  let elems := (tensor1DToList (n := n) t).map toString
+def vectorTensorToPy {n : Nat} (t : Tensor Float (.dim n .scalar)) : String :=
+  let elems := (vectorTensorToList (n := n) t).map toString
   "[" ++ String.intercalate ", " elems ++ "]"
 /-- Render a 2D float tensor as a Python nested-list literal. -/
-def tensor2DToPy {rows cols : Nat} (t : Tensor Float (.dim rows (.dim cols .scalar))) : String :=
+def matrixTensorToPy {rows cols : Nat} (t : Tensor Float (.dim rows (.dim cols .scalar))) : String :=
   let rowToStr (i : Fin rows) : String :=
     match t with
     | .dim f =>
@@ -191,7 +191,7 @@ TorchLean's matrix-valued specs often follow the mathematical convention where a
 `(out, in)` and applies them as `X @ W.T + b`. This helper prints a TorchLean matrix in the
 transposed orientation expected by PyTorch.
 -/
-def tensor2DToPyT {rows cols : Nat} (t : Tensor Float (.dim rows (.dim cols .scalar))) : String :=
+def transposedMatrixTensorToPy {rows cols : Nat} (t : Tensor Float (.dim rows (.dim cols .scalar))) : String :=
   let colToStr (j : Fin cols) : String :=
     match t with
     | .dim f =>
@@ -205,7 +205,7 @@ def tensor2DToPyT {rows cols : Nat} (t : Tensor Float (.dim rows (.dim cols .sca
   s!"[" ++ String.intercalate ", " colsStr ++ "]"
 
 /-- Render a 4D float tensor as a Python nested-list literal. -/
-def tensor4DToPy {a b c d : Nat} (t : Tensor Float (.dim a (.dim b (.dim c (.dim d .scalar))))) :
+def rankFourTensorToPy {a b c d : Nat} (t : Tensor Float (.dim a (.dim b (.dim c (.dim d .scalar))))) :
   String :=
   let toStr (i : Fin a) : String :=
     let toStr2 (j : Fin b) : String :=
@@ -267,160 +267,160 @@ def generatePyTorchHelperModules : String :=
   joinLines [
     "",
     "class SelectLast(nn.Module):",
-    indent2 "\"\"\"Select the last timestep from a (batch, seq, hidden) tensor.\"\"\"",
-    indent2 "def forward(self, x):",
-    indent4 "return x[:, -1, :]",
+    indentTwo "\"\"\"Select the last timestep from a (batch, seq, hidden) tensor.\"\"\"",
+    indentTwo "def forward(self, x):",
+    indentFour "return x[:, -1, :]",
     "",
     "class RNNOnlyOutput(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
-    indent4 "super().__init__()",
-    indent4 "self.rnn = nn.RNN(input_size, hidden_size, batch_first=True, **kwargs)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.rnn(x)",
-    indent4 "return y",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
+    indentFour "super().__init__()",
+    indentFour "self.rnn = nn.RNN(input_size, hidden_size, batch_first=True, **kwargs)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.rnn(x)",
+    indentFour "return y",
     "",
     "class GRUOnlyOutput(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
-    indent4 "super().__init__()",
-    indent4 "self.gru = nn.GRU(input_size, hidden_size, batch_first=True, **kwargs)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.gru(x)",
-    indent4 "return y",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
+    indentFour "super().__init__()",
+    indentFour "self.gru = nn.GRU(input_size, hidden_size, batch_first=True, **kwargs)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.gru(x)",
+    indentFour "return y",
     "",
     "class LSTMOnlyOutput(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
-    indent4 "super().__init__()",
-    indent4 "self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, **kwargs)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.lstm(x)",
-    indent4 "return y",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, **kwargs):",
+    indentFour "super().__init__()",
+    indentFour "self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, **kwargs)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.lstm(x)",
+    indentFour "return y",
     "",
     "class RNNClassifier(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
-    indent4 "super().__init__()",
-    indent4 "self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)",
-    indent4 "self.select = SelectLast()",
-    indent4 "self.fc = nn.Linear(hidden_size, num_classes)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.rnn(x)",
-    indent4 "y = self.select(y)",
-    indent4 "return self.fc(y)",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
+    indentFour "super().__init__()",
+    indentFour "self.rnn = nn.RNN(input_size, hidden_size, batch_first=True)",
+    indentFour "self.select = SelectLast()",
+    indentFour "self.fc = nn.Linear(hidden_size, num_classes)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.rnn(x)",
+    indentFour "y = self.select(y)",
+    indentFour "return self.fc(y)",
     "",
     "class GRUClassifier(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
-    indent4 "super().__init__()",
-    indent4 "self.gru = nn.GRU(input_size, hidden_size, batch_first=True)",
-    indent4 "self.select = SelectLast()",
-    indent4 "self.fc = nn.Linear(hidden_size, num_classes)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.gru(x)",
-    indent4 "y = self.select(y)",
-    indent4 "return self.fc(y)",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
+    indentFour "super().__init__()",
+    indentFour "self.gru = nn.GRU(input_size, hidden_size, batch_first=True)",
+    indentFour "self.select = SelectLast()",
+    indentFour "self.fc = nn.Linear(hidden_size, num_classes)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.gru(x)",
+    indentFour "y = self.select(y)",
+    indentFour "return self.fc(y)",
     "",
     "class LSTMClassifier(nn.Module):",
-    indent2 "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
-    indent4 "super().__init__()",
-    indent4 "self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)",
-    indent4 "self.select = SelectLast()",
-    indent4 "self.fc = nn.Linear(hidden_size, num_classes)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.lstm(x)",
-    indent4 "y = self.select(y)",
-    indent4 "return self.fc(y)",
+    indentTwo "def __init__(self, input_size: int, hidden_size: int, num_classes: int):",
+    indentFour "super().__init__()",
+    indentFour "self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)",
+    indentFour "self.select = SelectLast()",
+    indentFour "self.fc = nn.Linear(hidden_size, num_classes)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.lstm(x)",
+    indentFour "y = self.select(y)",
+    indentFour "return self.fc(y)",
     "",
     "class UnsupportedLayer(nn.Module):",
-    indent2 "def __init__(self, kind: str, detail: str = \"\"):",
-    indent4 "super().__init__()",
-    indent4 "self.kind = kind",
-    indent4 "self.detail = detail",
-    indent2 "def forward(self, x):",
-    indent4 "raise NotImplementedError(f\"Unsupported layer: {self.kind} ({self.detail})\")",
+    indentTwo "def __init__(self, kind: str, detail: str = \"\"):",
+    indentFour "super().__init__()",
+    indentFour "self.kind = kind",
+    indentFour "self.detail = detail",
+    indentTwo "def forward(self, x):",
+    indentFour "raise NotImplementedError(f\"Unsupported layer: {self.kind} ({self.detail})\")",
     "",
     "class ScaledDotProductSelfAttention(nn.Module):",
-    indent2 "def __init__(self, d_model: int):",
-    indent4 "super().__init__()",
-    indent4 "self.d_model = d_model",
-    indent2 "def forward(self, x):",
-    indent4 "# x: (batch, seq, d_model)",
-    indent4 "scores = torch.matmul(x, x.transpose(-2, -1)) / (self.d_model ** 0.5)",
-    indent4 "attn = torch.softmax(scores, dim=-1)",
-    indent4 "return torch.matmul(attn, x)",
+    indentTwo "def __init__(self, d_model: int):",
+    indentFour "super().__init__()",
+    indentFour "self.d_model = d_model",
+    indentTwo "def forward(self, x):",
+    indentFour "# x: (batch, seq, d_model)",
+    indentFour "scores = torch.matmul(x, x.transpose(-2, -1)) / (self.d_model ** 0.5)",
+    indentFour "attn = torch.softmax(scores, dim=-1)",
+    indentFour "return torch.matmul(attn, x)",
     "",
     "class SimpleRNN(nn.Module):",
-    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indentTwo ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
-    indent4 "super().__init__()",
-    indent4
+    indentFour "super().__init__()",
+    indentFour
       "self.rnn = nn.RNN(input_size, hidden_size, batch_first=True, bidirectional=bidirectional)",
-    indent4 "out_dim = hidden_size * (2 if bidirectional else 1)",
-    indent4 "self.fc = nn.Linear(out_dim, output_size)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.rnn(x)",
-    indent4 "return self.fc(y)",
+    indentFour "out_dim = hidden_size * (2 if bidirectional else 1)",
+    indentFour "self.fc = nn.Linear(out_dim, output_size)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.rnn(x)",
+    indentFour "return self.fc(y)",
     "",
     "class SimpleGRU(nn.Module):",
-    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indentTwo ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
-    indent4 "super().__init__()",
-    indent4
+    indentFour "super().__init__()",
+    indentFour
       "self.gru = nn.GRU(input_size, hidden_size, batch_first=True, bidirectional=bidirectional)",
-    indent4 "out_dim = hidden_size * (2 if bidirectional else 1)",
-    indent4 "self.fc = nn.Linear(out_dim, output_size)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.gru(x)",
-    indent4 "return self.fc(y)",
+    indentFour "out_dim = hidden_size * (2 if bidirectional else 1)",
+    indentFour "self.fc = nn.Linear(out_dim, output_size)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.gru(x)",
+    indentFour "return self.fc(y)",
     "",
     "class SimpleLSTM(nn.Module):",
-    indent2 ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
+    indentTwo ("def __init__(self, input_size: int, hidden_size: int, output_size: " ++
       "int, bidirectional: bool = False):"),
-    indent4 "super().__init__()",
-    indent4
+    indentFour "super().__init__()",
+    indentFour
       "self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=bidirectional)",
-    indent4 "out_dim = hidden_size * (2 if bidirectional else 1)",
-    indent4 "self.fc = nn.Linear(out_dim, output_size)",
-    indent2 "def forward(self, x):",
-    indent4 "y, _ = self.lstm(x)",
-    indent4 "return self.fc(y)",
+    indentFour "out_dim = hidden_size * (2 if bidirectional else 1)",
+    indentFour "self.fc = nn.Linear(out_dim, output_size)",
+    indentTwo "def forward(self, x):",
+    indentFour "y, _ = self.lstm(x)",
+    indentFour "return self.fc(y)",
     "",
     "class GRULanguageModel(nn.Module):",
-    indent2 "def __init__(self, vocab_size: int, hidden_size: int):",
-    indent4 "super().__init__()",
-    indent4 "self.embed = nn.Linear(vocab_size, hidden_size)",
-    indent4 "self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)",
-    indent4 "self.proj = nn.Linear(hidden_size, vocab_size)",
-    indent2 "def forward(self, x):",
-    indent4 "x = self.embed(x)",
-    indent4 "y, _ = self.gru(x)",
-    indent4 "return self.proj(y)",
+    indentTwo "def __init__(self, vocab_size: int, hidden_size: int):",
+    indentFour "super().__init__()",
+    indentFour "self.embed = nn.Linear(vocab_size, hidden_size)",
+    indentFour "self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)",
+    indentFour "self.proj = nn.Linear(hidden_size, vocab_size)",
+    indentTwo "def forward(self, x):",
+    indentFour "x = self.embed(x)",
+    indentFour "y, _ = self.gru(x)",
+    indentFour "return self.proj(y)",
     "",
     "class Seq2SeqInference(nn.Module):",
-    indent2 ("def __init__(self, src_vocab_size: int, tgt_vocab_size: int, " ++
+    indentTwo ("def __init__(self, src_vocab_size: int, tgt_vocab_size: int, " ++
       "embed_dim: int, hidden_dim: int, max_tgt_len: int, start_token: int = " ++
       "0):"),
-    indent4 "super().__init__()",
-    indent4 "self.src_embed = nn.Linear(src_vocab_size, embed_dim)",
-    indent4 "self.tgt_embed = nn.Embedding(tgt_vocab_size, embed_dim)",
-    indent4 "self.encoder = nn.RNN(embed_dim, hidden_dim, batch_first=True)",
-    indent4 "self.decoder = nn.RNN(embed_dim, hidden_dim, batch_first=True)",
-    indent4 "self.proj = nn.Linear(hidden_dim, tgt_vocab_size)",
-    indent4 "self.max_tgt_len = max_tgt_len",
-    indent4 "self.start_token = start_token",
-    indent2 "def forward(self, x):",
-    indent4 "# x: (batch, src_len, src_vocab_size) one-hot/dists",
-    indent4 "x = self.src_embed(x)",
-    indent4 "_enc_out, h = self.encoder(x)",
-    indent4 "batch = x.shape[0]",
-    indent4 "token = torch.full((batch,), self.start_token, dtype=torch.long, device=x.device)",
-    indent4 "inp = self.tgt_embed(token).unsqueeze(1)",
-    indent4 "logits = []",
-    indent4 "h_dec = h",
-    indent4 "for _ in range(self.max_tgt_len):",
-    indent6 "y, h_dec = self.decoder(inp, h_dec)",
-    indent6 "step = self.proj(y.squeeze(1))",
-    indent6 "logits.append(step)",
-    indent6 "token = torch.argmax(step, dim=-1)",
-    indent6 "inp = self.tgt_embed(token).unsqueeze(1)",
-    indent4 "return torch.stack(logits, dim=1)",
+    indentFour "super().__init__()",
+    indentFour "self.src_embed = nn.Linear(src_vocab_size, embed_dim)",
+    indentFour "self.tgt_embed = nn.Embedding(tgt_vocab_size, embed_dim)",
+    indentFour "self.encoder = nn.RNN(embed_dim, hidden_dim, batch_first=True)",
+    indentFour "self.decoder = nn.RNN(embed_dim, hidden_dim, batch_first=True)",
+    indentFour "self.proj = nn.Linear(hidden_dim, tgt_vocab_size)",
+    indentFour "self.max_tgt_len = max_tgt_len",
+    indentFour "self.start_token = start_token",
+    indentTwo "def forward(self, x):",
+    indentFour "# x: (batch, src_len, src_vocab_size) one-hot/dists",
+    indentFour "x = self.src_embed(x)",
+    indentFour "_enc_out, h = self.encoder(x)",
+    indentFour "batch = x.shape[0]",
+    indentFour "token = torch.full((batch,), self.start_token, dtype=torch.long, device=x.device)",
+    indentFour "inp = self.tgt_embed(token).unsqueeze(1)",
+    indentFour "logits = []",
+    indentFour "h_dec = h",
+    indentFour "for _ in range(self.max_tgt_len):",
+    indentSix "y, h_dec = self.decoder(inp, h_dec)",
+    indentSix "step = self.proj(y.squeeze(1))",
+    indentSix "logits.append(step)",
+    indentSix "token = torch.argmax(step, dim=-1)",
+    indentSix "inp = self.tgt_embed(token).unsqueeze(1)",
+    indentFour "return torch.stack(logits, dim=1)",
   ]
 
 /--
@@ -432,85 +432,85 @@ instead of the simpler `nn.Sequential` emitter.
 def generateBasePyTorchModule (className : String) (docstring : String) : String :=
   joinLines <|
     [ s!"class {className}(nn.Module):"
-    , indent2 s!"\"\"\"{docstring}\"\"\""
-    , indent2 ""
-    , indent2 "def __init__(self):"
-    , indent4 "super().__init__()"
-    , indent4 "self._initialize_layers()"
-    , indent4 ""
-    , indent4 "def _initialize_layers(self):"
-    , indent6 "raise NotImplementedError(\"Subclasses must implement _initialize_layers\")"
-    , indent4 ""
-    , indent2 "def forward(self, x):"
-    , indent4 "raise NotImplementedError(\"Subclasses must implement forward\")"
-    , indent4 ""
+    , indentTwo s!"\"\"\"{docstring}\"\"\""
+    , indentTwo ""
+    , indentTwo "def __init__(self):"
+    , indentFour "super().__init__()"
+    , indentFour "self._initialize_layers()"
+    , indentFour ""
+    , indentFour "def _initialize_layers(self):"
+    , indentSix "raise NotImplementedError(\"Subclasses must implement _initialize_layers\")"
+    , indentFour ""
+    , indentTwo "def forward(self, x):"
+    , indentFour "raise NotImplementedError(\"Subclasses must implement forward\")"
+    , indentFour ""
     ] ++
       generateGetModelInfoMethodLines className ++
-      [ indent4 ""
-      , indent2 "@property"
-      , indent2 "def input_shape(self):"
-      , indent4 "raise NotImplementedError(\"Subclasses must implement input_shape\")"
-      , indent4 ""
-      , indent2 "@property"
-      , indent2 "def output_shape(self):"
-      , indent4 "raise NotImplementedError(\"Subclasses must implement output_shape\")"
-      , indent4 ""
-      , indent2 "@property"
-      , indent2 "def layer_count(self):"
-      , indent4 "raise NotImplementedError(\"Subclasses must implement layer_count\")"
-      , indent4 ""
-      , indent2 "@property"
-      , indent2 "def operation_types(self):"
-      , indent4 "raise NotImplementedError(\"Subclasses must implement operation_types\")"
+      [ indentFour ""
+      , indentTwo "@property"
+      , indentTwo "def input_shape(self):"
+      , indentFour "raise NotImplementedError(\"Subclasses must implement input_shape\")"
+      , indentFour ""
+      , indentTwo "@property"
+      , indentTwo "def output_shape(self):"
+      , indentFour "raise NotImplementedError(\"Subclasses must implement output_shape\")"
+      , indentFour ""
+      , indentTwo "@property"
+      , indentTwo "def layer_count(self):"
+      , indentFour "raise NotImplementedError(\"Subclasses must implement layer_count\")"
+      , indentFour ""
+      , indentTwo "@property"
+      , indentTwo "def operation_types(self):"
+      , indentFour "raise NotImplementedError(\"Subclasses must implement operation_types\")"
       ]
 
 /-- Emit Python helpers for saving/loading state dictionaries and JSON checkpoints. -/
 def generateWeightLoadingUtils : String :=
   joinLines [
     "def load_weights_from_dict(model: nn.Module, state_dict: dict):",
-    indent2 "\"\"\"Load weights from a state dictionary into the model.\"\"\"",
-    indent2 "model.load_state_dict(state_dict)",
-    indent2 "return model",
+    indentTwo "\"\"\"Load weights from a state dictionary into the model.\"\"\"",
+    indentTwo "model.load_state_dict(state_dict)",
+    indentTwo "return model",
     "",
     "def save_weights_to_dict(model: nn.Module) -> dict:",
-    indent2 "\"\"\"Save model weights to a state dictionary.\"\"\"",
-    indent2 "return model.state_dict()",
+    indentTwo "\"\"\"Save model weights to a state dictionary.\"\"\"",
+    indentTwo "return model.state_dict()",
     "",
     "def save_model_to_file(model: nn.Module, filepath: str):",
-    indent2 "\"\"\"Save model weights to a file as a state_dict checkpoint.\"\"\"",
-    indent2 "torch.save(model.state_dict(), filepath)",
+    indentTwo "\"\"\"Save model weights to a file as a state_dict checkpoint.\"\"\"",
+    indentTwo "torch.save(model.state_dict(), filepath)",
     "",
     "def load_model_from_file(filepath: str, model: Optional[nn.Module] = None):",
-    indent2 "\"\"\"Load a state_dict checkpoint; optionally materialize it into `model`.\"\"\"",
-    indent2 "state_dict = torch.load(filepath, weights_only=True)",
-    indent2 "if model is None:",
-    indent2 "    return state_dict",
-    indent2 "model.load_state_dict(state_dict)",
-    indent2 "return model"
+    indentTwo "\"\"\"Load a state_dict checkpoint; optionally materialize it into `model`.\"\"\"",
+    indentTwo "state_dict = torch.load(filepath, weights_only=True)",
+    indentTwo "if model is None:",
+    indentTwo "    return state_dict",
+    indentTwo "model.load_state_dict(state_dict)",
+    indentTwo "return model"
   ]
 
 /-- Emit Python helpers for validating exported models. -/
 def generateTestingUtils : String :=
   joinLines [
     "def test_model_forward(model: nn.Module, input_shape: Tuple[int, ...], num_tests: int = 5):",
-    indent2 "\"\"\"Test model forward pass with random inputs.\"\"\"",
-    indent2 "model.eval()",
-    indent2 "with torch.no_grad():",
-    indent4 "for i in range(num_tests):",
-    indent6 "x = torch.randn(1, *input_shape)",
-    indent6 "y = model(x)",
-    indent6 "print(f\"Test {i+1}: Input shape: {x.shape}, Output shape: {y.shape}\")",
-    indent6 "print(f\"Output range: [{y.min().item():.4f}, {y.max().item():.4f}]\")",
+    indentTwo "\"\"\"Test model forward pass with random inputs.\"\"\"",
+    indentTwo "model.eval()",
+    indentTwo "with torch.no_grad():",
+    indentFour "for i in range(num_tests):",
+    indentSix "x = torch.randn(1, *input_shape)",
+    indentSix "y = model(x)",
+    indentSix "print(f\"Test {i+1}: Input shape: {x.shape}, Output shape: {y.shape}\")",
+    indentSix "print(f\"Output range: [{y.min().item():.4f}, {y.max().item():.4f}]\")",
     "",
     "def count_parameters(model: nn.Module) -> int:",
-    indent2 "\"\"\"Count the number of trainable parameters in the model.\"\"\"",
-    indent2 "return sum(p.numel() for p in model.parameters() if p.requires_grad)",
+    indentTwo "\"\"\"Count the number of trainable parameters in the model.\"\"\"",
+    indentTwo "return sum(p.numel() for p in model.parameters() if p.requires_grad)",
     "",
     "def print_model_summary(model: nn.Module):",
-    indent2 "\"\"\"Print a summary of the model architecture.\"\"\"",
-    indent2 "print(f\"Model: {model.__class__.__name__}\")",
-    indent2 "print(f\"Total parameters: {count_parameters(model):,}\")",
-    indent2 "print(f\"Model info: {model.get_model_info()}\")"
+    indentTwo "\"\"\"Print a summary of the model architecture.\"\"\"",
+    indentTwo "print(f\"Model: {model.__class__.__name__}\")",
+    indentTwo "print(f\"Total parameters: {count_parameters(model):,}\")",
+    indentTwo "print(f\"Model info: {model.get_model_info()}\")"
   ]
 
 /--
@@ -525,7 +525,7 @@ def generatePyTorchModule {α : Type} {s t : Shape}
   let outputShape := shapeToPyTupleString t
   let layerCount := countLayers chain
   let layers := SpecChain.extractLayerInfo chain
-  let layerStrings := layers.map (fun (_, pytorch) => indent8 pytorch)
+  let layerStrings := layers.map (fun (_, pytorch) => indentEight pytorch)
   let opList := "[" ++ String.intercalate ", " (layers.map (fun (op, _) => s!"\"{op}\"")) ++ "]"
 
   joinLines <|
@@ -533,36 +533,36 @@ def generatePyTorchModule {α : Type} {s t : Shape}
     , generatePyTorchHelperModules
     , ""
     , s!"class {className}(nn.Module):"
-    , indent2 "def __init__(self):"
-    , indent4 "super().__init__()"
-    , indent4 s!"# Input shape: {inputShape}"
-    , indent4 s!"# Output shape: {outputShape}"
-    , indent4 s!"# Layer count: {layerCount}"
-    , indent4 s!"# Operations: {String.intercalate ", " (layers.map (fun (op, _) => op))}"
-    , indent4 ""
-    , indent4 "self.layers = nn.Sequential("
+    , indentTwo "def __init__(self):"
+    , indentFour "super().__init__()"
+    , indentFour s!"# Input shape: {inputShape}"
+    , indentFour s!"# Output shape: {outputShape}"
+    , indentFour s!"# Layer count: {layerCount}"
+    , indentFour s!"# Operations: {String.intercalate ", " (layers.map (fun (op, _) => op))}"
+    , indentFour ""
+    , indentFour "self.layers = nn.Sequential("
     , String.intercalate ",\n" layerStrings
-    , indent4 ")"
+    , indentFour ")"
     , ""
-    , indent2 "def forward(self, x):"
-    , indent4 "return self.layers(x)"
-    , indent4 ""
-    , indent2 "@property"
-    , indent2 "def input_shape(self):"
-    , indent4 s!"return {inputShape}"
-    , indent4 ""
-    , indent2 "@property"
-    , indent2 "def output_shape(self):"
-    , indent4 s!"return {outputShape}"
-    , indent4 ""
-    , indent2 "@property"
-    , indent2 "def layer_count(self):"
-    , indent4 s!"return {layerCount}"
-    , indent4 ""
-    , indent2 "@property"
-    , indent2 "def operation_types(self):"
-    , indent4 s!"return {opList}"
-    , indent4 ""
+    , indentTwo "def forward(self, x):"
+    , indentFour "return self.layers(x)"
+    , indentFour ""
+    , indentTwo "@property"
+    , indentTwo "def input_shape(self):"
+    , indentFour s!"return {inputShape}"
+    , indentFour ""
+    , indentTwo "@property"
+    , indentTwo "def output_shape(self):"
+    , indentFour s!"return {outputShape}"
+    , indentFour ""
+    , indentTwo "@property"
+    , indentTwo "def layer_count(self):"
+    , indentFour s!"return {layerCount}"
+    , indentFour ""
+    , indentTwo "@property"
+    , indentTwo "def operation_types(self):"
+    , indentFour s!"return {opList}"
+    , indentFour ""
     ] ++
       generateGetModelInfoMethodLines className
 

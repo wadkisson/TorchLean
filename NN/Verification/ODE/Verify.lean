@@ -110,7 +110,7 @@ An imported corridor model plus its derived-graph.
 We store:
 - `g`: forward graph,
 - `dg`: derivative-augmented graph,
-- `ps0`: parameters and constants,
+- `baseParams`: parameters and constants,
 - `outId` and `dOutId`: output node ids for `u` and `du/dt`,
 - `inDim`: expected input dimension (1 for ODE time).
 -/
@@ -125,7 +125,7 @@ structure Model (α : Type) [Context α] where
   /-- Derived graph computing both `u(t)` and `du/dt` (by structural differentiation). -/
   dg    : Graph
   /-- Parameters/constants for the graphs. -/
-  ps0   : ParamStore α
+  baseParams   : ParamStore α
   /-- Output node id of `u(t)` in `g`. -/
   outId : Nat
   /-- Output node id of `du/dt` in `dg`. -/
@@ -165,7 +165,7 @@ This is a structural AD pass over the IR: for each node we build a corresponding
 and store its id in a side table.
 -/
 private def buildDerivativeGraph1D {α : Type} [Context α]
-    (g : Graph) (ps0 : ParamStore α) (outId : Nat) : IO (Graph × ParamStore α × Nat) := do
+    (g : Graph) (baseParams : ParamStore α) (outId : Nat) : IO (Graph × ParamStore α × Nat) := do
   if g.nodes.isEmpty then
     throw <| IO.userError "buildDerivativeGraph1D: empty graph"
   match g.nodes[0]? with
@@ -205,7 +205,7 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
             s!"buildDerivativeGraph1D: derivative parent {parentId} out of bounds at node {nodeId}"
 
   let init : DerivBuildState α :=
-    { nodes := g.nodes, ps := ps0, dId := Array.replicate g.nodes.size 0 }
+    { nodes := g.nodes, ps := baseParams, dId := Array.replicate g.nodes.size 0 }
 
   let (_, st) ← (show DerivBuildM α Unit from do
     for i in [0:g.nodes.size] do
@@ -433,7 +433,7 @@ private def boundsOn {α : Type} [Context α] [DecidableEq Shape]
     (ofFloat : Float → α) (m : Model α) (I : Interval) : IO (Bounds α) := do
   if m.inDim ≠ 1 then
     throw <| IO.userError s!"ODE verifier expects inputDim=1, got {m.inDim}"
-  let ps := seedInput1D (α := α) m.ps0 ofFloat I.center I.radius
+  let ps := seedInput1D (α := α) m.baseParams ofFloat I.center I.radius
   let ibp := runIBP (α:=α) m.dg ps
   let outB ←
     match NN.MLTheory.CROWN.Graph.outputBox? ibp m.outId with
@@ -495,10 +495,10 @@ private def loadModelDirectWith {α : Type} [Context α] (ofFloat : Float → α
     throw <| IO.userError
       s!"ODE verifier expects scalar outputDim=1, got {sd.arch.outputDim} in {path}"
   let g := Import.PINNPyTorch.buildGraph sd
-  let ps0 := Import.PINNPyTorch.toParamStoreWith (α := α) ofFloat sd
+  let baseParams := Import.PINNPyTorch.toParamStoreWith (α := α) ofFloat sd
   let outId := SequentialPINNArch.graphOutputId g
-  let (dg, ps1, dOutId) ← buildDerivativeGraph1D (α := α) g ps0 outId
-  pure { g := g, dg := dg, ps0 := ps1, outId := outId, dOutId := dOutId, inDim := sd.arch.inputDim }
+  let (dg, paramsWithDerivative, dOutId) ← buildDerivativeGraph1D (α := α) g baseParams outId
+  pure { g := g, dg := dg, baseParams := paramsWithDerivative, outId := outId, dOutId := dOutId, inDim := sd.arch.inputDim }
 
 /-- Linear-layer payload extracted from a PINN export (`w`, `b`). -/
 private structure LinLayer (inDim outDim : Nat) where
@@ -583,14 +583,14 @@ private def loadModelTorchLean (path : String) : IO (Model Float) := do
                 evalT tail a
             evalT chain x
       let compiled ←
-        match NN.Verification.TorchLean.compileForward1
+        match NN.Verification.TorchLean.compileForward
               (α := Float) (paramShapes := []) (inShape := xShape) (outShape := yShape)
               model (.nil) with
         | .ok c => pure c
         | .error e => throw <| IO.userError e
-      let (dg, ps1, dOutId) ← buildDerivativeGraph1D (α := Float) compiled.graph compiled.ps
+      let (dg, paramsWithDerivative, dOutId) ← buildDerivativeGraph1D (α := Float) compiled.graph compiled.ps
         compiled.outputId
-      pure { g := compiled.graph, dg := dg, ps0 := ps1, outId := compiled.outputId, dOutId :=
+      pure { g := compiled.graph, dg := dg, baseParams := paramsWithDerivative, outId := compiled.outputId, dOutId :=
         dOutId, inDim := inDim }
     | .relu =>
       let model : Runtime.Autograd.TorchLean.Program Float [xShape] yShape :=
@@ -621,14 +621,14 @@ private def loadModelTorchLean (path : String) : IO (Model Float) := do
                 evalR tail a
             evalR chain x
       let compiled ←
-        match NN.Verification.TorchLean.compileForward1
+        match NN.Verification.TorchLean.compileForward
               (α := Float) (paramShapes := []) (inShape := xShape) (outShape := yShape)
               model (.nil) with
         | .ok c => pure c
         | .error e => throw <| IO.userError e
-      let (dg, ps1, dOutId) ← buildDerivativeGraph1D (α := Float) compiled.graph compiled.ps
+      let (dg, paramsWithDerivative, dOutId) ← buildDerivativeGraph1D (α := Float) compiled.graph compiled.ps
         compiled.outputId
-      pure { g := compiled.graph, dg := dg, ps0 := ps1, outId := compiled.outputId, dOutId :=
+      pure { g := compiled.graph, dg := dg, baseParams := paramsWithDerivative, outId := compiled.outputId, dOutId :=
         dOutId, inDim := inDim }
     | .sin =>
       throw <| IO.userError
@@ -668,7 +668,7 @@ These come from the `settings` section of a certificate JSON (and can be partial
 structure ODEVerifierSettings where
   /-- Maximum recursion depth for time-domain splitting. -/
   maxDepth : Nat := 18
-  /-- Stop splitting once interval width falls below this (even if not verified). -/
+  /-- Stop splitting once interval width falls below this; unresolved boxes remain undecided. -/
   minWidth : Float := 1e-3
   /-- Optional numerical slack added to comparisons (helps absorb small floating-point error). -/
   slack : Float := 0.0

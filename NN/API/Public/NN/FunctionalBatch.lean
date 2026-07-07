@@ -19,8 +19,8 @@ namespace pure
 /-!
 `nn.functional` mirrors `torch.nn.functional`: pure, stateless building blocks.
 
-In TorchLean these are defined as derived ops over the small primitive `Ops` surface, so the same
-code works on both the eager backend and the compiled backend.
+In TorchLean these are derived ops over the small primitive `Ops` API, so the same code works on
+both the eager backend and the compiled backend.
 -/
 namespace functional
 
@@ -47,20 +47,20 @@ end functional
 /-!
 ## Batch Lifting
 
-`batchDim0 n model` wraps a *single-example* model `σ → τ` into a batched model
+`batchPointwise n model` wraps a *single-example* model `σ → τ` into a batched model
 `(dim n σ) → (dim n τ)` by running the underlying model once per batch element.
 
-This is the correctness-first batch lift used to expose PyTorch-like `N×...` APIs even when a primitive
-only exists for the unbatched shape.
+Correctness-first batch lift for exposing PyTorch-like `N×...` APIs even when a primitive only
+exists for the unbatched shape.
 -/
 
 /--
-Lift a single-example `LayerDef σ τ` to operate on a dimension-0 batch.
+Lift a single-example `LayerDef σ τ` to operate on a leading batch axis.
 
 This is a correctness-first batch lift: it runs the underlying layer independently on each batch
 element. Prefer a primitive batched layer when one exists.
 -/
-def batchLayerDim0 (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
+def batchLayerPointwise (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
     LayerDef (.dim n σ) (.dim n τ) :=
   let inSize : Nat := Spec.Shape.size σ
   let outSize : Nat := Spec.Shape.size τ
@@ -77,7 +77,7 @@ def batchLayerDim0 (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
           (β := m (TorchLean.RefTy (m := m) (α := α) (.dim n τ)))
           (fun args => do
             let (ps, xBatch) :=
-              _root_.Runtime.Autograd.Torch.RefList.splitAppend1
+              _root_.Runtime.Autograd.Torch.RefList.splitLast
                 (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
                 (ss := l.paramShapes) (τ := .dim n σ) args
             let xMat ←
@@ -112,10 +112,10 @@ def batchLayerDim0 (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
               outMat (by simp [Spec.Shape.size, outSize]))
   }
 
-/-- Lift a sequential model to act pointwise on a leading dim0 batch axis. -/
-def batchDim0 (n : Nat) {σ τ : Spec.Shape} : Sequential σ τ → Sequential (.dim n σ) (.dim n τ)
+/-- Lift a sequential model to act pointwise on a leading batch axis. -/
+def batchPointwise (n : Nat) {σ τ : Spec.Shape} : Sequential σ τ → Sequential (.dim n σ) (.dim n τ)
   | .id s => .id (.dim n s)
-  | .cons l rest => .cons (batchLayerDim0 n l) (batchDim0 n rest)
+  | .cons l rest => .cons (batchLayerPointwise n l) (batchPointwise n rest)
 
 /-!
 Note: some low-level TorchLean layers (notably conv/pool/norm) have Nat-side well-formedness

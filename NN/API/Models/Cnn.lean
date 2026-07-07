@@ -35,24 +35,24 @@ structure CnnConfig where
   pool : nn.MaxPool := { kH := 2, kW := 2, stride := 2 }
 
 /-- Height after the convolution stage. -/
-def CnnConfig.outH1 (cfg : CnnConfig) : Nat :=
+def CnnConfig.firstConvOutHeight (cfg : CnnConfig) : Nat :=
   (cfg.inH + 2 * cfg.conv.padding - cfg.conv.kH) / cfg.conv.stride + 1
 
 /-- Width after the convolution stage. -/
-def CnnConfig.outW1 (cfg : CnnConfig) : Nat :=
+def CnnConfig.firstConvOutWidth (cfg : CnnConfig) : Nat :=
   (cfg.inW + 2 * cfg.conv.padding - cfg.conv.kW) / cfg.conv.stride + 1
 
 /-- Height after the pooling stage. -/
-def CnnConfig.outH2 (cfg : CnnConfig) : Nat :=
-  (cfg.outH1 - cfg.pool.kH) / cfg.pool.stride + 1
+def CnnConfig.pooledOutHeight (cfg : CnnConfig) : Nat :=
+  (cfg.firstConvOutHeight - cfg.pool.kH) / cfg.pool.stride + 1
 
 /-- Width after the pooling stage. -/
-def CnnConfig.outW2 (cfg : CnnConfig) : Nat :=
-  (cfg.outW1 - cfg.pool.kW) / cfg.pool.stride + 1
+def CnnConfig.pooledOutWidth (cfg : CnnConfig) : Nat :=
+  (cfg.firstConvOutWidth - cfg.pool.kW) / cfg.pool.stride + 1
 
 /-- Flattened feature size entering the classifier head. -/
 def CnnConfig.featSize (cfg : CnnConfig) : Nat :=
-  Spec.Shape.size (NN.Tensor.Shape.CHW cfg.conv.outC cfg.outH2 cfg.outW2)
+  Spec.Shape.size (NN.Tensor.Shape.CHW cfg.conv.outC cfg.pooledOutHeight cfg.pooledOutWidth)
 
 /-- Batched image input shape for `cnn`. -/
 abbrev cnnInShape (cfg : CnnConfig) : Shape :=

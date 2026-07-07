@@ -20,8 +20,8 @@ public import NN.Entrypoint.Tensor
 /-!
 # Spec entrypoint
 
-This is the one-stop import for TorchLean’s *spec* layer: shapes, tensors, layers, modules, and
-model constructors.
+Import this file when you want TorchLean’s *spec* layer: shapes, tensors, layers, modules, and model
+constructors.
 
 If you're writing specs or proofs, this is usually the right place to start. If you're trying to
 *run* models (autograd, training loops, import/export), prefer the runtime entrypoints instead.
@@ -33,8 +33,8 @@ Structure:
 - `NN.Spec.Models.*` for reusable model constructors,
 - `NN.Spec.Autograd.*` / `NN.Spec.Dynamics.*` for auxiliary math-first interfaces.
 
-This module is the chapter boundary for the spec surface. It imports the focused `NN.Spec.*`
-subsystems directly and re-exports the ergonomic tensor entrypoint beside them.
+The entrypoint imports the focused `NN.Spec.*` subsystems directly and re-exports the tensor
+entrypoint beside them.
 -/
 
 @[expose] public section

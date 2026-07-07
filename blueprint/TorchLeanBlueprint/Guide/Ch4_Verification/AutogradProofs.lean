@@ -20,9 +20,9 @@ TorchLean's proof tree asks a more explicit question:
 > For the supported graph fragment, does the reverse pass compute the adjoint of the derivative of
 > the forward denotation?
 
-That is the proof architecture in [NN/Proofs/Autograd](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/Autograd/). We built it in layers so the
+The proof architecture lives in [NN/Proofs/Autograd](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/Autograd/). We built it in layers so the
 auditor can stop at the boundary they care about: algebraic tape soundness, Frechet derivative
-statements, proofs for particular operators, theorem surfaces for model blocks, and algebra for
+statements, proofs for particular operators, theorem entry points for model blocks, and algebra for
 training steps.
 
 The proof pipeline is:
@@ -36,9 +36,9 @@ local op derivative
   -> training step algebra
 ```
 
-That ordering is important. A theorem about a Transformer sublayer is not proved from scratch; it is
-assembled from local derivative rules, graph composition, and the analytic bridge to the derivative
-of the denotation.
+That ordering is the proof structure. A theorem about a Transformer sublayer is assembled from
+local derivative rules, graph composition, and the analytic bridge to the derivative of the
+denotation.
 
 # From Runtime Confidence To Theorem Obligations
 
@@ -55,9 +55,8 @@ overview at https://pytorch.org/docs/stable/autograd.html and JAX's autodiff gui
 https://jax.readthedocs.io/en/latest/automatic-differentiation.html for the user facing version of
 that workflow.
 
-TorchLean does not claim those systems are careless. We use the same mental model because it is
-the right one: local derivative rules plus reverse accumulation. What changes is that the runtime
-confidence is split into named theorem obligations.
+TorchLean keeps the same operational picture: local derivative rules plus reverse accumulation.
+What changes is that runtime confidence is split into named theorem obligations.
 
 - A registered backward rule becomes a local JVP/VJP or Fréchet derivative lemma for the op.
 - A tape reversal becomes global tape soundness by induction over the graph.
@@ -75,7 +74,7 @@ The central algebraic file is
 It defines the small tape language used by the rest of the autograd proofs, together with the local
 proof data carried by each node.
 
-The important objects are:
+The objects to track are:
 
 - `TensorPack`: public typed tensor payloads indexed by a list of shapes; internally, the
   autograd algebra still has a small context datatype with the same shape-indexed structure.
@@ -91,24 +90,24 @@ accumulation is the adjoint of forward sensitivity:
 
 $$`\langle \operatorname{jvp}_G(x, dx), seed\rangle = \langle dx, \operatorname{backprop}_G(x, seed)\rangle`
 
-This is the algebraic essence of reverse mode AD. A forward sensitivity `dx` pushed through the
-graph and then paired with an output cotangent gives the same scalar as pairing `dx` with the
-cotangent produced by reverse accumulation.
+This dot product identity is the algebraic essence of reverse mode AD. A forward sensitivity `dx`
+pushed through the graph and then paired with an output cotangent gives the same scalar as pairing
+`dx` with the cotangent produced by reverse accumulation.
 
-This dot product statement is useful because it is the common language between implementation and
-analysis. Runtime engineers recognize it as the VJP law. Mathematicians recognize it as the adjoint
-property. Lean can prove it compositionally: each node gives the local adjoint law, and graph
+The dot product statement is the common language between implementation and analysis. Runtime
+engineers recognize it as the VJP law. Mathematicians recognize it as the adjoint property. Lean can
+prove it compositionally: each node gives the local adjoint law, and graph
 soundness follows by induction over `Graph`.
 
-This is also where the comparison to PyTorch is most direct. PyTorch's engine performs a reverse
-walk over a dynamic graph and accumulates cotangents into inputs. TorchLean's algebraic graph does
-the same conceptual work, but the graph object carries enough structure for Lean to prove that the
+The comparison to PyTorch is most direct here. PyTorch's engine performs a reverse walk over a
+dynamic graph and accumulates cotangents into inputs. TorchLean's algebraic graph does the same
+conceptual work, but the graph object carries enough structure for Lean to prove that the
 accumulation is sound for every input context in the supported fragment.
 
 # From Dot Products To Frechet Derivatives
 
-The algebraic theorem is not the last word. A dot product VJP law is useful, but the
-guide should also say what function is being differentiated. The
+The algebraic theorem is not the last word. A dot product VJP law still has to be connected to the
+function being differentiated. The
 [Frechet derivative bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Core/FDeriv.lean) provides that link.
 
 That file vectorizes shaped tensor contexts into Euclidean spaces and connects three views:
@@ -128,7 +127,7 @@ division, logarithms, and square roots all have domain or nondifferentiability i
 states those conditions explicitly instead of using a blanket "autograd works" slogan. The theorem can demand exactly the
 local smoothness or nonzero hypotheses needed by the graph being differentiated.
 
-A useful mental example is
+Keep the example
 $`forward(x) = softmax(Wx + b)`. The scalar loss supplies an output cotangent
 $`seed = dL/dforward`, and the reverse pass returns the input and parameter cotangents
 $`dL/dx`, $`dL/dW`, and $`dL/db`.
@@ -176,13 +175,79 @@ The theorem proves that the formula used by the reverse rule is the adjoint of t
 forward function. Framework bugs and mistakes in custom ops often live at exactly that boundary:
 the program might execute successfully while returning a subtly wrong gradient.
 
-Their comments cite the PyTorch API docs for naming alignment, not as proof sources:
+Their comments cite the PyTorch API reference for naming alignment, not as proof sources:
 
 - [PyTorch softmax docs](https://pytorch.org/docs/stable/generated/torch.nn.functional.softmax.html)
 - [PyTorch log-softmax docs](https://pytorch.org/docs/stable/generated/torch.nn.functional.log_softmax.html)
 
-That separation is deliberate. Documentation tells us what users expect the op to mean; Lean proves
-the derivative law for TorchLean's mathematical definition.
+Documentation tells us what users expect the op to mean; Lean proves the derivative law for
+TorchLean's mathematical definition.
+
+## A Small Operator Audit Pattern
+
+When adding a new differentiable operator, the proof obligation is intentionally mechanical. The
+operator should expose the same three objects that the softmax files expose:
+
+```
+-- Mathematical forward map.
+def forward : Vec n -> Vec m := ...
+
+-- Directional derivative used by the forward-mode view.
+def jvp : Vec n -> Vec n -> Vec m := ...
+
+-- Reverse rule used by backprop.
+def vjp : Vec n -> Vec m -> Vec n := ...
+```
+
+The local theorem should then say two things:
+
+```
+-- The JVP is the derivative of the forward denotation.
+#check NN.Proofs.Autograd.FDeriv.Softmax.hasFDerivAt_softmaxVec
+
+-- The VJP is adjoint to the JVP.
+#check NN.Proofs.Autograd.FDeriv.LogSoftmax.inner_logSoftmaxJvp_vjp
+```
+
+The exact names differ by operator, but the contract should not. A runtime rule is not considered
+an autograd theorem merely because the code returns a tensor of the right shape. It needs a
+mathematical forward function, a derivative statement, and an adjointness statement that lets the
+graph theorem compose the local rule with surrounding nodes.
+
+This also explains why nondifferentiable points are not swept under the carpet. ReLU can be used in
+graphs, but a theorem phrased as a Fréchet derivative at a point must either avoid coordinates where
+the pre-activation is zero or state a subgradient convention in a different theorem. The current
+real-analysis statements take the first route: the hypothesis says where the derivative exists.
+
+# Runtime Autograd Link
+
+The theorem stack above is mathematical. The runtime autograd engine is another object. TorchLean
+therefore keeps a link layer between executed reverse graphs and proof graphs:
+
+- [runtime/autograd link core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link/Core.lean)
+- [backward graph link](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link/BackwardGraph.lean)
+- [accumulation invariants](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link/Accumulation.lean)
+
+Those files are about representation agreement. They do not prove a new derivative formula. They
+say that the runtime graph, its saved forward values, and its accumulation discipline can be read as
+the proof-level graph when the required invariants hold. That is the right granularity for auditing
+a new runtime node:
+
+- local derivative theorem for the mathematical operator;
+- runtime link theorem that the recorded node carries the same forward/VJP structure;
+- finite precision or backend theorem if the runtime scalar path is not the ideal real path.
+
+Write an autograd claim by naming each layer of evidence:
+
+```
+ideal VJP theorem
+  + runtime graph/link invariant
+  + scalar/runtime approximation bridge
+  = claim about executed gradients
+```
+
+Without the middle bridge, we only have a theorem about the proof graph. Without the last bridge, we
+only have a theorem about ideal arithmetic.
 
 # MLP And MSE Gradients: A Concrete Scalar Loss Story
 
@@ -197,7 +262,7 @@ The definitions are close by design to what a reader would write on a whiteboard
 - `mse` and `mseGrad` for the scalar loss;
 - gradient lemmas for `W2`, `b2`, `b1`, `x`, and `W1`.
 
-The important theorem pattern is:
+The theorem pattern is:
 
 $$`\operatorname{backpropGradient}
 =
@@ -210,24 +275,23 @@ $$`\nabla_\theta L(\theta)
 =
 \left(D_\theta f_\theta(x)\right)^{\!*}\nabla_y \ell(y,t).`
 
-For the last layer, this is clean. For the hidden ReLU layer, the theorem carries hypotheses such
-as "the value before activation is nonzero" at the coordinates being differentiated. That is exactly
-the kind of condition a runtime usually leaves implicit. PyTorch chooses a subgradient
-convention at zero; TorchLean's real analysis statement names the differentiability condition
-instead.
+For the last layer, the statement is clean. For the hidden ReLU layer, the theorem carries hypotheses such
+as "the value before activation is nonzero" at the coordinates being differentiated. Runtime systems
+usually leave that condition implicit. PyTorch chooses a subgradient convention at zero; TorchLean's
+real analysis statement names the differentiability condition instead.
 
-The claim should be read precisely: a proof over the reals of the MLP/MSE gradient is not a proof
-that an arbitrary float32 training run follows the real gradient exactly. It proves the ideal
-mathematical gradient. The finite precision bridge belongs to runtime approximation and to the
+Read the claim at that level. The theorem proves the ideal real-valued MLP/MSE gradient. A float32
+training run connects to that statement through a finite-precision bridge, which belongs to runtime
+approximation and to the
 [runtime approximation proof API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/).
 
 # Model Surfaces: Attention, Transformers, And Recurrent Cells
 
-The autograd APIs for model blocks are proof surfaces rather than a claim that every modern model is
-fully verified end to end. We built them to show how the algebra scales to the shapes users care
-about while keeping boundaries explicit.
+The autograd APIs for model blocks give theorem entry points for selected fragments rather than a claim
+that every modern model is fully verified end to end. We built them to show how the algebra scales
+to the shapes users care about while keeping boundaries explicit.
 
-Representative theorem surfaces:
+Representative theorem entry points:
 
 - [NN.Proofs.Autograd.Tape.Ops.Attention.ScaledDotProduct API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Attention/ScaledDotProduct.lean)
 - [NN.Proofs.Autograd.Tape.Ops.Attention.MultiHeadSelfAttention API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Attention/MultiHeadSelfAttention.lean)
@@ -253,19 +317,18 @@ For Transformer post-norm blocks, the post-norm API contains several theorem lay
 The recurrent file is kept modest. `elmanCell_backpropVec_eq_adjoint_fderiv` proves the
 reverse mode theorem for one Elman RNN cell, and `elmanTwoStep_hasFDerivAt` shows the
 shape of a short unrolled composition. Full BPTT over an arbitrary sequence length is the next
-induction over the unroll. The guide states that boundary explicitly so the current theorem scope is
-clear.
+induction over the unroll. That boundary is stated explicitly so the current theorem scope is clear.
 
 # Training Step Algebra
 
 Backprop correctness is about gradients. Training correctness also needs a clean account of how
-those gradients are seeded and consumed. That is the role of
+those gradients are seeded and consumed. That role belongs to
 [NN.Proofs.Autograd.Training.StepAlgebra API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Training/StepAlgebra.lean).
 
-There are two small but important pieces.
+There are two pieces to keep separate.
 
 First, `Graph.scalarLoss_grad_correct` specializes the global graph theorem to scalar losses. The
-seed is the scalar cotangent `1`, represented by `seedScalarLoss`. This is the formal version of
+seed is the scalar cotangent `1`, represented by `seedScalarLoss`. Formally, this is
 $`loss.backward()` seeding $`d loss / d loss = 1`.
 
 Second, `step` defines the algebra behind a simple optimizer update:
@@ -277,6 +340,14 @@ formula, and `step_nil` handles the empty parameter list. These are compact theo
 the training loop from becoming an opaque execution artifact. A realistic optimizer will add momentum,
 Adam statistics, clipping, or weight decay; this file gives the simple algebraic core that those
 extensions can refine.
+
+The optimizer theory page extends this idea for larger update records. The autograd page should not
+be read as proving optimizer convergence. It proves the gradient side of the handoff:
+
+$$`\text{reverse pass returns }(D_\theta L(\theta))^\* 1.`
+
+Optimization theory then decides what an update using that gradient means under step-size,
+smoothness, convexity, or backend-certification hypotheses.
 
 # Autograd Proof Tree
 
@@ -308,7 +379,7 @@ themselves, prove all of the following:
 - that CUDA kernels implement those nodes bit for bit;
 - that float32 arithmetic equals real arithmetic;
 - that all graphs exported from PyTorch or JAX fall inside the proved fragment;
-- that every architecture in the model zoo has a full training theorem.
+- that every architecture in the model examples has a full training theorem.
 
 Those are separate bridges. Some live in compiled graph correctness, some in CUDA contracts, and
 some in runtime approximation. This modular structure keeps the theorem boundaries explicit. Proved

@@ -56,7 +56,7 @@ def XFloat : Spec.Tensor Float (.dim 3 xShape) :=
 
 /-- Batched targets for training. -/
 def YFloat : Spec.Tensor Float (.dim 3 yShape) :=
-  Samples.regression2to1Float XFloat (Samples.affine2 2.0 (-3.0) 0.0)
+  Samples.regressionTargetsFloat XFloat (Samples.affinePlane 2.0 (-3.0) 0.0)
 
 /-- TorchLean model used for training and verification. -/
 def mkModel : nn.M (nn.Sequential xShape yShape) :=
@@ -113,6 +113,6 @@ def main (args : List String) : IO Unit := do
       args
     else
       "--backend=compiled" :: args
-  Runtime.withOptionsNoCast args (@runMain)
+  Runtime.withOptionsScalar args (@runMain)
 
 end NN.Verification.TorchLean.MlpTrainVerifyWorkflow

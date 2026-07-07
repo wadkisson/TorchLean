@@ -168,30 +168,30 @@ theorem box_contains_inflateUniform_of_approx {s : Shape}
 Float32-sound IBP for a 2-layer ReLU MLP, via uniform output-box inflation:
 
 1. Use the real-spec IBP theorem `NN.MLTheory.CROWN.Theorems.bound_ibp_sound`.
-2. Use `approxT` to bound FP32 forward error (`approxT_reluMlp2_fp32`).
+2. Use `approxT` to bound FP32 forward error (`approxT_reluTwoLayerMlp_float32`).
 3. Inflate the real IBP box by that error bound.
 
 The result is a real-valued interval that is guaranteed to contain the `FP32` execution result.
 -/
-theorem ibpBound_contains_reluMlp2_fp32 {inDim hidDim outDim : Nat}
-    (netS : NN.MLTheory.CROWN.MLP2 ℝ inDim hidDim outDim)
-    (netR : NN.MLTheory.CROWN.MLP2 R inDim hidDim outDim)
+theorem ibpBound_contains_reluTwoLayerMlp_float32 {inDim hidDim outDim : Nat}
+    (netS : NN.MLTheory.CROWN.TwoLayerMLP ℝ inDim hidDim outDim)
+    (netR : NN.MLTheory.CROWN.TwoLayerMLP R inDim hidDim outDim)
     (xB : NN.MLTheory.CROWN.Box ℝ (.dim inDim .scalar))
     (xS : Tensor ℝ (.dim inDim .scalar))
     (xR : Tensor R (.dim inDim .scalar))
     {eW1 eb1 eW2 eb2 ex : ℝ}
-    (hW1 : approxT (α := R) (toSpec := toSpec) netS.W1 netR.W1 eW1)
-    (hb1 : approxT (α := R) (toSpec := toSpec) netS.b1 netR.b1 eb1)
-    (hW2 : approxT (α := R) (toSpec := toSpec) netS.W2 netR.W2 eW2)
-    (hb2 : approxT (α := R) (toSpec := toSpec) netS.b2 netR.b2 eb2)
+    (hW1 : approxT (α := R) (toSpec := toSpec) netS.hiddenWeight netR.hiddenWeight eW1)
+    (hb1 : approxT (α := R) (toSpec := toSpec) netS.hiddenBias netR.hiddenBias eb1)
+    (hW2 : approxT (α := R) (toSpec := toSpec) netS.outputWeight netR.outputWeight eW2)
+    (hb2 : approxT (α := R) (toSpec := toSpec) netS.outputBias netR.outputBias eb2)
     (hx : approxT (α := R) (toSpec := toSpec) xS xR ex)
     (hxB : NN.MLTheory.CROWN.Box.contains (α := ℝ) xB xS) :
     ∃ epsOut : ℝ,
       NN.MLTheory.CROWN.Box.contains (α := ℝ)
         (inflateBoxUniform (B := NN.MLTheory.CROWN.boundIbp (α := ℝ) netS xB) epsOut)
         (tensorToSpec (α := R) (toSpec := toSpec)
-          (let l1R : Spec.LinearSpec R inDim hidDim := { weights := netR.W1, bias := netR.b1 }
-           let l2R : Spec.LinearSpec R hidDim outDim := { weights := netR.W2, bias := netR.b2 }
+          (let l1R : Spec.LinearSpec R inDim hidDim := { weights := netR.hiddenWeight, bias := netR.hiddenBias }
+           let l2R : Spec.LinearSpec R hidDim outDim := { weights := netR.outputWeight, bias := netR.outputBias }
            let z1R := Spec.linearSpec (α := R) l1R xR
            let a1R := mapSpec (reluR (β := β) (fexp := fexp) (rnd := rnd)) z1R
            Spec.linearSpec (α := R) l2R a1R)) := by
@@ -203,12 +203,12 @@ theorem ibpBound_contains_reluMlp2_fp32 {inDim hidDim outDim : Nat}
     NN.MLTheory.CROWN.Theorems.bound_ibp_sound (net := netS) (xB := xB) (x := xS) hxB
 
   -- FP32 forward is close to the real forward, with some propagated `epsOut`.
-  let l1S : Spec.LinearSpec ℝ inDim hidDim := { weights := netS.W1, bias := netS.b1 }
-  let l2S : Spec.LinearSpec ℝ hidDim outDim := { weights := netS.W2, bias := netS.b2 }
-  let l1R : Spec.LinearSpec R inDim hidDim := { weights := netR.W1, bias := netR.b1 }
-  let l2R : Spec.LinearSpec R hidDim outDim := { weights := netR.W2, bias := netR.b2 }
+  let l1S : Spec.LinearSpec ℝ inDim hidDim := { weights := netS.hiddenWeight, bias := netS.hiddenBias }
+  let l2S : Spec.LinearSpec ℝ hidDim outDim := { weights := netS.outputWeight, bias := netS.outputBias }
+  let l1R : Spec.LinearSpec R inDim hidDim := { weights := netR.hiddenWeight, bias := netR.hiddenBias }
+  let l2R : Spec.LinearSpec R hidDim outDim := { weights := netR.outputWeight, bias := netR.outputBias }
 
-  rcases approxT_reluMlp2_fp32
+  rcases approxT_reluTwoLayerMlp_float32
     (L0S := l1S) (L1S := l2S) (L0R := l1R) (L1R := l2R)
     (xS := xS) (xR := xR)
     (e0W := eW1) (e0b := eb1) (e1W := eW2) (e1b := eb2) (ex := ex)

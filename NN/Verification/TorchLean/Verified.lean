@@ -14,8 +14,8 @@ public import NN.Verification.TorchLean.Proved
 This module is the public naming layer for the verified forward compiler bridge.
 
 The implementation proof lives in `NN.Verification.TorchLean.Proved`; this file exposes the names we
-want users and downstream modules to reach for: `compileForward1`, `compileForward1_wellFormed`, and
-`compileForward1_correct`.
+want users and downstream modules to reach for: `compileForward`, `compileForward_wellFormed`, and
+`compileForward_correct`.
 -/
 
 @[expose] public section
@@ -29,58 +29,58 @@ open NN.Verification.TorchLean
 open NN.Verification.TorchLean.Proved
 
 /-- Compile a verified single-input forward program into the verifier IR. -/
-abbrev compileForward1
+abbrev compileForward
     {α : Type} [Context α]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Proved.Program α paramShapes inShape outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :
     NN.Verification.TorchLean.CompiledIR α :=
-  NN.Verification.TorchLean.Proved.compileForward1 (α := α) (paramShapes := paramShapes)
+  NN.Verification.TorchLean.Proved.compileForward (α := α) (paramShapes := paramShapes)
     (inShape := inShape) (outShape := outShape) p params
 
 /-- Compile-time structural safety of the compiled verifier graph. -/
-theorem compileForward1_wellFormed
+theorem compileForward_wellFormed
     {α : Type} [Context α]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Proved.Program α paramShapes inShape outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :
-    (compileForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) p
+    (compileForward (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) p
       params).graph.wellFormed = true :=
-  NN.Verification.TorchLean.Proved.compileForward1_wellFormed (α := α)
+  NN.Verification.TorchLean.Proved.compileForward_wellFormed (α := α)
     (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) p params
 
 /-- Short, explicit alias for the main end-to-end compiler correctness theorem. -/
-theorem compileForward1_correct
+theorem compileForward_correct
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Proved.Program α paramShapes inShape outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes)
     (x : Tensor α inShape) :
-    NN.Verification.TorchLean.evalCompiledForward1 (α := α) (inShape := inShape) (outShape := outShape)
-        (c := NN.Verification.TorchLean.Proved.compileForward1 (α := α) (paramShapes := paramShapes)
+    NN.Verification.TorchLean.runForwardIR (α := α) (inShape := inShape) (outShape := outShape)
+        (c := NN.Verification.TorchLean.Proved.compileForward (α := α) (paramShapes := paramShapes)
           (inShape := inShape) (outShape := outShape) p params)
         x
       =
-    NN.Verification.TorchLean.Proved.evalForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape)
+    NN.Verification.TorchLean.Proved.evalForward (α := α) (paramShapes := paramShapes) (inShape := inShape)
       (outShape := outShape) p params x :=
-  NN.Verification.TorchLean.Proved.evalCompiledForward1_eq_evalForward1 (α := α)
+  NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward (α := α)
     (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) p params x
 
 /-- Same content with a more concise statement name. -/
-theorem forward1_correct_eq_evalForward1
+theorem forward_correct_eq_evalForward
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Proved.Program α paramShapes inShape outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes)
     (x : Tensor α inShape) :
-    NN.Verification.TorchLean.evalCompiledForward1 (α := α) (inShape := inShape) (outShape := outShape)
-        (c := compileForward1 (α := α) (paramShapes := paramShapes)
+    NN.Verification.TorchLean.runForwardIR (α := α) (inShape := inShape) (outShape := outShape)
+        (c := compileForward (α := α) (paramShapes := paramShapes)
           (inShape := inShape) (outShape := outShape) p params)
         x
       =
-    NN.Verification.TorchLean.Proved.evalForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape)
+    NN.Verification.TorchLean.Proved.evalForward (α := α) (paramShapes := paramShapes) (inShape := inShape)
       (outShape := outShape) p params x :=
-  compileForward1_correct (α := α) (paramShapes := paramShapes) (inShape := inShape)
+  compileForward_correct (α := α) (paramShapes := paramShapes) (inShape := inShape)
     (outShape := outShape) p params x
 
 end NN.Verification.TorchLean.Verified

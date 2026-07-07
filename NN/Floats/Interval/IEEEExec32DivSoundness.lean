@@ -103,8 +103,8 @@ Assuming the denominator interval is either entirely negative (`d < 0`) or entir
 -/
 private theorem div_bounds_Icc (a b c d x y : ℝ)
     (hx : x ∈ Set.Icc a b) (hy : y ∈ Set.Icc c d) (h0 : d < 0 ∨ 0 < c) :
-    min4R (a / c) (a / d) (b / c) (b / d) ≤ x / y ∧
-      x / y ≤ max4R (a / c) (a / d) (b / c) (b / d) := by
+    minOfFourReal (a / c) (a / d) (b / c) (b / d) ≤ x / y ∧
+      x / y ≤ maxOfFourReal (a / c) (a / d) (b / c) (b / d) := by
   have hinv1 : (1 / y) ∈ Set.Icc (1 / d) (1 / c) := by
     cases h0 with
     | inl hd => exact inv_mem_Icc_of_mem_Icc_of_neg (c := c) (d := d) (y := y) hd hy
@@ -115,26 +115,26 @@ private theorem div_bounds_Icc (a b c d x y : ℝ)
     mul_bounds_Icc (a := a) (b := b) (c := d⁻¹) (d := c⁻¹) (x := x) (y := y⁻¹) hx hinv
   -- Rewrite corner products into division corners.
   have hmul_lo :
-      min4R (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) ≤ x * y⁻¹ := hmul.1
+      minOfFourReal (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) ≤ x * y⁻¹ := hmul.1
   have hmul_hi :
-      x * y⁻¹ ≤ max4R (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) := hmul.2
+      x * y⁻¹ ≤ maxOfFourReal (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) := hmul.2
   -- Reorder corners: our implementation uses `(a/c,a/d,b/c,b/d)`.
   have hmin_reorder :
-      min4R (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) =
-        min4R (a / c) (a / d) (b / c) (b / d) := by
-    simp [min4R, div_eq_mul_inv, min_comm]
+      minOfFourReal (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) =
+        minOfFourReal (a / c) (a / d) (b / c) (b / d) := by
+    simp [minOfFourReal, div_eq_mul_inv, min_comm]
   have hmax_reorder :
-      max4R (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) =
-        max4R (a / c) (a / d) (b / c) (b / d) := by
-    simp [max4R, div_eq_mul_inv, max_comm]
+      maxOfFourReal (a * d⁻¹) (a * c⁻¹) (b * d⁻¹) (b * c⁻¹) =
+        maxOfFourReal (a / c) (a / d) (b / c) (b / d) := by
+    simp [maxOfFourReal, div_eq_mul_inv, max_comm]
   constructor
   · -- Lower
-    have : min4R (a / c) (a / d) (b / c) (b / d) ≤ x / y := by
+    have : minOfFourReal (a / c) (a / d) (b / c) (b / d) ≤ x / y := by
       -- `hmul_lo` bounds `x*(1/y)`, and we rewrite to `x/y`.
       simpa [div_eq_mul_inv, hmin_reorder] using hmul_lo
     exact this
   · -- Upper
-    have : x / y ≤ max4R (a / c) (a / d) (b / c) (b / d) := by
+    have : x / y ≤ maxOfFourReal (a / c) (a / d) (b / c) (b / d) := by
       simpa [div_eq_mul_inv, hmax_reorder] using hmul_hi
     exact this
 
@@ -174,7 +174,7 @@ private lemma isNaN_roundRatUp_eq_false (sign : Bool) (num den : Nat) :
 /--
 `divDown x y` is non-NaN on the finite, nonzero-denominator path.
 
-We need this to justify rewriting `toEReal (min4 ...)` into nested `min` of `toEReal` values.
+We need this to justify rewriting `toEReal (minOfFour ...)` into nested `min` of `toEReal` values.
 -/
 private lemma isNaN_divDown_eq_false_of_isFinite (x y : IEEE32Exec)
     (hx : isFinite x = true) (hy : isFinite y = true) (hy0 : isZero y = false) :
@@ -384,10 +384,10 @@ theorem div_sound (A B : Interval32) (hA : Valid A) (hB : Valid B) :
     have hxy := div_bounds_Icc (a := toReal A.lo) (b := toReal A.hi)
       (c := toReal B.lo) (d := toReal B.hi) (x := x) (y := y) hx hy hsign
     have hxy_lo :
-        (min4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+        (minOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
           (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) ≤ x / y := hxy.1
     have hxy_hi :
-        x / y ≤ (max4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+        x / y ≤ (maxOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
           (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) := hxy.2
 
     -- Denominator endpoints are nonzero in IEEE sense (otherwise `toReal = 0`, contradicting the
@@ -500,7 +500,7 @@ theorem div_sound (A B : Interval32) (hA : Valid A) (hB : Valid B) :
     -- Lower endpoint ≤ min exact corners.
     have hlo_le_minCorners :
         toEReal (Interval32.div A B).lo ≤
-          ((min4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+          ((minOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
             (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) := by
       rw [hlo_eval]
       have h01 :
@@ -520,19 +520,19 @@ theorem div_sound (A B : Interval32) (hA : Valid A) (hB : Valid B) :
               (min ((toReal A.hi / toReal B.lo : ℝ) : EReal) ((toReal A.hi / toReal B.hi : ℝ) :
                 EReal)) :=
         min_le_min h01 h23
-      -- Convert the nested `min` of exact corners into `(min4R ...) : EReal`.
+      -- Convert the nested `min` of exact corners into `(minOfFourReal ...) : EReal`.
       have hnest :
           min (min ((toReal A.lo / toReal B.lo : ℝ) : EReal) ((toReal A.lo / toReal B.hi : ℝ) :
             EReal))
               (min ((toReal A.hi / toReal B.lo : ℝ) : EReal) ((toReal A.hi / toReal B.hi : ℝ) :
                 EReal)) =
-            ((min4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+            ((minOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
               (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) := by
-        simp [min4R, coe_min]
+        simp [minOfFourReal, coe_min]
       exact le_trans houter (le_of_eq hnest)
 
     have hhi_ge_maxCorners :
-        ((max4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+        ((maxOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
           (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) ≤
           toEReal (Interval32.div A B).hi := by
       rw [hhi_eval]
@@ -552,22 +552,22 @@ theorem div_sound (A B : Interval32) (hA : Valid A) (hB : Valid B) :
             max (max (toEReal q00) (toEReal q01)) (max (toEReal q10) (toEReal q11)) :=
         max_le_max h01 h23
       have hnest :
-          ((max4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+          ((maxOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
               (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) =
             max (max ((toReal A.lo / toReal B.lo : ℝ) : EReal) ((toReal A.lo / toReal B.hi : ℝ) :
               EReal))
                 (max ((toReal A.hi / toReal B.lo : ℝ) : EReal) ((toReal A.hi / toReal B.hi : ℝ) :
                   EReal)) := by
-        simp [max4R, coe_max]
-      -- Rewrite `max4R` then apply `houter`.
+        simp [maxOfFourReal, coe_max]
+      -- Rewrite `maxOfFourReal` then apply `houter`.
       exact le_trans (le_of_eq hnest) houter
 
     -- Combine with the real bound `minCorners ≤ x/y ≤ maxCorners`.
-    have hmin_le : ((min4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+    have hmin_le : ((minOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
           (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) ≤ (x / y : EReal) :=
             by
       exact (EReal.coe_le_coe_iff).2 hxy_lo
-    have hmax_ge : (x / y : EReal) ≤ ((max4R (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
+    have hmax_ge : (x / y : EReal) ≤ ((maxOfFourReal (toReal A.lo / toReal B.lo) (toReal A.lo / toReal B.hi)
           (toReal A.hi / toReal B.lo) (toReal A.hi / toReal B.hi) : ℝ) : EReal) := by
       exact (EReal.coe_le_coe_iff).2 hxy_hi
 

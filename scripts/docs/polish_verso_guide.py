@@ -453,10 +453,97 @@ main p > img:only-child {
   background: #ffffff;
 }
 
+.header-title-wrapper:has(.tl-guide-nav) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+  padding-right: 1rem;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.header-title-wrapper:has(.tl-guide-nav) .header-title {
+  flex: 0 0 auto;
+  margin: 0;
+  max-width: none;
+}
+
+.tl-guide-nav {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  gap: 0.4rem;
+  margin-left: 0.2rem;
+  padding: 0 0.7rem 0 0;
+  white-space: nowrap;
+}
+
+.tl-guide-nav a {
+  padding: 0.32rem 0.56rem;
+  border: 1px solid rgba(33, 59, 86, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #26394f;
+  text-decoration: none;
+  font-family: var(--verso-structure-font-family);
+  font-size: 0.86rem;
+  font-weight: 700;
+  box-shadow: 0 5px 14px rgba(22, 42, 64, 0.06);
+}
+
+.tl-guide-nav a:hover,
+.tl-guide-nav a:focus {
+  background: rgba(15, 95, 143, 0.09);
+  color: #0a3f61;
+  text-decoration: none;
+}
+
+#toc {
+  box-sizing: border-box;
+}
+
+#toc .first {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+#toc .split-tocs {
+  box-sizing: border-box;
+  width: 100%;
+  padding-left: 0.9rem;
+  padding-right: 0.8rem;
+}
+
+#toc .split-toc {
+  min-width: 0;
+}
+
+#toc .split-toc table {
+  width: 100%;
+}
+
+#toc .split-toc td {
+  overflow-wrap: anywhere;
+}
+
+#toc .split-toc td.num {
+  width: 2.6rem;
+  white-space: nowrap;
+}
+
 @media screen and (max-width: 700px) {
   header .header-title-wrapper {
     flex: 0 0 auto;
     min-width: auto;
+  }
+
+  header .header-title-wrapper:has(.tl-guide-nav) {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    padding-right: 0.4rem;
   }
 
   header .header-title h1 {
@@ -468,6 +555,19 @@ main p > img:only-child {
     flex: 1 1 7rem;
     min-width: 6rem;
     max-width: 10rem;
+  }
+
+  .tl-guide-nav {
+    margin-left: 0;
+    overflow-x: auto;
+    min-width: 0;
+    gap: 0.15rem;
+    padding-right: 0.55rem;
+  }
+
+  .tl-guide-nav a {
+    padding: 0.24rem 0.36rem;
+    font-size: 0.78rem;
   }
 
   main p > img:only-child {
@@ -543,6 +643,46 @@ TORCHLEAN_JS_BODY = r"""
       localStorage.setItem(storageKey, JSON.stringify(Array.from(set).sort()));
     } catch (_) {
       /* localStorage can be unavailable in privacy modes; the page still works. */
+    }
+  }
+
+  function mountGuideNav() {
+    const header = document.querySelector("body > header");
+    if (!header || header.querySelector(".tl-guide-nav")) return;
+
+    const titleWrapper = header.querySelector(".header-title-wrapper");
+    const guideHome = rootUrl.href;
+    const siteRoot = new URL("../", rootUrl);
+    const links = [
+      ["Main site", "./"],
+      ["Examples", "examples/"],
+      ["API Reference", "docs/"],
+      ["Graphs", "graphs/"],
+    ];
+
+    document.querySelectorAll(".header-title").forEach((a) => {
+      a.setAttribute("href", siteRoot.href);
+      a.setAttribute("aria-label", "Back to the TorchLean main site");
+    });
+
+    document.querySelectorAll(".toc-title").forEach((a) => {
+      a.setAttribute("href", guideHome);
+    });
+
+    const nav = document.createElement("nav");
+    nav.className = "tl-guide-nav";
+    nav.setAttribute("aria-label", "TorchLean site navigation");
+    for (const [label, path] of links) {
+      const a = document.createElement("a");
+      a.href = new URL(path, siteRoot).href;
+      a.textContent = label;
+      nav.appendChild(a);
+    }
+    if (titleWrapper) {
+      titleWrapper.appendChild(nav);
+    } else {
+      const search = header.querySelector("#search-wrapper");
+      header.insertBefore(nav, search || null);
     }
   }
 
@@ -812,6 +952,7 @@ TORCHLEAN_JS_BODY = r"""
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    mountGuideNav();
     replaceAsciiArrowsInText();
     autoLinkBareUrls();
     externalLinksOpenInNewTabs();
@@ -855,10 +996,10 @@ def write_js(root: Path) -> None:
 def inject_script(root: Path) -> None:
     """Install the shared guide script into every generated HTML page."""
     marker = "torchlean-guide-polish.js"
-    script_re = re.compile(r'\s*<script defer src="[^"]*torchlean-guide-polish\.js"></script>\n?')
+    script_re = re.compile(r'\s*<script defer src="[^"]*torchlean-guide-polish\.js(?:\?v=[^"]*)?"></script>\n?')
     # Verso emits a <base> tag on every generated page. A bare script URL is
     # therefore resolved relative to the guide root, even from nested pages.
-    tag = '    <script defer src="torchlean-guide-polish.js"></script>\n'
+    tag = '    <script defer src="torchlean-guide-polish.js?v=20260706-nav"></script>\n'
     for path in root.rglob("*.html"):
         html = path.read_text()
         if marker in html:
@@ -1103,6 +1244,27 @@ def add_fragment_aliases(root: Path) -> None:
         path.write_text(html_text)
 
 
+def remove_stale_search_shards(root: Path) -> None:
+    """Drop search-index shards from older Verso runs.
+
+    Verso names content shards with a version suffix. If a generated directory is
+    reused, old shards can survive and make removed headings searchable even
+    though the rendered pages are correct.
+    """
+    search_root = root / "-verso-search"
+    index_js = search_root / "searchIndex.js"
+    if not index_js.exists():
+        return
+    match = re.search(r'window\.searchIndexVersion\s*=\s*"([^"]+)"', index_js.read_text())
+    if match is None:
+        return
+    active = match.group(1)
+    for path in search_root.glob("searchIndex_*.js"):
+        if path.name.endswith(f".{active}.js"):
+            continue
+        path.unlink()
+
+
 def main() -> int:
     """CLI entry point for the post-Verso guide polish pass."""
     parser = argparse.ArgumentParser()
@@ -1127,6 +1289,7 @@ def main() -> int:
     write_js(args.guide)
     rewrite_repository_links(args.guide)
     add_fragment_aliases(args.guide)
+    remove_stale_search_shards(args.guide)
     inject_script(args.guide)
     return 0
 

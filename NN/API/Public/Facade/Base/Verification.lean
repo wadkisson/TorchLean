@@ -57,17 +57,17 @@ abbrev FlatAffineBounds := NN.MLTheory.CROWN.Graph.FlatAffineBounds
 /--
 Compile a sequential TorchLean model into verifier IR with one distinguished input.
 
-This is the usual “train a model, then run IBP/CROWN on its forward pass” path.
+Usual "train a model, then run IBP/CROWN on its forward pass" path.
 -/
-def compileForward1 {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
+def compileForward {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
     {σ τ : Shape}
     (model : SequentialModel σ τ)
     (params : ParamTensors α (modelParamShapes model)) :
     Except String (CompiledIR α) :=
-  NN.Verification.TorchLean.compileForward1
+  NN.Verification.TorchLean.compileForward
     (α := α) (paramShapes := modelParamShapes model)
     (inShape := σ) (outShape := τ)
-    (NN.API.nn.program (model := model) (α := α)) params
+    (NN.API.nn.forwardProgram (model := model) (α := α)) params
 
 /--
 Compile a custom TorchLean forward program into verifier IR with one distinguished input.
@@ -75,20 +75,20 @@ Compile a custom TorchLean forward program into verifier IR with one distinguish
 Use this when the target is not a plain `nn.Sequential`, for example a hand-written loss program or
 an attention fragment built directly from `TorchLean.Ops`.
 -/
-def compileProgram1 {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
+def compileProgram {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
     {paramShapes : List Shape} {σ τ : Shape}
-    (program : _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [σ]) τ)
+    (forwardProgram : _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [σ]) τ)
     (params : ParamTensors α paramShapes) :
     Except String (CompiledIR α) :=
-  NN.Verification.TorchLean.compileForward1
+  NN.Verification.TorchLean.compileForward
     (α := α) (paramShapes := paramShapes)
     (inShape := σ) (outShape := τ)
-    program params
+    forwardProgram params
 
 /--
 Seed the verifier input with an explicit input box.
 
-Call this after `compileForward1`, then hand the returned store to IBP/CROWN passes.
+Call this after `compileForward`, then hand the returned store to IBP/CROWN passes.
 -/
 def seedInputBox {α : Type} [NN.API.Semantics.Scalar α]
     (compiled : CompiledIR α) (xB : FlatBox α) : ParamStore α :=

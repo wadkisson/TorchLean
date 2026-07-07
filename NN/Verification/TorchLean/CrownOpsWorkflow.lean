@@ -82,7 +82,7 @@ def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToSt
   let cast : Float → α := Runtime.ofFloat
 
   let params : nn.ParamTensors α softmaxParamShapes :=
-    nn.ParamTensors.of2
+    nn.ParamTensors.pair
       (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
         [ cast 1.0, cast (-0.5)
         , cast 0.2, cast 0.7
@@ -91,9 +91,9 @@ def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToSt
       (NN.Tensor.tensorNDOfLenEq (α := α) [3] [cast 0.1, cast (-0.2), cast 0.0] (by rfl))
 
   let compiled ←
-    match Verification.compileProgram1
+    match Verification.compileProgram
           (α := α) (paramShapes := softmaxParamShapes) (σ := softmaxXShape) (τ := softmaxYShape)
-          (nn.program (model := softmaxModel) (α := α)) params with
+          (nn.forwardProgram (model := softmaxModel) (α := α)) params with
     | .ok c => pure c
     | .error e => throw <| IO.userError e
 
@@ -162,10 +162,10 @@ def mseXShape : Shape := .dim mseInDim .scalar
 /-- Output shape for the MSE-loss workflow. -/
 def mseYShape : Shape := .dim mseOutDim .scalar
 
-/-- Parameter shapes for the MSE-loss workflow program (`[W,b,target]`). -/
+/-- Parameter shapes for the MSE-loss workflow forwardProgram (`[W,b,target]`). -/
 def mseParamShapes : List Shape := [mseWShape, mseBShape, mseYShape]
 
-/-- TorchLean program: `yhat = linear(x); mse_loss(yhat, target)` returning a scalar. -/
+/-- TorchLean forwardProgram: `yhat = linear(x); mse_loss(yhat, target)` returning a scalar. -/
 def mseLossModel {α : Type} [Context α] [DecidableEq Shape] :
     _root_.Runtime.Autograd.TorchLean.Program α (mseParamShapes ++ [mseXShape])
       _root_.TorchLean.Shape.scalar :=
@@ -179,7 +179,7 @@ def mseLossModel {α : Type} [Context α] [DecidableEq Shape] :
 /--
 Run the MSE-loss workflow under a chosen scalar backend `α`.
 
-This compiles the TorchLean program to the verifier IR and prints IBP/CROWN bounds for the scalar
+This compiles the TorchLean forwardProgram to the verifier IR and prints IBP/CROWN bounds for the scalar
   loss.
 -/
 def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
@@ -188,14 +188,14 @@ def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString
   let cast : Float → α := Runtime.ofFloat
 
   let params : nn.ParamTensors α mseParamShapes :=
-    nn.ParamTensors.of3
+    nn.ParamTensors.triple
       (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
         [cast 0.4, cast (-0.3), cast 1.2, cast 0.1] (by rfl))
       (NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.05, cast (-0.02)] (by rfl))
       (NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.0, cast 1.0] (by rfl))
 
   let compiled ←
-    match Verification.compileProgram1
+    match Verification.compileProgram
           (α := α) (paramShapes := mseParamShapes) (σ := mseXShape)
           (τ := _root_.TorchLean.Shape.scalar)
           (mseLossModel (α := α)) params with

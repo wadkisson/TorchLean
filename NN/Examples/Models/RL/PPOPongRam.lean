@@ -68,7 +68,7 @@ References (primary):
 - Machado et al., "Revisiting the Arcade Learning Environment: Evaluation Protocols and Open Problems"
   (2018): https://arxiv.org/abs/1709.06009
 - ALE docs (environment catalogue and versioned `ALE/...-v5` ids): https://ale.farama.org/
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
 -/
 
 @[expose] public section
@@ -157,9 +157,9 @@ def sLogitsBatch : Shape := rl.ppo.LogitsBatchShape horizon nActions
 def sScalarBatch : Shape := rl.ppo.ScalarBatchShape horizon
 def sValueBatch : Shape := rl.ppo.ValueBatchShape horizon
 
-def sState1 : Shape := obsShape
-def sLogits1 : Shape := shape![nActions]
-def sValue1 : Shape := shape![1]
+def stateShape : Shape := obsShape
+def logitsShape : Shape := shape![nActions]
+def valueShape : Shape := shape![1]
 
 /-!
 ## Model (Actor + Critic)
@@ -199,10 +199,10 @@ def contract : rl.boundary.Contract obsShape nActions :=
     requireExclusiveDoneFlags := false }
 
 /--
-Run the smallest useful ALE smoke check.
+Start ALE, reset once, take one checked step, and close the subprocess.
 
-This exercises the same Gymnasium subprocess, ALE registration, RAM observation shape handshake,
-and Lean-side boundary contract as the full PPO runner, but avoids collecting a 128-step rollout.
+This exercises the Gymnasium subprocess, ALE registration, RAM observation shape handshake, and
+Lean side boundary contract as the full PPO runner, without collecting a 128-step rollout.
 -/
 def checkEnvOnly : IO Unit := do
   IO.eprintln s!"  starting env: {envId} (obs_type=ram)"
@@ -228,7 +228,7 @@ def main (args : List String) : IO UInt32 := do
   if args.contains "--check-env-only" then
     let args := args.erase "--check-env-only"
     return ←
-      ModelZoo.runFloat exeName args
+      Runtime.runFloat exeName args
         (banner := ModelZoo.bannerWithDeviceDetails
           exeName
           s!"PPO on {envId} (obs=ram, env check only)"
@@ -236,7 +236,7 @@ def main (args : List String) : IO UInt32 := do
         (k := fun _opts rest => do
           ModelZoo.orThrow exeName <| CLI.checkNoArgs rest
           checkEnvOnly)
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDeviceDetails
       exeName
       s!"PPO on {envId} (obs=ram, horizon={horizon})"
@@ -260,9 +260,9 @@ def main (args : List String) : IO UInt32 := do
         IO.eprintln "  building actor/critic..."
         let seedActor ← nn.freshSeed
         let seedCritic ← nn.freshSeed
-        let actorObs : nn.Sequential sState1 sLogits1 :=
+        let actorObs : nn.Sequential stateShape logitsShape :=
           nn.run seedActor (actorMk .scalar)
-        let criticObs : nn.Sequential sState1 sValue1 :=
+        let criticObs : nn.Sequential stateShape valueShape :=
           nn.run seedCritic (criticMk .scalar)
         let actorRollout : nn.Sequential sStateBatch sLogitsBatch :=
           nn.run seedActor (actorMk pfxBatch)
@@ -270,8 +270,8 @@ def main (args : List String) : IO UInt32 := do
           nn.run seedCritic (criticMk pfxBatch)
 
         IO.eprintln "  compiling actor/critic..."
-        let actorC ← nn.compileOut actorObs
-        let criticC ← nn.compileOut criticObs
+        let actorC ← actorObs.compile
+        let criticC ← criticObs.compile
 
         IO.eprintln "  initializing module + optimizer..."
         let m ← rl.ppo.instantiateActorCritic
@@ -298,8 +298,8 @@ def main (args : List String) : IO UInt32 := do
         do
           IO.eprintln "  evaluating initial policy..."
           let psAll0 ← rl.ppo.params (α := Float) m
-          let policy0 := rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll0
-          let policyLogits0 : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
+          let policy0 := rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll0
+          let policyLogits0 : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
             fun obs => policy0 (Tensor.map (fun x => x / 255.0) obs)
           let avg0 ←
             rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
@@ -310,10 +310,10 @@ def main (args : List String) : IO UInt32 := do
 
         for update in [0:updates] do
           let psAll ← rl.ppo.params (α := Float) m
-          let predictLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
-            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll
+          let predictLogits : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
+            rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll
           let predictValue : Tensor.T Float obsShape → Float :=
-            rl.ppo.criticValueFromParams criticObs criticC actorRollout criticRollout psAll
+            rl.ppo.criticValueFromParams criticC actorRollout criticRollout psAll
 
           let (rollout, rngCounter') ←
             rl.ppo.collectRolloutWith (α := Float) (obsShape := obsShape) (nActions := nActions)
@@ -331,8 +331,8 @@ def main (args : List String) : IO UInt32 := do
 
           if update % evalEvery == 0 then
             let psAll' ← rl.ppo.params (α := Float) m
-            let policy := rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll'
-            let policyLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
+            let policy := rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll'
+            let policyLogits : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
               fun obs => policy (Tensor.map (fun x => x / 255.0) obs)
             let avg ←
               rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)

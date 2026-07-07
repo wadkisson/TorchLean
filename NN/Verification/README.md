@@ -1,70 +1,186 @@
-# `NN/Verification` (verification library support)
+# `NN/Verification`
 
-This directory is the library layer for TorchLean verification workflows: it contains reusable
-checkers, parsers, certificate kernels, and bridges from models to verifier IR that examples and
-CLIs import.
+This directory contains the reusable verification machinery for TorchLean. It is where examples and
+CLI commands go when they need to turn a model, graph, certificate, dataset, or PDE residual into a
+Lean-checkable object.
 
-Key themes:
+The runnable verification commands reuse the same pieces as the Bug Zoo, robustness examples,
+PINN/scientific ML checks, ODE and spline certificates, and graph-level IBP/CROWN workflows.
 
-- **Graph verification**: most checkers operate on the op tagged IR (`NN.IR.Graph`) together
-  with a `CROWN`/LiRPA `ParamStore`.
-- **Runtime numerics**: executable scalars such as `Float` and `IEEE32Exec` can be swapped into
-  bound propagation and evaluation to study floating point effects.
-- **Explicit trust boundaries**: when using external toolchains (e.g. PyTorch exported weights or
-  certificates), we keep the parsing, validation, and recomputation inside Lean explicit.
-- **Proof layer**: `NN.Entrypoint.Verification` includes theorem level CROWN/LiRPA
-  soundness statements alongside the reusable verifier APIs. JSON checkers are executable
-  recomputation checks; theorem credit requires discharging the corresponding Lean hypotheses.
-  The TorchLean compiler proof surface also includes IR-level bridge facts for supported imported
-  ops, including elementwise arithmetic/activations, reshape/flatten/broadcast/sum, direct
-  leading-axis concat and generic concat through the shared evaluator, axis reductions, axis
-  permutation, supported transpose forms,
-  rank-2/3 matrix multiplication,
-  softmax through the evaluator's axis-permutation path, and the
-  payload-backed constants, `linear`, no-dilation `conv2d`, eval-mode NCHW BatchNorm, CHW pooling,
-  reshape-based LayerNorm, graph input/detach, and scalar MSE formulas used by the PyTorch/ONNX
-  path. For payload-backed imported ops, the bridge records both the helper evaluator contract
-  and the actual one-step `Graph.evalAt` success path. `Eval.Coverage` keeps a checked list of
-  the IR constructor families covered by those local evaluator lemmas.
-- **Data workflows**: reusable dataset and weight loading should live under `NN.Verification`
-  rather than directly inside examples. For example, sklearn digits certified accuracy and the
-  train-then-certify command live in `NN.Verification.Robustness.Digits`.
+## What Lives Here
 
-## Subfolders
+- `TorchLean/`: compilation and semantic glue for connecting TorchLean model fragments to the
+  verifier graph IR, plus proof-backed fragments for supported forward programs.
+- `Cert/`: JSON certificate formats and executable recomputation checkers, including IBP, CROWN,
+  alpha-CROWN, and alpha-beta-CROWN-style local node artifacts.
+- `Robustness/`: dataset-backed robustness workflows, including certified accuracy for small
+  sklearn digits models and VNN-COMP-style MNIST fully connected examples.
+- `PINN/`: PDE expression parsing, graph builders, residual interval helpers, certificate replay,
+  CLI commands, and dataset containment checks for PINN-style artifacts.
+- `ODE/`: corridor certificate checking for learned subsolution and supersolution enclosures.
+- `Geometry3D/`: camera/projection certificate checks for 3D bounding-box workflows.
+- `LiRPA/`: small exported artifacts for attention, CNN, GRU, MLP, and transformer encoder
+  certificates.
+- `VNNComp/`: compact VNN-COMP-style network/property loaders and MNIST fully connected checks.
+- `Util/`: shared parsing, tolerance, and numeric helpers.
 
-- `TorchLean/`: compilation and spec evaluation glue for reusing the same TorchLean model
-  definition/program for execution and verification.
-- `ODE/`: ODE corridor verifier for subsolution and supersolution certificates, inspired by
-  arXiv:2601.19818.
-- `PINN/`: reusable PINN graph builders, PDE DSL/parser, residual bound helpers, certificate
-  checker, CLI implementation, and dataset backed checker.
-- `Util/`: small shared utilities (JSON parsing helpers, numeric comparisons).
-- `Cert/`: certificate format checkers, such as "IBP output bounds agree with Lean recomputation".
-- `Robustness/`: reusable robustness workflows, including dataset backed certified accuracy.
+## Main Workflows
+
+TorchLean verification work has five recurring shapes.
+
+1. A Lean-native model is lowered to `NN.IR.Graph`; interval or affine bounds are propagated over
+   the graph; the checker reports whether the requested output relation follows from those bounds.
+
+2. An external tool produces an artifact, such as an alpha-beta-CROWN-style certificate or exported
+   JSON bounds. Lean parses the artifact and checks the predicate the format actually claims.
+
+3. A scientific ML script exports small PDE or dataset artifacts. Lean reloads the residual
+   expression, boxes, weights, samples, or intervals and checks the stated containment or residual
+   condition.
+
+4. A theorem-backed fragment connects the executable checker to a mathematical statement. This is
+   where a checked artifact becomes part of a formal claim, with the Lean hypotheses and remaining
+   producer assumptions visible at the call site.
+
+5. A domain-specific checker takes a structured artifact and proves a smaller local claim: a 3D
+   projection box contains the image of a cuboid, an ODE corridor encloses a trajectory, a PINN
+   residual stays inside a stated interval, or a VNN-COMP-style classifier margin is nonnegative on
+   an input box.
+
+The common pattern is intentionally plain: parse a small artifact, check shape and schema fields,
+recompute the claim in Lean, and name the assumptions that remain outside Lean.
+
+## What Is Proved Versus Checked
+
+External JSON is always treated as untrusted input. A checker may accept a file, but acceptance only
+means the file satisfied the predicate implemented by that checker. Decimal tolerances are explicit
+format tolerances. Soundness of the external producer is a separate claim and should be represented
+by an exporter/provenance argument, a replayable certificate, or a theorem about the producer.
+
+The theorem-level graph IBP/CROWN-family soundness results live under
+`NN.MLTheory.CROWN.Proofs.*`. Public entry points expose those statements through
+`NN.Verification.ProofBackedCertificates` and `NN.Entrypoint.Verification`.
+
+The TorchLean-to-IR proof API is separate. It covers the compiler proof fragment and local
+evaluator lemmas for supported imported operations. Current coverage includes elementwise
+arithmetic and activations, reshape/flatten/broadcast/sum, concat, axis reductions, supported
+transpose and permutation forms, rank-2/3 matrix multiplication, softmax through the evaluator's
+axis-permutation path, payload-backed constants, `linear`, no-dilation `conv2d`, eval-mode NCHW
+BatchNorm, CHW pooling, reshape-based LayerNorm, graph input/detach, and scalar MSE formulas used
+by the PyTorch/ONNX path.
+
+For payload-backed imported ops, the bridge records both the helper evaluator contract and the
+actual one-step `Graph.evalAt` success path. `Eval.Coverage` keeps a checked list of the IR
+constructor families covered by those local evaluator lemmas.
 
 ## Public Imports
 
-- `NN.Entrypoint.Verification`: reusable verification APIs and theorem level CROWN/LiRPA soundness
-  entry points.
-- `NN.Verification.Cert`: executable certificate checker surface (JSON parsers + recomputation checks).
-- `NN.Verification.ODE`: ODE corridor verifier surface (AST + parser + checker).
-- `NN.Verification.Splines`: spline and piecewise polynomial certificate checker surface.
+- `NN.Entrypoint.Verification`: reusable verification APIs and public handles to proof-backed
+  certificate soundness statements.
+- `NN.Verification.Cert`: executable certificate checker API.
+- `NN.Verification.LiRPA`: compact LiRPA-style artifact checkers and shared certificate utilities.
+- `NN.Verification.ODE`: ODE corridor verifier API.
+- `NN.Verification.Splines`: spline and piecewise-polynomial certificate checker API.
 - `NN.Verification.Robustness`: reusable robustness workflows and loaders.
 - `NN.Verification.PINN`: reusable PINN verification support.
+- `NN.Verification.Geometry3D`: 3D projection and box-certificate checking.
+- `NN.Verification.VNNComp`: compact VNN-COMP-style network and property workflows.
 - `NN.Verification.CLI`: runnable CLI registry used by `lake exe verify`.
 
-## JSON Artifacts And Tolerances
+## Commands To Try
 
-External JSON artifacts are treated as untrusted. Checkers parse them, validate shapes, and compare
-them against Lean recomputation. When decimal serialized floats are involved, the tolerance is an
-explicit artifact format tolerance; it is not a proof that the external producer is sound.
+Run the curated verification suite:
 
-## References (informal)
+```bash
+lake exe verify -- all
+```
 
-- IBP (interval bound propagation): Gowal et al., 2018 ("On the Effectiveness of Interval Bound
-  Propagation for Training Verifiably Robust Models").
-- CROWN / DeepPoly style linear relaxations: Zhang et al., 2018 ("Efficient Neural Network
-  Verification with CROWN").
-- LiRPA unification viewpoint: Xu et al., 2020 ("Automatic Perturbation Analysis for Scalable
-  Certified Robustness and Beyond").
-- ODE learn and verify corridor enclosures: Tanaka and Yatabe, 2026 (arXiv:2601.19818).
+Run TorchLean-native graph workflows:
+
+```bash
+lake exe verify -- torchlean-ibp
+lake exe verify -- torchlean-crown-ops
+lake exe verify -- torchlean-robustness
+lake exe verify -- torchlean-mlp-workflow --dtype float
+```
+
+These commands compile or build small TorchLean models, attach input regions, and run native bound
+passes over the graph-shaped object. Use them when changing graph lowering, bound propagation,
+compiled execution, or the public verification facade.
+
+Run a compact PINN certificate and residual-expression check:
+
+```bash
+lake exe verify -- pinn-cert
+lake exe verify -- pinn-cli -- "u_t + u*u_x - 0.01*u_xx" 0.0 0.5 0.01
+```
+
+Run a dataset containment diagnostic for PINN artifacts:
+
+```bash
+lake exe verify -- pinn-dataset-check
+```
+
+Use `--strict` on diagnostic commands when misses should turn into command failure.
+
+Run a compact alpha-beta-CROWN leaf certificate check:
+
+```bash
+lake exe verify -- abcrown-leaf
+```
+
+Run compact LiRPA-style fixture checks:
+
+```bash
+lake exe verify -- lirpa-mlp
+lake exe verify -- lirpa-cnn
+lake exe verify -- lirpa-attention
+lake exe verify -- lirpa-gru
+lake exe verify -- lirpa-encoder
+```
+
+These fixtures are small JSON artifacts for supported network fragments. They exercise the artifact
+parser and replay predicate without depending on a live external verifier.
+
+Run the small VNN-COMP-style MNIST fully connected workflow:
+
+```bash
+lake exe verify -- vnncomp-mnistfc
+```
+
+Run a 3D projection certificate check:
+
+```bash
+lake exe verify -- camera-box3d-cert
+```
+
+Run the spline certificate checker:
+
+```bash
+lake exe verify -- spline-cert
+```
+
+The exact command registry lives in `NN.Verification.CLI`; `lake exe verify --help` prints the
+commands available in the current checkout.
+
+## What A Checker Should Say
+
+A new checker should answer five questions in the code or README:
+
+1. What object is being checked?
+2. What file format or runtime object is allowed to provide candidate data?
+3. Which predicate is recomputed inside Lean?
+4. Which theorem, if any, lifts the check to a mathematical statement?
+5. Which producer, solver, runtime, or floating-point assumptions remain outside Lean?
+
+That convention makes checker output precise: a successful run identifies the object, the predicate,
+the theorem layer when one applies, and the remaining producer or runtime assumptions.
+
+## References
+
+- IBP: Gowal et al., 2018, "On the Effectiveness of Interval Bound Propagation for Training
+  Verifiably Robust Models".
+- CROWN: Zhang et al., 2018, "Efficient Neural Network Verification with CROWN".
+- LiRPA: Xu et al., 2020, "Automatic Perturbation Analysis for Scalable Certified Robustness and
+  Beyond".
+- ODE learn-and-verify corridors: Tanaka and Yatabe, 2026, arXiv:2601.19818.

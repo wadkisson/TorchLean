@@ -14,7 +14,7 @@ public import NN.Runtime.RL.PPO.Collect
 
 Umbrella import for TorchLean’s PPO rollout/training helpers.
 
-The PPO runtime surface is organized around:
+The PPO runtime code is organized around:
 
 - `NN.Runtime.RL.PPO.Rollout`: rollout record + minibatch conversion (GAE/returns live in `Runtime.RL.Core`).
 - `NN.Runtime.RL.PPO.Collect`: data collection from `Runtime.RL.Gymnasium.Session`.

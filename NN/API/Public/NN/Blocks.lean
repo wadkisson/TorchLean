@@ -245,7 +245,7 @@ def conv2dNormActPoolCHW {inC inH inW : Nat} (cfg : Conv2dNormActPool)
 /--
 `Conv2d -> BatchNorm2d -> Activation -> (optional Dropout)`, over batched image tensors (`N×C×H×W`).
 
-This is the public PyTorch-like path: examples should build CNNs directly over batched images.
+Public PyTorch-like path for examples that build CNNs directly over batched images.
 -/
 def conv2dNormAct {n inC inH inW : Nat} (cfg : Conv2dNormAct)
     [NeZero n] [NeZero inC] [NeZero cfg.conv.kH] [NeZero cfg.conv.kW] [NeZero cfg.conv.outC] :
@@ -328,7 +328,7 @@ def residualLayer {s : Spec.Shape} (inner : Sequential s s) : LayerDef s s :=
           (β := m (TorchLean.RefTy (m := m) (α := α) s))
           (fun args => do
             let (_psRefs, xRef) :=
-              _root_.Runtime.Autograd.Torch.RefList.splitAppend1
+              _root_.Runtime.Autograd.Torch.RefList.splitLast
                 (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
                 (ss := ps) (τ := s) args
             let y ←
@@ -384,7 +384,7 @@ def addBranchesLayer {σ τ : Spec.Shape} (f g : Sequential σ τ) : LayerDef σ
           (β := m (TorchLean.RefTy (m := m) (α := α) τ))
           (fun args => do
             let (psAll, xRef) :=
-              _root_.Runtime.Autograd.Torch.RefList.splitAppend1
+              _root_.Runtime.Autograd.Torch.RefList.splitLast
                 (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
                 (ss := psF ++ psG) (τ := σ) args
             let (psFrefs, psGrefs) :=
@@ -422,6 +422,6 @@ def addBranches {σ τ : Spec.Shape} (f g : Sequential σ τ) : Sequential σ τ
 
 We provide a *typed* and *composable* ResNet-18 style BasicBlock over CHW tensors.
 
-Key idea: we use a small canonical stride-2 formula `down2` (matching `GraphSpec/Models/resnet18`)
+Key idea: we use a small canonical stride-2 formula `strideTwoOutput` (matching `GraphSpec/Models/resnet18`)
 so projection shortcuts typecheck cleanly without leaking Nat arithmetic at call sites.
 -/

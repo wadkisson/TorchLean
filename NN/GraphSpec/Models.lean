@@ -39,7 +39,7 @@ includes both the broad spec catalog and the graph-authored coverage ladder.
 The current set is intentionally a coverage ladder, not an exhaustive catalog:
 
 1. `mlp`: smallest sequential typed parameter ABI.
-2. `cnn2`: sequential vision pipeline with convolution/pooling shape arithmetic.
+2. `twoConvCnn`: sequential vision pipeline with convolution/pooling shape arithmetic.
 3. `residualLinear`: minimal DAG model with a real skip connection.
 4. `ResNet18.model`: larger DAG model with repeated residual blocks and projection shortcuts.
 
@@ -55,7 +55,7 @@ which GraphSpec surface syntax they were authored in.
 Included examples:
 - `NN.GraphSpec.Models.mlp` (minimal sequential MLP) and
   `NN.GraphSpec.Models.mlpDAGModelZeroInit` (the same chain lowered to DAG),
-- `NN.GraphSpec.Models.cnn2` (sequential chain) and `NN.GraphSpec.Models.cnn2DAGModelZeroInit`
+- `NN.GraphSpec.Models.twoConvCnn` (sequential chain) and `NN.GraphSpec.Models.twoConvCnnDAGModelZeroInit`
   (the same model, lowered to DAG),
 - DAG-native models such as `NN.GraphSpec.Models.residualLinear` and
   `NN.GraphSpec.Models.ResNet18.model`.
@@ -68,7 +68,7 @@ See also:
 If you are new to this directory, a good order is:
 
 1. `Models.mlp`,
-2. `Models.cnn2`,
+2. `Models.twoConvCnn`,
 3. `Models.residualLinear` as the minimal DAG/skip-connection example,
 4. `Models.ResNet18.model` as the larger residual architecture.
 -/

@@ -11,7 +11,7 @@ public import NN.Verification.PINN.PyTorch.ParamStore
 /-!
 # PINN PyTorch
 
-Verification-facing PyTorch import surface for trained PINNs.
+PyTorch import path for trained PINNs used by verification workflows.
 
 This module exists so verification call sites can import one file:
 `NN.Verification.PINN.PyTorch`.

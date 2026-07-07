@@ -177,10 +177,10 @@ def sigmaMatVecMul (A : Σ m n : Nat, Tensor α (.dim m (.dim n .scalar)))
 /-- Helper: vector addition for sigma-typed tensors. -/
 def sigmaVecAdd (v1 v2 : Σ n : Nat, Tensor α (.dim n .scalar)) :
     Option (Σ n : Nat, Tensor α (.dim n .scalar)) :=
-  let ⟨n1, vec1⟩ := v1
-  let ⟨n2, vec2⟩ := v2
+  let ⟨n1, lhsVector⟩ := v1
+  let ⟨n2, rhsVector⟩ := v2
   if h : n1 = n2 then
-    some ⟨n1, Tensor.addSpec vec1 (by cases h; exact vec2)⟩
+    some ⟨n1, Tensor.addSpec lhsVector (by cases h; exact rhsVector)⟩
   else
     none
 

@@ -160,7 +160,7 @@ theorem smul {n : Nat} {D : Set (ReLUMlpBridge.TensorVec n)}
     rw [mlp_eval_nd_eq_bias_sum (l1 := l1) (l2 := l2') (x := x)]
     rw [mlp_eval_nd_eq_bias_sum (l1 := l1) (l2 := l2) (x := x)]
     -- Compute the scaled bias and weights.
-    simp [l2', mat1_get_matrixMN, extractScalarOutput, vectorN, Tensor.toScalar,
+    simp [l2', singleRowMatrix_get_matrixMN, extractScalarOutput, vectorN, Tensor.toScalar,
       mul_add, Finset.mul_sum, mul_left_comm, mul_comm]
   -- Bound `|c*f - c*mlp|` by factoring out the output-layer scale.
   have :
@@ -289,7 +289,7 @@ theorem smul {n : Nat} {K : Set (ReLUMlpBridge.TensorVec n)}
       classical
       rw [mlp_eval_nd_eq_bias_sum (l1 := l1) (l2 := l2') (x := x.1)]
       rw [mlp_eval_nd_eq_bias_sum (l1 := l1) (l2 := l2) (x := x.1)]
-      simp [l2', mat1_get_matrixMN, extractScalarOutput, vectorN, Tensor.toScalar,
+      simp [l2', singleRowMatrix_get_matrixMN, extractScalarOutput, vectorN, Tensor.toScalar,
         mul_add, Finset.mul_sum, mul_left_comm, mul_comm]
     have habs :
         |c * f x - mlpEvalNd (n := n) (hidDim := m) l1 l2' x.1|
@@ -1757,29 +1757,29 @@ Agreement theorem for the standalone 2D multiplication construction from `ReLUMu
 The n-dimensional development below subsumes this result. This theorem name remains available for
 downstream files that use the classical two-coordinate multiplication statement.
 -/
-theorem relu_mul_universal_approximation_box2d
+theorem relu_mul_universal_approximation_plane_box
     {M : ℝ} (hM : 0 < M) :
     ∀ ε > 0, ∃ (hidDim : ℕ) (l1 : LinearSpec ℝ 2 hidDim) (l2 : LinearSpec ℝ hidDim 1),
       ∀ x ∈ ReLUMulApprox.box M,
         |ReLUMulApprox.mulFun x - mlpEvalNd (n := 2) (hidDim := hidDim) l1 l2 x| < ε := by
   simpa using (ReLUMulApprox.relu_mul_universal_approximation_box (M := M) hM)
 
-lemma boxN_two_iff_box (M : ℝ) (x : ReLUMulApprox.TensorVec2) :
+lemma planeBox_iff_coordinateBox (M : ℝ) (x : ReLUMulApprox.PlaneTensorVec) :
     x ∈ boxN 2 M ↔ x ∈ ReLUMulApprox.box M := by
   constructor
   · intro hx
     refine And.intro ?_ ?_
     · have := hx (0 : Fin 2)
-      simpa [ReLUMulApprox.box, ReLUMulApprox.x0] using this
+      simpa [ReLUMulApprox.box, ReLUMulApprox.firstCoordinate] using this
     · have := hx (1 : Fin 2)
-      simpa [ReLUMulApprox.box, ReLUMulApprox.x1] using this
+      simpa [ReLUMulApprox.box, ReLUMulApprox.secondCoordinate] using this
   · intro hx
     -- Convert a two-coordinate box proof into the corresponding pair of interval facts.
     change ∀ i : Fin 2, toVec x i ∈ Set.Icc (-M) M
     refine (Fin.forall_fin_two).2 ?_
     refine And.intro ?_ ?_
-    · simpa [ReLUMulApprox.box, ReLUMulApprox.x0] using hx.1
-    · simpa [ReLUMulApprox.box, ReLUMulApprox.x1] using hx.2
+    · simpa [ReLUMulApprox.box, ReLUMulApprox.firstCoordinate] using hx.1
+    · simpa [ReLUMulApprox.box, ReLUMulApprox.secondCoordinate] using hx.2
 
 /--
 The same 2D multiplication guarantee derived from the nD coordinate-product theorem.
@@ -1787,7 +1787,7 @@ The same 2D multiplication guarantee derived from the nD coordinate-product theo
 This theorem is a cross-check between the specialized two-dimensional construction and the general
 coordinate-product approximation pipeline used by the compact-set theorem.
 -/
-theorem relu_mul_universal_approximation_box2d_via_nd
+theorem relu_mul_universal_approximation_plane_box_via_nd
     {M : ℝ} (hM : 0 < M) :
     ∀ ε > 0, ∃ (hidDim : ℕ) (l1 : LinearSpec ℝ 2 hidDim) (l2 : LinearSpec ℝ hidDim 1),
       ∀ x ∈ ReLUMulApprox.box M,
@@ -1798,7 +1798,7 @@ theorem relu_mul_universal_approximation_box2d_via_nd
     ⟨hidDim, l1, l2, h⟩
   refine ⟨hidDim, l1, l2, ?_⟩
   intro x hx
-  have hxN : x ∈ boxN 2 M := (boxN_two_iff_box (M := M) (x := x)).2 hx
-  simpa [ReLUMulApprox.mulFun, ReLUMulApprox.x0, ReLUMulApprox.x1] using h x hxN
+  have hxN : x ∈ boxN 2 M := (planeBox_iff_coordinateBox (M := M) (x := x)).2 hx
+  simpa [ReLUMulApprox.mulFun, ReLUMulApprox.firstCoordinate, ReLUMulApprox.secondCoordinate] using h x hxN
 
 end NN.MLTheory.Proofs.ReLU.Approximation.CompactSet

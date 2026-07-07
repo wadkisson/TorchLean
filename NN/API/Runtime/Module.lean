@@ -49,7 +49,7 @@ For compositional building blocks, prefer `API.TorchLean.NN` and `API.TorchLean.
 -/
 
 export _root_.NN.GraphSpec.Models.TorchLean
-  (mlp autoencoder cnn2 softmaxRegression mlpClassifier transformerBlock
+  (mlp autoencoder twoConvCnn softmaxRegression mlpClassifier transformerBlock
    resnet18Model resnet18Program resnet18InitParams)
 end Models
 
@@ -85,7 +85,7 @@ threads the same options record all the way down to the eager tape / CUDA tape s
 
 The shorter `instantiate` entrypoint selects the backend and then uses default runtime options.
 -/
-def instantiateWithOptions
+def instantiateConfigured
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     {paramShapes inputShapes : List Spec.Shape}
@@ -96,14 +96,14 @@ def instantiateWithOptions
     (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) defn cast opts
 
 /--
-Instantiate a Float module with runtime-side parameter initializers.
+Instantiate a Float module with runtime layer parameter initializers.
 
 This is the public runtime-initialization entrypoint. The initializer plan is indexed by the same
 `paramShapes` list as the module, so Lean checks that every parameter has exactly one initializer.
 In CUDA mode, supported initializers allocate device buffers directly instead of first constructing
 every parameter as a large nested Lean tensor.
 -/
-def instantiateFloatWithRuntimePlanOptions
+def instantiateFloatWithPlan
     {paramShapes inputShapes : List Spec.Shape}
     (defn : ScalarModuleDef paramShapes inputShapes)
     (opts : Options)
@@ -116,9 +116,9 @@ def instantiateFloatWithRuntimePlanOptions
 List-based wrapper for checkpoint/JSON boundaries.
 
 If the caller has a statically known parameter list, prefer
-`instantiateFloatWithRuntimePlanOptions`; this wrapper checks the list length before applying it.
+`instantiateFloatWithPlan`; this wrapper checks the list length before applying it.
 -/
-def instantiateFloatWithRuntimeInitOptions
+def instantiateFloatWithInit
     {paramShapes inputShapes : List Spec.Shape}
     (defn : ScalarModuleDef paramShapes inputShapes)
     (opts : Options)

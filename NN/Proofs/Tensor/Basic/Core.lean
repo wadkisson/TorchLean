@@ -25,7 +25,7 @@ public import NN.Spec.Core.TensorReductionShape
 /-!
 # Real Tensor Proof Toolkit
 
-This file is the `ℝ`-specialized proof-facing companion to the spec tensor layer.
+This file is the `ℝ`-specialized proof layer companion to the spec tensor layer.
 
 The tensor proof folder has two layers:
 
@@ -122,7 +122,7 @@ lemma toVec_scale_spec {n : Nat} (x : Tensor ℝ (.dim n .scalar)) (c : ℝ) :
 /--
 Flatten a tensor of shape `s` into a 1D view `Fin (Shape.size s) → ℝ`.
 
-This is the proof-facing counterpart of `Spec.Tensor.flatten_spec` specialized to `ℝ`. In PyTorch
+This is the proof layer counterpart of `Spec.Tensor.flatten_spec` specialized to `ℝ`. In PyTorch
 terms it is the functional analogue of flattening a tensor and then indexing it linearly
 (`torch.flatten`, `tensor.view(-1)`). See the spec file `NN/Spec/Core/TensorReductionShape.lean`
 for the definitional flatten/unflatten interface.
@@ -137,7 +137,7 @@ def flattenR {s : Shape} (x : Tensor ℝ s) : Fin (Shape.size s) → ℝ :=
 /--
 Unflatten a 1D view `Fin (Shape.size s) → ℝ` back into a tensor of shape `s`.
 
-This is the proof-facing counterpart of `Spec.Tensor.unflatten_spec` specialized to `ℝ`, and is
+This is the proof layer counterpart of `Spec.Tensor.unflatten_spec` specialized to `ℝ`, and is
 intended to round-trip with `flattenR` under the spec lemmas in
 `NN/Spec/Core/TensorReductionShape.lean`.
 -/

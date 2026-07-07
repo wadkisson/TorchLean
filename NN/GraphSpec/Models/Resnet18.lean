@@ -64,7 +64,7 @@ We solve this by defining a small family of **typed primitives** that cast the �
 output shapes into a *canonical* downsample formula:
 
 ```
-down2(h) = (h - 1) / 2 + 1
+strideTwoOutput(h) = (h - 1) / 2 + 1
 ```
 
 This is the standard stride-2 output formula for kernels with effective receptive field 1 or 3
@@ -117,12 +117,12 @@ Canonical stride-2 output-size formula used throughout this file.
 We write it once and reuse it for the stem, the downsampling residual blocks, and the max-pool so
 that all of those paths literally agree on the same type-level height/width expression.
 -/
-abbrev down2 (h : Nat) : Nat := (h - 1) / 2 + 1
+abbrev strideTwoOutput (h : Nat) : Nat := (h - 1) / 2 + 1
 
-/-- `down2` is always positive. -/
-lemma down2_pos (h : Nat) : down2 h > 0 := by
+/-- `strideTwoOutput` is always positive. -/
+lemma strideTwoOutput_pos (h : Nat) : strideTwoOutput h > 0 := by
   -- `(h - 1) / 2` is a Nat, so adding 1 is always positive.
-  simp [down2]
+  simp [strideTwoOutput]
 
 /-! ## Small typed primitives for ResNet typing -/
 
@@ -177,18 +177,18 @@ def conv3x3Same
           : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape c h w)))
   }
 
-/-- Typed 7×7 stem convolution (stride 2, padding 3), cast to the canonical `down2` spatial sizes.
+/-- Typed 7×7 stem convolution (stride 2, padding 3), cast to the canonical `strideTwoOutput` spatial sizes.
   -/
 def conv7x7Down
     (inC outC h w : Nat)
     (h_inC : inC ≠ 0) (_h_outC : outC ≠ 0) :
     PrimOp
       [ Shape.OIHW outC inC 7 7, Shape.Vec outC, imgShape inC h w ]
-      (imgShape outC (down2 h) (down2 w)) :=
+      (imgShape outC (strideTwoOutput h) (strideTwoOutput w)) :=
   have hShape :
       imgShape outC ((h + 2 * 3 - 7) / 2 + 1) ((w + 2 * 3 - 7) / 2 + 1) =
-        imgShape outC (down2 h) (down2 w) := by
-    simp [imgShape, down2, two_mul, Nat.add_comm]
+        imgShape outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [imgShape, strideTwoOutput, two_mul, Nat.add_comm]
   { name := "resnet.conv7x7_s2"
     specFwd := fun {α} _ctx xs =>
       match xs with
@@ -211,21 +211,21 @@ def conv7x7Down
                 (motive := fun s => Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) s)
                 y
                 hShape
-          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (down2 h) (down2
+          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (strideTwoOutput h) (strideTwoOutput
             w))))
   }
 
-/-- Typed 3×3 convolution (stride 2, padding 1), cast to the canonical `down2` spatial sizes. -/
+/-- Typed 3×3 convolution (stride 2, padding 1), cast to the canonical `strideTwoOutput` spatial sizes. -/
 def conv3x3Down
     (inC outC h w : Nat)
     (h_inC : inC ≠ 0) (_h_outC : outC ≠ 0) :
     PrimOp
       [ Shape.OIHW outC inC 3 3, Shape.Vec outC, imgShape inC h w ]
-      (imgShape outC (down2 h) (down2 w)) :=
+      (imgShape outC (strideTwoOutput h) (strideTwoOutput w)) :=
   have hShape :
       imgShape outC ((h + 2 * 1 - 3) / 2 + 1) ((w + 2 * 1 - 3) / 2 + 1) =
-        imgShape outC (down2 h) (down2 w) := by
-    simp [imgShape, down2, Nat.add_comm]
+        imgShape outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [imgShape, strideTwoOutput, Nat.add_comm]
   { name := "resnet.conv3x3_s2"
     specFwd := fun {α} _ctx xs =>
       match xs with
@@ -248,21 +248,21 @@ def conv3x3Down
                 (motive := fun s => Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) s)
                 y
                 hShape
-          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (down2 h) (down2
+          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (strideTwoOutput h) (strideTwoOutput
             w))))
   }
 
-/-- Typed 1×1 projection convolution (stride 2), cast to the canonical `down2` spatial sizes. -/
+/-- Typed 1×1 projection convolution (stride 2), cast to the canonical `strideTwoOutput` spatial sizes. -/
 def conv1x1Down
     (inC outC h w : Nat)
     (h_inC : inC ≠ 0) (_h_outC : outC ≠ 0) :
     PrimOp
       [ Shape.OIHW outC inC 1 1, Shape.Vec outC, imgShape inC h w ]
-      (imgShape outC (down2 h) (down2 w)) :=
+      (imgShape outC (strideTwoOutput h) (strideTwoOutput w)) :=
   have hShape :
       imgShape outC ((h + 2 * 0 - 1) / 2 + 1) ((w + 2 * 0 - 1) / 2 + 1) =
-        imgShape outC (down2 h) (down2 w) := by
-    simp [imgShape, down2]
+        imgShape outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [imgShape, strideTwoOutput]
   { name := "resnet.conv1x1_s2"
     specFwd := fun {α} _ctx xs =>
       match xs with
@@ -285,18 +285,18 @@ def conv1x1Down
                 (motive := fun s => Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) s)
                 y
                 hShape
-          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (down2 h) (down2
+          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape outC (strideTwoOutput h) (strideTwoOutput
             w))))
   }
 
-/-- Typed 3×3 max-pool (stride 2, padding 1), cast to the canonical `down2` spatial sizes. -/
+/-- Typed 3×3 max-pool (stride 2, padding 1), cast to the canonical `strideTwoOutput` spatial sizes. -/
 def maxpool3x3Down
     (c h w : Nat) :
-    PrimOp [imgShape c h w] (imgShape c (down2 h) (down2 w)) :=
+    PrimOp [imgShape c h w] (imgShape c (strideTwoOutput h) (strideTwoOutput w)) :=
   have hShape :
       imgShape c ((h + 2 * 1 - 3) / 2 + 1) ((w + 2 * 1 - 3) / 2 + 1) =
-        imgShape c (down2 h) (down2 w) := by
-    simp [imgShape, down2, Nat.add_comm]
+        imgShape c (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [imgShape, strideTwoOutput, Nat.add_comm]
   { name := "resnet.maxpool3x3_s2"
     specFwd := fun {α} _ctx xs =>
       match xs with
@@ -321,7 +321,7 @@ def maxpool3x3Down
                 (motive := fun s => Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) s)
                 y
                 hShape
-          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape c (down2 h) (down2 w))))
+          : m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (imgShape c (strideTwoOutput h) (strideTwoOutput w))))
   }
 
 /-! ## Parameter layout -/
@@ -462,27 +462,27 @@ def model
   let ps : List Shape := params inC numClasses
 
   -- Derived spatial sizes along the stem.
-  let h1 := down2 h
-  let w1 := down2 w
-  let h2 := down2 h1
-  let w2 := down2 w1
+  let h1 := strideTwoOutput h
+  let w1 := strideTwoOutput w
+  let h2 := strideTwoOutput h1
+  let w2 := strideTwoOutput w1
 
-  have h_h1 : h1 > 0 := down2_pos h
-  have h_w1 : w1 > 0 := down2_pos w
-  have h_h2 : h2 > 0 := down2_pos h1
-  have h_w2 : w2 > 0 := down2_pos w1
+  have h_h1 : h1 > 0 := strideTwoOutput_pos h
+  have h_w1 : w1 > 0 := strideTwoOutput_pos w
+  have h_h2 : h2 > 0 := strideTwoOutput_pos h1
+  have h_w2 : w2 > 0 := strideTwoOutput_pos w1
 
   -- Stage spatial sizes after successive downsampling blocks (stages 2–4).
-  let h3 := down2 h2; let w3 := down2 w2
-  let h4 := down2 h3; let w4 := down2 w3
-  let h5 := down2 h4; let w5 := down2 w4
+  let h3 := strideTwoOutput h2; let w3 := strideTwoOutput w2
+  let h4 := strideTwoOutput h3; let w4 := strideTwoOutput w3
+  let h5 := strideTwoOutput h4; let w5 := strideTwoOutput w4
 
-  have h_h3 : h3 > 0 := down2_pos h2
-  have h_w3 : w3 > 0 := down2_pos w2
-  have h_h4 : h4 > 0 := down2_pos h3
-  have h_w4 : w4 > 0 := down2_pos w3
-  have h_h5 : h5 > 0 := down2_pos h4
-  have h_w5 : w5 > 0 := down2_pos w4
+  have h_h3 : h3 > 0 := strideTwoOutput_pos h2
+  have h_w3 : w3 > 0 := strideTwoOutput_pos w2
+  have h_h4 : h4 > 0 := strideTwoOutput_pos h3
+  have h_w4 : w4 > 0 := strideTwoOutput_pos w3
+  have h_h5 : h5 > 0 := strideTwoOutput_pos h4
+  have h_w5 : w5 > 0 := strideTwoOutput_pos w4
 
   -- Deterministic parameter initialization (seeded; layout matches `params`).
   --
@@ -558,7 +558,7 @@ def model
     let stem : Runtime.Autograd.Torch.TList Float (convParams 64 inC 7 7 ++ bnParams 64) :=
       by
         simpa [convParams, bnParams, List.append_assoc] using
-          append (Runtime.Autograd.Torch.tlist2 k0 b0) (Runtime.Autograd.Torch.tlist2 g0 bt0)
+          append (Runtime.Autograd.Torch.tlistPair k0 b0) (Runtime.Autograd.Torch.tlistPair g0 bt0)
 
     let blk (outC inC : Nat)
         (k1 : Tensor Float (Shape.OIHW outC inC 3 3)) (b1 : Tensor Float (Shape.Vec outC))
@@ -568,7 +568,7 @@ def model
         Runtime.Autograd.Torch.TList Float (basicBlockParams inC outC false) :=
       by
         simpa [basicBlockParams, convParams, bnParams, List.append_assoc] using
-          append (Runtime.Autograd.Torch.tlist4 k1 b1 g1 bt1) (Runtime.Autograd.Torch.tlist4 k2 b2
+          append (Runtime.Autograd.Torch.tlistQuad k1 b1 g1 bt1) (Runtime.Autograd.Torch.tlistQuad k2 b2
             g2 bt2)
 
     let blkDown (outC inC : Nat)
@@ -582,9 +582,9 @@ def model
       by
         simpa [basicBlockParams, convParams, bnParams, List.append_assoc] using
           append
-            (append (Runtime.Autograd.Torch.tlist4 k1 b1 g1 bt1) (Runtime.Autograd.Torch.tlist4 k2
+            (append (Runtime.Autograd.Torch.tlistQuad k1 b1 g1 bt1) (Runtime.Autograd.Torch.tlistQuad k2
               b2 g2 bt2))
-            (Runtime.Autograd.Torch.tlist4 kp bp gp btp)
+            (Runtime.Autograd.Torch.tlistQuad kp bp gp btp)
 
     let stage1 : Runtime.Autograd.Torch.TList Float (stageParams 64 64) :=
       append
@@ -608,7 +608,7 @@ def model
 
     let head : Runtime.Autograd.Torch.TList Float [Shape.Mat numClasses 512, Shape.Vec numClasses]
       :=
-      Runtime.Autograd.Torch.tlist2 w80 b81
+      Runtime.Autograd.Torch.tlistPair w80 b81
 
     simpa [ps, params, stageParams, basicBlockParams, convParams, bnParams, List.append_assoc] using
       append stem (append stage1 (append stage2 (append stage3 (append stage4 head))))
@@ -717,11 +717,11 @@ def model
       (kp : Term Γ (Shape.OIHW outC inC 1 1)) (bp : Term Γ (Shape.Vec outC))
       (gp : Term Γ (Shape.Vec outC)) (btp : Term Γ (Shape.Vec outC))
       (xIn : Term Γ (imgShape inC h w)) :
-      Term Γ (imgShape outC (down2 h) (down2 w)) :=
-    let h' := down2 h
-    let w' := down2 w
-    have hh' : h' > 0 := down2_pos h
-    have hw' : w' > 0 := down2_pos w
+      Term Γ (imgShape outC (strideTwoOutput h) (strideTwoOutput w)) :=
+    let h' := strideTwoOutput h
+    let w' := strideTwoOutput w
+    have hh' : h' > 0 := strideTwoOutput_pos h
+    have hw' : w' > 0 := strideTwoOutput_pos w
     let conv1 :=
       Term.op (Γ := Γ)
         (conv3x3Down (inC := inC) (outC := outC) (h := h) (w := w)

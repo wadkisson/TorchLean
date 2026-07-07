@@ -200,9 +200,9 @@ def rSquaredSpec {batch inDim : Nat}
   (target : Tensor α (.dim batch .scalar)) (h : batch ≠ 0) :
   Tensor α .scalar :=
   let predictions := linearRegressionBatchedForwardSpec model input
-  let axis0 : Shape.valid_axis_inst 0 (Shape.dim batch Shape.scalar) :=
+  let leadingAxis : Shape.valid_axis_inst 0 (Shape.dim batch Shape.scalar) :=
     Shape.validAxisInstZeroAlt h
-  let target_mean := reduceMeanAuto 0 axis0 target
+  let target_mean := reduceMeanAuto 0 leadingAxis target
   let target_mean_broadcast := broadcastLike target target_mean
   let ss_res := reduceSumAuto 0 (squareSpec (subSpec predictions target))
   let ss_tot := reduceSumAuto 0 (squareSpec (subSpec target target_mean_broadcast))

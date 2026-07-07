@@ -30,8 +30,8 @@ public import NN.Runtime.RL
 /-!
 # Runtime Entrypoint
 
-This is the broad import for TorchLean's executable layer. It collects the runtime pieces that are
-useful when building, training, importing, exporting, or checking runnable models:
+Import this file when you need TorchLean's executable layer. It collects the runtime pieces used for
+building, training, importing, exporting, or checking runnable models:
 
 - the eager and compiled autograd engines;
 - the lower-level `Runtime.Autograd.Torch` session operations;
@@ -50,12 +50,12 @@ of the build.
 The runtime entrypoint imports reusable bridge infrastructure under
 `NN.Runtime.PyTorch.*`. Example-only MLP/CNN/Transformer round-trip code lives under
 `NN.Examples.Interop.PyTorch.*`, so ordinary runtime imports do not pull example modules into the
-library surface.
+library API.
 
 References / context:
 - PyTorch autograd overview:
   https://pytorch.org/docs/stable/autograd.html
-- PyTorch `nn.Module` / tensor ops surface:
+- PyTorch `nn.Module` / tensor ops API:
   https://pytorch.org/docs/stable/nn.html
   https://pytorch.org/docs/stable/torch.html
 - TorchLean’s import/export bridge details live in `NN.Runtime.PyTorch.Export.Core` and

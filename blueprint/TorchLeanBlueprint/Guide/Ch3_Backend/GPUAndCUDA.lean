@@ -12,25 +12,25 @@ worked for small CPU examples, it would miss many places where semantic mistakes
 fused attention, reductions, cuBLAS GEMM, cuFFT, selective scans, spectral convolution, and
 device-side randomness.
 
-The design is therefore pragmatic. CUDA accelerates supported Float32 runtime paths. The Lean-side
-spec and graph semantics remain the reference objects. Claims about native execution go through
-runtime agreement statements, parity tests, sanitizer checks, or future kernel-level proofs.
+The design is therefore pragmatic. CUDA accelerates supported Float32 runtime paths, while the
+Lean side spec and graph semantics remain the reference objects. Claims about native execution go
+through runtime agreement statements, parity tests, sanitizer checks, or future kernel-level proofs.
 
 # Backend Choices
 
-The CUDA design follows a few choices that are easy to miss if one only looks at the command line
-flags.
+The CUDA design follows a few choices that are easy to miss from the command line alone.
 
 1. *CUDA is opt-in at build time.* A normal `lake build` should work on machines without a GPU or a
    CUDA toolkit. Building with `-K cuda=true` is an explicit decision to link native device code.
 2. *CUDA is a runtime backend, not a second semantics.* The Lean model, the spec layer, and the
-   verifier IR keep their meaning. CUDA changes where supported float32 tensor work runs.
-3. *The backend is focused.* The first target is float32 tensor work used by the model
-   zoo: matmul, convolution, reductions, attention helpers, FFT/FNO kernels, and related VJP rules.
+   verifier IR keep their meaning for supported operations under their stated preconditions. CUDA
+   changes where supported float32 tensor work runs.
+3. *The backend is focused.* The first target is float32 tensor work used by the model examples:
+   matmul, convolution, reductions, attention helpers, FFT/FNO kernels, and related VJP rules.
 4. *Runtime agreement is stated explicitly.* TorchLean documents which facts are proved in Lean,
    which behaviors are specified in Lean, and which native behaviors are validated by tests.
 
-A precise CUDA claim has three parts: the Lean-side specification, the native implementation path,
+A precise CUDA claim has three parts: the Lean side specification, the native implementation path,
 and the agreement evidence between them.
 
 # The Short Version
@@ -58,7 +58,7 @@ scripts/checks/cuda_sanitize_tests.sh --all-tools
 
 The flag `-K cuda=true` is a *build* flag. It selects the native CUDA objects in the
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) and links CUDA libraries such as cuBLAS and cuFFT. The
-command line flag `--cuda` is a *runtime* flag. For long training runs, model commands also expose:
+command-line flag `--cuda` is a *runtime* flag. For long training runs, model commands also expose:
 
 ```
 --cuda-mem-watch N
@@ -67,11 +67,11 @@ command line flag `--cuda` is a *runtime* flag. For long training runs, model co
 That flag samples the CUDA allocator every `N` optimizer updates. It reports live and peak runtime
 allocation state and warns if the observed free-memory trend would exhaust the device before the
 requested run length. When a long CUDA run does not pass an explicit cadence, the public model
-examples choose a small default number of samples. This is part of the public runner interface, not
-a separate benchmark script, so MLP, CNN, GPT-style, ViT, and other model commands can report
-the same kind of long-run memory signal.
+examples choose a small default number of samples. The feature lives in the public runner interface,
+not in a separate benchmark script, so MLP, CNN, GPT, ViT, and other model commands can report the
+same kind of long-run memory signal.
 
-If either piece is missing, TorchLean should fail loudly rather than silently claiming that GPU
+If either piece is missing, TorchLean should fail loudly instead of silently claiming that GPU
 execution happened.
 
 # What Lives In The CUDA Backend
@@ -93,6 +93,31 @@ The native backend is bounded enough to audit:
 On non-CUDA builds, corresponding stub files are compiled instead.  Those stubs are not fake
 success paths; they are CPU reference implementations used by tests and by machines without a CUDA
 toolkit.
+
+# ATen, CUDA Runtime, And Lean Proofs
+
+TorchLean may interoperate with PyTorch artifacts, but the proof boundary is not PyTorch's
+dispatcher. PyTorch's ATen layer is the C++ tensor library under the Python API; it dynamically
+dispatches operations to CPU, CUDA, and other backends. That makes ATen a useful runtime and import
+producer, not a Lean semantic oracle.
+
+Read the boundary as a ledger:
+
+- *ATen / PyTorch*: may produce checkpoints, op names, shapes, and reference runs. Lean accepts only
+  the imported subset that is parsed, shape checked, lowered to `NN.IR.Graph`, and supplied with
+  payloads.
+- *CUDA runtime*: allocates device memory, launches kernels, copies buffers, synchronizes streams,
+  and reports errors. Lean sees opaque handles and returned bits, not the device execution trace.
+- *TorchLean CUDA kernels*: implement selected float32 tensor operations behind FFI symbols. Their
+  Lean-side contracts live in `KernelSpec`, `Float32Contract`, and operation-specific specs.
+- *cuBLAS / cuFFT / libdevice*: are vendor libraries. They are engineering dependencies and
+  documented runtime assumptions unless a narrower checker or proof discharges a specific contract.
+- *Lean proofs*: reason about specs, graphs, scalar reference models, and theorems that transport
+  native results back into those models once the named agreement assumptions are supplied.
+
+This means a PyTorch or ATen run can be evidence for a regression test, and a CUDA run can be
+evidence that the native path executed. Neither is, by itself, a proof about `Graph.denote`,
+`IEEE32Exec`, or `FP32`.
 
 # Implemented CUDA Surface
 
@@ -117,7 +142,7 @@ The main implemented pieces are:
   average pooling, smooth max pooling, and their backward paths;
 - *deterministic RNG kernels*: uniform and Bernoulli/dropout-style masks use the same SplitMix64
   stream convention as the CPU path, keyed by explicit seeds and linear indices;
-- *FlashAttention style fused attention*: the runtime can call a fused native attention forward and
+- *Fused attention*: the runtime can call a fused native attention forward and
   fused VJP instead of materializing scores, mask application, softmax, and value multiplication,
   while the Lean spec proves
   the fused contract equal to ordinary scaled dot product attention;
@@ -125,7 +150,7 @@ The main implemented pieces are:
   while the higher layer keeps a pure CPU/CUDA compatible definition at the model API;
 - *FFT and FNO kernels*: the FNO path uses cuFFT plus fused spectral multiplication and explicit
   backward kernels, with a dense CPU DFT reference for comparison;
-- *sanitizer and parity harnesses*: the CUDA suite compares native kernels, stubs, finite-difference
+- *sanitizer and parity harnesses*: the CUDA suite compares native kernels, CPU fallbacks, finite-difference
   gradients, deterministic replay, and model-level examples.
 
 That inventory matters because each item has a different agreement shape. Elementwise kernels can
@@ -135,19 +160,19 @@ specs and FFI agreement.
 
 The boundary can be read family by family:
 
-- *Elementwise maps*: Lean-side meaning is `mapSpec` / `map2Spec`; native agreement is pointwise
+- *Elementwise maps*: Lean side meaning is `mapSpec` / `map2Spec`; native agreement is pointwise
   primitive-bit agreement; tests compare CUDA, stubs, and finite scalar cases.
-- *Reductions and dot products*: Lean-side meaning is a fixed reduction spec such as
+- *Reductions and dot products*: Lean side meaning is a fixed reduction spec such as
   `reduceSumLeftSpec`; native agreement must fix or document accumulation order; tests check
   deterministic reduction paths.
-- *GEMM/BMM*: Lean-side meaning is `bmmSpec` plus row-major shape conventions; native agreement
+- *GEMM/BMM*: Lean side meaning is `bmmSpec` plus row-major shape conventions; native agreement
   includes cuBLAS layout, accumulation, and FMA behavior; tests compare against CPU references.
-- *Convolution and pooling*: Lean-side meaning is the tensor-index and VJP contract; native
+- *Convolution and pooling*: Lean side meaning is the tensor-index and VJP contract; native
   agreement covers indexing, padding, and layout; tests cover forward and backward paths.
-- *FFT/FNO*: Lean-side meaning is the spectral convolution contract; native agreement covers cuFFT
+- *FFT/FNO*: Lean side meaning is the spectral convolution contract; native agreement covers cuFFT
   layout, normalization, and fused spectral multiplication; tests include dense DFT references and
   finite-difference checks.
-- *Fused attention*: Lean-side meaning is the FlashAttention-style spec equal to SDPA; native
+- *Fused attention*: Lean side meaning is the FlashAttention-style spec equal to SDPA; native
   agreement is that the fused CUDA kernel implements that fused spec; tests compare attention
   forward/backward behavior.
 
@@ -158,7 +183,7 @@ separate because they are separate assumptions.
 
 # The Lean Side Contract
 
-The CUDA boundary is not just "some C++ code was linked." The Lean side gives names to the pieces of
+The CUDA boundary is more than "some C++ code was linked." The Lean side gives names to the pieces of
 the contract.
 
 ```
@@ -188,14 +213,14 @@ namespace Runtime.Autograd.Cuda.KernelSpec
 end Runtime.Autograd.Cuda.KernelSpec
 ```
 
-The idea is simple:
+The CUDA contract has three named pieces:
 
 - `KernelSpec` says what owned kernels mean as pure finite-index computations.
 - `Float32Contract` says how native primitive bits are expected to line up with `IEEE32Exec`.
 - `NativeSources` keeps a Lean map from external symbols to source files under `csrc/cuda`.
 
-This makes the CUDA contract small enough that a reader can find it, test it, and reason about the
-runtime agreement being used.
+The CUDA contract stays small enough to inspect: a reader can find the named spec, test the runtime
+path, and see which agreement assumption is being used.
 
 # Assumptions, Axioms, And Runtime Agreement
 
@@ -203,7 +228,7 @@ When we say "axiom" for CUDA here, we mean an explicit named assumption, not an 
 that any GPU result is correct. If a concrete native result satisfies the named agreement contract,
 then Lean theorems can transport that result back into the proved float32/spec layer.
 
-The most important named boundary is:
+The scalar boundary is:
 
 ```
 import NN.Runtime.Autograd.Engine.Cuda.Float32Contract
@@ -232,53 +257,76 @@ Lifting from scalar operations to kernels adds more assumptions:
   desired;
 - *cuFFT/FNO*: cuFFT normalization, half-spectrum layout, omitted modes, and real/imaginary weight
   layout are part of the native agreement contract;
-- *FlashAttention style attention*: Lean proves the fused attention spec equals SDPA, while the
+- *Fused attention*: Lean proves the fused attention spec equals SDPA, while the
   native fused kernel is trusted/validated to implement that fused spec;
 - *libdevice/transcendentals*: functions outside IEEE 754's basic arithmetic contract are treated as
   toolchain/library assumptions unless separately specified and tested.
 
-The remaining runtime base is deliberately ordinary and visible: Lean's FFI marshalling, the C/CUDA
-compiler, CUDA runtime and driver, GPU hardware, cuBLAS, cuFFT, libdevice, build flags, and the
-source-to-binary path. Tests and sanitizer runs validate that base.
+The remaining runtime base is ordinary systems software: Lean's FFI marshalling, the C/CUDA
+compiler, CUDA runtime and driver, GPU hardware, cuBLAS, cuFFT, libdevice, build flags, and the path
+from source to binary. Tests and sanitizer runs validate that base.
+
+# A Concrete GEMM Boundary
+
+Matrix multiplication is the smallest example where all layers are visible.
+
+At the spec level, the operation is an indexed sum. At the graph level, a `.linear` or BMM node
+denotes that indexed computation through `Graph.denote` and the parameter payload. At the CUDA
+runtime level, TorchLean stores row-major float32 buffers and calls cuBLAS for batched matrix
+multiplication.
+
+The native call is not the theorem. The agreement obligation includes:
+
+- dimensions fit both TorchLean's shape discipline and cuBLAS' `int`-shaped API;
+- row-major TorchLean buffers are interpreted correctly around cuBLAS' column-major convention;
+- the chosen cuBLAS routine, math mode, toolkit version, device architecture, and stream/handle
+  policy produce the result bits promised by the selected runtime contract;
+- the accumulation behavior is the one named by the contract, or the claim is weakened to a tested
+  runtime result rather than bitwise proof transport;
+- finite-path hypotheses hold if the result is being connected to `FP32` real-error theorems.
+
+This is why the source comment in `torchlean_cublas_common.h` matters: it records the row-major /
+column-major boundary where a silent transpose bug would otherwise look like an ordinary matrix
+multiply. It is also why cuBLAS reproducibility is cited as a library contract rather than assumed
+from the phrase "single precision GEMM."
 
 # Boundary Rationale
 
-The CUDA decisions are deliberately conservative.
+The CUDA decisions are conservative.
 
 First, Lean owns the pieces it can inspect directly: shapes, indices, pure tensor specs, scalar
 reference semantics, graph/IR semantics, and theorems that say "if native bits agree with this spec,
 then the proved semantic result follows." Native code enters through the corresponding runtime
 agreement.
 
-Second, TorchLean still needs to run real models.  Proving every GPU instruction before using CUDA
-would make the system unusable for training.  The compromise is a practical one: use CUDA for speed,
-keep the mathematical contract in Lean, and require tests/sanitizers/parity checks at the boundary.
+Second, TorchLean still needs to run real models. Proving every GPU instruction before using CUDA
+would make the system unusable for training. The compromise is practical: use CUDA for speed, keep
+the mathematical contract in Lean, and require tests, sanitizers, and parity checks at the boundary.
 
-Third, we avoid silent semantic changes. CUDA is a runtime backend, not a new meaning for the model.
-The same model API and IR should describe CPU eager, CUDA eager, and compiled execution.  That is why
-we are careful about `--cuda`: it changes where work runs, not what the operation is supposed to
-mean.
+Third, we avoid silent semantic changes. CUDA is a runtime backend, not a new meaning for the
+model. The same model API and IR should describe CPU eager, CUDA eager, and compiled execution.
+So `--cuda` stays narrow: it changes where work runs, not what the operation is supposed to mean.
 
-Fourth, we started with float32 because it is the smallest useful concrete target.  It covers the
+Fourth, we started with float32 because it is the smallest concrete target that covers the
 training examples, has an executable `IEEE32Exec` bridge, and keeps the native-bit agreement
 contract tractable. Float64, complex tensors, mixed precision, Tensor Cores, and approximate math modes
 can be added later with equally explicit contracts.
 
-Fifth, the fused kernels are correctness first. The attention kernel is "FlashAttention style"
-because its contract is fused SDPA with a fused VJP. A stronger claim about a production IO-tiled
-FlashAttention implementation would require a separate native-kernel proof or conformance story.
+Fifth, the fused kernels are correctness first. The attention kernel follows the FlashAttention
+shape, but the contract we state is fused SDPA with a fused VJP. A stronger claim about a production
+IO-tiled FlashAttention implementation would require a separate native-kernel proof or conformance
+story.
 
 # What A CUDA Claim Means
 
-Read CUDA claims at the right level:
+Read CUDA claims by the evidence they provide:
 
 - CUDA example ran: the native path executed and produced values.
-- CUDA parity test passed: the native path matched CPU, stub, or reference cases under the test
+- CUDA parity test passed: the native path matched CPU fallback or reference cases under the test
   conditions.
 - Lean spec theorem: the pure Lean specification has the stated property.
-- Runtime agreement assumption: native bits refine the Lean-side contract under stated conditions.
-- Verified CUDA kernel: a proof about the compiled native kernel itself. This is future work rather
-  than the current CUDA claim.
+- Runtime agreement assumption: native bits refine the Lean side contract under stated conditions.
+- Verified CUDA kernel: a proof about the compiled native kernel itself.
 
 This vocabulary keeps extension points clear: verified layout proofs around more kernels, generated
 proof obligations for FFI symbols, fixed-tree reductions for reproducibility, narrower
@@ -296,26 +344,26 @@ Runtime.Autograd.Cuda.Tape.matmul
 Runtime.Autograd.Cuda.Tape.spectralConv1dRfft
 ```
 
-The public training API usually hides those names.  A model zoo command such as
+The public training API usually hides those names. A model example command such as
 
 ```
 lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 ```
 
-still looks like an ordinary TorchLean run.  Under the hood, tensors are stored in CUDA buffers and
+still looks like an ordinary TorchLean run. Under the hood, tensors are stored in CUDA buffers and
 the local VJP rules call CUDA kernels.
 
-This is still an eager runtime backend. Verification passes consume the shared IR described in
-*Graphs and IR*; they do not verify a particular GPU schedule.
+CUDA remains an eager runtime backend. Verification passes consume the shared IR described in
+*Graphs and IR*; they are not proofs of a particular GPU schedule.
 
 The runtime is explicit about CUDA buffer ownership. During eager training, each forward/backward
 step creates tape values, gradient buffers, and local scratch buffers for kernels such as matmul,
 convolution, normalization, attention, and FNO spectral convolution. The values returned to the
-caller are kept; transient buffers are released after their contribution has been consumed. This is
-the practical reason the examples include allocator telemetry: if a future kernel holds on to
+caller are kept; transient buffers are released after their contribution has been consumed. The
+examples include allocator telemetry for a practical reason: if a future kernel holds on to
 scratch state across steps, the terminal should show the trend before it becomes an allocation
-failure. The same ownership rule is used by the public step-based model runners, so a long command
-does not keep old per-step tensors merely because the loader loop continued.
+failure. The same ownership rule is used by the public runners, so a long command does not retain
+old step tensors after the loader loop has moved on.
 
 In practice this gives TorchLean three related but distinct CUDA layers:
 
@@ -327,17 +375,17 @@ In practice this gives TorchLean three related but distinct CUDA layers:
 Keeping those three layers separate prevents a common mistake: treating "the CUDA example trained" as
 "the CUDA implementation has been verified."
 
-# Runtime-Side Initialization
+# Runtime Initialization
 
 Large Float/CUDA modules should not have to construct every initial parameter as a nested Lean
-tensor before the runtime can allocate device storage.  TorchLean therefore exposes runtime-side
+tensor before the runtime can allocate device storage.  TorchLean therefore exposes runtime
 Float initializers:
 
 ```
 TorchLean.RuntimeInit.FloatInit
 TorchLean.RuntimeInit.Plan
-TorchLean.Module.instantiateFloatWithRuntimePlanOptions
-TorchLean.Module.instantiateFloatWithRuntimeInitOptions
+TorchLean.Module.instantiateFloatWithPlan
+TorchLean.Module.instantiateFloatWithInit
 ```
 
 The typed `Plan` is indexed by the module's parameter-shape list.  That means Lean checks that every
@@ -345,7 +393,7 @@ parameter has exactly one initializer.  In CPU Float mode the initializer materi
 tensor.  In CUDA mode the supported initializers allocate device buffers directly and keep the host
 slot as a synchronized mirror for explicit readback.
 
-This is a runtime feature, not a new mathematical semantics.  The parameter is still a tensor of the
+Runtime initializers do not change the mathematical semantics.  The parameter is still a tensor of the
 declared shape.  The improvement is where storage is materialized: zeros, ones, uniform,
 Xavier/Glorot, Kaiming/He, and exact flat payloads can be created through the runtime path instead
 of first building a huge Lean object only to upload it immediately.
@@ -353,7 +401,7 @@ of first building a huge Lean object only to upload it immediately.
 # Float32 Only
 
 The CUDA backend is a float32 backend. Native buffers store C/CUDA `float`, and the Lean
-FFI surface exposes them as opaque float32 buffers.  That choice is deliberate:
+FFI exposes them as opaque float32 buffers.  That choice has three reasons:
 
 - it matches the common training precision for the examples;
 - it keeps the bridge to `IEEE32Exec` and the float32 proof layer manageable;
@@ -366,8 +414,8 @@ duplicated kernels with unclear semantics.
 
 CUDA and CPU stubs share the same SplitMix64-based deterministic RNG contract.  For operations such
 as `rand_uniform` and `bernoulli_mask`, both paths use the same low 32 bits of
-`splitmix64(key + i)`.  This is tested because toggling CUDA should not silently change a seeded
-experiment.
+`splitmix64(key + i)`.  The tests cover this because toggling CUDA should not silently change a
+seeded experiment.
 
 Reductions require a separate note.  Floating-point addition is not associative, so atomics may
 produce order-dependent roundoff.  TorchLean therefore separates fast atomic reductions from
@@ -435,20 +483,20 @@ Those names identify the contract:
 The native runtime path is separate. The [CUDA kernel API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Kernels.lean)
 declares the FFI symbols, the
 [native CUDA source](https://github.com/lean-dojo/TorchLean/blob/main/csrc/cuda/kernels/torchlean_cuda_kernels.cu) implements them, and the CPU
-stub sits next to it in
-[the CPU stub](https://github.com/lean-dojo/TorchLean/blob/main/csrc/cuda/kernels/torchlean_cuda_kernels_stub.c).
+CPU fallback sits next to it in
+[the fallback source](https://github.com/lean-dojo/TorchLean/blob/main/csrc/cuda/kernels/torchlean_cuda_kernels_stub.c).
 
 TorchLean's fused attention kernel is correctness-first: it implements the same masked,
-stable scaled dot product attention contract and fused VJP interface, but it is not claiming to be
-the production IO-tiled Dao-AILab kernel. The terminology in this guide is:
+stable scaled dot product attention contract and fused VJP interface. Its role in this chapter is
+the specified fused operator and native boundary, separate from the production IO-tiled Dao-AILab
+implementation. The terminology is:
 
-- *FlashAttention style contract* means the fused operator is specified as equal to SDPA.
+- *Fused attention contract* means the fused operator is specified as equal to SDPA.
 - *Native fused attention kernel* means the CUDA backend calls external code through the FFI.
-- *Verified CUDA FlashAttention* would require a proof about the native kernel, which TorchLean does
-  not claim.
+- *Verified CUDA FlashAttention* is the stronger theorem target about the native kernel itself.
 
 The regression test for this boundary is
-[NN.Tests.Runtime.Cuda.Attention API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Tests/Runtime/Cuda/Attention.lean), which compares
+[NN.Tests.Runtime.Cuda.Attention source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Tests/Runtime/Cuda/Attention.lean), which compares
 CPU eager and CUDA eager multi-head attention forward/backward behavior and keeps the fused kernels
 covered by the CUDA test suite.
 
@@ -537,6 +585,7 @@ python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.c
   https://docs.nvidia.com/cuda/pdf/Floating_Point_on_NVIDIA_GPU.pdf
 - NVIDIA cuBLAS documentation: https://docs.nvidia.com/cuda/cublas/
 - NVIDIA cuFFT documentation: https://docs.nvidia.com/cuda/cufft/
+- PyTorch ATen C++ API documentation: https://docs.pytorch.org/cppdocs/api/aten/index.html
 - Dao et al., "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
   arXiv:2205.14135.
 - Dao, "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning",

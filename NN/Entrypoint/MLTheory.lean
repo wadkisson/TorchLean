@@ -14,8 +14,8 @@ public import NN.MLTheory.API
 Curated umbrella import for TorchLean's ML-theory subsystem (robustness, verification-oriented
 theory modules, CROWN/Lyapunov infrastructure, etc.).
 
-`NN.MLTheory.API` remains the canonical curated surface. This entrypoint provides a stable
-"one import" path consistent with the other subsystems.
+`NN.MLTheory.API` remains the canonical curated import set. This entrypoint gives downstream code a
+stable "one import" path consistent with the other subsystems.
 -/
 
 @[expose] public section

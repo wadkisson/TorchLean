@@ -119,79 +119,97 @@ def approxEq (x y : Float) (tol : Float := 1e-5) : Bool :=
 
 /-- Reference tanh-MLP graph for `u : R -> R` used by the compact PINN certificate workflow. -/
 def buildGraph : Graph :=
-  let n0 : Node := { id := 0, parents := [], kind := .input,  outShape := .dim 1 .scalar }
-  let n1 : Node := { id := 1, parents := [0], kind := .linear, outShape := .dim 16 .scalar }
-  let n2 : Node := { id := 2, parents := [1], kind := .tanh,   outShape := .dim 16 .scalar }
-  let n3 : Node := { id := 3, parents := [2], kind := .linear, outShape := .dim 16 .scalar }
-  let n4 : Node := { id := 4, parents := [3], kind := .tanh,   outShape := .dim 16 .scalar }
-  let n5 : Node := { id := 5, parents := [4], kind := .linear, outShape := .dim 1 .scalar }
-  { nodes := #[n0,n1,n2,n3,n4,n5] }
+  let inputNode : Node := { id := 0, parents := [], kind := .input, outShape := .dim 1 .scalar }
+  let firstLinearNode : Node := { id := 1, parents := [0], kind := .linear, outShape := .dim 16 .scalar }
+  let firstTanhNode : Node := { id := 2, parents := [1], kind := .tanh, outShape := .dim 16 .scalar }
+  let middleLinearNode : Node := { id := 3, parents := [2], kind := .linear, outShape := .dim 16 .scalar }
+  let middleTanhNode : Node := { id := 4, parents := [3], kind := .tanh, outShape := .dim 16 .scalar }
+  let outputNode : Node := { id := 5, parents := [4], kind := .linear, outShape := .dim 1 .scalar }
+  { nodes := #[inputNode, firstLinearNode, firstTanhNode, middleLinearNode, middleTanhNode, outputNode] }
 
 /-- Same reference architecture as `buildGraph`, but with a 2D input `u : R^2 -> R`. -/
 def buildGraph2D : Graph :=
   -- Same architecture but with 2-D input
-  let n0 : Node := { id := 0, parents := [], kind := .input,  outShape := .dim 2 .scalar }
-  let n1 : Node := { id := 1, parents := [0], kind := .linear, outShape := .dim 16 .scalar }
-  let n2 : Node := { id := 2, parents := [1], kind := .tanh,   outShape := .dim 16 .scalar }
-  let n3 : Node := { id := 3, parents := [2], kind := .linear, outShape := .dim 16 .scalar }
-  let n4 : Node := { id := 4, parents := [3], kind := .tanh,   outShape := .dim 16 .scalar }
-  let n5 : Node := { id := 5, parents := [4], kind := .linear, outShape := .dim 1 .scalar }
-  { nodes := #[n0,n1,n2,n3,n4,n5] }
+  let inputNode : Node := { id := 0, parents := [], kind := .input, outShape := .dim 2 .scalar }
+  let firstLinearNode : Node := { id := 1, parents := [0], kind := .linear, outShape := .dim 16 .scalar }
+  let firstTanhNode : Node := { id := 2, parents := [1], kind := .tanh, outShape := .dim 16 .scalar }
+  let middleLinearNode : Node := { id := 3, parents := [2], kind := .linear, outShape := .dim 16 .scalar }
+  let middleTanhNode : Node := { id := 4, parents := [3], kind := .tanh, outShape := .dim 16 .scalar }
+  let outputNode : Node := { id := 5, parents := [4], kind := .linear, outShape := .dim 1 .scalar }
+  { nodes := #[inputNode, firstLinearNode, firstTanhNode, middleLinearNode, middleTanhNode, outputNode] }
 
 /-- Deterministic weights matching the exporter convention (1D input). -/
 def seedParamsFloat : ParamStore Float :=
-  -- Same as exporter: W1: 16x1, b1:16; Wm:16x16,bm:16; W2:1x16,b2:1
-  let W1 : Tensor Float (.dim 16 (.dim 1 .scalar)) :=
+  -- Same as exporter: first layer 16x1, middle layer 16x16, output layer 1x16.
+  let firstWeight : Tensor Float (.dim 16 (.dim 1 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun _ => Tensor.scalar (Float.ofNat (i.val + 1) * 0.1)))
-  let b1 : Tensor Float (.dim 16 .scalar) :=
+  let firstBias : Tensor Float (.dim 16 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (0.05 * (Float.ofNat i.val - 8.0)))
-  let Wm : Tensor Float (.dim 16 (.dim 16 .scalar)) :=
+  let middleWeight : Tensor Float (.dim 16 (.dim 16 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (if decide (i.val = j.val) then 1.0 else
       0.05)))
-  let bm : Tensor Float (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
-  let W2 : Tensor Float (.dim 1 (.dim 16 .scalar)) :=
+  let middleBias : Tensor Float (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
+  let outputWeight : Tensor Float (.dim 1 (.dim 16 .scalar)) :=
     Tensor.dim (fun _ => Tensor.dim (fun j => Tensor.scalar (0.1 + 0.01 * (Float.ofNat j.val))))
-  let b2 : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
-  let ps0 : ParamStore Float := {}
-  let ps1 := { ps0 with linearWB := ps0.linearWB.insert 1 ({ m := 16, n := 1,  w := W1, b := b1 }) }
-  let ps2 := { ps1 with linearWB := ps1.linearWB.insert 3 ({ m := 16, n := 16, w := Wm, b := bm }) }
-  let ps3 := { ps2 with linearWB := ps2.linearWB.insert 5 ({ m := 1,  n := 16, w := W2, b := b2 }) }
-  ps3
+  let outputBias : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
+  let emptyStore : ParamStore Float := {}
+  let withFirstLayer :=
+    { emptyStore with
+      linearWB := emptyStore.linearWB.insert 1 ({ m := 16, n := 1, w := firstWeight, b := firstBias }) }
+  let withMiddleLayer :=
+    { withFirstLayer with
+      linearWB :=
+        withFirstLayer.linearWB.insert 3
+          ({ m := 16, n := 16, w := middleWeight, b := middleBias }) }
+  let withOutputLayer :=
+    { withMiddleLayer with
+      linearWB :=
+        withMiddleLayer.linearWB.insert 5 ({ m := 1, n := 16, w := outputWeight, b := outputBias }) }
+  withOutputLayer
 
 /-- Deterministic weights for the 2D variant `buildGraph2D`. -/
 def seedParamsFloat2D : ParamStore Float :=
   -- First layer adapted to 2D input: 16x2
-  let W1 : Tensor Float (.dim 16 (.dim 2 .scalar)) :=
+  let firstWeight : Tensor Float (.dim 16 (.dim 2 .scalar)) :=
     Tensor.dim (fun i =>
       Tensor.dim (fun j =>
         let base := Float.ofNat (i.val + 1) * 0.05
         let w := if decide (j.val = 0) then base * 2.0 else base
         Tensor.scalar w))
-  let b1 : Tensor Float (.dim 16 .scalar) :=
+  let firstBias : Tensor Float (.dim 16 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (0.05 * (Float.ofNat i.val - 8.0)))
-  let Wm : Tensor Float (.dim 16 (.dim 16 .scalar)) :=
+  let middleWeight : Tensor Float (.dim 16 (.dim 16 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (if decide (i.val = j.val) then 1.0 else
       0.05)))
-  let bm : Tensor Float (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
-  let W2 : Tensor Float (.dim 1 (.dim 16 .scalar)) :=
+  let middleBias : Tensor Float (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
+  let outputWeight : Tensor Float (.dim 1 (.dim 16 .scalar)) :=
     Tensor.dim (fun _ => Tensor.dim (fun j => Tensor.scalar (0.1 + 0.01 * (Float.ofNat j.val))))
-  let b2 : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
-  let ps0 : ParamStore Float := {}
-  let ps1 := { ps0 with linearWB := ps0.linearWB.insert 1 ({ m := 16, n := 2,  w := W1, b := b1 }) }
-  let ps2 := { ps1 with linearWB := ps1.linearWB.insert 3 ({ m := 16, n := 16, w := Wm, b := bm }) }
-  let ps3 := { ps2 with linearWB := ps2.linearWB.insert 5 ({ m := 1,  n := 16, w := W2, b := b2 }) }
-  ps3
+  let outputBias : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar 0.0)
+  let emptyStore : ParamStore Float := {}
+  let withFirstLayer :=
+    { emptyStore with
+      linearWB := emptyStore.linearWB.insert 1 ({ m := 16, n := 2, w := firstWeight, b := firstBias }) }
+  let withMiddleLayer :=
+    { withFirstLayer with
+      linearWB :=
+        withFirstLayer.linearWB.insert 3
+          ({ m := 16, n := 16, w := middleWeight, b := middleBias }) }
+  let withOutputLayer :=
+    { withMiddleLayer with
+      linearWB :=
+        withMiddleLayer.linearWB.insert 5 ({ m := 1, n := 16, w := outputWeight, b := outputBias }) }
+  withOutputLayer
 
 /-- Seed a 1D input box `[x - eps, x + eps]` at node id 0. -/
 def seedInputFloat (ps : ParamStore Float) (x : Float) (eps : Float) : ParamStore Float :=
-  let x0 : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
-  ps.seedLInfBall 0 x0 eps
+  let inputCenter : Tensor Float (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
+  ps.seedLInfBall 0 inputCenter eps
 
 /-- Seed a 2D input box `[(x,y) - eps, (x,y) + eps]` at node id 0. -/
 def seedInputFloat2D (ps : ParamStore Float) (x y : Float) (eps : Float) : ParamStore Float :=
-  let x0 : Tensor Float (.dim 2 .scalar) :=
+  let inputCenter : Tensor Float (.dim 2 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (if decide (i.val = 0) then x else y))
-  ps.seedLInfBall 0 x0 eps
+  ps.seedLInfBall 0 inputCenter eps
 
 /-
   Hessian/Laplacian helpers (2D)
@@ -284,65 +302,83 @@ def fdResidualBounds (u_minus : Float × Float) (u0 : Float × Float) (u_plus : 
 
 /-- Generic param seeding (1D). -/
 def seedParamsGeneric {α : Type} [Context α] : ParamStore α :=
-  let W1 : Tensor α (.dim 16 (.dim 1 .scalar)) :=
+  let firstWeight : Tensor α (.dim 16 (.dim 1 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun _ => Tensor.scalar ((((i.val + 1 : Nat) : α)) *
       Numbers.pointone)))
   let eight : α := Numbers.four * Numbers.two
-  let b1 : Tensor α (.dim 16 .scalar) :=
+  let firstBias : Tensor α (.dim 16 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (Numbers.pointfive * Numbers.pointone * ((((i.val : Nat) : α)
       - eight))))
-  let Wm : Tensor α (.dim 16 (.dim 16 .scalar)) :=
+  let middleWeight : Tensor α (.dim 16 (.dim 16 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (if decide (i.val = j.val) then
       Numbers.one else (Numbers.pointfive * Numbers.pointone))))
-  let bm : Tensor α (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
+  let middleBias : Tensor α (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
   let pointzeroone : α := Numbers.pointone * Numbers.pointone
-  let W2 : Tensor α (.dim 1 (.dim 16 .scalar)) :=
+  let outputWeight : Tensor α (.dim 1 (.dim 16 .scalar)) :=
     Tensor.dim (fun _ => Tensor.dim (fun j => Tensor.scalar (Numbers.pointone + pointzeroone *
       (((j.val : Nat) : α)))))
-  let b2 : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
-  let ps0 : ParamStore α := {}
-  let ps1 := { ps0 with linearWB := ps0.linearWB.insert 1 ({ m := 16, n := 1,  w := W1, b := b1 }) }
-  let ps2 := { ps1 with linearWB := ps1.linearWB.insert 3 ({ m := 16, n := 16, w := Wm, b := bm }) }
-  let ps3 := { ps2 with linearWB := ps2.linearWB.insert 5 ({ m := 1,  n := 16, w := W2, b := b2 }) }
-  ps3
+  let outputBias : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
+  let emptyStore : ParamStore α := {}
+  let withFirstLayer :=
+    { emptyStore with
+      linearWB := emptyStore.linearWB.insert 1 ({ m := 16, n := 1, w := firstWeight, b := firstBias }) }
+  let withMiddleLayer :=
+    { withFirstLayer with
+      linearWB :=
+        withFirstLayer.linearWB.insert 3
+          ({ m := 16, n := 16, w := middleWeight, b := middleBias }) }
+  let withOutputLayer :=
+    { withMiddleLayer with
+      linearWB :=
+        withMiddleLayer.linearWB.insert 5 ({ m := 1, n := 16, w := outputWeight, b := outputBias }) }
+  withOutputLayer
 
 /-- 2D generic param seeding (first layer 16x2). -/
 def seedParamsGeneric2D {α : Type} [Context α] : ParamStore α :=
-  let W1 : Tensor α (.dim 16 (.dim 2 .scalar)) :=
+  let firstWeight : Tensor α (.dim 16 (.dim 2 .scalar)) :=
     Tensor.dim (fun i =>
       Tensor.dim (fun j =>
         let base := (((i.val + 1 : Nat) : α)) * (Numbers.pointfive * Numbers.pointone)
         let w := if decide (j.val = 0) then base * Numbers.two else base
         Tensor.scalar w))
   let eight : α := Numbers.four * Numbers.two
-  let b1 : Tensor α (.dim 16 .scalar) :=
+  let firstBias : Tensor α (.dim 16 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (Numbers.pointfive * Numbers.pointone * ((((i.val : Nat) : α)
       - eight))))
-  let Wm : Tensor α (.dim 16 (.dim 16 .scalar)) :=
+  let middleWeight : Tensor α (.dim 16 (.dim 16 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (if decide (i.val = j.val) then
       Numbers.one else (Numbers.pointfive * Numbers.pointone))))
-  let bm : Tensor α (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
+  let middleBias : Tensor α (.dim 16 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
   let pointzeroone : α := Numbers.pointone * Numbers.pointone
-  let W2 : Tensor α (.dim 1 (.dim 16 .scalar)) :=
+  let outputWeight : Tensor α (.dim 1 (.dim 16 .scalar)) :=
     Tensor.dim (fun _ => Tensor.dim (fun j => Tensor.scalar (Numbers.pointone + pointzeroone *
       (((j.val : Nat) : α)))))
-  let b2 : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
-  let ps0 : ParamStore α := {}
-  let ps1 := { ps0 with linearWB := ps0.linearWB.insert 1 ({ m := 16, n := 2,  w := W1, b := b1 }) }
-  let ps2 := { ps1 with linearWB := ps1.linearWB.insert 3 ({ m := 16, n := 16, w := Wm, b := bm }) }
-  let ps3 := { ps2 with linearWB := ps2.linearWB.insert 5 ({ m := 1,  n := 16, w := W2, b := b2 }) }
-  ps3
+  let outputBias : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar Numbers.zero)
+  let emptyStore : ParamStore α := {}
+  let withFirstLayer :=
+    { emptyStore with
+      linearWB := emptyStore.linearWB.insert 1 ({ m := 16, n := 2, w := firstWeight, b := firstBias }) }
+  let withMiddleLayer :=
+    { withFirstLayer with
+      linearWB :=
+        withFirstLayer.linearWB.insert 3
+          ({ m := 16, n := 16, w := middleWeight, b := middleBias }) }
+  let withOutputLayer :=
+    { withMiddleLayer with
+      linearWB :=
+        withMiddleLayer.linearWB.insert 5 ({ m := 1, n := 16, w := outputWeight, b := outputBias }) }
+  withOutputLayer
 
 /-- Generic input seeding for 1D. -/
 def seedInputGeneric {α : Type} [Context α] (ps : ParamStore α) (x : α) (eps : α) : ParamStore α :=
-  let x0 : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
-  ps.seedLInfBall 0 x0 eps
+  let inputCenter : Tensor α (.dim 1 .scalar) := Tensor.dim (fun _ => Tensor.scalar x)
+  ps.seedLInfBall 0 inputCenter eps
 
 /-- Generic input seeding for 2D. -/
 def seedInputGeneric2D {α : Type} [Context α] (ps : ParamStore α) (x y : α) (eps : α) : ParamStore
   α :=
-  let x0 : Tensor α (.dim 2 .scalar) :=
+  let inputCenter : Tensor α (.dim 2 .scalar) :=
     Tensor.dim (fun i => Tensor.scalar (if decide (i.val = 0) then x else y))
-  ps.seedLInfBall 0 x0 eps
+  ps.seedLInfBall 0 inputCenter eps
 
 end NN.Verification.PINN

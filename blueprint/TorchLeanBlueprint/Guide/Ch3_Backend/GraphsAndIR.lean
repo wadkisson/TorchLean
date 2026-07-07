@@ -7,18 +7,17 @@ open Verso.Genre Manual
 tag := "graphs-ir"
 %%%
 
-A neural network can become several different graph-like objects. During eager execution, the
-runtime records a tape. During compiled execution, it builds a reusable graph-shaped artifact.
-During verification, the checker needs a symbolic graph whose nodes have operation tags.
+A neural network can become several different graph objects. During eager execution, the
+runtime records a tape. During compiled execution, it builds a reusable graph artifact.
+During verification, the checker needs a symbolic graph whose nodes name their operations.
 
 These are related, but they are not interchangeable. A tape node may contain a closure. A verifier
 cannot reason generically about an arbitrary closure. It needs to know that a node is `.linear`,
 `.relu`, `.conv2d`, or `.softmax`, and it needs the shape and payload convention for that operation.
-That is the role of `NN.IR.Graph`.
+`NN.IR.Graph` supplies that representation.
 
-When a model, a verifier, and a runtime disagree, the most useful diagnostic question is often the
-simplest one: which graph is under discussion, and which denotation does each component attach to
-that graph?
+When a model, a verifier, and a runtime disagree, start with the graph: which graph is under
+discussion, and which denotation does each component attach to it?
 
 # One Word, Several Meanings
 
@@ -27,30 +26,30 @@ At a glance, the graph pipeline is:
 - the spec layer says what operations mean;
 - GraphSpec can describe architectures with typed parameter interfaces;
 - runtime execution produces tapes or compiled graph artifacts;
-- `NN.IR.Graph` gives the op-tagged graph consumed by widgets, exporters, runtime bridges, and
+- `NN.IR.Graph` gives the graph with named operations consumed by widgets, exporters, runtime bridges, and
   verification passes.
 
-The verifier-facing graph comes first because it is the object verifiers consume. The next two pages
+The verifier graph comes first because it is the object verifiers consume. The next two pages
 move upward: the spec layer explains the mathematical meanings behind the operations, and GraphSpec
 explains how architectures can be authored before they are lowered to IR.
 
 # Three Graphs, Not One
 
-The word "graph" appears in several places in TorchLean. The distinction is worth making early.
+The word "graph" appears in several places in TorchLean. The distinctions matter immediately.
 
 An eager tape records what happened during one execution. It stores runtime values, parent links,
 and local backward closures. It is excellent for debugging and backpropagation, but it is not the
 object a verifier wants to analyze.
 
-A compiled runtime graph is a reusable execution artifact. It is useful when the same model and
-loss are evaluated many times. Its nodes are still execution objects, not the external symbolic
-contract used by bound propagation.
+A compiled runtime graph is a reusable execution artifact for a fixed model and loss. Its nodes are
+still execution objects, not the external symbolic contract used by bound propagation.
 
 An `NN.IR.Graph` is the symbolic graph used by inspection, export, and verification. Its nodes carry
-operation tags, parent ids, and output shapes. Parameters live in a separate payload.
+operation names, parent ids, and output shapes. Parameters live in a separate payload.
 
-The verifier wants the third object. It can run bound propagation over an op-tagged graph. It cannot
-soundly inspect arbitrary runtime closures as if they were mathematical operators.
+The verifier wants the third object. It can run bound propagation over a graph whose nodes name their
+operations. It cannot soundly inspect arbitrary runtime closures as if they were mathematical
+operators.
 
 # The Graph Pipeline
 
@@ -68,17 +67,17 @@ The surrounding chapters explain how this graph is produced, executed, inspected
 Training and forward evaluation can use optional CUDA buffers and kernels for speed (*Runtime
 and Autograd*). The canonical verifier IR (`NN.IR.Graph`) and its Lean denotation (`Graph.denote`
 / `denoteAll`) are still defined and executed in Lean for the verification pipeline: IBP, CROWN, and
-certificate tooling consume that graph, not the GPU's internal kernel schedule. In other words: GPU
-mode changes *how* some float32 primitives are implemented at runtime; it should not change the
-*meaning* of the shared IR you export for verification, modulo the normal float-soundness caveats in
-*Floating-Point Semantics*.
+certificate tooling consume that graph, not the GPU's internal kernel schedule. GPU mode changes
+*how* some float32 primitives are implemented at runtime; it should not change the
+*meaning* of the shared IR you export for verification on supported operations under their stated
+domain preconditions, modulo the normal float-soundness caveats in *Floating-Point Semantics*.
 
 # The Canonical IR
 
-The graph that matters most in TorchLean is the symbolic DAG carrying explicit operation tags.
+The graph that matters most in TorchLean is the symbolic DAG carrying explicit operation names.
 
 The [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean) introduces `NN.IR.OpKind`, `NN.IR.Node`, and
-`NN.IR.Graph`. The graph stores only structure: nodes, parent links, operation tags, and output
+`NN.IR.Graph`. The graph stores only structure: nodes, parent links, operation names, and output
 shapes. Parameters stay outside the graph in payload tables keyed by node id.
 
 That keeps the IR small enough to diff, inspect, rewrite, and share across runtime, verification,
@@ -95,7 +94,7 @@ x
   -> linear(W2, b2)
 ```
 
-The IR sees the dataflow and the operation tags:
+The IR sees the dataflow and the operation names:
 
 ```
 node 0 : input      parents []
@@ -104,13 +103,13 @@ node 2 : relu       parents [1]
 node 3 : linear     parents [2]   payload[3] = (W2, b2)
 ```
 
-The graph stores topology and op tags. The payload stores weights, biases, and constants. That split
+The graph stores topology and operation names. The payload stores weights, biases, and constants. That split
 is why a verifier can say exactly which node it propagated through and which parameter tensor it
 used.
 
 # Reading An IR Node
 
-An IR node has a compact shape. The important fields are:
+An IR node has a compact shape. The fields to read first are:
 
 - `id`: the node number, also expected to be its array index,
 - `parents`: the ids of earlier nodes this node reads from,
@@ -118,9 +117,10 @@ An IR node has a compact shape. The important fields are:
   `.softmax axis`,
 - `outShape`: the declared output shape.
 
-That is the main difference from a runtime tape node. A tape node may carry closures and runtime
-values. An IR node carries a symbolic operation tag. Verifiers need the latter because an IBP or
-CROWN pass must be able to ask "what operation is this?" without executing arbitrary runtime code.
+The main difference from a runtime tape node is what the node is allowed to contain. A tape node may
+carry closures and runtime values. An IR node carries a symbolic operation tag. Verifiers need the
+latter because an IBP or CROWN pass must be able to ask "what operation is this?" without executing
+arbitrary runtime code.
 
 For example, a linear layer node has one parent: the activation input. Its weights and bias are not
 extra parents. They live in the payload store keyed by the linear node id. That convention keeps the
@@ -148,21 +148,21 @@ passes. It includes:
   and `.layernorm`,
 - explicit randomness nodes such as `.randUniform seed` and `.bernoulliMask seed`.
 
-Randomness is not ambient. A seeded random node is an explicit part of the graph. That matters for
-replay, debugging, and verification: the graph records the source of the mask instead of asking a
-backend to remember hidden state.
+Randomness is not ambient. A seeded random node is an explicit part of the graph. Replay, debugging,
+and verification can then refer to the source of the mask instead of asking a backend to remember
+hidden state.
 
 The IR account is built from three closely related groups of declarations:
 
 - [NN.IR.Graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
   - `OpKind` names the operation vocabulary.
-  - `Node` records ids, parents, operation tags, and declared output shapes.
-  - `Graph` stores the node array and exposes the basic well-formedness checks.
+  - `Node` records ids, parents, operation names, and declared output shapes.
+  - `Graph` stores the node array and exposes the basic checks that the graph is well formed.
 
 - [NN.IR.Infer API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Infer.lean) / [NN.IR.Check API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean)
-  - `checkInferredShapes` recomputes every declared output shape from parent shapes and op tags.
+  - `checkInferredShapes` recomputes every declared output shape from parent shapes and operation names.
   - `checkShapes` is the public alias for the same inferred-shape contract.
-  - These checks are meant for compiler and backend consistency checks.
+  - Compiler and backend tests use these checks to keep generated graphs honest.
 
 - [NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean)
   - The denotation defined in Lean:
@@ -191,7 +191,7 @@ mere bureaucracy; they are the difference between:
 - a verifier silently reasoning about a malformed artifact, and
 - a verifier/compiler failing loudly at a precise node id with a readable error.
 
-The most important invariants are:
+The core invariants are:
 
 - `Graph.checkWellFormed` (topology and ids)
   - ids are within bounds,
@@ -206,7 +206,7 @@ The most important invariants are:
 When writing a compiler pass or a rewrite, we treat these as the default consistency checks:
 
 - run `checkWellFormed` and `checkInferredShapes` on every output graph while developing,
-- and record "preserves well-formedness" as a proof obligation once the pass stabilizes.
+- and record "preserves well formed graphs" as a proof obligation once the pass stabilizes.
 
 # SSA Discipline
 
@@ -216,7 +216,7 @@ When writing a compiler pass or a rewrite, we treat these as the default consist
 - each node stores a list of parent ids,
 - and parents must be smaller ids.
 
-This buys several practical benefits:
+This discipline has several practical benefits:
 
 - *execution* is a fold over ids (no scheduler),
 - *debugging* is local (node `i` only depends on `0..(i-1)`),
@@ -225,19 +225,21 @@ This buys several practical benefits:
 
 # Why Parameters Live Outside The Graph
 
-The IR graph itself is just structure. Parameters are supplied by an explicit payload record
+The IR graph itself is pure structure. Parameters are supplied by an explicit payload record
 defined in [NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean):
 
 - `Payload.const? : Nat → Option (ConstFlat α)`
 - `Payload.linear? : Nat → Option (LinearWB α)`
 - `Payload.conv2d? : Nat → Option (Conv2DParams α)`
 
-This split is deliberate, for at least three reasons:
+The split gives the graph layer three practical properties:
 
-1. It keeps the graph small and shareable (diffs, pretty-printing, and rewrites stay local
-   without dragging around huge tensors).
-2. It matches the real world (ONNX initializers, PyTorch `state_dict` / `nn.Module` parameters).
-3. It is verification-friendly (verifiers want to attach extra metadata to parameters).
+1. It keeps the graph small and shareable: diffs, pretty-printing, and rewrites stay local
+   without dragging around huge tensors.
+2. It matches the real world: ONNX initializers, PyTorch `state_dict`, and `nn.Module` parameters
+   already separate structure from payload.
+3. It gives verifiers room to attach extra metadata to parameters without changing the graph
+   topology.
 
 A node such as `OpKind.linear` with exactly one parent `x` is intentional: the weights and bias are
 supplied through the payload map keyed by the node's id, not as extra parent edges in the DAG.
@@ -247,6 +249,46 @@ needed to execute parameterized nodes, plus the metadata required by bound propa
 `payloadOfParamStore` converts that verification store back to the `Payload` expected by the IR
 denotation, so the same graph can be evaluated and verified without introducing a second graph
 language.
+
+# Payloads Are Data, Not Proofs
+
+It is tempting to say that once a graph has been imported, the model has been verified. The IR is
+more modest than that. A graph plus payload is an artifact with enough structure for Lean to check
+shape discipline, supported op names, and evaluation against the Lean denotation. It is not by
+itself a certificate that the artifact came from the model the user had in mind.
+
+For imported or generated graphs, the trust boundary has three parts:
+
+- *producer boundary*: PyTorch, ATen, ONNX, a TorchLean compiler pass, or a hand-written exporter
+  produced the graph and payload;
+- *artifact checks*: `checkWellFormed`, shape inference, payload lookup, supported-op checks, and
+  parser validation run in Lean;
+- *semantic bridge*: a theorem or named assumption says the artifact denotes the intended model,
+  architecture, or runtime program.
+
+The middle line is what `NN.IR.Graph` gives us immediately. The third line is the theorem people
+usually want to cite. Keeping those apart avoids an easy mistake: trusting a converter because the
+converted graph is internally consistent.
+
+# External Graphs And ATen Operators
+
+PyTorch's ATen layer is a tensor library with many dynamically dispatched CPU and CUDA kernels. An
+ATen call such as `aten::add`, `aten::matmul`, or `aten::conv2d` is excellent producer-side
+information, but it is not automatically a TorchLean theorem. When a PyTorch or ONNX graph enters
+TorchLean, the importer has to translate the supported operator into a TorchLean IR opcode and
+payload convention.
+
+The accepted subset should therefore be read as a contract:
+
+- the external graph supplies op names, attributes, shapes, and initializers;
+- the importer maps supported cases to `OpKind` plus `Payload`;
+- Lean checks that the resulting graph is well formed and shape consistent;
+- later proof or verification code reasons about `Graph.denote`, not about the original ATen
+  dispatcher or ONNX runtime.
+
+Unsupported operators should fail closed. A graph break, custom Python function, or backend-specific
+ATen kernel may still be a useful runtime path, but it has not become part of the verified IR until
+there is an explicit lowering and semantic bridge for it.
 
 # A Compiler Checklist
 
@@ -259,8 +301,8 @@ When a pass emits a graph, the minimum reader checklist is:
 
 The first two checks are structural. The third is semantic bookkeeping. A graph can be perfectly
 well formed and still fail evaluation if a `.const`, `.linear`, or `.conv2d` node is missing its
-payload. That is a useful failure mode: the error is attached to a node id rather than becoming a
-silent mismatch between the model and the verifier input.
+payload. That failure is local: the error is attached to a node id rather than becoming a silent
+mismatch between the model and the verifier input.
 
 # Denotation In Plain Terms
 
@@ -270,7 +312,7 @@ The [IR semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Se
   (`DVal α := Σ s, Tensor α s`).
 - `Graph.denote` evaluates the graph and returns the dynamic value at `outputId`.
 
-Two practical notes are worth keeping in mind:
+Two practical notes:
 
 - evaluation returns `Except String ...` (so missing payloads and shape errors are explicit),
 - and the evaluator performs `checkWellFormed` up front (fast path for compiler-produced graphs).
@@ -297,12 +339,11 @@ workflows line up:
 - Proofs: state correctness theorems and soundness theorems *about the IR denotation*, not about an
   opaque runtime.
 
-This is the key to avoiding the classic verification failure mode: proving a property of the wrong
-graph.
+The separation avoids the classic verification failure mode: proving a property of the wrong graph.
 
 # A Tiny Worked Example
 
-This is a minimal "input + const + add" graph, including:
+Here is a minimal "input + const + add" graph, including:
 
 - the graph structure,
 - the external constant payload,
@@ -316,7 +357,7 @@ open NN
 open Spec
 open NN.IR
 
-def f2 (x y : Float) : Spec.Tensor Float (shape![2]) :=
+def pairTensor (x y : Float) : Spec.Tensor Float (shape![2]) :=
   Tensor.dim (fun
     | ⟨0, _⟩ => Tensor.scalar x
     | ⟨_, _⟩ => Tensor.scalar y)
@@ -333,10 +374,10 @@ def g : Graph :=
 
 def payload : Payload Float :=
   { const? := fun id =>
-      if id = 1 then some { n := 2, v := f2 0.25 0.25 } else none }
+      if id = 1 then some { n := 2, v := pairTensor 0.25 0.25 } else none }
 
 def input : DVal Float :=
-  DVal.mk (α := Float) (shape![2]) (f2 0.6 (-0.2))
+  DVal.mk (α := Float) (shape![2]) (pairTensor 0.6 (-0.2))
 
 -- Typical debugging checks:
 -- #eval g.checkWellFormed
@@ -354,8 +395,8 @@ In the infoview, this graph can be inspected with:
 
 Start from the [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean), the
 [IR semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean), and the
-[IR checking API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean). That is enough context to make the rest of the
-verification path much easier to follow.
+[IR checking API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean). Those three
+files give enough context for the rest of the verification path.
 
 # What Can Go Wrong
 
@@ -369,8 +410,8 @@ Most graph bugs fall into one of a few categories:
 
 TorchLean tries to make these failures local. Instead of discovering a bad certificate at the end of
 a long verification run, the IR checks should identify the first malformed node or missing payload.
-That is why the guide keeps returning to node ids, shapes, and payloads: they are the diagnostic
-coordinates of the graph layer.
+Node ids, shapes, and payloads keep returning throughout the graph material because they are the
+diagnostic coordinates of this layer.
 
 # Verification Reuses The Same Graph
 
@@ -381,38 +422,36 @@ The [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheo
 language. Instead, it takes `NN.IR.Graph` as given and layers verification state on top of it:
 interval boxes, affine forms, parameter stores, propagation state, and the passes that compute them.
 
-This is the main reason the IR needs operation tags: without them, verification passes cannot be
-generic over a runtime trace.
+The IR needs named operations because verification passes cannot be generic over an arbitrary
+runtime trace.
 
 # Runtime Graphs Have A Different Job
 
 Runtime graphs are designed around *execution*, so their shape is different from the verifier IR.
 The [eager engine API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Core.lean) contains `Tape`, where each node
 has runtime values and local VJP rules. The [compiled graph builder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/GraphM.lean)
-produces `Proofs.Autograd.Algebra.GraphData`, an SSA/DAG of closures. That is close to a "PyTorch
-graph" in spirit, but the nodes are opaque closures rather than symbolic operations, so verifiers
-need a separate reification step.
+produces `Proofs.Autograd.Algebra.GraphData`, an SSA/DAG of closures. It is close to a "PyTorch
+graph" in spirit, but the nodes are opaque closures rather than symbolic operations, so verifiers need
+a separate reification step.
 
-On the proof side, the [tape soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
+In the proof layer, the [tape soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
 contains the same idea again: `Proofs.Autograd.Algebra.Graph` and `GraphData` are SSA graphs whose
 nodes are functions with local adjointness laws, not symbolic op codes.
 
-A compact summary is: runtime graphs optimize for differentiable execution and debugging; the
-operation-tagged IR optimizes for shared semantics, inspection, and verification passes that need an
-explicit operator vocabulary.
+A compact summary is: runtime graphs optimize for differentiable execution and debugging; the IR
+optimizes for shared semantics, inspection, and verification passes that need named operators.
 
 # Where User Code Enters The IR Story
 
-The public model-building and training APIs are covered earlier in the guide. The extra point here
-is the semantic boundary:
+User-facing model code and graph artifacts meet at a semantic boundary:
 
 - ordinary training may run through eager or compiled runtime execution;
 - verification, export, and graph inspection need a symbolic `NN.IR.Graph`;
 - the bridge succeeds by producing a graph plus payload/parameter store, or fails with an explicit
   unsupported-operator error.
 
-So the IR chapter is not another tour of the training API. It is the contract for the artifact that
-verification and graph-level tooling consume.
+The IR chapter is therefore not another tour of the training API. It is the contract for the graph
+that verification, export, and inspection tools consume.
 
 # Compiling TorchLean Programs To IR
 
@@ -425,11 +464,11 @@ and unsupported ops fail with explicit errors rather than silently changing sema
 [TorchLean correctness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Correctness.lean) contains the helpers
 for comparing compiled graphs with the IR semantics (`NN.IR.Graph.denote`).
 
-GraphSpec is the typed architecture authoring layer. `NN.IR.Graph` is the lower shared IR used by
+GraphSpec is the typed architecture layer. `NN.IR.Graph` is the lower shared IR used by
 runtime compilation and verification. The compiler connects those levels while preserving a single
-verifier-facing denotation.
+denotation for verification.
 
-# The Proved Forward Fragment
+# The Compiler Proof Fragment
 
 The semantics alignment theorem people usually want to cite is:
 
@@ -442,27 +481,30 @@ Rather than forcing the public API to become an AST, TorchLean takes an additive
 a first-order forward fragment is introduced whose compiler correctness can be proved inside Lean,
 and coverage grows op by op.
 
-The [proved TorchLean compiler fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean) defines a
-first order SSA/DAG language (`FGraph`) with typed indices (`Idx`) into the current context. It
-provides a spec evaluator `evalForward1`, a compiler `compileForward1` into `NN.IR.Graph` plus
-`ParamStore`, and the structural theorem `compileForward1_wellFormed`.
-  - Proved (semantic alignment for the fragment):
-    - `Proved.evalCompiledForward1_eq_evalForward1`:
-      `evalCompiledForward1 (compileForward1 p params) x = evalForward1 p params x`.
+The [compiler proof fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean) defines a
+first-order SSA/DAG language (`FGraph`) with typed indices (`Idx`) into the current context. It
+provides a spec evaluator `evalForward`, a compiler `compileForward` into `NN.IR.Graph` plus
+`ParamStore`, and structural lemmas saying the compiled graph is well formed.
+
+The main semantic theorem for the fragment is:
+
+```
+runForwardIR (compileForward p params) x = evalForward p params x
+```
 
 The informal correctness statement is simple:
 
 For the proved forward fragment, the compiler preserves denotation:
 
 - take a forward program `p` (in the fragment),
-- compile it to IR (`compileForward1 p params = (g, payload)`),
+- compile it to IR (`compileForward p params = (g, payload)`),
 - then evaluating the IR graph under the IR semantics equals evaluating the fragment directly:
 
 $$`\operatorname{Graph.denote}(g,payload,input)
 =
-\operatorname{evalForward1}(p,params,input)`
+\operatorname{evalForward}(p,params,input)`
 
-(with the required typing and shape well-formedness conditions, which are also proved).
+(with the required typing and shape conditions, which are also proved).
 
 Why this matters, from an ML and verification point of view:
 
@@ -485,7 +527,10 @@ the verifier uses), *Widgets* (infoview inspection of graphs and bounds).
 # References
 
 - TorchLean paper: https://arxiv.org/abs/2602.22631
+- [PyTorch ATen docs](https://docs.pytorch.org/cppdocs/api/aten/index.html)
 - [PyTorch FX docs](https://pytorch.org/docs/stable/fx.html)
+- [PyTorch graph-break docs](https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/compile/programming_model.graph_breaks_index.html)
 - [ONNX](https://onnx.ai/) (common export boundary in practice)
+- [ONNX IR specification](https://onnx.ai/onnx/repo-docs/IR.html)
 - [GraphViz DOT language](https://graphviz.org/doc/info/lang.html)
 - SSA overview: `https://en.wikipedia.org/wiki/Static_single_assignment_form`

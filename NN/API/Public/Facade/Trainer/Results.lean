@@ -28,7 +28,7 @@ namespace Regression
 Uniform `ℓ∞` verification request for a trained regression model.
 
 The request is deliberately small: one center input and one radius. It maps cleanly to TorchLean's
-existing verifier stack:
+checked verifier path:
 
 1. compile the trained forward model to verifier IR,
 2. seed the distinguished input node with an `ℓ∞` box,
@@ -135,7 +135,7 @@ def printSummary {σ τ : Shape} (result : TrainResult σ τ) : IO Unit :=
 /--
 Run one regression prediction and print it with a user-provided label.
 
-This is the small "train, then inspect one heldout example" helper used by tutorials.
+Small "train, then inspect one heldout example" helper used by tutorials.
 -/
 def printPrediction {σ τ : Shape}
     (result : TrainResult σ τ) (label : String) (x : Tensor.T Float σ) : IO Unit := do
@@ -258,7 +258,7 @@ namespace Custom
 Result of training a custom supervised trainer.
 
 The trained handle mirrors `CrossEntropy.TrainResult`: custom objectives affect training, but
-inference is still just "run the checked model on a Float tensor". Keeping that surface identical
+inference is still just "run the checked model on a Float tensor". Keeping that API identical
 means examples can switch from a canned loss to a task-specific loss without rewriting their
 prediction/reporting code.
 -/

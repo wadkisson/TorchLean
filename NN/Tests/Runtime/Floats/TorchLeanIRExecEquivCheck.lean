@@ -55,14 +55,14 @@ def run : IO Unit := do
   let x : Tensor Float xShape :=
     Tensor.dim (fun i => Tensor.scalar ([0.5, 0.8][i.val]!))
 
-  -- TorchLean program for the model.
+  -- TorchLean forwardProgram for the model.
   let prog :
       Runtime.Autograd.TorchLean.Program Float (paramShapes ++ [xShape]) yShape :=
-    Runtime.Autograd.TorchLean.NN.Seq.program (model := model) (α := Float)
+    Runtime.Autograd.TorchLean.NN.Seq.forwardProgram (model := model) (α := Float)
 
   -- Compile to IR and executable `ExecGraphData`.
   let (c, exec) ←
-    match NN.Verification.TorchLean.compileForward1Exec
+    match NN.Verification.TorchLean.compileForwardExec
         (α := Float) (paramShapes := paramShapes) (inShape := xShape) (outShape := yShape) prog
           params with
     | .error e => throw <| IO.userError s!"torchlean_ir_exec_equiv_check: compile failed: {e}"

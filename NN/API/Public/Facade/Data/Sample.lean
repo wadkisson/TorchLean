@@ -85,17 +85,17 @@ end Sample
 namespace Samples
 
 export NN.API.Samples
-  (vec1Float vec2Float grid2Square affine2 regression2to1Float)
+  (singletonVectorFloat pointVectorFloat squareGrid affinePlane regressionTargetsFloat)
 
 /-- A length-1 tensor, casting host `Float` into the selected runtime scalar. -/
-def vec1 {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] (y : Float) :
+def singletonVector {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] (y : Float) :
     Tensor.T α (Shape.vec 1) :=
-  NN.API.Samples.vec1 NN.API.Runtime.ofFloat y
+  NN.API.Samples.singletonVector NN.API.Runtime.ofFloat y
 
 /-- A length-2 tensor, casting host `Float` coordinates into the selected runtime scalar. -/
-def vec2 {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] (x1 x2 : Float) :
+def pointVector {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] (x y : Float) :
     Tensor.T α (Shape.vec 2) :=
-  NN.API.Samples.vec2 NN.API.Runtime.ofFloat x1 x2
+  NN.API.Samples.pointVector NN.API.Runtime.ofFloat x y
 
 end Samples
 

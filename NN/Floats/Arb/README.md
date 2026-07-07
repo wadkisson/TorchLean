@@ -1,22 +1,34 @@
-# Arb oracle backend (`NN/Floats/Arb`)
+# Arb Oracle Backend (`NN/Floats/Arb`)
 
 This folder integrates Arb ball arithmetic, through python-flint and FLINT/Arb, as an external oracle
 callable from Lean.
 
-## What you get
+## What You Get
 
 - Rigorous enclosures: Arb tracks a real value as a ball `m ± r` that contains the true value
   according to Arb's interval arithmetic.
 - Configurable precision: you control the working precision in bits. Higher precision often
   tightens bounds, at higher compute cost.
 
-## Trust model
+## Files
+
+- `Oracle.lean`: Lean side process wrapper, request/response types, JSON parsing, and helper
+  functions for invoking the oracle.
+- `arb_oracle.py`: Python implementation backed by `python-flint`/FLINT/Arb.
+
+## Trust Model
 
 This backend is not kernel reducible and should be treated as untrusted by default:
 
 - Lean calls a Python process.
 - The Python process calls Arb/FLINT.
 - The result is a JSON payload that can be checked or inspected by Lean code.
+
+Arb is a serious validated-numerics library, but an Arb response is still an external result from
+Lean's point of view. A strong TorchLean claim should either:
+
+- check a small certificate derived from the Arb result, or
+- state explicitly that the claim depends on the Arb/python-flint oracle.
 
 If you want semantics defined inside Lean, use TorchLean's native float backends instead:
 
@@ -38,6 +50,12 @@ different Python and point Lean at it with `TORCHLEAN_ARB_PY`.)
 
 Lean wrappers call `NN/Floats/Arb/arb_oracle.py` through `IO.Process`. You can select the Python
 executable with `TORCHLEAN_ARB_PY`; otherwise the wrapper uses `python3`.
+
+The deep-dive comparison command is:
+
+```bash
+lake exe torchlean floats_arb_ieee_compare
+```
 
 ## Supported functions
 
@@ -62,11 +80,11 @@ variables introduce dependency effects.
 
 See the docstring at the top of `NN/Floats/Arb/arb_oracle.py` for the exact JSON shapes.
 
-## Integration strategy (how to use this in verification)
+## Integration Strategy
 
 There are two main ways to integrate Arb into verification pipelines:
 
-1. Certificate oracle (recommended): compute bounds externally (Python/Arb), emit a structured
+1. Certificate producer: compute bounds externally with Python/Arb, emit a structured
    certificate, and check it in Lean (small trusted checker, large untrusted solver).
 2. Hybrid primitive oracle: during IBP/CROWN propagation, call Arb only for expensive
    nonlinearities (e.g. `tanh/exp/log`) while keeping linear algebra in Lean. Per-node process

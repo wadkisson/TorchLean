@@ -82,22 +82,22 @@ This avoids a lot of "stuck" metavariables in larger model definitions.
 -/
 def map2SequenceSpec2 {seqLen dim1 dim2 : Nat} (outShape : Shape)
   (f : Tensor α (.dim dim1 .scalar) → Tensor α (.dim dim2 .scalar) → Tensor α outShape)
-  (seq1 : Tensor α (.dim seqLen (.dim dim1 .scalar)))
-  (seq2 : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
+  (leftSeq : Tensor α (.dim seqLen (.dim dim1 .scalar)))
+  (rightSeq : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
   Tensor α (.dim seqLen outShape) :=
-  match seq1, seq2 with
-  | Tensor.dim fn1, Tensor.dim fn2 =>
-    Tensor.dim (fun i => f (fn1 i) (fn2 i))
+  match leftSeq, rightSeq with
+  | Tensor.dim func, Tensor.dim rightFn =>
+    Tensor.dim (fun i => f (func i) (rightFn i))
 
 /-- Zip a vector sequence and a scalar sequence, then apply a vector×scalar function per step. -/
 def map2SequenceVecScalarSpec {seqLen dim : Nat} (outShape : Shape)
   (f : Tensor α (.dim dim .scalar) → Tensor α .scalar → Tensor α outShape)
-  (seq1 : Tensor α (.dim seqLen (.dim dim .scalar)))
-  (seq2 : Tensor α (.dim seqLen .scalar)) :
+  (leftSeq : Tensor α (.dim seqLen (.dim dim .scalar)))
+  (rightSeq : Tensor α (.dim seqLen .scalar)) :
   Tensor α (.dim seqLen outShape) :=
-  match seq1, seq2 with
-  | Tensor.dim fn1, Tensor.dim fn2 =>
-    Tensor.dim (fun i => f (fn1 i) (fn2 i))
+  match leftSeq, rightSeq with
+  | Tensor.dim func, Tensor.dim rightFn =>
+    Tensor.dim (fun i => f (func i) (rightFn i))
 
 
 /--
@@ -138,19 +138,19 @@ def reverseSequenceSpec {seqLen dim : Nat}
 /--
 Concatenate two sequences along the feature dimension.
 
-PyTorch analogy: `torch.cat([seq1, seq2], dim=1)` when shapes are `(seqLen, dim1)` and `(seqLen,
+PyTorch analogy: `torch.cat([leftSeq, rightSeq], dim=1)` when shapes are `(seqLen, dim1)` and `(seqLen,
   dim2)`.
 
 Do not confuse this with `Spec.Tensor.concatSequenceSpec` (defined in
 `NN.Spec.Core.TensorReductionShape`), which concatenates along the time axis (axis 0).
 -/
 def concatSequenceSpec {seqLen dim1 dim2 : Nat}
-  (seq1 : Tensor α (.dim seqLen (.dim dim1 .scalar)))
-  (seq2 : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
+  (leftSeq : Tensor α (.dim seqLen (.dim dim1 .scalar)))
+  (rightSeq : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
   Tensor α (.dim seqLen (.dim (dim1 + dim2) .scalar)) :=
-  match seq1, seq2 with
-  | Tensor.dim fn1, Tensor.dim fn2 =>
-    Tensor.dim (fun i => concatVectorsSpec (fn1 i) (fn2 i))
+  match leftSeq, rightSeq with
+  | Tensor.dim func, Tensor.dim rightFn =>
+    Tensor.dim (fun i => concatVectorsSpec (func i) (rightFn i))
 
 /--
 Reduce a batch of vectors by summing over the batch axis (explicit axis = 0).

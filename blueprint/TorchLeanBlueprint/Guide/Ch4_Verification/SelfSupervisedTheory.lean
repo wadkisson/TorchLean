@@ -11,10 +11,10 @@ Self supervised learning is full of objectives whose code looks simple but whose
 bookkeeping: which patches are masked, which view is predicted, which encoder receives gradients,
 and which term prevents collapse.
 
-TorchLean's SSL layer is about these objective semantics. It does not prove that MAE, JEPA, or
-VICReg training learns useful representations. It proves smaller facts: masked sums decompose as
-intended, MAE and JEPA instantiate a common predictive-view contract, and collapse guards are
-positive under the stated hypotheses.
+TorchLean's SSL layer is about these objective semantics. The formal claims are local:
+masked sums decompose as intended, MAE and JEPA instantiate a common predictive-view contract, and
+collapse guards are positive under the stated hypotheses. Generalization or representation-quality
+claims can then cite those objective facts instead of treating the training script as the definition.
 
 # The Minimal Pattern
 
@@ -27,9 +27,8 @@ Most SSL objectives in this layer have the same three ingredients:
 - *Guard term*: an extra scalar penalty that rules out a degenerate solution, such as a VICReg
   variance floor for collapse.
 
-That lets us write theorem statements about the objective itself. We are not proving that every
-training run learns good representations; we are proving that the named loss decomposes, respects
-finite masks, and penalizes the degenerate cases it claims to penalize.
+That lets us write theorem statements about the objective itself: the named loss decomposes,
+respects finite masks, and penalizes the degenerate cases it claims to penalize.
 
 # Predictive Views and Masks
 
@@ -61,11 +60,11 @@ Masks are equally concrete. The [masking API](https://github.com/lean-dojo/Torch
 uses finite indices throughout: a mask for length `n` is a function from `Fin n` to `Bool`, and
 `maskedLoss idxs ell` is the finite sum of `ell i` over the selected indices.
 
-The masked objective is just a finite sum:
+The masked objective is a finite sum:
 
 $$`L_M=\sum_{i\in M}\ell(\hat x_i,x_i).`
 
-The key theorems are small but important: `maskedLoss_append`, `maskedLoss_reverse`, and
+The key theorems are small: `maskedLoss_append`, `maskedLoss_reverse`, and
 `maskedLoss_eq_zero_of_all_zero`. They make sure that serialization details such as splitting or
 reversing the selected patch list do not silently change the algebra being proved.
 
@@ -105,7 +104,7 @@ $$`L_{\mathrm{JEPA}}
 f_{\mathrm{target}}(x_{\mathrm{target}}^v)\right).`
 
 The theorems `jepaLoss_append`, `jepaLoss_reverse`, and `jepaLoss_target_ext` are objective algebra
-facts. They do not say that a representation is useful; they say that the target and context
+facts. They do not say that a representation learned something good; they say that the target and context
 terms in the objective are exactly the terms named in the statement.
 
 # VICReg and Redundancy Reduction
@@ -129,7 +128,7 @@ $$`L_{\mathrm{var}}
 =
 \sum_j \max(0,\gamma-\sigma_j)^2.`
 
-The useful theorem pattern is collapse detection. If every variance is zero and the variance floor
+The theorem pattern is collapse detection. If every variance is zero and the variance floor
 `γ` is positive, then the variance penalty is positive:
 
 `varianceTerm_collapsed_positive` is the Lean theorem name for this collapsed representation case.
@@ -151,7 +150,7 @@ layer checks objective identities and degenerate cases directly.
 # What We Claim
 
 TorchLean formalizes selected SSL objective components and finite mask/list properties. It does not
-prove that MAE, JEPA, or VICReg training learns useful representations. Useful external anchors are
+prove that MAE, JEPA, or VICReg training learns good representations. External anchors are
 [MAE by He et al.](https://arxiv.org/abs/2111.06377),
 [VICReg by Bardes et al.](https://arxiv.org/abs/2105.04906), and JEPA style predictive embedding
 objectives from LeCun and collaborators. Those papers motivate the shapes of the objectives; the

@@ -337,85 +337,21 @@ theorem buildFrom_denoteAllFrom_exp
                 (gd := gd) (i := i) (st' := st') (x := x) (hi := hi)
                 (τ := n.outShape) (nodeData := nodeData) hTail hEval
 
-/-- Semantic-preservation lemma for `.log` lowering. -/
-theorem buildFrom_denoteAllFrom_log
-    {α : Type} [Context α] [DecidableEq Shape]
-    (g : NN.IR.Graph) (payload : Payload α) {inShape : Shape} {ss : List Shape}
-    (gd : GraphData α Unit [inShape] ss) (i : Nat) (st' : State α inShape)
-    (x : Tensor α inShape) (n : NN.IR.Node)
-    (hN : g.getNode i = .ok n) (hk : n.kind = .log) (hi : i < g.nodes.size)
-    (hBuild :
-      buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape)
-        (i := i) (st := (⟨ss, gd⟩ : State α inShape)) = .ok st')
-    (ih :
-      ∀ (st1 : State α inShape),
-        buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape)
-          (i := i + 1) st1 = .ok st' →
-        NN.IR.Graph.denoteAllFrom (α := α) (g := g) (payload := payload)
-          (input := NN.IR.DVal.mk (α := α) inShape x)
-          (i := i + 1) (vals := denoteAllState (α := α) inShape st1 x) =
-          .ok (denoteAllState (α := α) inShape st' x)) :
-    NN.IR.Graph.denoteAllFrom (α := α) (g := g) (payload := payload)
-      (input := NN.IR.DVal.mk (α := α) inShape x)
-      (i := i) (vals := denoteAllState (α := α) inShape (st := (⟨ss, gd⟩ : State α inShape)) x) =
-      .ok (denoteAllState (α := α) inShape st' x) := by
-  let vals0 : Array (NN.IR.DVal α) :=
-    denoteAllState (α := α) inShape (st := (⟨ss, gd⟩ : State α inShape)) x
-  let ctx : TList α ([inShape] ++ ss) :=
-    GraphData.eval (α := α) (Δ := Unit) (Γ := [inShape]) (ss := ss) gd (.cons x .nil) ()
-  let input : NN.IR.DVal α := NN.IR.DVal.mk (α := α) inShape x
+/--
+Positive-domain simplification for the compiled raw-log branch.
 
-  unfold buildFrom at hBuild
-  simp (config := { failIfUnchanged := false }) [hi, hN, hk] at hBuild
-  cases hp : n.parents with
-  | nil =>
-      simp [hp] at hBuild
-      try cases hBuild
-  | cons pId ps =>
-      cases ps with
-      | cons _ _ =>
-          simp [hp] at hBuild
-          try cases hBuild
-      | nil =>
-          cases hIdx : mkIdx (inShape := inShape) (ss := ss) pId n.outShape with
-          | error msg =>
-              simp [hp, hIdx] at hBuild
-              try cases hBuild
-          | ok ip =>
-              simp [hp, hIdx] at hBuild
-              let nodeData : NodeData α Unit ([inShape] ++ ss) n.outShape :=
-                mkFwdNode (α := α) (Γ := [inShape] ++ ss) (τ := n.outShape) (fun ctx =>
-                  let x := getIdx (α := α) (xs := ctx) ip
-                  -- `IRExec.buildFrom` inserts a runtime-domain check for raw `log` to match
-                  -- the eager autograd engine behavior. In Lean, `panic!` reduces to
-                  -- `Inhabited.default`, so this becomes a checked `if` with a default fallback.
-                  if Tensor.allSpec (α := α) (s := n.outShape) (fun v => decide (0 < v)) x = true then
-                    Tensor.logSpec (α := α) x
-                  else
-                    (Inhabited.default : Tensor α n.outShape))
-              let st1 : State α inShape := ⟨ss ++ [n.outShape], .snoc (ss := ss) gd nodeData⟩
-              have hRec :
-                  buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape)
-                      (i := i + 1) st1 =
-                    .ok st' := by
-                simpa [st1, nodeData] using hBuild
-              have hTail := ih st1 hRec
-              have hGet :
-                  vals0[pId]! =
-                    NN.IR.DVal.mk (α := α) n.outShape (getIdx (α := α) (xs := ctx) ip) := by
-                simpa [vals0, ctx] using
-                  (denoteAllState_get_mkIdx (inShape := inShape) (ss := ss)
-                    (gd := gd) (x := x) (pid := pId) (s := n.outShape) (idx := ip) hIdx)
-              have hEval :
-                  NN.IR.Graph.evalAt (α := α) (g := g) (payload := payload)
-                      (input := input) (vals := vals0) (i := i) =
-                    .ok (NN.IR.DVal.mk (α := α) n.outShape (nodeData.forward ctx ())) := by
-                simp [NN.IR.Graph.evalAt, hN, hk, hp, hGet, Graph.expectShape_mk,
-                  nodeData, mkFwdNode, NN.IR.DVal.shape, NN.IR.DVal.tensor, NN.IR.DVal.mk,
-                  throw_eq_error, Except.instMonad, Except.bind, Except.pure]
-              exact buildFrom_denoteAllFrom_nodeData_exact (α := α) (g := g) (payload := payload)
-                (gd := gd) (i := i) (st' := st') (x := x) (hi := hi)
-                (τ := n.outShape) (nodeData := nodeData) hTail hEval
+The end-to-end compiler theorem currently excludes raw `.log` through `NoRawLog`; a future theorem
+can use this local fact after it carries per-node positivity facts through the graph.
+-/
+theorem rawLogForward_positive
+    {α : Type} [Context α] {s : Shape} (x : Tensor α s)
+    (h : Tensor.allSpec (α := α) (s := s) (fun v => decide (0 < v)) x = true) :
+    (if Tensor.allSpec (α := α) (s := s) (fun v => decide (0 < v)) x = true then
+      Tensor.logSpec (α := α) x
+    else
+      (Inhabited.default : Tensor α s)) =
+      Tensor.logSpec (α := α) x := by
+  simp [h]
 
 /-- Semantic-preservation lemma for `.sin` lowering. -/
 theorem buildFrom_denoteAllFrom_sin

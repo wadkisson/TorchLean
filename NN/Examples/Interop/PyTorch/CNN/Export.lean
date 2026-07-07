@@ -58,7 +58,7 @@ structure MaxPool2dCfg where
   stride : Nat
 
 /-- Configuration for the 2-block CNN exporter. -/
-structure Cnn2Cfg where
+structure CnnStackConfig where
   /-- Class name to use in the generated Python. -/
   className : String := "CNN"
   /-- Input image channels. -/
@@ -81,61 +81,61 @@ structure Cnn2Cfg where
   fcOut : Nat
 
 /-- Render the 2-block CNN as a Python `nn.Module` class definition. -/
-def generateCnn2PyTorchClass (cfg : Cnn2Cfg) : String :=
+def generateCnnStackPyTorchClass (cfg : CnnStackConfig) : String :=
   let className := cfg.className
   joinLines <|
     [generatePyTorchImports, ""] ++
     [
       s!"class {className}(nn.Module):",
-      indent2 "\"\"\"2-block ConvNet (Conv2d → ReLU → MaxPool2d) × 2, then Flatten → Linear.\"\"\"",
-      indent2 "",
-      indent2 "def __init__(self):",
-      indent4 "super().__init__()",
-      indent4 (s!"self.conv1 = nn.Conv2d({cfg.conv1.inChannels}, " ++
+      indentTwo "\"\"\"2-block ConvNet (Conv2d → ReLU → MaxPool2d) × 2, then Flatten → Linear.\"\"\"",
+      indentTwo "",
+      indentTwo "def __init__(self):",
+      indentFour "super().__init__()",
+      indentFour (s!"self.conv1 = nn.Conv2d({cfg.conv1.inChannels}, " ++
         s!"{cfg.conv1.outChannels}, kernel_size=({cfg.conv1.kernelH}, " ++
         s!"{cfg.conv1.kernelW}), stride={cfg.conv1.stride}, " ++
         s!"padding={cfg.conv1.padding})"),
-      indent4 "self.relu1 = nn.ReLU()",
-      indent4 (s!"self.pool1 = nn.MaxPool2d(kernel_size=({cfg.pool1.kernelH}, " ++
+      indentFour "self.relu1 = nn.ReLU()",
+      indentFour (s!"self.pool1 = nn.MaxPool2d(kernel_size=({cfg.pool1.kernelH}, " ++
         s!"{cfg.pool1.kernelW}), stride={cfg.pool1.stride})"),
-      indent4 (s!"self.conv2 = nn.Conv2d({cfg.conv2.inChannels}, " ++
+      indentFour (s!"self.conv2 = nn.Conv2d({cfg.conv2.inChannels}, " ++
         s!"{cfg.conv2.outChannels}, kernel_size=({cfg.conv2.kernelH}, " ++
         s!"{cfg.conv2.kernelW}), stride={cfg.conv2.stride}, " ++
         s!"padding={cfg.conv2.padding})"),
-      indent4 "self.relu2 = nn.ReLU()",
-      indent4 (s!"self.pool2 = nn.MaxPool2d(kernel_size=({cfg.pool2.kernelH}, " ++
+      indentFour "self.relu2 = nn.ReLU()",
+      indentFour (s!"self.pool2 = nn.MaxPool2d(kernel_size=({cfg.pool2.kernelH}, " ++
         s!"{cfg.pool2.kernelW}), stride={cfg.pool2.stride})"),
-      indent4 "self.flatten = nn.Flatten()",
-      indent4 s!"self.fc = nn.Linear({cfg.flatSize}, {cfg.fcOut})",
-      indent2 "",
-      indent2 "def forward(self, x):",
-      indent4 "x = self.conv1(x)",
-      indent4 "x = self.relu1(x)",
-      indent4 "x = self.pool1(x)",
-      indent4 "x = self.conv2(x)",
-      indent4 "x = self.relu2(x)",
-      indent4 "x = self.pool2(x)",
-      indent4 "x = self.flatten(x)",
-      indent4 "x = self.fc(x)",
-      indent4 "return x",
-      indent2 "",
-      indent2 "@property",
-      indent2 "def input_shape(self):",
-      indent4 s!"return ({cfg.inputC}, {cfg.inputH}, {cfg.inputW})",
-      indent2 "",
-      indent2 "@property",
-      indent2 "def output_shape(self):",
-      indent4 s!"return ({cfg.fcOut},)",
-      indent2 "",
-      indent2 "@property",
-      indent2 "def layer_count(self):",
-      indent4 "return 8",
-      indent2 "",
-      indent2 "@property",
-      indent2 "def operation_types(self):",
-      indent4 ("return [\"Conv2D\", \"ReLU\", \"MaxPool2D\", \"Conv2D\", \"ReLU\", " ++
+      indentFour "self.flatten = nn.Flatten()",
+      indentFour s!"self.fc = nn.Linear({cfg.flatSize}, {cfg.fcOut})",
+      indentTwo "",
+      indentTwo "def forward(self, x):",
+      indentFour "x = self.conv1(x)",
+      indentFour "x = self.relu1(x)",
+      indentFour "x = self.pool1(x)",
+      indentFour "x = self.conv2(x)",
+      indentFour "x = self.relu2(x)",
+      indentFour "x = self.pool2(x)",
+      indentFour "x = self.flatten(x)",
+      indentFour "x = self.fc(x)",
+      indentFour "return x",
+      indentTwo "",
+      indentTwo "@property",
+      indentTwo "def input_shape(self):",
+      indentFour s!"return ({cfg.inputC}, {cfg.inputH}, {cfg.inputW})",
+      indentTwo "",
+      indentTwo "@property",
+      indentTwo "def output_shape(self):",
+      indentFour s!"return ({cfg.fcOut},)",
+      indentTwo "",
+      indentTwo "@property",
+      indentTwo "def layer_count(self):",
+      indentFour "return 8",
+      indentTwo "",
+      indentTwo "@property",
+      indentTwo "def operation_types(self):",
+      indentFour ("return [\"Conv2D\", \"ReLU\", \"MaxPool2D\", \"Conv2D\", \"ReLU\", " ++
         "\"MaxPool2D\", \"Flatten\", \"Linear\"]"),
-      indent2 ""
+      indentTwo ""
     ]
     ++ generateGetModelInfoMethodLines className
 
@@ -148,7 +148,7 @@ def generateCNNWithWeights (convW1 convB1 convW2 convB2 linearW linearB : String
     (inC outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolstride1 poolstride2
       flatSize : Nat)
     (className : String := "CNN") : String :=
-  let cfg : Cnn2Cfg :=
+  let cfg : CnnStackConfig :=
     { className := className
       inputC := inC
       inputH := inH
@@ -162,34 +162,34 @@ def generateCNNWithWeights (convW1 convB1 convW2 convB2 linearW linearB : String
       flatSize := flatSize
       fcOut := outC }
   joinLines [
-    generateCnn2PyTorchClass cfg,
+    generateCnnStackPyTorchClass cfg,
     "",
     "# Weight initialization functions",
     "def get_cnn_state_dict():",
-    indent2 "state_dict = {}",
-    indent2 s!"state_dict['conv1.weight'] = torch.tensor({convW1})",
-    indent2 s!"state_dict['conv1.bias'] = torch.tensor({convB1})",
-    indent2 s!"state_dict['conv2.weight'] = torch.tensor({convW2})",
-    indent2 s!"state_dict['conv2.bias'] = torch.tensor({convB2})",
-    indent2 s!"state_dict['fc.weight'] = torch.tensor({linearW})",
-    indent2 s!"state_dict['fc.bias'] = torch.tensor({linearB})",
-    indent2 "return state_dict",
-    indent2 "",
+    indentTwo "state_dict = {}",
+    indentTwo s!"state_dict['conv1.weight'] = torch.tensor({convW1})",
+    indentTwo s!"state_dict['conv1.bias'] = torch.tensor({convB1})",
+    indentTwo s!"state_dict['conv2.weight'] = torch.tensor({convW2})",
+    indentTwo s!"state_dict['conv2.bias'] = torch.tensor({convB2})",
+    indentTwo s!"state_dict['fc.weight'] = torch.tensor({linearW})",
+    indentTwo s!"state_dict['fc.bias'] = torch.tensor({linearB})",
+    indentTwo "return state_dict",
+    indentTwo "",
     "def load_cnn_weights(model):",
-    indent2 "state_dict = get_cnn_state_dict()",
-    indent2 "model.load_state_dict(state_dict)",
-    indent2 "return model",
-    indent2 "",
+    indentTwo "state_dict = get_cnn_state_dict()",
+    indentTwo "model.load_state_dict(state_dict)",
+    indentTwo "return model",
+    indentTwo "",
     "# Usage example",
     "if __name__ == \"__main__\":",
-    indent2 s!"model = {className}()",
-    indent2 "model = load_cnn_weights(model)",
-    indent2 s!"x = torch.randn(1, {inC}, {inH}, {inW})  # batch_size=1, channels, height, width",
-    indent2 "y = model(x)",
-    indent2 "print(f\"Input shape: {x.shape}\")",
-    indent2 "print(f\"Output shape: {y.shape}\")",
-    indent2 "print(f\"Output: {y}\")",
-    indent2 "print(f\"Model info: {model.get_model_info()}\")"
+    indentTwo s!"model = {className}()",
+    indentTwo "model = load_cnn_weights(model)",
+    indentTwo s!"x = torch.randn(1, {inC}, {inH}, {inW})  # batch_size=1, channels, height, width",
+    indentTwo "y = model(x)",
+    indentTwo "print(f\"Input shape: {x.shape}\")",
+    indentTwo "print(f\"Output shape: {y.shape}\")",
+    indentTwo "print(f\"Output: {y}\")",
+    indentTwo "print(f\"Model info: {model.get_model_info()}\")"
   ]
 
 end CNNPyTorch

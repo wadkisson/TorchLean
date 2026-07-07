@@ -38,7 +38,7 @@ For an **opt-in** executable that trains this MLP with `Torch.Options.fastKernel
 `useGpu` (GEMM path for every `linear`), run the example executable:
 
 - CPU: `lake exe torchlean mlp --cpu --steps 10`
-- CUDA: `lake build -R -K cuda=true && lake exe torchlean mlp --cuda --fast-kernels --steps 10`
+- CUDA: `lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 10`
 -/
 
 @[expose] public section
@@ -68,11 +68,11 @@ def mlp
     (seedW1 seedB1 seedW2 seedB2 : Nat := 0) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq
       (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
-  _root_.Runtime.Autograd.TorchLean.NN.seq1
+  _root_.Runtime.Autograd.TorchLean.NN.singleLayer
       (_root_.Runtime.Autograd.TorchLean.NN.linear inDim hidDim
         (seedW := seedW1) (seedB := seedB1)) >>>
-  _root_.Runtime.Autograd.TorchLean.NN.seq1 _root_.Runtime.Autograd.TorchLean.NN.relu >>>
-  _root_.Runtime.Autograd.TorchLean.NN.seq1
+  _root_.Runtime.Autograd.TorchLean.NN.singleLayer _root_.Runtime.Autograd.TorchLean.NN.relu >>>
+  _root_.Runtime.Autograd.TorchLean.NN.singleLayer
       (_root_.Runtime.Autograd.TorchLean.NN.linear hidDim outDim
         (seedW := seedW2) (seedB := seedB2))
 
@@ -98,7 +98,7 @@ def softmaxRegression
     (seedW seedB : Nat := 0) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq
       (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec numClasses) :=
-  _root_.Runtime.Autograd.TorchLean.NN.seq1
+  _root_.Runtime.Autograd.TorchLean.NN.singleLayer
     (_root_.Runtime.Autograd.TorchLean.NN.linear inDim numClasses (seedW := seedW) (seedB := seedB))
 
 end TorchLean

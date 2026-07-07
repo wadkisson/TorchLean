@@ -89,7 +89,7 @@ def concatVectorsSpec {α : Type} {n m : Nat}
         f2 j
 
 /-- Concatenate along axis 0 (append `t2` after `t1`). -/
-def concatDim0Spec {α : Type} {n m : Nat} {s : Shape}
+def concatLeadingAxisSpec {α : Type} {n m : Nat} {s : Shape}
   (t1 : Tensor α (.dim n s))
   (t2 : Tensor α (.dim m s)) :
   Tensor α (.dim (n + m) s) :=
@@ -106,14 +106,14 @@ def concatDim0Spec {α : Type} {n m : Nat} {s : Shape}
 /-!
 ## Slicing / concatenation on the leading axis
 
-`concat_dim0_spec` is the "append on axis 0" primitive that powers many higher-level utilities
+`concat_leading_axis_spec` is the "append on axis 0" primitive that powers many higher-level utilities
 (sequence concatenation, channel skip connections, etc.).
 
 For backprop and for "undoing" concatenations, it is convenient to have an explicit slice operation.
 We keep the API compact and index-safe:
 
-- `slice_range0_spec start len` selects `len` consecutive entries starting at `start` along axis 0.
-- `concat_dim0_backward_spec` is the adjoint of `concat_dim0_spec` (splits a gradient tensor).
+- `slice_leading_axis_range_spec start len` selects `len` consecutive entries starting at `start` along axis 0.
+- `concat_leading_axis_backward_spec` is the adjoint of `concat_leading_axis_spec` (splits a gradient tensor).
 -/
 
 /-- Slice `len` entries along axis 0, starting at `start`.
@@ -124,7 +124,7 @@ This is the simplest "range slice" one typically needs to express:
 - implementing `take`/`drop` without changing the inner shape.
 
 The proof `len + start ≤ n` makes the slice total (no out-of-bounds behavior). -/
-def sliceRange0Spec {α : Type} {n : Nat} {s : Shape}
+def sliceLeadingAxisRangeSpec {α : Type} {n : Nat} {s : Shape}
   (start len : Nat) (h : len + start ≤ n)
   (t : Tensor α (.dim n s)) : Tensor α (.dim len s) :=
   match t with
@@ -137,30 +137,30 @@ def sliceRange0Spec {α : Type} {n : Nat} {s : Shape}
           simpa [Nat.add_comm] using h
         f ⟨idx, lt_of_lt_of_le h1 h2⟩
 
-/-- Backward (adjoint) of `concat_dim0_spec`.
+/-- Backward (adjoint) of `concat_leading_axis_spec`.
 
-If `y = concat_dim0_spec x1 x2`, then in reverse-mode we split the upstream gradient `δy` into:
+If `y = concat_leading_axis_spec x1 x2`, then in reverse-mode we split the upstream gradient `δy` into:
 - `δx1` = the first `n` entries of `δy`,
 - `δx2` = the last  `m` entries of `δy`. -/
-def concatDim0BackwardSpec {α : Type} {n m : Nat} {s : Shape}
+def concatLeadingAxisBackwardSpec {α : Type} {n m : Nat} {s : Shape}
   (δ : Tensor α (.dim (n + m) s)) :
   Tensor α (.dim n s) × Tensor α (.dim m s) :=
-  let δ₁ := sliceRange0Spec (α := α) (n := n + m) (s := s) 0 n (Nat.le_add_right n m) δ
+  let δ₁ := sliceLeadingAxisRangeSpec (α := α) (n := n + m) (s := s) 0 n (Nat.le_add_right n m) δ
   let δ₂ :=
-    sliceRange0Spec (α := α) (n := n + m) (s := s) n m
+    sliceLeadingAxisRangeSpec (α := α) (n := n + m) (s := s) n m
       (by simp [Nat.add_comm]) δ
   (δ₁, δ₂)
 
 /--
-Backward (adjoint) of `slice_range0_spec`.
+Backward (adjoint) of `slice_leading_axis_range_spec`.
 
-If `y = slice_range0_spec start len x`, then `slice_range0_backward_spec start len δy` re-inserts
+If `y = slice_leading_axis_range_spec start len x`, then `slice_leading_axis_range_backward_spec start len δy` re-inserts
 the gradient into the original shape and fills everything outside the slice with zeros.
 -/
-def sliceRange0BackwardSpec {α : Type} [Zero α] {n : Nat} {s : Shape}
+def sliceLeadingAxisRangeBackwardSpec {α : Type} [Zero α] {n : Nat} {s : Shape}
   (start len : Nat) (_h : len + start ≤ n)
   (δ : Tensor α (.dim len s)) : Tensor α (.dim n s) :=
-  -- This is the adjoint of `slice_range0_spec`: the gradient is re-inserted into the
+  -- This is the adjoint of `slice_leading_axis_range_spec`: the gradient is re-inserted into the
   -- original shape and everything outside the slice is filled with zeros.
   Tensor.dim (fun i =>
     if h1 : i.val < start then
@@ -175,17 +175,17 @@ def sliceRange0BackwardSpec {α : Type} [Zero α] {n : Nat} {s : Shape}
 /--
 Concatenate two sequences along time (axis 0), producing a longer sequence.
 
-If `seq1 : (seqLen1 x hidden)` and `seq2 : (seqLen2 x hidden)`, this returns
-`(seqLen1 + seqLen2) x hidden` by appending `seq2` after `seq1`.
+If `leftSeq : (seqLen1 x hidden)` and `rightSeq : (seqLen2 x hidden)`, this returns
+`(seqLen1 + seqLen2) x hidden` by appending `rightSeq` after `leftSeq`.
 
 Do not confuse this with `Spec.concatSequenceSpec` (defined in `NN.Spec.Core.Sequence`), which
 concatenates along the feature dimension for *same-length* sequences.
 -/
 def concatSequenceSpec {α : Type} {seqLen1 seqLen2 hiddenSize : Nat}
-  (seq1 : Tensor α (.dim seqLen1 (.dim hiddenSize .scalar)))
-  (seq2 : Tensor α (.dim seqLen2 (.dim hiddenSize .scalar))) :
+  (leftSeq : Tensor α (.dim seqLen1 (.dim hiddenSize .scalar)))
+  (rightSeq : Tensor α (.dim seqLen2 (.dim hiddenSize .scalar))) :
   Tensor α (.dim (seqLen1 + seqLen2) (.dim hiddenSize .scalar)) :=
-  match seq1, seq2 with
+  match leftSeq, rightSeq with
   | .dim f1, .dim f2 =>
     .dim fun i =>
       if h : i.val < seqLen1 then
@@ -197,10 +197,10 @@ def concatSequenceSpec {α : Type} {seqLen1 seqLen2 hiddenSize : Nat}
 
 /-- Concatenate two sequences along the feature dimension (inner axis). -/
 def concatSequenceInnerSpec {α : Type} {seqLen hiddenSize1 hiddenSize2 : Nat}
-  (seq1 : Tensor α (.dim seqLen (.dim hiddenSize1 .scalar)))
-  (seq2 : Tensor α (.dim seqLen (.dim hiddenSize2 .scalar))) :
+  (leftSeq : Tensor α (.dim seqLen (.dim hiddenSize1 .scalar)))
+  (rightSeq : Tensor α (.dim seqLen (.dim hiddenSize2 .scalar))) :
   Tensor α (.dim seqLen (.dim (hiddenSize1 + hiddenSize2) .scalar)) :=
-  match seq1, seq2 with
+  match leftSeq, rightSeq with
   | .dim f1, .dim f2 =>
     .dim fun i =>
       match f1 i, f2 i with

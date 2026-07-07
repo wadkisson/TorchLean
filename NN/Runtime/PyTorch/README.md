@@ -9,6 +9,16 @@ We use PyTorch for two practical reasons:
 2. Moving artifacts: many workflows already produce PyTorch checkpoints or `state_dict`s. This
    bridge gives those parameters a path back into Lean for verification and proofs.
 
+This is an interop layer, not a second semantics for TorchLean. PyTorch may produce code, weights,
+graphs, or JSON artifacts, but TorchLean still parses the artifact, checks the shapes and supported
+operators, and connects the result to TorchLean IR/spec objects. PyTorch autograd is not part of the
+trusted proof boundary.
+
+This is also distinct from the ATen/libtorch runtime path. ATen can be used as a fast forward kernel
+provider in training, but TorchLean should still record the TorchLean graph/tape node and use
+TorchLean's backward rule. The files here are about moving artifacts between PyTorch and Lean; they
+do not hand model ownership or backward semantics to PyTorch.
+
 ## Export
 
 `Export/` contains reusable exporters and adapters.
@@ -37,6 +47,10 @@ Reading map:
   lowering into the checked TorchLean IR artifact.
 - Use `Export/IRPyTorch.lean` when you want a general `NN.IR.Graph` lowering path.
 
+The exported Python code is ordinary runtime code. It is useful for debugging and comparison, but a
+formal claim should name the Lean object that is checked after export: a parsed tensor bundle, a
+validated IR graph, a certificate, or a theorem over the imported graph semantics.
+
 ## Import
 
 `Import/` parses JSON encoded weights and graphs into TorchLean artifacts.
@@ -55,6 +69,10 @@ Reading map:
 - Use `Import/Core.lean` for the generic JSON parsing path.
 - Use `Import/TorchExport.lean` when you have a captured PyTorch graph JSON artifact.
 - Use `Import/CrownParamstore.lean` when you already have typed tensors and need to assemble a `ParamStore`.
+
+The importers reject unsupported structure early. That is a feature, not a limitation to paper over:
+an unsupported PyTorch op should fail with a clear message instead of silently becoming an
+uninterpreted node in a verification workflow.
 
 ## Examples live elsewhere
 
@@ -76,7 +94,7 @@ share.
   permutation, supported transpose forms, rank-2/3 matmul, softmax through the evaluator's
   axis-permutation path, and eval-mode NCHW BatchNorm now have theorem-level IR evaluator bridge
   facts. Payload-backed `linear`, no-dilation `conv2d`, payload-backed constants, and eval-mode
-  NCHW BatchNorm are also covered at the actual one-step `Graph.evalAt` path, not only at their
+  NCHW BatchNorm are also covered at the actual one-step `Graph.evalAt` path as well as at their
   helper evaluators. CHW pooling has the same local bridge to its spec operations. LayerNorm is
   covered through the IR evaluator's reshape-to-2D `Spec.layerNorm` path, and graph-structural nodes
   such as input, detach, and scalar MSE are covered as well. The theorem import surface also
@@ -84,9 +102,10 @@ share.
 - Load supported verification model families such as PINNs/FNOs through the example interop loaders.
 - Emit readable PyTorch code from a TorchLean `NN.IR.Graph` and `ParamStore`.
 
-What is not claimed: Lean does not prove PyTorch or CUDA kernels correct, and it does
-not parse `.pt`/`.pth` pickle/zip checkpoints directly. PyTorch is the external loader for those
-files; TorchLean checks the JSON artifact it receives.
+The trust boundary is explicit. PyTorch and CUDA kernels are external runtimes, and `.pt`/`.pth`
+pickle/zip checkpoints are loaded on the Python side. TorchLean's checked object is the JSON
+artifact it receives after export: tensor payloads with shapes, a supported graph structure, or a
+verification artifact that Lean can parse and replay.
 
 ## Reference (PyTorch)
 

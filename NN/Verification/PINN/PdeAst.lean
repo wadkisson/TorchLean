@@ -92,9 +92,9 @@ structure Prims where
   -- Use McCormick envelopes to bound u*v conservatively
   let (al, ah) := a; let (bl, bh) := b
   let (axU, ayU, cU) := mccormickUpper al ah bl bh
-  let (_, uHi) := eval2OnBox axU ayU cU al ah bl bh
+  let (_, uHi) := evalAffine2DOnBox axU ayU cU al ah bl bh
   let (axL, ayL, cL) := mccormickLower al ah bl bh
-  let (lLo, _) := eval2OnBox axL ayL cL al ah bl bh
+  let (lLo, _) := evalAffine2DOnBox axL ayL cL al ah bl bh
   (lLo, uHi)
 
 /-- Evaluate a PDE expression to an interval, given primitive bounds. -/

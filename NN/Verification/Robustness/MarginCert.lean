@@ -65,7 +65,7 @@ def checkOneExample (numClasses : Nat) (ex : Json) : IO (Bool × Bool) := do
   let hi ← expectFieldFloatArray exObj "logits_hi" "example"
   if lo.size ≠ numClasses || hi.size ≠ numClasses then
     throw <| IO.userError s!"example logits length mismatch (expected {numClasses})"
-  if !all2 lo hi NN.Verification.Util.Array.floatLe then
+  if !allPairwise lo hi NN.Verification.Util.Array.floatLe then
     throw <| IO.userError "example has invalid bounds (lo ≤ hi violated)"
   let cert := TopLabel.certifiesLabelFromArrayBounds lo hi label
 

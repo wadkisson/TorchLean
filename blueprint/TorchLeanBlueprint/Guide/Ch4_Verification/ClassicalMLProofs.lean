@@ -9,8 +9,8 @@ tag := "classical-ml-proofs"
 
 Not every proof in TorchLean is about a modern runtime boundary. Some declarations formalize
 classical ML theory: Hopfield energy, ReLU approximation components, and state space scan
-or causality facts. These are valuable because they show TorchLean can host mathematical ML theory
-directly, not only verify artifacts emitted by a runtime.
+or causality facts. TorchLean can host mathematical ML theory directly beside runtime artifact
+checkers.
 
 The common shape is small but powerful:
 
@@ -64,9 +64,9 @@ through nontrivial state changes. The theorems `cycleUpdate_no_nontrivial_cycles
 `cycleUpdate_exists_fixedpoint_le_card`, and `cycleUpdate_exists_fixedpoint_le_pow` are the checked
 versions of that classical argument.
 
-This is not a complete theory of all associative memory models. It is a named Hopfield vocabulary:
-states, energy, update assumptions, progress lemmas, and finite fixed point style theorems that
-later extensions can build on.
+The development is not a complete theory of all associative memory models. It is a named Hopfield
+vocabulary: states, energy, update assumptions, progress lemmas, and finite fixed point style
+theorems that later extensions can build on.
 
 # ReLU Approximation Bridges
 
@@ -115,12 +115,12 @@ $$`x_{0:k}=x'_{0:k}
 y_{0:k}=y'_{0:k}.`
 
 The [Mamba causality API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/StateSpace/MambaCausality.lean) specializes that
-idea to Mamba style computations. The theorem names stay direct:
+idea to Mamba computations. The theorem names stay direct:
 `diagonalS4_runList_append_outputs_prefix`, `compactMamba_runList_append_outputs_prefix`,
 `selectiveMamba_runListAux_append_outputs_prefix`, and
 `selectiveMamba_runList_append_outputs_prefix`.
 
-Sequence model verification is not only about attention. Attention has masks, KV caches, and
+Sequence model verification includes more than attention. Attention has masks, KV caches, and
 positional encodings. State space models have scan order, recurrent state, and causality
 conventions. The Mamba causality theorems give those concerns a place in the formal layer.
 
@@ -132,5 +132,5 @@ This area provides reusable proof components:
 - ReLU approximation lemmas seed MLP bridge arguments.
 - State space scan theorems seed causality arguments.
 
-They do not claim that every model in the zoo is fully verified. They give us named mathematical
-objects that future model theorems can reuse.
+They are the named mathematical objects that future model theorems can reuse: energy functions,
+approximation lemmas, scan equations, and convergence hypotheses.

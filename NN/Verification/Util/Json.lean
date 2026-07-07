@@ -217,7 +217,7 @@ def expectFormat (j : Json) (expected : String) (ctx : String := "top-level") : 
     throw <| IO.userError s!"{ctx}.format: unsupported format `{fmt}` (expected `{expected}`)"
 
 /-- Pointwise `all` on two float arrays of equal length. -/
-def all2 (a b : Array Float) (p : Float → Float → Bool) : Bool :=
+def allPairwise (a b : Array Float) (p : Float → Float → Bool) : Bool :=
   if hSize : a.size = b.size then
     (List.finRange a.size).all (fun (i : Fin a.size) =>
       let bi :=
@@ -230,7 +230,7 @@ def all2 (a b : Array Float) (p : Float → Float → Bool) : Bool :=
     false
 
 /-- Pointwise `any` on two float arrays of equal length. -/
-def any2 (a b : Array Float) (p : Float → Float → Bool) : Bool :=
+def anyPairwise (a b : Array Float) (p : Float → Float → Bool) : Bool :=
   if hSize : a.size = b.size then
     (List.finRange a.size).any (fun (i : Fin a.size) =>
       let bi :=

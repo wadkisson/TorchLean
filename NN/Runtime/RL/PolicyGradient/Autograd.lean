@@ -231,9 +231,9 @@ def ppoActorCriticScalarModuleDef
               let .cons states (.cons actionsOneHot (.cons oldLogProb (.cons advantages (.cons valueTarget .nil)))) :=
                 xs
               let logits ←
-                _root_.Runtime.Autograd.TorchLean.NN.Seq.evalParams (model := actor) (α := α) (m := m) .train psActor states
+                _root_.Runtime.Autograd.TorchLean.NN.Seq.forwardParams (model := actor) (α := α) (m := m) .train psActor states
               let values ←
-                _root_.Runtime.Autograd.TorchLean.NN.Seq.evalParams (model := critic) (α := α) (m := m) .train psCritic states
+                _root_.Runtime.Autograd.TorchLean.NN.Seq.forwardParams (model := critic) (α := α) (m := m) .train psCritic states
               ppoLossBatch (m := m) (α := α) (batch := batch) (nActions := nActions)
                 logits actionsOneHot oldLogProb advantages values valueTarget))
   }

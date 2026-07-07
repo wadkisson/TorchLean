@@ -73,8 +73,8 @@ def expectedUniformArray (n : Nat) (key : UInt64) : FloatArray :=
 
 def expectedBernoulliArray (n : Nat) (keepProb : Float) (key : UInt64) : FloatArray :=
   buildFloatArray n (fun i =>
-    let u01 := expectedUniformValue key i
-    if keepProb > u01 then 1.0 else 0.0)
+    let unitUniform := expectedUniformValue key i
+    if keepProb > unitUniform then 1.0 else 0.0)
 
 def assertFloatIsNaN (msg : String) (x : Float) : IO Unit := do
   if !x.isNaN then

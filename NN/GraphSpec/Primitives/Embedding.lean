@@ -43,7 +43,7 @@ open Runtime.Autograd.Torch (TList)
 
 This typed-list fact is used internally by `LowerToDAG.Primitive.toDAGPrimOp`.
 -/
-theorem splitAppend_append1
+theorem splitAppend_appendSingleton
     {α : Type} [Context α] :
     {ps : List Shape} → {σ : Shape} →
       (params : TList α ps) → (x : Tensor α σ) →
@@ -58,7 +58,7 @@ theorem splitAppend_append1
       simp
         [ Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append
         , Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend
-        , splitAppend_append1 (α := α) (ps := ps) (σ := σ) params x
+        , splitAppend_appendSingleton (α := α) (ps := ps) (σ := σ) params x
         ]
 
 /--
@@ -77,10 +77,10 @@ theorem toDAGPrimOp_specFwd_eq
           (ss₁ := ps) (ss₂ := [σ]) params (.cons x .nil))
     =
     p.specFwd (α := α) params x := by
-  -- Unfold the embedding and use `splitAppend_append1` to simplify the `splitAppend`.
+  -- Unfold the embedding and use `splitAppend_appendSingleton` to simplify the `splitAppend`.
   simp
     [ LowerToDAG.Primitive.toDAGPrimOp
-    , splitAppend_append1 (α := α) (ps := ps) (σ := σ) params x
+    , splitAppend_appendSingleton (α := α) (ps := ps) (σ := σ) params x
     ]
 
 end Primitive

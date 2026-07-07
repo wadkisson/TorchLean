@@ -11,7 +11,7 @@ public import NN.Runtime.Autograd.Engine.Cuda.Float32Contract
 /-!
 # Pure specifications for CUDA float32 kernels
 
-This file is the proof-facing companion to `NN.Runtime.Autograd.Engine.Cuda.*`.
+This file is the proof layer companion to `NN.Runtime.Autograd.Engine.Cuda.*`.
 
 The native CUDA backend is an FFI boundary, so Lean cannot prove facts about the compiled `.cu`
 binary directly. What we can do well is factor the interface into three layers:

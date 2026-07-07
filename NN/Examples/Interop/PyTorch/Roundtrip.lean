@@ -159,7 +159,7 @@ private def exportCNN : IO Unit := do
       stride := cnnStride2, padding := cnnPadding2 }
   let pool2 : Export.CNNPyTorch.MaxPool2dCfg :=
     { kernelH := cnnPoolKH, kernelW := cnnPoolKW, stride := cnnPoolStride2 }
-  let cfg : Export.CNNPyTorch.Cnn2Cfg :=
+  let cfg : Export.CNNPyTorch.CnnStackConfig :=
     { className := "TestCNN"
       inputC := cnnInC
       inputH := cnnInH
@@ -170,7 +170,7 @@ private def exportCNN : IO Unit := do
       pool2 := pool2
       flatSize := cnnFlatSize
       fcOut := cnnOutC }
-  let stub := Export.CNNPyTorch.generateCnn2PyTorchClass cfg
+  let stub := Export.CNNPyTorch.generateCnnStackPyTorchClass cfg
   writePy dir "TestCNN_PyTorch" stub
   -- If we have a JSON state_dict handy, also emit a runnable "with weights" helper.
   try
@@ -179,9 +179,9 @@ private def exportCNN : IO Unit := do
       | throw <| IO.userError "CNN JSON present but failed to parse as a CNN state_dict"
     let codeW :=
       Export.CNNPyTorch.generateCNNWithWeights
-        (Export.PyTorch.tensor4DToPy sd.convW1) (Export.PyTorch.tensor1DToPy sd.convB1)
-        (Export.PyTorch.tensor4DToPy sd.convW2) (Export.PyTorch.tensor1DToPy sd.convB2)
-        (Export.PyTorch.tensor2DToPy sd.linearW) (Export.PyTorch.tensor1DToPy sd.linearB)
+        (Export.PyTorch.rankFourTensorToPy sd.convW1) (Export.PyTorch.vectorTensorToPy sd.convB1)
+        (Export.PyTorch.rankFourTensorToPy sd.convW2) (Export.PyTorch.vectorTensorToPy sd.convB2)
+        (Export.PyTorch.matrixTensorToPy sd.linearW) (Export.PyTorch.vectorTensorToPy sd.linearB)
         cnnInC cnnOutC cnnInH cnnInW cnnKH cnnKW
         cnnStride1 cnnPadding1 cnnStride2 cnnPadding2
         cnnPoolKH cnnPoolKW cnnPoolStride1 cnnPoolStride2 cnnFlatSize

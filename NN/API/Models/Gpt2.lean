@@ -159,7 +159,7 @@ def causalTransformerTokenScalarModuleDefWithMode
             let x ← _root_.Runtime.Autograd.TorchLean.F.embeddingBatchSeqNat (m := m) (α := α)
               (vocab := cfg.vocab) (dim := cfg.dModel) (batch := cfg.batch)
               (seqLen := cfg.seqLen) tokenEmbedding tokens
-            let logits ← _root_.Runtime.Autograd.TorchLean.NN.Seq.evalParams
+            let logits ← _root_.Runtime.Autograd.TorchLean.NN.Seq.forwardParams
               (model := body) (α := α) (m := m) mode bodyParams x
             let logitsRows ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
               (s₁ := .dim cfg.batch (.dim cfg.seqLen (.dim cfg.vocab .scalar)))

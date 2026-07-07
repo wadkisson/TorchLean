@@ -14,7 +14,7 @@ public import NN.MLTheory.SelfSupervised.Masking
 This module formalizes the finite patch/token core of a masked autoencoder (MAE):
 
 - an input is a finite collection of patches `Fin n → Patch`;
-- an encoder/decoder stack is abstracted to a reconstruction function;
+- an encoder/decoder computation is abstracted to a reconstruction function;
 - the objective is a sum of per-patch losses over the masked indices.
 
 The formalization focuses on the semantic core. It captures the semantics that examples and future model

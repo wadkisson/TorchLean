@@ -112,15 +112,15 @@ abbrev vector (α : Type := Float) (xs : List α) :
     Tensor.T α (.dim xs.length .scalar) :=
   NN.Tensor.tensor1d (α := α) xs
 
-@[inherit_doc Spec.fromList1d]
-abbrev fromList1d {α : Type} (xs : List α) :
+@[inherit_doc Spec.vectorFromList]
+abbrev vectorFromList {α : Type} (xs : List α) :
     Tensor.T α (.dim xs.length .scalar) :=
-  Spec.fromList1d xs
+  Spec.vectorFromList xs
 
-@[inherit_doc Spec.fromList2d]
-abbrev fromList2d {α : Type} [Inhabited α] (xss : List (List α)) :
+@[inherit_doc Spec.matrixFromRows]
+abbrev matrixFromRows {α : Type} [Inhabited α] (xss : List (List α)) :
     Option (Tensor.T α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar))) :=
-  Spec.fromList2d xss
+  Spec.matrixFromRows xss
 
 @[inherit_doc NN.Tensor.tensorND]
 abbrev ofList {α : Type} (dims : List Nat) (xs : List α) :

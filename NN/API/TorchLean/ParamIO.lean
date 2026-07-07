@@ -18,7 +18,7 @@ TorchLean examples often want the same simple workflow:
 2. save its parameters, and
 3. reload those parameters later to sample / run inference.
 
-This module is the **API-facing** wrapper around the lower-level format implementation in
+This module is the public API wrapper around the lower-level format implementation in
 `Runtime.Autograd.TorchLean.ParamIO`.
 
 ## What Is Supported
@@ -92,8 +92,7 @@ def loadModuleParamsBits
 /--
 Load a JSON bits checkpoint as a parameter list (without mutating a module).
 
-This is useful when you want to run inference with `nn.evalParams` directly and never instantiate a
-trainer.
+This is useful when you want to run compiled inference directly and never instantiate a trainer.
 -/
 def loadParamBits
     {paramShapes : List Shape}

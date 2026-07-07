@@ -63,7 +63,7 @@ end DType
 Scalar classes used after a runtime backend has been selected.
 
 Most TorchLean code should let `Trainer` provide these instances implicitly. A few demos use
-`Runtime.withOptions` / `Runtime.withOptionsNoCast` to run the same code under a CLI-selected scalar
+`Runtime.withOptions` / `Runtime.withOptionsScalar` to run the same code under a CLI-selected scalar
 backend. These classes stay under `TorchLean.Runtime` so the root namespace can stay focused on
 models, data, and training.
 -/
@@ -126,8 +126,8 @@ def ofFloat {α : Type} [TorchLean.Runtime.Scalar α] (x : Float) : α :=
 /--
 Parse the usual TorchLean runtime flags and run a `Float` callback.
 
-Examples should use this or `ModelZoo.runFloat` instead of calling `TorchLean.Module.run` directly;
-that lower-level dispatcher is what backs this wrapper.
+Examples should use this instead of calling `TorchLean.Module.run` directly; that lower-level
+dispatcher is what backs this wrapper.
 -/
 def runFloat
     (exeName : String) (args : List String)
@@ -136,12 +136,38 @@ def runFloat
     (printOk : Bool := true) : IO UInt32 :=
   NN.API.Common.runFloat exeName args banner k printOk
 
+@[inherit_doc NN.API.Common.runSelectedOrFloat]
+abbrev runSelectedOrFloat := NN.API.Common.runSelectedOrFloat
+
+@[inherit_doc NN.API.Common.runSelectedOrFloatSimple]
+abbrev runSelectedOrFloatSimple := NN.API.Common.runSelectedOrFloatSimple
+
+@[inherit_doc NN.API.Common.requestsCompiledBackend]
+abbrev requestsCompiledBackend := NN.API.Common.requestsCompiledBackend
+
+@[inherit_doc NN.API.Common.cudaArgs]
+abbrev cudaArgs := NN.API.Common.cudaArgs
+
+@[inherit_doc NN.API.Common.requireEagerBackend]
+abbrev requireEagerBackend := NN.API.Common.requireEagerBackend
+
+@[inherit_doc NN.API.Common.cudaEagerArgs]
+abbrev cudaEagerArgs := NN.API.Common.cudaEagerArgs
+
+@[inherit_doc NN.API.Common.runNormalizedFloat]
+abbrev runNormalizedFloat := NN.API.Common.runNormalizedFloat
+
+@[inherit_doc NN.API.Common.runCudaFloat]
+abbrev runCudaFloat := NN.API.Common.runCudaFloat
+
+@[inherit_doc NN.API.Common.runCudaEagerFloat]
+abbrev runCudaEagerFloat := NN.API.Common.runCudaEagerFloat
+
 /--
 Parse the standard TorchLean runtime flags and return the resulting `Options`.
 
-This is the non-polymorphic sibling of `Runtime.withOptions`: examples that always run at `Float`
-can still parse `--cpu`, `--cuda`, `--backend`, and `--dtype` without exposing a polymorphic
-callback.
+Non-polymorphic sibling of `Runtime.withOptions`: examples that always run at `Float` can still
+parse `--cpu`, `--cuda`, `--backend`, and `--dtype` without exposing a polymorphic callback.
 -/
 def parseArgs (args : List String) (defaultDType : DType := .float) :
     Except String (Options × List String) := do
@@ -172,11 +198,11 @@ def withSelected
 Run a scalar-polymorphic example under the selected runtime when the callback does not need a
 Float-cast function.
 
-Prefer `Runtime.withOptionsNoCast` when the callback also needs parsed runtime options. This
+Prefer `Runtime.withOptionsScalar` when the callback also needs parsed runtime options. This
 exists for the rare case where only the selected scalar/backend instances and remaining CLI
 arguments matter.
 -/
-def withSelectedNoCast
+def withSelectedScalar
     (args : List String)
     (k :
       ∀ {α : Type}, [SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
@@ -204,7 +230,7 @@ def withOptions
 Run an example under the selected runtime and pass through runtime options when the callback does
 not need an explicit Float-cast function.
 -/
-def withOptionsNoCast
+def withOptionsScalar
     (args : List String)
     (k :
       ∀ {α : Type}, [SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
@@ -215,7 +241,7 @@ def withOptionsNoCast
 /--
 Run a verification or demo command under the selected runtime dtype.
 
-This is the banner-printing sibling of `withSelected`; it matches the convention used by
+Banner-printing sibling of `withSelected`; it matches the convention used by
 `lake exe verify -- ...` commands.
 -/
 def runWithDType

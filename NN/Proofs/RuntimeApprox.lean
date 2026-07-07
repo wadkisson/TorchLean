@@ -18,7 +18,7 @@ public import NN.Proofs.RuntimeApprox.Scale
 
 Umbrella import for TorchLean's executable-runtime-to-real-spec approximation theorems.
 
-The stack is intentionally layered:
+The runtime-approximation library is intentionally layered:
 - `Core`: tolerance objects and tensor/context approximation predicates;
 - `Rounding`: scalar `neural_round` error lemmas;
 - `Graph`: forward and reverse graph composition theorems;

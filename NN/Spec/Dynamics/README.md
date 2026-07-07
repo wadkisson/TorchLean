@@ -1,15 +1,31 @@
 # Spec Dynamics
 
-This folder defines a small spec level interface for discrete time dynamical systems: a system is a
-pure transition function `step : SpecTensor s -> SpecTensor s`, plus basic semantics like
-iteration/trajectories and named stability-style properties.
+This folder defines spec-level interfaces for discrete-time and state-space dynamical systems. The
+definitions are intentionally close to the mathematical object: a state, an optional input, a pure
+transition rule, and the trajectories obtained by iteration.
 
-The intent is to keep definitions close to the spec layer, where they are straightforward to reuse across
-models, while keeping proofs of global dynamics in `NN/MLTheory/*`. Hopfield networks are the motivating
-example: convergence claims are about repeated application of an update rule, not about any
-particular runtime implementation.
+The runtime is not part of this layer. A dynamics spec can later be used by Hopfield-style energy
+arguments, state-space model semantics, controller examples, Lyapunov predicates, or RL boundary
+statements without committing to a CUDA kernel, simulator, or training loop.
 
-Files:
+## Files
 
-- `system.lean`: core interface (`DynamicalSystem`, `DrivenSystem`), iteration semantics, and
-  stability style predicates wired to `NN.MLTheory.Robustness.Spec` and `NN.MLTheory.Stability.Spec`.
+- `System.lean`: `DynamicalSystem`, `DrivenSystem`, iteration semantics, trajectories, and
+  stability-style predicates wired to `NN.MLTheory.LearningTheory.Robustness.Spec` and
+  `NN.MLTheory.LearningTheory.Stability.Dynamics.Spec`.
+- `StateSpace.lean`: channelwise/state-space recurrence structures used by state-space and
+  sequence-model specifications.
+
+## How To Use It
+
+Use this folder when the claim is about repeated application of a transition rule:
+
+```text
+state₀
+  -> step state₀
+  -> step (step state₀)
+  -> trajectory n
+```
+
+Proofs of global behavior belong in `NN/MLTheory/*`. The spec folder names the objects; MLTheory
+proves stability, convergence, boundedness, or robustness facts about those objects.

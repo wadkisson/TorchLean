@@ -43,9 +43,9 @@ def meanModuleLoss {σ τ : Shape} {α : Type}
 /--
 Shared custom-loss training core for already-parsed public runtime settings.
 
-This is the public facade seam that opens a `ScalarModule` for a custom supervised objective.
-The unified `Trainer.new ... { task := .custom ... }` path uses the same checked
-module/loss/optimizer machinery as the runtime trainer.
+This opens a `ScalarModule` for a custom supervised objective. The unified
+`Trainer.new ... { task := .custom ... }` path uses the same checked module/loss/optimizer
+machinery as the runtime trainer.
 -/
 def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
     (trainer : Custom σ τ) (run : RunConfig) (data : Dataset σ τ)
@@ -79,7 +79,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
           let predict :=
             fun (xFloat : Tensor.T Float σ) => do
               let x := Tensor.castFloat (Runtime.ofFloat (α := α)) xFloat
-              let yhat ← Module.predict1 (α := α) runtimeOpts model m x
+              let yhat ← Module.predict (α := α) runtimeOpts model m x
               Tensor.toFloatIO yhat
           let predictBatch :=
             fun (xsFloat : List (Tensor.T Float σ)) => xsFloat.mapM predict
@@ -92,24 +92,13 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
               predictBatch := predictBatch }
           let extra ← afterTrain (α := α) model m
           pure (result, extra))
-  match run.dtype with
-  | .float =>
-      let out ← runFor (α := Float)
-      pure out
-  | _ =>
-      if runtimeOpts.useGpu then
-        throw <| IO.userError
-          "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
-      let outRef : IO.Ref (Option (Custom.TrainResult σ τ × β)) ← IO.mkRef none
-      match (← NN.API.DType.withRuntime run.dtype (fun {α} _ _ _ _ => do
-          let out ← runFor (α := α)
-          outRef.set (some out))) with
-      | .ok () =>
-          let some out ← outRef.get
-            | throw <| IO.userError
-                "TorchLean.Trainer.train: internal error: run result was not initialized"
-          pure out
-      | .error msg => throw <| IO.userError msg
+  if runtimeOpts.useGpu && run.dtype != .float then
+    throw <| IO.userError
+      "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
+  match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ =>
+      runFor (α := α))) with
+  | .ok out => pure out
+  | .error msg => throw <| IO.userError msg
 
 end Internal
 

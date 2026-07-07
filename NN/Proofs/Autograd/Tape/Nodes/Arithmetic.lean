@@ -260,9 +260,9 @@ def invertedDropoutCoeff {s : Shape} (mask : Fin (Shape.size s) → Bool) (keepP
 /--
 Fixed-mask inverted dropout node.
 
-This is the theorem-facing form of training-mode dropout. A runtime seed may generate `mask`, but
-the derivative theorem is stated after sampling: `mask` and `keepProb` are constants, and the node
-is simply a fixed diagonal linear map on the activation.
+Training-mode dropout after sampling has occurred. A runtime seed may generate `mask`, but the
+derivative theorem treats `mask` and `keepProb` as constants, so the node is simply a fixed diagonal
+linear map on the activation.
 -/
 def fixedInvertedDropout {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
     (mask : Fin (Shape.size s) → Bool) (keepProb : ℝ) : Node Γ s :=

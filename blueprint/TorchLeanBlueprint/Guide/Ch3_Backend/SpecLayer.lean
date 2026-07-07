@@ -23,7 +23,7 @@ prover. For broader language background, see the official Lean texts
 simple: write the mathematical object as an ordinary Lean definition, then make later layers show
 which definition they execute, differentiate, lower, or verify.
 
-The discussion assumes the tensor and model-building material from the earlier chapters and focuses
+The discussion assumes the tensor and model construction material from the earlier chapters and focuses
 on the semantic anchors that later runtime, autograd, graph, and verification statements cite.
 
 # Semantic Anchors
@@ -35,16 +35,15 @@ The answer should be a spec declaration. A spec declaration fixes the formula, t
 the scalar assumptions, the parameter record, and any conventions such as masks, epsilons,
 reductions, or train/eval mode.
 
-This gives each later layer a concrete obligation:
+Each later layer gets a concrete obligation:
 
-- runtime code must say which spec-level function it implements;
-- autograd code must say which spec-level function it differentiates;
-- graph compilers must say which spec-level function their graph denotes;
-- verifiers must say which spec-level function their bounds or certificates concern.
+- runtime code must say which specification function it implements;
+- autograd code must say which specification function it differentiates;
+- graph compilers must say which specification function their graph denotes;
+- verifiers must say which specification function their bounds or certificates concern.
 
-Model code does not need to write specs by hand. The point is that the project has a named
-mathematical object before execution speed, CUDA kernels, certificate formats, or export tools enter
-the discussion.
+Model code does not need to write specs by hand. The project still has a named mathematical object
+before execution speed, CUDA kernels, certificate formats, or export tools enter the discussion.
 
 # What A Spec Declaration Adds
 
@@ -84,9 +83,9 @@ open Spec
 #check dropoutInferenceSpec
 ```
 
-This is the level at which a paper statement should say what it means by "the model", "the loss",
-"dropout", or "softmax". Runtime code may implement these definitions efficiently; verification
-code may overapproximate them; but the spec declaration is where the target computation is named.
+At this level, a paper statement should say what it means by "the model", "the loss", "dropout",
+or "softmax". Runtime code may implement these definitions efficiently; verification code may
+overapproximate them; but the spec declaration is where the target computation is named.
 
 # Parameter Records Are Semantic Objects
 
@@ -131,8 +130,8 @@ For example:
 
 This avoids a common ambiguity. In code, "cross entropy" may mean probabilities passed through a
 log, logits passed through a stable log-softmax, a mean reduction, a sum reduction, or a version
-with ignored labels. A verification or autograd claim cannot just say "cross entropy." It needs the
-exact spec.
+with ignored labels. A verification or autograd claim needs the exact specification behind the
+phrase "cross entropy."
 
 # Stochastic Behavior Is Made Explicit
 
@@ -141,7 +140,7 @@ The spec layer does not hide randomness in global state. Dropout is the simplest
 - `dropoutMaskedSpec p mask x` is the training-time mathematical operation once the mask is given.
 - `dropoutInferenceSpec p x` is the deterministic inference-time operation.
 
-The mask, seed, or random tensor belongs in the data of the computation. This makes later claims
+The mask, seed, or random tensor belongs in the data of the computation. Later claims are then
 auditable: a theorem can say whether it is about a fixed mask, an explicit random source, or an
 inference-mode model.
 
@@ -164,7 +163,7 @@ Informally, `Context α` is "a scalar type on which machine learning expressions
 arithmetic, order/comparison, and the standard functions used in activations and losses (`exp`,
 `tanh`, `sqrt`, and so on).
 
-This is what lets us reuse the exact same network code for:
+That scalar interface lets the same network code be read as:
 
 - proofs (`α := ℝ`),
 - executable float32 models (`α := IEEE32Exec`),
@@ -173,8 +172,8 @@ This is what lets us reuse the exact same network code for:
 
 ## A Tiny Scalar-Polymorphic Definition
 
-This is the smallest useful instance of TorchLean's "write the architecture once; choose the scalar
-semantics later" design:
+This small definition shows TorchLean's "write the architecture once; choose the scalar semantics
+later" design:
 
 ```
 import NN
@@ -182,22 +181,23 @@ import NN
 open NN
 open Spec
 
-def affine2 {α : Type} [Context α]
-    (w11 w12 w21 w22 b1 b2 : α) :
+def affinePlane {α : Type} [Context α]
+    (firstRowFirstCol firstRowSecondCol secondRowFirstCol secondRowSecondCol
+      firstBias secondBias : α) :
     Spec.Tensor α (Shape.vec 2) -> Spec.Tensor α (Shape.vec 2)
   | x =>
-      let y1 := w11 * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
-              + w12 * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
-              + b1
-      let y2 := w21 * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
-              + w22 * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
-              + b2
+      let firstOutput := firstRowFirstCol * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
+              + firstRowSecondCol * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
+              + firstBias
+      let secondOutput := secondRowFirstCol * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
+              + secondRowSecondCol * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
+              + secondBias
       Tensor.dim (fun
-        | ⟨0, _⟩ => Tensor.scalar y1
-        | ⟨_, _⟩ => Tensor.scalar y2)
+        | ⟨0, _⟩ => Tensor.scalar firstOutput
+        | ⟨_, _⟩ => Tensor.scalar secondOutput)
 ```
 
-Not every model needs to be written by hand in this style. The important property is scalar
+Not every model needs to be written by hand in this style. The property we need is scalar
 instantiation: the same definition may later be instantiated at `α := ℝ`, `α := Float`, or
 `α := IEEE32Exec` without changing the architecture code.
 
@@ -227,7 +227,7 @@ $$`\text{certificate accepted}
 \text{property of Spec.forward over the stated input set}`
 
 For that reason, the spec layer still matters when the page you are reading is about CUDA, CROWN, or
-export. Those layers are meaningful only after they say which spec-level function they are
+export. Those layers are meaningful only after they say which specification function they are
 implementing, differentiating, lowering, or bounding.
 
 # A Practical Reading Habit
@@ -254,8 +254,8 @@ For concrete code, the usual first stops are:
 
 # Composition Boundaries
 
-The model-building chapter teaches the user-facing construction syntax. At the spec layer, the
-useful question is different: where does each piece of a model become a named mathematical object?
+The model construction chapter teaches the user-facing syntax. At the spec layer, the question is
+different: where does each piece of a model become a named mathematical object?
 
 - Layer specs name local formulas such as dense layers, convolutions, activations, normalization,
   pooling, and recurrent steps.
@@ -275,14 +275,14 @@ scalar semantics, reduction convention, or parameter record, that dependency sho
 definition or its type.
 
 That discipline is what the next layers use. Runtime execution, graph denotation, derivative
-statements, and verification certificates can point back to a precise spec-level object instead of
+statements, and verification certificates can point back to a precise specification object instead of
 to a prose description of an operation.
 
 # Architecture Specs Beyond The Small Examples
 
 The [model spec API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Models/) contains denotations for larger architecture families:
-residual networks, Vision Transformer style definitions, GPT-style decoders, state-space models,
-diffusion objectives, reinforcement-learning interfaces, and scientific-ML examples. The examples
+residual networks, Vision Transformer definitions, GPT decoders, state space models,
+diffusion objectives, reinforcement learning interfaces, and scientific ML examples. The examples
 and runtime wrappers may choose different execution paths, but the spec files are where the
 mathematical forward maps and objectives are named.
 
@@ -296,7 +296,7 @@ When an example claims to implement a larger model, a good reading path is:
 # What To Read Next
 
 Read *Runtime and Autograd* for executable traces and derivative paths. Read *Graphs and IR* for the
-canonical op-tagged DAG. Read *GraphSpec* for architecture objects that have both pure spec
+canonical DAG with named operations. Read *GraphSpec* for architecture objects that have both pure spec
 semantics and executable TorchLean programs. Read *Verification* for how bounds and certificates
 refer back to the same denotation.
 

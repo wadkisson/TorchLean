@@ -18,9 +18,10 @@ entry:
 
 https://docs.pytorch.org/docs/main/notes/autograd.html#division-by-zero-in-autograd
 
-TorchLean's useful claim here is kept narrow. We do not prove every user graph is finite.
-Instead, the safe-domain choice is an explicit spec node: use `safedivSpec` in the computation that
-is recorded, then mask or weight the resulting tensor.
+TorchLean's useful claim here is the graph-level contract. The safe-domain choice is an explicit
+spec node: use `safedivSpec` in the computation that is recorded, then mask or weight the resulting
+tensor. Downstream proofs and importers can then see the protected division directly in the graph
+shape.
 -/
 
 @[expose] public section

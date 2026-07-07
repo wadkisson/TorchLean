@@ -12,7 +12,7 @@ public import NN.Spec.Core.TensorOps
 /-!
 # Selective scan specs
 
-This file contains the small proof-facing core behind state-space sequence models such as S4 and
+This file contains the small proof layer core behind state-space sequence models such as S4 and
 Mamba.
 
 The key observation, used by Mamba's hardware-aware parallel scan, is that each per-token recurrent

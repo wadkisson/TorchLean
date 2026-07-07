@@ -13,7 +13,7 @@ public import NN.Verification.TorchLean.Proved.Correctness.Eval.LinearAlgebra
 
 Local semantics for IR concat.  The evaluator keeps the generic-axis implementation in the shared
 `Graph.evalConcat` helper, which moves the requested axis to the front, folds
-`Tensor.concatDim0Spec`, and moves the result back.
+`Tensor.concatLeadingAxisSpec`, and moves the result back.
 -/
 
 @[expose] public section
@@ -125,46 +125,46 @@ theorem evalAt_concat_binary_error
   rw [hConcat]
   rfl
 
-/-- The leading-axis concat fold agrees with `Tensor.concatDim0Spec` for binary concat. -/
-theorem evalConcatAxis0Fold_binary_eq
+/-- The leading-axis concat fold agrees with `Tensor.concatLeadingAxisSpec` for binary concat. -/
+theorem evalConcatLeadingAxisFold_pair_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m : Nat} {rest : Shape}
     (lhs : Tensor α (.dim n rest)) (rhs : Tensor α (.dim m rest)) :
-    Graph.evalConcatAxis0Fold (α := α) 2 (n + m) rest
+    Graph.evalConcatLeadingAxisFold (α := α) 2 (n + m) rest
         [DVal.mk (α := α) (.dim n rest) lhs,
           DVal.mk (α := α) (.dim m rest) rhs]
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
-  simp [Graph.evalConcatAxis0Fold,
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
+  simp [Graph.evalConcatLeadingAxisFold,
     DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-/-- The leading-axis concat fold agrees with two `Tensor.concatDim0Spec` steps for ternary concat. -/
-theorem evalConcatAxis0Fold_ternary_eq
+/-- The leading-axis concat fold agrees with two `Tensor.concatLeadingAxisSpec` steps for ternary concat. -/
+theorem evalConcatLeadingAxisFold_triple_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m k : Nat} {rest : Shape}
     (x : Tensor α (.dim n rest)) (y : Tensor α (.dim m rest))
     (z : Tensor α (.dim k rest)) :
-    Graph.evalConcatAxis0Fold (α := α) 3 (n + m + k) rest
+    Graph.evalConcatLeadingAxisFold (α := α) 3 (n + m + k) rest
         [DVal.mk (α := α) (.dim n rest) x,
           DVal.mk (α := α) (.dim m rest) y,
           DVal.mk (α := α) (.dim k rest) z]
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m + k) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n + m) (m := k) (s := rest)
-            (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) x y) z)) := by
-  simp [Graph.evalConcatAxis0Fold,
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
+            (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z)) := by
+  simp [Graph.evalConcatLeadingAxisFold,
     DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
-/-- The leading-axis concat fold agrees with three `Tensor.concatDim0Spec` steps for four inputs. -/
-theorem evalConcatAxis0Fold_quaternary_eq
+/-- The leading-axis concat fold agrees with three `Tensor.concatLeadingAxisSpec` steps for four inputs. -/
+theorem evalConcatLeadingAxisFold_quad_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m k l : Nat} {rest : Shape}
     (x : Tensor α (.dim n rest)) (y : Tensor α (.dim m rest))
     (z : Tensor α (.dim k rest)) (w : Tensor α (.dim l rest)) :
-    Graph.evalConcatAxis0Fold (α := α) 4 (n + m + k + l) rest
+    Graph.evalConcatLeadingAxisFold (α := α) 4 (n + m + k + l) rest
         [DVal.mk (α := α) (.dim n rest) x,
           DVal.mk (α := α) (.dim m rest) y,
           DVal.mk (α := α) (.dim k rest) z,
@@ -172,14 +172,14 @@ theorem evalConcatAxis0Fold_quaternary_eq
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m + k + l) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n + m + k) (m := l) (s := rest)
-            (Tensor.concatDim0Spec (α := α) (n := n + m) (m := k) (s := rest)
-              (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) x y) z) w)) := by
-  simp [Graph.evalConcatAxis0Fold,
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n + m + k) (m := l) (s := rest)
+            (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
+              (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z) w)) := by
+  simp [Graph.evalConcatLeadingAxisFold,
     DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Shape inference for binary concat along axis 0. -/
-theorem inferConcatOutShape_axis0_binary_eq
+theorem inferConcatOutShape_leadingAxis_pair_eq
     {n m : Nat} {rest : Shape} :
     OpContracts.inferConcatOutShape 0 [.dim n rest, .dim m rest] =
       .ok (.dim (n + m) rest) := by
@@ -194,7 +194,7 @@ theorem inferConcatOutShape_axis0_binary_eq
     hAxis, hRank, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Shape inference for ternary concat along axis 0. -/
-theorem inferConcatOutShape_axis0_ternary_eq
+theorem inferConcatOutShape_leadingAxis_triple_eq
     {n m k : Nat} {rest : Shape} :
     OpContracts.inferConcatOutShape 0 [.dim n rest, .dim m rest, .dim k rest] =
       .ok (.dim (n + m + k) rest) := by
@@ -210,7 +210,7 @@ theorem inferConcatOutShape_axis0_ternary_eq
     hAxis, hRankM, hRankK, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Shape inference for four-input concat along axis 0. -/
-theorem inferConcatOutShape_axis0_quaternary_eq
+theorem inferConcatOutShape_leadingAxis_quad_eq
     {n m k l : Nat} {rest : Shape} :
     OpContracts.inferConcatOutShape 0 [.dim n rest, .dim m rest, .dim k rest, .dim l rest] =
       .ok (.dim (n + m + k + l) rest) := by
@@ -227,7 +227,7 @@ theorem inferConcatOutShape_axis0_quaternary_eq
     hAxis, hRankM, hRankK, hRankL, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- The shared concat interpreter takes the direct leading-axis path when shape inference agrees. -/
-theorem evalConcat_axis0_binary_eq_of_infer
+theorem evalConcat_leadingAxis_pair_eq_of_infer
     {α : Type} [Context α] [DecidableEq Shape]
     {s₁ s₂ out : Shape} (lhs : Tensor α s₁) (rhs : Tensor α s₂)
     {nOut : Nat} {rest : Shape}
@@ -236,16 +236,16 @@ theorem evalConcat_axis0_binary_eq_of_infer
     Graph.evalConcat (α := α) 2 (binaryNodeOut (.concat 0) out) 0
         [DVal.mk (α := α) s₁ lhs, DVal.mk (α := α) s₂ rhs]
       =
-      Graph.evalConcatAxis0Fold (α := α) 2 nOut rest
+      Graph.evalConcatLeadingAxisFold (α := α) 2 nOut rest
         [DVal.mk (α := α) s₁ lhs, DVal.mk (α := α) s₂ rhs] := by
   subst hOut
   have hSame : (Shape.dim nOut rest != Shape.dim nOut rest) = false :=
     shapeBNe_refl (.dim nOut rest)
-  simp [Graph.evalConcat, binaryNodeOut, hInfer, Graph.evalConcatAxis0Fold,
+  simp [Graph.evalConcat, binaryNodeOut, hInfer, Graph.evalConcatLeadingAxisFold,
     hSame, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Local IR semantics for leading-axis binary concat when shape inference accepts the declared shape. -/
-theorem evalAt_concat_axis0_binary_eq_of_infer
+theorem evalAt_concat_leadingAxis_pair_eq_of_infer
     {α : Type} [Context α] [DecidableEq Shape]
     {n m : Nat} {rest : Shape}
     (lhs : Tensor α (.dim n rest)) (rhs : Tensor α (.dim m rest))
@@ -263,14 +263,14 @@ theorem evalAt_concat_axis0_binary_eq_of_infer
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
   apply evalAt_concat_binary_ok
-  rw [evalConcat_axis0_binary_eq_of_infer (lhs := lhs) (rhs := rhs)
+  rw [evalConcat_leadingAxis_pair_eq_of_infer (lhs := lhs) (rhs := rhs)
     (hOut := rfl) (hInfer := hInfer)]
-  exact evalConcatAxis0Fold_binary_eq (α := α) lhs rhs
+  exact evalConcatLeadingAxisFold_pair_eq (α := α) lhs rhs
 
 /-- Local IR semantics for binary concat along the leading axis. -/
-theorem evalAt_concat_axis0_binary_eq
+theorem evalAt_concat_leadingAxis_pair_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m : Nat} {rest : Shape}
     (lhs : Tensor α (.dim n rest)) (rhs : Tensor α (.dim m rest)) :
@@ -285,12 +285,12 @@ theorem evalAt_concat_axis0_binary_eq
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
-  exact evalAt_concat_axis0_binary_eq_of_infer (α := α) lhs rhs
-    inferConcatOutShape_axis0_binary_eq
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
+  exact evalAt_concat_leadingAxis_pair_eq_of_infer (α := α) lhs rhs
+    inferConcatOutShape_leadingAxis_pair_eq
 
 /-- Local IR semantics for ternary concat along the leading axis. -/
-theorem evalAt_concat_axis0_ternary_eq
+theorem evalAt_concat_leadingAxis_triple_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m k : Nat} {rest : Shape}
     (x : Tensor α (.dim n rest)) (y : Tensor α (.dim m rest))
@@ -308,20 +308,20 @@ theorem evalAt_concat_axis0_ternary_eq
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m + k) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n + m) (m := k) (s := rest)
-            (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) x y) z)) := by
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
+            (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z)) := by
   have hSame : (Shape.dim (n + m + k) rest != Shape.dim (n + m + k) rest) = false :=
     shapeBNe_refl (.dim (n + m + k) rest)
   simp [Graph.evalAt, ternaryGraphOut, ternaryNodeOut, Graph.getNode, Graph.getNode?,
-    Graph.evalConcat, inferConcatOutShape_axis0_ternary_eq, hSame,
+    Graph.evalConcat, inferConcatOutShape_leadingAxis_triple_eq, hSame,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have hFold := evalConcatAxis0Fold_ternary_eq (α := α) x y z
+  have hFold := evalConcatLeadingAxisFold_triple_eq (α := α) x y z
   simp [DVal.mk] at hFold
   rw [hFold]
   simp
 
 /-- Local IR semantics for four-input concat along the leading axis. -/
-theorem evalAt_concat_axis0_quaternary_eq
+theorem evalAt_concat_leadingAxis_quad_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {n m k l : Nat} {rest : Shape}
     (x : Tensor α (.dim n rest)) (y : Tensor α (.dim m rest))
@@ -340,16 +340,16 @@ theorem evalAt_concat_axis0_quaternary_eq
       =
       .ok
         (DVal.mk (α := α) (.dim (n + m + k + l) rest)
-          (Tensor.concatDim0Spec (α := α) (n := n + m + k) (m := l) (s := rest)
-            (Tensor.concatDim0Spec (α := α) (n := n + m) (m := k) (s := rest)
-              (Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := rest) x y) z) w)) := by
+          (Tensor.concatLeadingAxisSpec (α := α) (n := n + m + k) (m := l) (s := rest)
+            (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
+              (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z) w)) := by
   have hSame :
       (Shape.dim (n + m + k + l) rest != Shape.dim (n + m + k + l) rest) = false :=
     shapeBNe_refl (.dim (n + m + k + l) rest)
   simp [Graph.evalAt, quaternaryGraphOut, quaternaryNodeOut, Graph.getNode, Graph.getNode?,
-    Graph.evalConcat, inferConcatOutShape_axis0_quaternary_eq, hSame,
+    Graph.evalConcat, inferConcatOutShape_leadingAxis_quad_eq, hSame,
     Bind.bind, Except.bind, Pure.pure, Except.pure]
-  have hFold := evalConcatAxis0Fold_quaternary_eq (α := α) x y z w
+  have hFold := evalConcatLeadingAxisFold_quad_eq (α := α) x y z w
   simp [DVal.mk] at hFold
   rw [hFold]
   simp

@@ -70,8 +70,8 @@ def data : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
   Data.tensorDataset xs ys
 
 def probes : List (Trainer.Probe (Shape.vec 2)) :=
-  [ Trainer.Probe.vec2 "origin" 0.0 0.0 (some (toString (target 0.0 0.0)))
-  , Trainer.Probe.vec2 "heldout" 0.5 (-0.25) (some (toString (target 0.5 (-0.25)))) ]
+  [ Trainer.Probe.point "origin" 0.0 0.0 (some (toString (target 0.0 0.0)))
+  , Trainer.Probe.point "heldout" 0.5 (-0.25) (some (toString (target 0.5 (-0.25)))) ]
 
 /-- Tiny optimizer-choice example using only `import NN`. -/
 def optimizerChoiceExample : Except String (String × optim.Optimizer) := do
@@ -89,7 +89,7 @@ The shape below is the user-facing training path:
 
 - build the trainer from the model,
 - attach optimizer/backend choices once,
-- call `trainer.eval` for initial inference,
+- call `trainer.predict` for initial prediction,
 - call `trainer.train`,
 - use the returned trained handle for prediction.
 - call `trained.verifyRobustLInf` on a small `ℓ∞` box.
@@ -105,7 +105,7 @@ def run (_args : List String := []) : IO Unit := do
         backend := .compiled
         dtype := .float32 }
   let heldout : Tensor.T Float (Shape.vec 2) := tensorND! [2] [0.5, -0.25]
-  let initial ← trainer.eval heldout
+  let initial ← trainer.predict heldout
   IO.println s!"initial(heldout) = {Tensor.pretty initial}"
   let trained ← trainer.train data { steps := 25, batchSize := 4, logEvery := 10 } probes
   trained.printSummary

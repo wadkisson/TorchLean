@@ -13,7 +13,7 @@ public import NN.Runtime.RL.Numerics.Float32.Returns
 
 PPO is usually run with ordinary host floats, but these helpers make the scalar objective pieces
 executable under the explicit `IEEE32Exec` model and reject non-finite intermediates. They are useful
-for regression tests, debugging numerically fragile runs, and connecting runtime checks to proof-side
+for regression tests, debugging numerically fragile runs, and connecting runtime checks to proof layer
 finite hypotheses.
 
 Reference: Schulman et al., "Proximal Policy Optimization Algorithms" (2017).

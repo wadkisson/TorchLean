@@ -111,7 +111,7 @@ In this file, that semantics is implemented by `Interp.spec`, and it is defined 
   compute `⟦g₂⟧ params₂ (⟦g₁⟧ params₁ x)`.
 
 The compiler `Compile.torchProgram` follows the same structure, but targets a monadic Torch
-interface and expects arguments as `params ++ [input]` (matching `TorchLean.NN.Seq.program`).
+interface and expects arguments as `params ++ [input]` (matching `TorchLean.NN.Seq.forwardProgram`).
 
 ## Scope of `Core.lean`
 
@@ -167,7 +167,7 @@ A *primitive node* in the GraphSpec language.
 GraphSpec primitives package both sides of the “spec vs runtime” interface:
 
 - a **pure spec forward** function (`specFwd`) used by the reference interpreter, and
-- a **TorchLean program** (`torchProgram`) used by the compiler.
+- a **TorchLean forwardProgram** (`torchProgram`) used by the compiler.
 
 Optionally, a primitive may also provide a lowering to a TorchLean `LayerDef` (used to build a
 `TorchLean.NN.Seq` for training ergonomics + deterministic parameter initialization). Not every
@@ -197,11 +197,11 @@ structure Primitive (ps : List Shape) (σ τ : Shape) where
     ∀ {α : Type 0}, [Context α] →
       Runtime.Autograd.Torch.TList α ps → Tensor α σ → Tensor α τ
   /--
-  Executable TorchLean program.
+  Executable TorchLean forward program.
 
-  The program expects its arguments as `ps ++ [σ]` (all parameters first, then the input).
+  The forward program expects its arguments as `ps ++ [σ]` (all parameters first, then the input).
   This convention aligns with how sequential TorchLean models (`TorchLean.NN.Seq`) expose their
-  program interfaces.
+  forward-program interfaces.
   -/
   torchProgram :
     ∀ {α : Type 0}, [Context α] → [DecidableEq Shape] →
@@ -986,7 +986,7 @@ def torchProgram
             (p.torchProgram (α := α)) rs
       | .seq (ps₁ := ps₁) (ps₂ := ps₂) (τ := τm) g₁ g₂ => do
           let (params12, x) :=
-            Runtime.Autograd.Torch.RefList.splitAppend1 (Ref := Ref) (ss := ps₁ ++ ps₂) (τ := σ) rs
+            Runtime.Autograd.Torch.RefList.splitLast (Ref := Ref) (ss := ps₁ ++ ps₂) (τ := σ) rs
           let (params₁, params₂) := splitParamsRef (ps₁ := ps₁) (ps₂ := ps₂) params12
           let rs₁ :=
             Runtime.Autograd.Torch.RefList.append (Ref := Ref) (ss₁ := ps₁) (ss₂ := [σ])

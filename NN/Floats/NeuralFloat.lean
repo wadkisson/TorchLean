@@ -17,7 +17,7 @@ public import NN.Floats.NeuralFloat.Rounding
 /-!
 # `NN.Floats.NeuralFloat`
 
-This is the “rounding-on-ℝ” side of TorchLean’s float model stack. We use it when we want to talk about
+This is the “rounding-on-ℝ” side of TorchLean’s float models. We use it when we want to talk about
 formats and rounding generically, without committing to a concrete IEEE bit encoding:
 
 - generic format/rounding infrastructure,

@@ -18,8 +18,8 @@ public import NN.API.SelfSupervised
 This import collects the public names used by `NN.Entrypoint.*` callers, including the
 `TorchLean.*` namespaces.
 
-Most model and training files can just use `import NN`. Use this one when you want the same public
-names under the `NN.Entrypoint.*` tree without pulling in the broader umbrella.
+Most model and training files should use `import NN`. This entrypoint exposes the same public names
+under the `NN.Entrypoint.*` tree without pulling in the broader umbrella.
 -/
 
 @[expose] public section

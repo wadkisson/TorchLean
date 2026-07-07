@@ -31,6 +31,8 @@ These lemmas are infrastructure: they should not encode op-specific logic. Per-o
 
 - `throw_bind_ne_ok`: eliminates impossible success branches after `throw`.
 - `NoMSELoss`: side condition for semantic equivalence theorems over fragments that exclude `.mse_loss`.
+- `NoRawLog`: side condition for theorem statements that do not yet carry the positivity
+  precondition required by raw real `log`.
 - `dValsOfCtx_*`: typed-context to IR-array bridge lemmas.
 - `denoteAllState_*` helpers: semantic equivalence bridges between compiled state and IR denotation tables.
 
@@ -88,6 +90,18 @@ end-to-end semantic equivalence theorem keeps this condition so its branch proof
 -/
 def NoMSELoss (g : NN.IR.Graph) : Prop :=
   ∀ i n, g.getNode i = .ok n → n.kind ≠ .mseLoss
+
+/--
+Core semantic equivalence side condition: the IR graph contains no raw `.log` nodes.
+
+Raw real logarithm is only mathematical on positive inputs. The executable closure produced by
+`IRExec.buildFrom` is intentionally pure, while the IR denotation can report an `Except.error` for
+nonpositive inputs. Until the compiler theorem carries a per-node positivity/domain-validity
+predicate, the end-to-end semantic-equivalence theorem excludes raw `.log`. Use the total
+epsilon-protected `safe_log` operator when a graph needs unconditional execution.
+-/
+def NoRawLog (g : NN.IR.Graph) : Prop :=
+  ∀ i n, g.getNode i = .ok n → n.kind ≠ .log
 
 /--
 If a `do`-chain begins with `throw`, it cannot produce an `.ok` result.

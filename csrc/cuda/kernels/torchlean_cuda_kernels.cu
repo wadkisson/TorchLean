@@ -234,7 +234,7 @@ __global__ void spectral_conv1d_irfft_adjoint_f32(const cufftComplex* dX, float*
   dx[idx] = acc;
 }
 
-__global__ void reduce_sum_axis0_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
+__global__ void reduce_sum_by_column_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
   if (blockDim.x != kBlockSize) return;
   const uint32_t col = (uint32_t)blockIdx.x;
   if (col >= cols) return;
@@ -261,7 +261,7 @@ __global__ void reduce_sum_axis0_f32(const float* in, float* out, uint32_t rows,
   }
 }
 
-__global__ void reduce_sum_axis1_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
+__global__ void reduce_sum_by_row_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
   if (blockDim.x != kBlockSize) return;
   const uint32_t row = (uint32_t)blockIdx.x;
   if (row >= rows) return;
@@ -288,7 +288,7 @@ __global__ void reduce_sum_axis1_f32(const float* in, float* out, uint32_t rows,
   }
 }
 
-__global__ void reduce_max_axis0_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
+__global__ void reduce_max_by_column_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
   if (blockDim.x != kBlockSize) return;
   const uint32_t col = (uint32_t)blockIdx.x;
   if (col >= cols) return;
@@ -641,7 +641,7 @@ __global__ void scatter_add_rows_det_f32(const float* mat, const float* values, 
   out[t] = mat[t] + acc;
 }
 
-__global__ void reduce_max_axis1_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
+__global__ void reduce_max_by_row_f32(const float* in, float* out, uint32_t rows, uint32_t cols) {
   if (blockDim.x != kBlockSize) return;
   const uint32_t row = (uint32_t)blockIdx.x;
   if (row >= rows) return;
@@ -807,15 +807,15 @@ __global__ void selective_scan_diag_bwd_f32(const float* A, const float* B, cons
   dH0[j] = dhNext;
 }
 
-extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis0(b_lean_obj_arg BObj,
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_by_column(b_lean_obj_arg BObj,
                                                                           uint32_t rows,
                                                                           uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
-  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_axis0: R*C overflow");
+  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_by_column: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis0: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_by_column: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(C);
@@ -823,27 +823,27 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis0(b_lea
     return torchlean_cuda_buffer_box(out);
   }
   if (R == 0) {
-    checkCuda(cudaMemset(out->data, 0, C * sizeof(float)), "cudaMemset axis0 out failed");
+    checkCuda(cudaMemset(out->data, 0, C * sizeof(float)), "cudaMemset reduceSumByColumn out failed");
     return torchlean_cuda_buffer_box(out);
   }
 
-  check_axis_grid_size(C, "torchlean_cuda_buffer_reduce_sum_axis0: cols exceed CUDA x-grid range");
+  check_axis_grid_size(C, "torchlean_cuda_buffer_reduce_sum_by_column: cols exceed CUDA x-grid range");
   dim3 blocks = dim3((unsigned int)C);
   dim3 threads = dim3(kBlockSize);
-  reduce_sum_axis0_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
-  checkCuda(cudaGetLastError(), "cuda reduceSumAxis0 kernel launch failed");
+  reduce_sum_by_column_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
+  checkCuda(cudaGetLastError(), "cuda reduceSumByColumn kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 
-extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis1(b_lean_obj_arg BObj,
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_by_row(b_lean_obj_arg BObj,
                                                                           uint32_t rows,
                                                                           uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
-  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_axis1: R*C overflow");
+  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_by_row: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis1: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_by_row: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(R);
@@ -851,27 +851,27 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis1(b_lea
     return torchlean_cuda_buffer_box(out);
   }
   if (C == 0) {
-    checkCuda(cudaMemset(out->data, 0, R * sizeof(float)), "cudaMemset axis1 out failed");
+    checkCuda(cudaMemset(out->data, 0, R * sizeof(float)), "cudaMemset reduceSumByRow out failed");
     return torchlean_cuda_buffer_box(out);
   }
 
-  check_axis_grid_size(R, "torchlean_cuda_buffer_reduce_sum_axis1: rows exceed CUDA x-grid range");
+  check_axis_grid_size(R, "torchlean_cuda_buffer_reduce_sum_by_row: rows exceed CUDA x-grid range");
   dim3 blocks = dim3((unsigned int)R);
   dim3 threads = dim3(kBlockSize);
-  reduce_sum_axis1_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
-  checkCuda(cudaGetLastError(), "cuda reduceSumAxis1 kernel launch failed");
+  reduce_sum_by_row_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
+  checkCuda(cudaGetLastError(), "cuda reduceSumByRow kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 
-extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis0(b_lean_obj_arg BObj,
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_by_column(b_lean_obj_arg BObj,
                                                                           uint32_t rows,
                                                                           uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
-  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_axis0: R*C overflow");
+  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_by_column: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_max_axis0: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_max_by_column: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(C);
@@ -880,27 +880,27 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis0(b_lea
   }
   if (R == 0) {
     // Not expected in TorchLean WellFormed shapes, but totalize.
-    checkCuda(cudaMemset(out->data, 0, C * sizeof(float)), "cudaMemset max axis0 out failed");
+    checkCuda(cudaMemset(out->data, 0, C * sizeof(float)), "cudaMemset reduceMaxByColumn out failed");
     return torchlean_cuda_buffer_box(out);
   }
 
-  check_axis_grid_size(C, "torchlean_cuda_buffer_reduce_max_axis0: cols exceed CUDA x-grid range");
+  check_axis_grid_size(C, "torchlean_cuda_buffer_reduce_max_by_column: cols exceed CUDA x-grid range");
   dim3 blocks = dim3((unsigned int)C);
   dim3 threads = dim3(kBlockSize);
-  reduce_max_axis0_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
-  checkCuda(cudaGetLastError(), "cuda reduceMaxAxis0 kernel launch failed");
+  reduce_max_by_column_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
+  checkCuda(cudaGetLastError(), "cuda reduceMaxByColumn kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 
-extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis1(b_lean_obj_arg BObj,
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_by_row(b_lean_obj_arg BObj,
                                                                           uint32_t rows,
                                                                           uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
-  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_axis1: R*C overflow");
+  const size_t total = checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_by_row: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_max_axis1: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_max_by_row: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(R);
@@ -909,15 +909,15 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis1(b_lea
   }
   if (C == 0) {
     // Not expected in TorchLean WellFormed shapes, but totalize.
-    checkCuda(cudaMemset(out->data, 0, R * sizeof(float)), "cudaMemset max axis1 out failed");
+    checkCuda(cudaMemset(out->data, 0, R * sizeof(float)), "cudaMemset reduceMaxByRow out failed");
     return torchlean_cuda_buffer_box(out);
   }
 
-  check_axis_grid_size(R, "torchlean_cuda_buffer_reduce_max_axis1: rows exceed CUDA x-grid range");
+  check_axis_grid_size(R, "torchlean_cuda_buffer_reduce_max_by_row: rows exceed CUDA x-grid range");
   dim3 blocks = dim3((unsigned int)R);
   dim3 threads = dim3(kBlockSize);
-  reduce_max_axis1_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
-  checkCuda(cudaGetLastError(), "cuda reduceMaxAxis1 kernel launch failed");
+  reduce_max_by_row_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
+  checkCuda(cudaGetLastError(), "cuda reduceMaxByRow kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 

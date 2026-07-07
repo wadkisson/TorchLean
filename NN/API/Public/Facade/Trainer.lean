@@ -12,7 +12,7 @@ public import NN.API.Public.Facade.Trainer.Results
 public import NN.API.Public.Facade.Trainer.Run
 public import NN.API.Public.Facade.Trainer.Verify
 public import NN.API.Public.Facade.Trainer.Train
-public import NN.API.Public.Facade.Trainer.Eval
+public import NN.API.Public.Facade.Trainer.Predict
 
 /-!
 # TorchLean Public Trainer Facade
@@ -23,7 +23,7 @@ Import entrypoint for the public training API:
 let trainer := Trainer.new model
   { task := .regression
     optimizer := optim.adam { lr := 0.03 } }
-let y0 ← trainer.eval x
+let y0 ← trainer.predict x
 let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
 trained.printSummary
 ```

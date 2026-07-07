@@ -24,6 +24,7 @@ It mirrors the simplest PyTorch workflow:
 Run:
 
 - `lake exe torchlean quickstart_mlp`
+- `lake exe torchlean quickstart_mlp --steps 200 --dtype float32 --backend eager`
 - `lake exe torchlean quickstart_mlp --steps 200 --dtype float --backend eager`
 
 Optional flags (tutorial-specific):
@@ -67,11 +68,11 @@ def target (x1 x2 : Float) : Float :=
 /--
 Build the tutorial dataset at the runtime-selected scalar type.
 
-`Data.regression2to1Grid` keeps shape-indexed tensor slicing out of the first training example.
+`Data.regressionGrid` keeps shape-indexed tensor slicing out of the first training example.
 The underlying value is still a TorchLean supervised dataset with checked input/output shapes.
 -/
 def buildDataset : Trainer.Dataset (Shape.vec inDim) (Shape.vec outDim) :=
-  Data.regression2to1Grid (-1.0) 1.0 5 target
+  Data.regressionGrid (-1.0) 1.0 5 target
 
 /-- Command-line help for the simple MLP quickstart. -/
 def usage : String :=
@@ -84,7 +85,7 @@ def usage : String :=
     , "Options:"
     , "  --seed N"
     , "  --steps N"
-    , "  --dtype float|ieee32"
+    , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
     , "  --cpu | --cuda"
     , "  --log PATH"
@@ -108,8 +109,8 @@ def main (args : List String) : IO Unit := do
   IO.println s!"steps = {parsed.train.steps}"
 
   let probes := [
-    Trainer.Probe.vec2 "center" 0.0 0.0 (some (toString (target 0.0 0.0))),
-    Trainer.Probe.vec2 "heldout" 0.25 (-0.75) (some (toString (target 0.25 (-0.75))))
+    Trainer.Probe.point "center" 0.0 0.0 (some (toString (target 0.0 0.0))),
+    Trainer.Probe.point "heldout" 0.25 (-0.75) (some (toString (target 0.25 (-0.75))))
   ]
   let trained ← trainer.train buildDataset parsed.trainOptions probes
   trained.printSummary

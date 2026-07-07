@@ -24,7 +24,7 @@ This is the main entry point used by executable RL workflows: it is small, typed
 trust-boundary validation in one place.
 
 References:
-- Gymnasium API docs (`reset`/`step`, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (`reset`/`step`, `terminated` vs `truncated`): https://gymnasium.farama.org/
 - The original Gym API paper (background on the env interface): https://arxiv.org/abs/1606.01540
 - Trust-boundary contract definition: `NN.Runtime.RL.Boundary`.
 -/

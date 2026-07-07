@@ -7,32 +7,40 @@ open Verso.Genre Manual
 tag := "motivation"
 %%%
 
-The verification problem in ML is not only that neural networks can fail. It is that the object we
-check is often not exactly the object we ran.
+The verification problem in ML has two parts. Neural networks can fail, and the object we check is
+often not exactly the object we ran.
 
 A trained model may live as Python code, a checkpoint, an exported graph, a verifier input, and a
 CUDA execution path. Each representation can be reasonable on its own, but a guarantee becomes
 fragile if no one can say precisely how these representations agree. TorchLean is built around that
 question: when a model is checked, what exact computation is the claim about?
 
+This is not only a philosophical worry. The adversarial-examples literature made clear that small
+changes to an input can change a prediction even when the perturbation is meant to be harmless; a
+canonical early reference is Szegedy et al.,
+["Intriguing properties of neural networks"](https://arxiv.org/abs/1312.6199). Verification methods
+such as IBP, CROWN, and LiRPA attack that problem by computing sound output bounds for input
+regions. But a bound is only as meaningful as the object it bounds. If the verifier saw one graph
+and deployment ran another graph, the certificate may be mathematically interesting and operationally
+irrelevant.
+
 # Why Neural Networks Are Awkward To Check
 
 For ordinary software, a specification can often be crisp: a sorting routine returns a sorted list,
-or a compiler preserves program meaning. Neural networks are less tidy. A useful claim usually
+or a compiler preserves program meaning. Neural networks are less tidy. A serious claim usually
 depends on a region of inputs, a trained parameter set, a numeric backend, and a property such as a
 margin, an interval enclosure, a residual bound, a projection check, a Lyapunov condition, or a
 robustness guarantee.
 
 There is also a newer reason this matters. ML code is becoming easier to generate. A model, a
 training loop, a verifier script, or an export wrapper can now be produced quickly by an LLM or
-copied from a notebook. That is useful, but it changes the bottleneck. The scarce resource is no
-longer only code. It is semantic accountability: knowing what the code means, what assumptions it
-used, and whether the artifact being checked is the artifact that will be used.
+copied from a notebook. The bottleneck moves to meaning: what assumptions the code used, which
+artifact it produced, and whether the artifact being checked is the artifact that will be used.
 
-This is especially important in scientific ML. A classifier error is already serious, but a learned
+The distinction is sharpest in scientific ML. A classifier error is already serious, but a learned
 PDE surrogate, a neural controller, or a 3D perception certificate may sit inside a larger
-scientific or engineering argument. In those cases, we do not only want to know that a model ran. We
-want to know whether a residual was bounded, whether a controller satisfied the checked condition,
+scientific or engineering argument. In those cases, a successful run is only the beginning. We want
+to know whether a residual was bounded, whether a controller satisfied the checked condition,
 whether a projection certificate was replayed, or whether a finite precision execution stayed inside
 the intended envelope.
 
@@ -58,12 +66,19 @@ about the clean objective while the deployed computation used the broadcasted on
 # The Semantic Gap
 
 The ML verification literature has made real progress: interval bound propagation, CROWN/LiRPA
-relaxations, branch-and-bound methods, and mixed-integer encodings can prove useful robustness
+relaxations, branch-and-bound methods, and mixed-integer encodings can prove robustness
 properties for supported model classes.
 
+Those words also hide different kinds of evidence. A mixed-integer solver may return a certificate
+or a status code. A bound-propagation implementation may compute intervals using floating point
+arithmetic. A proof assistant theorem may show that a checker's accepted artifact implies an
+enclosure over an idealized semantics. A runtime regression may compare CUDA output to a reference
+implementation on selected inputs. All four are useful. They are not the same claim.
+
 The difficult part is connecting those checks to the artifact that actually ran. A proof about an
-idealized real-valued network is useful, but it is not automatically a proof about a PyTorch module,
-a CUDA kernel, a JSON checkpoint, or a float32 execution path.
+idealized real-valued network does not automatically cover PyTorch modules, CUDA kernels, JSON
+checkpoints, or float32 execution paths; those objects need explicit bridges or trust-boundary
+statements before they inherit the claim.
 
 That mismatch is the semantic gap. It can enter at many points:
 
@@ -74,17 +89,41 @@ That mismatch is the semantic gap. It can enter at many points:
   state.
 
 TorchLean is built around making those distinctions visible. The graph representation, the
-floating-point semantics, and the verifier infrastructure are ordinary Lean artifacts. They are not
-just labels attached to an experiment after it finishes.
+floating point semantics, and the verifier infrastructure are ordinary Lean artifacts, not labels
+attached to an experiment after it finishes.
 
-# What Lean Statements Buy Us
+# A Small But Typical Mismatch
 
-A Lean statement is more than prose documentation. It fixes the objects under discussion, records
-the quantifiers, and can be reused by later proofs without reinterpreting the claim. If a definition
-changes in a way that invalidates the theorem, Lean asks us to repair the proof or weaken the
-statement explicitly.
+Suppose a classifier is trained with preprocessing
 
-For a robustness claim, the useful shape is not merely "the model is robust." It is closer to:
+$$`x \longmapsto (x-\mu)/\sigma`
+
+but the verifier receives only the post-normalization network. That can be the right choice if the
+input region is also transformed into post-normalization coordinates. It is the wrong choice if the
+robustness claim is later written over raw pixels. The network did not become unsafe because of a
+syntax error; the claim became ambiguous because a boundary was left implicit.
+
+The same pattern appears in smaller bugs:
+
+- a training script uses `model.train()` while the exported graph assumes evaluation mode;
+- a mask is stored with `True` meaning "keep" in one library and "block" in another;
+- a graph optimizer fuses operations under real arithmetic assumptions while the deployment path
+  uses float32 rounding;
+- a certificate stores a lower bound for one logit margin, while the report describes a different
+  target label.
+
+TorchLean's response is not to ban these workflows. It is to require the workflow to name the graph,
+payload, mode, preprocessing convention, scalar semantics, and checker result that the claim uses.
+
+# What Lean Statements Add
+
+A Lean statement fixes the objects under discussion. It records the quantifiers, names the graph or
+program being discussed, and can be reused by later proofs without reinterpreting the claim. If a
+definition changes in a way that invalidates the theorem, Lean asks us to repair the proof or weaken
+the statement explicitly.
+
+For a robustness claim, the statement should name the graph, parameters, input region, label, and
+margin:
 
 $$`\forall x,\; x\in B
 \;\Longrightarrow\;
@@ -92,19 +131,36 @@ $$`\forall x,\; x\in B
 
 Here the graph `g`, parameters `θ`, input region `B`, label `y`, scalar semantics, and denotation
 are all part of the mathematical object being checked. A certificate checker can then prove that a
-particular JSON artifact implies the bound predicate for that graph-payload pair.
+particular JSON artifact implies the bound predicate for that graph and payload pair.
 
-For a compiler or runtime theorem, the useful shape is different:
+For a compiler or runtime theorem, the statement has a different shape:
 
 $$`\forall x,\quad
 \operatorname{denoteIR}(g,payload,x)
 =
 \operatorname{denoteCompiled}(\operatorname{compile}(g,payload),x)`
 
-That statement does not claim the model is accurate. It claims that a transformation preserved the
-meaning named by the IR semantics. This distinction matters: accuracy, robustness, compilation
-correctness, and floating-point approximation are different properties, and TorchLean keeps them as
-different theorems.
+That statement is about semantic preservation. Accuracy, robustness, compilation correctness, and
+floating point approximation are different properties, and TorchLean keeps them as different
+theorems.
+
+# Checks Are Programs, Proofs Are Claims About Programs
+
+It is useful to keep a simple ladder in mind:
+
+```
+run a model
+  -> observe an output
+  -> check a local property of an artifact
+  -> prove that accepted artifacts imply a semantic property
+  -> state which external boundaries remain
+```
+
+The lower rungs are still important. If a JSON artifact does not parse, or if inferred graph shapes
+do not match the payload, there is no theorem to discuss. But the upper rungs are where a guide or
+paper should be precise: "the checker accepted" is not automatically "the theorem applies." The
+theorem applies when the checker, graph fragment, scalar model, and assumptions match the theorem's
+hypotheses.
 
 # Our Response
 
@@ -138,9 +194,9 @@ $$`\forall x,\quad
 \operatorname{roundingEnvelope}(\operatorname{denote}_{\mathbb R}(model,\theta,x))`
 
 The habit is the same in each case: the theorem should say what object was checked, what claim
-follows, and which runtime or external assumptions remain. That is why TorchLean keeps runnable
-code, graph artifacts, and formal statements close together rather than treating verification as a
-report generated after the fact.
+follows, and which runtime or external assumptions remain. TorchLean keeps runnable code, graph
+artifacts, and formal statements close together so verification remains connected to the object that
+ran, rather than pasted into a report after the fact.
 
 ## References
 
@@ -152,6 +208,9 @@ report generated after the fact.
   Functions"](https://arxiv.org/abs/1811.00866), NeurIPS 2018.
 - Xu et al., ["Automatic Perturbation Analysis for Scalable Certified Robustness and
   Beyond"](https://arxiv.org/abs/2002.12920), NeurIPS 2020.
+- Wang et al., ["Beta-CROWN: Efficient Bound Propagation with Per-neuron Split Constraints for
+  Complete and Incomplete Neural Network Robustness Verification"](https://arxiv.org/abs/2103.06624),
+  NeurIPS 2021.
 - Jia and Rinard, ["Exploiting Verified Neural Networks via Floating Point Numerical
-  Error"](https://doi.org/10.1109/SPW50608.2020.00058), 2020.
+  Error"](https://arxiv.org/abs/2003.03021), 2020.
 - de Moura et al., ["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf), CADE 2015.

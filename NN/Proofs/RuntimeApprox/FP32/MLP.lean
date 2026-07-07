@@ -153,7 +153,7 @@ Compositional FP32 approximation theorem for a 2-layer ReLU MLP:
 This is the network-level bound consumed by the CROWN/IBP integration in
 `NN.Proofs.RuntimeApprox.FP32.CROWN`.
 -/
-theorem approxT_reluMlp2_fp32 {d0 d1 d2 : Nat}
+theorem approxT_reluTwoLayerMlp_float32 {d0 d1 d2 : Nat}
     {L0S : LinearSpec ℝ d0 d1} {L1S : LinearSpec ℝ d1 d2}
     {L0R : LinearSpec R d0 d1} {L1R : LinearSpec R d1 d2}
     {xS : SpecTensor (.dim d0 .scalar)} {xR : Tensor R (.dim d0 .scalar)}

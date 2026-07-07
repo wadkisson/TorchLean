@@ -73,9 +73,9 @@ so the model here is just two such layers composed with a nonlinearity and a rea
 -/
 structure GCN2Spec (n inDim hidDim outDim : Nat) (α : Type) where
   /-- First GCN layer: `inDim → hidDim`. -/
-  l1 : Spec.GCNLayerSpec n inDim hidDim α
+  inputLayer : Spec.GCNLayerSpec n inDim hidDim α
   /-- Second GCN layer: `hidDim → outDim`. -/
-  l2 : Spec.GCNLayerSpec n hidDim outDim α
+  outputLayer : Spec.GCNLayerSpec n hidDim outDim α
 
 /-- Forward pass for the 2-layer GCN with a graph-level mean pooling readout.
 
@@ -93,14 +93,16 @@ def GCN2Spec.forward
   (x : Tensor α (.dim n (.dim inDim .scalar)))
   (h_n : n > 0) :
   Tensor α (.dim outDim .scalar) :=
-  let h1 : Tensor α (.dim n (.dim hidDim .scalar)) :=
-    reluSpec (Spec.gcnLayerSpec (α := α) m.l1 x)
-  let h2 : Tensor α (.dim n (.dim outDim .scalar)) :=
-    Spec.gcnLayerSpec (α := α) m.l2 h1
+  let hiddenFeatures : Tensor α (.dim n (.dim hidDim .scalar)) :=
+    reluSpec (Spec.gcnLayerSpec (α := α) (n := n) (inDim := inDim) (outDim := hidDim)
+      m.inputLayer x)
+  let outputFeatures : Tensor α (.dim n (.dim outDim .scalar)) :=
+    Spec.gcnLayerSpec (α := α) (n := n) (inDim := hidDim) (outDim := outDim)
+      m.outputLayer hiddenFeatures
   have hn0 : n ≠ 0 := Nat.ne_of_gt h_n
-  have h_axis0 : Shape.valid_axis_inst 0 (Shape.dim n (Shape.dim outDim Shape.scalar)) :=
+  have hLeadingAxis : Shape.valid_axis_inst 0 (Shape.dim n (Shape.dim outDim Shape.scalar)) :=
     Shape.validAxisInstZeroAlt hn0
-  reduceMeanAuto 0 h_axis0 h2
+  reduceMeanAuto 0 hLeadingAxis outputFeatures
 
 /-- Per-layer gradients returned by `GCNLayerSpec` backward.
 
@@ -119,10 +121,10 @@ structure GCNLayerGrads (n inDim outDim : Nat) (α : Type) where
 
 /-- Gradients for both layers of `GCN2Spec`. -/
 structure GCN2Grads (n inDim hidDim outDim : Nat) (α : Type) where
-  /-- l 1. -/
-  l1 : GCNLayerGrads n inDim hidDim α
-  /-- l 2. -/
-  l2 : GCNLayerGrads n hidDim outDim α
+  /-- Gradients for the `inDim → hidDim` input GCN layer. -/
+  inputLayer : GCNLayerGrads n inDim hidDim α
+  /-- Gradients for the `hidDim → outDim` output GCN layer. -/
+  outputLayer : GCNLayerGrads n hidDim outDim α
 
 /-- Backward/VJP for `GCN2Spec.forward`.
 
@@ -146,36 +148,46 @@ def GCN2Spec.backward
   have hn0 : n ≠ 0 := Nat.ne_of_gt h_n
 
   -- Recompute forward intermediates (small and keeps the backward spec self-contained).
-  let z1 : Tensor α (.dim n (.dim hidDim .scalar)) := Spec.gcnLayerSpec (α := α) m.l1 x
-  let h1 : Tensor α (.dim n (.dim hidDim .scalar)) := reluSpec z1
-  let h2 : Tensor α (.dim n (.dim outDim .scalar)) := Spec.gcnLayerSpec (α := α) m.l2 h1
+  let hiddenPreActivation : Tensor α (.dim n (.dim hidDim .scalar)) :=
+    Spec.gcnLayerSpec (α := α) (n := n) (inDim := inDim) (outDim := hidDim)
+      m.inputLayer x
+  let hiddenFeatures : Tensor α (.dim n (.dim hidDim .scalar)) :=
+    reluSpec hiddenPreActivation
 
   -- Backprop through node-mean pooling:
-  -- y = (1/n) * Σᵢ h2[i]
+  -- y = (1/n) * Σᵢ outputFeatures[i]
   have hB : Shape.CanBroadcastTo (.dim outDim .scalar) (.dim n (.dim outDim .scalar)) := by
     apply Shape.CanBroadcastTo.expand_dims
     apply Shape.CanBroadcastTo.dim_eq
     apply Shape.CanBroadcastTo.scalar_to_any .scalar
 
-  let grad_h2 : Tensor α (.dim n (.dim outDim .scalar)) :=
+  let outputFeatureGrad : Tensor α (.dim n (.dim outDim .scalar)) :=
     scaleSpec (broadcastTo hB grad_output) (1 / (n : α))
 
-  -- Layer 2 backward.
-  let (dA2, dW2, db2, grad_h1) :=
-    Spec.gcnLayerBackwardSpec (α := α) m.l2 h1 grad_h2 hn0
+  -- Output layer backward.
+  let (outputAdjacencyGrad, outputWeightGrad, outputBiasGrad, hiddenFeatureGrad) :=
+    Spec.gcnLayerBackwardSpec (α := α) (n := n) (inDim := hidDim) (outDim := outDim)
+      m.outputLayer hiddenFeatures outputFeatureGrad hn0
 
-  -- ReLU backward: dZ1 = dH1 ⊙ ReLU'(Z1)
-  let grad_z1 : Tensor α (.dim n (.dim hidDim .scalar)) :=
-    mulSpec grad_h1 (reluDerivSpec z1)
+  -- ReLU backward: dZ = dH ⊙ ReLU'(Z).
+  let hiddenPreActivationGrad : Tensor α (.dim n (.dim hidDim .scalar)) :=
+    mulSpec hiddenFeatureGrad (reluDerivSpec hiddenPreActivation)
 
-  -- Layer 1 backward.
-  let (dA1, dW1, db1, grad_x) :=
-    Spec.gcnLayerBackwardSpec (α := α) m.l1 x grad_z1 hn0
+  -- Input layer backward.
+  let (inputAdjacencyGrad, inputWeightGrad, inputBiasGrad, inputGrad) :=
+    Spec.gcnLayerBackwardSpec (α := α) (n := n) (inDim := inDim) (outDim := hidDim)
+      m.inputLayer x hiddenPreActivationGrad hn0
 
   let grads : GCN2Grads n inDim hidDim outDim α :=
-    { l1 := { dA := dA1, dW := dW1, db := db1 }
-      l2 := { dA := dA2, dW := dW2, db := db2 } }
+    { inputLayer :=
+        { dA := inputAdjacencyGrad
+          dW := inputWeightGrad
+          db := inputBiasGrad }
+      outputLayer :=
+        { dA := outputAdjacencyGrad
+          dW := outputWeightGrad
+          db := outputBiasGrad } }
 
-  (grads, grad_x)
+  (grads, inputGrad)
 
 end Models

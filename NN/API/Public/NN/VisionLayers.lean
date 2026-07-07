@@ -27,7 +27,7 @@ namespace pure
 /--
 Named-field Conv2d configuration (CHW layout).
 
-This is the public, PyTorch-like entry point for convolution in TorchLean.
+Public, PyTorch-like convolution entrypoint for TorchLean.
 PyTorch analogue: `torch.nn.Conv2d`.
 See `https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html`.
 -/
@@ -86,7 +86,7 @@ def conv2d {n inC inH inW : Nat} (cfg : Conv2d) [NeZero inC] [NeZero cfg.kH] [Ne
       (NN.Tensor.Shape.Images n cfg.outC
         ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
         ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1)) :=
-  batchDim0 n (conv2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
+  batchPointwise n (conv2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
 
 @[inherit_doc conv2dCHWWith]
 def convCHWWith := @conv2dCHWWith
@@ -144,7 +144,7 @@ def maxPool2d {n inC inH inW : Nat} (cfg : MaxPool2d) [NeZero cfg.kH] [NeZero cf
       (NN.Tensor.Shape.Images n inC
         ((inH - cfg.kH) / cfg.stride + 1)
         ((inW - cfg.kW) / cfg.stride + 1)) :=
-  batchDim0 n (maxPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
+  batchPointwise n (maxPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
 
 /-- Shorthand for `maxPool2dWith` (PyTorch-style). -/
 def maxPoolWith := @maxPool2dWith
@@ -202,7 +202,7 @@ def avgPool2d {n inC inH inW : Nat} (cfg : AvgPool2d) [NeZero cfg.kH] [NeZero cf
       (NN.Tensor.Shape.Images n inC
         ((inH - cfg.kH) / cfg.stride + 1)
         ((inW - cfg.kW) / cfg.stride + 1)) :=
-  batchDim0 n (avgPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
+  batchPointwise n (avgPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
 
 /-- Shorthand for `avgPool2dWith` (PyTorch-style). -/
 def avgPoolWith := @avgPool2dWith

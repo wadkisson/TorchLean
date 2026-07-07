@@ -17,7 +17,7 @@ Many runnable examples in `NN/Examples/Models/*` follow the same pattern:
 2. wrap it as a `ScalarModuleDef` (model + supervised loss),
 3. load or synthesize one supervised sample `(x, y)`,
 4. run `steps` optimizer updates on that fixed sample, and
-5. either print `loss0 -> loss1` or write a TrainLog curve.
+5. either print before/after loss or write a TrainLog curve.
 
 This module keeps that loop in one place so examples stay short and consistent.
 
@@ -42,8 +42,8 @@ namespace TrainFixed
 
 /-- Before/after scalar losses for a fixed-sample training run. -/
 structure LossPair (α : Type) where
-  loss0 : α
-  loss1 : α
+  beforeLoss : α
+  afterLoss : α
 deriving Repr
 
 /-- One fixed-sample run for an arbitrary scalar backend. -/
@@ -65,9 +65,9 @@ def steps
     IO (LossPair α) := do
   nn.withModel mkModel fun model => do
     let modDef := mkModuleDef model
-    let m ← TorchLean.Module.instantiateWithOptions (α := α) modDef cast opts
-    let loss0 ← TorchLean.Module.forward (α := α) m sample
-    let L0 := _root_.Spec.Tensor.toScalar loss0
+    let m ← TorchLean.Module.instantiateConfigured (α := α) modDef cast opts
+    let initialLossTensor ← TorchLean.Module.forward (α := α) m sample
+    let beforeLoss := _root_.Spec.Tensor.toScalar initialLossTensor
     let opt := mkOptim cast (nn.paramShapes model)
     let optH ← TorchLean.Optim.handle (α := α) m opt
     let watchEvery := Common.effectiveCudaMemWatch opts steps cudaMemWatch
@@ -75,9 +75,9 @@ def steps
     for step in [0:steps] do
       optH.step sample
       memWatch? ← Common.reportCudaMemWatch opts watchEvery steps (step + 1) memWatch?
-    let loss1 ← TorchLean.Module.forward (α := α) m sample
-    let L1 := _root_.Spec.Tensor.toScalar loss1
-    pure { loss0 := L0, loss1 := L1 }
+    let finalLossTensor ← TorchLean.Module.forward (α := α) m sample
+    let afterLoss := _root_.Spec.Tensor.toScalar finalLossTensor
+    pure { beforeLoss := beforeLoss, afterLoss := afterLoss }
 
 /-- Fixed-sample run specialized to `Float`, returning a full per-step curve. -/
 def curveFloat
@@ -95,14 +95,14 @@ def curveFloat
     IO _root_.Runtime.Training.Curve := do
   nn.withModel mkModel fun model => do
     let modDef := mkModuleDef model
-    let m ← TorchLean.Module.instantiateWithOptions (α := Float) modDef id opts
-    let loss0 ← TorchLean.Module.forward (α := Float) m sample
-    let L0 := _root_.Spec.Tensor.toScalar loss0
+    let m ← TorchLean.Module.instantiateConfigured (α := Float) modDef id opts
+    let initialLossTensor ← TorchLean.Module.forward (α := Float) m sample
+    let initialLoss := _root_.Spec.Tensor.toScalar initialLossTensor
     let opt := mkOptim (nn.paramShapes model)
     let optH ← TorchLean.Optim.handle (α := Float) m opt
     let mut curve : _root_.Runtime.Training.Curve := {}
-    curve := curve.push 0 L0
-    let mut last := L0
+    curve := curve.push 0 initialLoss
+    let mut last := initialLoss
     let watchEvery := Common.effectiveCudaMemWatch opts steps cudaMemWatch
     let mut memWatch? ← Common.reportCudaMemWatch opts watchEvery steps 0 none
     for step in [0:steps] do

@@ -15,7 +15,7 @@ searches for a certificate, or partitions a domain. The second stage is a Lean c
 the artifact, checks the supported conditions, and records exactly what follows.
 
 TorchLean does not vendor the Two-Stage / α,β-CROWN repository. The core TorchLean library and
-`lake build` do not require that Python stack. If you want to run the external producer workflow,
+`lake build` do not require that Python environment. If you want to run the external producer workflow,
 clone the Two-Stage repository separately. TorchLean no longer carries that producer as a submodule.
 
 The workflow has two stages, each with a few concrete steps:
@@ -23,7 +23,7 @@ The workflow has two stages, each with a few concrete steps:
 ```
 Stage 1: external search or training
   PyTorch / Julia / α,β-CROWN
-  -> checkpoint, bounds, leaf certificate, controller candidate
+  -> checkpoint, bounds, raw leaf data, controller candidate
 
 Stage 2: Lean post-check
   parse artifact
@@ -35,8 +35,8 @@ Stage 2: Lean post-check
 
 In repository terms, the stages are:
 
-- Python training, Julia simulation, or α,β-CROWN produces a checkpoint, JSON artifact, or bound
-  report.
+- Python training, Julia simulation, or α,β-CROWN produces a checkpoint, raw artifact, terminal
+  domain dump, or bound report.
 - TorchLean parses the artifact into typed Lean data.
 - A TorchLean checker replays the supported computation, checks structure, or records an explicit
   producer hypothesis.
@@ -55,15 +55,15 @@ what Lean actually checks.
 
 # What TorchLean Provides
 
-TorchLean supports the Python-first verification pattern: an external producer writes an artifact,
-then Lean parses, replays, or structurally checks it. The current Two Stage checker handles a small
-leaf artifact JSON format exported from α,β-CROWN:
+TorchLean supports the verification pattern where Python writes an artifact first: Lean parses,
+replays, or structurally checks it. The current Two Stage checker handles a small leaf artifact JSON
+format converted from terminal domain data produced by α,β-CROWN:
 `abcrown-leaf` (see the certificate guide for what this does and does not check).
 
 # Running the Checker From TorchLean
 
-The Two Stage checker is registered in the unified verification CLI, so the easiest place to
-start is:
+The Two Stage checker is registered in the unified verification CLI. Start by listing the available
+verification commands:
 
 ```
 lake exe verify -- list
@@ -83,15 +83,19 @@ Clone the external producer only if you want to generate fresh α,β-CROWN / Two
 
 The Python verifier dependencies are managed by the external Two-Stage / α,β-CROWN repositories;
 TorchLean does not try to own that environment. Local α,β-CROWN runs follow those repositories'
-instructions; artifact export is described in *Certificates*.
+instructions. TorchLean's producer-side bridge for leaf artifacts is
+`scripts/verification/abcrown/export_leaf_artifact.py`; it converts a raw terminal-domain dump into the
+JSON checked by `lake exe verify -- abcrown-leaf`.
 
 # What Is Actually Checked
 
-The Lean pipelines re-evaluate models against TorchLean's semantics, including the chosen scalar
-domain such as `IEEE32Exec`, and run TorchLean's bound propagation and checkers on the resulting
-graphs. The `abcrown-leaf` JSON artifacts are structural leaf artifacts today: TorchLean can parse
-them and check their declared shape and metadata; stronger certificates would additionally replay
-or prove the bound computation.
+When the artifact contains enough model and bound data, the Lean pipelines re-evaluate models
+against TorchLean's semantics, including the chosen scalar domain such as `IEEE32Exec`, and run
+TorchLean's bound propagation and checkers on the resulting graphs. The `abcrown-leaf` JSON
+artifacts are structural leaf artifacts today: TorchLean can parse them and check their declared
+shape, metadata, box nesting, and exported witness lower-bound test; stronger certificates would
+additionally replay or prove the bound computation and, for a whole root-region claim, check leaf
+coverage.
 
 For branch-and-bound verification, the theorem pattern is:
 

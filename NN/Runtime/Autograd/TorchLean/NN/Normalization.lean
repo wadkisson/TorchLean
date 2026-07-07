@@ -45,7 +45,7 @@ def layerNorm
     seedBeta)
   { kind := "LayerNorm"
     paramShapes := [gammaShape, betaShape]
-    initParams := Torch.tlist2 gamma0 beta0
+    initParams := Torch.tlistPair gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -75,7 +75,7 @@ def rmsNorm
     := seedGamma)
   { kind := "RMSNorm"
     paramShapes := [gammaShape]
-    initParams := Torch.tlist1 gamma0
+    initParams := Torch.tlistSingleton gamma0
     paramRequiresGrad := [true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -108,7 +108,7 @@ def batchnormChannelFirst
     seedBeta)
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape]
-    initParams := Torch.tlist2 gamma0 beta0
+    initParams := Torch.tlistPair gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -146,7 +146,7 @@ def batchnormChannelFirstEval
     seedVar)
   { kind := "BatchNorm2d(eval)"
     paramShapes := [gammaShape, betaShape, meanShape, varShape]
-    initParams := Torch.tlist4 gamma0 beta0 mean0 var0
+    initParams := Torch.tlistQuad gamma0 beta0 mean0 var0
     paramRequiresGrad := [true, true, false, false]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -237,7 +237,7 @@ def instanceNorm2dNchw
     seedBeta)
   { kind := "InstanceNorm2d"
     paramShapes := [gammaShape, betaShape]
-    initParams := Torch.tlist2 gamma0 beta0
+    initParams := Torch.tlistPair gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -270,7 +270,7 @@ def groupNorm2dNchw
     seedBeta)
   { kind := s!"GroupNorm2d(groups={groups})"
     paramShapes := [gammaShape, betaShape]
-    initParams := Torch.tlist2 gamma0 beta0
+    initParams := Torch.tlistPair gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -302,7 +302,7 @@ def batchNorm2dNchw
     seedBeta)
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape]
-    initParams := Torch.tlist2 gamma0 beta0
+    initParams := Torch.tlistPair gamma0 beta0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

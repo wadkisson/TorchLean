@@ -22,20 +22,22 @@ public import NN.MLTheory.CROWN.Proofs.Overview
 /-!
 # Verification entrypoint
 
-This is the public umbrella import for TorchLean’s verification infrastructure: JSON utilities,
-certificate formats, ODE/PINN-style checkers, proof-backed certificate soundness, and the verified
-TorchLean-to-IR forward compiler bridge.
+Import this file for TorchLean’s verification infrastructure: JSON utilities, certificate formats,
+ODE/PINN-style checkers, proof-backed certificate soundness, and the proof-backed TorchLean-to-IR
+forward compiler bridge.
 
-We keep one verification entrypoint on purpose. The verified compiler bridge is imported here
+We keep one verification entrypoint on purpose. The compiler bridge is imported here
 through the naming-friendly `NN.Verification.TorchLean.Verified` API, so users do not have to choose
 between separate “proved” and “verified” umbrellas.
 
 Runnable CLIs stay out of this umbrella. If you want a command-line tool, import
 the registry explicitly (for example `NN.Verification.CLI`).
 
-Proof-backed certificate workflows enter here too. Executable examples can parse JSON artifacts and
-recompute bounds inside Lean; theorem-level credit comes from the imported CROWN/LiRPA soundness
-development, where locally valid certificates are connected to Lean graph semantics.
+The underlying CROWN/LiRPA soundness development enters here too. Executable examples can parse
+JSON artifacts and recompute bounds inside Lean; theorem-level credit comes from those imported
+soundness modules, where locally valid certificates are connected to Lean graph semantics. The
+convenience aliases in `NN.Verification.ProofBackedCertificates` sit one layer above this entrypoint
+and re-export the main theorem handles under verification names.
 -/
 
 @[expose] public section

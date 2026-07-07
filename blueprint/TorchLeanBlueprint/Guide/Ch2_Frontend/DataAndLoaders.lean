@@ -7,9 +7,9 @@ open Verso.Genre Manual
 tag := "datasets-loaders"
 %%%
 
-A model tutorial is only useful for a few minutes if it trains on one hard-coded tensor. Data enters
-TorchLean as in-memory samples, file-backed tensors, deterministic loaders, and minibatches with
-shapes the model can see. The surface is close by design to `torch.utils.data`, but the samples
+One hard-coded tensor is enough to explain a loss or a gradient, but real examples need data
+pipelines. TorchLean accepts in-memory samples, file-backed tensors, deterministic loaders, and
+minibatches with shapes the model can see. The API stays close to `torch.utils.data`, while samples
 carry Lean shapes.
 
 The reader model is:
@@ -38,10 +38,10 @@ import NN
 open TorchLean
 
 def X : Tensor.T Float (shape![25, 2]) :=
-  Samples.grid2Square (-1.0) 1.0 5
+  Samples.squareGrid (-1.0) 1.0 5
 
 def Y : Tensor.T Float (shape![25, 1]) :=
-  Samples.regression2to1Float X target
+  Samples.regressionTargetsFloat X target
 
 def dataset : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
   Data.tensorDataset X Y
@@ -59,9 +59,9 @@ let dataset :=
   Data.Bands.dataset
 ```
 
-This is the TorchLean analogue of a small PyTorch `TensorDataset`: a finite dataset whose elements
-are already tensors. It is excellent for introductory examples, tests, and examples where the point is the
-model or proof interface rather than file IO.
+Think of this as TorchLean's version of a small PyTorch `TensorDataset`: a finite dataset whose
+elements are already tensors. It fits introductory examples, tests, and examples where the model or
+proof interface matters more than file IO.
 
 The image band dataset used by the CNN tutorial is exposed through the public `Data` API and is
 used directly by
@@ -83,8 +83,37 @@ The public source types are:
 - `Data.LabeledSource` for inputs plus integer labels;
 - `Data.TabularSupervisedSource` for numeric CSV with input and target columns.
 
-The important behavior is that loading returns an error when the file or shape does not match the
-declared contract. A loader failure is not delayed until the model sees a bad batch.
+Loading returns an error when the file or shape does not match the declared contract. A loader
+failure is not delayed until the model sees a bad batch.
+
+The exact constructor names vary by source, but the shape of a file-backed load looks like this:
+
+```
+def source : Data.SupervisedSource :=
+  Data.SupervisedSource.ofPaths .npy "data/x.npy" "data/y.npy" 100 [2] [1]
+
+def loadData : IO (Trainer.Dataset (Shape.vec 2) (Shape.vec 1)) := do
+  match ← source.load (α := Float) with
+  | .ok data => pure data
+  | .error msg => throw <| IO.userError msg
+```
+
+That `Except String` boundary is not decoration. It is where a file-system object becomes a typed
+training dataset. Once the loader succeeds, the trainer does not need to ask whether `x.npy` was
+really two columns wide on every step.
+
+For tabular CSV data, the same idea is column based:
+
+```
+def csvSource : Data.TabularSupervisedSource :=
+  { path := "data/samples.csv"
+    inDim := 2
+    outDim := 1 }
+```
+
+The CSV convention is simple: each row contains the input columns followed by the target columns.
+The table can be messy as a file, but the resulting dataset is not allowed to be vague. Either the
+rows parse into the declared numeric shapes or the load fails with a concrete error.
 
 The data contract references are:
 
@@ -122,7 +151,7 @@ TorchLean, the batch dimension can appear in the type. If the model is written f
 keeps the tutorial simple by making every batch have the same static shape.
 
 More flexible loaders can still be written, but then the file has to say how it handles the changing
-batch dimension. That is the tradeoff: less implicit convenience, more visible shape information.
+batch dimension. The tradeoff is less implicit convenience and more visible shape information.
 
 When a full epoch is needed directly, `Data.BatchLoader.epoch` materializes the batches and returns
 the updated loader state. Most public examples stay one level higher and batch the dataset first:
@@ -133,8 +162,9 @@ let trained ← trainer.train data { steps := 200, batchSize := 16 }
 trained.printSummary
 ```
 
-That is the standard user-facing path. The loader still exists under the hood, but the public
-example does not need to own runner state, callbacks, or a separate epoch loop.
+The standard public path goes through `Data.batchDataset` and `trainer.train`. The loader still
+exists under the hood, but the example does not need to own runner state, callbacks, or a separate
+epoch loop.
 
 # A Complete Minibatch Shape
 
@@ -156,7 +186,7 @@ The minibatch model is:
 Shape.mat 5 2 -> Shape.mat 5 1
 ```
 
-That is why the quickstart writes:
+For that reason, the quickstart writes:
 
 ```
 def mkModel {batch : Nat} :
@@ -171,6 +201,24 @@ def mkModel {batch : Nat} :
 The model says it consumes a batch. The dataset says it contains individual samples. The loader
 connects those two views.
 
+This distinction is worth making explicit in code:
+
+```
+def perSample : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+  Data.tensorDataset xs ys
+
+def batched : IO (Trainer.Dataset (Shape.mat 5 2) (Shape.mat 5 1)) := do
+  Data.batchDataset 5 perSample (shuffle := true) (seed := 42)
+```
+
+The first value is a dataset of individual examples. The second value is a dataset of minibatches.
+That is why a batched model has matrix-shaped inputs even though the original row had only two
+features.
+
+If the dataset size is not divisible by the batch size, a fixed-size typed batch must decide what to
+do with the remainder. The beginner path drops the remainder. More advanced examples can pad,
+bucket by length, or use a dynamic batch wrapper, but they must say so in the code.
+
 # Hooks And Curves
 
 Good runnable commands should still leave an artifact behind. The public trainer result writes a
@@ -183,42 +231,51 @@ let trained ← trainer.train data
     log := .json outPath }
 ```
 
-The returned `trained` value is not only a string summary. It also keeps the trained runtime handle alive,
-so public examples can immediately run `trained.eval ...` without reopening the advanced runner
-API.
+The returned `trained` value keeps the trained runtime handle alive. Public examples can immediately
+run `trained.predict ...` without reopening the manual runner API.
 
 Lower-level callbacks still exist for runtime-module tutorials and custom training loops:
 
 ```
-Trainer.Advanced.onTrainStart do
-  Trainer.Advanced.Report.reportMeanLoss (task := task) runner dataset "before"
+Trainer.Manual.onTrainStart do
+  Trainer.Manual.Report.reportMeanLoss (task := task) runner dataset "before"
 ```
 
-The model zoo examples also accept a log path through the shared CLI flags. The JSON log is meant to
-be plotted or checked later, so the examples can answer the practical question: did the model learn
-on the dataset we gave it?
+The model examples also accept a log path through the shared CLI flags. The JSON log records the
+quantities needed for later plots or checks, so the examples can answer the practical question: did
+the model learn on the dataset we gave it?
 
 # Text and Sequence Data
 
 Text models use the same principle, but the sample builder is different. The sequence examples read
-a corpus, tokenize or encode it, and create causal samples. The useful files to read next are:
+a corpus, tokenize or encode it, and create causal samples. The relevant files are:
 
 - [NN/API/Text.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Text.lean)
 - [NN/Examples/Models/Sequence/Transformer.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Transformer.lean)
 - [NN/Examples/Models/Sequence/TextGpt2.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/TextGpt2.lean)
 
-The shapes are still the guide. A language model sample is not "just a list of tokens"; it is a
-tensor with a sequence length and a target convention.
+The shapes are still the guide. A language model sample is a tensor with a sequence length and a
+target convention, rather than an unstructured list of tokens.
 
 # What the Data Layer Guarantees
 
-The data layer does not prove that a dataset is scientifically meaningful. It does something more
-modest and more useful for the rest of the stack:
+The data layer gives the rest of the library a stable contract for examples and experiments:
 
 - it checks that tensors entering training have the shapes the model expects;
 - it keeps minibatches reproducible when the seed is fixed;
 - it gives training loops stable batch shapes when the example requests them;
 - it produces logs and reports that can be inspected later.
 
-That is the right amount of machinery for a tutorial book: enough to train real examples, but small
-enough that the reader can still see the path from file to tensor to model update.
+The data layer is deliberately modest: enough to train real examples, but small enough that the
+reader can still see the path from file to tensor to model update.
+
+# Data Is Evidence, Not A Proof
+
+It is tempting to overstate what a clean training log says. The data layer can show that a file was
+parsed, shapes matched, batches were reproducible, and loss moved during a run. Those are useful
+runtime facts. They are not the same as a theorem about generalization, a proof of optimizer
+convergence, or a certified robustness bound.
+
+Later chapters use the same datasets and models as inputs to stronger checks. The point of Chapter 2
+is to make sure the ordinary executable path is visible and typed before those stronger claims enter
+the story.

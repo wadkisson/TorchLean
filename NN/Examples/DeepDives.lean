@@ -1,0 +1,36 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.Examples.DeepDives.Floats.ArbIEEEExecCompare
+public import NN.Examples.DeepDives.Floats.Float32Modes
+public import NN.Examples.DeepDives.GraphSpec.Tutorial
+public import NN.Examples.DeepDives.IRAxisOps
+public import NN.Examples.DeepDives.OneSemanticUniverse
+public import NN.Examples.DeepDives.Tensors.Basic
+public import NN.Examples.DeepDives.TorchIRPyTorch
+public import NN.Examples.DeepDives.Widgets
+
+/-!
+# `NN.Examples.DeepDives`
+
+Curated umbrella for deep-dive TorchLean examples.
+
+These files are not beginner introductory examples. They cover cross-cutting boundaries:
+
+- float/runtime semantics and Arb-backed interval comparison;
+- GraphSpec lowering into the training API;
+- IR axis semantics and PyTorch export;
+- the “one semantic universe” contract connecting execution, CROWN/IBP, and widgets;
+- tensor construction/indexing/bridging basics and editor-only widget panels.
+
+Rule of thumb for this folder: examples may contain small concrete graphs, parameters, and display
+data, but reusable algorithms and data structures belong in `NN.*` library modules. Import this
+umbrella when you want the whole deep-dive example surface.
+-/
+
+@[expose] public section

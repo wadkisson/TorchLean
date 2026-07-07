@@ -1,37 +1,69 @@
-# `NN/Spec`: specification layer (reference definitions)
+# `NN/Spec`: Specification Layer
 
-This folder is TorchLean's specification layer. It holds the reference definitions of tensors, ops,
-layers, and models that we reuse for:
+This folder is TorchLean's specification layer. It holds the reference definitions of tensors,
+operations, layers, models, dynamics, and RL objects that later runtime and verification code point
+back to.
 
-- execution (instantiating scalars as `Float`, IEEE-754 models, etc.),
-- verification/bounds (instantiating scalars as `Interval`, etc.),
-- proofs (instantiating scalars as `ℝ`).
+The same spec can be instantiated in several scalar worlds:
+
+- `ℝ` for clean mathematical statements;
+- `FP32`/`NeuralFloat` for rounded-real proof models;
+- `IEEE32Exec` for executable binary32 semantics;
+- runtime scalar backends where explicit bridges state what is assumed.
 
 The practical goal is to avoid a gap between the network we run and the network we reason about:
-define it once, then reuse the same definition for execution and verification.
+define the reference behavior once, then make runtime, graph, and verifier layers say how they
+connect back to it.
 
-This layout mirrors the TorchLean paper (`arXiv:2602.22631`): we separate the focused
-`NN.Spec.*` modules, runtime entrypoints, and verification entrypoints, but we keep them aligned by
-building everything on top of the same core semantics. The public spec doorway is
-`NN.Entrypoint.Spec`; ordinary model/training code should start from `import NN`.
+Ordinary model/training code should start from `import NN`. Use `NN.Entrypoint.Spec` when a file is
+spec-focused and should avoid importing the full public API.
 
-## How to navigate
+## How To Navigate
 
 - `Core/`
-  - `shape.lean`: type-level tensor shapes + broadcast/axis utilities.
-  - `tensor/Core.lean`: the `Spec.Tensor` datatype (a pure tensor representation).
-  - `tensor_ops.lean`, `tensor_reduction_shape.lean`: elementwise ops + reductions.
-  - `context.lean`: `Context α`, the numeric backend interface (arithmetic, order, exp/tanh/etc.).
-- `Layers/`: forward + backward specs for common NN layers (linear/conv/attention/etc.).
-- `Autograd/`: spec level reverse mode building blocks (`OpSpec`) used by runtime AD wrappers.
-- `Module/`: module records that package layer specs with export metadata.
-- `Models/`: model compositions (MLP/CNN/Transformer/ResNet/Seq2Seq/etc.).
-- `NN/Examples/`: executable examples that exercise the specs.
+  - `Shape.lean`: type-level tensor shapes, axis utilities, and broadcasting evidence.
+  - `Context.lean`: `Context α`, the numeric backend interface for spec code.
+  - `Tensor/Core.lean`: the `Spec.Tensor` datatype.
+  - `TensorOps.lean`, `TensorReductionShape.lean`: elementwise ops, reductions, reshapes,
+    broadcasts, concat/slice, and axis manipulation.
+  - `Complex.lean`, `TensorBridge.lean`, `TensorGrad.lean`: FFT/FNO support, runtime bridges, and
+    gradient helper specs.
+- `Layers/`: forward and backward specs for common layers: linear, convolution, attention,
+  FlashAttention-style fused attention, normalization, pooling, embeddings, recurrent layers,
+  selective scan, dropout, and losses.
+- `Autograd/`: spec-level reverse-mode building blocks (`OpSpec`) used by runtime AD wrappers and
+  proof files.
+- `Module/`: module records that package layer specs with input/output shapes and export metadata.
+- `Models/`: model compositions such as MLP, CNN, Transformer, ResNet, ViT, Seq2Seq, UNet, GNN,
+  linear/logistic regression, gradient boosted trees, HMM/GMM/PCA, and state-space models.
+- `Dynamics/`: pure dynamical-system and state-space recurrence specs.
+- `RL/`: Bellman backups, returns, MDPs, Gymnasium-style environment contracts, and GridWorld specs.
+- `NN/Examples/`: executable examples that exercise the specs through the public trainer and CLI.
 
 ## Terminology
 
-- spec = pure reference definitions (this folder).
-- runtime = tape/graph execution, compilation, and training loops (see `NN/Runtime/*` and
+- spec = pure reference definitions in this folder.
+- runtime = tape/graph execution, compilation, CUDA paths, and training loops (see `NN/Runtime/*` and
   `NN.Entrypoint.Runtime`).
-- verification = sound bound propagation / certificate checking (see `NN/Verification/*` and
+- verification = bound propagation, certificate checking, and artifact replay (see `NN/Verification/*` and
   `NN.Entrypoint.Verification`).
+
+## What A Spec Claim Means
+
+A spec definition is the reference object for later layers. Runtime backends, external kernels, and
+serialized artifacts connect to it through explicit lowering, checking, or trust-boundary statements.
+The usual chain is:
+
+1. define the mathematical behavior here,
+2. execute or lower a runtime object elsewhere,
+3. state a bridge, checker, test, or theorem connecting the runtime/artifact back to the spec.
+
+This distinction matters for common ML conventions. For example, the attention spec uses the hard
+mask meaning: blocked positions contribute exactly zero softmax numerator. A runtime path may use a
+finite additive mask only when its contract says how that finite computation relates to the hard
+mask property being cited. Similarly, a real-valued layer spec, an executable `IEEE32Exec` path, and
+a CUDA `Float32` kernel are related objects, not interchangeable words.
+
+When adding a new spec, keep the reference behavior small and explicit. Put runtime shortcuts,
+foreign-library assumptions, tolerances, and file-format details in the runtime, verification, or
+trust-boundary layer that actually owns them.

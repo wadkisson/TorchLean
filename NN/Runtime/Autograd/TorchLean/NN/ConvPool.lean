@@ -51,7 +51,7 @@ def conv
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"Conv{d}d({inC}, {outC})"
     paramShapes := [KShape, bShape]
-    initParams := Torch.tlist2 k0 b0
+    initParams := Torch.tlistPair k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -92,7 +92,7 @@ def convTranspose
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"ConvTranspose{d}d({inC}, {outC})"
     paramShapes := [KShape, bShape]
-    initParams := Torch.tlist2 k0 b0
+    initParams := Torch.tlistPair k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -185,7 +185,7 @@ def conv2d
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"Conv2d({inC}, {outC}, {kH}x{kW})"
     paramShapes := [KShape, bShape]
-    initParams := Torch.tlist2 k0 b0
+    initParams := Torch.tlistPair k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -222,7 +222,7 @@ def convTranspose2d
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"ConvTranspose2d({inC}, {outC}, {kH}x{kW})"
     paramShapes := [KShape, bShape]
-    initParams := Torch.tlist2 k0 b0
+    initParams := Torch.tlistPair k0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

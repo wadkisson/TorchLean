@@ -414,7 +414,7 @@ def boxMinElem (B1 B2 : FlatBox α) : FlatBox α :=
 Componentwise square of an interval box: for each component `[l,u]` produce `[min (l^2,u^2), max
   (l^2,u^2)]`, with `0` as the minimum when the interval crosses `0`.
 
-The body is exposed because the proof-facing theorem module unfolds this executable rule when
+The body is exposed because the proof layer theorem module unfolds this executable rule when
 proving dimension preservation and pointwise enclosure.
 -/
 @[expose] def boxSquare (B : FlatBox α) : FlatBox α :=

@@ -15,7 +15,7 @@ public import NN.Spec.Layers.Activation
 Executable helper operators for the graph-based CROWN/IBP engine.
 
 This file keeps runtime certificate replay separate from proof imports:
-- Some proof-facing CROWN modules import `Mathlib` and large theorem developments. Native
+- Some proof layer CROWN modules import `Mathlib` and large theorem developments. Native
   executables that only replay certificates should not pay that import cost.
 - The graph verifier and executable certificate checks only need a compact set of computational
   definitions: ReLU relaxations plus interval rules for a few scalar activations.

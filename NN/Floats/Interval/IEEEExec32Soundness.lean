@@ -27,7 +27,7 @@ This module re-exports the main enclosure theorems for:
 - addition/subtraction/negation,
 - multiplication (4-corner rule),
 - division/reciprocal (with a conservative whole-interval fallback on division-by-zero),
-- auxiliary lemmas about `min4/max4` and non-NaN behavior.
+- auxiliary lemmas about `minOfFour/maxOfFour` and non-NaN behavior.
 
 We keep these as separate files for navigation, and provide this umbrella so downstream code can
 `import NN.Floats.Interval.IEEEExec32Soundness` without hunting for filenames.

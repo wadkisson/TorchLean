@@ -82,7 +82,7 @@ def ofReport {a : Type} (r : StepReport a) : ReportSum a :=
 /--
 Start an accumulator from a batch report, weighted by the number of samples in the batch.
 
-This is the appropriate constructor when `evalBatch` returns *means* over the batch, but we want
+This is the appropriate constructor when `reportBatch` returns *means* over the batch, but we want
 the final mean to weight by the number of items in each batch.
 -/
 def ofBatch {a : Type} [Mul a] [Coe Nat a]
@@ -145,7 +145,7 @@ average).
 def evalBatches {sample a : Type}
   [Add a] [Mul a] [Div a] [Coe Nat a]
   (tag : String) (batches : List (List sample))
-  (evalBatch : List sample -> Result (StepReport a)) :
+  (reportBatch : List sample -> Result (StepReport a)) :
   Result (StepReport a) := do
   match batches with
   | [] => .error (tagError tag "empty batch list")
@@ -153,13 +153,13 @@ def evalBatches {sample a : Type}
       if b0.isEmpty then
         .error (tagError tag "empty batch")
       else
-        let r0 <- evalBatch b0
+        let r0 <- reportBatch b0
         let acc0 := ReportSum.ofBatch (count := b0.length) r0
         let acc <- bs.foldlM (init := acc0) (fun acc b => do
           if b.isEmpty then
             .error (tagError tag "empty batch")
           else
-            let r <- evalBatch b
+            let r <- reportBatch b
             let sum := ReportSum.ofBatch (count := b.length) r
             ReportSum.add (tag := tag) acc sum)
         pure (ReportSum.mean acc)
@@ -168,10 +168,10 @@ def evalBatches {sample a : Type}
 def evalDatasetBatches {sample a : Type}
   [Add a] [Mul a] [Div a] [Coe Nat a]
   (tag : String) (batchSize : Nat) (ds : Dataset sample)
-  (evalBatch : List sample -> Result (StepReport a)) :
+  (reportBatch : List sample -> Result (StepReport a)) :
   Result (StepReport a) := do
   let batches <- Dataset.batches (tag := tag) batchSize ds
-  evalBatches (tag := tag) batches evalBatch
+  evalBatches (tag := tag) batches reportBatch
 
 end Eval
 end Train

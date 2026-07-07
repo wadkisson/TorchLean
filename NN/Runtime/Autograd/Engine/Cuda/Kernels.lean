@@ -35,44 +35,44 @@ namespace Cuda
 namespace Buffer
 
 /--
-Sum over axis 0 of a 2D buffer in row-major order.
+Sum down the rows of a 2D row-major buffer.
 
 Input `b` has shape `(rows, cols)` and is stored as length `rows*cols`.
 Output is length `cols` (sum down the rows for each column).
 -/
-@[extern "torchlean_cuda_buffer_reduce_sum_axis0"]
-opaque reduceSumAxis0 (b : Buffer) (rows cols : UInt32) : Buffer
+@[extern "torchlean_cuda_buffer_reduce_sum_by_column"]
+opaque reduceSumByColumn (b : Buffer) (rows cols : UInt32) : Buffer
 
 /--
-Sum over axis 1 of a 2D buffer in row-major order.
+Sum across the columns of a 2D row-major buffer.
 
 Input `b` has shape `(rows, cols)` and is stored as length `rows*cols`.
 Output is length `rows` (sum across the columns for each row).
 -/
-@[extern "torchlean_cuda_buffer_reduce_sum_axis1"]
-opaque reduceSumAxis1 (b : Buffer) (rows cols : UInt32) : Buffer
+@[extern "torchlean_cuda_buffer_reduce_sum_by_row"]
+opaque reduceSumByRow (b : Buffer) (rows cols : UInt32) : Buffer
 
 /--
-Max over axis 0 of a 2D buffer in row-major order.
+Maximum down the rows of a 2D row-major buffer.
 
 Input `b` has shape `(rows, cols)` and is stored as length `rows*cols`.
 Output is length `cols` (max down the rows for each column).
 -/
-@[extern "torchlean_cuda_buffer_reduce_max_axis0"]
-opaque reduceMaxAxis0 (b : Buffer) (rows cols : UInt32) : Buffer
+@[extern "torchlean_cuda_buffer_reduce_max_by_column"]
+opaque reduceMaxByColumn (b : Buffer) (rows cols : UInt32) : Buffer
 
 /--
-Max over axis 1 of a 2D buffer in row-major order.
+Maximum across the columns of a 2D row-major buffer.
 
 Input `b` has shape `(rows, cols)` and is stored as length `rows*cols`.
 Output is length `rows` (max across the columns for each row).
 -/
-@[extern "torchlean_cuda_buffer_reduce_max_axis1"]
-opaque reduceMaxAxis1 (b : Buffer) (rows cols : UInt32) : Buffer
+@[extern "torchlean_cuda_buffer_reduce_max_by_row"]
+opaque reduceMaxByRow (b : Buffer) (rows cols : UInt32) : Buffer
 
 /-- Concatenate two 1D buffers `a` (length `n`) and `b` (length `m`). -/
 @[extern "torchlean_cuda_buffer_concat1d"]
-opaque concat1d (a b : Buffer) (n m : UInt32) : Buffer
+opaque concatVectorBuffers (a b : Buffer) (n m : UInt32) : Buffer
 
 /--
 Slice a 1D buffer `b` (length `n`) starting at `start` for `len` elements.
@@ -80,7 +80,7 @@ Slice a 1D buffer `b` (length `n`) starting at `start` for `len` elements.
 Requires `start + len ≤ n`.
 -/
 @[extern "torchlean_cuda_buffer_slice1d"]
-opaque slice1d (b : Buffer) (n start len : UInt32) : Buffer
+opaque sliceVectorBuffer (b : Buffer) (n start len : UInt32) : Buffer
 
 /--
 Broadcast a row-vector (length `cols`) to a `(rows, cols)` matrix.
@@ -190,7 +190,7 @@ Output:
 - length `seqLen*state`, row-major hidden states, with
   `h[t,j] = A[j] * h[t-1,j] + B[j] * X[t,j]`, starting from `h0[j]`.
 
-This is the runtime primitive corresponding to the proof-facing affine scan contract in
+This is the runtime primitive corresponding to the proof layer affine scan contract in
 `NN.Spec.Layers.SelectiveScan` and `NN.MLTheory.Proofs.StateSpace.Scan`.
 -/
 @[extern "torchlean_cuda_buffer_selective_scan_diag_fwd"]
@@ -234,8 +234,8 @@ Output has shape `(batch, n, d)` and computes the same no-dropout masked attenti
 `hardMaskedSoftmax((Q Kᵀ) * scale, mask) V`. Blocked mask entries contribute zero softmax
 numerator; no finite sentinel is inserted.
 
-This is a fused native runtime primitive, not a proof object. The proof-facing contract is
-`Spec.flashAttention` in `NN/Spec/Layers/FlashAttention.lean`.
+This is a fused native runtime primitive. The proof layer contract is `Spec.flashAttention` in
+`NN/Spec/Layers/FlashAttention.lean`; the native kernel is part of the CUDA runtime boundary.
 -/
 @[extern "torchlean_cuda_buffer_flash_attention_fwd"]
 opaque flashAttentionFwd

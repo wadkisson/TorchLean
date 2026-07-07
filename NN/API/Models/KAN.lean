@@ -202,7 +202,7 @@ constructor.
 -/
 def KAN (cfg : KANConfig) :
     nn.M (nn.Sequential (kanInShape cfg) (kanOutShape cfg)) :=
-  pure <| nn.pure.batchDim0 cfg.batch (kanGo cfg.edge cfg.inDim cfg.hidden cfg.outDim cfg.seedBase)
+  pure <| nn.pure.batchPointwise cfg.batch (kanGo cfg.edge cfg.inDim cfg.hidden cfg.outDim cfg.seedBase)
 
 end models
 end nn

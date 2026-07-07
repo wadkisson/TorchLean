@@ -7,18 +7,18 @@ open Verso.Genre Manual
 tag := "proof-systems-beyond-bounds"
 %%%
 
-Verification in TorchLean goes beyond bounds: checked relationships connect artifacts to semantics.
+Verification in TorchLean means connecting an artifact to the semantics it claims to represent.
 
-IBP and CROWN are about enclosing outputs. Compiler correctness is about preserving graph meaning.
-Autograd correctness is about derivatives. Runtime approximation is about finite precision.
-BugZoo contracts are about making common ML failure modes precise. These are different proof
-systems, but they follow the same discipline: name the object, state the relation, and prove or
-check the relation for the supported fragment.
+IBP and CROWN enclose outputs. Compiler correctness preserves graph meaning. The autograd theorems
+connect backward rules to derivatives. Runtime approximation accounts for finite precision. BugZoo
+contracts make common ML failure modes precise. These are different proof systems, but they follow
+the same discipline: name the object, state the relation, and prove or check the relation for the
+supported fragment.
 
 # Comparison With ML Frameworks
 
 PyTorch, JAX, TensorFlow, XLA, TVM, CUDA, Gymnasium, and α,β-CROWN are excellent tools. TorchLean is
-not treating those tools as a problem. The important difference is where the mathematical claim is
+not treating those tools as a problem. The difference is where the mathematical claim is
 stated.
 
 - *PyTorch autograd*: ordinary use relies on the dynamic autograd engine and kernels; TorchLean proves
@@ -35,13 +35,14 @@ stated.
 - *Float32 execution*: ordinary use relies on backend arithmetic; TorchLean connects executable
   binary32 semantics, intervals, and explicit approximation theorems where the bridge is present.
 
-That is the recurring TorchLean pattern:
+The recurring TorchLean pattern is:
 
 1. name the semantic object;
 2. run or import an artifact;
 3. check the artifact against the semantic object;
 4. prove that the check implies the intended claim;
-5. leave native or external pieces as explicit assumptions when they are not proved.
+5. record native or external pieces as explicit assumptions until a checker or theorem discharges
+   them.
 
 # IRExec Correctness: The Big Compiler Theorem
 
@@ -57,8 +58,9 @@ The declaration is in the
 In plain English:
 
 > If `execGraphOfIR` successfully compiles an `NN.IR.Graph` and payload into executable compiled
-> graph data, then evaluating the compiled graph on any input gives the same value table as the
-> Lean denotational evaluator for the original IR graph.
+> graph data, and the graph is in the named supported fragment, then evaluating the compiled graph
+> on any input gives the same value table as the Lean denotational evaluator for the original IR
+> graph.
 
 The theorem connects three objects:
 
@@ -66,33 +68,40 @@ The theorem connects three objects:
 - `execGraphOfIR`: the compiler from IR to executable compiled graph data.
 - `ExecGraphData.denoteAll`: the compiled runtime evaluator.
 
-The theorem shape is: if `execGraphOfIR g payload` returns `ok exec`, then for every input `x`,
-the value table produced by `ExecGraphData.denoteAll exec x` is the same value table produced by
+The theorem shape is: if `execGraphOfIR g payload` returns `ok exec`, and the named fragment
+side conditions hold, then for every input `x`, the value table produced by
+`ExecGraphData.denoteAll exec x` is the same value table produced by
 `NN.IR.Graph.denoteAll g payload x`.
 
 In theorem notation, the supported-fragment statement has the shape:
 
 $$`\operatorname{execGraphOfIR}(G,P)=\operatorname{ok}(E)
+\;\land\; \operatorname{NoMSELoss}(G)
+\;\land\; \operatorname{NoRawLog}(G)
 \quad\Longrightarrow\quad
 \forall x,\;
 \operatorname{ExecGraphData.denoteAll}(E,x)
 =
 \operatorname{Graph.denoteAll}(G,P,x)`
 
-This is the theorem that prevents "verified the wrong executable graph" for the covered IRExec
-fragment.
+For the covered IRExec fragment, this theorem prevents "verified the wrong executable graph."
 
 There are side conditions, and they matter. The graph must pass the structural checks, compilation
-must succeed, and the current theorem has an explicit `NoMSELoss g` side condition because that op is
-not in this semantic equivalence proof path yet. That precision is part of the compiler proof:
-supported ops get named coverage, and unsupported ops or ops not moved yet do not get folded into
-the theorem.
+must succeed, and the current theorem has explicit fragment predicates:
 
-Why this is important:
+- `NoMSELoss g`, because that op is outside this whole-graph semantic equivalence proof path.
+- `NoRawLog g`, because raw real `log` needs a positivity precondition. The local positive-domain
+  branch is present, but the whole-graph theorem needs per-node domain facts to use it. Use the
+  epsilon-protected safe-log operation when unconditional execution is intended.
+
+That precision is part of the compiler proof: supported ops get named coverage, and unsupported ops
+or ops needing extra domain facts do not get folded into the theorem by vague prose.
+
+What this theorem rules out:
 
 - In PyTorch or XLA style compilation, we usually rely on the compiler and test for regressions.
-- In TorchLean's supported IRExec fragment, the compiler's forward result is tied to the IR
-  denotation by a Lean theorem.
+- In TorchLean's supported IRExec fragment, under the named side conditions, the compiler's forward
+  result is tied to the IR denotation by a Lean theorem.
 - This directly targets the classic silent wrong code problem: the optimized/executable graph
   should not secretly compute a different mathematical program.
 
@@ -115,9 +124,9 @@ The current proof is split for auditability:
 - The [semantic equivalence theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/IRExec/Correctness/SemanticEquivalence.lean)
   ties the cases together into `execGraphOfIR_semantics_eq`.
 
-This is one of the places where TorchLean is genuinely doing something stronger than a normal ML
-framework. A regression test says "we tried these examples." The theorem says "for every input, if
-the supported compiler accepts this graph, the compiled evaluator and IR denotation agree."
+Here TorchLean is doing more than a normal ML framework can do with tests. A regression test says
+"we tried these examples." The theorem says "for every input, if the supported compiler accepts this
+graph and the named fragment side conditions hold, the compiled evaluator and IR denotation agree."
 
 # A Tiny IRExec Example
 
@@ -174,7 +183,7 @@ A helpful way to say the contrast is:
 > PyTorch gives us `loss.backward()`. TorchLean proves, for supported graph fragments,
 > that the reverse pass computes the adjoint of the derivative of the forward denotation.
 
-That is a large conceptual difference. The theorem is not "gradients looked plausible on a test
+The conceptual difference is large. The theorem is not "gradients looked plausible on a test
 batch." It is a mathematical statement about the whole graph, under the stated operator/domain
 conditions.
 
@@ -185,11 +194,12 @@ $$`\left\langle \operatorname{JVP}_G(x;\dot x),\bar y\right\rangle
 \left\langle \dot x,\operatorname{VJP}_G(x;\bar y)\right\rangle`
 
 Once this is proved locally for primitive nodes and lifted through the graph, reverse mode becomes a
-theorem about the graph denotation rather than just an execution trace.
+theorem about the graph denotation rather than only an execution trace.
 
 # Autograd Proofs For Model Blocks
 
-The autograd proof tree is not limited to scalar examples. We also have proof surfaces for model families.
+The autograd proof tree is not limited to scalar examples. It also contains theorem entry points
+for selected model families.
 
 Examples:
 
@@ -205,10 +215,10 @@ Examples:
 - The [Elman cell API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Recurrent/ElmanCell.lean) gives a
   recurrent theorem for one cell and explains that full BPTT is the next induction over the unroll.
 
-That last phrase matters because it separates proved fragments from open work. A theorem for one
-cell is not the same as a full theorem for a sequence model. A Transformer sublayer theorem is not
-the same as all of GPT-2. The value is that TorchLean makes those boundaries precise instead of
-using one broad "autograd works" phrase for everything.
+That last phrase separates proved fragments from open work. A theorem for one cell is not the same
+as a full theorem for a sequence model. A Transformer sublayer theorem is not the same as all of
+GPT-2. TorchLean names those boundaries instead of using one broad "autograd works" phrase for
+everything.
 
 # Runtime Approximation: Real Proofs Are Not Float Proofs
 
@@ -216,7 +226,7 @@ A common mistake in ML verification is to prove something over real numbers and 
 code as if no bridge were needed. TorchLean has a separate runtime approximation tree because we do
 not want to blur that boundary.
 
-The key idea is an approximation relation:
+The approximation relation is:
 
 $$`runtimeValue \approx_{\varepsilon} specValue`
 
@@ -241,7 +251,7 @@ relative tolerance tracking, and the
 [FP32 CROWN bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/FP32/CROWN.lean) connects approximation
 budgets to verifier margins.
 
-This is the right way to talk about deployment:
+A deployment statement should separate three facts:
 
 - a theorem over the reals says what the ideal spec does;
 - a runtime approximation theorem says the executable path stays within a tolerance;
@@ -249,8 +259,9 @@ This is the right way to talk about deployment:
 
 # Reinforcement Learning: MDPs, PPO, Replay, And Boundaries
 
-The RL stack is another place where TorchLean should say more than "we implemented PPO."
-The codebase has both runtime RL tools and MDP facts in Lean.
+Reinforcement learning is another place where the claim matters. Saying "we implemented PPO" is a
+runtime statement. TorchLean also has Lean definitions for transition data, rollout boundaries, and
+MDP facts, so the executable algorithm can be separated from the mathematical claims attached to it.
 
 Runtime side:
 
@@ -280,17 +291,16 @@ Compared with ordinary Gymnasium usage, the difference is again the boundary. A 
 can return an observation and reward; TorchLean can additionally check that a transition record has
 the expected shape/action/reward contract before treating it as evidence on a path toward a theorem.
 
-# Generative Models: Objectives, Samplers, And What Is Actually Proved
+# Generative Models: Objectives, Samplers, And Checked Claims
 
-TorchLean has generative model examples and theory declarations, with a kept narrow claim:
-the current formal layer does not prove that a trained diffusion model generates good images. It
-does provide exact specifications and theorem fragments for the mathematical pieces that these
-models use.
+TorchLean has generative model examples and theory declarations for objectives, schedulers, and
+sampler equations. Image-quality or distributional claims require additional evaluation assumptions,
+but the mathematical pieces used by the models can still be named, inspected, and checked in Lean.
 
 Theory APIs:
 
 - [NN.MLTheory.Generative.Diffusion API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion.lean) collects the
-  diffusion theory surface.
+  diffusion theory API.
 - The [forward Gaussian API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/ForwardGaussian.lean) states that
   affine forward noising of a standard Gaussian remains Gaussian.
 - The [diffusion samplers API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/Samplers.lean) records boundary and
@@ -304,17 +314,17 @@ Theory APIs:
 
 Executable examples:
 
-- [NN.Examples.Models.Generative.Diffusion API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean)
-- [autoencoder example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean)
-- [VAE example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean)
-- [VQ-VAE example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/VqVae.lean)
-- [GAN example API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean)
+- [NN.Examples.Models.Generative.Diffusion source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean)
+- [autoencoder example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean)
+- [VAE example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean)
+- [VQ-VAE example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/VqVae.lean)
+- [GAN example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean)
 
 The precise wording is:
 
-> TorchLean can run small generative examples and prove selected objective/sampler facts. That is not a
-> claim of full generative model quality, distributional convergence, or production sampler
-> correctness for every native kernel.
+> TorchLean can run small generative examples and prove selected objective/sampler facts. The claim is
+> not full generative model quality, distributional convergence, or production sampler correctness for
+> every native kernel.
 
 # Learning Theory: DP, Stability, Robustness
 
@@ -357,18 +367,18 @@ The [BugZoo API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Bu
 - *Compiler boundary*: accepted backends must match source semantics.
 - *Float boundary*: runtime Float32 ops are tied to explicit IEEE style semantics.
 
-This gives a concrete comparison to ordinary frameworks:
+A concrete comparison with ordinary frameworks is:
 
 - PyTorch usually catches these through tests, bug reports, runtime warnings, and regression suites.
 - TorchLean turns the intended behavior into a small spec or theorem so the failure mode has a
   stable regression target.
 
-# Widgets: Proofs Need Human Debugging Too
+# Widgets: Inspecting Proof Objects
 
-Widgets are not proofs, but they matter because proof engineering and verifier debugging are
-painful without visual feedback.
+Widgets matter because proof engineering and verifier debugging are much easier when the objects are
+visible.
 
-The [widgets API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives readable views of proof and runtime artifacts:
+The [widgets source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives readable views of proof and runtime artifacts:
 
 - IR graph views show node ids, shapes, op kinds, and execution traces.
 - Runtime autograd widgets show tapes, gradients, and reverse traversal.
@@ -377,15 +387,15 @@ The [widgets API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) 
 - RL widgets show trajectories and PPO/GridWorld artifacts.
 - Training widgets show logs and metric traces.
 
-The important rule is:
+The rule is:
 
-> A widget does not create a theorem. It helps us inspect the same Lean object that a theorem or
-> checker may later consume.
+> A widget is an inspection view for the same Lean object that a theorem or checker may later
+> consume.
 
-That is why widgets belong in the proof layer. They are the human interface to artifacts that would
+Widgets belong in the proof layer because they are the human interface to artifacts that would
 otherwise be unreadable arrays, graph contexts, or certificate JSON.
 
-# Model Zoo: Runtime Breadth, Not Theorem Overclaiming
+# Model Examples: Runtime Breadth, Not Theorem Overclaiming
 
 The model examples show breadth:
 
@@ -396,9 +406,8 @@ The model examples show breadth:
 - DQN and PPO examples.
 
 Not every model has a full correctness theorem. The examples share the same API, runtime, graph,
-CUDA, data, and verification boundaries as the theorem files. That is the bridge we want: the
-formal abstractions are tested against realistic ML shapes instead of living only in small proof
-snippets.
+CUDA, data, and verification boundaries as the theorem files. That bridge matters: the formal
+abstractions are tested against realistic ML shapes instead of living only in small proof snippets.
 
 # Where To Go Next
 

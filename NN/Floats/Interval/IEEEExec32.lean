@@ -105,11 +105,11 @@ them `private`) so downstream soundness proofs can unfold `Interval32.mul` in a 
 -/
 
 /-- Minimum of 4 float values, using IEEE `minimum` (NaNs propagate). -/
-def min4 (a b c d : IEEE32Exec) : IEEE32Exec :=
+def minOfFour (a b c d : IEEE32Exec) : IEEE32Exec :=
   minimum (minimum a b) (minimum c d)
 
 /-- Maximum of 4 float values, using IEEE `maximum` (NaNs propagate). -/
-def max4 (a b c d : IEEE32Exec) : IEEE32Exec :=
+def maxOfFour (a b c d : IEEE32Exec) : IEEE32Exec :=
   maximum (maximum a b) (maximum c d)
 
 /--
@@ -127,7 +127,7 @@ def mul (A B : Interval32) : Interval32 :=
   let q01 := mulUp A.lo B.hi
   let q10 := mulUp A.hi B.lo
   let q11 := mulUp A.hi B.hi
-  ⟨min4 p00 p01 p10 p11, max4 q00 q01 q10 q11⟩
+  ⟨minOfFour p00 p01 p10 p11, maxOfFour q00 q01 q10 q11⟩
 
 /-- The "whole" interval `[-∞, +∞]` (useful as a conservative fallback). -/
 @[inline] def whole : Interval32 := ⟨negInf, posInf⟩
@@ -171,7 +171,7 @@ def div (A B : Interval32) : Interval32 :=
     let q01 := divUp A.lo B.hi
     let q10 := divUp A.hi B.lo
     let q11 := divUp A.hi B.hi
-    ⟨min4 p00 p01 p10 p11, max4 q00 q01 q10 q11⟩
+    ⟨minOfFour p00 p01 p10 p11, maxOfFour q00 q01 q10 q11⟩
 
 /--
 Interval reciprocal `1/B`, implemented as a special case of interval division.

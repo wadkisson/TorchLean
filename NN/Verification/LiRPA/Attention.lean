@@ -43,23 +43,27 @@ open _root_.Spec.Tensor
 
 /-- Small fixed graph with one `softmax` node, used to exercise certificate checking. -/
 def buildGraph : Graph :=
-  let n0 : Node := { id := 0, parents := [], kind := .input, outShape := .dim 4 .scalar }
-  let n1 : Node := { id := 1, parents := [0], kind := .matmul, outShape := .dim 5 .scalar }
-  let n2 : Node :=
+  let inputNode : Node := { id := 0, parents := [], kind := .input, outShape := .dim 4 .scalar }
+  let scoreNode : Node := { id := 1, parents := [0], kind := .matmul, outShape := .dim 5 .scalar }
+  let softmaxNode : Node :=
     { id := 2, parents := [1], kind := .softmax (axis := 0), outShape := .dim 5 .scalar }
-  let n3 : Node := { id := 3, parents := [2], kind := .matmul, outShape := .dim 3 .scalar }
-  { nodes := #[n0, n1, n2, n3] }
+  let valueProjectionNode : Node := { id := 3, parents := [2], kind := .matmul, outShape := .dim 3 .scalar }
+  { nodes := #[inputNode, scoreNode, softmaxNode, valueProjectionNode] }
 
 /-- Seed deterministic weights for the two matmul nodes in `buildGraph`. -/
 def seedParamsFloat : ParamStore Float :=
-  let Wq : Tensor Float (.dim 5 (.dim 4 .scalar)) :=
+  let scoreWeight : Tensor Float (.dim 5 (.dim 4 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (Float.ofNat (1 + (i.val + 2*j.val)))))
-  let Wv : Tensor Float (.dim 3 (.dim 5 .scalar)) :=
+  let valueWeight : Tensor Float (.dim 3 (.dim 5 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (Float.ofNat (2 + (i.val + j.val)))))
-  let ps0 : ParamStore Float := {}
-  let ps1 := { ps0 with matmulW := ps0.matmulW.insert 1 ({ m := 5, n := 4, w := Wq }) }
-  let ps2 := { ps1 with matmulW := ps1.matmulW.insert 3 ({ m := 3, n := 5, w := Wv }) }
-  ps2
+  let emptyStore : ParamStore Float := {}
+  let withScoreWeight :=
+    { emptyStore with
+      matmulW := emptyStore.matmulW.insert 1 ({ m := 5, n := 4, w := scoreWeight }) }
+  let withValueWeight :=
+    { withScoreWeight with
+      matmulW := withScoreWeight.matmulW.insert 3 ({ m := 3, n := 5, w := valueWeight }) }
+  withValueWeight
 
 /-- Insert an `L∞` input box of radius `eps` around a fixed center point. -/
 def seedInputFloat (ps : ParamStore Float) (eps : Float) : ParamStore Float :=

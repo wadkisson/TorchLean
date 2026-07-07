@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 1 --steps 1
+  lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 
 This is a real-data ViT-style CIFAR-10 minibatch run:
 - patch embedding via Conv2d,
@@ -32,7 +32,7 @@ adds CIFAR loader construction and the step-limited training loop.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
-lake build -R -K cuda=true && lake exe torchlean vit --cuda --n-total 1 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
 ```
 
 This command is a small runtime check. Larger image-token runs belong in runtime profiling work,
@@ -40,7 +40,7 @@ not the default quick path:
 
 ```bash
 lake build -R -K cuda=true
-lake exe torchlean vit --cuda --fast-kernels --n-total 1 --steps 1
+lake exe -K cuda=true torchlean vit --cuda --fast-kernels --n-total 1 --steps 1
 ```
 -/
 

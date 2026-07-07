@@ -7,9 +7,10 @@ open Verso.Genre Manual
 tag := "tensors-shapes"
 %%%
 
-The first thing to understand in TorchLean is that a tensor's shape is part of the object, not only
-runtime metadata. This is a small change with a large effect. If a model returns predictions of
-shape `[batch, 1]` and the target has shape `[batch]`, TorchLean does not silently guess the
+The first thing to understand in TorchLean is that a tensor's shape is part of the object. It belongs
+to the tensor value that the program is allowed to manipulate. The change is small, but the effect is
+large: if a model returns predictions of shape `[batch, 1]` and the target has shape `[batch]`,
+TorchLean does not silently guess the
 intended convention. Maybe the target should be reshaped. Maybe the model head is wrong. Maybe the
 loss should be different. The choice belongs in the code.
 
@@ -39,12 +40,12 @@ it has two dimensions.
 User-facing code does not write `Spec.Tensor` explicitly. Instead, examples usually import
 `TorchLean` and use the public `Tensor`, `Shape`, and constructor macros from the `NN` umbrella.
 
-This is still a tensor in the spec layer, with a precise meaning. The `NN.Tensor` layer gives you
-good constructors and printing without changing the math.
+It is still a tensor in the spec layer, with a precise meaning. The `NN.Tensor` layer gives you good
+constructors and printing without changing the math.
 
 ## PyTorch Similarity
 
-The closest PyTorch mental model is:
+The closest PyTorch comparison is:
 
 ```
 import torch
@@ -69,8 +70,8 @@ def y : Tensor.T Float (shape![2, 2]) :=
 def z := x + y
 ```
 
-That is the basic pattern throughout TorchLean: the syntax feels familiar, but the shape is
-checked by Lean instead of being discovered only at runtime.
+The basic pattern throughout TorchLean is familiar syntax with shape information checked by Lean
+instead of discovered only at runtime.
 
 # Shapes: Values (and Often Types)
 
@@ -100,8 +101,8 @@ The full list is generated in the tensor reference, but the convention is simple
 TorchLean uses the scalar element type as the “dtype”. For example:
 
 - `Tensor Float s` is a runnable floating tensor (convenient for examples),
-- `Tensor ℚ s` is a rational tensor (useful for exact arithmetic),
-- `Tensor ℝ s` is a proof-side mathematical tensor,
+- `Tensor ℚ s` is a rational tensor for exact arithmetic,
+- `Tensor ℝ s` is a mathematical tensor used in proofs,
 - `Tensor TorchLean.Floats.IEEE32Exec s` is an executable IEEE-754 binary32 tensor.
 - `Tensor Interval s` is the shape of a verifier or bound-propagation tensor when the scalar domain
   carries intervals or relaxations.
@@ -119,6 +120,27 @@ $$`f_\alpha :
 The subscript changes when we choose `Float`, `IEEE32Exec`, `ℝ`, intervals, or another scalar
 domain. The architecture and shapes remain the same.
 
+The guide uses these scalar choices in different contexts:
+
+```
+-- Executable tutorial value.
+def xf : Tensor.T Float (Shape.vec 3) :=
+  tensor! [1.0, 2.0, 3.0]
+
+-- Exact arithmetic value, useful for tiny algebraic examples.
+def xq : Tensor.T Rat (Shape.vec 3) :=
+  tensor! [1, 2, 3]
+
+-- Mathematical proof shape. Values of this type belong in theorem statements,
+-- not in `#eval` examples.
+-- def xr : Tensor.T Real (Shape.vec 3) := ...
+```
+
+The last line is intentionally only a comment. `Real` is the right scalar for mathematical
+semantics, but it is not the right scalar for an executable training run. A theorem may quantify
+over real tensors; a quickstart file should normally run over `Float` or an executable float32
+backend.
+
 In the codebase, the scalar layer splits into a few pieces:
 
 - `Spec.SpecScalar` is fixed to `ℝ` for the mathematical spec layer.
@@ -130,7 +152,7 @@ In the codebase, the scalar layer splits into a few pieces:
 
 For readers in a theorem file, `α` often means “the scalar the theorem is polymorphic over”. In a
 training tutorial, the beginner path usually avoids exposing `α` at all: the trainer picks the
-runtime scalar from the `dtype` field in the `Trainer.new` config. Advanced runtime files may still
+runtime scalar from the `dtype` field in the `Trainer.new` config. Runtime-internal files may still
 spell out the scalar parameter because the same model can be instantiated over `Float`,
 `IEEE32Exec`, or `ℝ` depending on whether you are executing, validating, or proving.
 
@@ -173,8 +195,8 @@ def x : Tensor.T Float (shape![2, 2]) :=
   tensor! [[1.0, 2.0], [3.0, 4.0]]
 ```
 
-When you are writing code that should work with several backends, `tensorF!` is a useful trick: write Float
-literals once, then cast elementwise into a runtime scalar `α`.
+When code should work with several backends, `tensorF!` lets you write `Float` literals once and
+cast them elementwise into a runtime scalar `α`.
 
 ```
 -- `cast : Float → α` comes from the runtime runner (see the training tutorials).
@@ -237,9 +259,9 @@ matches the usual PyTorch `NCHW` layout once a batch axis is added.
 Shape.images batch channels height width
 ```
 
-This is the shape expected by the public `nn.conv` builder. The batch dimension is part of the model
-type, so a model trained with batch size `8` and a model trained with batch size `16` have different
-types unless the file abstracts over `batch`.
+The public `nn.conv` builder expects this shape. The batch dimension is part of the model type, so a
+model trained with batch size `8` and a model trained with batch size `16` have different types
+unless the file abstracts over `batch`.
 
 # Reading Tensor Types In Model Code
 
@@ -263,14 +285,14 @@ nn.Sequential (Shape.images batch 3 32 32) (shape![batch, 10])
 
 read it as an image classifier: a batch of RGB images goes to ten logits per image.
 
-This habit is more useful than memorizing every constructor. The shape tells you what the model
-claims to do before you read the body.
+This habit is better than memorizing every constructor. The shape tells you what the model claims to
+do before you read the body.
 
 # Shape Design Decisions
 
 TorchLean's tensor layer makes a few choices that are worth understanding early.
 
-1. *Shapes are part of the specification.* A tensor is not just a pointer plus runtime metadata; in
+1. *Shapes are part of the specification.* A tensor is more than a pointer plus runtime metadata; in
    the core APIs, its shape appears in the Lean type.
 2. *Dynamic inputs are allowed at the boundary.* File loaders, JSON artifacts, and CLI data often
    arrive with runtime dimensions. TorchLean checks those dimensions as data and then packages them
@@ -280,8 +302,8 @@ TorchLean's tensor layer makes a few choices that are worth understanding early.
 4. *Flattened and shaped views are connected by lemmas.* Runtime and verifier code often wants flat
    buffers; proof code often wants shaped tensors. The tensor library keeps those views related.
 
-This is why a tutorial tensor can feel close to PyTorch while the theorem declarations still have
-enough structure to prove algebraic facts about the same operations.
+A tutorial tensor can therefore feel close to PyTorch while theorem declarations still have enough
+structure to prove algebraic facts about the same operations.
 
 For example, pointwise addition is not "add two buffers and hope their metadata agrees." Its
 informal type is:
@@ -315,9 +337,9 @@ def wGood : Tensor.T Float (shape![3, 4]) :=
   tensor! [[1, 0, 0, 1], [0, 1, 1, 0], [1, 1, 0, 0]]
 ```
 
-A transposed weight has shape `shape![4, 3]`, which is a different type. That does not prove the
-model is correct, but it prevents a large class of accidental wiring mistakes from reaching the
-runtime or verifier.
+A transposed weight has shape `shape![4, 3]`, which is a different type. Correctness still depends
+on the model claim being checked, but this typing discipline prevents a large class of accidental
+wiring mistakes from reaching the runtime or verifier.
 
 # Dynamic Shapes
 
@@ -328,7 +350,7 @@ cases TorchLean provides:
   length check;
 - `DynTensor α`, which stores the `Shape` as data alongside the tensor.
 
-This lets tooling remain shape-aware even when the type cannot carry the full shape index.
+Tooling can remain shape aware even when the type cannot carry the full shape index.
 
 If you want the most permissive constructors, the API also includes:
 
@@ -343,7 +365,40 @@ the boundary. Instead, it lets you choose between:
 - shapes checked at runtime (`tensorND`, `tensorDynND`), and
 - permissive padding behavior for sequence data (`tensor2dPadTo`, `tensor2dPadRight`).
 
-That is the shape of a mixed proof/runtime ML stack.
+The middle ground is precise shapes where the program owns them, runtime checks where data enters
+from the outside, and explicit padding only when padding is part of the model.
+
+# Shape Checks At The Boundary
+
+File formats and CLI inputs arrive as ordinary data, so TorchLean cannot know their shape until the
+loader reads them. The boundary therefore has a common pattern:
+
+```
+def loadVector4 (xs : List Float) : Except String (Tensor.T Float (Shape.vec 4)) :=
+  tensorND [4] xs
+```
+
+If `xs` has four elements, the loader returns a typed tensor. If it has three or five, the function
+returns an error instead of constructing a bad value. This is a runtime check that creates a typed
+object after it succeeds.
+
+The static version is different:
+
+```
+def knownVector4 : Tensor.T Float (Shape.vec 4) :=
+  tensorND! [4] [0.0, 1.0, 2.0, 3.0]
+```
+
+Here the shape and the payload are visible in the Lean file, so the macro can discharge the length
+obligation while the file elaborates. The important distinction is not syntax. It is where the
+evidence comes from:
+
+- `tensorND!` is for data that is literally present in the source file;
+- `tensorND` is for data that must be checked when the program runs;
+- theorem statements usually quantify over `x : Tensor.T α s` and do not load data at all.
+
+That same three-way split appears throughout TorchLean: static snippets, runtime checks, and
+theorems live in different parts of the project.
 
 ## How TorchLean Differs from Plain PyTorch
 
@@ -355,7 +410,7 @@ wrong axis order or layout. In PyTorch you often discover that after a runtime e
 forces the mismatch to be visible up front.
 
 ```
--- PyTorch style idea:
+-- PyTorch-like sketch:
 --   y = x @ w
 --
 -- TorchLean-shaped idea:
@@ -369,10 +424,10 @@ def wMat : Tensor.T Float (shape![3, 4]) := tensor! [[1, 0, 0, 1], [0, 1, 1, 0],
 If you want a small file that you can run immediately and stay focused on tensors,
 start here:
 
-- [NN.Examples.Quickstart.TensorBasics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean)
-- [NN.Examples.Advanced.Tensors.Basic API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Tensors/Basic.lean)
+- [TensorBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean)
+- [DeepDives.Tensors.Basic source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Tensors/Basic.lean)
 
-It demonstrates:
+This file shows:
 
 - dtype-as-type (`Float`, `ℚ`, `Int`),
 - `tensor!` nesting + row-major flattening,
@@ -382,9 +437,9 @@ It demonstrates:
 
 # What the Tensor Layer Gives You
 
-TorchLean’s tensor layer is part of the specification, not only an ergonomic layer. It is strong because the shape index is
-part of the tensor’s type, and the proof layer already knows how to move between typed views,
-flattened views, and algebraic laws.
+TorchLean’s tensor layer is part of the specification. The shape index is part of the tensor’s type,
+and the proof layer already knows how to move between typed views, flattened views, and algebraic
+laws.
 
 Representative theorems and definitions:
 
@@ -402,6 +457,26 @@ ordinary algebra instead of ad hoc shape bookkeeping. The same tensor library ca
 - exact reasoning in `ℚ` or `ℝ`,
 - executable float32 examples,
 - and shape-safe data / model pipelines.
+
+The bridge from tensor syntax to algebra is deliberately small. A model author writes the familiar
+object:
+
+```
+def bias : Tensor.T Float (shape![1, 3]) :=
+  tensor! [[0.1, -0.2, 0.3]]
+```
+
+A proof author usually does not prove facts about that literal. They prove a statement for every
+tensor of the same shape:
+
+```
+-- Sketch of the kind of statement the proof layer proves:
+-- theorem add_zero {α} [Zero α] [Add α] (x : Tensor.T α s) :
+--   x + Tensor.zeros = x := ...
+```
+
+The executable example gives intuition. The theorem, when present, gives the reusable guarantee.
+Runtime tests and theorem statements should not be described as if they were the same thing.
 
 If you want the proof companion, start from the
 [tensor proof API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Tensor/Basic.lean).

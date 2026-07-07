@@ -15,7 +15,7 @@ Tour of the public autograd APIs beyond ordinary training:
 
 - `autograd.model.*` for model-level VJP, Jacobian, and loss gradients.
 - `autograd.model.OutputLoss.*` for reusable scalar losses on model outputs.
-- `autograd.fn1.*` for Jacobian / Hessian APIs on single-input tensor functions.
+- `autograd.func.*` for Jacobian / Hessian APIs on single-input tensor functions.
 - `nn.functional.detach` for stop-gradient behavior.
 
 Run:
@@ -56,10 +56,10 @@ def detachedMSELoss : autograd.model.OutputLoss YShape YShape :=
   -- Same forward value as `mseLoss`, but all gradients are zero (stop-gradient / detach).
   autograd.model.OutputLoss.detach mseLoss
 
-def squareFn : autograd.fn1.Fn XShape XShape :=
+def squareFn : autograd.func.Fn XShape XShape :=
   fun x => nn.functional.square x
 
-def sumsqFn : autograd.fn1.Fn XShape Shape.scalar :=
+def sumsqFn : autograd.func.Fn XShape Shape.scalar :=
   fun x => do
     let y ← nn.functional.square x
     -- `mean` is a convenient scalar reduction, like `torch.mean`.
@@ -111,7 +111,7 @@ def paramDirection {α : Type} (payload : DemoPayload α) :
 /-- Unpack this tutorial's single Linear-layer parameter pack. -/
 def unpackLinearParams {α : Type} (params : autograd.model.Params model α) :
     Tensor.T α WShape × Tensor.T α BShape := by
-  simpa [autograd.model.Params, model, BShape] using tensorpack.unpack2 params
+  simpa [autograd.model.Params, model, BShape] using tensorpack.unpackPair params
 
 /-- Run the Float autograd walkthrough. -/
 def runDemo : IO Unit := do
@@ -200,14 +200,14 @@ def runDemo : IO Unit := do
   -- ------------------------------------------------------------
   -- 6) jacfwd/jacrev/hessian for a function of a single tensor input
   -- ------------------------------------------------------------
-  let jacCols ← autograd.fn1.jacfwd (α := Float) squareFn payload.x
-  IO.println s!"jacfwd1(square) cols = {jacCols.size} (should be size(in)=2)"
+  let jacCols ← autograd.func.jacfwd (α := Float) squareFn payload.x
+  IO.println s!"jacfwdInput(square) cols = {jacCols.size} (should be size(in)=2)"
   for i in List.finRange jacCols.size do
     let col := jacCols[i.1]'i.2
     IO.println s!"  col[{i.1}] = {Tensor.pretty col}"
 
-  let hessCols ← autograd.fn1.hessian (α := Float) sumsqFn payload.x
-  IO.println s!"hessian1(mean(x^2)) cols = {hessCols.size} (should be size(in)=2)"
+  let hessCols ← autograd.func.hessian (α := Float) sumsqFn payload.x
+  IO.println s!"hessianInput(mean(x^2)) cols = {hessCols.size} (should be size(in)=2)"
   for i in List.finRange hessCols.size do
     let col := hessCols[i.1]'i.2
     IO.println s!"  H*e[{i.1}] = {Tensor.pretty col}"
@@ -218,19 +218,19 @@ def runDemo : IO Unit := do
   --
   -- These entrypoints cover the common case of a single tensor input.
   let seedSq : Tensor.T Float XShape := Tensor.fill 1.0 XShape
-  let vjpSq ← autograd.fn1.vjp (α := Float) squareFn payload.x seedSq
+  let vjpSq ← autograd.func.vjp (α := Float) squareFn payload.x seedSq
   IO.println s!"vjp(square, seed=ones) = {Tensor.pretty vjpSq}"
 
-  let jacRowsSq ← autograd.fn1.jacrev (α := Float) squareFn payload.x
+  let jacRowsSq ← autograd.func.jacrev (α := Float) squareFn payload.x
   IO.println s!"jacrev1(square) rows = {jacRowsSq.size} (should be size(out)=2)"
   for i in List.finRange jacRowsSq.size do
     let row := jacRowsSq[i.1]'i.2
     IO.println s!"  row[{i.1}] = {Tensor.pretty row}"
 
-  let gSumsq ← autograd.fn1.grad (α := Float) sumsqFn payload.x
+  let gSumsq ← autograd.func.grad (α := Float) sumsqFn payload.x
   IO.println s!"grad1(mean(x^2)) = {Tensor.pretty gSumsq}"
 
-  let (valSumsq, gSumsq2) ← autograd.fn1.valueAndGradScalar (α := Float) sumsqFn payload.x
+  let (valSumsq, gSumsq2) ← autograd.func.valueAndGradScalar (α := Float) sumsqFn payload.x
   IO.println s!"valueAndGradScalar(mean(x^2)) value = {valSumsq}, grad = {Tensor.pretty gSumsq2}"
 
 end Internal

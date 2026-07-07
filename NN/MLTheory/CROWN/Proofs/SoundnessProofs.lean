@@ -174,8 +174,8 @@ If x ∈ xB, then forward(net, x) ∈ bound_affine(net, xB).
 This is the key soundness theorem for CROWN: it shows that the affine relaxation
 computed by `bound_affine` is indeed an overapproximation of the true network output.
 -/
-theorem crown_affine_mlp2_sound {inDim hidDim outDim : Nat}
-    (net : MLP2 ℝ inDim hidDim outDim)
+theorem crown_affine_twoLayerMlp_sound {inDim hidDim outDim : Nat}
+    (net : TwoLayerMLP ℝ inDim hidDim outDim)
     (xB : Box ℝ (.dim inDim .scalar))
     (x : Tensor ℝ (.dim inDim .scalar))
     (hx : Box.contains xB x) :

@@ -17,7 +17,7 @@ public import NN.Proofs.Analysis.Softmax
 /-!
 # Analysis Proofs
 
-Curated import surface for TorchLean's real-analysis and numerics-facing proof utilities.
+Curated import for TorchLean's real-analysis and numerical proof utilities.
 
 This is the “math facts about the spec” layer. It should not contain executable CUDA checks,
 empirical approximations, or model examples. A good rule of thumb:
@@ -35,9 +35,9 @@ The split between these files is intentional:
   that depend on those norm facts.
 - `Softmax`, `Dropout`, and `Normalization` collect layer-specific algebraic theorems.
 - `Fft` is pure mathlib `ℂ` DFT algebra with no TorchLean runtime dependency.
-- `FftBridge` is the transport layer from TorchLean runtime FFT twiddle definitions to the exact
+- `FftBridge` transports TorchLean runtime FFT twiddle definitions to the exact
   `Fft` matrices. Keeping it separate prevents the pure DFT theorem file from importing the runtime
-  stack.
+  implementation.
 
 Trust boundary: these are Lean theorems about TorchLean specs and mathlib objects. CUDA/cuFFT or
 other native fast paths are tested against their contracts elsewhere; they are not proved by this

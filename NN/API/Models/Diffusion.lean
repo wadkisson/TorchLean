@@ -15,7 +15,7 @@ Config-style diffusion model constructors plus reusable, dataset-independent DDP
 
 The runnable examples decide where data comes from (CIFAR-10, ImageNet-style folders, synthetic
 artifacts).  The definitions here are shape-parametric and can be reused by tests, examples, and
-future proof-facing specifications.
+future proof layer specifications.
 -/
 
 @[expose] public section
@@ -68,25 +68,25 @@ def epsConvNet (cfg : EpsConvNetConfig)
   letI : NeZero cfg.w := ⟨h_w⟩
   letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
   nn.Sequential![
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
     ReLU,
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
     ReLU,
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),
     ReLU,
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
@@ -121,7 +121,7 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
   letI : NeZero cfg.w := ⟨h_w⟩
   letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
   nn.Sequential![
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)
@@ -130,13 +130,13 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
     (do
       let block ←
         nn.Sequential![
-          withSeeds2 (fun seedK seedB =>
+          withSeedPair (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
               (kInit := .uniform (-0.1) 0.1)),
           ReLU,
-          withSeeds2 (fun seedK seedB =>
+          withSeedPair (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
@@ -147,13 +147,13 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
     (do
       let block ←
         nn.Sequential![
-          withSeeds2 (fun seedK seedB =>
+          withSeedPair (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
               (kInit := .uniform (-0.1) 0.1)),
           ReLU,
-          withSeeds2 (fun seedK seedB =>
+          withSeedPair (fun seedK seedB =>
             _root_.NN.API.nn.pure.blocks.conv3x3SameImages
               (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
               (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
@@ -161,7 +161,7 @@ def epsResidualConvNet (cfg : EpsConvNetConfig)
         ]
       pure (nn.pure.blocks.residual block)),
     ReLU,
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages
         (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
         (seedK := seedK) (seedB := seedB)

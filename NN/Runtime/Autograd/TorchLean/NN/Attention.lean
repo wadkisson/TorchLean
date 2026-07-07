@@ -54,7 +54,7 @@ def multiHeadAttention
     := seedW + 3)
   { kind := s!"MultiHeadAttention(heads={numHeads}, headDim={headDim})"
     paramShapes := [wProjShape, wProjShape, wProjShape, wOShape]
-    initParams := Torch.tlist4 wq0 wk0 wv0 wo0
+    initParams := Torch.tlistQuad wq0 wk0 wv0 wo0
     paramRequiresGrad := [true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -66,18 +66,18 @@ def multiHeadAttention
   }
 
 /-- Lift a single layer into a 1-layer sequential model. -/
-def seq1 {σ τ : Shape} (l : LayerDef σ τ) : Seq σ τ :=
+def singleLayer {σ τ : Shape} (l : LayerDef σ τ) : Seq σ τ :=
   .cons l (.id τ)
 
 /-!
 ## Sequential model literal (`tlseq[...]`)
 
-When writing compact models, chaining `seq1` with `>>>` is a bit verbose:
+When writing compact models, chaining `singleLayer` with `>>>` is a bit verbose:
 
 ```lean
-TorchLean.NN.seq1 (TorchLean.NN.linear inDim hidDim) >>>
-TorchLean.NN.seq1 TorchLean.NN.tanh >>>
-TorchLean.NN.seq1 (TorchLean.NN.linear hidDim outDim)
+TorchLean.NN.singleLayer (TorchLean.NN.linear inDim hidDim) >>>
+TorchLean.NN.singleLayer TorchLean.NN.tanh >>>
+TorchLean.NN.singleLayer (TorchLean.NN.linear hidDim outDim)
 ```
 
 This macro provides a compact, explicit alternative:
@@ -90,15 +90,15 @@ tlseq[
 ]
 ```
 
-It expands to `seq1 ... >>> seq1 ... >>> ...`.
+It expands to `singleLayer ... >>> singleLayer ... >>> ...`.
 The syntax is namespaced to avoid colliding with other libraries.
 -/
 
 syntax (name := torchLeanSeqLit) "tlseq" "[" term,+ "]" : term
 
 macro_rules
-  | `(tlseq[$l]) => `(TorchLean.NN.seq1 $l)
-  | `(tlseq[$l, $ls,*]) => `(TorchLean.NN.seq1 $l >>> tlseq[$ls,*])
+  | `(tlseq[$l]) => `(TorchLean.NN.singleLayer $l)
+  | `(tlseq[$l, $ls,*]) => `(TorchLean.NN.singleLayer $l >>> tlseq[$ls,*])
 
 end NN
 

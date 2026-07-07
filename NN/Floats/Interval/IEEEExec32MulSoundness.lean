@@ -60,7 +60,7 @@ open TorchLean.Floats.Interval
 `mulDown x y` is non-NaN on finite inputs.
 
 This is a small bridge fact: it lets us apply the `toEReal_minimum_eq_min` lemma (which
-requires a non-NaN hypothesis) when reasoning about the `min4` corner selection used by
+requires a non-NaN hypothesis) when reasoning about the `minOfFour` corner selection used by
 `Interval32.mul`.
 -/
 private lemma isNaN_mulDown_eq_false_of_isFinite (x y : IEEE32Exec)
@@ -104,7 +104,7 @@ private lemma isNaN_mulDown_eq_false_of_isFinite (x y : IEEE32Exec)
 /--
 `mulUp x y` is non-NaN on finite inputs.
 
-As for `isNaN_mulDown_eq_false_of_isFinite`, this is used to justify that the IEEE `maximum`/`min4`
+As for `isNaN_mulDown_eq_false_of_isFinite`, this is used to justify that the IEEE `maximum`/`minOfFour`
 helpers behave like `max`/`min` on the `EReal` semantics of the rounded corner products.
 -/
 private lemma isNaN_mulUp_eq_false_of_isFinite (x y : IEEE32Exec)
@@ -166,9 +166,9 @@ theorem mul_sound (A B : Interval32)
   have hxy := mul_bounds_Icc (a := toReal A.lo) (b := toReal A.hi) (c := toReal B.lo) (d := toReal
     B.hi)
     (x := x) (y := y) hx hy
-  have hxy_lo : (min4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+  have hxy_lo : (minOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
                     (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) ≤ x * y := hxy.1
-  have hxy_hi : x * y ≤ (max4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+  have hxy_hi : x * y ≤ (maxOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
                     (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) := hxy.2
 
   -- Directed rounding corner products.
@@ -221,7 +221,7 @@ theorem mul_sound (A B : Interval32)
   have hlo_eval :
       toEReal (Interval32.mul A B).lo =
         min (min (toEReal p00) (toEReal p01)) (min (toEReal p10) (toEReal p11)) := by
-    -- unfold `mul` and rewrite `toEReal (min4 ...)`
+    -- unfold `mul` and rewrite `toEReal (minOfFour ...)`
     simp [Interval32.mul, p00, p01, p10, p11,
       toEReal_min4_eq (a := p00) (b := p01) (c := p10) (d := p11) hp00NaN hp01NaN hp10NaN hp11NaN]
 
@@ -233,7 +233,7 @@ theorem mul_sound (A B : Interval32)
 
   have hlo_le_minCorners :
       toEReal (Interval32.mul A B).lo ≤
-        ((min4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+        ((minOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
           (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) := by
     -- Rewrite `toEReal lo` into nested `min`, then use monotonicity of `min`.
     rw [hlo_eval]
@@ -254,19 +254,19 @@ theorem mul_sound (A B : Interval32)
                 EReal)) :=
       min_le_min h01 h23
     refine le_trans hmin ?_
-    -- Convert the `EReal`-nested min into a coercion of `min4R`.
+    -- Convert the `EReal`-nested min into a coercion of `minOfFourReal`.
     have : (min (min ((toReal A.lo * toReal B.lo : ℝ) : EReal) ((toReal A.lo * toReal B.hi : ℝ) :
       EReal))
             (min ((toReal A.hi * toReal B.lo : ℝ) : EReal) ((toReal A.hi * toReal B.hi : ℝ) :
               EReal))) =
-          ((min4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+          ((minOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
             (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) := by
       -- Regroup the `min`s and push coercions through `min`.
-      simp [min4R, coe_min, min_left_comm, min_comm]
+      simp [minOfFourReal, coe_min, min_left_comm, min_comm]
     exact le_of_eq this
 
   have hmaxCorners_le_hhi :
-      ((max4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+      ((maxOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
           (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) ≤
         toEReal (Interval32.mul A B).hi := by
     rw [hhi_eval]
@@ -286,22 +286,22 @@ theorem mul_sound (A B : Interval32)
           max (max (toEReal q00) (toEReal q01)) (max (toEReal q10) (toEReal q11)) :=
       max_le_max h01 h23
     refine le_trans ?_ hmax
-    -- Convert the `max4R` coercion to the nested `max` over the four exact corners.
-    have : ((max4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+    -- Convert the `maxOfFourReal` coercion to the nested `max` over the four exact corners.
+    have : ((maxOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
         (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) =
           max (max ((toReal A.lo * toReal B.lo : ℝ) : EReal) ((toReal A.lo * toReal B.hi : ℝ) :
             EReal))
               (max ((toReal A.hi * toReal B.lo : ℝ) : EReal) ((toReal A.hi * toReal B.hi : ℝ) :
                 EReal)) := by
-      simp [max4R, coe_max, max_left_comm, max_comm]
+      simp [maxOfFourReal, coe_max, max_left_comm, max_comm]
     exact le_of_eq this
 
   -- Cast real bounds into `EReal`.
-  have hxy_loE : ((min4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+  have hxy_loE : ((minOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
         (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) ≤ (x * y : EReal) :=
           by
     exact (EReal.coe_le_coe_iff).2 hxy_lo
-  have hxy_hiE : (x * y : EReal) ≤ ((max4R (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
+  have hxy_hiE : (x * y : EReal) ≤ ((maxOfFourReal (toReal A.lo * toReal B.lo) (toReal A.lo * toReal B.hi)
         (toReal A.hi * toReal B.lo) (toReal A.hi * toReal B.hi) : ℝ) : EReal) := by
     exact (EReal.coe_le_coe_iff).2 hxy_hi
 

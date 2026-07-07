@@ -12,7 +12,7 @@ public import NN.API.Public.Facade.Runtime.RL
 /-!
 # TorchLean Module Runtime Facade
 
-Executable module operations for advanced runtime and example code.
+Executable module operations for manual runtime and example code.
 -/
 
 @[expose] public section
@@ -28,14 +28,14 @@ abbrev ScalarModule := NN.API.TorchLean.Module.ScalarModule
 abbrev ScalarModuleDef := NN.API.TorchLean.Module.ScalarModuleDef
 
 export NN.API.TorchLean.Module
-  (instantiateWithOptions forward backward step initOptim stepWith
+  (instantiateConfigured forward backward step initOptim stepWith
    params setParams trainSGD trainWith meanLoss run)
 
 /--
 Instantiate an executable runtime module from a public `ScalarModuleDef`.
 
-This is the generic public entrypoint for custom runtime tasks outside the standard supervised
-module constructors such as `Module.instantiateMse` or `Module.instantiateCrossEntropyOneHot`.
+Generic public entrypoint for custom runtime tasks outside the standard supervised module
+constructors such as `Module.instantiateMse` or `Module.instantiateCrossEntropyOneHot`.
 -/
 def instantiate
     {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
@@ -45,36 +45,21 @@ def instantiate
     (defn : ScalarModuleDef paramShapes inputShapes)
     (cast : Float → α := Runtime.ofFloat) :
     IO (ScalarModule α paramShapes inputShapes) :=
-  instantiateWithOptions (α := α) defn cast opts
+  instantiateConfigured (α := α) defn cast opts
 
 /--
 Run one inference step through a supervised runtime module.
 
-This is the public sibling of the direct runtime pattern
-`nn.eval1 opts model m.trainer.params x`.
+Public sibling of the direct runtime pattern `model.predict opts m.trainer.params x`.
 -/
-def predict1 {σ τ : Shape} {α : Type}
+def predict {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
     (model : nn.Sequential σ τ)
     (m : ScalarModule α (nn.paramShapes model) [σ, τ])
     (x : Tensor.T α σ) : IO (Tensor.T α τ) :=
-  nn.eval1 (α := α) opts model m.trainer.params x
-
-/--
-Run one no-grad inference step through a supervised runtime module.
-
-Use this for sampling/reporting paths that should not build an autograd tape.
--/
-def predict1NoGrad {σ τ : Shape} {α : Type}
-    [Runtime.TensorScalar α] [DecidableEq Shape]
-    [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (opts : Options)
-    (model : nn.Sequential σ τ)
-    (m : ScalarModule α (nn.paramShapes model) [σ, τ])
-    (x : Tensor.T α σ) : IO (Tensor.T α τ) :=
-  nn.eval1NoGrad (α := α) opts model m.trainer.params x
+  nn.predict (α := α) model opts m.trainer.params x
 
 /--
 Instantiate a supervised MSE module directly from a sequential model.
@@ -108,7 +93,7 @@ def instantiateCrossEntropyOneHot {σ τ : Shape} {α : Type}
 /--
 Instantiate a custom supervised runtime module directly from a sequential model.
 
-Use this when a public example keeps the ordinary `nn.Sequential` model surface but needs a custom
+Use this when a public example keeps the ordinary `nn.Sequential` model API but needs a custom
 loss/module definition instead of the standard MSE or cross-entropy module constructors.
 -/
 def instantiateModuleDefModel
@@ -212,8 +197,8 @@ def withModuleDefModel
 Build a sequential model, instantiate a runtime module for a custom scalar loss program, and
 continue with both values.
 
-This is the custom-loss sibling of `withMseModel` / `withCrossEntropyOneHotModel`. Use it when the
-model is ordinary `nn.Sequential`, but the loss needs task-specific logic beyond the standard MSE or
+Custom-loss sibling of `withMseModel` / `withCrossEntropyOneHotModel`. Use it when the model is
+ordinary `nn.Sequential`, but the loss needs task-specific logic beyond the standard MSE or
 cross-entropy module constructors.
 -/
 def withScalarLossModel
@@ -288,9 +273,8 @@ def sgdHandle {α : Type}
 Create a one-step update function for any typed module input pack from the public optimizer config
 used by the trainer API.
 
-This is the generic bridge for custom training loops: richer examples can keep their own control
-flow while still choosing SGD/Adam/AdamW through the same `optim.*` config surface as
-`Trainer.RunConfig`.
+Generic bridge for custom training loops: richer examples can keep their own control flow while
+still choosing a public `optim.*` config through the same API as `Trainer.RunConfig`.
 -/
 def optimizerInputs {α : Type}
     [Runtime.TensorScalar α] [Runtime.Scalar α] [DecidableEq Shape]
@@ -311,12 +295,38 @@ def optimizerInputs {α : Type}
           (paramShapes := paramShapes)
         let optH ← NN.API.TorchLean.Optim.handle (α := α) m opt
         pure optH.step
+  | .adagrad lr epsilon =>
+      let opt := NN.API.TorchLean.Optim.adagrad
+        (α := α)
+        (Runtime.ofFloat lr)
+        (Runtime.ofFloat epsilon)
+        (paramShapes := paramShapes)
+      let optH ← NN.API.TorchLean.Optim.handle (α := α) m opt
+      pure optH.step
+  | .rmsprop lr decay epsilon =>
+      let opt := NN.API.TorchLean.Optim.rmsprop
+        (α := α)
+        (Runtime.ofFloat lr)
+        (Runtime.ofFloat decay)
+        (Runtime.ofFloat epsilon)
+        (paramShapes := paramShapes)
+      let optH ← NN.API.TorchLean.Optim.handle (α := α) m opt
+      pure optH.step
   | .adam lr beta1 beta2 epsilon =>
       let optH ← adamHandle m
         (Runtime.ofFloat lr)
         (Runtime.ofFloat beta1)
         (Runtime.ofFloat beta2)
         (Runtime.ofFloat epsilon)
+      pure optH.step
+  | .adadelta lr rho epsilon =>
+      let opt := NN.API.TorchLean.Optim.adadelta
+        (α := α)
+        (Runtime.ofFloat lr)
+        (Runtime.ofFloat rho)
+        (Runtime.ofFloat epsilon)
+        (paramShapes := paramShapes)
+      let optH ← NN.API.TorchLean.Optim.handle (α := α) m opt
       pure optH.step
   | .adamw lr weightDecay beta1 beta2 epsilon =>
       let optH ← adamWHandle m
@@ -330,8 +340,8 @@ def optimizerInputs {α : Type}
 /--
 Create a sample-step function from the public optimizer config used by the trainer API.
 
-This is the bridge for custom training loops: richer examples can keep their own control flow while
-still choosing SGD/Adam/AdamW through the same `optim.*` config surface as `Trainer.RunConfig`.
+Bridge for custom training loops: richer examples can keep their own control flow while still
+choosing a public `optim.*` config through the same API as `Trainer.RunConfig`.
 -/
 def optimizerStep {α : Type} {σ τ : Shape}
     [Runtime.TensorScalar α] [Runtime.Scalar α] [DecidableEq Shape]

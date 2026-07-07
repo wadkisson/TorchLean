@@ -108,11 +108,11 @@ The returned `WithWorkspace` records the buffers used to compute the stable form
 those buffers only as long as the node may need them for backprop, then releases them explicitly.
 -/
 def rowSoftmaxForward (x : Buffer) (rows cols : UInt32) : Buffer.WithWorkspace :=
-  let rowMax := Buffer.reduceMaxAxis1 x rows cols
+  let rowMax := Buffer.reduceMaxByRow x rows cols
   let maxB := Buffer.broadcastVecToCols rowMax rows cols
   let shifted := Buffer.sub x maxB
   let ex := Buffer.exp shifted
-  let rowSum := Buffer.reduceSumAxis1 ex rows cols
+  let rowSum := Buffer.reduceSumByRow ex rows cols
   let sumB := Buffer.broadcastVecToCols rowSum rows cols
   let y := Buffer.div ex sumB
   { value := y, workspace := [rowMax, maxB, shifted, ex, rowSum, sumB] }
@@ -127,12 +127,12 @@ Row-wise hard-masked softmax.
 literal zero numerator. This matches `Spec.hardMaskedSoftmaxSpec`, not a finite additive sentinel.
 -/
 def rowHardMaskedSoftmaxForward (x mask : Buffer) (rows cols : UInt32) : Buffer.WithWorkspace :=
-  let rowMax := Buffer.reduceMaxAxis1 x rows cols
+  let rowMax := Buffer.reduceMaxByRow x rows cols
   let maxB := Buffer.broadcastVecToCols rowMax rows cols
   let shifted := Buffer.sub x maxB
   let ex := Buffer.exp shifted
   let exMasked := Buffer.mul ex mask
-  let rowSum := Buffer.reduceSumAxis1 exMasked rows cols
+  let rowSum := Buffer.reduceSumByRow exMasked rows cols
   let sumB := Buffer.broadcastVecToCols rowSum rows cols
   let y := Buffer.div exMasked sumB
   { value := y, workspace := [rowMax, maxB, shifted, ex, exMasked, rowSum, sumB] }
@@ -141,7 +141,7 @@ def rowHardMaskedSoftmaxForward (x mask : Buffer) (rows cols : UInt32) : Buffer.
 def rowSoftmaxBwd (y dLdy : Buffer) (rows cols : UInt32) : Buffer :=
   -- JVP/VJP: dX = y * (dY - sum(dY*y, axis=1)).
   let dy_y := Buffer.mul dLdy y
-  let dot := Buffer.reduceSumAxis1 dy_y rows cols
+  let dot := Buffer.reduceSumByRow dy_y rows cols
   let dotB := Buffer.broadcastVecToCols dot rows cols
   let centered := Buffer.sub dLdy dotB
   Buffer.releaseThen dy_y <| Buffer.releaseThen dot <| Buffer.releaseThen dotB <|
@@ -155,11 +155,11 @@ This computes `x - rowMax - log(sum(exp(x-rowMax)))` directly, avoiding the less
 until the backward pass has finished.
 -/
 def rowLogSoftmaxForward (x : Buffer) (rows cols : UInt32) : Buffer.WithWorkspace :=
-  let rowMax := Buffer.reduceMaxAxis1 x rows cols
+  let rowMax := Buffer.reduceMaxByRow x rows cols
   let maxB := Buffer.broadcastVecToCols rowMax rows cols
   let shifted := Buffer.sub x maxB
   let ex := Buffer.exp shifted
-  let rowSum := Buffer.reduceSumAxis1 ex rows cols
+  let rowSum := Buffer.reduceSumByRow ex rows cols
   let logSum := Buffer.log rowSum
   let logSumB := Buffer.broadcastVecToCols logSum rows cols
   let y := Buffer.sub shifted logSumB
@@ -172,7 +172,7 @@ private def rowLogSoftmaxFwd (x : Buffer) (rows cols : UInt32) : Buffer :=
 def rowLogSoftmaxBwd (y dLdy : Buffer) (rows cols : UInt32) : Buffer :=
   -- VJP: dX = dY - exp(logSoftmax(X)) * sum(dY, axis=1).
   let probs := Buffer.exp y
-  let rowSum := Buffer.reduceSumAxis1 dLdy rows cols
+  let rowSum := Buffer.reduceSumByRow dLdy rows cols
   let sumB := Buffer.broadcastVecToCols rowSum rows cols
   let scaled := Buffer.mul probs sumB
   Buffer.releaseThen probs <| Buffer.releaseThen rowSum <| Buffer.releaseThen sumB <|

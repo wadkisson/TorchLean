@@ -16,14 +16,14 @@ public import NN.Proofs.RL.Boundary
 runtime layer intentionally does not *carry* the Prop-level proof object in its return type.
 
 This file provides a proof-layer wrapper that returns the same transition bundled with a proof
-that it satisfies the Lean-side trust-boundary contract (`Runtime.RL.Boundary.ContractHolds`).
+that it satisfies the Lean side trust-boundary contract (`Runtime.RL.Boundary.ContractHolds`).
 
 This is useful when you want a “checked preconditions” API: instead of assuming numeric/shape
 safety of externally collected rollouts, you explicitly check and obtain a usable hypothesis.
 
 References:
 
-- Gymnasium API docs (reset/step, terminated vs truncated): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, terminated vs truncated): https://gymnasium.farama.org/
 -/
 
 @[expose] public section

@@ -33,8 +33,8 @@ This file implements a pragmatic “sound route” for interval endpoints of tra
    - upper endpoint: round toward `+∞` (using `roundDyadicUp`).
 
 Trust boundary:
-- The enclosure `[L,U]` is an **oracle claim** from Arb/python-flint; this module does not prove the
-  Arb computation inside Lean.
+- The enclosure `[L,U]` is an **oracle claim** from Arb/python-flint; Arb is the external trusted
+  producer for that real enclosure.
 - The rounding-to-float32 step is in-Lean and (for dyadic rounding) proved sound in
   `NN/Floats/IEEEExec/DirectedRoundingSoundness.lean`.
 

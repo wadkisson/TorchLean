@@ -18,7 +18,7 @@ import Mathlib.Algebra.Order.Algebra
 # Synthetic Samples and Compact Datasets
 
 This module provides deterministic data generators used by examples and tests:
-- 2D tabular grids (`grid2`, `linspace`)
+- 2D tabular grids (`cartesianGrid`, `linspace`)
 - simple regression/classification sample builders
 - a compact "band image" generator (2D patterns) for CHW examples
 
@@ -39,20 +39,20 @@ open Spec
 /-! ## Tabular 2D -/
 
 /-- 2D affine synthetic target function generator (re-exported from the runtime helper module). -/
-abbrev affine2 := _root_.Runtime.Autograd.Torch.Samples.affine2
+abbrev affinePlane := _root_.Runtime.Autograd.Torch.Samples.affinePlane
 
 /-- A length-1 float vector tensor. -/
-def vec1Float (y : Float) : Spec.Tensor Float (.dim 1 .scalar) :=
-  _root_.Runtime.Autograd.Torch.Samples.vec1 y
+def singletonVectorFloat (y : Float) : Spec.Tensor Float (.dim 1 .scalar) :=
+  _root_.Runtime.Autograd.Torch.Samples.singletonVector y
 
 /-- A length-2 float vector tensor. -/
-def vec2Float (x1 x2 : Float) : Spec.Tensor Float (.dim 2 .scalar) :=
-  _root_.Runtime.Autograd.Torch.Samples.vec2 x1 x2
+def pointVectorFloat (x y : Float) : Spec.Tensor Float (.dim 2 .scalar) :=
+  _root_.Runtime.Autograd.Torch.Samples.pointVector x y
 
 /--
 Cartesian product of two float vectors (batched tensor of points).
 
-`grid2 xs ys` produces a tensor `X : (m*n, 2)` containing all pairs `(x, y)` with:
+`cartesianGrid xs ys` produces a tensor `X : (m*n, 2)` containing all pairs `(x, y)` with:
 - `x` taken from `xs : (m,)`
 - `y` taken from `ys : (n,)`
 
@@ -60,7 +60,7 @@ Ordering is row-major: for each `x` in `xs` (outer loop), we sweep all `y` in `y
 
 PyTorch analogue: `torch.cartesian_prod(xs, ys)` (up to shape).
 -/
-def grid2 {m n : Nat}
+def cartesianGrid {m n : Nat}
     (xs : Spec.Tensor Float (.dim m .scalar)) (ys : Spec.Tensor Float (.dim n .scalar)) :
     Spec.Tensor Float (.dim (m * n) (.dim 2 .scalar)) :=
   Spec.Tensor.dim (fun ij =>
@@ -68,7 +68,7 @@ def grid2 {m n : Nat}
     let j : Fin n := ij.modNat (m := m) (n := n)
     let x : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get xs i)
     let y : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get ys j)
-    vec2Float x y)
+    pointVectorFloat x y)
 
 /--
 Linearly spaced points including endpoints.
@@ -91,36 +91,36 @@ def linspace (lo hi : Float) (count : Nat) : Spec.Tensor Float (.dim count .scal
         Spec.Tensor.scalar (lo + t * (hi - lo)))
 
 /-- Rectangular grid over `[xLo, xHi] x [yLo, yHi]`. -/
-def grid2Rect (xLo xHi yLo yHi : Float) (xCount yCount : Nat) :
+def rectangularGrid (xLo xHi yLo yHi : Float) (xCount yCount : Nat) :
     Spec.Tensor Float (.dim (xCount * yCount) (.dim 2 .scalar)) :=
-  grid2 (linspace xLo xHi xCount) (linspace yLo yHi yCount)
+  cartesianGrid (linspace xLo xHi xCount) (linspace yLo yHi yCount)
 
 /-- Square grid over `[lo, hi] x [lo, hi]`. -/
-def grid2Square (lo hi : Float) (count : Nat) :
+def squareGrid (lo hi : Float) (count : Nat) :
     Spec.Tensor Float (.dim (count * count) (.dim 2 .scalar)) :=
-  grid2Rect lo hi lo hi count count
+  rectangularGrid lo hi lo hi count count
 
 /--
 Compute 2D→1D regression targets for a batched grid.
 
 Input `X` has shape `(n,2)` and the output `Y` has shape `(n,1)`.
 -/
-def regression2to1Float {n : Nat} (X : Spec.Tensor Float (.dim n (.dim 2 .scalar)))
+def regressionTargetsFloat {n : Nat} (X : Spec.Tensor Float (.dim n (.dim 2 .scalar)))
     (f : Float → Float → Float) : Spec.Tensor Float (.dim n (.dim 1 .scalar)) :=
   Spec.Tensor.dim (fun i =>
     let x : Spec.Tensor Float (.dim 2 .scalar) := Spec.get X i
-    let x1 : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get x ⟨0, by decide⟩)
-    let x2 : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get x ⟨1, by decide⟩)
-    vec1Float (f x1 x2))
+    let firstCoord : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get x ⟨0, by decide⟩)
+    let secondCoord : Float := _root_.Spec.Tensor.toScalar (_root_.Spec.get x ⟨1, by decide⟩)
+    singletonVectorFloat (f firstCoord secondCoord))
 
-/-- Casted version of `vec1Float` under an arbitrary scalar semantics `α`. -/
-def vec1 {α : Type} [Context α] (cast : Float → α) (y : Float) : Spec.Tensor α (.dim 1 .scalar) :=
-  Common.castTensor cast (vec1Float y)
+/-- Casted version of `singletonVectorFloat` under an arbitrary scalar semantics `α`. -/
+def singletonVector {α : Type} [Context α] (cast : Float → α) (y : Float) : Spec.Tensor α (.dim 1 .scalar) :=
+  Common.castTensor cast (singletonVectorFloat y)
 
-/-- Casted version of `vec2Float` under an arbitrary scalar semantics `α`. -/
-def vec2 {α : Type} [Context α] (cast : Float → α) (x1 x2 : Float) : Spec.Tensor α (.dim 2 .scalar)
+/-- Casted version of `pointVectorFloat` under an arbitrary scalar semantics `α`. -/
+def pointVector {α : Type} [Context α] (cast : Float → α) (x y : Float) : Spec.Tensor α (.dim 2 .scalar)
   :=
-  Common.castTensor cast (vec2Float x1 x2)
+  Common.castTensor cast (pointVectorFloat x y)
 
 /-! ## Image 2D (Synthetic CHW Pixels) -/
 

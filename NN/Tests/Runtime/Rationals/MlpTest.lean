@@ -40,25 +40,25 @@ abbrev exHidDim := 3
 abbrev exOutDim := 1
 
 /-- Helper tensors for layer-1 parameters. -/
-def exW1 : Tensor ℚ (.dim exHidDim (.dim exInDim .scalar)) :=
+def exampleHiddenWeight : Tensor ℚ (.dim exHidDim (.dim exInDim .scalar)) :=
   tensorND! [exHidDim, exInDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
-def exb1 : Tensor ℚ (.dim exHidDim .scalar) :=
+def exampleHiddenBias : Tensor ℚ (.dim exHidDim .scalar) :=
   tensorND! [exHidDim] [0.1, 0.2, 0.3]
 
 /-- Layer-2 parameters. Weight matrix is [outDim × hidDim]. -/
-def exW2 : Tensor ℚ (.dim exOutDim (.dim exHidDim .scalar)) :=
+def exampleOutputWeight : Tensor ℚ (.dim exOutDim (.dim exHidDim .scalar)) :=
   tensorND! [exOutDim, exHidDim] [0.7, 0.8, 0.9]
 
-def exb2 : Tensor ℚ (.dim exOutDim .scalar) :=
+def exampleOutputBias : Tensor ℚ (.dim exOutDim .scalar) :=
   tensorND! [exOutDim] [0.4]
 
 /-- Assemble `LinearSpec`s. -/
-def exLin1 : Spec.LinearSpec ℚ exInDim exHidDim :=
-{ weights := exW1, bias := exb1 }
+def exampleHiddenLayer : Spec.LinearSpec ℚ exInDim exHidDim :=
+{ weights := exampleHiddenWeight, bias := exampleHiddenBias }
 
-def exLin2 : Spec.LinearSpec ℚ exHidDim exOutDim :=
-{ weights := exW2, bias := exb2 }
+def exampleOutputLayer : Spec.LinearSpec ℚ exHidDim exOutDim :=
+{ weights := exampleOutputWeight, bias := exampleOutputBias }
 
 /-- Input vector `[0.5, 0.8]`. -/
 def exInput : Tensor ℚ (.dim exInDim .scalar) :=
@@ -66,26 +66,26 @@ def exInput : Tensor ℚ (.dim exInDim .scalar) :=
 
 /-- Build the MLP SpecChain and run the forward pass. -/
 def exNet : SpecChain ℚ (.dim exInDim .scalar) (.dim exOutDim .scalar) :=
-  Examples.mlpSpec (α:=ℚ) exLin1 exLin2
+  Examples.mlpSpec (α:=ℚ) exampleHiddenLayer exampleOutputLayer
 
 def exOutput : Tensor ℚ (.dim exOutDim .scalar) :=
   SpecChain.forward (α:=ℚ) exNet exInput
 
 /-- Manually compute the expected output to confirm composition correctness. -/
 def exExpected : Tensor ℚ (.dim exOutDim .scalar) :=
-  let z1 := Spec.linearSpec (α:=ℚ) exLin1 exInput
+  let z1 := Spec.linearSpec (α:=ℚ) exampleHiddenLayer exInput
   let a1 := Activation.reluSpec z1
-  Spec.linearSpec (α:=ℚ) exLin2 a1
+  Spec.linearSpec (α:=ℚ) exampleOutputLayer a1
 
 -- Gradient verification -----------------------------------------------------
 
 def exDLdy : Tensor ℚ (.dim exOutDim .scalar) :=
   tensorND! [exOutDim] [1.0]
 
-def exGrad := Examples.mlpBackward (α:=ℚ) exLin1 exLin2 exInput exDLdy
+def exGrad := Examples.mlpBackward (α:=ℚ) exampleHiddenLayer exampleOutputLayer exInput exDLdy
 
 def exDXOpspec :=
-  Examples.mlpOpspecBackward (α:=ℚ) exLin1 exLin2 exInput exDLdy
+  Examples.mlpOpspecBackward (α:=ℚ) exampleHiddenLayer exampleOutputLayer exInput exDLdy
 
 /-- Extract ∂L/∂x from the 5-tuple returned by `mlp_backward`. -/
 def dXHand : Tensor ℚ (.dim exInDim .scalar) :=
@@ -109,14 +109,14 @@ def sgdStep
   let yPred := Examples.mlpForward (α:=ℚ) l1 l2 exInput
   -- PyTorch MSELoss: grad = 2 * (ŷ - y) / N, here N = 1
   let diff  := Tensor.scaleSpec (Tensor.subSpec yPred yTarget) (2.0 : ℚ)
-  let (dW1, db1, dW2, db2, _) :=
+  let (hiddenWeightGrad, hiddenBiasGrad, outputWeightGrad, outputBiasGrad, _) :=
     Examples.mlpBackward (α:=ℚ) l1 l2 exInput diff
   -- SGD update: param ← param - lr * grad
-  let newW1 := Tensor.subSpec l1.weights (Tensor.scaleSpec dW1 lr)
-  let newb1 := Tensor.subSpec l1.bias    (Tensor.scaleSpec db1 lr)
-  let newW2 := Tensor.subSpec l2.weights (Tensor.scaleSpec dW2 lr)
-  let newb2 := Tensor.subSpec l2.bias    (Tensor.scaleSpec db2 lr)
-  ({ weights := newW1, bias := newb1 }, { weights := newW2, bias := newb2 })
+  let updatedHiddenWeight := Tensor.subSpec l1.weights (Tensor.scaleSpec hiddenWeightGrad lr)
+  let updatedHiddenBias := Tensor.subSpec l1.bias    (Tensor.scaleSpec hiddenBiasGrad lr)
+  let updatedOutputWeight := Tensor.subSpec l2.weights (Tensor.scaleSpec outputWeightGrad lr)
+  let updatedOutputBias := Tensor.subSpec l2.bias    (Tensor.scaleSpec outputBiasGrad lr)
+  ({ weights := updatedHiddenWeight, bias := updatedHiddenBias }, { weights := updatedOutputWeight, bias := updatedOutputBias })
 
 /-- Train for `n` epochs (tail-recursive). -/
 def trainN : Nat → Spec.LinearSpec ℚ exInDim exHidDim → Spec.LinearSpec ℚ exHidDim exOutDim →
@@ -126,11 +126,11 @@ def trainN : Nat → Spec.LinearSpec ℚ exInDim exHidDim → Spec.LinearSpec �
   let (l1', l2') := sgdStep l1 l2
   trainN k l1' l2'
 
-def finalPair := trainN 4 exLin1 exLin2
-def finalL1 : Spec.LinearSpec ℚ exInDim exHidDim := finalPair.fst
-def finalL2 : Spec.LinearSpec ℚ exHidDim exOutDim := finalPair.snd
+def finalPair := trainN 4 exampleHiddenLayer exampleOutputLayer
+def finalHiddenLayer : Spec.LinearSpec ℚ exInDim exHidDim := finalPair.fst
+def finalOutputLayer : Spec.LinearSpec ℚ exHidDim exOutDim := finalPair.snd
 
-def yAfterTrain := Examples.mlpForward (α:=ℚ) finalL1 finalL2 exInput
+def yAfterTrain := Examples.mlpForward (α:=ℚ) finalHiddenLayer finalOutputLayer exInput
 
 def ratToFloatString (q : ℚ) : String :=
   toString (Rat.toFloat q)
@@ -161,7 +161,7 @@ def run : IO Unit := do
 
   IO.println s!"Output after 4 epochs (approx): {prettyRatVecApprox yAfterTrain}"
   IO.println s!"Prediction error (approx, ŷ - y): {prettyRatVecApprox (Tensor.subSpec yAfterTrain yTarget)}"
-  IO.println s!"Initial output: {pretty (Examples.mlpForward (α:=ℚ) exLin1 exLin2 exInput)}"
+  IO.println s!"Initial output: {pretty (Examples.mlpForward (α:=ℚ) exampleHiddenLayer exampleOutputLayer exInput)}"
   IO.println s!"SpecChain forward: {pretty (SpecChain.forward (α:=ℚ) exNet exInput)}"
 
 end Rationals

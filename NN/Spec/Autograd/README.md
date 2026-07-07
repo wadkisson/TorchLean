@@ -1,33 +1,35 @@
 # `NN.Spec.Autograd`
 
-This directory defines TorchLean's spec level interface for reverse mode automatic differentiation.
-The intent is to keep the math small and explicit:
+This directory defines TorchLean's spec-level interface for reverse-mode automatic differentiation.
+The interface is intentionally small:
 
-- an `OpSpec` is forward plus VJP (vector Jacobian product),
+- an `OpSpec` is a forward function plus a VJP, and
 - composition of `OpSpec`s is the chain rule.
 
-This layer is deliberately independent of any particular runtime tape/graph engine. It is the
-contract that runtime code should implement (or reuse) so the executable system stays aligned with
-the spec.
+This layer is independent of any particular runtime tape, compiled graph, CUDA kernel, or external
+provider. It is the mathematical contract that runtime code should implement or reuse so executable
+training stays aligned with the spec.
 
 PyTorch analogy:
 
 - `OpSpec.forward` is like `torch.autograd.Function.forward`.
 - `OpSpec.backward` is like `torch.autograd.Function.backward`, but expressed as a pure VJP that
-  receives the input explicitly (instead of a mutable `ctx`).
+  receives the input explicitly instead of reading a mutable context.
 
-Files:
+## Files
 
-- `autograd_spec.lean`: defines `Spec.OpSpec` and sequential composition (`compose` / `>>>`). This
-  is the small interface for reverse mode differentiation.
-- `ops.lean`: a small library of common `OpSpec`s built from the spec layer tensor primitives
-  (activations, pointwise math ops, reductions, broadcasting aware wrappers, and loss functions).
+- `AutogradSpec.lean`: defines `Spec.OpSpec` and sequential composition (`compose` / `>>>`).
+- `Ops.lean`: common `OpSpec`s built from spec tensor primitives: activations, pointwise math,
+  reductions, broadcasting-aware wrappers, and loss functions.
 
-Where to look for graphs and execution:
+## Where To Look For The Other Layers
 
-- `NN/Runtime/Autograd/*`: executable tape/graph engines and training utilities.
-- `NN/GraphSpec/*` and `NN/IR/*`: typed DAG / IR representations used by compilation and verification.
-- `NN/Proofs/Autograd/*`: correctness statements that relate runtime execution to spec level math.
+- `NN/Runtime/Autograd/`: executable tape/graph engines and training utilities.
+- `NN/GraphSpec/` and `NN/IR/`: typed DAG and op-tagged IR representations used by compilation and
+  verification.
+- `NN/Proofs/Autograd/`: correctness statements relating runtime execution or tape algebra to
+  spec-level derivatives.
 
-Synchronization note: define the math once (in `NN/Spec/*`) and have runtime code call those
-helpers when possible. That keeps runtime rules and spec rules tied to the same vocabulary.
+Synchronization rule: define the math once in `NN/Spec/*` and have runtime code call those helpers
+when possible. That keeps runtime rules, proof statements, and spec rules tied to the same
+vocabulary.

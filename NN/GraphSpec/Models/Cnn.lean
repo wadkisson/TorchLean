@@ -120,7 +120,7 @@ Input/output:
 - input `x : CHW inC inH inW` (no batch dimension),
 - output logits `: Vec outDim`.
 -/
-def cnn2
+def twoConvCnn
     (inC c1 c2 outDim inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1
       poolStride2 : Nat)
     {h_inC : inC ≠ 0} {h_c1 : c1 ≠ 0} {_h_c2 : c2 ≠ 0}
@@ -190,7 +190,7 @@ sequential `Graph` pipeline.
 
 Initialization: all-zero parameters (see `LowerToDAG.Graph.toDAGModelZeroInit`).
  -/
-def cnn2DAGModelZeroInit
+def twoConvCnnDAGModelZeroInit
     (inC c1 c2 outDim inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1
       poolStride2 : Nat)
     {h_inC : inC ≠ 0} {h_c1 : c1 ≠ 0} {h_c2 : c2 ≠ 0}
@@ -207,7 +207,7 @@ def cnn2DAGModelZeroInit
       [Shape.CHW inC inH inW]
       (Shape.Vec outDim) :=
   LowerToDAG.Graph.toDAGModelZeroInit <|
-    cnn2
+    twoConvCnn
       (inC := inC) (c1 := c1) (c2 := c2) (outDim := outDim)
       (inH := inH) (inW := inW)
       (kH := kH) (kW := kW)

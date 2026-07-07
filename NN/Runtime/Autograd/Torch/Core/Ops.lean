@@ -1073,43 +1073,43 @@ def concatVectors {α : Type} (s : EagerSession α) [Context α]
   dispatchCudaOpt (α := α) s "concat_vectors" cpu cuda
 
 /-- Concatenate along dim 0 for tensors with leading dimension. PyTorch: `torch.cat(..., dim=0)`. -/
-def concatDim0 {α : Type} (s : EagerSession α) [DecidableEq Shape]
+def concatLeadingAxis {α : Type} (s : EagerSession α) [DecidableEq Shape]
   {n m : Nat} {sh : Shape}
   (a : TensorRef α (.dim n sh))
   (b : TensorRef α (.dim m sh)) :
   IO (TensorRef α (.dim (n + m) sh)) := do
   let cpu := do
     let t0 ← s.tape.get
-    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.concatDim0 (α := α) (t := t0) (n := n) (m := m)
+    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.concatLeadingAxis (α := α) (t := t0) (n := n) (m := m)
       (s := sh) a.id b.id)
     s.tape.set t1
     pure { id := id }
   let cuda := do
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
-      Runtime.Autograd.Cuda.Tape.concatDim0 (t := t0) (n := n) (m := m) (s := sh) a.id b.id
+      Runtime.Autograd.Cuda.Tape.concatLeadingAxis (t := t0) (n := n) (m := m) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "concat_dim0" cpu cuda
+  dispatchCudaOpt (α := α) s "concat_leading_axis" cpu cuda
 
 /-- Slice along dim 0: `x[start:start+len]`. PyTorch: standard slicing. -/
-def sliceRange0 {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
+def sliceLeadingAxisRange {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
   {n : Nat} {sh : Shape}
   (x : TensorRef α (.dim n sh)) (start len : Nat) (h : len + start ≤ n) :
   IO (TensorRef α (.dim len sh)) := do
   let cpu := do
     let t0 ← s.tape.get
-    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.sliceRange0 (α := α) (t := t0) (n := n) (s := sh)
+    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.sliceLeadingAxisRange (α := α) (t := t0) (n := n) (s := sh)
       x.id start len h)
     s.tape.set t1
     pure { id := id }
   let cuda := do
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
-      Runtime.Autograd.Cuda.Tape.sliceRange0 (t := t0) (n := n) (s := sh) x.id start len h
+      Runtime.Autograd.Cuda.Tape.sliceLeadingAxisRange (t := t0) (n := n) (s := sh) x.id start len h
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "slice_range0" cpu cuda
+  dispatchCudaOpt (α := α) s "slice_leading_axis_range" cpu cuda
 
 /--
 N-D max pooling for channels-first tensors `(C, spatial...)` (no batch axis).

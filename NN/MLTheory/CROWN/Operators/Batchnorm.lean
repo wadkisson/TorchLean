@@ -143,7 +143,7 @@ def derivBatchnorm (params : BatchNormParams α)
     { lo := outLo, hi := outHi }
 
 /-- Second derivative of BatchNorm is zero (affine function). -/
-def deriv2Batchnorm (params : BatchNormParams α)
+def secondDerivBatchnorm (params : BatchNormParams α)
     (_d2B : Box α (.dim params.dim .scalar)) : Box α (.dim params.dim .scalar) :=
   let zero := Spec.fill (α:=α) Numbers.zero (.dim params.dim .scalar)
   { lo := zero, hi := zero }
@@ -175,11 +175,11 @@ theorem deriv_batchnorm_returns_box (params : BatchNormParams α)
   | .dim _, .dim _, .dim _, .dim _ => exact ⟨_, _, rfl⟩
 
 /-- BatchNorm second derivative is zero (affine function). -/
-theorem deriv2_batchnorm_is_zero (params : BatchNormParams α)
+theorem second_derivative_batchnorm_is_zero (params : BatchNormParams α)
     (d2B : Box α (.dim params.dim .scalar)) :
-    let result := deriv2Batchnorm params d2B
+    let result := secondDerivBatchnorm params d2B
     result.lo = result.hi := by
-  unfold deriv2Batchnorm
+  unfold secondDerivBatchnorm
   rfl
 
 end Theorems

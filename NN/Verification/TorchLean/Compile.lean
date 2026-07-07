@@ -333,7 +333,7 @@ instance {α : Type} [Context α] [DecidableEq Shape] :
     let node : Node := { id := id, parents := [pa, pb], kind := .concat 0, outShape := out }
     pushNode (α := α) node
     pure (.node id)
-  concatDim0 := fun {nDim mDim} {s} a b => do
+  concatLeadingAxis := fun {nDim mDim} {s} a b => do
     let pa ← ensureNode (α := α) a
     let pb ← ensureNode (α := α) b
     let id ← freshId (α := α)
@@ -342,7 +342,7 @@ instance {α : Type} [Context α] [DecidableEq Shape] :
     pushNode (α := α) node
     pure (.node id)
 
-  sliceRange0 := fun {nDim} {s} start len _h x => do
+  sliceLeadingAxisRange := fun {nDim} {s} start len _h x => do
     -- Lower leading-axis slicing to the existing linear verifier fragment:
     --
     --   x : (nDim, s)
@@ -579,7 +579,7 @@ instance {α : Type} [Context α] [DecidableEq Shape] :
   logSoftmax := fun {s} x => do
     -- The verifier IR represents `log_softmax` by lowering it through
     -- `softmax` followed by `log` so the semantic graph remains expressible; runtime eager/compiled
-    -- training still uses the stable primitive added in the autograd stack.
+    -- training still uses the stable primitive from the autograd runtime.
     let axis :=
       match Shape.rank s with
       | 0 => 0
@@ -1039,7 +1039,7 @@ def refListConstOfTList {α : Type} [Context α] :
   | _s :: ss, .cons t ts => .cons (.const t) (refListConstOfTList (ss := ss) ts)
 
 /-- Compile a TorchLean forward model with a single distinguished input (the last argument). -/
-def compileForward1
+def compileForward
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)

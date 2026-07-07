@@ -104,7 +104,7 @@ structure Options where
   /--
   GPU precision for fast-kernel matmul over Lean `Float` tensors.
 
-  `.fp32` matches the eager CUDA buffer stack. `.fp64` selects the double-precision DGEMM path for
+  `.fp32` matches the eager CUDA buffer path. `.fp64` selects the double-precision DGEMM path for
   matmul-only `Float` workloads that request double precision on GPU.
   -/
   fastGpuMatmulPrecision : Runtime.Autograd.FastKernels.GpuMatmulPrecision := .fp32
@@ -136,9 +136,8 @@ end Options
 /--
 Opaque handle to a tensor value in the current session/tape.
 
-This is the TorchLean analogue of a PyTorch `Tensor` object whose "identity" is a node/leaf id in
-  the
-autograd tape. The phantom shape index `s` makes shape mismatches explicit at compile time.
+Like a PyTorch tensor handle, the value is identified by a node or leaf id in the autograd tape.
+The phantom shape index `s` makes shape mismatches explicit at compile time.
 -/
 structure TensorRef (α : Type) (s : Shape) where
   /-- Node/leaf identifier in the owning session tape. -/

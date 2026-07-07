@@ -3,14 +3,15 @@ title: Examples
 usemathjax: true
 ---
 
-Use the examples by workflow. Start with a small model if you want to run TorchLean, use the graph
-and autograd pages if you want to understand the core machinery, and use the verification or Bug Zoo
-pages if you want to see how runtime artifacts become checked Lean objects.
+The examples are the runnable side of TorchLean: training a model, computing gradients, loading data,
+exporting weights, sampling images or text, and checking the claims that sit next to those runs. The
+first-pass links give a short route through the project; the cards below jump directly to a model
+family or verification workflow.
 
-## Start Here
+## First Pass
 
 <div class="workflow-list examples-start-list">
-  <a href="{{ '/docs/NN/Examples/Models.html' | relative_url }}">
+  <a href="{{ '/blueprint/Examples-and-Applications/Model-Examples-Deep-Dive/' | relative_url }}">
     <span>01</span>
     <strong>Run a model</strong>
     <em>MLP, CNN, text, diffusion, and RL examples with training loops and saved artifacts.</em>
@@ -35,6 +36,11 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     <strong>Study failure cases</strong>
     <em>Masks, normalization, losses, KV caches, token ids, batching, and float boundaries.</em>
   </a>
+  <a href="{{ '/blueprint/Verification-and-Certificates/Optimization-Theory/' | relative_url }}">
+    <span>06</span>
+    <strong>Study optimizer laws</strong>
+    <em>Muon certificates, orthogonalized update directions, and GaLore-style projected updates.</em>
+  </a>
 </div>
 
 ## Featured Examples
@@ -44,7 +50,7 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/graph-ir-bounds-new.png' | relative_url }}" alt="TorchLean graph IR to interval bounds example"/>
     <span class="showcase-body">
       <span class="showcase-title">Graph IR and Bounds</span>
-      <span class="showcase-text">Follow a small model as it becomes an op-tagged graph, then use that graph for shape checks, execution traces, and interval bounds.</span>
+      <span class="showcase-text">Follow a small model as it becomes a graph with named operations, then use that graph for shape checks, execution traces, and interval bounds.</span>
       <span class="showcase-link">Open guide page</span>
     </span>
   </a>
@@ -58,12 +64,12 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/Models.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Building-Models/Training-From-Scratch/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/supervised-training-new.png' | relative_url }}" alt="MLP and CNN training example"/>
     <span class="showcase-body">
       <span class="showcase-title">Supervised Training</span>
       <span class="showcase-text">Instantiate supervised models, build loaders, fit for multiple epochs or fixed steps, and save loss curves from the same Lean runner.</span>
-      <span class="showcase-link">Open model examples docs</span>
+      <span class="showcase-link">Open training guide</span>
     </span>
   </a>
 
@@ -89,7 +95,7 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/scientific-ml-new.png' | relative_url }}" alt="Scientific ML pipeline from Burgers data to FNO training and Lean checks"/>
     <span class="showcase-body">
       <span class="showcase-title">Scientific ML</span>
-      <span class="showcase-text">Prepare the Burgers dataset, train a 1D Fourier neural operator, export prediction artifacts, and connect PINN-style checks to Lean.</span>
+      <span class="showcase-text">Prepare the Burgers dataset, train a 1D Fourier neural operator, export prediction artifacts, and connect PDE residual checks to Lean.</span>
       <span class="showcase-link">Open scientific ML pipeline</span>
     </span>
   </a>
@@ -107,17 +113,17 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/float32-ieee-new.png' | relative_url }}" alt="Float32 and IEEE-754 checks example"/>
     <span class="showcase-body">
       <span class="showcase-title">Float32 and IEEE-754</span>
-      <span class="showcase-text">Compare real specifications, rounded `FP32` models, executable IEEE bit semantics, and runtime `Float32` bridge assumptions.</span>
+      <span class="showcase-text">Compare real specifications, rounded <code>FP32</code> models, executable IEEE bit semantics, and runtime <code>Float32</code> bridge assumptions.</span>
       <span class="showcase-link">Open floating-point guide</span>
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/Models/RL.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Examples-and-Applications/Reinforcement-Learning/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/reinforcement-learning-new.png' | relative_url }}" alt="Reinforcement learning examples"/>
     <span class="showcase-body">
       <span class="showcase-title">Reinforcement Learning</span>
       <span class="showcase-text">Run PPO on Lean-native and Gymnasium environments, then inspect the rollout, reward, and policy artifacts that enter training.</span>
-      <span class="showcase-link">Open RL example docs</span>
+      <span class="showcase-link">Open RL guide</span>
     </span>
   </a>
 
@@ -143,7 +149,7 @@ pages if you want to see how runtime artifacts become checked Lean objects.
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/verification-bounds-new.png' | relative_url }}" alt="IBP and alpha-CROWN verification example"/>
     <span class="showcase-body">
       <span class="showcase-title">IBP and CROWN Verification</span>
-      <span class="showcase-text">Attach input boxes to an IR graph, propagate interval or affine bounds, and check small external certificates through Lean. PINN examples use the same verification-facing artifact style.</span>
+      <span class="showcase-text">Attach input boxes to an IR graph, propagate interval or affine bounds, and check small external certificates through Lean. PINN examples use the same artifact-first style.</span>
       <span class="showcase-link">Open verification tutorial</span>
     </span>
   </a>
@@ -151,6 +157,18 @@ pages if you want to see how runtime artifacts become checked Lean objects.
 
 CUDA is opt-in. The build flags, runtime path, and agreement assumptions are explained in
 [GPU and CUDA]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+For the broader backend design, read
+[Backend Selection and Trust]({{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}).
 For long CUDA training runs, model commands also expose allocator telemetry through
 `--cuda-mem-watch N`; longer runs choose a small default cadence so device-memory behavior is visible
 while the example is running.
+
+The command registry is:
+
+```bash
+lake exe torchlean --help
+lake exe verify --help
+```
+
+Those commands are the live index of runnable entry points. The guide explains the ideas behind each
+path; the help output names the exact commands and flags.

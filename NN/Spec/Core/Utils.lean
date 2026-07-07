@@ -121,7 +121,7 @@ def expandLastDim {α : Type} {n : Nat} (t : Tensor α (.dim n .scalar)) :
 /-- Build a vector tensor from a list.
 
 PyTorch analogy: `torch.tensor(xs)` producing a 1D tensor. -/
-def fromList1d {α : Type} (xs : List α) : Tensor α (.dim xs.length .scalar) :=
+def vectorFromList {α : Type} (xs : List α) : Tensor α (.dim xs.length .scalar) :=
   Tensor.dim (fun i => Tensor.scalar (xs.get i))
 
 /-- Build a matrix tensor from a list of rows (strict validation).
@@ -131,7 +131,7 @@ It refuses empty input and refuses ragged rows, because that usually indicates a
 call site (e.g. an accidental missing column in imported weights).
 
 PyTorch analogy: `torch.tensor(xss)` will also error if `xss` is ragged. -/
-def fromList2d {α : Type} [Inhabited α] (xss : List (List α)) :
+def matrixFromRows {α : Type} [Inhabited α] (xss : List (List α)) :
     Option (Tensor α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar)))
       :=
   match xss with
@@ -168,7 +168,7 @@ This is useful when importing data that is naturally ragged, or when you intenti
 
 PyTorch analogy: this is closer to a manual `pad_sequence` + `torch.tensor`, except we do it
 directly as a tensor constructor at the spec layer. -/
-def fromList2dPadTo {α : Type} [Inhabited α] (nCols : Nat) (xss : List (List α)) :
+def matrixFromRowsPadTo {α : Type} [Inhabited α] (nCols : Nat) (xss : List (List α)) :
     Tensor α (.dim xss.length (.dim nCols .scalar)) :=
   Tensor.dim (fun i =>
     let row := xss.getD i.val []
@@ -178,8 +178,8 @@ def fromList2dPadTo {α : Type} [Inhabited α] (nCols : Nat) (xss : List (List �
 
 If `xss = []`, this returns a `0 x 0` tensor. Otherwise, the number of columns is
 `max_row_length xss` and shorter rows are padded with `default`. -/
-def fromList2dPadRight {α : Type} [Inhabited α] (xss : List (List α)) :
+def matrixFromRowsPadRight {α : Type} [Inhabited α] (xss : List (List α)) :
     Tensor α (.dim xss.length (.dim (maxRowLength xss) .scalar)) :=
-  fromList2dPadTo (nCols := maxRowLength xss) xss
+  matrixFromRowsPadTo (nCols := maxRowLength xss) xss
 
 end Spec

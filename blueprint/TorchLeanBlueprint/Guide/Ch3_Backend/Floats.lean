@@ -15,7 +15,7 @@ The numerical objects and their bridges need distinct names.
 
 # The Central Example
 
-The easiest example is a dot product. Suppose a model computes:
+A dot product shows the issue immediately. Suppose a model computes:
 
 $$`\sum_i w_i x_i`
 
@@ -23,20 +23,21 @@ Over the reals, this sum has one mathematical value. Over float32, the value als
 rounding after each operation, whether multiplication and addition are fused, and the order in which
 the sum is evaluated. On a GPU, a parallel reduction may use a different tree from a CPU loop.
 
-A useful theorem has to say which arithmetic it is about. It should state:
+A theorem about a floating-point computation has to say which arithmetic it is about. It should
+state:
 
 - which semantic scalar is used;
 - which reduction or operation order is used;
 - which finite/no-overflow side conditions are required;
 - and which theorem, checker, or runtime agreement connects the executed value to the proof value.
 
-That is the whole numeric discipline of this chapter.
+Those questions define the numeric discipline of the chapter.
 
 # Four Numeric Layers
 
 TorchLean separates four numerical layers:
 
-- *Real specification*: `ℝ` tensors and spec functions. This is the ideal mathematical model:
+- *Real specification*: `ℝ` tensors and spec functions. This ideal mathematical model describes
   networks, losses, and verifier inequalities before rounding.
 - *Rounded real proof model*: `FP32` / `NF`. This model performs real operations and rounds to the
   binary32 grid, which is the right setting for compositional error proofs.
@@ -47,7 +48,7 @@ TorchLean separates four numerical layers:
   tests, certificates, or assumptions.
 
 The first three layers are Lean definitions. The fourth layer is the implementation path, so claims
-about it require an agreement statement with the Lean-side model. That is how TorchLean can run real
+about it require an agreement statement with the Lean side model. TorchLean can then run real
 examples while still saying exactly which numerical object a theorem concerns.
 
 # Why Both `FP32` And `IEEE32Exec` Exist
@@ -55,14 +56,14 @@ examples while still saying exactly which numerical object a theorem concerns.
 `FP32` and `IEEE32Exec` answer different questions.
 
 `FP32` is the proof model. It is a rounded-real scalar: compute the real operation, round to the
-binary32 format, and keep an explicit error bound. This is the right level for layerwise forward
-error, verifier-margin transfer, and paper statements such as "the rounded execution stays within
-ε of the real specification."
+binary32 format, and keep an explicit error bound. Use this level for layerwise forward error,
+verifier-margin transfer, and paper statements such as "the rounded execution stays within ε of the
+real specification."
 
 `IEEE32Exec` is the executable bit model. It stores raw binary32 bits and implements IEEE-style
 behavior for the core operations, including signed zero, infinities, NaNs, comparisons, and
-special-value propagation. This is the right level for widgets, examples, edge-case tests, and checking
-what a binary32-shaped computation actually does.
+special-value propagation. Use this level for widgets, examples, edge-case tests, and checking what
+a binary32-shaped computation actually does.
 
 The bridge theorems connect the two on the finite path. That means the inputs and result decode to
 ordinary finite real values, and the operation-specific side conditions are satisfied. When a
@@ -107,9 +108,9 @@ open TorchLean.Floats.IEEE754
 #check Float32Bridge.RuntimeFloat32MatchesIEEE32Exec
 ```
 
-Read these names as the dependency graph. `F32` selects the scalar. `FP32` is the proof-side scalar.
+Read these names as the dependency graph. `F32` selects the scalar. `FP32` is the scalar used in proofs.
 `IEEE32Exec` is the executable scalar. `BridgeFP32` and `BridgeFP32Total` say how executable bits
-become proof-side rounded reals. `BridgeInitFloat32` names what remains if a claim uses Lean's
+become rounded reals in the proof model. `BridgeInitFloat32` names what remains if a claim uses Lean's
 runtime `Float32`.
 
 # A Single Addition At Four Levels
@@ -120,7 +121,7 @@ The same expression, `a + b`, has four different readings:
 - `FP32.add a b` is exact real addition rounded to the binary32 grid.
 - `IEEE32Exec.add x y` is executable binary32 bit arithmetic with IEEE-style special cases.
 - a runtime or CUDA add is a native implementation whose agreement is tested, checked, or assumed
-  against a Lean-side contract.
+  against a Lean side contract.
 
 The finite bridge theorem says the `IEEE32Exec` result agrees with the `FP32` rounded-real result
 when the finite hypotheses hold:
@@ -138,8 +139,33 @@ open TorchLean.Floats.IEEE754
 #check IEEE32Exec.toReal?_add_eq_ite
 ```
 
-That is the pattern for the rest of the chapter. Do not collapse the layers; connect them with a
+The pattern for the rest of the chapter is to keep the layers separate and connect them with a
 named theorem, checker, or runtime agreement.
+
+# Binary32 Is A Format, Not A Whole Execution Story
+
+IEEE 754 binary32 fixes the interchange format: one sign bit, eight exponent bits, twenty-three
+stored fraction bits, and an implicit leading bit for normal values. It also names the special
+values that make floating point unlike ordinary real arithmetic: signed zeros, subnormals,
+infinities, and NaNs. In the default round-to-nearest, ties-to-even mode, a correctly rounded
+primitive operation is the exact real result rounded once to that binary32 format.
+
+That sentence is already more precise than "float32", but it is still not the whole story for a
+neural-network run. A dot product also has an evaluation tree. A fused multiply-add rounds once,
+while a separate multiply followed by add rounds twice. A library call such as `expf` or a CUDA
+special-function approximation has a documented accuracy contract, not automatically the same
+contract as a primitive IEEE arithmetic operation. A verifier statement therefore cannot stop at
+"this is FP32"; it must say which computation produced the FP32 value.
+
+TorchLean's rule is:
+
+- use `IEEE32Exec` when the bit pattern and IEEE-style special cases are the object of study;
+- use `FP32` when the proof needs rounded-real error bounds on the finite path;
+- use a runtime or CUDA agreement assumption when the value came from Lean `Float32`, C/CUDA
+  `float`, ATen, cuBLAS, cuFFT, or libdevice.
+
+The standard supplies a vocabulary for binary32. The proof still has to identify the program,
+operation order, library boundary, and finite-path side conditions.
 
 # Reductions Need An Order
 
@@ -147,16 +173,37 @@ Real addition is associative. Floating-point addition is not. Therefore a theore
 sum, dot product, convolution accumulation, attention score, or CUDA reduction needs an order
 contract.
 
-TorchLean states reduction facts around a finite evaluation tree rather than pretending every
-parallel schedule is the same:
+TorchLean states reduction facts around a finite evaluation tree. Different parallel schedules can
+produce different rounded results, so the evaluation order is part of the statement:
 
 The [reductions API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Reductions.lean) contains the long-form theorem
-names for sum trees and dot products. The important reading rule is shorter than the names:
-soundness is stated for a specified finite evaluation tree, not for every possible reordering.
+names for sum trees and dot products. The reading rule is shorter than the names: soundness is
+stated for a specified finite evaluation tree, not for every possible reordering.
 
-This is the numerical reason CUDA reductions are discussed in the native-boundary chapter. A fast
-kernel may be a perfectly good training kernel, but a proof-quality statement needs a fixed tree or
-an explicit reduction specification.
+CUDA reductions appear in the native boundary chapter for this numerical reason. A fast kernel may
+be a perfectly good training kernel, but a proof-quality statement needs a fixed tree or an explicit
+reduction specification.
+
+# A Dot Product Written Two Ways
+
+For real numbers, the following two programs denote the same expression:
+
+```
+(((w0 * x0) + (w1 * x1)) + (w2 * x2)) + (w3 * x3)
+
+((w0 * x0) + (w1 * x1)) + ((w2 * x2) + (w3 * x3))
+```
+
+For binary32, they can differ. If the implementation uses fused multiply-adds, they can differ again:
+
+```
+fma w3 x3 (fma w2 x2 (fma w1 x1 (w0 * x0)))
+```
+
+All three are reasonable implementation strategies. They are not the same theorem target. A
+TorchLean statement about a dot product should therefore name the accumulation tree or cite the
+kernel contract that fixes it. The same principle applies to convolution sums, matrix
+multiplication, layer normalization, softmax denominators, and backward reductions.
 
 # Finite Path, Precisely
 
@@ -196,30 +243,29 @@ This reading is valid under the stated finite and operation specific hypotheses.
 
 # Transcendentals And Library Boundaries
 
-The proof-side `FP32` model defines transcendentals by applying the corresponding real function and
+The `FP32` proof model defines transcendentals by applying the corresponding real function and
 then rounding. Theorems such as `exp_abs_error`, `tanh_abs_error`, and interval membership lemmas
 are therefore statements relative to Lean's real functions.
 
-The executable and native stacks are different. A CPU `libm`, CUDA `libdevice`, or vendor library
-may provide an approximation with documented accuracy. TorchLean therefore keeps transcendental
-claims explicit:
+Executable Lean semantics and native library calls are different objects. A CPU `libm`, CUDA
+`libdevice`, or vendor library may provide an approximation with documented accuracy. TorchLean
+therefore keeps transcendental claims explicit:
 
-- use `FP32` / `NF` for proof-side rounded-real statements;
+- use `FP32` / `NF` for rounded real statements in Lean proofs;
 - use `IEEE32Exec` for deterministic executable behavior where the operation is defined in Lean;
 - use a runtime or CUDA contract when an external library computes the value.
 
-This is the same lesson emphasized by the floating-point verification literature: compiler,
-library, and hardware choices are part of the semantics unless they are isolated behind a proof or
-contract.
+The floating point verification literature makes the same point: compiler, library, and hardware
+choices are part of the semantics unless they are isolated behind a proof or contract.
 
 # Runtime And CUDA Boundaries
 
 Lean's runtime `Float32` operations are external runtime calls. Lean documents `Float` operations as
 IEEE-style opaque operations that do not reduce in the kernel and compile to C operators; the same
-general concern applies here. Runtime operations can be used, tested, and connected to Lean-side
+general concern applies here. Runtime operations can be used, tested, and connected to Lean side
 semantics through explicit agreement assumptions.
 
-TorchLean names that assumption surface:
+TorchLean names that assumption explicitly:
 
 ```
 import NN.Floats.IEEEExec.BridgeInitFloat32
@@ -235,7 +281,7 @@ open TorchLean.Floats.IEEE754.Float32Bridge
 
 The class says, operation by operation, that runtime float32 bits match the `IEEE32Exec` reference
 bits. Once that bridge is supplied, downstream proofs can reuse the `IEEE32Exec` and `FP32`
-theorems. Without it, a runtime result remains implementation evidence rather than a Lean-side
+theorems. Without it, a runtime result remains implementation evidence rather than a Lean side
 scalar statement.
 
 CUDA uses the same idea at the native boundary:
@@ -260,7 +306,7 @@ reduction specifications, and finite-path hypotheses.
 
 # Concrete Bit Patterns
 
-`IEEE32Exec` is useful because special values are concrete:
+`IEEE32Exec` makes special values concrete:
 
 ```
 import NN.Floats.IEEEExec.Exec32
@@ -277,7 +323,7 @@ def third32 : IEEE32Exec := IEEE32Exec.ofFloat (Float.ofBits 0x3fd5555555555555)
 ```
 
 For a visual inspection path, open the widget examples:
-[Widgets API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean), especially `#float32_view` and
+[Widgets source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean), especially `#float32_view` and
 `#float32_round_view`.
 
 # What The Claims Mean
@@ -299,7 +345,7 @@ Runtime agreement paths:
 - alternative rounding modes and exception flags not modeled by the current theorem path.
 
 That split is the claim. Native execution is part of the workflow, and TorchLean makes the agreement
-with Lean-side semantics small, named, and testable.
+with Lean side semantics small, named, and testable.
 
 # How To Choose The Right Layer
 
@@ -333,7 +379,7 @@ checker, or runtime agreement that connects it to the layer below.
   [FloatSpec package](https://reservoir.lean-lang.org/%40Beneficial-AI-Foundation/FloatSpec)
 - Gappa, for certified floating-point bounds and proof generation:
   [Gappa paper](https://arxiv.org/abs/0801.0523)
-- CompCert, for verified compilation including machine floating-point models:
+- CompCert, for verified compilation, including machine floating point models:
   [CompCert commented development](https://compcert.org/doc/)
 - NVIDIA, *Floating Point and IEEE 754*:
   [NVIDIA floating-point guide](https://docs.nvidia.com/cuda/pdf/Floating_Point_on_NVIDIA_GPU.pdf)

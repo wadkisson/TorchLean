@@ -34,7 +34,7 @@ Notes:
   wrappers live in `NN/Proofs/RL/*` (e.g. `NN/Proofs/RL/Gymnasium.lean`).
 
 References:
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
 - Trust-boundary contract: `NN.Runtime.RL.Boundary`.
 -/
 

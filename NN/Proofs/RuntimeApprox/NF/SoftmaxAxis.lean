@@ -13,7 +13,7 @@ public import NN.Proofs.RuntimeApprox.NF.Ops
 
 NF (rounded) backend: notes on *axis softmax*.
 
-TorchLean's NF proof stack provides end-to-end approximation bounds for the scalar
+TorchLean's NF proof files provide end-to-end approximation bounds for the scalar
 logistic helper used throughout the NF runtime layer and the autograd proofs.
 
 Important: the NF node named `softmax` below is the scalar logistic-like function

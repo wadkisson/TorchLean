@@ -154,12 +154,12 @@ open NN.Verification.TorchLean
                   simp [evalNode, hx, Bind.bind, Except.bind] at hv
                 cases hEq
             | ok tx =>
-                -- Domain discipline: `log` is undefined outside the positive domain. In Lean's
-                -- logic, `panic!` reduces to the default inhabitant, so `evalNode` returns
-                -- `if allSpec (0 < ·) tx then logSpec tx else default`.
-                simp [evalNode, hx, Bind.bind, Except.bind] at hv
-                cases hv
-                simp
+                by_cases hpos :
+                    Tensor.allSpec (α := α) (s := out) (fun v => decide (0 < v)) tx = true
+                · simp [evalNode, hx, hpos, Bind.bind, Except.bind] at hv
+                  cases hv
+                  simp
+                · simp [evalNode, hx, hpos, Bind.bind, Except.bind] at hv
         case inv x =>
             cases hx : getVal (α := α) (inShape := inShape) (ss := ss) (s := out) vals x with
             | error e =>

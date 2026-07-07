@@ -83,8 +83,8 @@ def byte : Tokenizer where
 /--
 Build a character-level tokenizer from an explicit alphabet.
 
-This is the TorchLean analogue of the `stoi/itos` tables used in character-level GPT examples
-(including Karpathy's "char-gpt" / minGPT walkthroughs): `encode` maps characters to ids
+The resulting `encode`/`decode` pair has the same role as the `stoi`/`itos` tables used in
+character-level GPT examples: `encode` maps characters to ids
 `0..alphabet.size-1`, and `decode` maps ids back to characters.
 
 Notes:
@@ -729,11 +729,11 @@ def writeGenerationTrainLog
     (log : _root_.Runtime.Training.LogDestination)
     (title : String)
     (steps : Nat)
-    (loss0 loss1 : Float)
+    (beforeLoss afterLoss : Float)
     (gen : GenerationOptions)
     (generated? : Option String := none)
     (extra : Array String := #[]) : IO Unit :=
-  Common.writeBeforeAfterLossLogTo log title steps loss0 loss1
+  Common.writeBeforeAfterLossLogTo log title steps beforeLoss afterLoss
     (generationNotes gen generated? extra)
 
 /-- Write a before/after loss log for a prompt-based text training command. -/
@@ -741,11 +741,11 @@ def writePromptTrainLog
     (log : _root_.Runtime.Training.LogDestination)
     (title : String)
     (steps : Nat)
-    (loss0 loss1 : Float)
+    (beforeLoss afterLoss : Float)
     (gen : PromptGenerationOptions)
     (generated? : Option String := none)
     (extra : Array String := #[]) : IO Unit :=
-  Common.writeBeforeAfterLossLogTo log title steps loss0 loss1
+  Common.writeBeforeAfterLossLogTo log title steps beforeLoss afterLoss
     (promptGenerationNotes gen generated? extra)
 
 /-- Shared "load one parameter pack, then sample" option surface. -/

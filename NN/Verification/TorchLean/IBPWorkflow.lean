@@ -65,7 +65,7 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
     [Runtime.Scalar α] : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   let params : nn.ParamTensors α paramShapes :=
-    nn.ParamTensors.of4
+    nn.ParamTensors.quad
       (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
         [cast 0.1, cast 0.2, cast 0.3, cast 0.4, cast 0.5, cast 0.6] (by rfl))
       (NN.Tensor.tensorNDOfLenEq (α := α) [3]
@@ -76,7 +76,7 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
         [cast 0.4] (by rfl))
 
   let compiled ←
-    match Verification.compileForward1 (α := α) model params with
+    match Verification.compileForward (α := α) model params with
     | .ok c => pure c
     | .error e => throw <| IO.userError e
 

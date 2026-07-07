@@ -44,7 +44,7 @@ export NN.API.nn.pure
   (linear rnn gru mamba lstm
    embedding learnedPositionalEmbedding sinusoidalPositionalEncoding rope
    relu silu gelu sigmoid tanh softmax sum flatten flattenBatch
-   flattenStart1 dropout flattenLinear
+   dropout flattenLinear
    conv2dCHWWith conv2dCHW conv2d convCHWWith convCHW conv
    maxPool2dWith maxPool2dCHW maxPool2d maxPoolWith maxPoolCHW maxPool
    avgPool2dWith avgPool2dCHW avgPool2d avgPoolWith avgPoolCHW avgPool
@@ -56,7 +56,7 @@ export NN.API.nn.pure
 namespace blocks
 
 export NN.API.nn.blocks
-  (Activation MLP mlp down2)
+  (Activation MLP mlp strideTwoOutput)
 
 @[inherit_doc NN.API.nn.blocks.ResNetBasicBlock]
 abbrev ResNetBasicBlockConfig := NN.API.nn.blocks.ResNetBasicBlock
@@ -117,8 +117,8 @@ abbrev ResNetBasicBlock {n inC h w : Nat} (cfg : blocks.ResNetBasicBlockConfig)
     M (Sequential
       (Shape.images n inC h w)
       (Shape.images n cfg.outC
-        (if cfg.downsample then blocks.down2 h else h)
-        (if cfg.downsample then blocks.down2 w else w))) :=
+        (if cfg.downsample then blocks.strideTwoOutput h else h)
+        (if cfg.downsample then blocks.strideTwoOutput w else w))) :=
   NN.API.nn.resnetBasicBlock (n := n) (inC := inC) (h := h) (w := w) cfg
 
 @[inherit_doc NN.API.nn.Linear]

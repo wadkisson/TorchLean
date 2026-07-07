@@ -27,7 +27,7 @@ python3 scripts/rl/export_gymnasium_rollout.py --env-id CartPole-v1 --steps 256 
 2. Open this file in an editor and put the cursor on the `#rl_boundary_rollout_file_view` command.
 
 The widget validates every transition against the contract and summarizes any violations. This is
-the trust boundary that sits between untrusted Python environments and Lean-side PPO code.
+the trust boundary that sits between untrusted Python environments and Lean side PPO code.
 -/
 
 open Spec Tensor

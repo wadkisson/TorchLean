@@ -464,7 +464,7 @@ lemma sum_spec_dim {n : Nat} {s : Shape} (t : Tensor ℝ (.dim n s)) :
 /--
 The real-analysis `Spec.dot` agrees with the backend-generic recursive dot.
 
-`Spec.dot` is defined as `sumSpec (mulSpec a b)`, which is the proof-facing version of the
+`Spec.dot` is defined as `sumSpec (mulSpec a b)`, which is the proof layer version of the
 PyTorch idiom `(a * b).sum()`.  `Proofs.TensorAlgebra.dot` is recursive over the tensor shape so it
 works over arbitrary semiring-like scalar models.  This bridge lets real proofs reuse generic
 algebra instead of repeating finite-sum rearrangements.

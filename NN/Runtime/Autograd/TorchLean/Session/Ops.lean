@@ -236,15 +236,15 @@ def concatVectors {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
 
 /-- Concatenate along the outermost dimension (dimension 0) (dispatches to eager vs compiled
   backend). -/
-def concatDim0 {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
+def concatLeadingAxis {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
   {n m : Nat} {sh : Shape}
   (a : _root_.Runtime.Autograd.Torch.TensorRef α (.dim n sh))
   (b : _root_.Runtime.Autograd.Torch.TensorRef α (.dim m sh)) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim (n + m) sh)) := do
   match s.impl with
-  | .eager sess => EagerSession.concatDim0 (α := α) sess (n := n) (m := m) (sh := sh) a b
+  | .eager sess => EagerSession.concatLeadingAxis (α := α) sess (n := n) (m := m) (sh := sh) a b
   | .compiled sess =>
-      _root_.Runtime.Autograd.Torch.Internal.SessionIR.concatDim0 (α := α) sess (n := n) (m := m)
+      _root_.Runtime.Autograd.Torch.Internal.SessionIR.concatLeadingAxis (α := α) sess (n := n) (m := m)
         (sh := sh) a b
 
 /--
@@ -252,15 +252,15 @@ Slice a contiguous `[start, start+len)` range from dimension 0.
 
 PyTorch analogy: `x[start:start+len]` for the first dimension.
 -/
-def sliceRange0 {α : Type} (s : Session α) [Zero α] [DecidableEq Shape]
+def sliceLeadingAxisRange {α : Type} (s : Session α) [Zero α] [DecidableEq Shape]
   {n : Nat} {sh : Shape}
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim n sh)) (start len : Nat) (h : len + start ≤
     n) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim len sh)) := do
   match s.impl with
-  | .eager sess => EagerSession.sliceRange0 (α := α) sess (n := n) (sh := sh) x start len h
+  | .eager sess => EagerSession.sliceLeadingAxisRange (α := α) sess (n := n) (sh := sh) x start len h
   | .compiled sess =>
-      _root_.Runtime.Autograd.Torch.Internal.SessionIR.sliceRange0 (α := α) sess
+      _root_.Runtime.Autograd.Torch.Internal.SessionIR.sliceLeadingAxisRange (α := α) sess
         (n := n) (sh := sh) x start len h
 
 /--

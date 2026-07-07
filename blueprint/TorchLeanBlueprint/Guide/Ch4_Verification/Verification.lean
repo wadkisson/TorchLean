@@ -40,9 +40,9 @@ A few names come up over and over in what follows:
 
 # A Map Of Claim Types
 
-TorchLean's verification support is easiest to read as a table of objects and support mechanisms:
+TorchLean's verification support is organized by object and support mechanism:
 
-- *Shape well formedness*: the object is `NN.IR.Graph`; the support is an executable structural
+- *Graph and shape checks*: the object is `NN.IR.Graph`; the support is an executable structural
   checker for node ids, parent ids, op arities, payloads, and output shapes.
 - *Compiler alignment*: the object is an IR graph and a compiled runtime graph; the support is a
   Lean theorem relating their denotations for a supported fragment.
@@ -50,19 +50,19 @@ TorchLean's verification support is easiest to read as a table of objects and su
   soundness theorem for interval propagation.
 - *CROWN certificate*: the object is affine lower and upper forms over a graph; the support is a
   replay checker or theorem fragment for the supported operators.
-- *Autograd correctness*: the object is a tape or graph; the support is a Lean theorem saying
-  backprop computes the adjoint derivative.
+- *Autograd correctness*: the object is a supported tape node or graph fragment; the support is a
+  Lean theorem saying the corresponding reverse-mode rule computes the intended adjoint derivative.
 - *Runtime approximation*: the object is a runtime tensor and a spec tensor; the support is a
   tolerance theorem.
-- *External α,β-CROWN artifact*: the object is a JSON leaf certificate; the support is structural
+- *External α,β-CROWN artifact*: the object is a JSON leaf artifact; the support is structural
   checking today, with stronger recomputation certificates as the natural next level.
 - *Scientific ML certificate*: the object is an ODE tube, PINN residual certificate, spline
   certificate, or controller artifact; the support is a checker plus a theorem pattern for that
   mathematical domain.
 
-The useful habit is to name the workflow and claim level. "Verified" should come with a noun:
-verified shape check, verified IR compilation theorem, verified IBP enclosure, verified imported
-certificate, or verified float32 transfer theorem.
+Name the workflow and claim level. "Verified" should come with a noun:
+verified shape check, verified IR compilation theorem, verified IBP enclosure, checked imported
+artifact, or verified float32 transfer theorem.
 
 # Three Theorem Shapes
 
@@ -88,8 +88,8 @@ $$`\operatorname{Check}(G,C)=\texttt{true}
 \quad\Longrightarrow\quad
 \operatorname{Sound}(G,C)`
 
-This is the pattern that makes external producers useful. A producer can search for `C`; Lean checks
-the finite object and applies the theorem attached to the checker.
+This division is what makes external producers fit the story. A producer can search for `C`; Lean
+checks the finite object and applies the theorem attached to the checker.
 
 # The Main Idea
 
@@ -98,7 +98,7 @@ The same graph serves several roles at once. A model is compiled to an explicit 
 on that graph; and theorems talk about the graph denotation rather than about an opaque execution
 trace.
 
-That gives us a useful vocabulary for the rest of the manual:
+The rest of the manual uses three words carefully:
 
 - `proved` means Lean has a theorem about a semantic object defined in Lean.
 - `checked` means Lean recomputes or structurally validates an imported artifact.
@@ -116,20 +116,20 @@ A good way to read TorchLean verification output is as a ladder:
    statement about the graph denotation.
 5. *A scalar bridge applies.* The theorem can be related to the runtime scalar path being claimed.
 
-The ladder is meant to prevent category mistakes. A CUDA training run supplies evidence about a
-runtime path. A graph soundness theorem supplies a mathematical statement about an IR denotation.
-An imported certificate checker supplies a statement about the artifact it accepts. Strong claims
-say which rungs were used.
+The ladder prevents category mistakes. A CUDA training run supplies evidence about a runtime path.
+A graph soundness theorem supplies a mathematical statement about an IR denotation. An imported
+certificate checker supplies a statement about the artifact it accepts. Strong claims say which
+rungs were used.
 
-This is the bridge between a PyTorch style API and verification mathematics that can be stated and
+The bridge matters because a familiar ML API can lead to verification mathematics that is stated and
 cited precisely.
 
 # Shared Semantic Target
 
-TorchLean is not just a verifier with a convenient front end. Runtime compilation and verification
-share one graph semantic target, the scalar semantics are explicit enough that floating point
-assumptions can be named rather than hand-waved, and certificate checking is separated into
-recompute-and-compare checks versus weaker structural checks of imported artifacts.
+Runtime compilation and verification share one graph semantic target. The scalar semantics are
+explicit enough that floating point assumptions can be named rather than hand-waved, and certificate
+checking is separated into recompute-and-compare checks versus weaker structural checks of imported
+artifacts.
 
 That perspective is why the examples cover several application families instead of a single minimal
 robustness case:
@@ -157,10 +157,10 @@ The repository uses two patterns:
   ODE corridors, PINN residual certificates, CROWN node certificates, or α,β-CROWN leaf artifacts
   and check a precise predicate inside Lean.
 
-That gives a clean division of labor. Python, Julia, CUDA, and external verifiers can search,
+The division of labor is clean. Python, Julia, CUDA, and external verifiers can search,
 train, optimize, and generate candidate artifacts. Lean checks the artifacts that have a specified
-format and theorem-backed meaning. If a workflow imports an external answer without recomputation
-or a proof-backed checker, the guide records the producer hypothesis as part of the claim.
+format and theorem support. If a workflow imports an external answer without recomputation or a
+proof backed checker, the producer hypothesis is part of the claim.
 
 # From Bug Case Studies To Verification Obligations
 
@@ -188,7 +188,7 @@ So the verification claim is layered:
 4. the native CUDA kernel remains an external implementation that must be tested or separately
    proved against the spec.
 
-This is our recurring habit: every strong claim should say which layer discharged it.
+The recurring habit is simple: every strong claim should say which layer discharged it.
 
 ## Reproducing The Geometry3D Detector Check
 
@@ -216,9 +216,9 @@ lake exe verify -- camera-box3d-cert _external/geometry3d/wilddet3d/wilddet3d_ca
 ```
 
 The WildDet3D group produces both an accepted projected-footprint certificate and a rejected strict
-model-bbox diagnostic. This is the important distinction: the detector can be useful, while its
-2D/3D glue claim is still checked after export instead of accepted because the tensor came from a
-large model.
+model-bbox diagnostic. The distinction matters: the detector may be a good producer, while its 2D/3D
+glue claim is still checked after export instead of accepted because the tensor came from a large
+model.
 
 ![WildDet3D model bbox versus projected 3D footprint](Guide/Assets/bug-zoo/geometry3d-wilddet3d-bbox-diagnostic.png)
 
@@ -235,6 +235,15 @@ the shared semantics is `NN.IR.Graph.denote` / `NN.IR.Graph.denoteAll`, and the 
 produce `PropState` artifacts such as IBP boxes and affine forms over that same IR.
 
 The implemented IBP and CROWN affine layer keeps `proved`, `checked`, and `assumed` distinct.
+
+The LiRPA literature uses the same conceptual split between an abstract bound object and the
+concrete network semantics. CROWN introduced efficient linear relaxations for general activations
+([Zhang et al., NeurIPS 2018](https://arxiv.org/abs/1811.00866)); `auto_LiRPA` generalized this style
+to computational graphs ([Xu et al., NeurIPS 2020](https://arxiv.org/abs/2002.12920)); β-CROWN
+adds branch-and-bound split constraints to bound propagation
+([Wang et al., NeurIPS 2021](https://arxiv.org/abs/2103.06624)). TorchLean's role is not to rename
+that literature. It is to expose which part of a LiRPA-style workflow is executable, which part is
+checked as an artifact, and which part is proved against `NN.IR.Graph` semantics.
 
 # IBP vs CROWN (What These Passes Actually Compute)
 
@@ -253,7 +262,7 @@ Informally, IBP says:
 > if each parent value lies inside its parent box, then the node value lies inside the box produced
 > by the IBP transformer for that op.
 
-This makes IBP inexpensive and robust, but also conservative. Over sufficiently deep nonlinear
+IBP is inexpensive and robust, but also conservative. Over sufficiently deep nonlinear
 composition, intervals can widen quickly.
 
 The key linear layer rule is sign splitting. For a row `y_i = sum_j W_ij x_j + b_i`, positive
@@ -264,8 +273,21 @@ while negative weights do the opposite. In a two input example with `x1 in [0, 1
 For ReLU, IBP uses monotonicity: if `y in [l, u]`, then `ReLU y` lies in
 `[max 0 l, max 0 u]`.
 
-That is sound and extremely simple. The limitation is that after this step the verifier has forgotten
+The rule is sound and extremely simple. The limitation is that after this step the verifier has forgotten
 which input directions made `y` large or small; it keeps only the interval endpoints.
+
+The local theorem shape in the proof layer is exactly this:
+
+```
+#check NN.MLTheory.CROWN.Graph.Theorems.Semantics.encloses
+#check NN.MLTheory.CROWN.Graph.Theorems.box_add_sound
+#check NN.MLTheory.CROWN.Graph.Theorems.box_sub_sound
+#check NN.MLTheory.CROWN.Graph.Theorems.box_relu_sound
+```
+
+These are local facts. The global IBP theorem later composes them over the graph. If an op does not
+have a local enclosure theorem for the semantics being claimed, an executable interval result for
+that op should be reported as executable support, not as a proved enclosure.
 
 ## CROWN / DeepPoly (Affine Bounds)
 
@@ -279,9 +301,8 @@ CROWN passes carry *affine* upper and lower bounds with respect to a designated 
 TorchLean stores these objects in flattened form for efficiency and reuse across operators. In
 spirit, that design is closest to the DeepPoly/ERAN style of verifier.
 
-The important difference from IBP is that CROWN keeps a symbolic linear envelope instead of only a
-box. A node is not merely "somewhere between `lo` and `hi`"; it is bounded by affine functions of
-the original input.
+CROWN keeps a symbolic linear envelope instead of only a box. A node is bounded by affine functions
+of the original input, rather than only by scalar lower and upper endpoints.
 
 For linear layers, we reuse the same sign-splitting idea, but we split against the parent affine
 lower and upper forms rather than against raw interval endpoints. The
@@ -294,8 +315,8 @@ we enclose it with lines. The standard upper line has slope `u / (u - l)` and pa
 `(l, 0)` and `(u, u)`. The lower line can be either `0` or `y`. For example, if `y in [-1, 2]`,
 the standard CROWN upper line has slope `2/3`.
 
-The lower line can be either `0` or `y`, both sound but useful in different downstream objectives.
-That small choice is the seed of α-CROWN.
+The lower line can be either `0` or `y`; both are sound, and each serves different downstream
+objectives. That small choice is the seed of α-CROWN.
 
 # A More Concrete Example: Certifying A Margin
 
@@ -311,13 +332,12 @@ CROWN instead can backpropagate the linear objective `logit_0 - logit_1` through
 bound that margin directly. If the affine margin lower bound evaluates to `0.15` on the input box,
 then every input in the perturbation box keeps class `0` ahead of class `1` by at least `0.15`.
 
-This is why CROWN methods matter: they can preserve correlations that interval methods
-erase.
+CROWN methods matter because they can preserve correlations that interval methods erase.
 
 # Worked Example: TorchLean, IR, and IBP (Tiny MLP)
 
 The simplest verification pipeline in TorchLean is easy to state: define a model with the
-TorchLean API, compile its forward pass to the canonical IR with operation tags (`NN.IR.Graph`), seed an
+TorchLean API, compile its forward pass to the canonical IR with named operations (`NN.IR.Graph`), seed an
 input uncertainty set, run a verifier pass such as IBP, and then read off the output bounds at the
 output node id.
 
@@ -351,7 +371,7 @@ def runOnce : IO Unit := do
       (tensorND! [1] [0.4])
 
   let compiled ←
-    match NN.Verification.TorchLean.compileForward1
+    match NN.Verification.TorchLean.compileForward
           (α := Float) (paramShapes := paramShapes) (inShape := Shape.vec 2) (outShape := Shape.vec 1)
           (nn.program (model := model) (α := Float)) params with
     | .ok c => pure c
@@ -380,7 +400,7 @@ Two TorchLean invariants are visible immediately:
 
 The key takeaway from the code sample is:
 
-- `compileForward1` makes the graph and its payload explicit,
+- `compileForward` makes the graph and its payload explicit,
 - `runIBP` reads that graph directly,
 - and the output bounds are only meaningful because both steps share the same semantics.
 
@@ -433,6 +453,21 @@ with the provided IBP pre-activation bounds:
 Then the ReLU transfer becomes exact for active/inactive neurons and falls back to the relaxation
 for unstable neurons.
 
+The scalar phase proof lives at the exact boundary where β evidence matters:
+
+```
+#check NN.MLTheory.CROWN.Cert.ReLUPhase
+#check NN.MLTheory.CROWN.Cert.phaseConsistentScalar?
+#check NN.MLTheory.CROWN.Cert.phaseRelaxUpperScalar
+#check NN.MLTheory.CROWN.Cert.phaseRelaxLowerScalar
+#check NN.MLTheory.CROWN.Proofs.phaseRelaxUpperScalar_sound
+#check NN.MLTheory.CROWN.Proofs.phaseRelaxLowerScalar_sound
+```
+
+The β value is not trusted as a label. It is checked against the IBP pre-activation interval and
+then interpreted by the phase relaxation theorem. That is why a split artifact can improve a bound
+without moving the branch-and-bound search procedure into Lean.
+
 That boundary is explicit. The full external search loop that chooses branches, optimizes α values,
 and prunes the tree is still outside the formal boundary. The imported artifact is checkable at the
 boundary we can state precisely: dimensions, graph ids, per node affine bounds, α vectors,
@@ -451,9 +486,9 @@ TorchLean.
 
 # More Worked Examples
 
-The fastest way to understand the verifier stack is to watch a few tiny networks go through the
-same logic used for larger graphs. These examples are compact; their value is that every
-production-scale claim is made of these same local steps plus induction over the graph.
+The fastest way to understand the verifier is to watch a few tiny networks go through the same
+logic used for larger graphs. These examples are compact; their value is that every production-scale
+claim is made of these same local steps plus induction over the graph.
 
 ## Example 1: IBP certifies a one-layer margin
 
@@ -467,7 +502,7 @@ IBP gives:
 
 The margin lower bound is `1.8 - 1.5 = 0.3`.
 
-So the verifier can certify class `0` over the whole input box. This is the simple case: the
+So the verifier can certify class `0` over the whole input box. In the simple case, the
 property is simple enough that interval endpoints are already decisive.
 
 ## Example 2: IBP can lose a true correlation
@@ -483,8 +518,8 @@ But if IBP bounds the logits separately, it gets:
 - `logit1 in [-0.1, 0.9]`,
 - margin lower bound `0 - 0.9 = -0.9`.
 
-That does not prove the property. Nothing is wrong with IBP; it is sound. The interval abstraction
-has discarded the fact that the same `x` appears in both logits. CROWN can keep the affine
+The property is undecided at this abstraction level. IBP remains sound; the interval abstraction has
+discarded the fact that the same `x` appears in both logits. CROWN can keep the affine
 dependency and bound the margin directly:
 
 For the margin objective, CROWN keeps the cancellation `x - (x - 0.1) = 0.1`.
@@ -508,7 +543,7 @@ interpolating lower slope `z >= alpha * y` with `0 <= alpha <= 1`.
 
 If we only need a lower bound on `z`, `alpha = 0` is often strongest on this box because it gives
 `z >= 0`. But downstream layers can flip signs or combine neurons, so the best α value is
-objective-dependent. That is why an external α optimizer can improve the final margin even though
+objective dependent. An external α optimizer can therefore improve the final margin even though
 every local α choice remains a simple line.
 
 ## Example 4: β splitting turns an unstable ReLU into exact cases
@@ -524,11 +559,11 @@ At the root box, `y in [-0.5, 0.5]`, so β must be `0` (unstable). Now split the
 On the left branch, β may say inactive (`beta = -1`) and the exact transfer is `z = 0`. On the
 right branch, β may say active (`beta = 1`) and the exact transfer is `z = y`.
 
-This is the branch-and-bound intuition behind β-CROWN. A loose triangle relaxation is not the end of
+The branch and bound intuition behind β-CROWN is that a loose triangle relaxation is not the end of
 the argument; the input space can be split until ambiguous ReLUs become exact on each leaf.
-TorchLean's current checker does not accept the split just because a JSON file says so. It checks
-the β phase against the branch's IBP pre-activation bounds, then applies the exact active/inactive
-transfer when the phase is consistent.
+TorchLean's current checker validates the split against the branch data. It checks the β phase
+against the branch's IBP pre-activation bounds, then applies the exact active/inactive transfer when
+the phase is consistent.
 
 ## Example 5: What a node certificate is proving locally
 
@@ -540,15 +575,29 @@ affine bounds.
 
 If yes, that node's certificate is accepted. If every node is accepted in topological order, and the
 graph is in the supported semantic fragment, the proof declarations can lift those local checks to a global
-enclosure theorem. That is the heart of the design: small local checks, then a graph soundness
-argument.
+enclosure theorem. The design is small local checks first, then a graph soundness argument.
+
+The global theorem names worth recognizing are:
+
+```
+#check NN.MLTheory.CROWN.Graph.CertSoundness.Supported
+#check NN.MLTheory.CROWN.Graph.CertSoundness.TopoSorted
+#check NN.MLTheory.CROWN.Graph.CertSoundness.cert_encloses_semantics
+#check NN.MLTheory.CROWN.Graph.CrownCertSoundness.crown_checker_encloses_semantics
+#check NN.MLTheory.CROWN.Graph.CrownCertSoundness.crown_checker_encloses_semantics_ieee32exec
+```
+
+The first theorem is the IBP-style graph enclosure theorem. The CROWN checker theorem is stated for
+a local step function with a transfer-soundness hypothesis, so plain CROWN, α-CROWN, and α,β-CROWN
+can share the global checker skeleton after their local transfer facts are supplied. The IEEE32Exec
+variant is a separate statement, not an automatic consequence of the real-valued theorem.
 
 # Pointers To Deeper Chapters
 
 The verification tree is broad, so the list below names areas that need their own careful reading
 path rather than being compressed into one verifier slogan:
 
-- `CROWN` as objective dependent backward reasoning, not only forward node by node affine bounds.
+- `CROWN` as objective dependent backward reasoning, beyond forward node by node affine bounds.
 - The difference between a per node recompute certificate and a branch and bound leaf artifact.
 - Which ops have proofs today versus only executable/debuggable support today.
 - How derivative bounds support PINN and ODE workflows.
@@ -568,7 +617,7 @@ ideas, but they answer different scientific questions.
 
 ## 1. Robustness and margin certification
 
-This is the most familiar verifier workflow for many ML readers:
+For many ML readers, this is the most familiar verifier workflow:
 
 - seed an input perturbation region,
 - propagate bounds through the network,
@@ -581,7 +630,7 @@ Relevant tools and examples:
 - `margin-cert`
 - `torchlean-ibp`
 
-This is the natural place to connect TorchLean to the adversarial-robustness literature and to the
+This section connects TorchLean to the adversarial-robustness literature and to the
 IBP / CROWN / LiRPA papers already cited below.
 
 ## 2. PINN residual bounds
@@ -597,12 +646,12 @@ The implementation is organized around the [PINN CLI](https://github.com/lean-do
 [PINN dataset checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/DatasetCheck.lean), and the commands
 `pinn-cli`, `pinn-cert`, and `pinn-dataset-check`.
 
-This is one of the clearest places where TorchLean's derivative-aware graph propagation is doing
-something more specialized than standard image-classifier robustness.
+Here TorchLean's derivative-aware graph propagation does something more specialized than standard
+image-classifier robustness.
 
 ## 3. ODE enclosure verification
 
-The ODE stack answers a different question again:
+The ODE verifier answers a different question again:
 
 > Does a neural network satisfy subsolution / supersolution style inequalities for a differential
 > equation over a region?
@@ -613,13 +662,13 @@ Useful declarations and tools:
 - [ODE verifier API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/ODE/Verify.lean)
 - CLI tool: `ode`
 
-This is also one of the places where the proof layer and the numerical layer meet most directly:
+Here the proof layer and the numerical layer meet directly:
 the executable checker runs over an explicit scalar backend, while the theorem interpretation
 depends on the selected floating-point semantics and runtime agreement.
 
 ## 4. External benchmark and ecosystem workflows
 
-Not every useful workflow in TorchLean starts from a model written natively in Lean.
+Not every TorchLean workflow starts from a model written natively in Lean.
 
 Relevant tools and examples:
 
@@ -632,9 +681,9 @@ without treating "imported JSON" as already a theorem.
 
 ## 5. Controller / Lyapunov two-stage workflows
 
-The Lyapunov and controller workflows are still more research-flavored than the smallest public examples,
-but they are important for understanding the paper's broader claim that the stack applies to
-dynamical systems as well as to classifier margins.
+The Lyapunov and controller workflows are still more research-flavored than the smallest public
+examples, but they carry the paper's broader claim: the same artifact/checker/proof discipline
+applies to dynamical systems as well as to classifier margins.
 
 Useful declarations:
 
@@ -693,8 +742,8 @@ pass populated the expected state.
 #check NN.IR.Graph.checkInferredShapes
 #check NN.IR.Check.wellFormed_iff
 #check NN.IR.Check.wellShaped_iff
-#check NN.Verification.TorchLean.Proved.compileForward1_wellFormed
-#check NN.Verification.TorchLean.Proved.evalCompiledForward1_eq_evalForward1
+#check NN.Verification.TorchLean.Proved.compileForward_wellFormed
+#check NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward
 ```
 
 # Supported Proved Fragment (Today)
@@ -710,8 +759,8 @@ TorchLean verification examples:
 - `.linear`, `.matmul` in the verifier dialect where weights live in `ParamStore`
 - `.tanh`, `.sigmoid`, `.sin`, `.cos`
 
-This list matters because it distinguishes a bound that is merely executable from one that is
-backed by the proof layer. Examples that use operators outside that fragment can still be run
+This list matters because it distinguishes an executable bound from one backed by the proof layer.
+Examples that use operators outside that fragment can still be run
 and inspected, but their outputs should not be treated as proof claims without extending the
 soundness development.
 
@@ -782,7 +831,7 @@ and the transfer can use the exact inactive rule `ReLU(y) = 0`.
 Different certificate formats support different claims.
 
 - A recompute and compare certificate says Lean can independently check a claimed bound artifact.
-- A structural certificate says Lean can verify shape and consistency conditions for an artifact.
+- A structural artifact says Lean can check shape and consistency conditions for an artifact.
 - A proof-backed certificate exports enough local evidence for Lean to connect acceptance to the
   graph semantics.
 
@@ -798,6 +847,22 @@ hypothesis for those bounds.
 
 The [α,β-CROWN leaf checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert/AbCrownLeafCert.lean) handles that boundary
 and is exposed through `lake exe verify -- abcrown-leaf`.
+
+## Trusted Boundary Table
+
+The table below is the short version auditors usually need:
+
+| Artifact | Lean checks | Lean theorem claim | Remaining boundary |
+|---|---|---|---|
+| `NN.IR.Graph` shape check | node ids, arities, payload shapes | graph is structurally meaningful | none about numerical semantics |
+| IBP pass on supported graph | boxes produced by Lean code | `cert_encloses_semantics` if hypotheses hold | scalar/backend agreement if claiming runtime behavior |
+| CROWN node certificate | local affine transfers match Lean recomputation | CROWN checker theorem for supported transfers | producer search for good slopes is not proved |
+| α,β-CROWN node certificate | α ranges, β phase consistency, affine transfer match | transfer soundness plus global checker theorem | external branch search not proved |
+| α,β-CROWN leaf artifact | JSON structure, nested boxes, exported prune witness | structural leaf condition | soundness of exported lower bounds unless recomputed |
+| CUDA/PyTorch runtime output | tests or explicit bridge artifacts | only if a bridge theorem applies | native kernel and library behavior |
+
+This table is intentionally conservative. A checked artifact is valuable, but it should not be
+described as a theorem about more objects than it actually names.
 
 # Runnable verification workflows today
 
@@ -854,7 +919,7 @@ default path.
 
 ## IR and compilation
 
-- Canonical graph with operation tags: [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
+- Canonical graph with named operations: [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
 - TorchLean forward compiler to IR: [compiler API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Compile.lean)
 - IR evaluation helpers: [TorchLean correctness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Correctness.lean)
 - Proved forward fragment: [proved compiler fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean)
@@ -873,7 +938,7 @@ they relate.
 ## CLI registry
 
 - Unified entrypoint: [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/CLI.lean)
-  - This is what `lake exe verify` runs.
+  - `lake exe verify` runs this entrypoint.
 
 ## Certificate checkers (JSON compare)
 
@@ -922,8 +987,8 @@ Informal theorem shape:
 > the op semantics, then the propagated boxes enclose the denotation of the whole graph (by
 > induction over node ids / topo order).
 
-This is the standard "local soundness + induction over a DAG" structure that scales as more ops
-are added.
+The proof uses the standard "local soundness + induction over a DAG" structure, which scales as more
+ops are added.
 
 Important caveat:
 Some operator enclosures, especially for transcendentals, are implemented as heuristics
@@ -948,7 +1013,7 @@ TorchLean is explicit about what is proved in Lean and what is checked as an ext
 - With an imported external certificate, Lean can check structural consistency; validating the bound
   computation requires the computation itself to be exported and checked as well.
 
-The certificate guide documents the current minimal JSON leaf certificate format (v0.1) used in the
+The certificate guide documents the current minimal JSON leaf-artifact schema (v0.1) used in the
 Two-Stage path.
 
 # Informal theorem shapes (for citations)
@@ -966,7 +1031,7 @@ In words (forward fragment only):
 > evaluating the compiled IR graph equals evaluating the forward program's spec evaluator.
 
 In code, look for the compile-forward theorem in the `Correctness` namespace. Its name starts with
-`evalCompiledForward1` and ends with `eq_evalForward1`.
+`runForwardIR` and ends with `eq_evalForward`.
 
 ## IBP Soundness Over the Graph Dialect (Supported Subset)
 
@@ -977,7 +1042,7 @@ In words:
 > If `runIBP` produces boxes for all nodes in a supported graph, then for any input `x` in the
 > seeded input box, the true denotation of every node lies within its IBP box.
 
-This is the main "interval bounds cover true values" theorem surface for the proved subset. The Lean source
+This theorem is the main statement behind "interval bounds cover true values" in the proved subset. The Lean source
 to cite is [graph certificate soundness](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean).
 
 ## Informal soundness statement (the one-liner)
@@ -1010,7 +1075,7 @@ Interpreted as a progression:
 - `cert_encloses_semantics` is the IBP enclosure theorem for the supported graph dialect;
 - `crown_checker_encloses_semantics` is the corresponding CROWN checker theorem;
 - `alphaCrown_transfer_sound` and `alphaBetaCrown_transfer_sound` are the transfer-soundness
-  theorems for connecting external α-CROWN / α,β-CROWN style artifacts to the Lean semantics.
+  theorems for connecting external α-CROWN / α,β-CROWN artifacts to the Lean semantics.
 
 ## Certificate Checking (External Artifact Boundary)
 
@@ -1020,16 +1085,17 @@ Reference declarations:
 
 In words:
 
-> If Lean accepts a leaf certificate artifact, then the leaf's stated prune/verified condition
-> holds under the certificate's declared semantics and any explicit oracle assumptions.
+> If Lean accepts a leaf artifact, then the represented leaf's stated prune/verified condition
+> passes TorchLean's structural checks under the artifact's declared fields and any explicit producer
+> assumptions.
 
-This is the intended shape for integrating external runs without treating them as already proved.
+Use this shape for integrating external runs without treating them as already proved.
 
 Two theorems that line up compilation and evaluation:
 
 ```
-#check NN.Verification.TorchLean.Proved.compileForward1_wellFormed
-#check NN.Verification.TorchLean.Proved.evalCompiledForward1_eq_evalForward1
+#check NN.Verification.TorchLean.Proved.compileForward_wellFormed
+#check NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward
 ```
 
 Related manual pages: *Graphs and IR* (IR definition), *Floating-Point Semantics* (scalar backends),

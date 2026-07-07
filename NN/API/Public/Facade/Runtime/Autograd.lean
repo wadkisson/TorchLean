@@ -31,69 +31,69 @@ export NN.API.autograd.model
 /--
 Pack explicit weight and bias tensors for the public `nn.linear` constructor.
 
-This is the parameter-side companion to `nn.linear inDim outDim seedW seedB`.
+Parameter-side companion to `nn.linear inDim outDim seedW seedB`.
 -/
 def linearParams {α : Type} {inDim outDim : Nat} {seedW seedB : Nat}
     (w : Tensor.T α (Shape.mat outDim inDim))
     (b : Tensor.T α (Shape.vec outDim)) :
     Params (nn.linear inDim outDim seedW seedB) α :=
-  nn.ParamTensors.of2 w b
+  nn.ParamTensors.pair w b
 
 /--
 Pack one tensor into the typed parameter/result container used by the public autograd APIs.
 -/
-def pack1 {α : Type} {s₁ : Shape} :
+def packSingleton {α : Type} {s₁ : Shape} :
     Tensor.T α s₁ → nn.ParamTensors α [s₁] :=
-  fun x => nn.ParamTensors.of1 x
+  fun x => nn.ParamTensors.singleton x
 
 /--
 Pack two tensors into the typed parameter/result container used by the public autograd APIs.
 -/
-def pack2 {α : Type} {s₁ s₂ : Shape}
+def packPair {α : Type} {s₁ s₂ : Shape}
     (x₁ : Tensor.T α s₁) (x₂ : Tensor.T α s₂) :
     nn.ParamTensors α [s₁, s₂] :=
-  nn.ParamTensors.of2 x₁ x₂
+  nn.ParamTensors.pair x₁ x₂
 
 /--
 Pack three tensors into the typed parameter/result container used by the public autograd APIs.
 -/
-def pack3 {α : Type} {s₁ s₂ s₃ : Shape}
+def packTriple {α : Type} {s₁ s₂ s₃ : Shape}
     (x₁ : Tensor.T α s₁) (x₂ : Tensor.T α s₂) (x₃ : Tensor.T α s₃) :
     nn.ParamTensors α [s₁, s₂, s₃] :=
-  nn.ParamTensors.of3 x₁ x₂ x₃
+  nn.ParamTensors.triple x₁ x₂ x₃
 
 /--
 Pack four tensors into the typed parameter/result container used by the public autograd APIs.
 -/
-def pack4 {α : Type} {s₁ s₂ s₃ s₄ : Shape}
+def packQuad {α : Type} {s₁ s₂ s₃ s₄ : Shape}
     (x₁ : Tensor.T α s₁) (x₂ : Tensor.T α s₂)
     (x₃ : Tensor.T α s₃) (x₄ : Tensor.T α s₄) :
     nn.ParamTensors α [s₁, s₂, s₃, s₄] :=
-  nn.ParamTensors.of4 x₁ x₂ x₃ x₄
+  nn.ParamTensors.quad x₁ x₂ x₃ x₄
 
 /-- Unpack a one-entry typed autograd parameter/result container. -/
-def unpack1 {α : Type} {s₁ : Shape}
+def unpackSingleton {α : Type} {s₁ : Shape}
     (xs : nn.ParamTensors α [s₁]) :
     Tensor.T α s₁ :=
-  nn.ParamTensors.unpack1 xs
+  nn.ParamTensors.unpackSingleton xs
 
 /-- Unpack a two-entry typed autograd parameter/result container. -/
-def unpack2 {α : Type} {s₁ s₂ : Shape}
+def unpackPair {α : Type} {s₁ s₂ : Shape}
     (xs : nn.ParamTensors α [s₁, s₂]) :
     Tensor.T α s₁ × Tensor.T α s₂ :=
-  nn.ParamTensors.unpack2 xs
+  nn.ParamTensors.unpackPair xs
 
 /-- Unpack a three-entry typed autograd parameter/result container. -/
-def unpack3 {α : Type} {s₁ s₂ s₃ : Shape}
+def unpackTriple {α : Type} {s₁ s₂ s₃ : Shape}
     (xs : nn.ParamTensors α [s₁, s₂, s₃]) :
     Tensor.T α s₁ × Tensor.T α s₂ × Tensor.T α s₃ :=
-  nn.ParamTensors.unpack3 xs
+  nn.ParamTensors.unpackTriple xs
 
 /-- Unpack a four-entry typed autograd parameter/result container. -/
-def unpack4 {α : Type} {s₁ s₂ s₃ s₄ : Shape}
+def unpackQuad {α : Type} {s₁ s₂ s₃ s₄ : Shape}
     (xs : nn.ParamTensors α [s₁, s₂, s₃, s₄]) :
     Tensor.T α s₁ × Tensor.T α s₂ × Tensor.T α s₃ × Tensor.T α s₄ :=
-  nn.ParamTensors.unpack4 xs
+  nn.ParamTensors.unpackQuad xs
 
 namespace OutputLoss
 
@@ -104,12 +104,12 @@ end OutputLoss
 
 end model
 
-namespace fn1
+namespace func
 
-export NN.API.autograd.fn1
+export NN.API.autograd.func
   (Fn jacfwd hessian vjp jacrev grad valueAndGradScalar)
 
-end fn1
+end func
 
 end autograd
 

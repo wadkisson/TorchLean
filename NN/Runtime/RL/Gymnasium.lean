@@ -22,7 +22,7 @@ The bridge has two layers:
   full observed transition validated by the trust-boundary contract.
 
 References:
-- Gymnasium API docs (reset/step, terminated vs truncated): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, terminated vs truncated): https://gymnasium.farama.org/
 - The original Gym API paper (background on the env interface): https://arxiv.org/abs/1606.01540
 - Gymnasium source repository (implementation reference): https://github.com/Farama-Foundation/Gymnasium
 - Trust-boundary rationale: see `NN.Runtime.RL.Boundary`.

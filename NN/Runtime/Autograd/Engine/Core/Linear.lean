@@ -132,13 +132,13 @@ Concatenate two tensors along dimension 0.
 
 PyTorch comparison: `torch.cat([a, b], dim=0)`.
 -/
-def concatDim0 {α : Type} [DecidableEq Shape]
+def concatLeadingAxis {α : Type} [DecidableEq Shape]
   {n m : Nat} {s : Shape} (t : Tape α) (aId bId : Nat) : Result (Tape α × Nat) := do
   let a ← requireValue (α := α) (t := t) (s := .dim n s) aId
   let b ← requireValue (α := α) (t := t) (s := .dim m s) bId
-  let y := Spec.Tensor.concatDim0Spec (α := α) (n := n) (m := m) (s := s) a b
+  let y := Spec.Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := s) a b
   let node : Node α :=
-    { name := some "concat_dim0"
+    { name := some "concat_leading_axis"
       value := AnyTensor.mk y
       requires_grad := true
       parents := [aId, bId]
@@ -158,11 +158,11 @@ Slice along dimension 0: `x[start : start+len]`.
 The proof argument `h` enforces bounds.
 PyTorch comparison: `x[start:start+len]` on tensors with a leading dimension.
 -/
-def sliceRange0 {α : Type} [Zero α] [DecidableEq Shape]
+def sliceLeadingAxisRange {α : Type} [Zero α] [DecidableEq Shape]
   {n : Nat} {s : Shape} (t : Tape α) (xId : Nat) (start len : Nat) (h : len + start ≤ n) :
   Result (Tape α × Nat) :=
   unary (α := α) (t := t) (σ := .dim n s) (τ := .dim len s)
-    "slice_range0" xId
+    "slice_leading_axis_range" xId
     (forward := fun x => Spec.sliceRangeSpec (α := α) (n := n) (s := s) x start len h)
     (backward := fun _x dLdz =>
-      Spec.Tensor.sliceRange0BackwardSpec (α := α) (n := n) (s := s) start len h dLdz)
+      Spec.Tensor.sliceLeadingAxisRangeBackwardSpec (α := α) (n := n) (s := s) start len h dLdz)

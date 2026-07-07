@@ -14,9 +14,8 @@ public import NN.Runtime.Autograd.Compiled.IRExec.Correctness
 This module collects proof-heavy targets for regular CI coverage while keeping
 the everyday build focused on the main library surface.
 
-The main target here is compiled IR execution correctness. Keeping it
-as a named CI import makes the proof surface explicit without forcing every
-developer build to elaborate the same targets.
+The main target here is compiled IR execution correctness. Keeping it as a named CI import makes
+the expensive proof targets visible without forcing every developer build to elaborate them.
 -/
 
 @[expose] public section

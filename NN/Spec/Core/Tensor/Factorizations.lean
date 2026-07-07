@@ -13,7 +13,7 @@ public import NN.Spec.Core.TensorReductionShape.LinearAlgebra
 # Matrix factorizations (spec layer)
 
 This file provides **real**, shape-indexed reference implementations of the two *exact, finite*
-matrix factorizations that classical / scientific-ML models (Gaussian processes, kernel ridge
+matrix factorizations that classical / scientific ML models (Gaussian processes, kernel ridge
 regression, PCA, least squares) depend on, and which were previously missing from the spec layer:
 
 - `choleskySpec`   — Cholesky factorization `A = L · Lᵀ` (lower-triangular `L`), proved for
@@ -108,12 +108,11 @@ attribute. The clean closure form is what the correctness proofs reason about; t
 is a strict, array-backed rewrite that the compiler runs instead, so `#eval` stays fast (the closure
 form re-evaluates prefixes exponentially in the interpreter).
 
-**This substitution is *trusted*, not verified.** No Lean theorem proves `choleskyColsFn = choleskyColsImpl`
-(etc.), so compiled `#eval`/runtime code executes the `…Impl` body while the proofs constrain only the
-closure body. The two are believed equal by construction (they transcribe the same recurrence), and the
-numeric examples in `NN/Examples/Factorization` are *evidence* the compiled path is correct — but they
-exercise the `…Impl` replacement, not the proof body, and are not a substitute for an equivalence proof.
-Anything proved about `choleskyFn`/`solveRidgeFn` therefore transfers to `#eval` output only modulo this
+**This substitution is a trusted runtime boundary.** Compiled `#eval`/runtime code executes the `…Impl`
+body while the proofs constrain the clean closure body. The two transcribe the same recurrence, and the
+numeric examples in `NN/Examples/Factorization` exercise the compiled path, but a future equivalence
+theorem should discharge this boundary explicitly. Anything proved about `choleskyFn`/`solveRidgeFn`
+therefore transfers to `#eval` output only modulo this
 unverified hook.
 -/
 

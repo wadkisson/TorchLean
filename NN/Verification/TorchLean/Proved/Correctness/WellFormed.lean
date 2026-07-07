@@ -11,7 +11,7 @@ public import NN.Verification.TorchLean.Proved.Compile
 /-!
 # Verified Forward Fragment: Graph Structure
 
-The structural part of compiler correctness: every graph produced by `compileVerifiedForward1`
+The structural part of compiler correctness: every graph produced by `compileVerifiedForward`
 satisfies the verifier IR well-formedness checks.
 -/
 
@@ -305,15 +305,15 @@ theorem wellFormed_push
       simpa [compileFGraph, c', id, n, ps', res] using hNext
 
 /--
-Graphs produced by `compileVerifiedForward1` satisfy the IR structural discipline (`Graph.wellFormed =
+Graphs produced by `compileVerifiedForward` satisfy the IR structural discipline (`Graph.wellFormed =
   true`).
 -/
-theorem compileVerifiedForward1_wellFormed
+theorem compileVerifiedForward_wellFormed
       {α : Type} [Context α]
       {paramShapes : List Shape} {inShape outShape : Shape}
       (p : Program α paramShapes inShape outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :
-    (compileVerifiedForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape :=
+    (compileVerifiedForward (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape :=
       outShape)
         p params).graph.wellFormed = true := by
     classical
@@ -325,7 +325,7 @@ theorem compileVerifiedForward1_wellFormed
       NN.IR.OpKind.minParents, NN.IR.OpKind.maxParents?]
   have hSize0 : c0.graph.nodes.size = (Ctx inShape []).length := by
     simp [c0, Ctx]
-  simpa [compileVerifiedForward1, c0, input] using
+  simpa [compileVerifiedForward, c0, input] using
       compileFGraph_wellFormed (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := [])
         (out := outShape)
         (g := p) (params := params) (c := c0) hSize0 hWF0

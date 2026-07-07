@@ -14,7 +14,7 @@ public import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
 
 Attention code has its own failure modes: mask polarity, head reshaping, Q/K/V layout, and KV-cache
 mismatches are easy to get wrong and hard to notice from accuracy tests alone. This file focuses on the
-mask part, because TorchLean already has a precise theorem stack for it.
+mask part, because TorchLean already has precise theorems for it.
 
 Here is the bug-shaped PyTorch pattern we want to rule out:
 

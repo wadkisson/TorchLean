@@ -74,11 +74,11 @@ namespace IntervalF32
 @[inline] def negInf : Float32 := Float32.ofBits (0xff800000 : UInt32)
 
 /-- Minimum of four runtime `Float32` values using Lean's runtime order. -/
-def min4 (a b c d : Float32) : Float32 :=
+def minOfFour (a b c d : Float32) : Float32 :=
   min (min a b) (min c d)
 
 /-- Maximum of four runtime `Float32` values using Lean's runtime order. -/
-def max4 (a b c d : Float32) : Float32 :=
+def maxOfFour (a b c d : Float32) : Float32 :=
   max (max a b) (max c d)
 
 /-- Naive endpoint addition; no directed rounding. -/
@@ -99,7 +99,7 @@ def mul (A B : IntervalF32) : IntervalF32 :=
   let p01 := A.lo * B.hi
   let p10 := A.hi * B.lo
   let p11 := A.hi * B.hi
-  ⟨min4 p00 p01 p10 p11, max4 p00 p01 p10 p11⟩
+  ⟨minOfFour p00 p01 p10 p11, maxOfFour p00 p01 p10 p11⟩
 
 /-- Conservative fallback interval `[-∞, +∞]`. -/
 @[inline] def whole : IntervalF32 := ⟨negInf, posInf⟩
@@ -126,7 +126,7 @@ def div (A B : IntervalF32) : IntervalF32 :=
     let p01 := A.lo / B.hi
     let p10 := A.hi / B.lo
     let p11 := A.hi / B.hi
-    ⟨min4 p00 p01 p10 p11, max4 p00 p01 p10 p11⟩
+    ⟨minOfFour p00 p01 p10 p11, maxOfFour p00 p01 p10 p11⟩
 
 end IntervalF32
 
@@ -157,11 +157,11 @@ namespace IntervalRat
 @[inline] def point (x : Rat) : IntervalRat := ⟨x, x⟩
 
 /-- Minimum of four rationals. -/
-def min4 (a b c d : Rat) : Rat :=
+def minOfFour (a b c d : Rat) : Rat :=
   min (min a b) (min c d)
 
 /-- Maximum of four rationals. -/
-def max4 (a b c d : Rat) : Rat :=
+def maxOfFour (a b c d : Rat) : Rat :=
   max (max a b) (max c d)
 
 /-- Exact interval addition over rationals. -/
@@ -182,7 +182,7 @@ def mul (A B : IntervalRat) : IntervalRat :=
   let p01 := A.lo * B.hi
   let p10 := A.hi * B.lo
   let p11 := A.hi * B.hi
-  ⟨min4 p00 p01 p10 p11, max4 p00 p01 p10 p11⟩
+  ⟨minOfFour p00 p01 p10 p11, maxOfFour p00 p01 p10 p11⟩
 
 /-- Boolean check that `outer` contains `inner`. -/
 def contains (outer inner : IntervalRat) : Bool :=

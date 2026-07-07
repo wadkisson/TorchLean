@@ -118,9 +118,9 @@ def nchwToTokens (cfg : VitConfig) : nn.LayerDef (vitConvOutShape cfg) (vitToken
 One-block ViT-style classifier.
 
 This is the constructor used by `torchlean vit`. Keeping it here makes the example a one-liner:
-`def mkModel := nn.models.vit1 cfg`.
+`def mkModel := nn.models.vit cfg`.
 -/
-def vit1 (cfg : VitConfig)
+def vit (cfg : VitConfig)
     (h_inC : cfg.inC ≠ 0 := by decide)
     (h_patchH : cfg.patchH ≠ 0 := by decide)
     (h_patchW : cfg.patchW ≠ 0 := by decide)

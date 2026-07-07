@@ -15,7 +15,7 @@ public import NN.Runtime.RL.Algorithms.PolicyGradient
 /-!
 # RL Algorithm Equations
 
-This umbrella collects the runtime-side equations for finite-action reinforcement-learning
+This umbrella collects the runtime layer equations for finite-action reinforcement-learning
 algorithms:
 
 - multi-armed bandits;

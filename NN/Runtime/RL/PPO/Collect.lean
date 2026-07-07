@@ -28,7 +28,7 @@ References:
 - Schulman et al., "Proximal Policy Optimization Algorithms" (2017): https://arxiv.org/abs/1707.06347
 - Schulman et al., "High-Dimensional Continuous Control Using Generalized Advantage Estimation"
   (2015): https://arxiv.org/abs/1506.02438
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
 -/
 
 @[expose] public section

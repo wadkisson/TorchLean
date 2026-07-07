@@ -54,7 +54,7 @@ training run.
 def loadCheckpointIfSome {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [Runtime.Scalar α] [DecidableEq Shape]
     (trainer : CrossEntropy σ τ)
-    (runner : NN.API.train.Advanced.Runner α trainer.task)
+    (runner : NN.API.train.Manual.Runner α trainer.task)
     (path? : Option System.FilePath) : IO Unit := do
   match path? with
   | none => pure ()
@@ -71,12 +71,12 @@ def saveCheckpointIfSome {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [Runtime.Scalar α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (trainer : CrossEntropy σ τ)
-    (runner : NN.API.train.Advanced.Runner α trainer.task)
+    (runner : NN.API.train.Manual.Runner α trainer.task)
     (path? : Option System.FilePath) : IO Unit := do
   match path? with
   | none => pure ()
   | some path =>
-      let ps ← Advanced.params (task := trainer.task) runner
+      let ps ← Manual.params (task := trainer.task) runner
       let psFTask ← paramsToFloatIO (α := α) ps
       let psFModel : ParamTensors Float (nn.paramShapes trainer.model) :=
         Eq.mp (by rw [CrossEntropy.taskParamShapes_eq (trainer := trainer)]) psFTask
@@ -87,42 +87,27 @@ def saveCheckpointIfSome {σ τ : Shape} {α : Type}
 /--
 Run a general cross-entropy trainer directly from a public `RunConfig`.
 
-This is the same direct runtime seam used by regression/classifier. The important part is what it
-does *not* do: it does not serialize the config back into CLI flags or expose a `Runner` callback to
-ordinary examples.
+Same direct runtime path used by regression/classifier trainers. It does *not* serialize the config
+back into CLI flags or expose a `Runner` callback to ordinary examples.
 -/
 def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
     (trainer : CrossEntropy σ τ) (run : RunConfig)
     (k : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
       [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α] →
-      NN.API.train.Advanced.Runner α trainer.task → IO β) :
+      NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO β := do
   let opts := run.toOptions
-  match run.dtype with
-  | .float =>
+  if opts.useGpu && run.dtype != .float then
+    throw <| IO.userError
+      "TorchLean.Trainer.trainSelectedCrossEntropy: CUDA execution currently requires dtype Float"
+  match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ => do
       let runner ←
-        NN.API.TorchLean.Trainer.instantiateWithOptions
-          (task := trainer.task) (α := Float) (opts := opts)
-      let out ← k (α := Float) runner
-      pure out
-  | _ =>
-      if opts.useGpu then
-        throw <| IO.userError
-          "TorchLean.Trainer.trainSelectedCrossEntropy: CUDA execution currently requires dtype Float"
-      let outRef : IO.Ref (Option β) ← IO.mkRef none
-      match (← NN.API.DType.withRuntime run.dtype (fun {α} _ _ _ _ => do
-          let runner ←
-            NN.API.TorchLean.Trainer.instantiateWithOptions
-              (task := trainer.task) (α := α) (opts := opts)
-          let out ← k (α := α) runner
-          outRef.set (some out))) with
-      | .ok () =>
-          let some out ← outRef.get
-            | throw <| IO.userError
-                "TorchLean.Trainer.trainSelectedCrossEntropy: internal error: run result was not initialized"
-          pure out
-      | .error msg => throw <| IO.userError msg
+        NN.API.TorchLean.Trainer.instantiateConfigured
+          (task := trainer.task) (α := α) (opts := opts)
+      k (α := α) runner)) with
+  | .ok out => pure out
+  | .error msg => throw <| IO.userError msg
 
 /--
 Shared cross-entropy training core for already-parsed public runtime settings.
@@ -135,12 +120,12 @@ def trainDatasetWithSelectedRunnerCore {σ τ : Shape} {β : Type} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (trainer : CrossEntropy σ τ)
-    (runner : NN.API.train.Advanced.Runner α trainer.task)
+    (runner : NN.API.train.Manual.Runner α trainer.task)
     (run : RunConfig) (data : Dataset σ τ)
     (opts : TrainOptions) (probes : List (Probe σ) := [])
     (afterTrain : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
-      NN.API.train.Advanced.Runner α trainer.task → IO β) :
+      NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO (CrossEntropy.TrainResult σ τ × β) := do
   loadCheckpointIfSome (α := α) trainer runner opts.loadParams?
   let dataset ← data.build (α := α)
@@ -150,7 +135,7 @@ def trainDatasetWithSelectedRunnerCore {σ τ : Shape} {β : Type} {α : Type}
     unless probes.isEmpty do
       IO.println title
       for probe in probes do
-        let yhat ← Advanced.predict (task := trainer.task) runner (probe.input (α := α))
+        let yhat ← Manual.predict (task := trainer.task) runner (probe.input (α := α))
         let expected :=
           match probe.expected with
           | some value => s!"  target={value}"
@@ -158,21 +143,21 @@ def trainDatasetWithSelectedRunnerCore {σ τ : Shape} {β : Type} {α : Type}
         let inputText := if probe.inputText.isEmpty then "" else s!" {probe.inputText}"
         IO.println s!"  {probe.name}:{inputText}{expected}  pred={Tensor.pretty yhat}"
 
-  NN.API.train.Advanced.Report.reportMeanLoss (task := trainer.task) runner dataset "before"
+  NN.API.train.Manual.Report.reportMeanLoss (task := trainer.task) runner dataset "before"
   reportProbes "predictions(before)"
 
   let cfg := opts.toTrainConfig run.optimizer
   let report ← NN.API.TorchLean.Trainer.trainDataset (task := trainer.task) runner cfg dataset
 
-  Advanced.evalMode (task := trainer.task) runner
-  NN.API.train.Advanced.Report.reportMeanLoss (task := trainer.task) runner dataset "after"
+  Manual.evalMode (task := trainer.task) runner
+  NN.API.train.Manual.Report.reportMeanLoss (task := trainer.task) runner dataset "after"
   reportProbes "predictions(after)"
   saveCheckpointIfSome (α := α) trainer runner opts.saveParams?
   let predict :=
     fun (xFloat : Tensor.T Float σ) => do
-      Advanced.evalMode (task := trainer.task) runner
+      Manual.evalMode (task := trainer.task) runner
       let x := Tensor.castFloat (Runtime.ofFloat (α := α)) xFloat
-      let yhat ← Advanced.predict (task := trainer.task) runner x
+      let yhat ← Manual.predict (task := trainer.task) runner x
       Tensor.toFloatIO yhat
   let predictBatch :=
     fun (xsFloat : List (Tensor.T Float σ)) => xsFloat.mapM predict
@@ -197,7 +182,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
     (opts : TrainOptions) (probes : List (Probe σ) := [])
     (afterTrain : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
-      NN.API.train.Advanced.Runner α trainer.task → IO β) :
+      NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO (CrossEntropy.TrainResult σ τ × β) := do
   withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ runner =>
     trainDatasetWithSelectedRunnerCore (α := α) trainer runner run data opts probes afterTrain)
@@ -229,10 +214,9 @@ Train with a runtime scalar that has already been selected by the caller.
 
 Call `trainer.train` when the scalar should be chosen from `trainer.runConfig.dtype`.
 This method exists for model-zoo dispatchers that already run inside a callback like
-`ModelZoo.runAnyOrFloatNoCast`: at that point Lean has a concrete scalar type `α`, not merely a
-`Runtime.DType` tag.  The important ergonomic point is that even these advanced examples still use
-the public trainer surface, so they do not have to open-code module creation, loss calls, or
-optimizer steps.
+`Runtime.runSelectedOrFloatSimple`: at that point Lean has a concrete scalar type `α`, not merely a
+`Runtime.DType` tag. Even these deep-dive examples still use the public trainer API, so they do not
+have to open-code module creation, loss calls, or optimizer steps.
 -/
 def trainSelected {σ τ : Shape} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
@@ -242,7 +226,7 @@ def trainSelected {σ τ : Shape} {α : Type}
     IO (CrossEntropy.TrainResult σ τ) := do
   let run := (trainer.runConfig.withOptions runtimeOpts)
   let runner ←
-    NN.API.TorchLean.Trainer.instantiateWithOptions
+    NN.API.TorchLean.Trainer.instantiateConfigured
       (task := trainer.task) (α := α) (opts := runtimeOpts)
   let (report, _) ← CrossEntropy.Internal.trainDatasetWithSelectedRunnerCore
     (α := α) trainer runner run data trainOpts probes
@@ -253,8 +237,8 @@ def trainSelected {σ τ : Shape} {α : Type}
 /--
 Train on an in-memory one-hot cross-entropy dataset using the trainer's attached runtime settings.
 
-This is the sequence-model implementation behind `trainer.train`: persistent runtime choices live on
-the trainer, while step/logging choices live on `TrainOptions`.
+Sequence-model implementation behind `trainer.train`: persistent runtime choices live on the
+trainer, while step/logging choices live on `TrainOptions`.
 -/
 def train {σ τ : Shape} (trainer : CrossEntropy σ τ)
     (data : Dataset σ τ) (opts : TrainOptions := {}) (probes : List (Probe σ) := []) :

@@ -226,7 +226,7 @@ def clampHuberMaskSpec {s : Shape}
 /-- Update a tensor at a (runtime) index path.
 
 The index path is interpreted outermost-first. Out-of-bounds indices leave the tensor unchanged.
-This is an executable convenience helper; most proof-facing code prefers total, shape-indexed access.
+This is an executable convenience helper; most proof layer code prefers total, shape-indexed access.
 -/
 def updateTensorSpec {α : Type} : ∀ {s : Shape}, Tensor α s → List Nat → α → Tensor α s
   | .scalar, .scalar _, [], new_val => .scalar new_val

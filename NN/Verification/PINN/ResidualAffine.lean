@@ -111,7 +111,7 @@ def mccormickLower (lx ux ly uy : Float) : (Float × Float × Float) :=
 
 /-- Evaluate an affine ax*u + ay*v + c on intervals u∈[ul,uh], v∈[vl,vh]
     to produce a numeric interval bound. -/
-def eval2OnBox (ax ay c ul uh vl vh : Float) : (Float × Float) :=
+def evalAffine2DOnBox (ax ay c ul uh vl vh : Float) : (Float × Float) :=
   let p1 := ax * ul + ay * vl + c
   let p2 := ax * ul + ay * vh + c
   let p3 := ax * uh + ay * vl + c
@@ -126,7 +126,7 @@ def eval2OnBox (ax ay c ul uh vl vh : Float) : (Float × Float) :=
     box up to `maxDepth` or until width ≤ `minWidth`. On each sub-box it calls
     the provided bounding function `boundOn` which must return (lo, hi).
     Returns the tightest global (min lo, max hi) across sub-boxes. -/
-def bnb1D (x eps : Float) (maxDepth : Nat) (minWidth : Float)
+def branchAndBound1D (x eps : Float) (maxDepth : Nat) (minWidth : Float)
    (boundOn : Float → Float → IO (Float × Float)) : IO (Float × Float) := do
   let rec go (a b : Float) (d : Nat) : IO (Float × Float) := do
     match d with

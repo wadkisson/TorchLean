@@ -13,7 +13,7 @@ public import NN.Verification.TorchLean.Correctness
 /-!
 # CompileExec
 
-TorchLean → shared IR → executable SSA graph (runtime-facing wrapper).
+TorchLean → shared IR → executable SSA graph (runtime layer wrapper).
 
 This module wraps the shared-IR compilation pipeline for runtime use:
 
@@ -60,13 +60,13 @@ Compile a TorchLean forward model (single distinguished input) to:
 - a concrete IR `Payload` (parameters/constants),
 - and an executable forward SSA graph (`ExecGraphData`).
 -/
-def compileForward1IRExec
+def compileForwardIRExec
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :
     Except String (CompiledIRExec α) := do
-  let c ← NN.Verification.TorchLean.compileForward1
+  let c ← NN.Verification.TorchLean.compileForward
     (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) model params
   let payload : NN.IR.Payload α :=
     NN.Verification.TorchLean.payloadOfParamStore (α := α) c.ps

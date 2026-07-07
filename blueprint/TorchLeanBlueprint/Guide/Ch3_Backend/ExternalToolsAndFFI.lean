@@ -9,8 +9,8 @@ tag := "external-tools-ffi"
 
 TorchLean is not trying to make Lean do every job. Python can train models and load checkpoints.
 Julia can run numerical search. Arb can produce high-precision interval evidence. CUDA can execute
-kernels. External verifiers can optimize bounds. The important question is what comes back to Lean
-and what Lean checks before using it.
+kernels. External verifiers can optimize bounds. The question is what comes back to Lean and what
+Lean checks before using it.
 
 The guiding pattern is producer and checker: external tools produce small artifacts; Lean checks
 the parts that have a stated contract.
@@ -38,22 +38,22 @@ the ecosystem layer:
 - how Julia can produce numeric or spline/PINN artifacts that Lean checks later;
 - how Arb through `python-flint` can produce high-precision interval evidence;
 - how C/CUDA FFI differs from subprocess integration;
-- how we decide what is proved, what is parsed, what is tested, and what is merely assumed.
+- how we decide what is proved, what is parsed, what is tested, and what remains an assumption.
 
-That distinction matters because TorchLean is designed to work with numerical ecosystems. Lean
-serves as the accountability layer; the other tools remain excellent at what they do, while the
-boundary stays explicit.
+That distinction matters because TorchLean often sits beside numerical tools rather than replacing
+them. Lean serves as the accountability layer; the other tools remain excellent at what they do,
+while the boundary stays explicit.
 
 # Two Kinds Of Boundary
 
 TorchLean uses two main external boundaries.
 
 The FFI path is direct and fast. Lean calls native symbols for CUDA buffers, kernels, cuBLAS, cuFFT,
-allocation, and finalizers. This is the right path for runtime execution.
+allocation, and finalizers. Use it for runtime execution.
 
 The subprocess path is slower but easier to audit. Lean launches Python, Julia, Arb, or a verifier,
-then reads JSON, stdout, or a file. This is the right path for certificate producers, data
-conversion, plotting, and external numeric search.
+then reads JSON, stdout, or a file. Use it for certificate producers, data conversion, plotting, and
+external numeric search.
 
 In practice:
 
@@ -61,7 +61,7 @@ In practice:
 - Subprocesses are for producers: PyTorch export, Arb interval queries, Julia spline fitting,
   Gymnasium environments, external verifiers, dataset conversion, and plotting.
 
-Both are useful. The question is which artifact returns to Lean and which contract Lean checks.
+Both paths matter. The question is which artifact returns to Lean and which contract Lean checks.
 
 # Producer Roles
 
@@ -148,7 +148,8 @@ operators fail closed. They do not get silently approximated as verified TorchLe
 Python also appears in:
 
 - data preparation scripts such as tiny Shakespeare, TinyStories, CIFAR, and FNO Burgers helpers;
-- plotting scripts, where Python renders outputs but does not prove anything about the model;
+- plotting scripts, where Python renders visual summaries while model claims come from the checked
+  artifact or theorem named by the workflow;
 - Gymnasium RL environments, where Lean checks observation shape, action count, reward parsing, and
   transition records against a `Runtime.RL.Boundary.Contract`;
 - external verification producers such as alpha,beta-CROWN / Two-Stage scripts that emit JSON
@@ -159,7 +160,7 @@ accepted.
 
 # Julia: Numeric Producers And Certificate Search
 
-Julia is useful when the producing side wants high performance numerical code, differential
+Julia fits the producer role when a workflow needs high performance numerical code, differential
 equation tooling, optimization, spline fitting, or GPU-heavy search. The wrapper stays thin and
 optional:
 
@@ -181,14 +182,14 @@ The trust rule is the same as for Python. A Julia script may fit a piecewise pol
 a candidate certificate, or produce PINN/spline residual data. Lean should then check the small
 certificate data it needs: cell domains, polynomial coefficients, interval bounds, residual
 inequalities, and shape conventions. Julia's optimizer, floating-point arithmetic, GPU scheduler,
-and package stack remain external evidence unless Lean checks the returned certificate.
+and package environment remain external evidence unless Lean checks the returned certificate.
 
 # Arb And python-flint
 
 Arb is the example where external numerical strength is genuinely valuable. Through `python-flint`,
-we can ask Arb/FLINT for rigorous ball-arithmetic enclosures at high precision. That is excellent
-evidence, especially for transcendental functions or interval experiments, but it is still an
-external oracle unless the returned certificate is independently checked in Lean.
+we can ask Arb/FLINT for rigorous ball-arithmetic enclosures at high precision. Those enclosures
+are strong evidence, especially for transcendental functions or interval experiments, but they are
+still external oracle results unless the returned certificate is independently checked in Lean.
 
 ```
 import NN.Floats.Arb
@@ -223,12 +224,12 @@ evidence, not Lean kernel proof.
 
 The C/CUDA FFI boundary sits below Python or Julia subprocesses. The native code does not
 usually return a neat JSON certificate; it mutates buffers, launches kernels, and hands Lean opaque
-external objects. That is why the CUDA contract is stricter about source maps, bit contracts, and
+external objects. The CUDA contract is therefore stricter about source maps, bit contracts, and
 regression tests.
 
-The useful declarations are the
+The declarations to read are the
 [trusted CUDA bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Trusted.lean),
-[buffer surface](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Buffer.lean),
+[buffer API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Buffer.lean),
 [native source map](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/NativeSources.lean),
 [float32 contract](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Float32Contract.lean), and
 [kernel specs](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/KernelSpec.lean).
@@ -241,7 +242,8 @@ guessing which `.cu` file owns it.
 
 There are several levels of "connected to Lean", and they should not be confused.
 
-- *Launched from Lean*: Lean starts a process or calls an FFI symbol. This is interface work.
+- *Launched from Lean*: Lean starts a process or calls an FFI symbol. The connection is at the
+  interface level.
 - *Parsed by Lean*: Lean successfully reads JSON, raw bits, or a buffer handle. This checks format.
 - *Shape-checked by Lean*: tensors, graphs, or observations match declared shapes and supported ops.
 - *Replay-checked by Lean*: Lean recomputes the artifact's local condition, such as a certificate
@@ -266,7 +268,7 @@ artifact is checked against the claim we are willing to state.
 # Where To Read Next
 
 - *GPU and CUDA Boundaries* for the native FFI version of this pattern.
-- *PyTorch Roundtrip* for Python graph and weight artifacts.
+- *PyTorch Round Trip* for Python graph and weight artifacts.
 - *Verification Certificates* and *Two-Stage Workflows* for external producer / Lean checker
   verification.
 - `TRUST_BOUNDARIES.md` for the current inventory of axioms, FFI code,

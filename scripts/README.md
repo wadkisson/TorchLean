@@ -24,7 +24,7 @@ Everything is organized by purpose:
 These scripts are used by the build, documentation, and local verification paths:
 
 - `checks/check.sh`
-- `checks/example_smoke.sh`
+- `checks/example_regression.sh`
 - `checks/cuda_sanitize_tests.sh`
 - `checks/cuda_profile_tests.sh`
 - `checks/check_case_collisions.py`
@@ -102,9 +102,9 @@ Generated locally:
 
 - `checks/check.sh`: local verification gate for `lake build`, `lake test`, `lake lint`,
   and optional CUDA / `NN.CI.All` checks.
-- `checks/example_smoke.sh`: sequential smoke test for the public `lake exe torchlean ...`
+- `checks/example_regression.sh`: sequential regression check for the public `lake exe torchlean ...`
   example surface. It audits every registered subcommand's `--help` path and runs compact
-  tutorial/interop examples; pass `--cuda` for a short real-CUDA model smoke set, or
+  tutorial/interop examples; pass `--cuda` for a short real-CUDA model regression set, or
   `--extended-cuda` for a broader one-step model-zoo CUDA run. Optional external-environment
   checks, such as ALE/Pong, live behind `--external-rl`.
 - `checks/cuda_sanitize_tests.sh`: CUDA sanitizer runner for the CUDA runtime test suite.
@@ -125,7 +125,7 @@ Useful commands:
 
 ```bash
 scripts/checks/check.sh --ci-all
-scripts/checks/example_smoke.sh
+scripts/checks/example_regression.sh
 scripts/checks/cuda_profile_tests.sh --both
 python3 scripts/checks/repo_lint.py --fail-on-warn
 python3 scripts/checks/dependency_audit.py --markdown /tmp/torchlean_dependency_audit.md --fail-on-error
@@ -157,7 +157,7 @@ python3 scripts/checks/check_case_collisions.py
 
 ## Documentation
 
-- `docs/build_site.sh`: rebuilds the generated API docs, the Verso guide (from the
+- `docs/build_site.sh`: rebuilds the DocGen declaration pages, the Verso guide (from the
   `blueprint/` package), dependency graph JSON, and homepage bundle.
 - `docs/polish_docgen.py`: post-processes DocGen HTML with the TorchLean landing page,
   navigation links, declaration legends, dependency-link rewrites, and site styling.
@@ -167,6 +167,10 @@ python3 scripts/checks/check_case_collisions.py
 `docs/build_site.sh` is the full site build: it rebuilds Lean modules, DocGen, the Verso guide,
 the dependency graph JSON, and the Jekyll site. To refresh only the graph artifact, run
 `checks/dependency_audit.py` directly.
+
+The dependency audit is a source-architecture check. Its graph is made from Lean imports, so it is
+the right tool for questions about layer boundaries and module ownership. It is not the graph IR
+used by TorchLean runtimes, and it is not a declaration-level proof-dependency extractor.
 
 ## Sandboxed Lean Checking
 
@@ -203,6 +207,8 @@ the checker.
   `verification/lirpa/export_attention_cert.py`, `verification/lirpa/export_gru_cert.py`,
   `verification/lirpa/export_crown_cert.py`: small deterministic LiRPA/CROWN certificate
   producers.
+- `verification/abcrown/export_leaf_artifact.py`: converts raw alpha-beta-CROWN-style terminal-domain dumps
+  into TorchLean's `abcrown_leaf_artifact_v0_1` JSON schema and can run the Lean checker.
 - `verification/robustness/train_digits_linear.py`: trains the tiny digits linear model used by
   robustness examples.
 - `verification/robustness/export_margin_cert.py`: writes logit-margin certificates consumed by

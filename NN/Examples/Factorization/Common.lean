@@ -11,10 +11,9 @@ public import NN.Spec.Core.Tensor.Factorizations
 /-!
 # Factorization examples — shared helpers
 
-Small `Float`-valued helpers used by the matrix-factorization examples (`Cholesky`, `QR`). These
-examples are *executable sanity checks*: each one reconstructs the original matrix from its factors and
-asserts (via `#eval`) that the maximum entrywise reconstruction error is below a tolerance, so the build
-fails if a factorization is wrong.
+Small `Float`-valued helpers used by the matrix-factorization examples (`Cholesky`, `QR`). Each
+example reconstructs the original matrix from its factors and asserts (via `#eval`) that the maximum
+entrywise reconstruction error is below a tolerance, so the build fails if a factorization is wrong.
 
 These run over `Float` (the executable 64-bit runtime scalar), which is the precision the
 factorizations target for Gaussian-process / kernel-method use.

@@ -12,6 +12,12 @@ PyTorch is the right default for broad, high-performance ML engineering. TorchLe
 question: what extra structure do we need when a model must be run, inspected, lowered to a graph,
 imported or exported, and connected to a formal claim?
 
+The useful comparison is therefore not "which library is better?" but "which library should own
+which part of the workflow?" PyTorch is excellent when the primary task is to train, debug, scale,
+profile, and deploy models in the existing Python ecosystem. TorchLean becomes useful when the model
+or artifact must also be a Lean object: something with typed shapes, named parameters, graph
+denotation, numerical semantics, and checkable Lean claims.
+
 # A Fair Comparison
 
 The short version is:
@@ -35,11 +41,16 @@ For the main design dimensions:
 - Floating point: PyTorch follows backend behavior. TorchLean names real, float32, executable
   IEEE-754, and native-runtime layers separately.
 
+That is why TorchLean is not a drop-in replacement for PyTorch. It does not try to match PyTorch's
+operator coverage, distributed training stack, profiler ecosystem, or deployment maturity. The
+tradeoff goes the other direction: for the supported fragments, TorchLean asks for more explicit
+structure so later code can state what was checked and what was proved.
+
 # Modules And Parameters
 
 In PyTorch, a model is usually an `nn.Module`. The module owns its parameters and buffers, and
-calling `model(x)` runs `forward` using that internal state. This is the right ergonomic choice for
-many training scripts.
+calling `model(x)` runs `forward` using that internal state. That ergonomic choice is exactly right
+for many training scripts.
 
 ```
 # PyTorch
@@ -75,9 +86,15 @@ Informally, the forward pass is a function of both the architecture and the para
 
 $$`\operatorname{forward}(\operatorname{architecture},\theta,x)=y`
 
-That is the first major difference. In PyTorch, `state_dict()` exposes the parameters when needed.
-In TorchLean, the parameter bundle is already part of the ordinary data path. This makes it easier
-for graph lowering, checkpoint exchange, and theorem statements to refer to the same weights.
+The first major difference is how visible the parameters are. In PyTorch, `state_dict()` exposes the
+parameters when needed. In TorchLean, the parameter bundle is already part of the ordinary data
+path, so graph lowering, checkpoint exchange, and theorem statements can refer to the same weights.
+
+This difference affects audits. In PyTorch, an audit often asks whether the `state_dict`, module
+definition, preprocessing code, and export script agreed. In TorchLean, the aim is to make that
+agreement a typed path: architecture plus payload plus input convention becomes the object consumed
+by graph lowering and verification. The agreement may still depend on an external import boundary,
+but the boundary is named.
 
 # Shapes And Types
 
@@ -98,6 +115,11 @@ runtime kernel is reached.
 
 That tradeoff is intentional. TorchLean gives up some of Python's dynamism in exchange for a
 stronger statement about the computations that do elaborate.
+
+The shape type is not a claim about performance, accuracy, or robustness. It is a static contract.
+It can rule out a large family of dimensional mistakes, but it does not prove that the labels are
+correct, that the dataset is representative, or that the model generalizes. TorchLean uses types for
+structural facts and separate checks or theorems for semantic facts.
 
 # Training And Autograd
 
@@ -124,7 +146,13 @@ PyTorch's autograd is mature, broad, and deeply optimized. TorchLean's advantage
 for supported fragments, the backward pass can be related to a Lean specification and the resulting
 artifacts can be inspected inside the same formal environment.
 
-For the public training surface, see the [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) and the
+This is a narrow claim. A successful TorchLean training run is still a runtime event, not a proof
+that the optimizer found a good model. A Lean theorem about a supported backward rule is a theorem
+about that rule's denotation, not a benchmark result. The value of putting training machinery near
+specifications is that a later proof can name the same parameter bundle, loss, graph, or derivative
+definition without translating through an informal diagram.
+
+For the public training API, see the [public API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean) and the
 [training runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train.lean).
 
 # Graphs And Verification
@@ -133,9 +161,16 @@ PyTorch has several graph-oriented tools, including tracing, FX, `torch.export`,
 pipelines. They are engineering tools for capture, transformation, optimization, and deployment.
 They are not, by themselves, Lean theorem statements about a model.
 
-TorchLean's graph path is designed for a different use case. A supported model can be lowered to
-[NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean), a graph whose nodes carry operation tags and a Lean denotation. Verifier
-passes and certificate checkers can then talk about that graph directly:
+This is not a criticism of those tools. PyTorch's
+[`torch.export`](https://docs.pytorch.org/docs/main/user_guide/torch_compiler/export.html) is
+captures a full graph representation of a PyTorch program for portable, Python-less execution
+contexts. That is a different contract from a Lean denotation. TorchLean can interoperate
+with external graph artifacts, but the formal claim eventually has to name a Lean object and the
+boundary through which the external artifact entered.
+
+TorchLean's graph path has a different target. A supported model can be lowered to
+[NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean), a graph whose nodes name their operations and have a Lean denotation.
+Verifier passes and certificate checkers can then talk about that graph directly:
 
 $$`\operatorname{NN.IR.Graph.denoteAll}(g,\theta,x)`
 
@@ -152,7 +187,7 @@ PyTorch remains valuable at the boundary. It has the ecosystem for large dataset
 checkpoints, distributed training, debugging tools, and deployment practices. TorchLean therefore
 supports interop, but it keeps the contract focused.
 
-The supported round-trip is family based:
+The supported round trip is family based:
 
 1. choose a known architecture family,
 2. agree on parameter names, order, and tensor shapes,
@@ -162,25 +197,35 @@ The supported round-trip is family based:
 
 The relevant APIs are [PyTorch export](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Export.lean),
 [PyTorch import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Import.lean), and the
-[round-trip examples](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch.lean). A narrow contract is easier to audit
+[round trip examples](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch.lean). A narrow contract is easier to audit
 and easier to connect to verification.
+
+Interop claims should be written at the right strength:
+
+- "The file was parsed" is an input/output claim.
+- "The names and shapes match this architecture family" is a structural check.
+- "The imported payload denotes the same function as the source module" requires a semantic bridge
+  for the supported operators and preprocessing convention.
+- "The deployed CUDA path implements the same function" is an additional runtime or proof boundary.
+
+TorchLean tries to make the first two straightforward and to expose the hypotheses needed for the
+last two.
 
 # Floating Point And Kernels
 
 PyTorch users normally rely on the behavior of the selected backend: CPU kernels, CUDA kernels,
-vendor libraries, compiler fusions, and device-specific floating-point choices. That is appropriate
-for practical ML engineering, but it leaves a verification question: which numeric semantics did the
-claim use?
+vendor libraries, compiler fusions, and device specific floating point choices. That default is
+sound engineering, but it leaves a verification question: which numeric semantics did the claim use?
 
 TorchLean names the relevant layers separately:
 
 - real valued specifications for clean mathematical statements,
-- proof side float32 models such as `FP32`,
+- float32 proof models such as `FP32`,
 - executable IEEE binary32 models such as `IEEE32Exec`,
 - native runtime kernels behind explicit assumptions.
 
-This separation does not make native kernels disappear from the trusted base. It makes the boundary
-precise. A theorem can say whether it is about real semantics, executable binary32 semantics, or a
+The separation does not make native kernels disappear from the trusted base. It makes the boundary
+precise: a theorem can say whether it is about real semantics, executable binary32 semantics, or a
 native backend related to those semantics by a stated bridge.
 
 # When To Use Which
@@ -195,4 +240,13 @@ contract, or when a verifier result should connect to a formal statement.
 A realistic workflow can use both. Train in PyTorch when that is the right engineering choice.
 Export a known architecture and payload. Import it into TorchLean. Inspect the graph. Check the
 certificate. State the remaining assumptions. TorchLean's contribution is the semantic layer around
-that workflow, not a claim that every training job should move into Lean.
+that workflow: the model, graph, payload, certificate, and theorem statement can be kept in one
+checked vocabulary.
+
+# References
+
+- Paszke et al., ["PyTorch: An Imperative Style, High-Performance Deep Learning Library"](https://arxiv.org/abs/1912.01703),
+  NeurIPS 2019.
+- PyTorch `torch.export` documentation: https://docs.pytorch.org/docs/main/user_guide/torch_compiler/export.html
+- ONNX project documentation: https://onnx.ai/
+- de Moura et al., ["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf), CADE 2015.

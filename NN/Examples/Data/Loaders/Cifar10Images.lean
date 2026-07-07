@@ -138,7 +138,7 @@ def usage : String :=
     , "  --batch N"
     , "  --lr LR"
     , "  --check-only"
-    , "  --dtype float|ieee32"
+    , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
     , "  --cpu | --cuda"
     ]

@@ -3,9 +3,28 @@
 This folder contains the TorchLean landing page and the small amount of glue that assembles the
 public site:
 
-- API docs under `/docs/` (built by DocGen4)
+- API reference under `/docs/` (built by DocGen4)
 - Verso guide (built from the `blueprint/` Lake package) under `/blueprint/`
 - Curated runnable examples under `/examples/` (a maintained Jekyll page)
+- Dependency and import graph pages under `/graphs/` and `/importgraph/`
+- Status/update notes under `/updates/`
+
+The source of truth is split deliberately. Edit the source that owns the idea, then rebuild the
+generated output:
+
+| Public page | Source to edit |
+| --- | --- |
+| Landing page | `home_page/index.md`, site CSS/JS/assets |
+| Getting started | `home_page/start/index.md` |
+| Examples pages | `home_page/examples/**/index.md` plus matching `NN/Examples/**` README/source |
+| Guide | `blueprint/TorchLeanBlueprint/Guide/**/*.lean` |
+| API reference | `NN/**/*.lean` module docstrings and declaration docstrings |
+| Graph pages | `home_page/graphs/index.md`, `scripts/checks/dependency_audit.py`, generated graph JSON |
+| CUDA page | `home_page/cuda/index.md` plus the guide's CUDA/trust-boundary chapters |
+| Trust/provenance claims | `TRUST_BOUNDARIES.md`, `THIRD_PARTY_NOTICES.md`, relevant checker README |
+
+Avoid editing generated HTML by hand. Regenerate `home_page/docs`, `home_page/blueprint`,
+`home_page/importgraph`, and `home_page/_site` from their sources.
 
 ## Local preview
 
@@ -30,14 +49,14 @@ bundle _2.3.14_ exec jekyll serve --config _config.yml,_config_dev.yml --port 40
 
 The public website expects a few generated directories under `home_page/`:
 
-- `home_page/docs/` (DocGen4 HTML API docs)
+- `home_page/docs/` (DocGen4 HTML API reference)
 - `home_page/blueprint/` (Verso guide HTML)
 - `home_page/graphs/dependency-audit.json` (module/import graph audit for the
   interactive dependency explorer)
 
 CI populates these via `.github/workflows/blueprint.yml`. To reproduce that locally:
 
-### API docs (DocGen4)
+### API Reference (DocGen4)
 
 ```bash
 cd ..
@@ -93,6 +112,40 @@ From the repo root:
 ```bash
 scripts/docs/build_site.sh
 ```
+
+That script rebuilds Lean modules, DocGen, the Verso guide, dependency graph artifacts, the import
+graph viewer, installs the Jekyll bundle, and writes `home_page/_site`.
+
+For a lighter pass after editing only Jekyll Markdown:
+
+```bash
+cd home_page
+bundle _2.3.14_ exec jekyll build --config _config.yml,_config_dev.yml
+```
+
+For a lighter pass after editing only the Verso guide:
+
+```bash
+cd blueprint
+lake exe blueprint-gen --output ../_out/blueprint
+cd ..
+python3 scripts/docs/polish_verso_guide.py --guide _out/blueprint/html-multi
+rm -rf home_page/blueprint
+mkdir -p home_page/blueprint
+cp -r _out/blueprint/html-multi/* home_page/blueprint/
+```
+
+## Site Review Checklist
+
+Before publishing a docs-heavy change, check:
+
+- the page explains what object is being discussed: model, graph, artifact, checker, or theorem;
+- runtime examples name their data path, command, and output artifacts;
+- verification pages name the predicate Lean recomputes and the producer boundary that remains;
+- CUDA/ATen/PyTorch text does not imply external backward or native kernels are proved unless a
+  theorem says so;
+- generated pages were rebuilt from source rather than edited directly;
+- `bundle _2.3.14_ exec jekyll build --config _config.yml,_config_dev.yml` succeeds.
 
 ## Troubleshooting (Common)
 

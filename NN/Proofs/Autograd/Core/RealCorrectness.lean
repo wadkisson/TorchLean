@@ -28,12 +28,12 @@ on top of `Spec.OpSpec.compose`.
 
 We keep two correctness developments:
 
-- `real_correctness.lean` (this file) specializes to `ℝ` and is the home for rules whose
-  definitions/proofs genuinely depend on real-analytic structure (e.g. smooth activations and
-  `exp/log`-style ops).
-- `semiring_correctness.lean` is backend-generic over a type `α` with `[CommSemiring α]`. It is
-  meant to instantiate to *exact* backends like `ℚ`, so it avoids assuming division, order, or
-  transcendental functions unless an op explicitly requires them.
+- `NN/Proofs/Autograd/Core/RealCorrectness.lean` (this file) specializes to `ℝ` and is the
+  home for rules whose definitions/proofs genuinely depend on real-analytic structure (e.g. smooth
+  activations and `exp/log`-style ops).
+- `NN/Proofs/Autograd/Core/SemiringCorrectness.lean` is backend-generic over a type `α` with
+  `[CommSemiring α]`. It is meant to instantiate to *exact* backends like `ℚ`, so it avoids assuming
+  division, order, or transcendental functions unless an op explicitly requires them.
 
 Keeping them separate prevents importing analysis-heavy assumptions into the semiring-generic proofs
 and keeps compilation dependencies smaller.
@@ -136,7 +136,8 @@ private theorem dot_elemwise_adjoint {s : Shape}
   dot (mulSpec dx df) δ = dot dx (mulSpec df δ) := by
   unfold dot
   -- Reduce to associativity of elementwise multiplication.
-  -- `mul_spec_assoc` is proved in `NN/Proofs/tensor.lean`.
+  -- `mul_spec_assoc` is provided by the tensor proof layer imported from
+  -- `NN/Proofs/Tensor/Basic.lean`.
   simp [mul_spec_assoc]
 
 -- Primitive operation correctness lemmas for the real-valued autograd semantics.
@@ -396,7 +397,8 @@ def linearCorrect {inDim outDim : Nat}
   correct := by
     intro x dx δ
     -- `linear_op.backward` ignores the input `x`, so the proof is purely linear-algebraic.
-    -- Use the adjoint lemma from `NN/Proofs/tensor.lean`.
+    -- Use the adjoint lemma from the tensor proof layer imported from
+    -- `NN/Proofs/Tensor/Basic.lean`.
     -- Our goal has dot with the arguments flipped compared to the lemma; use `dot_comm`.
     classical
     have hadj :=

@@ -143,6 +143,20 @@ COMMANDS: tuple[Command, ...] = (
         ),
     ),
     Command(
+        group="abcrown",
+        kind="bundled fixture",
+        description="Convert the compact raw alpha-beta-CROWN leaf dump and check it in Lean.",
+        argv=(
+            "python3",
+            str(SCRIPTS_DIR / "abcrown" / "export_leaf_artifact.py"),
+            "--input",
+            "NN/Examples/Verification/AbCrown/example_raw_leaf_dump.json",
+            "--out",
+            "_external/abcrown/leaf_artifact.json",
+            "--check",
+        ),
+    ),
+    Command(
         group="geometry3d-real",
         kind="local output",
         description="Run DETR + Depth Anything V2 on a real image, export a 3D-box cert, and check it in Lean.",
@@ -289,7 +303,7 @@ COMMANDS: tuple[Command, ...] = (
 def selected_commands(group: str) -> list[Command]:
     """Return commands matching a named regeneration group."""
     if group == "all-light":
-        groups = {"digits", "lirpa", "pinn-small"}
+        groups = {"abcrown", "digits", "lirpa", "pinn-small"}
         return [cmd for cmd in COMMANDS if cmd.group in groups]
     return [cmd for cmd in COMMANDS if cmd.group == group]
 
@@ -302,6 +316,7 @@ def main() -> None:
         default="all-light",
         choices=[
             "all-light",
+            "abcrown",
             "digits",
             "lirpa",
             "spline",

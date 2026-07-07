@@ -1,33 +1,37 @@
 # `NN.Spec.Module`
 
-This directory is TorchLean's module wrapper layer for the spec codebase.
+This directory is TorchLean's module-wrapper layer for the spec codebase. Most mathematical
+definitions live in `NN/Spec/Layers/` and `NN/Spec/Core/`; this folder packages selected specs into
+a uniform shape-indexed module interface:
 
-Most math lives in `NN/Spec/Layers/*` (pure layer specs) and `NN/Spec/Core/*` (tensors/shapes).
-Here we package selected layer specs into a uniform interface that records input/output shapes:
+```lean
+ModSpec.NNModuleSpec α inShape outShape
+```
 
-`ModSpec.NNModuleSpec α inShape outShape`
+That lets TorchLean compose blocks with `ModSpec.SpecChain`, attach export/pretty-printing
+metadata, and keep model-shaped specs close to the public `nn.Sequential` style without making the
+runtime the source of truth.
 
-That lets us:
+## Files
 
-- compose blocks with `ModSpec.SpecChain` (a shape safe `nn.Sequential` style chain), and
-- attach metadata (`kind`, `export_func`) for export and pretty printing tooling.
+- `SpecModule.lean`: `NNModuleSpec`, `SpecChain`, composition, and evaluation helpers.
+- `Activation.lean`: wrappers for ReLU, sigmoid, tanh, softmax, and related activations.
+- `Linear.lean`: linear layer wrappers and small sequence classifier helpers.
+- `Conv.lean`: convolution and transpose-convolution wrappers.
+- `Pooling.lean`, `GlobalPooling.lean`: pooling wrappers over image-like tensors.
+- `Normalization.lean`: layer norm and related normalization wrappers.
+- `Attention.lean`: scaled dot-product self-attention wrapper.
+- `Embedding.lean`: one-hot/numeric embedding wrapper.
+- `PositionalEncoding.lean`: learnable positional encodings.
+- `Rnn.lean`, `RnnModels.lean`, `LstmModels.lean`, `GruModels.lean`: recurrent wrappers and
+  recurrent model shapes.
+- `Dropout.lean`: deterministic inference and explicit-mask dropout wrappers.
+- `Flatten.lean`: flattening wrappers used by CNN/model-zoo specs.
+- `Gnn.lean`: compact graph-convolution wrapper.
+- `Autoencoder.lean`, `Seq2seq.lean`, `Resnet.lean`: larger neural model wrappers.
+- `LinearRegression.lean`, `LogisticRegression.lean`, `Svm.lean`, `DecisionTree.lean`,
+  `GradientBoostedTrees.lean`, `Pca.lean`, `Gmm.lean`, `Hmm.lean`: classical ML and probabilistic
+  model specs that share the same typed-tensor vocabulary.
 
-Files:
-
-- `spec_module.lean`: defines `NNModuleSpec` and `SpecChain` composition/evaluation helpers.
-- `activation.lean`: wrappers for common activations (ReLU/sigmoid/tanh/softmax).
-- `linear.lean`: linear layer wrappers and small sequence classifier helpers.
-- `conv2d.lean`: conv2d wrapper (single image `(C,H,W)` convention).
-- `conv_transpose2d.lean`: transpose conv wrapper (single image `(C,H,W)` convention).
-- `pooling.lean`: max/avg pooling wrappers (single image `(C,H,W)` convention).
-- `normalization.lean`: layer norm wrapper.
-- `attention.lean`: scaled dot-product self-attention wrapper.
-- `embedding.lean`: one hot embedding wrapper (purely numeric variant).
-- `positional_encoding.lean`: learnable positional encoding wrapper.
-- `rnn.lean`: RNN/LSTM/GRU wrappers (sequence forward with canonical zero initial state).
-- `dropout.lean`: deterministic dropout wrappers (inference-scale and explicit-mask variants).
-- `global_pooling.lean`: global avg/max pooling wrappers (flattened `(C)` outputs).
-- `gnn.lean`: a GCN style graph layer wrapper.
-- `decision_tree.lean`: a small non-neural baseline datatype and evaluator used by tree models.
-
-Note: The `kind`/`export_func` fields are metadata; they are not part of the mathematical meaning.
+The `kind` and `export_func` fields are metadata for tooling. They are not part of the mathematical
+meaning of a module. The meaning comes from the wrapped spec function and its input/output shapes.

@@ -87,9 +87,9 @@ def sampleWithSavedParams
   nn.withModel NN.Examples.Models.Sequence.Gpt2.model fun model => do
     -- The checkpoint boundary is shape-indexed: stale files fail before sampling starts.
     let paramsBits ← Checkpoint.loadModelParamBits model load.paramsPath
-    let compiled ← nn.compileOut model (α := Float)
+    let compiled ← model.compile (α := Float)
     let predict : NN.Examples.Models.Sequence.Gpt2.Predictor :=
-      fun x => pure <| nn.predict1 model compiled paramsBits x
+      fun x => pure <| compiled.forward paramsBits x
     let outIds ←
       NN.Examples.Models.Sequence.Gpt2.generateSampled predict load.prompt load.generate
         load.temperature load.topK load.seed load.repeatWindow load.repeatPenalty load.asciiOnly
@@ -104,7 +104,7 @@ def main (args : List String) : IO UInt32 := do
   if args.contains "--help" || args.contains "-h" then
     IO.println usage
     return 0
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := fun _ => s!"{exeName}: sample from saved params")
     (k := fun _opts rest => do
       let (load, rest) ← ModelZoo.orThrow exeName <|

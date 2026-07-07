@@ -12,6 +12,11 @@ public import NN.API.Public.Facade.NN
 # TorchLean Adapter Facade
 
 Parameter-efficient adapter operations exposed by the `NN` umbrella.
+
+Adapters change the parameterization of a model or layer.  They are not optimizers: the optimizer
+still acts on whichever adapter/base parameters the caller chooses to train.  For LoRA, the public
+the API here builds the low-rank delta and effective linear weight; freezing base weights and
+choosing an optimizer are separate training-loop decisions.
 -/
 
 @[expose] public section

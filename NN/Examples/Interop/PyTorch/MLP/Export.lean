@@ -41,22 +41,22 @@ inductive WeightKeyStyle where
   deriving DecidableEq, Repr
 
 /-- Key name for the first layer's weight tensor in a PyTorch `state_dict`. -/
-def w1Key : WeightKeyStyle → String
+def firstWeightKey : WeightKeyStyle → String
   | .linear => "fc1.weight"
   | .sequential => "layers.0.weight"
 
 /-- Key name for the first layer's bias tensor in a PyTorch `state_dict`. -/
-def b1Key : WeightKeyStyle → String
+def firstBiasKey : WeightKeyStyle → String
   | .linear => "fc1.bias"
   | .sequential => "layers.0.bias"
 
 /-- Key name for the second layer's weight tensor in a PyTorch `state_dict`. -/
-def w2Key : WeightKeyStyle → String
+def secondWeightKey : WeightKeyStyle → String
   | .linear => "fc2.weight"
   | .sequential => "layers.2.weight"
 
 /-- Key name for the second layer's bias tensor in a PyTorch `state_dict`. -/
-def b2Key : WeightKeyStyle → String
+def secondBiasKey : WeightKeyStyle → String
   | .linear => "fc2.bias"
   | .sequential => "layers.2.bias"
 
@@ -91,43 +91,43 @@ This returns *lines* (not a single string) so callers can splice it into larger 
 def generateMLPPyTorchClassLines (inDim hidDim outDim : Nat) (className : String) : List String :=
   [
     s!"class {className}(nn.Module):",
-    indent2 (s!"\"\"\"Multi-Layer Perceptron with {inDim} input, {hidDim} hidden, " ++
+    indentTwo (s!"\"\"\"Multi-Layer Perceptron with {inDim} input, {hidDim} hidden, " ++
       s!"{outDim} output dimensions\"\"\""),
-    indent2 "",
-    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indentTwo "",
+    indentTwo (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
-    indent4 "super().__init__()",
-    indent4 "self.input_dim = input_dim",
-    indent4 "self.hidden_dim = hidden_dim",
-    indent4 "self.output_dim = output_dim",
-    indent4 "",
-    indent4 "# Define layers",
-    indent4 "self.fc1 = nn.Linear(input_dim, hidden_dim)",
-    indent4 "self.relu = nn.ReLU()",
-    indent4 "self.fc2 = nn.Linear(hidden_dim, output_dim)",
-    indent4 "",
-    indent2 "def forward(self, x):",
-    indent4 "x = self.fc1(x)",
-    indent4 "x = self.relu(x)",
-    indent4 "x = self.fc2(x)",
-    indent4 "return x",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def input_shape(self):",
-    indent4 s!"return ({inDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def output_shape(self):",
-    indent4 s!"return ({outDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def layer_count(self):",
-    indent4 "return 3",  -- fc1, relu, fc2
-    indent4 "",
-    indent2 "@property",
-    indent2 "def operation_types(self):",
-    indent4 "return [\"Linear\", \"ReLU\", \"Linear\"]",
-    indent4 ""
+    indentFour "super().__init__()",
+    indentFour "self.input_dim = input_dim",
+    indentFour "self.hidden_dim = hidden_dim",
+    indentFour "self.output_dim = output_dim",
+    indentFour "",
+    indentFour "# Define layers",
+    indentFour "self.fc1 = nn.Linear(input_dim, hidden_dim)",
+    indentFour "self.relu = nn.ReLU()",
+    indentFour "self.fc2 = nn.Linear(hidden_dim, output_dim)",
+    indentFour "",
+    indentTwo "def forward(self, x):",
+    indentFour "x = self.fc1(x)",
+    indentFour "x = self.relu(x)",
+    indentFour "x = self.fc2(x)",
+    indentFour "return x",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def input_shape(self):",
+    indentFour s!"return ({inDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def output_shape(self):",
+    indentFour s!"return ({outDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def layer_count(self):",
+    indentFour "return 3",  -- fc1, relu, fc2
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def operation_types(self):",
+    indentFour "return [\"Linear\", \"ReLU\", \"Linear\"]",
+    indentFour ""
   ] ++
     generateGetModelInfoMethodLines className
       [ ("input_dim", "self.input_dim")
@@ -158,28 +158,28 @@ def generateMLPWithWeights {inDim hidDim outDim : Nat}
     "",
     "# Weight initialization functions",
     "def get_mlp_state_dict():",
-    indent2 "state_dict = {}",
-    indent2 s!"state_dict['{w1Key keyStyle}'] = torch.tensor({tensor2DToPy w1})",
-    indent2 s!"state_dict['{b1Key keyStyle}'] = torch.tensor({tensor1DToPy b1})",
-    indent2 s!"state_dict['{w2Key keyStyle}'] = torch.tensor({tensor2DToPy w2})",
-    indent2 s!"state_dict['{b2Key keyStyle}'] = torch.tensor({tensor1DToPy b2})",
-    indent2 "return state_dict",
-    indent2 "",
+    indentTwo "state_dict = {}",
+    indentTwo s!"state_dict['{firstWeightKey keyStyle}'] = torch.tensor({matrixTensorToPy w1})",
+    indentTwo s!"state_dict['{firstBiasKey keyStyle}'] = torch.tensor({vectorTensorToPy b1})",
+    indentTwo s!"state_dict['{secondWeightKey keyStyle}'] = torch.tensor({matrixTensorToPy w2})",
+    indentTwo s!"state_dict['{secondBiasKey keyStyle}'] = torch.tensor({vectorTensorToPy b2})",
+    indentTwo "return state_dict",
+    indentTwo "",
     "def load_mlp_weights(model):",
-    indent2 "state_dict = get_mlp_state_dict()",
-    indent2 "model.load_state_dict(state_dict)",
-    indent2 "return model",
-    indent2 "",
+    indentTwo "state_dict = get_mlp_state_dict()",
+    indentTwo "model.load_state_dict(state_dict)",
+    indentTwo "return model",
+    indentTwo "",
     "# Usage example",
     "if __name__ == \"__main__\":",
-    indent2 s!"model = {className}()",
-    indent2 "model = load_mlp_weights(model)",
-    indent2 s!"x = torch.randn(1, {inDim})  # batch_size=1, features={inDim}",
-    indent2 "y = model(x)",
-    indent2 "print(f\"Input shape: {x.shape}\")",
-    indent2 "print(f\"Output shape: {y.shape}\")",
-    indent2 "print(f\"Output: {y}\")",
-    indent2 "print(f\"Model info: {model.get_model_info()}\")"
+    indentTwo s!"model = {className}()",
+    indentTwo "model = load_mlp_weights(model)",
+    indentTwo s!"x = torch.randn(1, {inDim})  # batch_size=1, features={inDim}",
+    indentTwo "y = model(x)",
+    indentTwo "print(f\"Input shape: {x.shape}\")",
+    indentTwo "print(f\"Output shape: {y.shape}\")",
+    indentTwo "print(f\"Output: {y}\")",
+    indentTwo "print(f\"Model info: {model.get_model_info()}\")"
   ]
 
 /--
@@ -193,86 +193,86 @@ def generateMLPWithSoftmax {inDim hidDim outDim : Nat} (className : String := "M
   joinLines <|
   [generatePyTorchImports, ""] ++ [
     s!"class {className}(nn.Module):",
-    indent2 s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
-    indent2 "",
-    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indentTwo s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
+    indentTwo "",
+    indentTwo (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
-    indent4 "super().__init__()",
-    indent4 "self.input_dim = input_dim",
-    indent4 "self.hidden_dim = hidden_dim",
-    indent4 "self.output_dim = output_dim",
-    indent4 "",
-    indent4 "# Define layers",
-    indent4 "self.fc1 = nn.Linear(input_dim, hidden_dim)",
-    indent4 "self.relu = nn.ReLU()",
-    indent4 "self.fc2 = nn.Linear(hidden_dim, output_dim)",
-    indent4 "self.softmax = nn.Softmax(dim=1)",
-    indent4 "",
-    indent2 "def forward(self, x):",
-    indent4 "x = self.fc1(x)",
-    indent4 "x = self.relu(x)",
-    indent4 "x = self.fc2(x)",
-    indent4 "x = self.softmax(x)",
-    indent4 "return x",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def input_shape(self):",
-    indent4 s!"return ({inDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def output_shape(self):",
-    indent4 s!"return ({outDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def layer_count(self):",
-    indent4 "return 4",  -- fc1, relu, fc2, softmax
-    indent4 "",
-    indent2 "@property",
-    indent2 "def operation_types(self):",
-    indent4 "return [\"Linear\", \"ReLU\", \"Linear\", \"Softmax\"]"
+    indentFour "super().__init__()",
+    indentFour "self.input_dim = input_dim",
+    indentFour "self.hidden_dim = hidden_dim",
+    indentFour "self.output_dim = output_dim",
+    indentFour "",
+    indentFour "# Define layers",
+    indentFour "self.fc1 = nn.Linear(input_dim, hidden_dim)",
+    indentFour "self.relu = nn.ReLU()",
+    indentFour "self.fc2 = nn.Linear(hidden_dim, output_dim)",
+    indentFour "self.softmax = nn.Softmax(dim=1)",
+    indentFour "",
+    indentTwo "def forward(self, x):",
+    indentFour "x = self.fc1(x)",
+    indentFour "x = self.relu(x)",
+    indentFour "x = self.fc2(x)",
+    indentFour "x = self.softmax(x)",
+    indentFour "return x",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def input_shape(self):",
+    indentFour s!"return ({inDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def output_shape(self):",
+    indentFour s!"return ({outDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def layer_count(self):",
+    indentFour "return 4",  -- fc1, relu, fc2, softmax
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def operation_types(self):",
+    indentFour "return [\"Linear\", \"ReLU\", \"Linear\", \"Softmax\"]"
   ]
 
 /-- Line-based version of `generateMLPWithSoftmax` for script composition. -/
 def generateMLPWithSoftmaxLines {inDim hidDim outDim : Nat} (className : String) : List String :=
   [
     s!"class {className}(nn.Module):",
-    indent2 s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
-    indent2 "",
-    indent2 (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
+    indentTwo s!"\"\"\"Multi-Layer Perceptron with softmax output for classification\"\"\"",
+    indentTwo "",
+    indentTwo (s!"def __init__(self, input_dim: int = {inDim}, hidden_dim: int = " ++
       s!"{hidDim}, output_dim: int = {outDim}):"),
-    indent4 "super().__init__()",
-    indent4 "self.input_dim = input_dim",
-    indent4 "self.hidden_dim = hidden_dim",
-    indent4 "self.output_dim = output_dim",
-    indent4 "",
-    indent4 "# Define layers",
-    indent4 "self.fc1 = nn.Linear(input_dim, hidden_dim)",
-    indent4 "self.relu = nn.ReLU()",
-    indent4 "self.fc2 = nn.Linear(hidden_dim, output_dim)",
-    indent4 "self.softmax = nn.Softmax(dim=1)",
-    indent4 "",
-    indent2 "def forward(self, x):",
-    indent4 "x = self.fc1(x)",
-    indent4 "x = self.relu(x)",
-    indent4 "x = self.fc2(x)",
-    indent4 "x = self.softmax(x)",
-    indent4 "return x",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def input_shape(self):",
-    indent4 s!"return ({inDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def output_shape(self):",
-    indent4 s!"return ({outDim},)",
-    indent4 "",
-    indent2 "@property",
-    indent2 "def layer_count(self):",
-    indent4 "return 4",  -- fc1, relu, fc2, softmax
-    indent4 "",
-    indent2 "@property",
-    indent2 "def operation_types(self):",
-    indent4 "return [\"Linear\", \"ReLU\", \"Linear\", \"Softmax\"]"
+    indentFour "super().__init__()",
+    indentFour "self.input_dim = input_dim",
+    indentFour "self.hidden_dim = hidden_dim",
+    indentFour "self.output_dim = output_dim",
+    indentFour "",
+    indentFour "# Define layers",
+    indentFour "self.fc1 = nn.Linear(input_dim, hidden_dim)",
+    indentFour "self.relu = nn.ReLU()",
+    indentFour "self.fc2 = nn.Linear(hidden_dim, output_dim)",
+    indentFour "self.softmax = nn.Softmax(dim=1)",
+    indentFour "",
+    indentTwo "def forward(self, x):",
+    indentFour "x = self.fc1(x)",
+    indentFour "x = self.relu(x)",
+    indentFour "x = self.fc2(x)",
+    indentFour "x = self.softmax(x)",
+    indentFour "return x",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def input_shape(self):",
+    indentFour s!"return ({inDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def output_shape(self):",
+    indentFour s!"return ({outDim},)",
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def layer_count(self):",
+    indentFour "return 4",  -- fc1, relu, fc2, softmax
+    indentFour "",
+    indentTwo "@property",
+    indentTwo "def operation_types(self):",
+    indentFour "return [\"Linear\", \"ReLU\", \"Linear\", \"Softmax\"]"
   ]
 
 /--
@@ -336,15 +336,15 @@ def generateCompleteMLPExport {inDim hidDim outDim : Nat}
     "# MLP-specific utilities",
     ("def create_mlp_from_spec(input_dim: int, hidden_dim: int, output_dim: " ++
       "int, use_softmax: bool = False):"),
-    indent2 "\"\"\"Create an MLP model from specifications.\"\"\"",
-    indent2 "if use_softmax:",
-      indent4 s!"return {className}WithSoftmax(input_dim, hidden_dim, output_dim)",
-    indent2 "else:",
-      indent4 s!"return {className}(input_dim, hidden_dim, output_dim)",
-    indent2 "",
+    indentTwo "\"\"\"Create an MLP model from specifications.\"\"\"",
+    indentTwo "if use_softmax:",
+      indentFour s!"return {className}WithSoftmax(input_dim, hidden_dim, output_dim)",
+    indentTwo "else:",
+      indentFour s!"return {className}(input_dim, hidden_dim, output_dim)",
+    indentTwo "",
     "def mlp_parameter_count(input_dim: int, hidden_dim: int, output_dim: int) -> int:",
-    indent2 "\"\"\"Calculate the number of parameters in an MLP.\"\"\"",
-    indent2 "return input_dim * hidden_dim + hidden_dim + hidden_dim * output_dim + output_dim"
+    indentTwo "\"\"\"Calculate the number of parameters in an MLP.\"\"\"",
+    indentTwo "return input_dim * hidden_dim + hidden_dim + hidden_dim * output_dim + output_dim"
   ]
 
 end MLPPyTorch

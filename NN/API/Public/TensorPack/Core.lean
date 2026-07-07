@@ -15,11 +15,11 @@ Shape-indexed tensor packs and supervised-sample helpers used by the public API.
 
 Main declarations:
 - `NN.API.TensorPack`: the public typed tuple of tensors.
-- `NN.API.tensorpack.*`: fixed-arity constructors, projections, mapping, zipping, append, and split.
+- `NN.API.tensorpack.*`: typed-pack constructors, projections, mapping, zipping, append, and split.
 - `NN.API.sample.*`: supervised `(x, y)` samples and minibatch wrappers.
 
-This file is part of the public API layer.  The operations here are small wrappers around the
-checked tensor-pack representation; they do not introduce a second semantics for tensors or samples.
+The operations here are small wrappers around the checked tensor-pack representation; they do not
+introduce a second semantics for tensors or samples.
 -/
 
 @[expose] public section
@@ -33,28 +33,28 @@ abbrev TensorPack (α : Type) (shapes : List Spec.Shape) :=
 
 namespace tensorpack
 
-/-- Construct a 1-element tensor pack. -/
-abbrev mk1 {α : Type} {s : Spec.Shape} (x : Spec.Tensor α s) : TensorPack α [s] :=
-  TorchLean.tensorpack1 x
+/-- Construct a one-element tensor pack. -/
+abbrev singleton {α : Type} {s : Spec.Shape} (x : Spec.Tensor α s) : TensorPack α [s] :=
+  TorchLean.tensorpackSingleton x
 
-/-- Construct a 2-element tensor pack. -/
-abbrev mk2 {α : Type} {s₁ s₂ : Spec.Shape}
+/-- Construct a two-element tensor pack. -/
+abbrev pair {α : Type} {s₁ s₂ : Spec.Shape}
     (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂) :
     TensorPack α [s₁, s₂] :=
-  TorchLean.tensorpack2 x₁ x₂
+  TorchLean.tensorpackPair x₁ x₂
 
-/-- Construct a 3-element tensor pack. -/
-abbrev mk3 {α : Type} {s₁ s₂ s₃ : Spec.Shape}
+/-- Construct a three-element tensor pack. -/
+abbrev triple {α : Type} {s₁ s₂ s₃ : Spec.Shape}
     (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂) (x₃ : Spec.Tensor α s₃) :
     TensorPack α [s₁, s₂, s₃] :=
-  TorchLean.tensorpack3 x₁ x₂ x₃
+  TorchLean.tensorpackTriple x₁ x₂ x₃
 
-/-- Construct a 4-element tensor pack. -/
-abbrev mk4 {α : Type} {s₁ s₂ s₃ s₄ : Spec.Shape}
+/-- Construct a four-element tensor pack. -/
+abbrev quad {α : Type} {s₁ s₂ s₃ s₄ : Spec.Shape}
     (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂)
     (x₃ : Spec.Tensor α s₃) (x₄ : Spec.Tensor α s₄) :
     TensorPack α [s₁, s₂, s₃, s₄] :=
-  TorchLean.tensorpack4 x₁ x₂ x₃ x₄
+  TorchLean.tensorpackQuad x₁ x₂ x₃ x₄
 
 /-- Map each tensor entry (shape-preserving). -/
 def map {α β : Type} (f : ∀ {s : Spec.Shape}, Spec.Tensor α s → Spec.Tensor β s) :
@@ -85,42 +85,42 @@ def split {α : Type} :
       (.cons x xs₁, xs₂)
 
 /-- First element of a non-empty tensor pack. -/
-def get0 {α : Type} {s : Spec.Shape} {ss : List Spec.Shape} :
+def first {α : Type} {s : Spec.Shape} {ss : List Spec.Shape} :
     TensorPack α (s :: ss) → Spec.Tensor α s
   | .cons x _ => x
 
 /-- Second element of a tensor pack with at least two entries. -/
-def get1 {α : Type} {s₀ s₁ : Spec.Shape} {ss : List Spec.Shape} :
+def second {α : Type} {s₀ s₁ : Spec.Shape} {ss : List Spec.Shape} :
     TensorPack α (s₀ :: s₁ :: ss) → Spec.Tensor α s₁
   | .cons _ (.cons x _) => x
 
 /-- Third element of a tensor pack with at least three entries. -/
-def get2 {α : Type} {s₀ s₁ s₂ : Spec.Shape} {ss : List Spec.Shape} :
+def third {α : Type} {s₀ s₁ s₂ : Spec.Shape} {ss : List Spec.Shape} :
     TensorPack α (s₀ :: s₁ :: s₂ :: ss) → Spec.Tensor α s₂
   | .cons _ (.cons _ (.cons x _)) => x
 
 /-- Fourth element of a tensor pack with at least four entries. -/
-def get3 {α : Type} {s₀ s₁ s₂ s₃ : Spec.Shape} {ss : List Spec.Shape} :
+def fourth {α : Type} {s₀ s₁ s₂ s₃ : Spec.Shape} {ss : List Spec.Shape} :
     TensorPack α (s₀ :: s₁ :: s₂ :: s₃ :: ss) → Spec.Tensor α s₃
   | .cons _ (.cons _ (.cons _ (.cons x _))) => x
 
 /-- Unpack a one-element tensor pack. -/
-def unpack1 {α : Type} {s : Spec.Shape} :
+def unpackSingleton {α : Type} {s : Spec.Shape} :
     TensorPack α [s] → Spec.Tensor α s
   | .cons x .nil => x
 
 /-- Unpack a two-element tensor pack into a Lean pair. -/
-def unpack2 {α : Type} {s₁ s₂ : Spec.Shape} :
+def unpackPair {α : Type} {s₁ s₂ : Spec.Shape} :
     TensorPack α [s₁, s₂] → (Spec.Tensor α s₁ × Spec.Tensor α s₂)
   | .cons x₁ (.cons x₂ .nil) => (x₁, x₂)
 
 /-- Unpack a three-element tensor pack into a Lean triple. -/
-def unpack3 {α : Type} {s₁ s₂ s₃ : Spec.Shape} :
+def unpackTriple {α : Type} {s₁ s₂ s₃ : Spec.Shape} :
     TensorPack α [s₁, s₂, s₃] → (Spec.Tensor α s₁ × Spec.Tensor α s₂ × Spec.Tensor α s₃)
   | .cons x₁ (.cons x₂ (.cons x₃ .nil)) => (x₁, x₂, x₃)
 
-/-- Unpack a four-element tensor pack into a Lean 4-tuple. -/
-def unpack4 {α : Type} {s₁ s₂ s₃ s₄ : Spec.Shape} :
+/-- Unpack a four-element tensor pack into a Lean tuple. -/
+def unpackQuad {α : Type} {s₁ s₂ s₃ s₄ : Spec.Shape} :
     TensorPack α [s₁, s₂, s₃, s₄] →
       (Spec.Tensor α s₁ × Spec.Tensor α s₂ × Spec.Tensor α s₃ × Spec.Tensor α s₄)
   | .cons x₁ (.cons x₂ (.cons x₃ (.cons x₄ .nil))) => (x₁, x₂, x₃, x₄)
@@ -140,7 +140,7 @@ abbrev Batch (α : Type) (n : Nat) (σ τ : Spec.Shape) :=
 /-- Build a supervised sample `(x, y)` as a two-tensor pack. -/
 def mk {α : Type} {σ τ : Spec.Shape} (x : Spec.Tensor α σ) (y : Spec.Tensor α τ) :
     Supervised α σ τ :=
-  tensorpack.mk2 x y
+  tensorpack.pair x y
 
 /-- Build a batched supervised sample `(xBatch, yBatch)`. -/
 def batch {α : Type} {n : Nat} {σ τ : Spec.Shape}
@@ -150,16 +150,16 @@ def batch {α : Type} {n : Nat} {σ τ : Spec.Shape}
 
 /-- Extract the input tensor `x` from a supervised sample. -/
 def x {α : Type} {σ τ : Spec.Shape} (s : Supervised α σ τ) : Spec.Tensor α σ :=
-  tensorpack.get0 s
+  tensorpack.first s
 
 /-- Extract the target tensor `y` from a supervised sample. -/
 def y {α : Type} {σ τ : Spec.Shape} (s : Supervised α σ τ) : Spec.Tensor α τ :=
-  tensorpack.get1 s
+  tensorpack.second s
 
 /-- Unpack a supervised sample as the ordinary pair `(x, y)`. -/
 def toPair {α : Type} {σ τ : Spec.Shape} (s : Supervised α σ τ) :
     Spec.Tensor α σ × Spec.Tensor α τ :=
-  tensorpack.unpack2 s
+  tensorpack.unpackPair s
 
 /-- `x` of a constructed supervised sample `mk x y` is `x`. -/
 @[simp] theorem x_mk {α : Type} {σ τ : Spec.Shape}

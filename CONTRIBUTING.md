@@ -112,6 +112,32 @@ bundle _2.3.14_ exec jekyll serve --config _config.yml,_config_dev.yml
 If native Ruby gems fail to build, install your distribution’s Ruby development package and build
 tools.
 
+## When A Feature Needs Docs
+
+Most nontrivial TorchLean changes should update more than one surface. Use this map before opening a
+PR:
+
+| Change | Documentation surface |
+| --- | --- |
+| Public API name, trainer option, data loader, or optimizer | declaration docstrings, `NN/API/README.md`, quickstart/example docs if user-facing |
+| New runtime backend, CUDA kernel, ATen/libtorch path, or FFI hook | module docstring, `TRUST_BOUNDARIES.md`, CUDA/runtime docs, focused regression check |
+| New graph/IR operator | `NN/IR/README.md`, shape/semantics docstrings, runtime/proof/checker coverage note |
+| New model-family example | `NN/Examples/Models/.../README.md`, command help, website example page if it is public-facing |
+| New verifier or certificate format | `NN/Verification/README.md`, artifact schema docs, example README, trust-boundary note |
+| New theorem family | module docstring, `NN/Proofs` or `NN/MLTheory` README, runnable example/checker pointer |
+| New dataset or external producer | `THIRD_PARTY_NOTICES.md`, data/conversion docs, provenance note |
+
+The goal is not to write marketing copy for every file. The goal is that a reader can answer four
+questions without guessing:
+
+- What object is this file about?
+- What command or import should I use?
+- What is checked or proved?
+- Which runtime or external assumptions remain?
+
+Generated pages should be rebuilt from their sources. Do not hand-edit DocGen or Verso output in
+`home_page/docs` or `home_page/blueprint`.
+
 ## Trust Boundaries
 
 TorchLean keeps three categories separate:

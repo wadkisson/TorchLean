@@ -690,7 +690,7 @@ theorem Vdot_negative (x : Tensor ℝ (.dim n .scalar))
 /-!
 # Verification Status: FAILED
 
-The certificate does not prove Lyapunov stability:
+The certificate leaves Lyapunov stability unchecked:
 - V > 0: {cert['verification']['V_positive']}
 - V̇ < 0: {cert['verification']['Vdot_negative']}
 

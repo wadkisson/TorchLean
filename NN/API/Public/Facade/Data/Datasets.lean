@@ -30,10 +30,10 @@ export NN.API.Data
   (CsvOptions
    TensorFormat TensorSource BatchLoader AnyBatchLoader SupervisedSource LabeledSource
    toList size batchLoader cycleListOrError firstArrayOrError fromNpy
-   requireFiles requireFile requirePairedFiles availableNpyRows writePredictionCsv1D
+   requireFiles requireFile requirePairedFiles availableNpyRows writeVectorPredictionCsv
    supervisedNpySource loadSupervisedNpyFloatSamples
-   fromList tensorDatasetDim0 tensorDatasetDim0F supervisedDim0 supervisedDim0F
-   loader fromNpyTensorND fromNpyTensorNDPrefixDim0 fromNpyImage fromNpyImages
+   fromList tensorDatasetFromLeadingAxis tensorDatasetFromLeadingAxisFloat supervisedFromLeadingAxis supervisedFromLeadingAxisFloat
+   loader fromNpyTensorND fromNpyTensorNDLeadingPrefix fromNpyImage fromNpyImages
    fromNpySupervised fromNpyLabeled fromCsvSupervised fromCsvLabeled
    tabularCsvLoader loaderAny randomSplitAt)
 
@@ -47,7 +47,7 @@ def tensorDataset
     {n : Nat} {σ τ : Shape}
     (X : Tensor.T Float (.dim n σ)) (Y : Tensor.T Float (.dim n τ)) :
     Trainer.Dataset σ τ :=
-  { build := fun {α} _ => pure <| supervisedDim0F (α := α) X Y }
+  { build := fun {α} _ => pure <| supervisedFromLeadingAxisFloat (α := α) X Y }
 
 /--
 Runtime-polymorphic supervised dataset from an explicit sample builder.
@@ -65,7 +65,7 @@ def samples
 /--
 Build a singleton dataset from one runtime-polymorphic supervised sample.
 
-Small examples can use the `Trainer.Dataset` surface without fixing the runtime scalar or backend
+Small examples can use the `Trainer.Dataset` API without fixing the runtime scalar or backend
 in the dataset definition itself.
 -/
 def singleton
@@ -109,7 +109,7 @@ Runtime-polymorphic dataset from an in-memory list of `Float` supervised samples
 
 Several examples build their training windows in ordinary `Float` first because the source is text,
 CSV, NPY, or another external boundary. This constructor keeps those examples on the public trainer
-surface: the samples are still cast to the runtime-selected scalar at training time, so callers do not
+API: the samples are still cast to the runtime-selected scalar at training time, so callers do not
 have to write their own scalar-polymorphic dataset adapter.
 -/
 def floatSamples
@@ -132,9 +132,9 @@ def floatSampleArray
 /--
 Convert an unbatched supervised dataset into a fixed-size batched dataset.
 
-This is the public "minibatch the dataset first" adapter for examples that want the model itself to
-own the batch axis. The returned dataset stores samples of shape `dim batch σ` and `dim batch τ`,
-so it can be passed directly to `Trainer.new` with a batched model.
+Public adapter for examples that want to minibatch the dataset before training and let the model own
+the batch axis. The returned dataset stores samples of shape `dim batch σ` and `dim batch τ`, so it
+can be passed directly to `Trainer.new` with a batched model.
 -/
 def batchDataset
     {σ τ : Shape} (batch : Nat) (data : Trainer.Dataset σ τ)
@@ -157,7 +157,7 @@ def batchDataset
 /--
 Split a public dataset into deterministic train/test views.
 
-This is the dataset-level analogue of `torch.utils.data.random_split`: the split happens after the
+Dataset-level analogue of `torch.utils.data.random_split`: the split happens after the
 trainer materializes the runtime scalar, but callers stay on ordinary `Trainer.Dataset` values.
 -/
 def randomSplitDataset
@@ -206,9 +206,9 @@ def tabularCsvDataset
 /--
 Runtime-polymorphic supervised regression dataset from a tensor source.
 
-This is the public file-data analogue of `torch.utils.data.TensorDataset(X, Y)` for examples whose
-targets are tensors rather than class labels. The source records where batched features and targets
-live; the trainer materializes them at the selected scalar type.
+Public file-data analogue of `torch.utils.data.TensorDataset(X, Y)` for examples whose targets are
+tensors rather than class labels. The source records where batched features and targets live; the
+trainer materializes them at the selected scalar type.
 -/
 def supervisedDataset (src : SupervisedSource) :
     Trainer.Dataset (Shape.ofDims src.xDims) (Shape.ofDims src.yDims) :=
@@ -221,8 +221,8 @@ def supervisedDataset (src : SupervisedSource) :
 /--
 Runtime-polymorphic supervised dataset backed by paired `.npy` files.
 
-This is the common file-backed regression/operator-learning path: `xPath` stores samples with shape
-`xDims`, and `yPath` stores matching targets with shape `yDims`.
+Common file-backed regression/operator-learning path: `xPath` stores samples with shape `xDims`,
+and `yPath` stores matching targets with shape `yDims`.
 -/
 def supervisedNpyDataset
     (xPath yPath : System.FilePath) (n : Nat)
@@ -233,8 +233,8 @@ def supervisedNpyDataset
 /--
 Runtime-polymorphic one-hot classification dataset from a tensor source.
 
-This is the public file-data analogue of `torch.utils.data.TensorDataset`: the source records where
-features and integer labels live, and the trainer materializes them at the selected scalar type.
+Public file-data analogue of `torch.utils.data.TensorDataset`: the source records where features and
+integer labels live, and the trainer materializes them at the selected scalar type.
 -/
 def labeledDataset (src : LabeledSource) :
     Trainer.Dataset (Shape.ofDims src.xDims) (Shape.vec src.classes) :=

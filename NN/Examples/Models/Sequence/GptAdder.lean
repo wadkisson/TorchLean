@@ -4,12 +4,11 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 CUDA-only minGPT-style addition walkthrough:
-  lake build -R -K cuda=true
-  lake exe torchlean gpt_adder --steps 1 --optim adam --lr 0.005 --a 7 --b 8
-  lake exe torchlean gpt_adder --steps 1 --optim sgd --lr 0.05 --a 7 --b 8
+  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --optim adam --lr 0.005 --a 7 --b 8
+  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --optim sgd --lr 0.05 --a 7 --b 8
 
 Interactive addition REPL:
-  lake exe torchlean gpt_adder --steps 1 --interactive
+  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --interactive
 -/
 
 module
@@ -578,20 +577,20 @@ def trainAdderFloat (opts : Options) (trainOpts : AdderOptions) :
       title := "GPT adder training"
       notes := trainOpts.logNotes opts }
   trained.printSummary
-  match (← CurriculumMode.finalLine? mode trained.eval) with
+  match (← CurriculumMode.finalLine? mode trained.predict) with
   | some line => IO.println line
   | none => pure ()
-  printProbe trained.eval trainOpts.a trainOpts.b
+  printProbe trained.predict trainOpts.a trainOpts.b
   if !trainOpts.probes.isEmpty then
     IO.println "  extra checks:"
     for (a, b) in trainOpts.probes do
-      printProbe trained.eval a b
+      printProbe trained.predict a b
   if trainOpts.interactive then
-    interactiveLoop trained.eval
+    interactiveLoop trained.predict
 
 /-- CLI entrypoint for the CUDA GPT adder command. -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runGpuEagerFloat exeName args
+  Runtime.runCudaEagerFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "minGPT-style addition training")
     (k := fun opts rest => do
       if !opts.useGpu then

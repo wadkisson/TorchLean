@@ -6,17 +6,17 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Runtime.Optim.Optimizers
+public import NN.MLTheory.Optimization.OptimizerLaws
 
 /-!
 # Runtime Optimizer Equations
 
 Small executable theorems about TorchLean's optimizer equations.
 
-These are kept modest. They prove properties of the update rules that TorchLean actually
-executes, rather than broad convergence claims that would require assumptions about convexity,
-smoothness, stochastic gradients, and floating-point error. Larger optimization theory can build on
-these equations.
+These are kept modest. They prove properties of the update rules that TorchLean actually executes,
+rather than broad convergence claims that would require assumptions about convexity, smoothness,
+stochastic gradients, and floating-point error. Larger optimization theory can build on these
+equations through `Optimization.OptimizerLaws`.
 
 This is the tensor-facing layer: the statements are phrased over `Spec.Tensor` and the executable
 operator dictionary `Spec.Context`. When we want ordinary algebraic simplification, such as proving

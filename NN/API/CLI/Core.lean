@@ -505,14 +505,14 @@ meaningful on its own.
 -/
 def takePairedPathFlags
     (args : List String)
-    (key1 key2 : String) :
+    (firstKey secondKey : String) :
     Except String ((Option System.FilePath × Option System.FilePath) × List String) := do
-  let (path1?, args) ← takePathFlagOnce args key1
-  let (path2?, args) ← takePathFlagOnce args key2
-  match path1?, path2? with
-  | some _, none => throw s!"--{key1} requires --{key2}"
-  | none, some _ => throw s!"--{key2} requires --{key1}"
-  | _, _ => pure ((path1?, path2?), args)
+  let (firstPath?, args) ← takePathFlagOnce args firstKey
+  let (secondPath?, args) ← takePathFlagOnce args secondKey
+  match firstPath?, secondPath? with
+  | some _, none => throw s!"--{firstKey} requires --{secondKey}"
+  | none, some _ => throw s!"--{secondKey} requires --{firstKey}"
+  | _, _ => pure ((firstPath?, secondPath?), args)
 
 /--
 Common training flags for epoch-oriented loader/tutorial commands: `--epochs` and `--batch`.

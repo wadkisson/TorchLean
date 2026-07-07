@@ -46,7 +46,7 @@ open NN.Verification.Geometry3D.Box3D
 /--
 The core 3D glue contract used by this BugZoo example.
 
-If a certificate passes `checkCert`, then it satisfies the theorem-facing `Verified3DBox` predicate:
+If a certificate passes `checkCert`, then it satisfies the `Verified3DBox` predicate:
 positive image dimensions, ordered in-frame bbox, positive depth for all eight tensor corners,
 projected corners inside the image, and projected corners enclosed by the claimed 2D box.
 -/

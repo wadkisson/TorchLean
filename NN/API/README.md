@@ -1,6 +1,6 @@
 # NN/API
 
-These modules back the public TorchLean API. Model and training code usually imports:
+These modules back the public TorchLean API. Model and training code should start from:
 
 ```lean
 import NN
@@ -11,13 +11,106 @@ Use the `NN.API.*` imports when you are extending TorchLean itself or working in
 
 * `NN.API.Public` backs the `TorchLean.nn`, `TorchLean.optim`, `TorchLean.Trainer`,
   `TorchLean.Data`, `TorchLean.Loss`, and `TorchLean.Metrics` namespaces.
-* `NN.API.Runtime` exposes the executable runtime surface for code that works directly with tensor
+* `NN.API.Runtime` exposes the executable runtime API for code that works directly with tensor
   operations, module execution, autograd, supervised training, and session-level tools.
 * Focused files under `NN/API` give subsystem code a smaller import target than the full `NN`
   umbrella.
 
+The public optimizer API includes `optim.sgd`, `optim.momentumSGD`, `optim.adagrad`,
+`optim.rmsprop`, `optim.adam`, `optim.adamw`, and `optim.adadelta`. Optimizers are ordinary
+runtime objects, but the proof layer files do not treat them as opaque callbacks. They package each
+optimizer as a shape-polymorphic `TensorOptimizer`, register a one-step `StepSpec`, and then reuse
+generic stream lemmas such as `runSteps_append` and `runSteps_eq_optimizer_runSteps`.
+
+Optimizer-adjacent APIs use names that expose the object they actually own:
+
+* **Muon** is an optimizer with an explicit orthogonalization backend. Runtime code uses
+  `optim.runtimeMuon`. Proof code uses `Optim.TensorOptimizer.muon` and the generic
+  `TensorOptimizer`/`StepSpec` interface. The Muon proofs separate three facts:
+  the momentum buffer recurrence, the backend output used as the update direction, and the
+  parameter update equation. Checked backends can provide either an exact certificate
+  `QᵀQ = I` or an approximate certificate bounding `QᵀQ - I` entrywise. QR gives an exact path
+  under positive-pivot hypotheses; Newton-Schulz gives a residual-checked approximate path and a
+  fixed-point exact path. The detailed theorem handles live in
+  `NN.MLTheory.Optimization.Muon` and `NN.MLTheory.Optimization.OptimizerLaws`.
+* **GaLore** is gradient-projection machinery. Its runtime name is
+  `optim.galore.projectedSGD`, because the projection and the optimizer applied afterward are both
+  part of the update statement.
+* **LoRA** is adapter/parameterization structure. It lives under `TorchLean.Adapters.LoRA`, so
+  examples keep adapter weights and optimizer state separate.
+
 The design rule is simple: examples and downstream projects should import `NN`, then use the
 `TorchLean` namespace. Subsystem code can import the focused `NN.API.*` module it actually needs.
+
+## Public API Shape
+
+The public API should feel like one model with selectable execution modes, not like a separate
+method for every backend. The intended pattern is:
+
+```lean
+import NN
+open TorchLean
+
+def model :=
+  nn.Sequential![
+    nn.Linear 2 8,
+    nn.ReLU,
+    nn.Linear 8 1
+  ]
+
+def task :=
+  Trainer.new model
+    { task := .regression
+      optimizer := optim.adam { lr := 0.001 }
+      backend := .compiled
+      dtype := .float32 }
+```
+
+Training, prediction, batched prediction, verification hooks, logs, and trained-result handles
+should hang off that trainer/result story. Backend selection is an option on the same model, not a
+different public name for the forward pass.
+
+That is why public code should prefer names like:
+
+- `trainer.predict`,
+- `trainer.train`,
+- `trained.predict`,
+- `trained.predictBatch`,
+- `trained.verify`,
+- `backend := .eager` or `backend := .compiled`,
+- CUDA flags on the command line when native execution is selected.
+
+Do not introduce public names that encode arity or implementation details. If an implementation
+layer needs an internal helper, keep it internal and give the public facade a model-level name.
+
+The comparison to PyTorch's `torch.compile` is the right public analogy: compiling should be a
+property of the model or trainer path, not a second mathematical forward function. TorchLean differs
+because the graph and proof objects are explicit, but the user-facing shape should still stay simple.
+
+## Public Workflow
+
+A public example should follow this lifecycle:
+
+1. Define a model with `TorchLean.nn` constructors.
+2. Create a `Trainer` with the task, optimizer, dtype, seed, and backend.
+3. Use `trainer.predict` for a before-training probe if the example needs one.
+4. Run `trainer.train` on typed samples, batches, or a stream.
+5. Use the trained handle for prediction, logging, export, or verification hooks.
+
+That lifecycle keeps parameters and optimizer state inside one owner. Eager inference, compiled
+inference, and no-gradient inference should not be taught as separate public entrypoints. The
+backend is a choice in `Options`/trainer configuration; it is not a new public mathematical
+operation.
+
+When an example needs lower-level control, use the runtime facade deliberately:
+
+- `TorchLean.Module.*` for manually instantiated modules and custom losses.
+- `TorchLean.Runtime.*` for scalar/backend options and runtime plumbing.
+- `TorchLean.Data.*` for shape-checked loaders and batch streams.
+- `TorchLean.Verification.*` for certificate/checker entrypoints.
+
+If a feature needs to appear in ordinary tutorials, add it through this public facade instead of
+teaching users an implementation path under `NN/Runtime`.
 
 ## Folder Rule
 
@@ -56,14 +149,14 @@ Top-level `NN/API/*.lean` files are import entrypoints. Definitions belong in ma
   repository examples; `Trainer.Command` in the example tree owns runnable command orchestration.
 * `NN.API.Public.Autograd`, `NN.API.Public.Seeded`, and `NN.API.Public.TensorPack` are import-only
   entrypoints for their matching `*.Core` definition files.
-* `NN.API.Public.Training` imports `NN.API.Public.Training.Core`; this is the advanced
+* `NN.API.Public.Training` imports `NN.API.Public.Training.Core`; this is the lower-level
   callback/runner layer, not the path ordinary examples should teach first.
 
 Entrypoint files preserve short import names. Implementation files live in the matching
 subdirectories.
 
-The public surface exposes scalar evidence, shape-indexed parameter packs, graph semantics, and
-checker boundaries when those objects are part of the example or proof. The import story is:
+The public API exposes scalar evidence, shape-indexed parameter packs, graph semantics, and checker
+boundaries when those objects are part of the example or proof. The import story is:
 
 * `import NN` for model, data, training, verification, and proof workflows.
 * Focused `NN.API.*`, `NN.Runtime.*`, `NN.Spec.*`, and `NN.Proofs.*` imports for subsystem files.

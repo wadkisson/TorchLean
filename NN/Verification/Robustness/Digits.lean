@@ -100,7 +100,7 @@ structure DigitsOpts where
 
 /-- Options for the train → compile → certify report command. -/
 structure TrainCertifyOpts where
-  /-- Lean-side certification options after Python exports the model and dataset. -/
+  /-- Lean side certification options after Python exports the model and dataset. -/
   certify : DigitsOpts := {}
   /-- Python trainer script path. -/
   script : String := defaultTrainScript
@@ -267,7 +267,7 @@ def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToString α]
       (NN.API.Common.castTensor cast linF.bias)
 
   let compiled ←
-    match NN.Verification.TorchLean.compileForward1
+    match NN.Verification.TorchLean.compileForward
           (α := α) (paramShapes := paramShapes) (inShape := xShape) (outShape := yShape)
           (classifier (α := α)) params with
     | .ok c => pure c

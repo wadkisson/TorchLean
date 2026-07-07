@@ -25,7 +25,7 @@ This module keeps that boundary precise:
 - if those native bits agree with the `IEEE32Exec` reference op, then the existing proved
   `IEEE32Exec → FP32-on-ℝ` theorems apply immediately.
 
-In other words, the proof stack is:
+In other words, the proof route is:
 
 `native CUDA bits` --(explicit agreement assumption / tests / toolchain contract)-->
 `IEEE32Exec` --(proved in Lean)--> `FP32` rounding-on-`ℝ` error bounds.

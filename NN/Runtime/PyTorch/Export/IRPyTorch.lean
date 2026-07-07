@@ -60,7 +60,7 @@ open Export.PyTorch
 /-- Flatten a tensor and render it as a Python list literal (used for
   `torch.tensor([...]).reshape(...)`). -/
 def tensorToPyFlat {s : Shape} (t : Tensor Float s) : String :=
-  tensor1DToPy (n := Shape.size s) (Tensor.flattenSpec (α := Float) t)
+  vectorTensorToPy (n := Shape.size s) (Tensor.flattenSpec (α := Float) t)
 
 /-- Return `true` iff every element of the list equals the first element (vacuously true on `[]`).
   -/
@@ -267,8 +267,8 @@ private def collectBindings (g : NN.IR.Graph) (ps : ParamStore Float) (opts : Op
             let wFlat := tensorToPyFlat (s := wShape) lp.w
             let bFlat := tensorToPyFlat (s := bShape) lp.b
             initLines := initLines ++
-              [ indent4 s!"self.{linearWAttr n.id} = nn.Parameter({pyTensorFromFlat wFlat wShape})"
-              , indent4 s!"self.{linearBAttr n.id} = nn.Parameter({pyTensorFromFlat bFlat bShape})"
+              [ indentFour s!"self.{linearWAttr n.id} = nn.Parameter({pyTensorFromFlat wFlat wShape})"
+              , indentFour s!"self.{linearBAttr n.id} = nn.Parameter({pyTensorFromFlat bFlat bShape})"
               ]
     | .conv2d .. =>
         match ps.conv2dCfg.get? n.id with
@@ -279,9 +279,9 @@ private def collectBindings (g : NN.IR.Graph) (ps : ParamStore Float) (opts : Op
             let kFlat := tensorToPyFlat (s := kShape) cfg.spec.kernel
             let bFlat := tensorToPyFlat (s := bShape) cfg.spec.bias
             initLines := initLines ++
-              [ indent4
+              [ indentFour
                 s!"self.{conv2dKernelAttr n.id} = nn.Parameter({pyTensorFromFlat kFlat kShape})"
-              , indent4
+              , indentFour
                 s!"self.{conv2dBiasAttr n.id} = nn.Parameter({pyTensorFromFlat bFlat bShape})"
               ]
     | .batchNorm2dNchwEval .. =>
@@ -290,10 +290,10 @@ private def collectBindings (g : NN.IR.Graph) (ps : ParamStore Float) (opts : Op
         | some p =>
             let sC : Shape := .dim p.c .scalar
             initLines := initLines ++
-              [ indent4 s!"self.{batchNormGammaAttr n.id} = nn.Parameter({pyTensorFromFlat (tensorToPyFlat (s := sC) p.gamma) sC})"
-              , indent4 s!"self.{batchNormBetaAttr n.id} = nn.Parameter({pyTensorFromFlat (tensorToPyFlat (s := sC) p.beta) sC})"
-              , indent4 s!"self.register_buffer(\"{batchNormMeanAttr n.id}\", {pyTensorFromFlat (tensorToPyFlat (s := sC) p.mean) sC})"
-              , indent4 s!"self.register_buffer(\"{batchNormVarAttr n.id}\", {pyTensorFromFlat (tensorToPyFlat (s := sC) p.var) sC})"
+              [ indentFour s!"self.{batchNormGammaAttr n.id} = nn.Parameter({pyTensorFromFlat (tensorToPyFlat (s := sC) p.gamma) sC})"
+              , indentFour s!"self.{batchNormBetaAttr n.id} = nn.Parameter({pyTensorFromFlat (tensorToPyFlat (s := sC) p.beta) sC})"
+              , indentFour s!"self.register_buffer(\"{batchNormMeanAttr n.id}\", {pyTensorFromFlat (tensorToPyFlat (s := sC) p.mean) sC})"
+              , indentFour s!"self.register_buffer(\"{batchNormVarAttr n.id}\", {pyTensorFromFlat (tensorToPyFlat (s := sC) p.var) sC})"
               ]
     | _ => pure ()
 
@@ -304,8 +304,8 @@ private def collectBindings (g : NN.IR.Graph) (ps : ParamStore Float) (opts : Op
         match ps.constVals.get? n.id with
         | none => throw s!"IR→PyTorch: missing const value for node {n.id}"
         | some fv =>
-            let flatListStr := tensor1DToPy (n := fv.n) fv.v
-            let flatVals := tensor1DToList (n := fv.n) fv.v
+            let flatListStr := vectorTensorToPy (n := fv.n) fv.v
+            let flatVals := vectorTensorToList (n := fv.n) fv.v
             let uniform := allEq flatVals
             let forceLearn :=
               opts.learnableConsts && forcedLearnableConsts.contains n.id
@@ -321,22 +321,22 @@ private def collectBindings (g : NN.IR.Graph) (ps : ParamStore Float) (opts : Op
                       let rowFlat := tensorToPyFlat (s := .dim embedDim .scalar) rowT
                       let rowParam := pyTensorFromFlat rowFlat (.dim embedDim .scalar)
                       initLines := initLines ++
-                        [ indent4 s!"self.{attr} = nn.Parameter({rowParam})" ]
+                        [ indentFour s!"self.{attr} = nn.Parameter({rowParam})" ]
                       bindings := bindings.insert n.id (.paramBroadcast2D attr seqLen embedDim)
                   | none =>
                       let attr := constAttr n.id
                       initLines := initLines ++
-                        [ indent4 s!"self.{attr} = nn.Parameter({pyTensorFromFlat flatListStr s})" ]
+                        [ indentFour s!"self.{attr} = nn.Parameter({pyTensorFromFlat flatListStr s})" ]
                       bindings := bindings.insert n.id (.paramFull attr)
               | _ =>
                   let attr := constAttr n.id
                   initLines := initLines ++
-                    [ indent4 s!"self.{attr} = nn.Parameter({pyTensorFromFlat flatListStr s})" ]
+                    [ indentFour s!"self.{attr} = nn.Parameter({pyTensorFromFlat flatListStr s})" ]
                   bindings := bindings.insert n.id (.paramFull attr)
             else
               let attr := constAttr n.id
               initLines := initLines ++
-                [ indent4 s!"self.register_buffer(\"{attr}\", {pyTensorFromFlat flatListStr s})" ]
+                [ indentFour s!"self.register_buffer(\"{attr}\", {pyTensorFromFlat flatListStr s})" ]
               bindings := bindings.insert n.id (.bufferFull attr)
     | _ => pure ()
 
@@ -373,16 +373,16 @@ private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings 
     let id := n.id
     match n.kind with
     | .input =>
-        lines := lines ++ [indent4 s!"v{id} = x"]
+        lines := lines ++ [indentFour s!"v{id} = x"]
     | .const _ =>
         let e ← constExpr bindings id
-        lines := lines ++ [indent4 s!"v{id} = {e}"]
+        lines := lines ++ [indentFour s!"v{id} = {e}"]
     | .randUniform seed =>
         let shp := shapeToPyTupleString n.outShape
         lines := lines ++
-          [ indent4 s!"_gen{id} = torch.Generator(device=x.device)"
-          , indent4 s!"_gen{id}.manual_seed({seed} + {id})"
-          , indent4
+          [ indentFour s!"_gen{id} = torch.Generator(device=x.device)"
+          , indentFour s!"_gen{id}.manual_seed({seed} + {id})"
+          , indentFour
             s!"v{id} = torch.rand({shp}, generator=_gen{id}, device=x.device, dtype=x.dtype)"
           ]
     | .bernoulliMask seed =>
@@ -391,51 +391,51 @@ private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings 
         let rand :=
           s!"torch.rand({shp}, generator=_gen{id}, device=v{p}.device, dtype=v{p}.dtype)"
         lines := lines ++
-          [ indent4 s!"_gen{id} = torch.Generator(device=v{p}.device)"
-          , indent4 s!"_gen{id}.manual_seed({seed} + {id})"
-          , indent4 s!"v{id} = ({rand} < v{p}).to(v{p}.dtype)"
+          [ indentFour s!"_gen{id} = torch.Generator(device=v{p}.device)"
+          , indentFour s!"_gen{id}.manual_seed({seed} + {id})"
+          , indentFour s!"v{id} = ({rand} < v{p}).to(v{p}.dtype)"
           ]
     | .detach =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{p}.detach()"]
+        lines := lines ++ [indentFour s!"v{id} = v{p}.detach()"]
     | .add =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{a} + v{b}"]
+        lines := lines ++ [indentFour s!"v{id} = v{a} + v{b}"]
     | .sub =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{a} - v{b}"]
+        lines := lines ++ [indentFour s!"v{id} = v{a} - v{b}"]
     | .mul_elem =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{a} * v{b}"]
+        lines := lines ++ [indentFour s!"v{id} = v{a} * v{b}"]
     | .minElem =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.minimum(v{a}, v{b})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.minimum(v{a}, v{b})"]
     | .maxElem =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.maximum(v{a}, v{b})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.maximum(v{a}, v{b})"]
     | .sum =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.sum(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.sum(v{p})"]
     | .reduceSum axis =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.sum(v{p}, dim={axis})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.sum(v{p}, dim={axis})"]
     | .reduceMean axis =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.mean(v{p}, dim={axis})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.mean(v{p}, dim={axis})"]
     | .broadcastTo _inShape outShape =>
         let p ← expectUnary id n.parents
         let shp := shapeToPyTupleString outShape
-        lines := lines ++ [indent4 s!"v{id} = torch.broadcast_to(v{p}, {shp})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.broadcast_to(v{p}, {shp})"]
     | .matmul =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.matmul(v{a}, v{b})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.matmul(v{a}, v{b})"]
     | .linear =>
         let xId ← expectUnary id n.parents
         match ps.linearWB.get? id with
         | none => throw s!"IR→PyTorch: missing linear params for node {id}"
         | some _ =>
             lines := lines ++
-              [ indent4 s!"v{id} = F.linear(v{xId}, self.{linearWAttr id}, self.{linearBAttr id})" ]
+              [ indentFour s!"v{id} = F.linear(v{xId}, self.{linearWAttr id}, self.{linearBAttr id})" ]
     | .conv2d inC outC kH kW stride padding =>
         let xId ← expectUnary id n.parents
         -- We rely on the conv2d params stored in the ParamStore (kernel + bias).
@@ -448,14 +448,14 @@ private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings 
               s!"_y = F.conv2d(_x, self.{wName}, self.{bName}, " ++
                 s!"stride={stride}, padding={padding})"
             lines := lines ++
-              [ indent4 s!"_x = v{xId}"
-              , indent4 "_batched = (_x.dim() == 3)"
-              , indent4 "if _batched:"
-              , indent8 "_x = _x.unsqueeze(0)"
-              , indent4 convLine
-              , indent4 "if _batched:"
-              , indent8 "_y = _y.squeeze(0)"
-              , indent4 s!"v{id} = _y"
+              [ indentFour s!"_x = v{xId}"
+              , indentFour "_batched = (_x.dim() == 3)"
+              , indentFour "if _batched:"
+              , indentEight "_x = _x.unsqueeze(0)"
+              , indentFour convLine
+              , indentFour "if _batched:"
+              , indentEight "_y = _y.squeeze(0)"
+              , indentFour s!"v{id} = _y"
               ]
             let _ := (inC, outC, kH, kW) -- keep args for readability; already embedded in kind
     | .batchNorm2dNchwEval channels =>
@@ -464,100 +464,100 @@ private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings 
         | none => throw s!"IR→PyTorch: missing batch_norm2d_nchw_eval params for node {id}"
         | some p =>
             lines := lines ++
-              [ indent4 s!"_x = v{xId}"
-              , indent4 "_batched = (_x.dim() == 4)"
-              , indent4 "if not _batched:"
-              , indent8 "_x = _x.unsqueeze(0)"
-              , indent4
+              [ indentFour s!"_x = v{xId}"
+              , indentFour "_batched = (_x.dim() == 4)"
+              , indentFour "if not _batched:"
+              , indentEight "_x = _x.unsqueeze(0)"
+              , indentFour
                 s!"_y = F.batch_norm(_x, self.{batchNormMeanAttr id}, self.{batchNormVarAttr id}, self.{batchNormGammaAttr id}, self.{batchNormBetaAttr id}, training=False, eps={p.eps})"
-              , indent4 "if not _batched:"
-              , indent8 "_y = _y.squeeze(0)"
-              , indent4 s!"v{id} = _y"
+              , indentFour "if not _batched:"
+              , indentEight "_y = _y.squeeze(0)"
+              , indentFour s!"v{id} = _y"
               ]
             let _ := channels
     | .maxPool2d kH kW stride =>
         let xId ← expectUnary id n.parents
         lines := lines ++
-          [ indent4 s!"_x = v{xId}"
-          , indent4 "_batched = (_x.dim() == 3)"
-          , indent4 "if _batched:"
-          , indent8 "_x = _x.unsqueeze(0)"
-          , indent4 s!"_y = F.max_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride})"
-          , indent4 "if _batched:"
-          , indent8 "_y = _y.squeeze(0)"
-          , indent4 s!"v{id} = _y"
+          [ indentFour s!"_x = v{xId}"
+          , indentFour "_batched = (_x.dim() == 3)"
+          , indentFour "if _batched:"
+          , indentEight "_x = _x.unsqueeze(0)"
+          , indentFour s!"_y = F.max_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride})"
+          , indentFour "if _batched:"
+          , indentEight "_y = _y.squeeze(0)"
+          , indentFour s!"v{id} = _y"
           ]
     | .maxPool2dPad kH kW stride padding =>
         let xId ← expectUnary id n.parents
         lines := lines ++
-          [ indent4 s!"_x = v{xId}"
-          , indent4 "_batched = (_x.dim() == 3)"
-          , indent4 "if _batched:"
-          , indent8 "_x = _x.unsqueeze(0)"
-          , indent4
+          [ indentFour s!"_x = v{xId}"
+          , indentFour "_batched = (_x.dim() == 3)"
+          , indentFour "if _batched:"
+          , indentEight "_x = _x.unsqueeze(0)"
+          , indentFour
             s!"_y = F.max_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride}, padding={padding})"
-          , indent4 "if _batched:"
-          , indent8 "_y = _y.squeeze(0)"
-          , indent4 s!"v{id} = _y"
+          , indentFour "if _batched:"
+          , indentEight "_y = _y.squeeze(0)"
+          , indentFour s!"v{id} = _y"
           ]
     | .avgPool2d kH kW stride =>
         let xId ← expectUnary id n.parents
         lines := lines ++
-          [ indent4 s!"_x = v{xId}"
-          , indent4 "_batched = (_x.dim() == 3)"
-          , indent4 "if _batched:"
-          , indent8 "_x = _x.unsqueeze(0)"
-          , indent4 s!"_y = F.avg_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride})"
-          , indent4 "if _batched:"
-          , indent8 "_y = _y.squeeze(0)"
-          , indent4 s!"v{id} = _y"
+          [ indentFour s!"_x = v{xId}"
+          , indentFour "_batched = (_x.dim() == 3)"
+          , indentFour "if _batched:"
+          , indentEight "_x = _x.unsqueeze(0)"
+          , indentFour s!"_y = F.avg_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride})"
+          , indentFour "if _batched:"
+          , indentEight "_y = _y.squeeze(0)"
+          , indentFour s!"v{id} = _y"
           ]
     | .avgPool2dPad kH kW stride padding =>
         let xId ← expectUnary id n.parents
         lines := lines ++
-          [ indent4 s!"_x = v{xId}"
-          , indent4 "_batched = (_x.dim() == 3)"
-          , indent4 "if _batched:"
-          , indent8 "_x = _x.unsqueeze(0)"
-          , indent4
+          [ indentFour s!"_x = v{xId}"
+          , indentFour "_batched = (_x.dim() == 3)"
+          , indentFour "if _batched:"
+          , indentEight "_x = _x.unsqueeze(0)"
+          , indentFour
             s!"_y = F.avg_pool2d(_x, kernel_size=({kH}, {kW}), stride={stride}, padding={padding})"
-          , indent4 "if _batched:"
-          , indent8 "_y = _y.squeeze(0)"
-          , indent4 s!"v{id} = _y"
+          , indentFour "if _batched:"
+          , indentEight "_y = _y.squeeze(0)"
+          , indentFour s!"v{id} = _y"
           ]
     | .relu =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.relu(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.relu(v{p})"]
     | .tanh =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.tanh(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.tanh(v{p})"]
     | .sin =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.sin(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.sin(v{p})"]
     | .cos =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.cos(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.cos(v{p})"]
     | .sigmoid =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.sigmoid(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.sigmoid(v{p})"]
     | .exp =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.exp(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.exp(v{p})"]
     | .log =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.log(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.log(v{p})"]
     | .inv =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.reciprocal(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.reciprocal(v{p})"]
     | .abs =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.abs(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.abs(v{p})"]
     | .sqrt =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.sqrt(v{p})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.sqrt(v{p})"]
     | .softmax axis =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = torch.softmax(v{p}, dim={axis})"]
+        lines := lines ++ [indentFour s!"v{id} = torch.softmax(v{p}, dim={axis})"]
     | .layernorm axis =>
         let p ← expectUnary id n.parents
         let dims := shapeDims n.outShape
@@ -567,38 +567,38 @@ private def emitForwardBody (g : NN.IR.Graph) (ps : ParamStore Float) (bindings 
           | [] => "()"
           | [d] => s!"({d},)"
           | _ => "(" ++ ", ".intercalate (normalized.map toString) ++ ")"
-        lines := lines ++ [indent4
+        lines := lines ++ [indentFour
           s!"v{id} = F.layer_norm(v{p}, normalized_shape={normalizedShape})"]
     | .reshape _inShape outShape =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{p}.reshape({shapeToPyTupleString outShape})"]
+        lines := lines ++ [indentFour s!"v{id} = v{p}.reshape({shapeToPyTupleString outShape})"]
     | .flatten _ =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{p}.reshape({shapeToPyTupleString n.outShape})"]
+        lines := lines ++ [indentFour s!"v{id} = v{p}.reshape({shapeToPyTupleString n.outShape})"]
     | .permute perm =>
         let p ← expectUnary id n.parents
         if perm.isEmpty then
-          lines := lines ++ [indent4 s!"v{id} = v{p}"]
+          lines := lines ++ [indentFour s!"v{id} = v{p}"]
         else
           let permStr := ", ".intercalate (perm.map toString)
-          lines := lines ++ [indent4 s!"v{id} = v{p}.permute({permStr})"]
+          lines := lines ++ [indentFour s!"v{id} = v{p}.permute({permStr})"]
     | .concat axis =>
         if n.parents.isEmpty then
           throw s!"IR→PyTorch: node {id}: concat expects ≥1 parent"
         else
           let args := ", ".intercalate (n.parents.map (fun p => s!"v{p}"))
-          lines := lines ++ [indent4 s!"v{id} = torch.cat([{args}], dim={axis})"]
+          lines := lines ++ [indentFour s!"v{id} = torch.cat([{args}], dim={axis})"]
     | .swap_first_two =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{p}.transpose(0, 1)"]
+        lines := lines ++ [indentFour s!"v{id} = v{p}.transpose(0, 1)"]
     | .transpose3dLastTwo =>
         let p ← expectUnary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = v{p}.transpose(-1, -2)"]
+        lines := lines ++ [indentFour s!"v{id} = v{p}.transpose(-1, -2)"]
     | .mseLoss =>
         let (a, b) ← expectBinary id n.parents
-        lines := lines ++ [indent4 s!"v{id} = F.mse_loss(v{a}, v{b}, reduction='mean')"]
+        lines := lines ++ [indentFour s!"v{id} = F.mse_loss(v{a}, v{b}, reduction='mean')"]
 
-  lines := lines ++ [indent4 s!"return v{outputId}"]
+  lines := lines ++ [indentFour s!"return v{outputId}"]
   pure lines
 
 /--
@@ -631,14 +631,14 @@ def emit
 
   let classHeader : List String :=
     [ s!"class {opts.className}(nn.Module):"
-    , indent2 "def __init__(self):"
-    , indent4 "super().__init__()"
-    , indent4 s!"dtype = {opts.dtypeExpr}"
+    , indentTwo "def __init__(self):"
+    , indentFour "super().__init__()"
+    , indentFour s!"dtype = {opts.dtypeExpr}"
     ]
 
   let classForwardHeader : List String :=
     [ ""
-    , indent2 "def forward(self, x):"
+    , indentTwo "def forward(self, x):"
     ]
 
   let classLines : List String :=
@@ -658,60 +658,60 @@ def emit
         if outIsLoss then
           ( [ ""
             , "def train_step(model: nn.Module, x: torch.Tensor, opt=None):"
-            , indent2 "model.train()"
-            , indent2 "if opt is not None:"
-            , indent4 "opt.zero_grad(set_to_none=True)"
-            , indent2 "loss = model(x)"
-            , indent2 "if opt is not None:"
-            , indent4 "loss.backward()"
-            , indent4 "opt.step()"
-            , indent2 "return float(loss.detach().cpu())"
+            , indentTwo "model.train()"
+            , indentTwo "if opt is not None:"
+            , indentFour "opt.zero_grad(set_to_none=True)"
+            , indentTwo "loss = model(x)"
+            , indentTwo "if opt is not None:"
+            , indentFour "loss.backward()"
+            , indentFour "opt.step()"
+            , indentTwo "return float(loss.detach().cpu())"
             ]
           , [ ""
             , "if __name__ == '__main__':"
-            , indent2 "torch.manual_seed(0)"
-            , indent2 "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
-            , indent2 s!"model = {opts.className}().to(device)"
-            , indent2 "opt = make_optimizer(model, kind='adam', lr=1e-3)"
-            , indent2 s!"x = torch.randn({xTuple}, dtype={opts.dtypeExpr}, device=device)"
-            , indent2 "loss = train_step(model, x, opt)"
-            , indent2 "print('loss', loss)"
+            , indentTwo "torch.manual_seed(0)"
+            , indentTwo "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
+            , indentTwo s!"model = {opts.className}().to(device)"
+            , indentTwo "opt = make_optimizer(model, kind='adam', lr=1e-3)"
+            , indentTwo s!"x = torch.randn({xTuple}, dtype={opts.dtypeExpr}, device=device)"
+            , indentTwo "loss = train_step(model, x, opt)"
+            , indentTwo "print('loss', loss)"
             ] )
         else
           ( [ ""
             , "def train_step(model: nn.Module, x: torch.Tensor, y: torch.Tensor, opt=None):"
-            , indent2 "model.train()"
-            , indent2 "if opt is not None:"
-            , indent4 "opt.zero_grad(set_to_none=True)"
-            , indent2 "out = model(x)"
-            , indent2 "loss = F.mse_loss(out, y, reduction='mean')"
-            , indent2 "if opt is not None:"
-            , indent4 "loss.backward()"
-            , indent4 "opt.step()"
-            , indent2 "return float(loss.detach().cpu())"
+            , indentTwo "model.train()"
+            , indentTwo "if opt is not None:"
+            , indentFour "opt.zero_grad(set_to_none=True)"
+            , indentTwo "out = model(x)"
+            , indentTwo "loss = F.mse_loss(out, y, reduction='mean')"
+            , indentTwo "if opt is not None:"
+            , indentFour "loss.backward()"
+            , indentFour "opt.step()"
+            , indentTwo "return float(loss.detach().cpu())"
             ]
           , [ ""
             , "if __name__ == '__main__':"
-            , indent2 "torch.manual_seed(0)"
-            , indent2 "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
-            , indent2 s!"model = {opts.className}().to(device)"
-            , indent2 "opt = make_optimizer(model, kind='adam', lr=1e-3)"
-            , indent2 s!"x = torch.randn({xTuple}, dtype={opts.dtypeExpr}, device=device)"
-            , indent2 s!"y = torch.randn({yTuple}, dtype={opts.dtypeExpr}, device=device)"
-            , indent2 "loss = train_step(model, x, y, opt)"
-            , indent2 "print('loss', loss)"
+            , indentTwo "torch.manual_seed(0)"
+            , indentTwo "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')"
+            , indentTwo s!"model = {opts.className}().to(device)"
+            , indentTwo "opt = make_optimizer(model, kind='adam', lr=1e-3)"
+            , indentTwo s!"x = torch.randn({xTuple}, dtype={opts.dtypeExpr}, device=device)"
+            , indentTwo s!"y = torch.randn({yTuple}, dtype={opts.dtypeExpr}, device=device)"
+            , indentTwo "loss = train_step(model, x, y, opt)"
+            , indentTwo "print('loss', loss)"
             ] )
 
       [ ""
       , "def make_optimizer(model: nn.Module, kind: str = 'adam', lr: float = 1e-3):"
-      , indent2 "params = [p for p in model.parameters() if p.requires_grad]"
-      , indent2 "if len(params) == 0:"
-      , indent4 "return None"
-      , indent2 "if kind == 'sgd':"
-      , indent4 "return torch.optim.SGD(params, lr=lr)"
-      , indent2 "if kind == 'adam':"
-      , indent4 "return torch.optim.Adam(params, lr=lr)"
-      , indent2 "raise ValueError(f'unknown optimizer kind: {kind}')"
+      , indentTwo "params = [p for p in model.parameters() if p.requires_grad]"
+      , indentTwo "if len(params) == 0:"
+      , indentFour "return None"
+      , indentTwo "if kind == 'sgd':"
+      , indentFour "return torch.optim.SGD(params, lr=lr)"
+      , indentTwo "if kind == 'adam':"
+      , indentFour "return torch.optim.Adam(params, lr=lr)"
+      , indentTwo "raise ValueError(f'unknown optimizer kind: {kind}')"
       ] ++ trainStepDef ++ mainLines
 
   pure (joinLines (imports ++ classLines ++ helpers))

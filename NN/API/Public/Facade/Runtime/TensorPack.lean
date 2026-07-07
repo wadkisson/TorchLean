@@ -11,7 +11,7 @@ public import NN.API.Public.Facade.NN
 /-!
 # TorchLean Runtime Tensor-Pack Facade
 
-Public tensor-pack names used by runtime-facing examples.
+Public tensor-pack names used by runtime layer examples.
 -/
 
 @[expose] public section
@@ -24,7 +24,9 @@ namespace tensorpack
 abbrev TensorPack := TorchLean.TensorPack
 
 export NN.API.tensorpack
-  (mk1 mk2 mk3 mk4 map zipWith append split unpack1 unpack2 unpack3 unpack4 get0 get1 get2 get3)
+  (singleton pair triple quad map zipWith append split
+   unpackSingleton unpackPair unpackTriple unpackQuad
+   first second third fourth)
 
 end tensorpack
 

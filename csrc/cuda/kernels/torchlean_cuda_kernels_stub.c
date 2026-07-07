@@ -14,15 +14,15 @@
 
 static const float kTorchLeanPiF = 3.14159265358979323846f;
 
-LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis0(b_lean_obj_arg BObj, uint32_t rows,
+LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_by_column(b_lean_obj_arg BObj, uint32_t rows,
                                                                uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
   const size_t total =
-      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_axis0_stub: R*C overflow");
+      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_by_column_stub: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis0_stub: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_by_column_stub: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(C);
@@ -36,15 +36,15 @@ LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis0(b_lean_obj_arg B
   return torchlean_cuda_buffer_box(out);
 }
 
-LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis1(b_lean_obj_arg BObj, uint32_t rows,
+LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_by_row(b_lean_obj_arg BObj, uint32_t rows,
                                                                uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
   const size_t total =
-      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_axis1_stub: R*C overflow");
+      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_sum_by_row_stub: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_axis1_stub: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_sum_by_row_stub: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(R);
@@ -58,15 +58,15 @@ LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_sum_axis1(b_lean_obj_arg B
   return torchlean_cuda_buffer_box(out);
 }
 
-LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis0(b_lean_obj_arg BObj, uint32_t rows,
+LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_by_column(b_lean_obj_arg BObj, uint32_t rows,
                                                                uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
   const size_t total =
-      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_axis0_stub: R*C overflow");
+      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_by_column_stub: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_max_axis0_stub: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_max_by_column_stub: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(C);
@@ -86,15 +86,15 @@ LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis0(b_lean_obj_arg B
   return torchlean_cuda_buffer_box(out);
 }
 
-LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_axis1(b_lean_obj_arg BObj, uint32_t rows,
+LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_by_row(b_lean_obj_arg BObj, uint32_t rows,
                                                                uint32_t cols) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   const size_t R = (size_t)rows;
   const size_t C = (size_t)cols;
   const size_t total =
-      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_axis1_stub: R*C overflow");
+      checked_mul_size(R, C, "torchlean_cuda_buffer_reduce_max_by_row_stub: R*C overflow");
   if (b->size != total) {
-    lean_internal_panic("torchlean_cuda_buffer_reduce_max_axis1_stub: size mismatch");
+    lean_internal_panic("torchlean_cuda_buffer_reduce_max_by_row_stub: size mismatch");
   }
 
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(R);

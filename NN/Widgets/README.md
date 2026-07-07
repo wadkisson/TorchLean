@@ -40,6 +40,7 @@ import NN.Widgets.Verification.CROWN
 | Verification | IBP/CROWN states and bound tightness |
 | Training | loss curves, metrics, confusion matrices |
 | RL | GridWorld, PPO, and rollout artifacts |
+| Models | model-specific panels, currently including GPT-style sequence views |
 
 ## Layout
 
@@ -50,12 +51,13 @@ import NN.Widgets.Verification.CROWN
 - `Numerics`: floating point inspection widgets such as binary32 bit views.
 - `Verification`: CROWN/IBP certificate and bound propagation panels.
 - `RL`: GridWorld and PPO rollout visualizers.
+- `Models`: model-specific views that do not belong to the generic tensor/IR families.
 
 ## Examples
 
 Open these files in an editor with the Lean infoview enabled:
 
-- `NN/Examples/Advanced/Widgets.lean`
+- `NN/Examples/DeepDives/Widgets.lean`
 - `NN/Examples/RL/PPOGridWorldView.lean`
 - `NN/Examples/RL/PPOCartPoleView.lean`
 - `NN/Examples/RL/PPOPongRamView.lean`
@@ -64,6 +66,20 @@ Open these files in an editor with the Lean infoview enabled:
 
 The examples are compact and editor friendly. File backed viewers render an error panel
 when an artifact is missing instead of making the Lean build fail.
+
+## What Widgets Do Not Prove
+
+A widget can show the object that a theorem, checker, or runtime produced. It does not make that
+object correct by rendering it. For example:
+
+- an IR widget can show malformed graph structure, but the graph checker is what accepts or rejects
+  the artifact;
+- a CROWN widget can show interval widths, but the certificate theorem or checker is what supports
+  a bound claim;
+- a Float32 widget can show bits and rounding choices, but the `IEEE32Exec`/`FP32` bridge files are
+  where semantic claims live.
+
+This keeps widgets useful without making them part of the trusted proof boundary.
 
 ## PyTorch Translator Widget
 
@@ -74,10 +90,9 @@ PyTorch file -> recognized layer report -> TorchLean skeleton -> trust-boundary 
 ```
 
 It is a supported-subset assistant for common `nn.Sequential`-style models such as MLPs
-and simple CNN blocks. It does not parse arbitrary Python and does not prove PyTorch execution
-correct. For real modules, use the existing `torch.export` JSON bridge and Lean graph importer; the
-widget helps users see whether their model is close to TorchLean's supported subset before they run
-the full capture/import path.
+and simple CNN blocks. Arbitrary Python modules and PyTorch execution semantics belong to the
+`torch.export` JSON bridge and Lean graph importer; the widget helps users see whether their model
+is close to TorchLean's supported subset before they run the full capture/import path.
 
 In Lean files, the practical command is:
 

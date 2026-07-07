@@ -30,10 +30,10 @@ The modules here are split by trust boundary by trust boundary:
 - `Trusted` and `Buffer` expose the opaque FFI buffer type and allocation/copy primitives.
 - `Kernels`, `ConvPool`, and `DGemm` declare native CUDA/CPU-stub kernel entrypoints.
 - `Tape` and `Ops` build the CUDA reverse-mode tape over those buffers.
-- `Float32Contract` and `KernelSpec` state the proof-facing reference contracts for native bits.
+- `Float32Contract` and `KernelSpec` state the proof layer reference contracts for native bits.
 - `NativeSources` documents which C/CUDA files implement the external symbols.
 
-Lean does not prove the compiled CUDA binary correct. It proves the pure specs and graph-level
+The compiled CUDA binary is a native trust boundary. Lean proves the pure specs and graph-level
 connections around this boundary, while runtime tests validate the native implementation path.
 -/
 

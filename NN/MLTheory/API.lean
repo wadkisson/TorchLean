@@ -13,6 +13,8 @@ public import NN.MLTheory.LearningTheory
 public import NN.MLTheory.Optimization.FirstOrder
 public import NN.MLTheory.Optimization.GDLinearConvergence
 public import NN.MLTheory.Optimization.LowRank
+public import NN.MLTheory.Optimization.Muon
+public import NN.MLTheory.Optimization.OptimizerLaws
 public import NN.MLTheory.Optimization.SmoothStrongConvexBridge
 public import NN.MLTheory.Optimization.StronglyConvexGD
 public import NN.MLTheory.SelfSupervised

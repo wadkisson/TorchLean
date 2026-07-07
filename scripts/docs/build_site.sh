@@ -7,7 +7,7 @@ cd "$ROOT"
 echo "==> Building Lean modules"
 lake build
 
-echo "==> Building DocGen API docs"
+echo "==> Building DocGen API reference"
 # DocGen can try to render equations for every imported definition, including Lean and Mathlib
 # internals. That is noisy and not useful for the public site, so site builds disable equation
 # rendering while keeping declaration types, docstrings, source links, search, and module pages.

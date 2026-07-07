@@ -57,7 +57,7 @@ export _root_.Runtime.Autograd.Torch
    reduceSum reduceMean
    gatherScalar gatherRow gatherScalarNat gatherVecNat gatherRowsNat scatterAddVec
      scatterAddRow
-   matmul bmm concatVectors concatDim0 sliceRange0
+   matmul bmm concatVectors concatLeadingAxis sliceLeadingAxisRange
    maxPool2d maxPool2dPad smoothMaxPool2d avgPool2d avgPool2dPad
    relu silu gelu sigmoid tanh softmax softplus exp log inv detach safeLog logSoftmax
    globalAvgPool2dChw globalAvgPool2dNchw
@@ -120,11 +120,11 @@ namespace Private
 /-! ## Batch-first derived ops -/
 
 /-- Create a `0 × s` tensor (empty along the leading dimension). -/
-def emptyDim0 {α : Type} (s : Shape) : Tensor α (.dim 0 s) :=
+def emptyLeadingAxis {α : Type} (s : Shape) : Tensor α (.dim 0 s) :=
   Tensor.dim (fun i : Fin 0 => Fin.elim0 i)
 
 /-- Remove a leading singleton dimension: `(1 × s) → s`. -/
-def squeezeDim0 {α : Type} [Context α] [DecidableEq Shape]
+def squeezeLeadingAxis {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) (.dim 1 s)) :
     m (RefTy (m := m) (α := α) s) :=
@@ -132,7 +132,7 @@ def squeezeDim0 {α : Type} [Context α] [DecidableEq Shape]
     simp [Shape.size])
 
 /-- Add a leading singleton dimension: `s → (1 × s)`. -/
-def unsqueezeDim0 {α : Type} [Context α] [DecidableEq Shape]
+def unsqueezeLeadingAxis {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) s) :
     m (RefTy (m := m) (α := α) (.dim 1 s)) :=
@@ -152,24 +152,24 @@ def mapBatch0 {α : Type} [Context α] [DecidableEq Shape]
     m (RefTy (m := m) (α := α) (.dim batch t)) :=
   match batch with
   | 0 =>
-      _root_.Runtime.Autograd.Torch.const (m := m) (α := α) (s := .dim 0 t) (emptyDim0 (α := α) t)
+      _root_.Runtime.Autograd.Torch.const (m := m) (α := α) (s := .dim 0 t) (emptyLeadingAxis (α := α) t)
   | batch+1 => do
       let head1 ←
-        _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+        _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
           (nDim := batch+1) (s := s)
           (start := 0) (len := 1) (by simp) x
-      let head ← squeezeDim0 (m := m) (α := α) (s := s) head1
+      let head ← squeezeLeadingAxis (m := m) (α := α) (s := s) head1
       let yhead ← f head
-      let yhead1 ← unsqueezeDim0 (m := m) (α := α) (s := t) yhead
+      let yhead1 ← unsqueezeLeadingAxis (m := m) (α := α) (s := t) yhead
       let tail ←
-        _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+        _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
           (nDim := batch+1) (s := s)
           (start := 1) (len := batch) (by simp) x
       let ytail ← mapBatch0 (m := m) (α := α) (batch := batch) (s := s) (t := t) tail f
       let y ←
-        _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+        _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
           (nDim := 1) (mDim := batch) (s := t) yhead1 ytail
-      -- `concat_dim0` returns `1 + batch`; rewrite to `batch + 1` for the caller.
+      -- `concat_leading_axis` returns `1 + batch`; rewrite to `batch + 1` for the caller.
       return (by simpa [Nat.one_add] using y)
 
 /-- Convert a boolean tensor mask to a `{0,1}` tensor (same shape). -/

@@ -58,7 +58,7 @@ def outDim : Nat := 1
 
 /-- Batched MLP `2 -> 8 -> 1` built from the public model constructor. -/
 def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
-  nn.models.Mlp1ReLU
+  nn.models.MlpReLU
     { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
 /-- Command-line help for the minibatch MLP quickstart. -/
@@ -75,7 +75,7 @@ def usage : String :=
     , "  --seed N"
     , "  --batch N"
     , "  --steps N"
-    , "  --dtype float|ieee32"
+    , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
     , "  --cpu | --cuda"
     , "  --log PATH"

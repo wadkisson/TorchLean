@@ -19,15 +19,15 @@ Runtime execution stays in `IEEE32Exec`/`Float`/`NeuralFloat`; each backend has 
 status relative to the spec layer.
 
 Note on trust boundaries:
-- Lean's `Float` is an *implementation* type; this repo does not prove that `Float` execution
-  matches an IEEE-754 spec. Claims connecting `Float` execution to spec-level `ℝ` therefore cross a
-  trusted runtime interface.
+- Lean's `Float` is an *implementation* type. Claims connecting `Float` execution to spec-level `ℝ`
+  therefore cross a trusted runtime interface unless they pass through an explicit executable
+  floating-point model.
 - `IEEE32Exec` is an executable bit-level IEEE-754 binary32 model; connecting it to Lean/runtime
   hardware float32 is out of scope (treat that bridge as trusted).
 - For proof-relevant numeric execution, use the rounding model backends (`NeuralFloat` / `NF`),
   where per-op error bounds can be stated and composed.
 - `NeuralFloat`/`NF` are formal *models* implemented in Lean. Relating them to real hardware
-  floating-point (or Lean's `Float`) is a separate backend-correlation assumption, not a theorem in
+  floating-point (or Lean's `Float`) is a separate backend-correlation assumption handled outside
   this module.
 -/
 

@@ -32,7 +32,7 @@ Everything runs *inside Lean*:
 
 Notes:
 - This workflow uses the in-repo IBP/CROWN engine, so its bounds are meant to exercise TorchLean's
-  own verifier stack rather than reproduce every optimization used by external α/β-CROWN systems.
+  own verifier path rather than reproduce every optimization used by external α/β-CROWN systems.
 - The point is the *trust boundary*: the whole compute path, including float32 semantics, is inside
   Lean, and external tooling is not required to run the end-to-end pipeline.
 
@@ -131,7 +131,7 @@ def pgdStepCompiled
       (ss₁ := paramShapes width) (ss₂ := [xShape]) gAll).2
   let .cons g .nil := gx
   let x' := Tensor.addSpec x (Tensor.scaleSpec g pgdStepSize)
-  clampVec2 (-rad) rad x'
+  clampStateVector (-rad) rad x'
 
 /--
 Final post-check: compile the TorchLean loss to the shared verifier IR, then run IBP and CROWN
@@ -141,7 +141,7 @@ def checkBox (width : Nat) (params : NN.API.TensorPack α (paramShapes width)) (
   epsCheck) : IO Unit := do
   IO.println "Stage 2 check: IBP + CROWN on the scalar loss over a small box"
   let compiled ←
-    match NN.Verification.TorchLean.compileForward1
+    match NN.Verification.TorchLean.compileForward
           (α := α) (paramShapes := paramShapes width) (inShape := xShape) (outShape := Shape.scalar)
           (lossProg width (β := α)) params with
     | .ok c => pure c
@@ -189,18 +189,18 @@ def run (width : Nat) (args : List String) : IO Unit := do
   -- Stage 1: initialization pass on random x in [-rad, rad]^2
   let mut seed : UInt64 := 1
   for i in [0:stage1Steps] do
-    let (seed', x) := sampleVec2 seed rad
+    let (seed', x) := sampleStateVector seed rad
     seed := seed'
     let xs : NN.API.TensorPack α [xShape] := tensorpack! x
-    let loss0 := _root_.Runtime.Autograd.Torch.scalarOf (←
+    let currentLoss := _root_.Runtime.Autograd.Torch.scalarOf (←
       _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr xs)
     _root_.Runtime.Autograd.Torch.ScalarTrainer.stepT tr lr xs
     if i % 5 = 0 then
-      IO.println s!"[stage1] step {i}: loss={loss0}"
+      IO.println s!"[stage1] step {i}: loss={currentLoss}"
 
   -- Stage 2: PGD on x to find violations, then train on them
   for round in [0:stage2Rounds] do
-    let (seed', x0) := sampleVec2 seed rad
+    let (seed', x0) := sampleStateVector seed rad
     seed := seed'
     let params ← tr.getParams
     let mut x := x0

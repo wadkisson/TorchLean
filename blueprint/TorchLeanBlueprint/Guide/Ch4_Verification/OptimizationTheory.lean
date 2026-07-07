@@ -16,9 +16,8 @@ a step size condition.
 
 The runtime can execute SGD, Adam style updates, or PPO losses. The optimization theory material
 names the ideal update and the assumptions under which a theorem is allowed to say "this step moves
-closer." That is the useful comparison with PyTorch: PyTorch faithfully runs an optimizer step;
-TorchLean can also state the mathematical contract that would justify calling the step contractive
-or convergent.
+closer." PyTorch faithfully runs an optimizer step; TorchLean can also state the mathematical
+contract that would justify calling the step contractive or convergent.
 
 # The Optimization Contract
 
@@ -31,8 +30,8 @@ The optimization contract has three layers:
 - *Convergence theorem*: the conditional theorem saying that iterating the ideal map makes progress
   under assumptions such as strong monotonicity, Lipschitzness, and a safe step size.
 
-Keeping these layers separate stops a common overclaim. A decreasing loss curve is evidence that an
-optimizer is doing something useful; it is not itself a proof that the update map is contractive.
+Keeping these layers separate stops a common overclaim. A decreasing loss curve is evidence about a
+run; it is not itself a proof that the update map is contractive.
 
 # First Order Updates
 
@@ -43,14 +42,91 @@ equal to `state.time + 1`. In Lean this is direct algebra.
 
 The [FirstOrder optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/FirstOrder.lean) contains
 the corresponding projection theorems: `update_params_eq`, `update_buffer_eq`, and
-`update_time_eq`. These do not prove convergence. They make the update record transparent so later
-proofs can cite the actual algebra instead of relying on a prose description of the optimizer.
+`update_time_eq`. These are transparency facts for the update record. They let later convergence
+proofs cite the actual algebra instead of relying on a prose description of the optimizer.
+
+For tensor optimizers with richer state, the
+[optimizer laws API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/OptimizerLaws.lean) exposes the same pattern:
+
+```
+#check NN.MLTheory.Optimization.TensorOptimizer.sgd
+#check NN.MLTheory.Optimization.TensorOptimizer.adamw
+#check NN.MLTheory.Optimization.StepSpec
+#check NN.MLTheory.Optimization.StepSpec.runSteps_eq_optimizer_runSteps
+#check NN.MLTheory.Optimization.SGD.update_eq_spec
+#check NN.MLTheory.Optimization.AdamW.update_eq_spec
+```
+
+`StepSpec` is the important interface. It gives a proof-level equation for one optimizer step, and
+then the generic run theorem lifts that equation over a stream of gradients. The point is modest but
+useful: if a trainer says it used AdamW, a theorem can cite the AdamW update equation rather than a
+string in a config file.
 
 Low rank optimizer facts follow the same pattern. The
 [low rank optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/LowRank.lean) records equations such as
 "with the identity projection, projected SGD is ordinary SGD" and "identity low rank state agrees
 with the corresponding momentum update." These are algebraic agreement facts, not global
 optimality claims for every low rank method.
+
+For AdamW specifically, TorchLean follows the usual decoupled weight decay distinction from
+Loshchilov and Hutter,
+["Decoupled Weight Decay Regularization"](https://arxiv.org/abs/1711.05101). The Lean theorem is an
+update equation, not an empirical claim that AdamW generalizes better on a task.
+
+# Optimizer Extension Points: Muon And GaLore-Style Updates
+
+Modern optimizer work often mixes a familiar base update with a specialized backend. TorchLean
+models that explicitly. The runtime layer gives the executable update equation. The theory layer
+states what has to be true of the backend output before the update can be cited in a proof.
+
+Muon is represented as momentum followed by an orthogonalization backend. One step first updates the
+momentum buffer
+
+$$`m_{t+1}=\beta m_t+g_t,`
+
+then asks a backend for the direction used in the parameter update. With the identity backend,
+Muon's parameter update is exactly momentum SGD. With a certified matrix backend, the claim is about
+the actual direction returned by that backend: exact column orthogonality
+
+$$`Q^\top Q = I`
+
+or an approximate Gram-residual bound
+
+$$`\|Q^\top Q-I\|_\infty \le \varepsilon.`
+
+The [Muon theory file](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/Muon.lean)
+packages these cases as exact, approximate, and checked-backend contracts. QR-backed directions give
+an exact path under positive-pivot hypotheses. Newton-Schulz-style directions give a residual-checked
+approximate path, together with fixed-point exact statements when the iteration has reached the
+corresponding algebraic condition.
+
+The checked-backend theorem names are deliberately verbose:
+
+```
+#check NN.MLTheory.Optimization.Muon.update_has_exact_certified_step_of_checked_backend
+#check NN.MLTheory.Optimization.Muon.update_has_approx_certified_step_of_checked_backend
+#check NN.MLTheory.Optimization.Muon.update_direction_has_approx_column_gram_of_checked_backend
+#check NN.MLTheory.Optimization.Muon.update_has_exact_certified_step_qr
+```
+
+They encode the trust boundary. A backend may be fast, randomized, iterative, or external. Lean only
+uses the backend as an orthogonalizing step after the backend's success predicate has been checked
+or assumed explicitly. That keeps "Muon step executed" separate from "direction has an exact or
+approximate Gram certificate."
+
+GaLore-style code is different. GaLore is a gradient-projection strategy, not a single optimizer
+name. The runtime object is a projector/lift pair around a base update:
+
+$$`p_{t+1}=p_t-\eta\,\mathrm{lift}(\mathrm{project}(g_t)).`
+
+The current checked baseline says that if the projector is the identity, projected SGD is ordinary
+SGD. A future low-rank projector or refresh policy can optimize memory and matrix structure, but it
+has to state its own projection contract instead of being hidden inside the word "optimizer."
+
+This naming is reflected in the public API. Standard trainer configs use names such as
+`optim.sgd`, `optim.adamw`, and `optim.adadelta`. Runtime-level extension points use more explicit
+names such as `optim.runtimeMuon` and `optim.galore.projectedSGD`, because those calls need a
+backend or projection story as part of the mathematical object.
 
 # Gradient Descent As A Contractive Map
 
@@ -68,7 +144,7 @@ $`\eta` is in the safe range, then one step is contractive:
 > `x` and `y`.
 
 The [linear convergence API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/GDLinearConvergence.lean) names the
-important predicate `StrongMonotone mu g`. Informally, it says that the inner product of
+predicate `StrongMonotone mu g`. Informally, it says that the inner product of
 `g x - g y` with `x - y` dominates `mu * ||x - y||^2`.
 
 The two analytic hypotheses can be read as:
@@ -87,8 +163,8 @@ should remember:
 > If the contraction factor `q η μ L` is nonnegative and strictly below one, then repeated gradient
 > descent steps shrink the squared distance to the reference point geometrically.
 
-That is the real mathematical content. The Lean theorem is deliberately conditional because those
-conditions are exactly what experiments cannot infer from a loss curve.
+The mathematical content is in the hypotheses. The Lean theorem keeps those conditions explicit
+because a loss curve cannot infer them.
 
 The contraction and convergence shapes are:
 
@@ -102,6 +178,21 @@ and then
 
 $$`\|x_t-x^\star\|^2\le q^t\|x_0-x^\star\|^2.`
 
+Concrete theorem names:
+
+```
+#check NN.MLTheory.Optimization.GDLinearConvergence.StrongMonotone
+#check NN.MLTheory.Optimization.GDLinearConvergence.step_norm_sq_le
+#check NN.MLTheory.Optimization.StronglyConvexGD.dist_sq_iterate_le_of_q_lt_one
+#check NN.MLTheory.Optimization.StronglyConvexGD.error_abs_contract_real
+```
+
+The result is the standard smooth/strongly-monotone contraction argument found in convex
+optimization texts such as Nesterov's
+[*Introductory Lectures on Convex Optimization*](https://link.springer.com/book/10.1007/978-1-4419-8853-9).
+TorchLean's contribution here is not a new convergence rate; it is the ability to attach the rate to
+the exact update map and assumptions used by the rest of the verified training story.
+
 # Smoothness, Strong Convexity, And The Bridge
 
 Most papers state convergence using smoothness and strong convexity of an objective `f`, not
@@ -114,16 +205,25 @@ The informal first order strong convexity condition says that `f y` lies above t
 The [smooth strong convex bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/SmoothStrongConvexBridge.lean)
 turns that objective level statement into a gradient map statement. The theorem to recognize is
 `strongMonotone_gradient_of_firstOrderStrongConvex`: under the first order strong convexity
-hypothesis, the gradient is strongly monotone. This is the bridge that lets a training theorem move
-from "the loss has these analytic assumptions" to "the update map is contractive."
+hypothesis, the gradient is strongly monotone. That bridge lets a training theorem move from "the
+loss has these analytic assumptions" to "the update map is contractive."
+
+```
+#check NN.MLTheory.Optimization.SmoothStrongConvexBridge.FirstOrderStrongConvex
+#check NN.MLTheory.Optimization.SmoothStrongConvexBridge.strongMonotone_gradient_of_firstOrderStrongConvex
+```
+
+The bridge is useful because autograd theorems usually speak about derivatives of a loss, while
+convergence theorems often speak about a gradient map. The theorem connects those two vocabularies
+without treating "gradient" as an informal word.
 
 # How This Connects To Verified Training
 
-Autograd correctness can tell us that the gradient path computes the intended derivative. Runtime
-approximation can tell us how close a rounded update is to the ideal update. Optimization theory is
-where we state what that update means as an algorithm.
+The autograd theorems explain why the gradient path computes the intended derivative. Runtime
+approximation theorems explain how close a rounded update is to the ideal update. Optimization
+theory is where we state what that update means as an algorithm.
 
-For example, an end-to-end training theorem can be read as a composition of three facts:
+For example, a theorem about a full training run can be read as a composition of three facts:
 
 - an autograd theorem saying the gradient is the adjoint derivative of the loss;
 - a runtime approximation theorem saying the executable update is close to the ideal update;
@@ -134,10 +234,21 @@ Those hypotheses matter. The optimization layer avoids turning a loss curve into
 claim: convexity, smoothness, strong monotonicity, and step size conditions remain visible in the
 theorem statement.
 
-# What We Claim
+# Claim Shape
 
 TorchLean formalizes selected first order optimization facts and their assumptions, so future
-training theorems can cite named Lean objects rather than prose folklore. It does not prove that
-every training run converges. The classical lineage is the convex optimization tradition:
-smoothness, strong convexity, gradient descent, and contraction arguments. The Lean declarations let us use
-that tradition without hiding its assumptions behind a training loop.
+training theorems can cite named Lean objects rather than prose folklore. A theorem about a
+particular run must still name its hypotheses: the gradient being used, the scalar semantics, the
+step-size condition, and any backend contract such as a Muon orthogonalizer certificate or a
+projector law. The classical lineage is the convex optimization tradition: smoothness, strong
+convexity, gradient descent, and contraction arguments. The Lean declarations let us use that
+tradition without hiding its assumptions behind a training loop.
+
+# References
+
+- Yurii Nesterov,
+  [*Introductory Lectures on Convex Optimization*](https://link.springer.com/book/10.1007/978-1-4419-8853-9),
+  Springer 2004.
+- Ilya Loshchilov and Frank Hutter,
+  ["Decoupled Weight Decay Regularization"](https://arxiv.org/abs/1711.05101),
+  ICLR 2019.

@@ -367,7 +367,7 @@ def layernormPure {α : Type} [Context α]
     throw s!"layernorm: seqLen must be > 0 (got {seqLen})"
 
 /-- Fold leading-axis concat over dynamic values that already share the same tail shape. -/
-def evalConcatAxis0Fold {α : Type} [Context α]
+def evalConcatLeadingAxisFold {α : Type} [Context α]
     (i : Nat) (nOut : Nat) (rest : Shape) (parents : List (DVal α)) :
     Except String (DVal α) := do
   let toSigma (pv : DVal α) : Except String (Sigma fun n => Tensor α (Shape.dim n rest)) := do
@@ -392,7 +392,7 @@ def evalConcatAxis0Fold {α : Type} [Context α]
           (fun acc nxt =>
             match acc, nxt with
             | ⟨n1, t1⟩, ⟨n2, t2⟩ =>
-                ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n := n1) (m := n2) (s := rest)
+                ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n := n1) (m := n2) (s := rest)
                   t1 t2⟩)
           s0
       match outSigma with
@@ -411,7 +411,7 @@ Evaluate a `concat` node from already evaluated parent values.
 
 The IR concat operation accepts any valid axis.  The tensor primitive concatenates along axis `0`,
 so the evaluator implements the generic case by moving the requested axis to the front, folding
-`Tensor.concatDim0Spec` over the permuted parents, and moving the result back.
+`Tensor.concatLeadingAxisSpec` over the permuted parents, and moving the result back.
 -/
 def evalConcat {α : Type} [Context α] [DecidableEq Shape]
     (i : Nat) (n : Node) (axis : Nat) (parents : List (DVal α)) : Except String (DVal α) := do
@@ -427,7 +427,7 @@ def evalConcat {α : Type} [Context α] [DecidableEq Shape]
   if axis = 0 then
     match n.outShape with
     | Shape.dim nOut rest =>
-        evalConcatAxis0Fold (α := α) i nOut rest parents
+        evalConcatLeadingAxisFold (α := α) i nOut rest parents
     | _ =>
         throw s!"IR eval: node {i}: concat expects rank≥1 outShape, got {repr n.outShape}"
   else
@@ -477,7 +477,7 @@ def evalConcat {α : Type} [Context α] [DecidableEq Shape]
               (fun acc nxt =>
                 match acc, nxt with
                 | ⟨n1, t1⟩, ⟨n2, t2⟩ =>
-                    ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n := n1) (m := n2) (s := rest)
+                    ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n := n1) (m := n2) (s := rest)
                       t1 t2⟩)
               s0
           match outSigma with
@@ -927,18 +927,14 @@ def evalAt
         match n.parents with
         | [pId] =>
             let p ← expectShape (α := α) (expected := n.outShape) (getParent pId)
-            -- Domain discipline: align IR denotation with the compiled runtime backend.
-            -- The raw `log` is treated as undefined on nonpositive inputs; both the compiler
-            -- (`IRExec.buildFrom`) and this evaluator model that by producing a default value
-            -- (in Lean, `panic!` reduces to `Inhabited.default`). Use `safeLogSpec`/`safeLogOp`
-            -- in models that require epsilon protection.
-            let t : Tensor α n.outShape :=
-              if Tensor.allSpec (α := α) (s := n.outShape) (fun v => decide (0 < v)) p then
-                Tensor.logSpec (α := α) p
-              else
-                panic!
-                  "IR eval: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection"
-            pure (DVal.mk (α := α) n.outShape t)
+            -- Domain discipline: raw `log` is undefined on nonpositive inputs. The evaluator
+            -- rejects that case explicitly; use `safeLogSpec`/`safeLogOp` in models that require
+            -- epsilon protection.
+            if Tensor.allSpec (α := α) (s := n.outShape) (fun v => decide (0 < v)) p then
+              pure (DVal.mk (α := α) n.outShape (Tensor.logSpec (α := α) p))
+            else
+              throw
+                "IR eval: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection"
         | _ => throw s!"IR eval: node {i}: log expects 1 parent ({n.summary})"
     | .inv =>
         match n.parents with

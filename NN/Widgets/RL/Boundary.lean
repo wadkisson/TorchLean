@@ -18,7 +18,7 @@ public meta import ProofWidgets.Demos.Macro
 This widget is the “trust boundary debugger” for TorchLean RL.
 
 It reads a Gymnasium-style rollout JSON file (typically produced by
-`scripts/rl/export_gymnasium_rollout.py`), validates every transition against a Lean-side
+`scripts/rl/export_gymnasium_rollout.py`), validates every transition against a Lean side
 `Runtime.RL.Boundary.Contract`, and renders a compact report:
 
 - number of transitions,

@@ -15,6 +15,7 @@ import argparse
 import pathlib
 import re
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -44,6 +45,134 @@ ALLOWED_LINTER_SUPPRESSION_FILES = {
     "NN/Tensor/API.lean",
 }
 
+# Documentation may mention producer-side environment variables only when the implementation hook
+# exists in source. This prevents guide text from advertising phantom integration flags.
+DOCUMENTED_ENV_VAR_IMPLEMENTATIONS = {
+    "ABCROWN_ARTIFACT_OUT": "scripts/verification/abcrown/export_leaf_artifact.py",
+}
+
+TRUST_BOUNDARY_DECL_REFS = {
+    "TorchLean.Floats.IEEE754.Float32Bridge.RuntimeFloat32MatchesIEEE32Exec": (
+        "NN/Floats/IEEEExec/BridgeInitFloat32.lean",
+        re.compile(r"\bclass\s+RuntimeFloat32MatchesIEEE32Exec\b"),
+    ),
+    "NN.MLTheory.CROWN.Graph.CrownCertSoundness.CrownTransferSound": (
+        "NN/MLTheory/CROWN/Proofs/GraphCrownCertSoundness.lean",
+        re.compile(r"\bdef\s+CrownTransferSound\b"),
+    ),
+    "NN.MLTheory.Proofs.UniversalApproximation.FloatIntervalApprox.OpsExact.Sound": (
+        "NN/MLTheory/Proofs/Approximation/FloatInterval/Semantics.lean",
+        re.compile(r"\bclass\s+Sound\s*:\s*Prop\b"),
+    ),
+}
+
+DOC_FACT_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(
+            r"leaf (?:artifact )?JSON format exported from (?:α,β-CROWN|alpha-beta-CROWN)",
+            flags=re.IGNORECASE,
+        ),
+        "TorchLean alpha-beta-CROWN leaf JSON is produced by TorchLean's converter from raw terminal-domain data; do not imply the external verifier natively exports the TorchLean schema.",
+    ),
+    (
+        re.compile(
+            r"Set\s+`?ABCROWN_ARTIFACT_OUT`?.{0,80}(?:before running|when running)\s+(?:α,β-CROWN|alpha-beta-CROWN)",
+            flags=re.IGNORECASE,
+        ),
+        "`ABCROWN_ARTIFACT_OUT` belongs to TorchLean's exporter/helper boundary around alpha-beta-CROWN.",
+    ),
+    (
+        re.compile(
+            r"(?:external tool|alpha-beta-CROWN)\s+writes\s+the\s+JSON",
+            flags=re.IGNORECASE,
+        ),
+        "TorchLean's alpha-beta-CROWN JSON schema is written by the TorchLean exporter/helper, not vanilla alpha-beta-CROWN.",
+    ),
+    (
+        re.compile(
+            r"Two-Stage tooling can emit a small JSON \*leaf\s+certificate\*",
+            flags=re.IGNORECASE,
+        ),
+        "Say that an instrumented external verifier exposes terminal domains and TorchLean's helper converts them; do not imply the external Two-Stage tooling natively emits TorchLean's schema.",
+    ),
+    (
+        re.compile(
+            r"External JSON artifacts are treated as untrusted\.\s+Checkers parse them, validate shapes, and compare\s+them against Lean recomputation",
+            flags=re.IGNORECASE,
+        ),
+        "Not every JSON artifact is recomputed in Lean; distinguish structural checks, recomputation checks, and theorem-backed checks.",
+    ),
+    (
+        re.compile(
+            r"A CUDA run proves that the CUDA path executed",
+            flags=re.IGNORECASE,
+        ),
+        "Reserve `prove` for Lean/checker claims; a CUDA run is runtime evidence, not a proof.",
+    ),
+    (
+        re.compile(
+            r"verified reverse mode autograd",
+            flags=re.IGNORECASE,
+        ),
+        "Do not imply all reverse-mode autograd is verified; say selected reverse-mode/autograd proofs.",
+    ),
+    (
+        re.compile(
+            r"bundled (?:α,β-CROWN|alpha-beta-CROWN) leaf certificate",
+            flags=re.IGNORECASE,
+        ),
+        "The bundled alpha-beta-CROWN file is a structural leaf artifact, not a proof-backed certificate.",
+    ),
+    (
+        re.compile(
+            r"External (?:α,β-CROWN|alpha-beta-CROWN) artifact.*JSON leaf certificate",
+            flags=re.IGNORECASE,
+        ),
+        "Call the alpha-beta-CROWN import a JSON leaf artifact unless the computation is replayed or proof-backed.",
+    ),
+    (
+        re.compile(
+            r"\bleaf_cert\.json\b|<cert\.json>|Output certificate path",
+            flags=re.IGNORECASE,
+        ),
+        "Alpha-beta-CROWN-facing docs and CLI help should use `leaf_artifact.json` / artifact wording; the checker is structural unless a separate proof/replay path is named.",
+    ),
+    (
+        re.compile(
+            r"Autograd correctness.*backprop computes the adjoint derivative",
+            flags=re.IGNORECASE,
+        ),
+        "Autograd correctness claims must name the supported tape node or graph fragment.",
+    ),
+    (
+        re.compile(
+            r"JSON \*leaf\s+certificate\*",
+            flags=re.IGNORECASE,
+        ),
+        "Use `leaf artifact` for alpha-beta-CROWN structural JSON unless the computation is replayed or proof-backed.",
+    ),
+    (
+        re.compile(
+            r"abcrown-leaf` to check a JSON certif(?:icate)? against TorchLean's semantics",
+            flags=re.IGNORECASE,
+        ),
+        "Use artifact wording: abcrown-leaf checks a converted structural leaf artifact plus a local witness predicate at the TorchLean boundary.",
+    ),
+]
+
+TORCHLEAN_SOURCE_LINK_RE = re.compile(
+    r"https://github\.com/lean-dojo/TorchLean/blob/main/([^\s\)\]`]+)"
+)
+
+DOCGEN_API_LINK_RE = re.compile(
+    r"""(?:['"(])(/docs/[A-Za-z0-9_./-]+\.html(?:#[A-Za-z0-9_'.:-]+)?)"""
+)
+
+LOCAL_SOURCE_REF_RE = re.compile(
+    r"`((?:NN|blueprint|home_page|scripts|csrc)/[^`\s]+"
+    r"\.(?:lean|md|py|json|sh|cu|c|h|yml|yaml))`"
+)
+
 PUBLIC_EXAMPLE_PREFIXES = (
     "NN/Examples/Quickstart/",
     "NN/Examples/Models/",
@@ -62,7 +191,7 @@ PUBLIC_GUIDE_PREFIXES = (
     "NN/Examples/Models/README.md",
     "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/",
     "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/",
-    "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/",
+    "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/",
 )
 
 PUBLIC_GUIDE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -123,12 +252,12 @@ PUBLIC_GUIDE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public guides should say `Trainer.stepEpochLR`, not `train.stepEpochLR`.",
     ),
     (
-        re.compile(r"\btrain\.Advanced\b"),
-        "public guides should say `Trainer.Advanced` for escape-hatch code, not `train.Advanced`.",
+        re.compile(r"\btrain\.Manual\b"),
+        "public guides should say `Trainer.Manual` for escape-hatch code, not `train.Manual`.",
     ),
     (
-        re.compile(r"\bNN\.API\.train\.Advanced\b"),
-        "public guides should not teach the internal `NN.API.train.Advanced` namespace; explain it as an advanced runtime escape hatch.",
+        re.compile(r"\bNN\.API\.train\.Manual\b"),
+        "public guides should not teach the internal `NN.API.train.Manual` namespace; explain it as a manual runtime escape hatch.",
     ),
 ]
 
@@ -170,16 +299,16 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public examples should not expose `TaskRunner`; use `Trainer`/`Module` helpers instead.",
     ),
     (
-        re.compile(r"\bTrainer\.Advanced\.trainLoaderWith\b"),
-        "public examples should use `Trainer.RunConfig` + `Trainer.TrainOptions` with `trainer.train`, not `Trainer.Advanced.trainLoaderWith`.",
+        re.compile(r"\bTrainer\.Manual\.trainLoaderWith\b"),
+        "public examples should use `Trainer.RunConfig` + `Trainer.TrainOptions` with `trainer.train`, not `Trainer.Manual.trainLoaderWith`.",
     ),
     (
-        re.compile(r"\bTrainer\.Advanced\.logLossEvery\b"),
-        "public examples should keep logging inline or use `Trainer.TrainSummary`; do not expose `Trainer.Advanced.logLossEvery`.",
+        re.compile(r"\bTrainer\.Manual\.logLossEvery\b"),
+        "public examples should keep logging inline or use `Trainer.TrainSummary`; do not expose `Trainer.Manual.logLossEvery`.",
     ),
     (
         re.compile(r"\bfitWithParams\b"),
-        "public examples should prefer `fitWithCompiledForward1` or other public trainer/verifier bridges instead of reopening raw post-training parameter callbacks.",
+        "public examples should prefer the public trainer/verifier bridges instead of reopening raw post-training parameter callbacks.",
     ),
     (
         re.compile(r"\bTList\b"),
@@ -190,24 +319,24 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public examples should not expose raw `tlist` packs; use public tensor/model helpers instead.",
     ),
     (
-        re.compile(r"\bModule\.instantiateWithOptions\b"),
-        "public examples should use `Module.instantiate`, `Module.instantiateMse`, or `Module.instantiateCrossEntropyOneHot`, not `Module.instantiateWithOptions` directly.",
+        re.compile(r"\bModule\.instantiateConfigured\b"),
+        "public examples should use `Module.instantiate`, `Module.instantiateMse`, or `Module.instantiateCrossEntropyOneHot`, not `Module.instantiateConfigured` directly.",
     ),
     (
         re.compile(r"\bTorchLean\.Module\.run\b"),
-        "public examples should use `Runtime.runFloat`, `Runtime.withOptions`, or `ModelZoo.runFloat`, not the raw `TorchLean.Module.run` dispatcher.",
+        "public examples should use `Runtime.runFloat` or `Runtime.withOptions`, not the raw `TorchLean.Module.run` dispatcher.",
     ),
     (
-        re.compile(r"\bRuntime\.withSelected(NoCast)?\b"),
-        "public examples should use `Runtime.withOptions` / `Runtime.withOptionsNoCast`, which pass parsed runtime options through the facade.",
+        re.compile(r"\bRuntime\.withSelected(Scalar)?\b"),
+        "public examples should use `Runtime.withOptions` / `Runtime.withOptionsScalar`, which pass parsed runtime options through the facade.",
     ),
     (
         re.compile(r"\bModule\.(withMseModel|withCrossEntropyOneHotModel|withScalarLossModel)\b"),
         "public model/example training should use `Trainer.*` handles, not raw `Module.with*Model` setup.",
     ),
     (
-        re.compile(r"\bModule\.(lossScalar|optimizerStep|predict1|predict1NoGrad)\b"),
-        "public model/example training should use trained handles (`trained.predict`, callbacks, or `verify`), not raw module stepping/prediction.",
+        re.compile(r"\bModule\.(lossScalar|optimizerStep)\b"),
+        "public model/example training should use trained handles (`trained.predict`, callbacks, or `verify`), not raw module stepping.",
     ),
     (
         re.compile(
@@ -582,6 +711,49 @@ def _mask_lean_comments_and_strings(text: str) -> str:
     return "".join(out)
 
 
+def _check_local_source_refs(path: pathlib.Path, text: str, findings: list[Finding]) -> None:
+    """Check backtick-quoted local source paths in authored docs/comments."""
+
+    for m in LOCAL_SOURCE_REF_RE.finditer(text):
+        raw_target = m.group(1).split("#", 1)[0]
+        if any(marker in raw_target for marker in ("*", "<", ">", "...")):
+            continue
+        target = pathlib.Path(urllib.parse.unquote(raw_target))
+        if target.is_absolute():
+            continue
+        if not (REPO_ROOT / target).exists():
+            line, col = _line_col(text, m.start())
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"dead local source reference: `{raw_target}` does not exist in this checkout.",
+                )
+            )
+
+
+def _check_docgen_api_links(path: pathlib.Path, text: str, findings: list[Finding]) -> None:
+    """Check website links to generated API pages against the corresponding Lean source."""
+
+    for m in DOCGEN_API_LINK_RE.finditer(text):
+        url = urllib.parse.unquote(m.group(1))
+        module_path = url.removeprefix("/docs/").split("#", 1)[0].removesuffix(".html")
+        target = REPO_ROOT / f"{module_path}.lean"
+        if not target.exists():
+            line, col = _line_col(text, m.start())
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"dead generated API link: `/docs/{module_path}.html` has no `{module_path}.lean` source.",
+                )
+            )
+
+
 def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
     """Run TorchLean's repository hygiene checks and return all findings."""
     findings: list[Finding] = []
@@ -614,6 +786,108 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
     except OSError as e:
         scripts_readme_text = ""
         findings.append(Finding("ERROR", scripts_readme, None, None, f"failed to read file: {e}"))
+
+    for env_var, rel_impl in DOCUMENTED_ENV_VAR_IMPLEMENTATIONS.items():
+        docs_mention = False
+        for path in list(REPO_ROOT.glob("README.md")) + list((REPO_ROOT / "blueprint").rglob("*.lean")) + list((REPO_ROOT / "home_page").rglob("*.md")):
+            if any(part in {"_site", "docs", "vendor"} for part in path.relative_to(REPO_ROOT).parts):
+                continue
+            try:
+                if env_var in path.read_text(encoding="utf-8"):
+                    docs_mention = True
+                    break
+            except OSError:
+                continue
+        if docs_mention:
+            impl = REPO_ROOT / rel_impl
+            try:
+                impl_text = impl.read_text(encoding="utf-8")
+            except OSError as e:
+                findings.append(Finding("ERROR", impl, None, None, f"documented env var `{env_var}` has no readable implementation: {e}"))
+                continue
+            if env_var not in impl_text:
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        impl,
+                        None,
+                        None,
+                        f"documented env var `{env_var}` is not implemented in its declared producer helper.",
+                    )
+                )
+
+    trust_file = REPO_ROOT / "TRUST_BOUNDARIES.md"
+    try:
+        trust_text = trust_file.read_text(encoding="utf-8")
+    except OSError as e:
+        trust_text = ""
+        findings.append(Finding("ERROR", trust_file, None, None, f"failed to read file: {e}"))
+
+    for fq_name, (rel_source, decl_re) in TRUST_BOUNDARY_DECL_REFS.items():
+        if fq_name not in trust_text:
+            findings.append(
+                Finding(
+                    "ERROR",
+                    trust_file,
+                    None,
+                    None,
+                    f"trust-boundary declaration `{fq_name}` is missing from TRUST_BOUNDARIES.md.",
+                )
+            )
+        source = REPO_ROOT / rel_source
+        try:
+            source_text = source.read_text(encoding="utf-8")
+        except OSError as e:
+            findings.append(Finding("ERROR", source, None, None, f"failed to read file: {e}"))
+            continue
+        if not decl_re.search(source_text):
+            findings.append(
+                Finding(
+                    "ERROR",
+                    source,
+                    None,
+                    None,
+                    f"TRUST_BOUNDARIES.md cites `{fq_name}`, but the expected declaration was not found.",
+                )
+            )
+
+    doc_fact_paths = (
+        list(REPO_ROOT.glob("README.md"))
+        + list(REPO_ROOT.glob("TRUST_BOUNDARIES.md"))
+        + list(REPO_ROOT.glob("THIRD_PARTY_NOTICES.md"))
+        + list((REPO_ROOT / "blueprint").rglob("*.lean"))
+        + list((REPO_ROOT / "home_page").rglob("*.md"))
+        + list((REPO_ROOT / "NN").rglob("*.md"))
+        + list((REPO_ROOT / "scripts").rglob("*.md"))
+    )
+    for path in doc_fact_paths:
+        if any(part in {"_site", "docs", "vendor"} for part in path.relative_to(REPO_ROOT).parts):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if path.suffix != ".lean":
+            _check_local_source_refs(path, text, findings)
+            _check_docgen_api_links(path, text, findings)
+        for rx, msg in DOC_FACT_BANNED_PATTERNS:
+            for m in rx.finditer(text):
+                line, col = _line_col(text, m.start())
+                findings.append(Finding("ERROR", path, line, col, msg))
+        for m in TORCHLEAN_SOURCE_LINK_RE.finditer(text):
+            raw_target = m.group(1).split("#", 1)[0]
+            target = urllib.parse.unquote(raw_target)
+            if not (REPO_ROOT / target).exists():
+                line, col = _line_col(text, m.start())
+                findings.append(
+                    Finding(
+                        "ERROR",
+                        path,
+                        line,
+                        col,
+                        f"dead TorchLean source link: `{raw_target}` does not exist in this checkout.",
+                    )
+                )
 
     for path in _iter_script_files():
         rel = path.relative_to(REPO_ROOT).as_posix()
@@ -699,6 +973,7 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
 
         text = raw.decode("utf-8", errors="replace")
         masked = _mask_lean_comments_and_strings(text)
+        _check_local_source_refs(path, text, findings)
 
         if not _has_nn_header(path, text):
             findings.append(

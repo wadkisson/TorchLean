@@ -21,8 +21,8 @@ We formalized this layer so those predicates have names inside Lean. Runtime dia
 matter, but they are not silently upgraded into theorems. The recurring pattern is:
 
 - state a mathematical predicate such as privacy, robustness, or stability;
-- compute a runtime diagnostic or artifact when that is useful evidence;
-- add a bridge theorem when the artifact is meant to support a formal claim.
+- compute a runtime diagnostic or artifact when that evidence matters;
+- add a bridge theorem when an artifact is used to support a formal claim.
 
 The same discipline appears elsewhere in TorchLean. Specifications say what the claim means,
 runtime code computes evidence or artifacts, and proofs connect checked hypotheses to the theorem
@@ -43,8 +43,8 @@ The learning theory material is organized around five concrete objects:
 - *Ridge regression case study*: a one dimensional strongly regularized ERM theorem, with a real
   stability theorem plus an `IEEE32Exec` execution bridge.
 
-The API links in the sections below point to the exact declarations, but the guide should be read
-from left to right: first the definition, then the theorem shape, then the runtime boundary.
+Read each section in the same order: first the definition, then the theorem shape, then the runtime
+boundary. The source links point to the exact declarations.
 
 # Differential Privacy
 
@@ -74,16 +74,30 @@ The file also proves two closure facts we expect to reuse in larger developments
   `δ₂ ≥ δ₁`.
 - `differentialPrivacy_postprocess`: measurable post processing preserves DP.
 
-That second theorem is the practical bridge to mainstream stacks. In ordinary ML code, we often
+That second theorem is the practical bridge to ordinary ML practice. In training code, we often
 train a private model and then pass it through exporters, evaluators, dashboards, or downstream
 selection logic. The DP theorem says the post processing step does not need to inspect the private
 input again. TorchLean states that as a Lean theorem rather than relying on a comment.
+
+Concrete names to look for:
+
+```
+#check NN.MLTheory.LearningTheory.DifferentialPrivacy.DifferentialPrivacy
+#check NN.MLTheory.LearningTheory.DifferentialPrivacy.differentialPrivacy_mono_delta
+#check NN.MLTheory.LearningTheory.DifferentialPrivacy.differentialPrivacy_postprocess
+```
 
 The theorem shape is:
 
 $$`M\ \text{is}\ (\varepsilon,\delta)\text{-DP}
 \quad\Longrightarrow\quad
 f\circ M\ \text{is}\ (\varepsilon,\delta)\text{-DP}.`
+
+The reference point is the standard DP event inequality from Dwork, McSherry, Nissim, and Smith,
+["Calibrating Noise to Sensitivity in Private Data Analysis"](https://link.springer.com/chapter/10.1007/11681878_14)
+(TCC 2006). TorchLean's current definitions name the property and closure rules; they are not a
+claim that a particular optimizer is DP-SGD. A DP-SGD theorem would still need the sampling,
+clipping, noise calibration, and composition accounting hypotheses.
 
 # Robustness: Spec Versus Runtime
 
@@ -106,9 +120,9 @@ The spec side works over TorchLean tensors without committing to one runtime sca
 - contraction mappings,
 - local sensitivity ratios.
 
-This is the vocabulary used by proof developments. For example, a certified robustness claim should
-say that the classifier is constant on an `ε` ball, not merely that a search attack failed to find an
-adversarial point.
+Proof developments use this vocabulary. For example, a certified robustness claim should say that
+the classifier is constant on an `ε` ball. A failed search attack is evidence, but it is not the
+certificate.
 
 A typical local robustness predicate has the form:
 
@@ -155,11 +169,26 @@ The theorem shape is the standard uniform stability inequality:
 $$`\forall S,S^{(i)},z,\qquad
 |\ell(A(S),z)-\ell(A(S^{(i)}),z)|\le \beta.`
 
+Concrete declarations:
+
+```
+#check NN.MLTheory.LearningTheory.Stability.Dataset
+#check NN.MLTheory.LearningTheory.Stability.replaceAt
+#check NN.MLTheory.LearningTheory.Stability.removeAt
+#check NN.MLTheory.LearningTheory.Stability.UniformStableReplace
+#check NN.MLTheory.LearningTheory.Stability.UniformStability
+```
+
+The classical reference is Bousquet and Elisseeff,
+["Stability and Generalization"](https://jmlr.org/papers/v2/bousquet02a.html) (JMLR 2002). The
+TorchLean definitions follow the same proof habit: first make the perturbation of the dataset
+explicit, then state how much the learned loss can change.
+
 # Dynamical Stability
 
 The stability entrypoint also imports
 [NN.MLTheory.LearningTheory.Stability.Dynamics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Dynamics.lean).
-This is for recurrence systems, such as `x_{t+1} = f x_t`, and for systems driven by inputs, where
+This covers recurrence systems, such as `x_{t+1} = f x_t`, and systems driven by inputs, where
 the next state depends on an input sequence. The spec file
 [Dynamics.Spec](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Dynamics/Spec.lean) names predicates
 such as Lyapunov stability, asymptotic stability, exponential stability, input to state stability,
@@ -168,10 +197,10 @@ stability. The runtime file
 [Dynamics.Runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Dynamics/Runtime.lean) provides
 `Float` diagnostics for concrete systems.
 
-This matters for neural networks because not every learning theory question is a static supervised
-learning theorem. Recurrent models, samplers, controllers, RL policies interacting with
-state, and learned dynamical systems all need language for trajectories. Again, the runtime side is
-empirical unless a theorem connects the observed diagnostic to the spec predicate.
+Neural-network learning theory is not limited to static supervised learning. Recurrent models,
+samplers, controllers, RL policies interacting with state, and learned dynamical systems all need
+language for trajectories. The runtime side is empirical unless a theorem connects the observed
+diagnostic to the spec predicate.
 
 # Ridge Regression As A Worked Theorem
 
@@ -180,8 +209,8 @@ The most concrete learning theory development is
 It proves a replace one uniform stability bound for one dimensional ridge regression with squared
 loss under bounded inputs.
 
-The theorem follows the classical strongly convex ERM argument, but the file does it in a deliberately
-small setting so the proof is inspectable:
+The theorem follows the classical strongly convex ERM argument in a small setting, so the proof is
+inspectable:
 
 1. Each example is a bounded pair `(x, y)` with `|x| <= X` and `|y| <= Y`.
 2. The closed form fit is
@@ -202,6 +231,17 @@ The dataset is the same `Dataset` representation from the stability core. The bo
 assumptions are carried by types and hypotheses. The final statement is a Lean theorem, not a prose
 claim next to a Python implementation.
 
+The headline theorem name is:
+
+```
+#check NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.ridgeFit1D_sqLoss_uniformStableReplace
+```
+
+A reader should notice what this theorem does and does not say. It proves a real-valued stability
+bound for the closed-form ridge estimator under bounded data and positive regularization. It does
+not say that an arbitrary minibatch trainer, an iterative solver stopped early, or a float32
+implementation has the same bound. Those variants need their own algorithm and numerical bridge.
+
 # Runtime And Spec Splits
 
 The learning theory tree repeats a pattern: a spec predicate or theorem is kept
@@ -220,9 +260,36 @@ The IEEE32Exec side implements the algorithm with TorchLean's executable binary3
 the bridge to a proof level round after each primitive semantics under explicit finiteness
 conditions.
 
-That is the same numerics philosophy used elsewhere in TorchLean. A theorem over the reals is not
+The numerics philosophy is the same one used elsewhere in TorchLean. A theorem over the reals is not
 automatically a native float theorem. We first prove the clean mathematical result, then separately
 state what finite precision execution means and which hypotheses are needed to connect it.
+
+The executable ridge bridge is deliberately narrow:
+
+```
+#check NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.IEEE32Exec.ridgeFit1DExec
+#check NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.IEEE32Exec.ridgeFit1D_execExpr_toReal_eq_fp32Spec_of_finiteEval
+```
+
+The second theorem is a finite-evaluation bridge: if the executable expression evaluates finitely,
+its real interpretation agrees with the proof-level FP32 expression. That is not a stability theorem
+by itself. It is one bridge that can be composed with a stability theorem when the remaining
+rounded-arithmetic error bounds have also been supplied.
+
+# Learning Theory Claim Checklist
+
+For a learning theory claim, the guide should make four fields visible:
+
+```
+object       : mechanism, classifier, algorithm, dataset, trajectory, or estimator
+property     : privacy, robustness, stability, convergence, or bounded residual
+evidence     : theorem, checker, runtime diagnostic, or imported artifact
+boundary     : real semantics, FP32/IEEE32Exec bridge, or external producer assumption
+```
+
+This checklist is intentionally plain. It prevents a sampled diagnostic from being described as a
+certificate, and it prevents a real-valued theorem from being described as a deployment guarantee
+without a numerical bridge.
 
 # A Concrete Comparison To Mainstream Stacks
 
@@ -243,6 +310,15 @@ Here is the practical difference we are aiming for:
 This does not make TorchLean automatically prove every learning theory theorem. It makes the boundary
 between theorem, checker, diagnostic, and assumption harder to blur.
 
+# References
+
+- Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith,
+  ["Calibrating Noise to Sensitivity in Private Data Analysis"](https://link.springer.com/chapter/10.1007/11681878_14),
+  TCC 2006.
+- Olivier Bousquet and Andre Elisseeff,
+  ["Stability and Generalization"](https://jmlr.org/papers/v2/bousquet02a.html),
+  JMLR 2002.
+
 # Suggested Path Through The Theory
 
 For readers coming in fresh, we recommend this first pass:
@@ -261,5 +337,5 @@ For readers coming in fresh, we recommend this first pass:
    when you want the finite precision bridge.
 
 The common voice across this layer is intentional: we built small, named definitions first, then
-attached runtime checks and proof obligations to them. That is how TorchLean lets ML engineering
-and formal learning theory live in the same codebase without treating them as the same activity.
+attached runtime checks and proof obligations to them. TorchLean can then keep ML engineering and
+formal learning theory in the same codebase without treating them as the same activity.

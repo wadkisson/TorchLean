@@ -8,25 +8,32 @@ neural-network programs. It provides typed tensors and model APIs, a shared grap
 IR, runtime/autograd support, finite-precision semantics, certificate checkers,
 CUDA/runtime boundaries, and examples across modern ML and scientific ML.
 
+The project is organized around one discipline: keep the object of the claim
+visible. A classifier, FNO, PINN residual, optimizer step, imported checkpoint,
+or verifier certificate should not become a loose collection of scripts once it
+starts running. TorchLean gives those objects Lean names, executable paths, graph
+representations, and theorem or checker APIs where the current library has
+support.
+
 ## Quickstart
 
 ```bash
 git clone https://github.com/lean-dojo/TorchLean.git
 cd TorchLean
 lake build
-python3 scripts/datasets/download_example_data.py --auto-mpg
-lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean mlp --steps 10 --dtype float --backend eager
+lake exe torchlean quickstart_mlp --cpu --steps 10 --dtype float32 --backend eager
+lake exe torchlean quickstart_mlp --cpu --steps 10 --dtype float --backend eager
 
 # Optional CUDA run, if the CUDA toolkit and an NVIDIA GPU are available:
 lake build -K cuda=true
 lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000
 ```
 
-The first MLP command uses the executable IEEE-style Float32 path. The second
-uses Lean's builtin `Float` runtime path. The CUDA command uses the native GPU
-runtime path and checks that the CUDA backend is available; it is not a trusted
-proof boundary.
+The first quickstart uses TorchLean's executable IEEE-style Float32 scalar. The
+second uses Lean's builtin `Float` runtime path. The CUDA command uses the
+native GPU runtime path and checks that the CUDA backend is available. Theorem
+statements that mention CUDA cite the native-runtime boundary in
+`TRUST_BOUNDARIES.md` instead of treating a kernel launch as Lean proof evidence.
 
 TorchLean is pinned by `lean-toolchain` and currently builds with
 `leanprover/lean4:v4.31.0`.
@@ -60,8 +67,8 @@ def trainOnce : IO Unit := do
         optimizer := optim.sgd { lr := 0.05 }
         backend := .compiled
         dtype := .float32 }
-  let y0 ← trainer.eval (tensorND! [2] [0.5, -0.25])
-  IO.println s!"initial={Tensor.pretty y0}"
+  let initialPrediction ← trainer.predict (tensorND! [2] [0.5, -0.25])
+  IO.println s!"initial={Tensor.pretty initialPrediction}"
   let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
   trained.printSummary
 ```
@@ -74,24 +81,43 @@ lake exe verify --help
 lake exe verify -- torchlean-ibp
 ```
 
-For the maintained example surface:
+For the maintained examples:
 
 ```bash
 lake build NN.Examples.Zoo
 ```
 
+The public API is centered around `Trainer.new`. A trainer owns the model, task, optimizer, runtime
+backend, scalar mode, and seed. It can run one prediction with `trainer.predict`, run training with
+`trainer.train`, and return a trained handle whose `predict`, `predictBatch`, and `verify` methods
+reuse the trained parameters. Verification commands use the same idea at the artifact level: the
+CLI names the graph, certificate, dataset, or external producer boundary being checked.
+
+Backend selection is an option on the same model. Eager execution, compiled graph execution, CUDA
+runtime paths, and selected external forward-kernel providers are not separate public meanings of
+the network. When a fast runtime supplies a value, TorchLean still records the graph, tape, payload,
+or checker object that later statements refer to. If a path cannot preserve that relationship for
+training, it belongs behind an explicit runtime boundary or fallback.
+
+The maintained command set currently includes quickstarts, supervised models, CNN/ViT, GPT-style
+text, Mamba, diffusion, FNO Burgers, PPO/DQN, PyTorch round trips, data loaders, floating-point
+deep dives, GraphSpec, BugZoo, and verification workflows such as `torchlean-ibp`,
+`torchlean-crown-ops`, `abcrown-leaf`, `pinn-cert`, `pinn-dataset-check`, `digits-train-certify`,
+and `vnncomp-mnistfc`.
+
 ## Documentation
 
 - Project site: <https://lean-dojo.github.io/TorchLean/>
 - Guide: <https://lean-dojo.github.io/TorchLean/blueprint/>
-- API reference: <https://lean-dojo.github.io/TorchLean/docs/>
+- Examples: <https://lean-dojo.github.io/TorchLean/examples/>
+- Module graph: <https://lean-dojo.github.io/TorchLean/graphs/>
 - Updates and recent validation notes: <https://lean-dojo.github.io/TorchLean/updates/>
 - Paper: [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631)
   (arXiv:2602.22631)
 
-Detailed tutorials, verification chapters, model walkthroughs, CUDA notes, and
-API-level reference material belong in the guide and generated docs rather than
-in this README.
+For a first pass, read the guide and examples together: the guide explains the objects, and the
+examples show the commands that produce them. Use the source tree for exact declarations and the
+graph page for module ownership.
 
 ## Use TorchLean From Another Lean Project
 
@@ -136,7 +162,7 @@ require TorchLean from "../TorchLean"
   PyTorch import/export, and RL runtime support.
 - `NN/IR` and `NN/GraphSpec`: graph IR, graph semantics, and typed architecture
   descriptions.
-- `NN/Proofs`: tensor algebra, autograd correctness, analytic derivatives,
+- `NN/Proofs`: tensor algebra, selected autograd correctness theorems, analytic derivatives,
   runtime approximation, and bridge proofs.
 - `NN/Floats`: finite-precision models, IEEE-style executable semantics,
   NeuralFloat formats, and error-bound infrastructure.
@@ -147,6 +173,44 @@ require TorchLean from "../TorchLean"
   and interoperability workflows.
 - `blueprint/TorchLeanBlueprint/Guide`: source for the public guide.
 - `home_page`: project website sources.
+
+## Current Capabilities
+
+The same rule applies across the tree: name the object, name the artifact, and name the boundary.
+
+- **Training and runtime.** `Trainer.new` supports supervised tasks, scalar/backend choices,
+  trained handles, prediction, logs, typed step streams, generated or file-backed batches, and
+  optional CUDA-backed Float32 runtime paths. Public code should look like one trainer with selected
+  backend options, not one public forward method per backend.
+- **Graphs and compiler fragments.** TorchLean models can be lowered to a shared IR. A first-order
+  forward fragment has Lean-side compiler-correctness theorems, and coverage grows operation by
+  operation. GraphSpec describes typed architectures above the lower-level op-tagged DAG consumed by
+  runtime, widgets, exporters, and verification passes.
+- **Verification.** The repository includes IBP/CROWN-style graph checks, α/β-CROWN-style artifact
+  replay, robustness workflows, VNN-COMP-style MNIST checks, PINN residual checks, ODE corridors,
+  spline certificates, and 3D geometry projection certificates. External producers write compact
+  artifacts; Lean parses the artifact, checks the stated predicate, and records any remaining
+  producer assumptions.
+- **ML theory.** The theory layer covers CROWN/LiRPA objects, optimizer laws, Muon
+  orthogonalization certificates, learning-theory examples, generative objective identities,
+  self-supervised-learning algebra, approximation theorems, and floating-point bridges. Optimizers
+  use a generic `TensorOptimizer`/`StepSpec` interface so new update rules can share stream laws
+  before proving optimizer-specific facts.
+- **Scientific ML.** The FNO Burgers and PINN/ODE paths show how numerical artifacts can be carried
+  back into Lean checks. External simulators and optimizers remain named producers; Lean owns the
+  artifact schemas, residual predicates, dataset checks, and certificate replay statements that sit
+  at the verification boundary.
+
+## What To Cite For A Claim
+
+| Claim shape | Where to look |
+| --- | --- |
+| "This model runs and trains" | `NN/Examples`, `NN/Runtime`, command output, and regression tests. |
+| "This graph has a checked bound/certificate" | `NN/Verification`, `NN/MLTheory/CROWN`, and the artifact schema named by the command. |
+| "This compilation/evaluation fragment preserves meaning" | `NN/Verification/TorchLean/Proved` and the theorem imported through `NN.Entrypoint.Verification`. |
+| "This optimizer update follows the intended equation" | `NN/Runtime/Optim` for executable equations and `NN/MLTheory/Optimization` for reusable laws. |
+| "This finite-precision statement has a formal model" | `NN/Floats`, `NN/Proofs/RuntimeApprox`, and the relevant bridge hypotheses. |
+| "This CUDA/PyTorch/ATen/Julia/Gymnasium path was used" | `TRUST_BOUNDARIES.md`, the runtime module docstring, and the command or artifact provenance. |
 
 ## Correctness and Boundaries
 
@@ -161,21 +225,10 @@ Lean proofs, executable checkers, Lake builds, tests, and explicit
 trust-boundary documentation are the source of truth for what is proved,
 checked, or assumed.
 
-## Citation
+## Paper
 
-For the current paper BibTeX, use the citation metadata on arXiv:
-
-```bibtex
-@misc{george2026torchleanformalizingneuralnetworks,
-      title={TorchLean: Formalizing Neural Networks in Lean},
-      author={Robert Joseph George and Jennifer Cruden and Will Adkisson and Xiangru Zhong and Huan Zhang and Anima Anandkumar},
-      year={2026},
-      eprint={2602.22631},
-      archivePrefix={arXiv},
-      primaryClass={cs.MS},
-      url={https://arxiv.org/abs/2602.22631},
-}
-```
+TorchLean is described in the arXiv preprint
+[TorchLean: Formalizing Neural Networks in Lean](https://arxiv.org/abs/2602.22631).
 
 ## License
 

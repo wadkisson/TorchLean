@@ -5,22 +5,23 @@ from typing import Any
 
 from common import affine_interval, centered_box, write_json
 
-# GRU gate graph: 0=input(3) -> 1=linear -> 2=sigmoid; 0 -> 3=linear -> 4=tanh; 5=mul_elem
+# GRU gate graph:
+# input -> gate linear -> sigmoid; input -> candidate linear -> tanh; multiply both branches.
 
 n = 3
 
 
 def seed_params():
     """Return deterministic shared gate weights and biases."""
-    W = [[float(1 + (i + j)) for j in range(n)] for i in range(n)]
-    b = [float(i) for i in range(n)]
-    return W, b
+    weight = [[float(1 + (i + j)) for j in range(n)] for i in range(n)]
+    bias = [float(i) for i in range(n)]
+    return weight, bias
 
 
 def seed_input_box(eps: float = 0.5):
     """Return the input interval box centered at `[1, 2, 3]`."""
-    x0 = [float(i + 1) for i in range(n)]
-    return centered_box(x0, eps)
+    input_center = [float(i + 1) for i in range(n)]
+    return centered_box(input_center, eps)
 
 
 def ibp_sigmoid(lo: list[float], hi: list[float]) -> tuple[list[float], list[float]]:
@@ -61,28 +62,25 @@ def ibp_mul_elem(
     lo = []
     hi = []
     for lx, ux, ly, uy in zip(x_lo, x_hi, y_lo, y_hi):
-        p1 = lx * ly
-        p2 = lx * uy
-        p3 = ux * ly
-        p4 = ux * uy
-        lo.append(min(p1, p2, p3, p4))
-        hi.append(max(p1, p2, p3, p4))
+        products = [lx * ly, lx * uy, ux * ly, ux * uy]
+        lo.append(min(products))
+        hi.append(max(products))
     return lo, hi
 
 
 def run_ibp() -> dict[str, Any]:
     """Compute the GRU-gate certificate payload consumed by Lean."""
-    W, b = seed_params()
+    weight, bias = seed_params()
     x_lo, x_hi = seed_input_box(0.5)
-    a_lo, a_hi = affine_interval(W, b, x_lo, x_hi)  # node 1
-    s_lo, s_hi = ibp_sigmoid(a_lo, a_hi)       # node 2
-    b_lo, b_hi = affine_interval(W, b, x_lo, x_hi)  # node 3
-    t_lo, t_hi = ibp_tanh(b_lo, b_hi)          # node 4
-    y_lo, y_hi = ibp_mul_elem(s_lo, s_hi, t_lo, t_hi)  # node 5
+    gate_lo, gate_hi = affine_interval(weight, bias, x_lo, x_hi)
+    sigmoid_lo, sigmoid_hi = ibp_sigmoid(gate_lo, gate_hi)
+    candidate_lo, candidate_hi = affine_interval(weight, bias, x_lo, x_hi)
+    tanh_lo, tanh_hi = ibp_tanh(candidate_lo, candidate_hi)
+    output_lo, output_hi = ibp_mul_elem(sigmoid_lo, sigmoid_hi, tanh_lo, tanh_hi)
     return {
         "graph": "gru_gate_workflow_v1",
         "input_box": {"id": 0, "dim": n, "lo": x_lo, "hi": x_hi},
-        "result": {"node_id": 5, "dim": n, "lo": y_lo, "hi": y_hi},
+        "result": {"node_id": 5, "dim": n, "lo": output_lo, "hi": output_hi},
     }
 
 

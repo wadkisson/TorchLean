@@ -263,16 +263,14 @@ def evalNode
       pure <| DVal.mk (α := α) s (Tensor.expSpec (α := α) tx)
   | .log (s := s) x =>
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
-      -- Domain discipline: align the verified execution model with the IR semantics and compiled
-      -- runtime backend. The raw `log` is treated as undefined on nonpositive inputs; use
-      -- `safe_log` in models that require epsilon protection.
-      let y : Tensor α s :=
-        if Tensor.allSpec (α := α) (s := s) (fun v => decide (0 < v)) tx then
-          Tensor.logSpec (α := α) tx
-        else
-          panic!
-            "TorchLeanVerified: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection"
-      pure <| DVal.mk (α := α) s y
+      -- Domain discipline: align the verified execution model with the IR semantics. The raw
+      -- `log` is treated as undefined on nonpositive inputs; use `safe_log` in models that require
+      -- epsilon protection.
+      if Tensor.allSpec (α := α) (s := s) (fun v => decide (0 < v)) tx then
+        pure <| DVal.mk (α := α) s (Tensor.logSpec (α := α) tx)
+      else
+        throw
+          "IR eval: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection"
   | .inv (s := s) x =>
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       pure <| DVal.mk (α := α) s (Tensor.invSpec (α := α) tx)
@@ -386,7 +384,7 @@ Evaluate a verified forward fragment program.
 This is the top-level evaluator for `Program`: it initializes the context with the input value and
 then interprets the SSA let-chain.
 -/
-def evalForward1
+def evalForward
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (p : Program α paramShapes inShape outShape)

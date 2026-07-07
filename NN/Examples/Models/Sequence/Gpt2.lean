@@ -4,7 +4,7 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 CUDA text example:
-  lake build -R -K cuda=true && lake exe torchlean gpt2 --cuda --steps 1 --windows 1 --generate 0
+  lake exe -K cuda=true torchlean gpt2 --cuda --steps 1 --windows 1 --generate 0
   lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --prompt "First Citizen:" --steps 1 \
     --windows 1 --generate 0 --temperature 0.85 --top-k 12 --sample-seed 7
   lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 \
@@ -57,7 +57,7 @@ wiring and save/reload loop.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake build -R -K cuda=true && lake exe torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 -/
 
@@ -288,13 +288,13 @@ def unitTrainStepsFloat (opts : Options) (input : String)
       log := .disabled
       loadParams? := train.loadParams?
       saveParams? := train.saveParams? }
-  let (L0, L1) ←
+  let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some train.steps) (lr? := some train.lr)
 
-  let logits0 ← trained.eval (Sample.x reportSample)
-  printPredictionReport "after " train.prompt logits0
-  let generatedIds ← generateSampled trained.eval train.prompt train.generate
+  let afterLogits ← trained.predict (Sample.x reportSample)
+  printPredictionReport "after " train.prompt afterLogits
+  let generatedIds ← generateSampled trained.predict train.prompt train.generate
     train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty train.asciiOnly
   let generated := text.escapeByteIdsForDisplay generatedIds
   IO.println s!"  generated={generated}"
@@ -302,19 +302,19 @@ def unitTrainStepsFloat (opts : Options) (input : String)
   IO.println s!"  sampling=top_k({train.topK}), temperature={train.temperature}, seed={train.seed}"
   IO.println s!"  repetition_penalty={train.repeatPenalty} repeat_window={train.repeatWindow}"
   if train.interactive then
-    interactiveLoopFloat trained.eval train
+    interactiveLoopFloat trained.predict train
   let cudaMemWatch := ModelZoo.effectiveCudaMemWatch opts train.steps train.cudaMemWatch
   text.writeGenerationTrainLog
-    train.log "GPT-2 byte prompt training" train.steps L0 L1
+    train.log "GPT-2 byte prompt training" train.steps beforeLoss afterLoss
     train.toGenerationOptions generated
     #[ModelZoo.deviceNote opts,
       s!"windows={train.windows}",
       s!"cuda_mem_watch={cudaMemWatch}"]
-  pure (L0, L1, generated)
+  pure (beforeLoss, afterLoss, generated)
 
 /-- CLI entrypoint for byte-level GPT training, sampling, logging, and checkpointing. -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "causal LM training")
     (k := fun opts rest => do
       let (input, rest) ← takeInputText rest

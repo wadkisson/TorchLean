@@ -170,7 +170,7 @@ end Init
 namespace Samples
 
 /-- Turn a point `(x1,x2)` into a `Tensor Float (.dim 2 .scalar)`. -/
-def vec2 (x1 x2 : Float) : Tensor Float (.dim 2 .scalar) :=
+def pointVector (x1 x2 : Float) : Tensor Float (.dim 2 .scalar) :=
   Tensor.dim (fun i =>
     Tensor.scalar <|
       match i.val with
@@ -179,11 +179,11 @@ def vec2 (x1 x2 : Float) : Tensor Float (.dim 2 .scalar) :=
       | _ => 0.0)
 
 /-- Turn a scalar `y` into a `Tensor Float (.dim 1 .scalar)`. -/
-def vec1 (y : Float) : Tensor Float (.dim 1 .scalar) :=
+def singletonVector (y : Float) : Tensor Float (.dim 1 .scalar) :=
   Tensor.dim (fun _ => Tensor.scalar y)
 
 /-- Affine map `y = w1*x1 + w2*x2 + b` for building small regression datasets. -/
-def affine2 (w1 w2 b : Float) (x1 x2 : Float) : Float :=
+def affinePlane (w1 w2 b : Float) (x1 x2 : Float) : Float :=
   w1 * x1 + w2 * x2 + b
 
 end Samples
@@ -199,7 +199,7 @@ abbrev scalarOf {α : Type} (t : Tensor α Shape.scalar) : α :=
   t.item
 
 /-- Build a one-element `TList` (useful for curried trainer APIs). -/
-def tlist1 {α : Type} {s₁ : Shape} (x₁ : Tensor α s₁) : TList α [s₁] :=
+def tlistSingleton {α : Type} {s₁ : Shape} (x₁ : Tensor α s₁) : TList α [s₁] :=
   .cons x₁ .nil
 
 /-! ## `TList` syntax sugar -/
@@ -207,7 +207,7 @@ def tlist1 {α : Type} {s₁ : Shape} (x₁ : Tensor α s₁) : TList α [s₁] 
 /--
 Build a `TList` from a comma-separated list of terms.
 
-This is meant for training code where `tlist1`/`tlist2`/… becomes tedious.
+This is meant for training code where `tlistSingleton`/`tlistPair`/… becomes tedious.
 
 Example:
 
@@ -229,16 +229,16 @@ macro_rules
       go xs
 
 /-- Build a two-element `TList` (useful for curried trainer APIs). -/
-def tlist2 {α : Type} {s₁ s₂ : Shape} (x₁ : Tensor α s₁) (x₂ : Tensor α s₂) : TList α [s₁, s₂] :=
+def tlistPair {α : Type} {s₁ s₂ : Shape} (x₁ : Tensor α s₁) (x₂ : Tensor α s₂) : TList α [s₁, s₂] :=
   .cons x₁ (.cons x₂ .nil)
 
 /-- Build a three-element `TList` (useful for curried trainer APIs). -/
-def tlist3 {α : Type} {s₁ s₂ s₃ : Shape}
+def tlistTriple {α : Type} {s₁ s₂ s₃ : Shape}
     (x₁ : Tensor α s₁) (x₂ : Tensor α s₂) (x₃ : Tensor α s₃) : TList α [s₁, s₂, s₃] :=
   .cons x₁ (.cons x₂ (.cons x₃ .nil))
 
 /-- Build a four-element `TList` (useful for curried trainer APIs). -/
-def tlist4 {α : Type} {s₁ s₂ s₃ s₄ : Shape}
+def tlistQuad {α : Type} {s₁ s₂ s₃ s₄ : Shape}
     (x₁ : Tensor α s₁) (x₂ : Tensor α s₂) (x₃ : Tensor α s₃) (x₄ : Tensor α s₄) : TList α [s₁, s₂,
       s₃, s₄] :=
   .cons x₁ (.cons x₂ (.cons x₃ (.cons x₄ .nil)))

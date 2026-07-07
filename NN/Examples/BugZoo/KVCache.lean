@@ -49,7 +49,7 @@ def appendToken {α : Type} {seqLen headDim : Nat}
     (past : Spec.Tensor α (.dim seqLen (.dim headDim .scalar)))
     (newToken : Spec.Tensor α (.dim headDim .scalar)) :
     Spec.Tensor α (.dim (seqLen + 1) (.dim headDim .scalar)) :=
-  Spec.Tensor.concatDim0Spec past (singletonToken newToken)
+  Spec.Tensor.concatLeadingAxisSpec past (singletonToken newToken)
 
 /-- Append both key and value vectors to the KV cache. -/
 def appendKV {α : Type} {seqLen headDim : Nat}
@@ -69,7 +69,7 @@ theorem appendKV_last_key {α : Type} {seqLen headDim : Nat}
   | mk keys values =>
     cases keys with
     | dim keyRows =>
-      simp [appendKV, appendToken, singletonToken, Spec.Tensor.concatDim0Spec,
+      simp [appendKV, appendToken, singletonToken, Spec.Tensor.concatLeadingAxisSpec,
         Spec.getAtSpec]
 
 /-- The newly appended value is exactly the final value in the updated cache. -/
@@ -82,7 +82,7 @@ theorem appendKV_last_value {α : Type} {seqLen headDim : Nat}
   | mk keys values =>
     cases values with
     | dim valueRows =>
-      simp [appendKV, appendToken, singletonToken, Spec.Tensor.concatDim0Spec,
+      simp [appendKV, appendToken, singletonToken, Spec.Tensor.concatLeadingAxisSpec,
         Spec.getAtSpec]
 
 end NN.Examples.BugZoo.KVCache

@@ -17,7 +17,7 @@ IEEE32Exec-facing theorems for combining:
 - real-valued hinge-network approximation results, and
 - a proved rounding/error bound for executing that hinge network with IEEE binary32 rounding.
 
-The file is organized as a refinement stack:
+The file is organized as a refinement chain:
 
 - `hingeFunIeee` defines the executable network using IEEE-754 binary32 operations;
 - `HingeSumFinite` records the exact finiteness obligations needed to rule out NaN/Inf paths;

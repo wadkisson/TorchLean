@@ -31,6 +31,18 @@ reproducible without pulling in large benchmark dumps.
 - `lake exe verify -- torchlean-crown-ops`
   Exercises nonlinear verifier ops such as softmax and MSE loss on small TorchLean graphs.
 
+- `lake exe verify -- abcrown-leaf`
+  Parses the bundled alpha-beta-CROWN-style leaf artifact and recomputes the local certificate
+  predicate inside Lean.
+
+- `lake exe verify -- vnncomp-mnistfc`
+  Loads a compact VNN-COMP-style fully connected MNIST network/property pair and checks the
+  supported robustness condition through the TorchLean verifier path.
+
+- `lake exe verify -- camera-box3d-cert`
+  Recomputes a camera projection certificate for a 3D box artifact and checks that the claimed 2D
+  envelope contains the projected corners.
+
 - `lake exe verify -- spline-cert`
   Checks an exact rational piecewise polynomial certificate. With `--regen`, Julia is used only as
   an untrusted producer and Lean checks the regenerated JSON payload.
@@ -41,10 +53,10 @@ reproducible without pulling in large benchmark dumps.
   `NN.Verification.TorchLean.*` build models in TorchLean, compile them to verifier IR, and run
   bound propagation directly.
 
-- Exporter-backed verification: `LiRPA/*`, `VNNComp/*`, `AbCrown/*`, `ODE/*`, and `PINN/*` hold
-  bundled artifacts consumed by reusable CLI/checker code under `NN/Verification`. Python or
-  external tools may produce candidate JSON artifacts, but Lean still parses and checks the artifact
-  before accepting it.
+- Exporter-backed verification: `LiRPA/*`, `VNNComp/*`, `AbCrown/*`, `Geometry3D/*`, `ODE/*`, and
+  `PINN/*` hold bundled artifacts consumed by reusable CLI/checker code under `NN/Verification`.
+  Python or external tools may produce candidate JSON artifacts, but Lean still parses and checks
+  the artifact before accepting it.
 
 - Certificate checkers: `LiRPA/*`, `AbCrown/*`,
   `NN.Verification.Robustness.MarginCert`, and `NN.Verification.Splines.PiecewiseLinearCLI` parse
@@ -61,7 +73,8 @@ reproducible without pulling in large benchmark dumps.
   implementations live under `NN.Verification.ODE` and `NN.Verification.PINN`, with Python scripts
   under `scripts/verification/` used as untrusted producers for weights or candidate certificates.
 
-- Proof map: theorem-level CROWN/LiRPA soundness pointers live under
+- Proof map: theorem-level graph IBP/CROWN-family soundness is developed under
+  `NN.MLTheory.CROWN.Proofs.*`. Public theorem handles are exposed through
   `NN.Verification.ProofBackedCertificates` and `NN.Entrypoint.Verification`, not in this artifact
   directory.
 
@@ -76,14 +89,15 @@ not trusted. Treat a workflow as checked only when Lean parses the artifact, che
 recomputes the relevant predicate or bound.
 
 Some JSON checkers compare decimal serialized floating point values with an explicit
-tolerance. That is an artifact format check, not a theorem that the external producer is sound. For
-the theorem path, use `NN.Entrypoint.Verification`, which states checker-style soundness
-over the Lean graph semantics once the local certificate hypotheses are discharged.
+tolerance. That checks the serialized artifact against the declared tolerance; soundness of the
+producer is a separate claim. For the theorem path, use the proof modules re-exported by
+`NN.Entrypoint.Verification`, which state checker-style soundness over the Lean graph semantics once
+the local certificate hypotheses are discharged.
 
 ## Small Constants Versus Real Data
 
-Small hand written tensors are acceptable in TorchLean native operator workflows because their job
-is to exercise a verifier path reproducibly. Workflows that make data claims should
+Small hand-written tensors are useful in TorchLean-native operator workflows because the whole
+graph, input box, and property can be inspected in one file. Workflows that make data claims should
 load weights and datasets from documented assets. Digits artifacts are bundled; large VNN-COMP
 exports are kept outside git and passed to the checker explicitly.
 

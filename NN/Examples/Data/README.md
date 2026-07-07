@@ -10,6 +10,11 @@ external dataset -> Python converter/downloader -> .npy or numeric CSV -> TorchL
 Use Python for JPEG folders, `.pt`, `.npz`, `.mat`, and dataset downloads. Use Lean for typed
 tensors, typed batching, training, verification, and reproducible evaluation.
 
+The important point is that data enters TorchLean through a small boundary file. A loader should not
+hide where the samples came from, what shape was expected, or whether labels were interpreted as
+integer ids or one-hot targets. Those details are part of the claim whenever a trained model,
+prediction artifact, or certificate is later discussed.
+
 ## Local Tutorial Artifacts
 
 Generate the small ignored artifacts used by the loader tutorials:
@@ -40,6 +45,33 @@ This writes:
 
 Classification labels are numeric values such as `0.0`, `1.0`, ..., and are converted to one-hot
 targets on the Lean side.
+
+## Boundary Files And Manifests
+
+For custom data, prefer converter commands that write a manifest. The manifest is a provenance note:
+it tells later readers which file was converted, which key was read, and what shape was exported.
+
+Useful converter patterns:
+
+```bash
+python3 scripts/datasets/torchlean_data_convert.py tensor \
+  --input features.pt --key x --output data/real/mytask/X.npy --manifest
+
+python3 scripts/datasets/torchlean_data_convert.py pair \
+  --x-input dataset.npz --x-key images --x-output data/real/mytask/X.npy \
+  --y-input dataset.npz --y-key labels --y-output data/real/mytask/y.npy \
+  --manifest
+
+python3 scripts/datasets/torchlean_data_convert.py image-folder \
+  --input imagenette2/train --height 160 --width 160 --labels-from-dirs \
+  --x-output data/real/imagenette/train_X.npy \
+  --y-output data/real/imagenette/train_y.npy \
+  --manifest
+```
+
+The Lean loader then checks the exported shape before training code sees the tensor. If the data is
+later used by a verifier, the verifier should cite the same shape/provenance boundary instead of
+assuming the dataset layout from a filename.
 
 ## Downloaded Example Data
 
@@ -79,25 +111,20 @@ lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
 lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
-## Convert External Data
+## Training Data Versus Verification Data
 
-Use `.npy` as the stable tensor boundary:
+Most model-zoo commands use data for training or evaluation. Verification commands use data more
+strictly: an input box, coordinate sample, residual dataset, or prediction artifact becomes part of
+the checked claim.
 
-```bash
-python3 scripts/datasets/torchlean_data_convert.py tensor \
-  --input features.pt --key x --output data/real/mytask/X.npy --manifest
+Keep those roles separate:
 
-python3 scripts/datasets/torchlean_data_convert.py pair \
-  --x-input dataset.npz --x-key images --x-output data/real/mytask/X.npy \
-  --y-input dataset.npz --y-key labels --y-output data/real/mytask/y.npy \
-  --manifest
-
-python3 scripts/datasets/torchlean_data_convert.py image-folder \
-  --input imagenette2/train --height 160 --width 160 --labels-from-dirs \
-  --x-output data/real/imagenette/train_X.npy \
-  --y-output data/real/imagenette/train_y.npy \
-  --manifest
-```
+- training data may be large, shuffled, and summarized by logs;
+- verification fixtures should be small, reproducible, and explicit about tolerances;
+- generated prediction artifacts should record the command and shape metadata needed to reload
+  them;
+- external datasets and producers should be listed in `THIRD_PARTY_NOTICES.md` when they become
+  part of a documented workflow.
 
 ## Lean API
 

@@ -25,7 +25,7 @@ This module is TorchLean's public data layer. The intended workflow is:
 2. Describe those files with `TensorSource`, `SupervisedSource`, or `LabeledSource`.
 3. Load them into shape-typed TorchLean tensors and datasets.
 4. Train with `batchLoader` / `BatchLoader.epoch`, the public `trainer.train` path, or
-   `TorchLean.Trainer.trainDataset` when an advanced runner loop is still the right tool.
+   `TorchLean.Trainer.trainDataset` when an manual runner loop is still the right tool.
 
 We keep the implementation small and predictable:
 - datasets are in-memory and pure (often backed by `List`)
@@ -68,7 +68,7 @@ namespace Data
 export _root_.Runtime.Autograd.Train
   (Dataset CsvOptions
    readCsvFloatRows readCsvDatasetPairs readCsvVectorDataset
-   readNpy readNpyPrefixDim0 readNpyVector readNpyMatrix
+   readNpy readNpyLeadingAxisPrefix readNpyVector readNpyMatrix
    vectorOfList vectorOfArray matrixOfLists matrixOfArrays
    datasetOfPairs datasetOfListVectors)
 /--
@@ -123,7 +123,7 @@ Write a one-dimensional prediction probe CSV.
 Rows are `i,x,input,target,prediction`, where `x = i/(n-1)` for `n > 1`.
 This writes the compact prediction table used by plotting examples such as 1D operator learning.
 -/
-def writePredictionCsv1D {n : Nat}
+def writeVectorPredictionCsv {n : Nat}
     (path : System.FilePath)
     (input target prediction : Spec.Tensor Float (NN.Tensor.Shape.Vec n)) : IO Unit := do
   let rows := (List.finRange n).map (fun i =>
@@ -306,9 +306,8 @@ def epoch {a : Type} (name : String) (dl : RawDataLoader a) :
   _root_.Runtime.Autograd.Train.DataLoader.epoch name dl
 
 /--
-Like `epoch`, but apply a user-provided `collate` function to each minibatch.
-
-This is the TorchLean analogue of PyTorch's `collate_fn=` option.
+Like `epoch`, but apply a user-provided `collate` function to each minibatch, matching the role of
+PyTorch's `collate_fn=` option.
 -/
 def epochCollate {a b : Type} (name : String) (dl : RawDataLoader a)
     (collate : List a → Except String b) :
@@ -336,7 +335,7 @@ The underlying CSV loaders take an `opts : CsvOptions := {}` argument.
 If we write `abbrev fromCsvRows := readCsvFloatRows`, Lean will *apply the default argument*
 and `fromCsvRows` will no longer accept `opts`.
 
-So we eta-expand here to keep the public surface configurable.
+So we eta-expand here to keep the options argument available to callers.
 -/
 
 /-- Read a CSV file as a list of rows of floats. -/
@@ -413,10 +412,10 @@ def labeled {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α] {σ : 
     tensorpack! x, y)
 
 /-!
-## TensorDataset (dim0 batching)
+## TensorDataset (leading-axis batching)
 
 PyTorch's `TensorDataset` concept is: given one or more tensors that share the same `size(0)`,
-build a dataset of samples by slicing each tensor along dimension 0.
+build a dataset of samples by slicing each tensor along its leading batch axis.
 
 In TorchLean we do the same thing, but with shapes tracked in the type:
 
@@ -426,20 +425,20 @@ In TorchLean we do the same thing, but with shapes tracked in the type:
 -/
 
 /--
-Slice a batched `TensorPack` along dimension 0.
+Slice a batched `TensorPack` along its leading batch axis.
 
 If a sample is represented as a shape-indexed tuple `TensorPack β ss`, then a minibatch of size `n`
 is `TensorPack β (ss.map (fun s => .dim n s))`. This function picks a batch index `i : Fin n` and returns
 the corresponding single sample.
 -/
-def unbatchTListDim0 {β : Type} {n : Nat} :
+def unbatchTensorPack {β : Type} {n : Nat} :
     {ss : List Spec.Shape} →
       API.TorchLean.TensorPack β (ss.map (fun s => Spec.Shape.dim n s)) →
       Fin n →
       API.TorchLean.TensorPack β ss
   | [], .nil, _i => .nil
   | _s :: ss, .cons x xs, i =>
-      .cons (Spec.getAtSpec x i) (unbatchTListDim0 (β := β) (ss := ss) xs i)
+      .cons (Spec.getAtSpec x i) (unbatchTensorPack (β := β) (ss := ss) xs i)
 
 /-- Convert a shape-indexed `TensorPack` of `Float` tensors to the runtime scalar type `α`. -/
 def castTListOfFloat {α : Type} [API.Runtime.Scalar α] :
@@ -451,48 +450,47 @@ def castTListOfFloat {α : Type} [API.Runtime.Scalar α] :
       .cons (Spec.mapTensor (API.Runtime.ofFloat (α := α)) x) (castTListOfFloat (ss := ss) xs)
 
 /--
-Build a dataset by slicing a *batched* `TensorPack` along dim0.
-
-This is the TorchLean analogue of PyTorch's `TensorDataset(t1, t2, ...)`.
+Build a dataset by slicing a *batched* `TensorPack` along the leading batch axis. This gives the
+typed counterpart of a tensor dataset built from several aligned arrays.
 -/
-def tensorDatasetDim0 {β : Type} {n : Nat} {ss : List Spec.Shape}
+def tensorDatasetFromLeadingAxis {β : Type} {n : Nat} {ss : List Spec.Shape}
     (xs : API.TorchLean.TensorPack β (ss.map (fun s => Spec.Shape.dim n s))) :
     Dataset (API.TorchLean.TensorPack β ss) :=
-  fromList <| (List.finRange n).map (fun i => unbatchTListDim0 (β := β) (n := n) (ss := ss) xs i)
+  fromList <| (List.finRange n).map (fun i => unbatchTensorPack (β := β) (n := n) (ss := ss) xs i)
 
 /--
-Float-to-`α` variant of `tensorDatasetDim0`, for data loaded from disk.
+Float-to-`α` variant of `tensorDatasetFromLeadingAxis`, for data loaded from disk.
 -/
-def tensorDatasetDim0F {α : Type} [API.Runtime.Scalar α]
+def tensorDatasetFromLeadingAxisFloat {α : Type} [API.Runtime.Scalar α]
     {n : Nat} {ss : List Spec.Shape}
     (xs : API.TorchLean.TensorPack Float (ss.map (fun s => Spec.Shape.dim n s))) :
     Dataset (API.TorchLean.TensorPack α ss) :=
   let samples : List (API.TorchLean.TensorPack α ss) :=
     (List.finRange n).map (fun i =>
-      castTListOfFloat (α := α) (unbatchTListDim0 (β := Float) (n := n) (ss := ss) xs i))
+      castTListOfFloat (α := α) (unbatchTensorPack (β := Float) (n := n) (ss := ss) xs i))
   fromList samples
 
 /--
-Supervised dataset from two batched tensors `X : (n, σ)` and `Y : (n, τ)` by slicing dim0.
+Supervised dataset from two batched tensors `X : (n, σ)` and `Y : (n, τ)` by slicing the leading batch axis.
 
 This is the common regression/supervised-learning case: the TorchLean analogue of
 `TensorDataset(X, Y)` in PyTorch.
 -/
-def supervisedDim0 {α : Type}
+def supervisedFromLeadingAxis {α : Type}
     {n : Nat} {σ τ : Spec.Shape}
     (X : Spec.Tensor α (.dim n σ))
     (Y : Spec.Tensor α (.dim n τ)) :
     Dataset (API.TorchLean.TensorPack α [σ, τ]) :=
-  tensorDatasetDim0 (β := α) (n := n) (ss := [σ, τ])
+  tensorDatasetFromLeadingAxis (β := α) (n := n) (ss := [σ, τ])
     (tensorpack! X, Y)
 
-/-- Float-to-`α` variant of `supervisedDim0`, for data loaded from disk. -/
-def supervisedDim0F {α : Type} [API.Runtime.Scalar α]
+/-- Float-to-`α` variant of `supervisedFromLeadingAxis`, for data loaded from disk. -/
+def supervisedFromLeadingAxisFloat {α : Type} [API.Runtime.Scalar α]
     {n : Nat} {σ τ : Spec.Shape}
     (X : Spec.Tensor Float (.dim n σ))
     (Y : Spec.Tensor Float (.dim n τ)) :
     Dataset (API.TorchLean.TensorPack α [σ, τ]) :=
-  tensorDatasetDim0F (α := α) (n := n) (ss := [σ, τ])
+  tensorDatasetFromLeadingAxisFloat (α := α) (n := n) (ss := [σ, τ])
     (tensorpack! X, Y)
 
 /-!
@@ -515,7 +513,7 @@ def fromNpyTensorND (path : System.FilePath) (dims : List Nat) :
         pure <| NN.Tensor.tensorND (α := Float) dims data.values.toList
 
 /--
-Load an N-D tensor from a `.npy` file, allowing the file to contain more rows on dim 0.
+Load an N-D tensor from a `.npy` file, allowing the file to contain more rows on the leading axis.
 
 This is the dataset-loader analogue of taking `tensor[:n]` in PyTorch. The rank and trailing
 dimensions must still match exactly; only the leading dimension may be larger than requested.
@@ -533,9 +531,9 @@ This is still a checked loader, not an implicit reshape:
 - the file must contain at least the requested number of rows;
 - only C-order NPY files can be prefix-loaded efficiently by the low-level parser.
 -/
-def fromNpyTensorNDPrefixDim0 (path : System.FilePath) (dims : List Nat) :
+def fromNpyTensorNDLeadingPrefix (path : System.FilePath) (dims : List Nat) :
     IO (Except String (Spec.Tensor Float (NN.Tensor.shapeOfDims dims))) := do
-  let res ← readNpyPrefixDim0 path dims
+  let res ← readNpyLeadingAxisPrefix path dims
   match res with
   | .error e => pure (.error e)
   | .ok data =>
@@ -594,7 +592,7 @@ Labeled dataset from a batched tensor `X : (n, σ)` and a label vector `y : (n,)
 Labels are stored as floats (common when exporting from NumPy); we validate each label is an
 integer in `[0, classes)`, then one-hot encode it.
 -/
-def labeledDim0 {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α]
+def labeledFromLeadingAxis {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α]
     (tag : String) (classes : Nat)
     {n : Nat} {σ : Spec.Shape}
     (X : Spec.Tensor Float (.dim n σ))
@@ -614,20 +612,20 @@ Load a supervised dataset from two `.npy` files containing batched arrays:
 - `X.npy` has shape `(n, xDims...)`
 - `Y.npy` has shape `(n, yDims...)`
 
-and we build a dataset by slicing along dim0.
+and we build a dataset by slicing along the leading batch axis.
 -/
 def fromNpySupervised {α : Type} [API.Runtime.Scalar α]
     (xPath yPath : System.FilePath) (n : Nat) (xDims yDims : List Nat) :
     IO (Except String (Dataset (API.TorchLean.TensorPack α [NN.Tensor.shapeOfDims xDims,
       NN.Tensor.shapeOfDims yDims]))) := do
-  let xRes ← fromNpyTensorNDPrefixDim0 xPath (n :: xDims)
-  let yRes ← fromNpyTensorNDPrefixDim0 yPath (n :: yDims)
+  let xRes ← fromNpyTensorNDLeadingPrefix xPath (n :: xDims)
+  let yRes ← fromNpyTensorNDLeadingPrefix yPath (n :: yDims)
   match xRes with
   | .error e => pure (.error e)
   | .ok X =>
       match yRes with
       | .error e => pure (.error e)
-      | .ok Y => pure (.ok (supervisedDim0F (α := α) X Y))
+      | .ok Y => pure (.ok (supervisedFromLeadingAxisFloat (α := α) X Y))
 
 /--
 Load a labeled classification dataset from two `.npy` files:
@@ -635,21 +633,21 @@ Load a labeled classification dataset from two `.npy` files:
 - `X.npy` has shape `(n, xDims...)`
 - `y.npy` has shape `(n,)` with float-encoded integer labels in `[0, classes)`
 
-and we build a dataset by slicing along dim0 and one-hot encoding the labels.
+and we build a dataset by slicing along the leading batch axis and one-hot encoding the labels.
 -/
 def fromNpyLabeled {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α]
     (xPath yPath : System.FilePath) (n : Nat) (xDims : List Nat) (classes : Nat) :
     IO (Except String (Dataset (API.TorchLean.TensorPack α [NN.Tensor.shapeOfDims xDims,
       NN.Tensor.Shape.Vec classes]))) := do
-  let xRes ← fromNpyTensorNDPrefixDim0 xPath (n :: xDims)
-  let yRes ← fromNpyTensorNDPrefixDim0 yPath [n]
+  let xRes ← fromNpyTensorNDLeadingPrefix xPath (n :: xDims)
+  let yRes ← fromNpyTensorNDLeadingPrefix yPath [n]
   match xRes with
   | .error e => pure (.error e)
   | .ok X =>
       match yRes with
       | .error e => pure (.error e)
       | .ok y =>
-          pure <| labeledDim0 (α := α) (σ := NN.Tensor.shapeOfDims xDims) "npy" classes X y
+          pure <| labeledFromLeadingAxis (α := α) (σ := NN.Tensor.shapeOfDims xDims) "npy" classes X y
 
 /--
 Load a supervised dataset from a CSV with `inDim + outDim` columns per row:
@@ -710,7 +708,7 @@ single scheme:
 
 1. describe each tensor as a `TensorSource`;
 2. load it as a typed TorchLean tensor;
-3. build supervised/labeled datasets by slicing dim0, just like PyTorch `TensorDataset`.
+3. build supervised/labeled datasets by slicing the leading batch axis, just like PyTorch `TensorDataset`.
 
 Policy for external ecosystems:
 - NumPy `.npy` is the canonical interchange format for numeric tensors.
@@ -720,7 +718,7 @@ Policy for external ecosystems:
   handles a small deterministic interchange format rather than every external binary format.
 -/
 
-/-- File formats supported directly by the Lean-side unified data-source loader. -/
+/-- File formats supported directly by the Lean side unified data-source loader. -/
 inductive TensorFormat where
   /-- NumPy `.npy`, supporting the subset decoded by `fromNpyTensorND`. -/
   | npy
@@ -748,7 +746,7 @@ structure TensorSource where
   path : System.FilePath
   /-- Expected dimensions. -/
   dims : List Nat
-  /-- Direct Lean-side format. External formats should be preconverted to `.npy`. -/
+  /-- Direct Lean side format. External formats should be preconverted to `.npy`. -/
   format : TensorFormat := .npy
   /-- CSV parsing options, used only when `format = .csv`. -/
   csvOptions : CsvOptions := {}
@@ -815,18 +813,18 @@ def loadFloatAs (format : TensorFormat) (path : System.FilePath)
   | .csv => loadCsvTensorND path dims opts
 
 /--
-Load a Float tensor, allowing NPY files to contain more rows than requested on dim 0.
+Load a Float tensor, allowing NPY files to contain more rows than requested on the leading axis.
 
 `TensorSource.loadFloatAs` is exact: the file shape must equal `dims`.  This prefix variant is for
 dataset-style sources where `dims` starts with the number of rows requested by the current run.  CSV
 sources remain exact because CSV has no binary prefix contract; NPY sources use
-`fromNpyTensorNDPrefixDim0`.
+`fromNpyTensorNDLeadingPrefix`.
 -/
-def loadFloatPrefixDim0As (format : TensorFormat) (path : System.FilePath)
+def loadFloatLeadingPrefixAs (format : TensorFormat) (path : System.FilePath)
     (dims : List Nat) (opts : CsvOptions := {}) :
     IO (Except String (Spec.Tensor Float (NN.Tensor.shapeOfDims dims))) := do
   match format with
-  | .npy => fromNpyTensorNDPrefixDim0 path dims
+  | .npy => fromNpyTensorNDLeadingPrefix path dims
   | .csv => loadCsvTensorND path dims opts
 
 /-- Load a `TensorSource` as a Float tensor with the statically reflected `shapeOfDims src.dims`. -/
@@ -842,7 +840,7 @@ Two tensor sources representing supervised data:
 - `y` must have shape `(n, yDims...)`.
 -/
 structure SupervisedSource where
-  /-- Number of samples along dim0. -/
+  /-- Number of samples along the leading batch axis. -/
   n : Nat
   /-- Per-sample input dimensions. -/
   xDims : List Nat
@@ -863,7 +861,7 @@ def ofPaths (format : TensorFormat) (xPath yPath : System.FilePath)
     y := { path := yPath, dims := n :: yDims, format, csvOptions } }
 
 /--
-Load a supervised dataset by slicing dim0 from the two tensors.
+Load a supervised dataset by slicing the leading batch axis from the two tensors.
 
 This is the preferred public loader for regression/operator-learning examples, regardless of
 whether the backing files are `.npy` or small numeric CSV tables.
@@ -873,16 +871,16 @@ def load {α : Type} [API.Runtime.Scalar α] (src : SupervisedSource) :
       NN.Tensor.shapeOfDims src.yDims]))) := do
   -- Dataset sources interpret `src.n` as "number of rows to use in this run."  For NPY files, the
   -- physical file is allowed to contain more rows; for CSV files, the requested shape remains exact.
-  let xRes ← TensorSource.loadFloatPrefixDim0As src.x.format src.x.path (src.n :: src.xDims)
+  let xRes ← TensorSource.loadFloatLeadingPrefixAs src.x.format src.x.path (src.n :: src.xDims)
     src.x.csvOptions
-  let yRes ← TensorSource.loadFloatPrefixDim0As src.y.format src.y.path (src.n :: src.yDims)
+  let yRes ← TensorSource.loadFloatLeadingPrefixAs src.y.format src.y.path (src.n :: src.yDims)
     src.y.csvOptions
   match xRes with
   | .error e => pure (.error e)
   | .ok X =>
       match yRes with
       | .error e => pure (.error e)
-      | .ok Y => pure (.ok (supervisedDim0F (α := α) X Y))
+      | .ok Y => pure (.ok (supervisedFromLeadingAxisFloat (α := α) X Y))
 
 end SupervisedSource
 
@@ -912,7 +910,7 @@ Two tensor sources representing labeled classification data:
 - `y` must have shape `(n,)` and contain integer-valued labels.
 -/
 structure LabeledSource where
-  /-- Number of samples along dim0. -/
+  /-- Number of samples along the leading batch axis. -/
   n : Nat
   /-- Per-sample input dimensions. -/
   xDims : List Nat
@@ -933,7 +931,7 @@ def ofPaths (format : TensorFormat) (xPath yPath : System.FilePath)
     y := { path := yPath, dims := [n], format, csvOptions } }
 
 /--
-Load a labeled classification dataset by slicing dim0 and one-hot encoding labels.
+Load a labeled classification dataset by slicing the leading batch axis and one-hot encoding labels.
 
 For CSV label vectors, store labels as a single-column table with `dims = [n, 1]` and use a custom
 `TensorSource` if needed; the path constructor above is aimed at `.npy` label vectors.
@@ -943,16 +941,16 @@ def load {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α] (src : La
       NN.Tensor.Shape.Vec src.classes]))) := do
   -- Labels use the same prefix-row convention as supervised tensors. This lets one full exported
   -- label vector back different bounded runs without making separate copies on disk.
-  let xRes ← TensorSource.loadFloatPrefixDim0As src.x.format src.x.path (src.n :: src.xDims)
+  let xRes ← TensorSource.loadFloatLeadingPrefixAs src.x.format src.x.path (src.n :: src.xDims)
     src.x.csvOptions
-  let yRes ← TensorSource.loadFloatPrefixDim0As src.y.format src.y.path [src.n] src.y.csvOptions
+  let yRes ← TensorSource.loadFloatLeadingPrefixAs src.y.format src.y.path [src.n] src.y.csvOptions
   match xRes with
   | .error e => pure (.error e)
   | .ok X =>
       match yRes with
       | .error e => pure (.error e)
       | .ok y =>
-          pure <| labeledDim0 (α := α) (σ := NN.Tensor.shapeOfDims src.xDims)
+          pure <| labeledFromLeadingAxis (α := α) (σ := NN.Tensor.shapeOfDims src.xDims)
             "data-source" src.classes X y
 
 end LabeledSource
@@ -986,15 +984,14 @@ end TabularSupervisedSource
 
 /--
 Build a supervised dataset from two matrices `X : n×inDim` and `Y : n×outDim` by pairing rows.
-
-This is the TorchLean analogue of PyTorch's `TensorDataset(X, Y)` for simple regression.
+This is the simple regression case of a tensor dataset.
 -/
 def supervisedRows {α : Type} [API.Semantics.Scalar α] [API.Runtime.Scalar α]
     {n inDim outDim : Nat}
     (X : Spec.Tensor Float (NN.Tensor.Shape.Mat n inDim))
     (Y : Spec.Tensor Float (NN.Tensor.Shape.Mat n outDim)) :
     Dataset (API.TorchLean.TensorPack α [NN.Tensor.Shape.Vec inDim, NN.Tensor.Shape.Vec outDim]) :=
-  supervisedDim0F (α := α) X Y
+  supervisedFromLeadingAxisFloat (α := α) X Y
 
 /--
 Collate a length-`n` supervised batch into a single sample with a leading batch axis.
@@ -1146,7 +1143,7 @@ end BatchLoader
 Public loader API: supervised datasets become fixed-size minibatch loaders by default.
 
 The underlying dataset still stores individual samples; the loader batches them and `epoch`
-returns tensors with a leading dim0 batch axis. Because the batch size is reflected in the type,
+returns tensors with a leading batch axis. Because the batch size is reflected in the type,
 the public batched path requires full batches, so `dropLast` defaults to `true`.
 -/
 def batchLoader {α : Type} {σ τ : Spec.Shape}

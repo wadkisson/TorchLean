@@ -101,9 +101,9 @@ This applies the DFT to the leading dimension `n` of a shape `dim n rest` by:
 3. reshaping back.
 
 This is the most generally useful primitive for building N-D FFTs: you can permute an axis to the
-front, call `fftDim0`, then permute back.
+front, call `fftLeadingAxis`, then permute back.
 -/
-def fftDim0 (n : Nat) (rest : Shape) :
+def fftLeadingAxis (n : Nat) (rest : Shape) :
     LayerDef (.dim n rest) (.dim n rest) :=
   let sIn : Shape := .dim n rest
   let cols : Nat := Shape.size rest
@@ -128,9 +128,9 @@ def fftDim0 (n : Nat) (rest : Shape) :
 /--
 Inverse FFT along the outermost axis of a tensor (uses the inverse DFT matrix).
 
-See `fftDim0` for the implementation strategy.
+See `fftLeadingAxis` for the implementation strategy.
 -/
-def ifftDim0 (n : Nat) (rest : Shape) :
+def ifftLeadingAxis (n : Nat) (rest : Shape) :
     LayerDef (.dim n rest) (.dim n rest) :=
   let sIn : Shape := .dim n rest
   let cols : Nat := Shape.size rest
@@ -154,19 +154,19 @@ def ifftDim0 (n : Nat) (rest : Shape) :
 
 /-- FFT on matrices: apply the DFT along the leading dimension (`n×width`). -/
 abbrev fftMat (n width : Nat) : LayerDef (mat n width) (mat n width) :=
-  fftDim0 (n := n) (rest := .dim width .scalar)
+  fftLeadingAxis (n := n) (rest := .dim width .scalar)
 
 /-- Inverse FFT on matrices: apply the inverse DFT along the leading dimension (`n×width`). -/
 abbrev ifftMat (n width : Nat) : LayerDef (mat n width) (mat n width) :=
-  ifftDim0 (n := n) (rest := .dim width .scalar)
+  ifftLeadingAxis (n := n) (rest := .dim width .scalar)
 
 /-- Vector FFT layer, implemented as a DFT along the only non-scalar axis. -/
 abbrev fftVec (n : Nat) : LayerDef (vec n) (vec n) :=
-  fftDim0 (n := n) (rest := .scalar)
+  fftLeadingAxis (n := n) (rest := .scalar)
 
 /-- Inverse vector FFT layer, implemented as an inverse DFT along the only non-scalar axis. -/
 abbrev ifftVec (n : Nat) : LayerDef (vec n) (vec n) :=
-  ifftDim0 (n := n) (rest := .scalar)
+  ifftLeadingAxis (n := n) (rest := .scalar)
 
 namespace Internal
 
@@ -186,7 +186,7 @@ end Internal
 FFT along an axis at a given depth (0-based from the outermost).
 
 This is implemented by swapping the target axis outward (one adjacent swap per step) until it
-reaches depth `0`, applying `fftDim0`, then swapping back.
+reaches depth `0`, applying `fftLeadingAxis`, then swapping back.
 
 If `depth ≥ Shape.rank s`, this layer is the identity.
 -/
@@ -214,7 +214,7 @@ def fftAtDepth : {s : Shape} → Nat → LayerDef s s
                     else
                       pure x
                 | ⟨.dim nDim rest, x0⟩ =>
-                    let y0 ← (fftDim0 (n := nDim) (rest := rest)).forward mode (α := α) (m := m) x0
+                    let y0 ← (fftLeadingAxis (n := nDim) (rest := rest)).forward mode (α := α) (m := m) x0
                     let yFront : Σ s' : Shape, RefTy (m := m) (α := α) s' :=
                       ⟨.dim nDim rest, y0⟩
                     let yBack ← Internal.permuteBySwaps (α := α) (m := m) yFront swapsBack
@@ -247,7 +247,7 @@ def ifftAtDepth : {s : Shape} → Nat → LayerDef s s
                     else
                       pure x
                 | ⟨.dim nDim rest, x0⟩ =>
-                    let y0 ← (ifftDim0 (n := nDim) (rest := rest)).forward mode (α := α) (m := m) x0
+                    let y0 ← (ifftLeadingAxis (n := nDim) (rest := rest)).forward mode (α := α) (m := m) x0
                     let yFront : Σ s' : Shape, RefTy (m := m) (α := α) s' :=
                       ⟨.dim nDim rest, y0⟩
                     let yBack ← Internal.permuteBySwaps (α := α) (m := m) yFront swapsBack

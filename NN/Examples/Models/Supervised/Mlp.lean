@@ -6,7 +6,7 @@ Authors: TorchLean Team
 Device-agnostic real-data example:
   python3 scripts/datasets/download_example_data.py --auto-mpg
   lake exe torchlean mlp --cpu
-  lake build -R -K cuda=true && lake exe torchlean mlp --cuda
+  lake exe -K cuda=true torchlean mlp --cuda
 -/
 
 module
@@ -60,7 +60,7 @@ def hidDim : Nat := 32
 def outDim : Nat := 1
 
 /-- Shared MLP configuration used by shapes and the constructor. -/
-def cfg : nn.models.Mlp1Config :=
+def cfg : nn.models.MlpConfig :=
   { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
 /-- Input shape: a minibatch of Auto MPG feature vectors. -/
@@ -71,7 +71,7 @@ abbrev τ := Shape.mat batch outDim
 
 /-- One-hidden-layer ReLU MLP from the public model API. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.Mlp1ReLU cfg
+  nn.models.MlpReLU cfg
 
 /--
 Auto MPG as a public TorchLean dataset.

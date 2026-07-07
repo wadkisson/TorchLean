@@ -31,7 +31,7 @@ namespace TorchLean
 /-!
 # Runtime Layer Helpers
 
-Sequential layer constructors over the lower-level TorchLean runtime surface. These keep the direct
+Sequential layer constructors over the lower-level TorchLean runtime API. These keep the direct
 runtime API available while the higher-level `NN.API.Public.nn` namespace provides named-field configs.
 -/
 
@@ -44,14 +44,14 @@ namespace Layers
 (`Seq σ τ`). This namespace provides direct `Seq` constructors and common derived shapes such as
 `flattenLinear`.
 
-For the more fully-documented public surface (named-field configs, blocks, etc.), see
+For the documented user API with named-field configs and blocks, see
 `NN.API.Public` under `API.nn`.
 -/
 
 /-- Lift a single layer into a sequential model. -/
 def of {σ τ : Spec.Shape} (layer : API.TorchLean.NN.LayerDef σ τ) :
     API.TorchLean.NN.Seq σ τ :=
-  API.TorchLean.NN.seq1 layer
+  API.TorchLean.NN.singleLayer layer
 
 /-- Linear layer over vectors (returns a 1-layer `Seq`). -/
 def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :

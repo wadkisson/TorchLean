@@ -252,7 +252,7 @@ def nchwBatchStats {α : Type} [Context α]
 namespace LayerDef
 
 /--
-Backend reference type used when evaluating a `LayerDef`.
+Backend reference type used when running a `LayerDef`.
 
 This is the `Ref` type provided by the current `Torch.Ops` backend instance (eager tape, compiled
   IR,
@@ -263,13 +263,13 @@ abbrev RefT (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape]
   Torch.Ops.Ref (m := m) (α := α) s
 
 /--
-Evaluate a `LayerDef` given parameter refs and an input ref.
+Run a `LayerDef` forward given parameter refs and an input ref.
 
 This is the "module forward" operation at the reference level.
 
 PyTorch analogy: calling `layer(x)` where the layer's parameters are already allocated.
 -/
-def eval {σ τ : Shape} (l : LayerDef σ τ) {α : Type} [Context α] [DecidableEq Shape]
+def forwardRef {σ τ : Shape} (l : LayerDef σ τ) {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Torch.Ops (m := m) (α := α)]
     (mode : Mode)
     (ps : Torch.RefList (RefT (m := m) (α := α)) l.paramShapes)
@@ -278,23 +278,23 @@ def eval {σ τ : Shape} (l : LayerDef σ τ) {α : Type} [Context α] [Decidabl
     (l.forward mode (α := α) (m := m)) (Torch.RefList.append ps (.cons x .nil))
 
 /--
-Evaluate a `LayerDef` on concrete tensors by compiling its forward program.
+Run a `LayerDef` on concrete tensors by compiling its forward program.
 
 This is primarily used by runtime utilities (e.g. sequential `updateBuffers`) where we want to run
 forward to obtain intermediate activations.
 
 PyTorch analogy: running a forward pass eagerly on concrete tensors.
 -/
-def evalTensor {σ τ : Shape} (l : LayerDef σ τ) (mode : Mode)
+def forwardTensor {σ τ : Shape} (l : LayerDef σ τ) (mode : Mode)
     {α : Type} [Context α] [DecidableEq Shape]
     (ps : Torch.TList α l.paramShapes) (x : Tensor α σ) : IO (Tensor α τ) := do
-  let compiled ← _root_.Runtime.Autograd.TorchLean.Autodiff.compileOut (α := α)
+  let compiled ← _root_.Runtime.Autograd.TorchLean.Autodiff.compileGraph (α := α)
     (paramShapes := l.paramShapes) (inputShapes := [σ]) (τ := τ)
     (l.forward mode)
   let args : Torch.TList α (l.paramShapes ++ [σ]) :=
     Torch.Proofs.Autograd.Algebra.TList.append (α := α) (ss₁ := l.paramShapes) (ss₂ := [σ]) ps
       (.cons x .nil)
-  pure <| _root_.Runtime.Autograd.Torch.CompiledOut.forward compiled args
+  pure <| _root_.Runtime.Autograd.Torch.CompiledGraph.forward compiled args
 
 end LayerDef
 end NN

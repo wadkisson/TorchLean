@@ -28,16 +28,16 @@ namespace blocks
 /--
 Canonical stride-2 spatial downsampling formula used by ResNet blocks.
 
-`down2 h = (h - 1) / 2 + 1 = ceil(h / 2)`.
+`strideTwoOutput h = (h - 1) / 2 + 1 = ceil(h / 2)`.
 
 This matches the output-size formula for common stride-2 layers used in ResNet downsampling
 (e.g. `3×3` conv with padding `1`, or `1×1` conv with padding `0`).
 -/
-abbrev down2 (h : Nat) : Nat := (h - 1) / 2 + 1
+abbrev strideTwoOutput (h : Nat) : Nat := (h - 1) / 2 + 1
 
-/-- `down2` is always positive (used to discharge `NeZero` goals). -/
-lemma down2_pos (h : Nat) : down2 h > 0 := by
-  simp [down2]
+/-- `strideTwoOutput` is always positive (used to discharge `NeZero` goals). -/
+lemma strideTwoOutput_pos (h : Nat) : strideTwoOutput h > 0 := by
+  simp [strideTwoOutput]
 
 /--
 Shape arithmetic fact: `3×3` conv with stride `1` and padding `1` preserves a positive spatial
@@ -83,13 +83,13 @@ def conv3x3Same {inC outC h w : Nat}
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
 /--
-ResNet `3×3` convolution with padding `1`, stride `2` (spatial downsampling via `down2`),
+ResNet `3×3` convolution with padding `1`, stride `2` (spatial downsampling via `strideTwoOutput`),
   over CHW images.
 -/
 def conv3x3Down {inC outC h w : Nat} [NeZero inC]
     (seedK seedB : Nat := 0)
     (kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1) :
-    Sequential (NN.Tensor.Shape.Image inC h w) (NN.Tensor.Shape.Image outC (down2 h) (down2 w)) :=
+    Sequential (NN.Tensor.Shape.Image inC h w) (NN.Tensor.Shape.Image outC (strideTwoOutput h) (strideTwoOutput w)) :=
       by
   let raw :=
     conv2dCHW (inC := inC) (inH := h) (inW := w)
@@ -97,8 +97,8 @@ def conv3x3Down {inC outC h w : Nat} [NeZero inC]
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hShape :
       NN.Tensor.Shape.CHW outC ((h + 2 * 1 - 3) / 2 + 1) ((w + 2 * 1 - 3) / 2 + 1) =
-        NN.Tensor.Shape.CHW outC (down2 h) (down2 w) := by
-    simp [NN.Tensor.Shape.CHW, down2, Nat.add_comm]
+        NN.Tensor.Shape.CHW outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [NN.Tensor.Shape.CHW, strideTwoOutput, Nat.add_comm]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
@@ -123,12 +123,12 @@ def conv1x1Same {inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
-/-- ResNet `1×1` convolution with stride `2` (spatial downsampling via `down2`), over CHW
+/-- ResNet `1×1` convolution with stride `2` (spatial downsampling via `strideTwoOutput`), over CHW
   images. -/
 def conv1x1Down {inC outC h w : Nat} [NeZero inC]
     (seedK seedB : Nat := 0)
     (kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1) :
-    Sequential (NN.Tensor.Shape.Image inC h w) (NN.Tensor.Shape.Image outC (down2 h) (down2 w)) :=
+    Sequential (NN.Tensor.Shape.Image inC h w) (NN.Tensor.Shape.Image outC (strideTwoOutput h) (strideTwoOutput w)) :=
       by
   let raw :=
     conv2dCHW (inC := inC) (inH := h) (inW := w)
@@ -136,8 +136,8 @@ def conv1x1Down {inC outC h w : Nat} [NeZero inC]
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hShape :
       NN.Tensor.Shape.Image outC ((h + 2 * 0 - 1) / 2 + 1) ((w + 2 * 0 - 1) / 2 + 1) =
-        NN.Tensor.Shape.Image outC (down2 h) (down2 w) := by
-    simp [NN.Tensor.Shape.Image, down2, Nat.add_comm]
+        NN.Tensor.Shape.Image outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [NN.Tensor.Shape.Image, strideTwoOutput, Nat.add_comm]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Image inC h w) τ) raw hShape
 
@@ -162,13 +162,13 @@ def conv3x3SameImages {n inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
-/-- ResNet `3×3` convolution over batched images (`NCHW`-style), downsampling via `down2`.
+/-- ResNet `3×3` convolution over batched images (`NCHW`-style), downsampling via `strideTwoOutput`.
   -/
 def conv3x3DownImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC]
     (seedK seedB : Nat := 0)
     (kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1) :
-    Sequential (NN.Tensor.Shape.Images n inC h w) (NN.Tensor.Shape.Images n outC (down2 h) (down2
+    Sequential (NN.Tensor.Shape.Images n inC h w) (NN.Tensor.Shape.Images n outC (strideTwoOutput h) (strideTwoOutput
       w)) := by
   let raw :=
     conv2d (n := n) (inC := inC) (inH := h) (inW := w)
@@ -176,8 +176,8 @@ def conv3x3DownImages {n inC outC h w : Nat}
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hShape :
       NN.Tensor.Shape.Images n outC ((h + 2 * 1 - 3) / 2 + 1) ((w + 2 * 1 - 3) / 2 + 1) =
-        NN.Tensor.Shape.Images n outC (down2 h) (down2 w) := by
-    simp [NN.Tensor.Shape.Images, down2, Nat.add_comm]
+        NN.Tensor.Shape.Images n outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [NN.Tensor.Shape.Images, strideTwoOutput, Nat.add_comm]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
@@ -202,13 +202,13 @@ def conv1x1SameImages {n inC outC h w : Nat}
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
-/-- ResNet `1×1` convolution over batched images (`NCHW`-style), downsampling via `down2`.
+/-- ResNet `1×1` convolution over batched images (`NCHW`-style), downsampling via `strideTwoOutput`.
   -/
 def conv1x1DownImages {n inC outC h w : Nat}
     [NeZero n] [NeZero inC]
     (seedK seedB : Nat := 0)
     (kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1) :
-    Sequential (NN.Tensor.Shape.Images n inC h w) (NN.Tensor.Shape.Images n outC (down2 h) (down2
+    Sequential (NN.Tensor.Shape.Images n inC h w) (NN.Tensor.Shape.Images n outC (strideTwoOutput h) (strideTwoOutput
       w)) := by
   let raw :=
     conv2d (n := n) (inC := inC) (inH := h) (inW := w)
@@ -216,8 +216,8 @@ def conv1x1DownImages {n inC outC h w : Nat}
       , seedK := seedK, seedB := seedB, kInit := kInit }
   have hShape :
       NN.Tensor.Shape.Images n outC ((h + 2 * 0 - 1) / 2 + 1) ((w + 2 * 0 - 1) / 2 + 1) =
-        NN.Tensor.Shape.Images n outC (down2 h) (down2 w) := by
-    simp [NN.Tensor.Shape.Images, down2, Nat.add_comm]
+        NN.Tensor.Shape.Images n outC (strideTwoOutput h) (strideTwoOutput w) := by
+    simp [NN.Tensor.Shape.Images, strideTwoOutput, Nat.add_comm]
   exact
     Eq.ndrec (motive := fun τ => Sequential (NN.Tensor.Shape.Images n inC h w) τ) raw hShape
 
@@ -251,8 +251,8 @@ def resnetBasicBlockCHW {inC h w : Nat} (cfg : ResNetBasicBlock)
     Sequential
       (NN.Tensor.Shape.Image inC h w)
       (NN.Tensor.Shape.Image cfg.outC
-        (if cfg.downsample then down2 h else h)
-        (if cfg.downsample then down2 w else w)) := by
+        (if cfg.downsample then strideTwoOutput h else h)
+        (if cfg.downsample then strideTwoOutput w else w)) := by
   classical
   -- Seed layout: conv/bn/conv/bn/(proj conv/bn) in a fixed order.
   let seedConv1K := cfg.seedBase + 0
@@ -276,10 +276,10 @@ def resnetBasicBlockCHW {inC h w : Nat} (cfg : ResNetBasicBlock)
 
   if hDown : cfg.downsample = true then
     -- Stride-2 downsample.
-    let h' := down2 h
-    let w' := down2 w
-    have hh' : h' > 0 := down2_pos h
-    have hw' : w' > 0 := down2_pos w
+    let h' := strideTwoOutput h
+    let w' := strideTwoOutput w
+    have hh' : h' > 0 := strideTwoOutput_pos h
+    have hw' : w' > 0 := strideTwoOutput_pos w
 
     let conv1 : Sequential (NN.Tensor.Shape.Image inC h w) (NN.Tensor.Shape.Image cfg.outC h' w') :=
       conv3x3Down (inC := inC) (outC := cfg.outC) (h := h) (w := w)
@@ -396,8 +396,8 @@ def resnetBasicBlock {n inC h w : Nat} (cfg : ResNetBasicBlock)
     Sequential
       (NN.Tensor.Shape.Images n inC h w)
       (NN.Tensor.Shape.Images n cfg.outC
-        (if cfg.downsample then down2 h else h)
-        (if cfg.downsample then down2 w else w)) := by
+        (if cfg.downsample then strideTwoOutput h else h)
+        (if cfg.downsample then strideTwoOutput w else w)) := by
   classical
   have hn : n > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := n))
   -- Seed layout: conv/bn/conv/bn/(proj conv/bn) in a fixed order.
@@ -422,10 +422,10 @@ def resnetBasicBlock {n inC h w : Nat} (cfg : ResNetBasicBlock)
 
   if hDown : cfg.downsample = true then
     -- Stride-2 downsample.
-    let h' := down2 h
-    let w' := down2 w
-    have hh' : h' > 0 := down2_pos h
-    have hw' : w' > 0 := down2_pos w
+    let h' := strideTwoOutput h
+    let w' := strideTwoOutput w
+    have hh' : h' > 0 := strideTwoOutput_pos h
+    have hw' : w' > 0 := strideTwoOutput_pos w
     have hH' : h' ≠ 0 := Nat.ne_of_gt hh'
     have hW' : w' ≠ 0 := Nat.ne_of_gt hw'
     letI : NeZero h' := ⟨hH'⟩

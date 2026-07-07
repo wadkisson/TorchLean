@@ -18,7 +18,7 @@ The implementations live under `NN.GraphSpec.Models.TorchLean.*`, because they a
 constructors. The runtime namespace stays focused on execution machinery: ops, backends, sessions,
 losses, optimizers, and training loops.
 
-`NN.TorchLeanModels` is the short import surface for those constructors, so example code can refer
+`NN.TorchLeanModels` is the short import path for those constructors, so example code can refer
 to `TorchLeanModels.mlp` without exposing the internal GraphSpec module layout.
 -/
 
@@ -29,7 +29,7 @@ namespace NN
 namespace TorchLeanModels
 
 export _root_.NN.GraphSpec.Models.TorchLean
-  (mlp autoencoder cnn2 softmaxRegression mlpClassifier transformerBlock
+  (mlp autoencoder twoConvCnn softmaxRegression mlpClassifier transformerBlock
    fno1d fno1dParamShapes
    resnet18Model resnet18Program resnet18InitParams
   )

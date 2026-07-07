@@ -36,8 +36,8 @@ def loadParamBits {paramShapes : List Shape} (path : System.FilePath) :
 /--
 Load a JSON checkpoint containing exact `Float.toBits` parameter values for one checked model.
 
-This is the model-specialized companion to `loadParamBits`: callers can hand it the model they are
-about to evaluate instead of repeating `paramShapes := nn.paramShapes model`.
+Model-specialized companion to `loadParamBits`: callers hand over the model they are about to
+evaluate instead of repeating `paramShapes := nn.paramShapes model`.
 -/
 def loadModelParamBits {σ τ : Shape}
     (model : nn.Sequential σ τ) (path : System.FilePath) :

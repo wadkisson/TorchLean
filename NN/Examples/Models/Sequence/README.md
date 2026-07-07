@@ -1,23 +1,94 @@
-# Sequence Examples (TorchLean)
+# Sequence Examples
 
-This folder contains the runnable sequence model examples.
+This folder contains runnable sequence-model examples: recurrent networks, Transformer blocks,
+causal language models, a Mamba-style model, and a small arithmetic curriculum. These examples are
+where tokenization, sequence length, causal masking, recurrent state, cache-like behavior, and
+generation options enter the model zoo.
 
-Main entrypoints:
+## Main Entry Points
 
-- `CharGpt.lean` (`lake exe torchlean chargpt ...`): the minGPT-style character GPT teaching path.
-- `Gpt2.lean` (`lake exe torchlean gpt2 ...`): a compact byte-level GPT-2-style causal Transformer.
+- `Rnn.lean` (`lake exe torchlean rnn ...`): a small recurrent text-window example.
+- `Lstm.lean` (`lake exe torchlean lstm ...`): LSTM text-window training with a time-distributed
+  head.
+- `Transformer.lean` (`lake exe torchlean transformer ...`): a compact transformer encoder block
+  over a real text window.
+- `CharGpt.lean` (`lake exe torchlean chargpt ...`): the minGPT-style character-tokenizer teaching
+  path.
+- `Gpt2.lean` (`lake exe torchlean gpt2 ...`): a compact byte-level GPT-2-style causal Transformer
+  with save/reload support.
 - `Gpt2Saved.lean` (`lake exe torchlean gpt2_saved ...`): load weights saved by `gpt2` and sample.
-- `TextGpt2.lean` (`lake exe torchlean text_gpt2 ...`): CUDA only corpus trainer, with byte level
-  tokens or GPT-2 BPE.
-- `Mamba.lean` (`lake exe torchlean mamba ...`): compact text training for the Mamba-style model.
+- `TextGpt2.lean` (`lake exe torchlean text_gpt2 ...`): CUDA corpus trainer with byte-level tokens
+  or GPT-2 BPE.
+- `GptAdder.lean` (`lake exe torchlean gpt_adder ...`): a synthetic addition curriculum for
+  next-token models.
+- `Mamba.lean` (`lake exe torchlean mamba ...`): compact text training for the Mamba-style state
+  model.
 
-Why there are multiple GPT like files:
+## Why There Are Several GPT Paths
 
-- They use different *tokenizers* and *intended scales*.
-- `chargpt` is the single-file corpus path with an alphabet tokenizer; keep it to a 1-step quick check.
-- `gpt2` is the byte-level Transformer path with save/reload support and the compact 10-step check.
-- `text_gpt2` is the "trainer interface" for larger corpora and optional GPT-2 BPE.
+They test different pieces of the stack.
 
-Other sequence examples are here too (RNN/LSTM layer checks, a transformer block, and the
-`gpt_adder` curriculum). Supervised time series forecasting lives in
-`NN/Examples/Models/Supervised/LstmRegression.lean`, although it uses an LSTM layer.
+- `chargpt` is the smallest single-file character path. It is good for understanding the data flow
+  and for keeping a fast sequence-model check in the runner.
+- `gpt2` is the compact byte-level causal Transformer path. It supports saving parameters and
+  reloading through `gpt2_saved`.
+- `text_gpt2` is the larger corpus trainer. It can use raw byte tokens or GPT-2 BPE tokenizer files
+  and is intended for CUDA-backed runs.
+- `gpt_adder` is not a language dataset. It is a controlled next-token task for checking whether
+  sequence models, optimizers, and generation plumbing behave on a tiny symbolic curriculum.
+
+## Token And Artifact Boundaries
+
+Sequence examples are especially sensitive to hidden conventions. The docs and command output should
+make these objects visible:
+
+- tokenizer choice: byte tokens, character tokens, or GPT-2 BPE files;
+- sequence length and batch shape;
+- causal mask semantics;
+- shifted target construction for next-token prediction;
+- generation settings such as temperature, top-k, repeat penalty, and seed;
+- saved parameter paths for reloadable runs.
+
+The byte-token examples keep the vocabulary fixed at 256 so the boundary is small. BPE examples use
+explicit `vocab.json` and `merges.txt` files under `data/real/gpt2/`. Saved-parameter examples
+reload a shape-indexed parameter pack and fail before sampling if the saved shapes no longer match
+the model architecture.
+
+Useful commands:
+
+```bash
+lake exe torchlean rnn --cpu --steps 1
+lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
+lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --steps 10 --generate 0
+lake exe -K cuda=true torchlean text_gpt2 --cuda --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 1 --generate 0
+lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+```
+
+For a save/reload check:
+
+```bash
+lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare \
+  --steps 1 --windows 1 --generate 0 --save-params /tmp/gpt2.params.json
+
+lake exe -K cuda=true torchlean gpt2_saved --cuda \
+  --params /tmp/gpt2.params.json --prompt "ROMEO:" --generate 16
+```
+
+## What To Inspect
+
+| Artifact | Why it matters |
+| --- | --- |
+| Training log JSON | Shows loss over steps and records run metadata. |
+| Saved params JSON | Tests the shape-indexed parameter boundary used by reload/sampling workflows. |
+| Generated text | Qualitative preview of the runtime path; theorem-level claims should cite the owning spec/proof files. |
+| Tokenizer files | Define the vocabulary boundary for BPE models. |
+| Lean source shapes | Show batch, sequence, vocabulary, and logits dimensions at the type level. |
+
+Sequence models also touch verification problems: causal masks, KV/cache position contracts,
+tokenizer boundaries, and batch invariance. Those contracts live in the spec/proof/BugZoo layers.
+The model commands here are runtime producers and regression examples; theorem statements should be
+cited from the files that own those contracts.
+
+Supervised time-series forecasting lives in
+`NN/Examples/Models/Supervised/LstmRegression.lean`, although it uses an LSTM layer, because that
+example is about forecasting targets from windows rather than sequence-model mechanics.

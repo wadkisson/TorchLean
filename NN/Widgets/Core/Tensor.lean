@@ -233,7 +233,7 @@ def tensorHtml {α : Type} [ToString α] {s : Shape} (t : Tensor α s)
             <div>
               <details «open»={true}>
                 <summary>
-                      {pill s!"slices(axis0)={idxs.length}"} {pill s!"clipped={clipped}"} {pill
+                      {pill s!"leading slices={idxs.length}"} {pill s!"clipped={clipped}"} {pill
                         s!"sliceShape={TensorInternal.dimsString s'}"}
                     </summary>
                 <div style={json% {"margin-top": "8px"}}>

@@ -32,10 +32,10 @@ def floatLt (x y : Float) : Bool :=
 /--
 Check pointwise containment `[lo, hi] ⊆ [rootLo, rootHi]` for JSON-style float arrays.
 
-The helper is strict about lengths through `all2`: mismatched arrays are rejected.
+The helper is strict about lengths through `allPairwise`: mismatched arrays are rejected.
 -/
 def boxWithin (rootLo rootHi lo hi : Array Float) : Bool :=
-  all2 rootLo lo floatLe && all2 lo hi floatLe && all2 hi rootHi floatLe
+  allPairwise rootLo lo floatLe && allPairwise lo hi floatLe && allPairwise hi rootHi floatLe
 
 /--
 Check whether a lower-bound vector refutes a threshold vector at some coordinate.
@@ -43,7 +43,7 @@ Check whether a lower-bound vector refutes a threshold vector at some coordinate
 This is the executable form of `∃ i, threshold[i] < lowerBound[i]`.
 -/
 def refutesThreshold (lowerBound threshold : Array Float) : Bool :=
-  any2 lowerBound threshold (fun lb thr => floatLt thr lb)
+  anyPairwise lowerBound threshold (fun lb thr => floatLt thr lb)
 
 /--
 Check a supplied witness coordinate for threshold refutation.

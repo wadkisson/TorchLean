@@ -37,13 +37,13 @@ All routines in this file are **runtime diagnostics**:
 - they compute concrete trajectories and check concrete inequalities, and
 - they return `Bool` for convenience in scripts/CLIs.
 
-They are factually correct as *computations* (“this inequality held on these sampled points for
-this many steps”), but they are **not proofs** of the corresponding `Prop` definitions in
+They are factually correct as *computations*: “this inequality held on these sampled points for
+this many steps.” The corresponding theorem statements live in the `Prop` definitions in
 `NN.MLTheory.Stability.Spec`.
 
 In other words:
 
-- `true` means “passed these tests”, not “theorem proved”;
+- `true` means the sampled runtime diagnostic passed;
 - `false` means “found a counterexample to the tested condition”.
 -/
 
@@ -111,7 +111,8 @@ inequality of the form
 
 for the given `expected_decay_rate`.
 
-This is a heuristic diagnostic; it is not a proof of exponential stability.
+This is a heuristic diagnostic. A theorem about exponential stability should state the dynamical
+hypotheses separately and use this run only as runtime evidence.
 -/
 def testExponentialStability {s : Shape}
     (f : Tensor Float s → Tensor Float s)

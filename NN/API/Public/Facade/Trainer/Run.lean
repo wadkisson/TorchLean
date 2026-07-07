@@ -42,12 +42,12 @@ structure Probe (σ : Shape) where
 
 namespace Probe
 
-/-- Two-coordinate vector probe, useful for small tabular regression examples. -/
-def vec2 (name : String) (x1 x2 : Float) (expected : Option String := none) :
+/-- Two-coordinate vector probe for small tabular regression examples. -/
+def point (name : String) (x y : Float) (expected : Option String := none) :
     Probe (Shape.vec 2) :=
   { name := name
-    inputText := s!"x=({x1},{x2})"
-    input := fun {α} _ _ => NN.API.Samples.vec2 (α := α) NN.API.Runtime.ofFloat x1 x2
+    inputText := s!"x=({x},{y})"
+    input := fun {α} _ _ => NN.API.Samples.pointVector (α := α) NN.API.Runtime.ofFloat x y
     expected := expected }
 
 /-- Probe built from a concrete `Float` tensor. -/
@@ -210,6 +210,36 @@ def runConfig (opts : Options) (base : RunConfig := {}) : RunConfig :=
 
 namespace Implementation
 
+/--
+Run a callback under a runtime dtype that can also be read back to host `Float` tensors.
+
+Public trainer methods return ordinary `Float` predictions for display and downstream scripts, even
+when the model itself runs under an executable scalar such as `IEEE32Exec`. This dispatcher carries
+the extra scalar-readback evidence that `DType.withRuntime` intentionally does not require.
+-/
+def withReadableRuntime {β : Type}
+    (dtype : Runtime.DType)
+    (k : ∀ {α : Type}, [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
+      [Runtime.Scalar α] →
+      [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α] → IO β) :
+    IO (Except String β) := do
+  match dtype with
+  | .float =>
+      let out ← k (α := Float)
+      pure (.ok out)
+  | .real =>
+      pure (.error
+        "dtype=real is proof-only (noncomputable); use it in theorems, not in executables")
+  | .float32 { mode := .fp32 } =>
+      pure (.error
+        "float32-mode=fp32 is proof-only (noncomputable); use it in theorems/verification proofs")
+  | .float32 { mode := .ieee754Exec } =>
+      let out ← k (α := TorchLean.Floats.F32 .ieee754Exec)
+      pure (.ok out)
+  | .complex _ =>
+      pure (.error
+        "complex runtime trainer predictions do not yet have a public Float readback path")
+
 namespace Regression
 
 /-- Runtime configuration carried by this trainer. -/
@@ -299,7 +329,7 @@ def withLoadParams (opts : TrainOptions) (path : System.FilePath) : TrainOptions
 def withSaveParams (opts : TrainOptions) (path : System.FilePath) : TrainOptions :=
   { opts with saveParams? := some path }
 
-/-- Lower the public training options to the advanced runtime training config. -/
+/-- Lower the public training options to the manual runtime training config. -/
 def toTrainConfig (opts : TrainOptions) (optimizer : optim.Optimizer) :
     NN.API.TorchLean.Trainer.TrainConfig :=
   { steps := opts.steps

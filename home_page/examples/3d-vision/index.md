@@ -7,8 +7,9 @@ A 3D detector can act as an artifact producer. The detector/exporter emits a cam
 3D box corners, image dimensions, and a claimed 2D box. TorchLean reloads that JSON, recomputes the
 projection in Lean, and checks whether the claimed box really encloses the projected corners.
 
-The result is a small but useful certificate: not a proof that the detector is always correct, but
-a check that this exported geometry claim follows from the tensors in the artifact.
+The result is a small certificate for this exported scene: the checker establishes that
+the claimed 2D box follows from the camera and corner tensors in the artifact. The detector remains
+the producer; TorchLean checks the geometric claim it exported.
 
 <div class="media-slab">
   <img src="{{ '/assets/media/examples/showcase/geometry3d-vision-certificates.png' | relative_url }}" alt="3D vision projection certificate workflow"/>
@@ -27,9 +28,9 @@ bbox2d : [xmin, ymin, xmax, ymax]
 For each corner `(x, y, z)`, the checker forms the homogeneous point `[x, y, z, 1]`, multiplies by
 the `3 x 4` camera matrix, divides image coordinates by projected depth, and compares the resulting
 pixel `(u, v)` with both the image bounds and the claimed 2D box. The depth check matters: a point
-behind the camera should not be accepted just because its divided coordinates look plausible.
+behind the camera is rejected before its divided coordinates can be treated as an image point.
 
-Lean verifies that image dimensions are positive, the box is ordered and inside the image, all eight
+Lean checks that image dimensions are positive, the box is ordered and inside the image, all eight
 corners have positive projected depth, every projected corner is inside the image, and every
 projected corner is enclosed by the claimed 2D box.
 
@@ -57,9 +58,9 @@ def checkCert (cert : BoxCameraCert α) : Bool :=
     checkBBoxEnclosesProjection cert
 ```
 
-And the theorem connects the executable checker to the theorem-facing contract. The excerpt omits
-the standard arithmetic/typeclass parameters; the full theorem is in the
-[3D box verification API]({{ '/docs/NN/Verification/Geometry3D/Box3D.html' | relative_url }}):
+And the theorem connects the executable checker to the formal contract. The excerpt omits the
+standard arithmetic/typeclass parameters; the full theorem is in the
+[3D geometry verification source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Verification/Geometry3D):
 
 ```lean
 theorem checkCert_sound
@@ -73,7 +74,7 @@ geometric claim from that data.
 ## Run The Real Model Path
 
 The direct 3D detector route uses WildDet3D from Hugging Face. The optional path installs a real 3D
-detector stack, so it is better as an end-to-end example than as a first runtime check.
+detector pipeline, so it is better as an end-to-end example than as a first runtime check.
 
 ```bash
 python3 -m pip install -r scripts/verification/geometry3d/requirements-wilddet3d.txt
@@ -104,8 +105,8 @@ claim because projected 3D corners fall outside that box.
 
 ## What A JSON Artifact Looks Like
 
-The concrete JSON is kept plain so it is easy to produce from any detector, not just
-WildDet3D.
+The concrete JSON is kept plain so the same checker can read artifacts from WildDet3D, Omni3D,
+or another detector/exporter that emits the camera and box fields.
 
 ```json
 {
@@ -120,7 +121,7 @@ WildDet3D.
 }
 ```
 
-For Cube R-CNN, Omni3D, or another detector, the workflow is the same: export `K` or `P`, image
+For Cube R-CNN, Omni3D, or another detector, the export path is the same: export `K` or `P`, image
 size, corners, and a claimed box, then run the Lean checker.
 
 ```bash

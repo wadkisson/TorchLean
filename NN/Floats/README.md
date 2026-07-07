@@ -13,6 +13,20 @@ float32 name to depend on, import `NN.Floats.Float32`.
 
 Executable examples that exercise this infrastructure live under `NN/Examples/`.
 
+## Which Layer Should I Cite?
+
+| If your claim is about... | Use this layer |
+| --- | --- |
+| executable binary32 values inside Lean | `IEEEExec` |
+| finite float32-as-rounded-real error bounds | `FP32` |
+| precision-parametric rounding and ULP facts | `NeuralFloat` / `NF` |
+| interval enclosures with directed endpoints | `Interval` |
+| high-precision external enclosure evidence | `Arb`, with the oracle boundary named |
+| CUDA, ATen/libtorch, or Lean runtime `Float` | a runtime bridge or `TRUST_BOUNDARIES.md` assumption |
+
+This distinction is part of the correctness story. A theorem over `FP32` does not become a CUDA
+claim until a runtime bridge or trust-boundary statement connects the executable path to that model.
+
 ## The Three Float32 Views
 
 TorchLean uses three complementary notions of float32. They have different
@@ -83,6 +97,10 @@ Where to look:
 - `NN/Floats/IEEEExec/BridgeERealTotal.lean`: an `EReal`-valued semantics that distinguishes `+∞` and `-∞`.
 - `NN/Floats/IEEEExec/BridgeInitFloat32.lean`: an assumption based bridge from Lean's runtime
   `Init.Float32` to `IEEE32Exec`, at the bit level.
+
+For native CUDA and ATen/libtorch paths, the bridge is not in this folder by default. Those backends
+are runtime providers. A proof layer float claim should say which Lean model it uses and where the
+runtime/backend agreement assumption is discharged or documented.
 
 Background references that informed the design:
 - IEEE 754-2019: https://doi.org/10.1109/IEEESTD.2019.8766229

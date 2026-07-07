@@ -176,8 +176,8 @@ def transformerStackGo {batch n dModel : Nat} [NeZero n] [NeZero dModel]
 /--
 Stack `cfg.layers` copies of `blocks.transformerEncoderBlock`.
 
-This is the TorchLean analogue of composing `torch.nn.TransformerEncoderLayer` into a
-`torch.nn.TransformerEncoder` (modulo the fact that TorchLean uses `Seq` composition).
+TorchLean analogue of composing `torch.nn.TransformerEncoderLayer` into a
+`torch.nn.TransformerEncoder`, using `Seq` composition for the typed model.
 -/
 def transformerEncoderStackWithMask {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : TransformerEncoderStack)

@@ -48,7 +48,7 @@ round-trip facts:
 Those lemmas let us move between the functional spec view and the array/list view without
 handwaving.
 
-Example file: `NN.Examples.Advanced.Tensor.TensorBridge`.
+Example file: `NN.Examples.DeepDives.Tensor.TensorBridge`.
 
 References / analogies:
 - Row-major ("C-order") is the default contiguous layout in many toolchains (NumPy/PyTorch) and is a

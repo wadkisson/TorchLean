@@ -45,7 +45,7 @@ def assertFloatArrayEq (msg : String) (a b : FloatArray) : IO Unit := do
 def runScatterAddTwice : IO Unit := do
   IO.println "== deterministic scatter_add: exact repeatability =="
 
-  -- Enable deterministic mode via Lean-facing API.
+  -- Enable deterministic mode via Lean side API.
   let enabled := Buffer.setDeterministicReductionsChecked true
   if !enabled then
     throw <| IO.userError "deterministic mode: expected flag to be enabled"
@@ -59,7 +59,7 @@ def runScatterAddTwice : IO Unit := do
   let x := Buffer.zeros n
   let big := Buffer.full one 1.0e8
   let ones := Buffer.full (k - one) 1.0
-  let values := Buffer.concat1d big ones one (k - one)
+  let values := Buffer.concatVectorBuffers big ones one (k - one)
 
   let idx : Array Nat := Array.replicate k.toNat 0
   let y1 := Buffer.scatterAdd x values n idx k

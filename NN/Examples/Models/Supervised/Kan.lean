@@ -6,7 +6,7 @@ Authors: TorchLean Team
 Device-agnostic real-data example:
   python3 scripts/datasets/download_example_data.py --auto-mpg
   lake exe torchlean kan --cpu --steps 20
-  lake build -R -K cuda=true && lake exe torchlean kan --cuda --steps 20
+  lake exe -K cuda=true torchlean kan --cuda --steps 20
 -/
 
 module
@@ -21,7 +21,7 @@ This example trains a small Kolmogorov-Arnold Network on the prepared Auto MPG t
 CSV. The downloader normalizes the columns to `[0, 1]`, so the piecewise-linear KAN basis uses
 `inputScale = gridSize - 1` to spread its knots across the data interval.
 
-`KAN` is a model constructor. The task is chosen by the general trainer surface:
+`KAN` is a model constructor. The task is chosen by the general trainer API:
 
 ```lean
 let trainer := Trainer.new model { task := .regression, optimizer := optim.adam { lr := 1e-3 } }

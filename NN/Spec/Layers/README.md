@@ -1,13 +1,12 @@
 # `NN.Spec.Layers`
 
-This directory contains TorchLean's layer definitions: common neural network building blocks
-written as pure functions on `Spec.Tensor` (and parameter records).
+This directory contains TorchLean's layer definitions: common neural-network building blocks written
+as pure functions on spec tensors and parameter records.
 
-The emphasis here is on a clear reference definition, with explicit gradient rules for layers used
-by reverse-mode training:
-
-- each layer file defines a forward spec (what the layer computes),
-- layers used by reverse-mode execution also define a derivative or VJP spec (what gradients mean).
+The emphasis is a clear reference definition. Runtime code, graph lowering, CUDA kernels, and
+verification passes should be able to point back here when they need the mathematical meaning of an
+operation. For layers used by reverse-mode training, the spec layer also records derivative or VJP
+rules so the backward meaning is visible.
 
 Most models in `NN/Spec/Models/*` are built by composing these layer specs, sometimes through the
 `NN/Spec/Module/*` wrappers that provide the `NNModuleSpec` interface for `SpecChain`.
@@ -24,6 +23,8 @@ Files:
 - `Conv.lean`: 1D/2D convolution and transposed convolution specs plus explicit backward rules.
 - `Pooling.lean`: max/avg pooling, padded pooling, adaptive pooling, and smooth max pooling
   surrogates, including backward/JVP rules.
+- `Pooling/`: two-dimensional, padded, N-dimensional, and alias helpers used by the main pooling
+  umbrella.
 - `GlobalPooling.lean`: global avg/max pooling and backward rules.
 - `Normalization.lean`: LayerNorm and BatchNorm style utilities with explicit backward specs.
 - `Embedding.lean`: one-hot embeddings (`oneHot @ W`) and the corresponding VJP.
@@ -36,3 +37,6 @@ Files:
 - `Utils.lean`: shared image/tensor utilities used by convolution and pooling layers.
 
 The underlying tensor primitives (maps, matmul, reshape, broadcasting) live under `NN/Spec/Core/*`.
+
+This folder defines meanings, not backend performance. A fused CUDA kernel, ATen provider, or
+compiled runtime node should be documented against the spec operation it implements or approximates.

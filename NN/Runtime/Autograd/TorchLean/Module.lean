@@ -107,7 +107,7 @@ the initialization analogue of `TList`: the type says there is exactly one initi
 for each parameter shape, in the same order.  That removes the annoying runtime failure mode where a
 plain list is one element too short or too long.
 
-The initializers themselves are runtime schemes rather than proof objects.  The proof-facing story
+The initializers themselves are runtime schemes rather than proof objects.  The proof layer story
 is still the ordinary `Tensor Float s` parameter value; this plan only controls how the executable
 Float runtime materializes those tensors on CPU or CUDA.
 -/

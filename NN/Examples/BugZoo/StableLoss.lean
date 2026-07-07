@@ -61,8 +61,8 @@ TorchLean makes the protected variant visible:
 Spec.Tensor.safedivSpec x denom
 ```
 
-This does not prove every custom loss finite automatically, but it gives the library-approved stable
-path a checked definition and a theorem below.
+The checked definition and theorem below give the library-approved stable path for this division
+pattern.
 -/
 
 @[expose] public section

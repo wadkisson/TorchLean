@@ -13,10 +13,11 @@ TorchLean website.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 
 # `append_style` is idempotent: it removes everything after this marker before
@@ -44,8 +45,71 @@ UPSTREAM_DOCGEN_BASE = "https://leanprover-community.github.io/mathlib4_docs/"
 HREF_RE = re.compile(r'href="([^"]+)"')
 
 
+DOC_THEME_SCRIPT = """
+<script>
+(function () {
+  const key = "torchlean-theme";
+  const root = document.documentElement;
+
+  function preferredTheme() {
+    const stored = window.localStorage && window.localStorage.getItem(key);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+
+  function applyTheme(theme) {
+    root.setAttribute("data-theme", theme);
+    if (window.localStorage) {
+      window.localStorage.setItem("theme", theme);
+    }
+    const button = document.querySelector("[data-doc-theme-toggle]");
+    if (button) {
+      const isDark = theme === "dark";
+      button.textContent = isDark ? "Light" : "Dark";
+      button.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
+      button.setAttribute("title", isDark ? "Use light theme" : "Use dark theme");
+    }
+    document.querySelectorAll("iframe.navframe").forEach(function (frame) {
+      try {
+        if (frame.contentDocument) {
+          frame.contentDocument.documentElement.setAttribute("data-theme", theme);
+        }
+      } catch (_err) {
+        // Same-origin in local/docs builds; ignore if a browser blocks access.
+      }
+    });
+  }
+
+  applyTheme(preferredTheme());
+
+  window.addEventListener("DOMContentLoaded", function () {
+    applyTheme(preferredTheme());
+    document.querySelectorAll("iframe.navframe").forEach(function (frame) {
+      frame.addEventListener("load", function () {
+        applyTheme(root.getAttribute("data-theme") || preferredTheme());
+      });
+    });
+    const button = document.querySelector("[data-doc-theme-toggle]");
+    if (!button) {
+      return;
+    }
+    button.addEventListener("click", function () {
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      window.localStorage && window.localStorage.setItem(key, next);
+      applyTheme(next);
+    });
+  });
+})();
+</script>
+"""
+
+
 def prune_dependency_pages(docs: Path) -> None:
-    """Keep the published API docs focused on TorchLean modules.
+    """Keep the published API reference focused on TorchLean modules.
 
     DocGen generates pages for every imported package. That is useful in a local
     theorem-library browser, but expensive on GitHub Pages: Mathlib and Lean's
@@ -115,14 +179,90 @@ def rewrite_dependency_links(docs: Path) -> None:
             path.write_text(updated, encoding="utf-8")
 
 
+def _nearest_existing_doc_page(docs: Path, target: Path) -> Path | None:
+    """Return the nearest published module page for a missing DocGen target.
+
+    The public API site intentionally prunes dependency pages and only publishes
+    a curated slice of TorchLean module pages.  DocGen can still emit links to a
+    deeper `NN/...` module that was typechecked but not published as an HTML
+    page.  Rather than ship a local 404, send readers to the nearest published
+    ancestor module page.
+    """
+    try:
+        rel = target.relative_to(docs)
+    except ValueError:
+        return None
+
+    parts = list(rel.parts)
+    if not parts or parts[0] != "NN":
+        return None
+
+    if parts[-1].endswith(".html"):
+        parts[-1] = parts[-1][:-5]
+
+    while len(parts) > 1:
+        candidate = docs.joinpath(*parts).with_suffix(".html")
+        if candidate.exists():
+            return candidate
+        parts.pop()
+
+    candidate = docs / "NN.html"
+    return candidate if candidate.exists() else None
+
+
+def rewrite_missing_nn_links(docs: Path) -> None:
+    """Rewrite missing local TorchLean links to the nearest emitted module page.
+
+    This keeps generated docs and hand-written DocGen landing pages honest after
+    the public site prunes the full DocGen universe.  The link text still names
+    the precise declaration/module; the href lands on the closest page that is
+    actually present in the published reference.
+    """
+
+    for path in docs.rglob("*.html"):
+        text = path.read_text(encoding="utf-8")
+
+        def repl(match: re.Match[str]) -> str:
+            url = match.group(1)
+            if (
+                not url
+                or url.startswith(("#", "http://", "https://", "mailto:", "javascript:", "data:"))
+            ):
+                return match.group(0)
+
+            path_part, sep, suffix = url.partition("#")
+            query = ""
+            if "?" in path_part:
+                path_part, query_sep, query = path_part.partition("?")
+                suffix = query_sep + query + (sep + suffix if sep else "")
+            elif sep:
+                suffix = sep + suffix
+
+            if not path_part:
+                return match.group(0)
+
+            target = (path.parent / unquote(path_part)).resolve()
+            if target.exists():
+                return match.group(0)
+
+            replacement = _nearest_existing_doc_page(docs, target)
+            if replacement is None:
+                return match.group(0)
+
+            rel = os.path.relpath(replacement, path.parent).replace(os.sep, "/")
+            return f'href="{quote(rel, safe="/.#?=&:%")}{suffix}"'
+
+        updated = HREF_RE.sub(repl, text)
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+
+
 def write_index(docs: Path) -> None:
-    """Replace DocGen's default index with a TorchLean-specific API landing page.
+    """Replace DocGen's default index with a TorchLean-specific API index.
 
     DocGen's stock index is a raw module tree.  That is technically complete,
-    but not friendly for a project website: users need a few stable entrypoints
-    before they start searching thousands of generated declarations.  This page
-    keeps the DocGen search scripts and module drawer, but adds a curated front
-    door for common TorchLean surfaces.
+    but hard to scan on a project website. The replacement keeps DocGen search
+    and the module drawer, then exposes the main TorchLean declaration groups.
     """
     (docs / "index.html").write_text(
         """<!doctype html>
@@ -134,7 +274,7 @@ def write_index(docs: Path) -> None:
   <link rel="icon" href="./favicon.svg">
   <link rel="mask-icon" href="./favicon.svg" color="#000000">
   <link rel="prefetch" href=".//declarations/declaration-data.bmp" as="image">
-  <title>TorchLean API Docs</title>
+  <title>TorchLean API Reference</title>
   <script defer src="./mathjax-config.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -156,6 +296,7 @@ def write_index(docs: Path) -> None:
       <a href="../examples/">Examples</a>
       <a href="../graphs/">Graphs</a>
     </div>
+    <button class="tl-doc-theme-toggle" type="button" data-doc-theme-toggle aria-label="Use dark theme" title="Use dark theme">Dark</button>
     <form id="search_form">
       <input type="text" name="q" autocomplete="off" placeholder="Search declarations">
       <button id="search_button" onclick="javascript: form.action='./search.html';">Search</button>
@@ -163,59 +304,45 @@ def write_index(docs: Path) -> None:
   </header>
   <main>
     <a id="top"></a>
-    <section class="tl-api-hero">
-      <p class="tl-kicker">TorchLean API Docs</p>
-      <h1>Exact declarations, organized by API surface.</h1>
-      <p>
-        These pages are generated from Lean. Use the cards below for the main TorchLean surfaces,
-        then use search when you need a specific definition, theorem, or module.
-      </p>
-      <div class="tl-hero-actions">
-        <a href="../blueprint/">Read the Guide</a>
-        <a href="../examples/">Run an Example</a>
-        <a href="./search.html">Search Declarations</a>
-      </div>
-    </section>
-
     <section class="tl-api-grid" aria-label="Main API entrypoints">
       <a class="tl-api-card" href="./NN/Library.html">
-        <span>Recommended import</span>
-        <strong>NN.Library</strong>
+        <strong>Start with one import</strong>
+        <span>NN.Library</span>
         <p>The broad umbrella import for ordinary downstream use.</p>
       </a>
       <a class="tl-api-card" href="./NN/API/Public.html">
-        <span>Public API</span>
-        <strong>NN.API.Public</strong>
+        <strong>Write model code</strong>
+        <span>NN.API.Public</span>
         <p>The PyTorch-shaped public surface for model code and examples.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Tensor/API.html">
-        <span>Tensors</span>
-        <strong>NN.Tensor.API</strong>
+      <a class="tl-api-card" href="./NN/Entrypoint/Tensor.html">
+        <strong>Work with tensors</strong>
+        <span>NN.Tensor.API</span>
         <p>Tensor operations, shapes, and the user-facing tensor layer.</p>
       </a>
       <a class="tl-api-card" href="./NN/IR/Graph.html">
-        <span>Graph IR</span>
-        <strong>NN.IR.Graph</strong>
+        <strong>Inspect graph IR</strong>
+        <span>NN.IR.Graph</span>
         <p>The op-tagged graph representation used by lowering and verification.</p>
       </a>
       <a class="tl-api-card" href="./NN/IR/Semantics.html">
-        <span>Semantics</span>
-        <strong>NN.IR.Semantics</strong>
+        <strong>Read operator semantics</strong>
+        <span>NN.IR.Semantics</span>
         <p>The executable meaning attached to IR operators and graph evaluation.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Runtime/Autograd/TorchLean.html">
-        <span>Runtime</span>
-        <strong>NN.Runtime.Autograd.TorchLean</strong>
+      <a class="tl-api-card" href="./NN/Entrypoint/Runtime.html">
+        <strong>Run training code</strong>
+        <span>NN.Runtime.Autograd.TorchLean</span>
         <p>Runtime autograd, compiled execution, and training support.</p>
       </a>
       <a class="tl-api-card" href="./NN/Verification/CLI.html">
-        <span>Verification</span>
-        <strong>NN.Verification.CLI</strong>
+        <strong>Check certificates</strong>
+        <span>NN.Verification.CLI</span>
         <p>The registered certificate and verification command surface.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Floats/IEEEExec.html">
-        <span>Float32</span>
-        <strong>NN.Floats.IEEEExec</strong>
+      <a class="tl-api-card" href="./NN/Floats/IEEEExec/Exec32.html">
+        <strong>Audit Float32 execution</strong>
+        <span>NN.Floats.IEEEExec</span>
         <p>Executable IEEE-754 binary32 semantics used in float audits.</p>
       </a>
     </section>
@@ -224,11 +351,11 @@ def write_index(docs: Path) -> None:
       <h2>Browse By Layer</h2>
       <div class="tl-link-list">
         <a href="./NN/API/Public.html">API</a>
-        <a href="./NN/Spec/Core.html">Spec</a>
-        <a href="./NN/Runtime/Autograd/TorchLean.html">Runtime</a>
+        <a href="./NN/Spec/Core/Shape.html">Spec</a>
+        <a href="./NN/Entrypoint/Runtime.html">Runtime</a>
         <a href="./NN/IR/Graph.html">IR</a>
-        <a href="./NN/GraphSpec/Core.html">GraphSpec</a>
-        <a href="./NN/Proofs/Tensor.html">Proofs</a>
+        <a href="./NN/GraphSpec/Models.html">GraphSpec</a>
+        <a href="./NN/Entrypoint/Proofs.html">Proofs</a>
         <a href="./NN/Verification/CLI.html">Verification</a>
         <a href="./NN/Examples/Zoo.html">Examples</a>
       </div>
@@ -243,19 +370,19 @@ def write_index(docs: Path) -> None:
       </article>
       <a href="./NN/API/Public.html">
         <strong>Write model code</strong>
-        <span>Public tensor and layer facade.</span>
+        <span>NN.API.Public</span>
       </a>
       <a href="./NN/IR/Graph.html">
         <strong>Inspect lowering</strong>
-        <span>The shared graph object that verification and execution read.</span>
+        <span>NN.IR.Graph</span>
       </a>
-      <a href="./NN/Runtime/Autograd/TorchLean.html">
+      <a href="./NN/Entrypoint/Runtime.html">
         <strong>Run autograd</strong>
-        <span>Runtime training and reverse-mode execution entrypoints.</span>
+        <span>NN.Runtime.Autograd.TorchLean</span>
       </a>
       <a href="./NN/Verification/CLI.html">
         <strong>Check certificates</strong>
-        <span>Commands and declarations used by verification examples.</span>
+        <span>NN.Verification.CLI</span>
       </a>
     </section>
 
@@ -271,9 +398,10 @@ def write_index(docs: Path) -> None:
     </section>
   </main>
   <nav class="nav"><iframe src="./navbar.html" class="navframe" frameborder="0"></iframe></nav>
+  {DOC_THEME_SCRIPT}
 </body>
 </html>
-""",
+""".replace("{DOC_THEME_SCRIPT}", DOC_THEME_SCRIPT),
         encoding="utf-8",
     )
 
@@ -399,12 +527,40 @@ header .header_filename {
   text-decoration: none;
 }
 
+.tl-doc-theme-toggle {
+  border: 1px solid var(--tl-border);
+  border-radius: 999px;
+  padding: 0.28rem 0.62rem;
+  background: color-mix(in srgb, var(--body-bg) 90%, var(--code-bg));
+  color: color-mix(in srgb, var(--text-color) 82%, transparent);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tl-doc-theme-toggle:hover {
+  color: var(--tl-teal);
+  border-color: color-mix(in srgb, var(--tl-teal) 45%, transparent);
+  background: var(--tl-teal-soft);
+}
+
 /* Landing-page module drawer ---------------------------------------------
    The landing page uses the same hidden checkbox / iframe navbar that DocGen
    emits everywhere else. The custom index hides the drawer by default and
    expose it with a human label, "Modules", instead of the raw hamburger glyph. */
 .tl-docs-index {
   --content-width: min(1080px, calc(100vw - 3rem));
+  --tl-doc-drawer-width: 20rem;
+  --tl-doc-open-content-width: min(960px, calc(100vw - var(--tl-doc-drawer-width) - 5rem));
+}
+
+.tl-docs-index:has(#nav_toggle:checked) {
+  display: grid;
+  grid-template-columns: var(--tl-doc-drawer-width) var(--tl-doc-open-content-width);
+  justify-content: start;
+  column-gap: 1.5rem;
+  padding: 0 1.25rem 0 clamp(1.5rem, 3vw, 3rem);
 }
 
 .tl-docs-index header {
@@ -426,14 +582,54 @@ header .header_filename {
 
 .tl-docs-index #nav_toggle:checked ~ .nav {
   display: block;
-  width: min(24rem, calc(100vw - 2rem));
+  position: sticky;
+  top: calc(var(--header-height) + 1rem);
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  width: 100%;
   max-width: none;
-  left: 1rem;
+  height: calc(100vh - var(--header-height) - 2rem);
+  left: auto;
   z-index: 4;
   background: var(--body-bg);
   border: 1px solid rgba(127, 127, 127, 0.24);
   border-radius: 12px;
-  padding: 0.75rem;
+  margin: calc(var(--header-height) + 1rem) 0 1rem;
+  overflow: hidden;
+  padding: 0;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+}
+
+.tl-docs-index #nav_toggle:checked ~ main {
+  grid-column: 2;
+  grid-row: 2;
+  width: 100%;
+  max-width: var(--tl-doc-open-content-width);
+  margin: calc(var(--header-height) + 1rem) 0 4rem;
+}
+
+.tl-docs-index #nav_toggle:checked ~ main .tl-api-grid,
+.tl-docs-index #nav_toggle:checked ~ main .tl-task-grid {
+  grid-template-columns: 1fr;
+}
+
+.tl-docs-index #nav_toggle:checked ~ main .tl-api-card,
+.tl-docs-index #nav_toggle:checked ~ main .tl-task-grid > a,
+.tl-docs-index #nav_toggle:checked ~ main .tl-task-grid > article {
+  min-height: auto;
+  min-width: 0;
+  padding: 0.8rem 0.95rem;
+}
+
+.tl-docs-index #nav_toggle:checked ~ main .tl-api-grid,
+.tl-docs-index #nav_toggle:checked ~ main .tl-api-section {
+  margin-top: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+#settings {
+  display: none !important;
 }
 
 .tl-docs-index label[for="nav_toggle"] {
@@ -451,9 +647,9 @@ header .header_filename {
 }
 
 /* Landing-page layout -----------------------------------------------------
-   These rules are only for `/docs/`: a hero, entrypoint cards, layer chips,
-   task shortcuts, and the declaration-kind legend.  The declaration pages use
-   the later `body:not(.tl-docs-index)` rules. */
+   These rules are only for `/docs/`: entrypoint cards, layer chips, task
+   shortcuts, and the declaration-kind legend. The declaration pages use the
+   later `body:not(.tl-docs-index)` rules. */
 main {
   padding-bottom: 4rem;
 }
@@ -464,63 +660,11 @@ main {
   margin-right: auto;
 }
 
-.tl-api-hero {
-  margin: 1.25rem 0 1.5rem;
-  padding: 1.7rem 1.8rem;
-  border: 1px solid rgba(21, 120, 120, 0.18);
-  border-radius: 18px;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--code-bg) 78%, transparent), transparent),
-    color-mix(in srgb, var(--body-bg) 88%, var(--code-bg));
-  box-shadow: var(--tl-shadow);
-}
-
-.tl-api-hero h1 {
-  margin: 0.1rem 0 0.55rem;
-  font-size: clamp(1.9rem, 3vw, 2.7rem);
-  line-height: 1.08;
-}
-
-.tl-api-hero p {
-  margin: 0;
-  max-width: 780px;
-}
-
-.tl-hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 1rem;
-}
-
-.tl-hero-actions a {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.5rem 0.72rem;
-  border: 1px solid var(--tl-border);
-  border-radius: 999px;
-  text-decoration: none;
-  background: color-mix(in srgb, var(--body-bg) 90%, var(--code-bg));
-}
-
-.tl-hero-actions a:first-child {
-  background: var(--tl-teal);
-  border-color: var(--tl-teal);
-  color: white;
-}
-
-.tl-kicker {
-  color: var(--tl-teal);
-  font-weight: 800;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-}
-
 .tl-api-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.9rem;
-  margin: 1rem 0 1.75rem;
+  margin: 1.35rem 0 1.75rem;
 }
 
 .tl-api-card {
@@ -545,16 +689,16 @@ main {
 .tl-api-card span {
   display: block;
   color: var(--tl-teal);
+  font-family: JuliaMono, monospace;
   font-size: 0.78rem;
   font-weight: 800;
-  text-transform: uppercase;
+  overflow-wrap: anywhere;
 }
 
 .tl-api-card strong {
   display: block;
-  margin: 0.28rem 0 0.36rem;
-  font-family: JuliaMono, monospace;
-  font-size: 1.03rem;
+  margin: 0 0 0.32rem;
+  font-size: 1.08rem;
   overflow-wrap: anywhere;
 }
 
@@ -638,7 +782,9 @@ main {
 .tl-task-grid span {
   display: block;
   color: color-mix(in srgb, var(--text-color) 72%, transparent);
-  font-size: 0.95rem;
+  font-family: JuliaMono, monospace;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
 }
 
 .tl-kind-section {
@@ -858,9 +1004,47 @@ label[for="nav_toggle"]::before {
 }
 
 .navframe {
-  border: 1px solid var(--tl-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--body-bg) 92%, var(--code-bg));
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.tl-docs-index .navframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+body > .navframe {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body > .navframe > .nav {
+  box-sizing: border-box;
+  left: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 1rem 1.05rem 1.25rem;
+  font-size: 0.94rem;
+}
+
+body > .navframe > .nav h3:first-child {
+  margin-top: 0;
+}
+
+body > .navframe > .nav h3 {
+  margin: 1.15rem 0 0.45rem;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+body > .navframe > .nav .nav_link,
+body > .navframe > .nav summary {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .tl-nav-hint {
@@ -998,12 +1182,28 @@ body:not(.tl-docs-index) :not(pre) > code {
     margin-left: 0;
   }
 
-  .tl-docsite-links {
-    display: none;
+  .tl-doc-theme-toggle {
+    order: 2;
   }
 
-  .tl-api-hero {
-    padding: 1rem;
+  .tl-docs-index #nav_toggle:checked ~ .nav {
+    position: fixed;
+    top: calc(var(--header-height) + 0.75rem);
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+    max-width: none;
+  }
+
+  .tl-docs-index #nav_toggle:checked ~ main {
+    max-width: var(--content-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .tl-docsite-links {
+    display: none;
   }
 
   .tl-api-grid,
@@ -1029,8 +1229,7 @@ def add_nav_hint(docs: Path) -> None:
 
     The generated tree can still contain dependency names in cached navigation
     metadata. The published pages are pruned to TorchLean modules, so this hint
-    points visitors at the `NN` subtree without pretending the docs are a full
-    mirror of Mathlib or Lean.
+    points visitors at the `NN` subtree and states the intended scope directly.
     """
     nav = docs / "navbar.html"
     if not nav.exists():
@@ -1133,6 +1332,16 @@ def rename_docgen_header(docs: Path) -> None:
             )
             updated = updated.replace('<h2 class="header_filename', links + '<h2 class="header_filename', 1)
 
+        if "data-doc-theme-toggle" not in updated and '<h2 class="header_filename' in updated:
+            theme_button = (
+                '<button class="tl-doc-theme-toggle" type="button" data-doc-theme-toggle '
+                'aria-label="Use dark theme" title="Use dark theme">Dark</button>'
+            )
+            updated = updated.replace('<h2 class="header_filename', theme_button + '<h2 class="header_filename', 1)
+
+        if "data-doc-theme-toggle" in updated and "torchlean-theme" not in updated:
+            updated = updated.replace("</body>", DOC_THEME_SCRIPT + "\n</body>", 1)
+
         # Only declaration-heavy pages need the color legend.  Module-only pages
         # such as `NN.Library` would waste sidebar space with it.
         if has_declarations and "tl-kind-legend-side" not in updated:
@@ -1155,6 +1364,7 @@ def main() -> None:
     append_style(docs)
     add_nav_hint(docs)
     rename_docgen_header(docs)
+    rewrite_missing_nn_links(docs)
 
 
 if __name__ == "__main__":

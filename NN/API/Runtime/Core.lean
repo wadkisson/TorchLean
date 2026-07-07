@@ -42,7 +42,7 @@ Most of this namespace is a curated re-export of `_root_.Runtime.Autograd.TorchL
 
 The exported names fall into these groups:
 - execution control: `Backend`, `Options`
-- program interface: `Ops`, `RefTy`, `Program`, `CompiledOut`, `CompiledScalar`, ...
+- program interface: `Ops`, `RefTy`, `Program`, `CompiledGraph`, `CompiledScalar`, ...
 - primitive tensor ops: `add`, `matmul`, `reshape`, elementwise activations, pooling, ...
 - training utilities: `trainCycle*`, `meanLoss`
 -/
@@ -50,7 +50,7 @@ The exported names fall into these groups:
 export _root_.Runtime.Autograd.TorchLean (Backend Options TensorRef Param AnyParam)
 export _root_.Runtime.Autograd.FastKernels (GpuMatmulPrecision)
 export _root_.Runtime.Autograd.TorchLean (CompiledScalar compileScalar)
-export _root_.Runtime.Autograd.TorchLean (CompiledOut compileOut)
+export _root_.Runtime.Autograd.TorchLean (CompiledGraph compileGraph)
 export _root_.Runtime.Autograd.TorchLean (ParamList ScalarTrainer scalarTrainer)
 export _root_.Runtime.Autograd.TorchLean (TList Ops Ref RefList CurriedRef RefTy Program)
 export _root_.Runtime.Autograd.TorchLean.Curried (Fn curry uncurry)
@@ -68,34 +68,34 @@ export _root_.Runtime.Autograd.TorchLean
    sum flatten
    linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention conv2d)
 export _root_.Runtime.Autograd.TorchLean
-  (scalarOf tlist1 tlist2 tlist3 tlist4 trainCycleSGD trainCycleOptim meanLoss)
+  (scalarOf tlistSingleton tlistPair tlistTriple tlistQuad trainCycleSGD trainCycleOptim meanLoss)
 
 /-- Public name for TorchLean's shape-indexed tensor-pack / typed tuple representation. -/
 abbrev TensorPack (α : Type) (shapes : List Spec.Shape) := TList α shapes
 
 /-- Construct a one-tensor pack. -/
-abbrev tensorpack1 {α : Type} {s1 : Spec.Shape} (x1 : Spec.Tensor α s1) :
-    TensorPack α [s1] :=
-  tlist1 x1
+abbrev tensorpackSingleton {α : Type} {s : Spec.Shape} (x : Spec.Tensor α s) :
+    TensorPack α [s] :=
+  tlistSingleton x
 
 /-- Construct a two-tensor pack. -/
-abbrev tensorpack2 {α : Type} {s1 s2 : Spec.Shape}
-    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2) :
-    TensorPack α [s1, s2] :=
-  tlist2 x1 x2
+abbrev tensorpackPair {α : Type} {s₁ s₂ : Spec.Shape}
+    (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂) :
+    TensorPack α [s₁, s₂] :=
+  tlistPair x₁ x₂
 
 /-- Construct a three-tensor pack. -/
-abbrev tensorpack3 {α : Type} {s1 s2 s3 : Spec.Shape}
-    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2) (x3 : Spec.Tensor α s3) :
-    TensorPack α [s1, s2, s3] :=
-  tlist3 x1 x2 x3
+abbrev tensorpackTriple {α : Type} {s₁ s₂ s₃ : Spec.Shape}
+    (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂) (x₃ : Spec.Tensor α s₃) :
+    TensorPack α [s₁, s₂, s₃] :=
+  tlistTriple x₁ x₂ x₃
 
 /-- Construct a four-tensor pack. -/
-abbrev tensorpack4 {α : Type} {s1 s2 s3 s4 : Spec.Shape}
-    (x1 : Spec.Tensor α s1) (x2 : Spec.Tensor α s2)
-    (x3 : Spec.Tensor α s3) (x4 : Spec.Tensor α s4) :
-    TensorPack α [s1, s2, s3, s4] :=
-  tlist4 x1 x2 x3 x4
+abbrev tensorpackQuad {α : Type} {s₁ s₂ s₃ s₄ : Spec.Shape}
+    (x₁ : Spec.Tensor α s₁) (x₂ : Spec.Tensor α s₂)
+    (x₃ : Spec.Tensor α s₃) (x₄ : Spec.Tensor α s₄) :
+    TensorPack α [s₁, s₂, s₃, s₄] :=
+  tlistQuad x₁ x₂ x₃ x₄
 
 /-
 `TList` is a *typed list of tensors* whose shape list lives in the type.
@@ -103,14 +103,14 @@ abbrev tensorpack4 {α : Type} {s1 s2 s3 s4 : Spec.Shape}
 It is great for safety (the compiler tracks parameter order/shapes), but raw destructuring
 with `.cons ... .nil` is noisy in examples.
 
-For tuple-like constructors/accessors (`tensorpack.unpack2`, `tensorpack.get1`, etc.), see
+For tuple-like constructors/accessors (`tensorpack.unpackPair`, `tensorpack.second`, etc.), see
 `NN/API/Public/TensorPack.lean`.
 -/
 
 namespace RefList
 
-/-- Unpack a 2-element `RefList` into a pair. -/
-def unpack2 {Ref : Spec.Shape → Type} {s₁ s₂ : Spec.Shape} :
+/-- Unpack a two-element `RefList` into a pair. -/
+def unpackPair {Ref : Spec.Shape → Type} {s₁ s₂ : Spec.Shape} :
     TorchLean.RefList Ref [s₁, s₂] → (Ref s₁ × Ref s₂)
   | .cons x₁ (.cons x₂ .nil) => (x₁, x₂)
 
@@ -145,12 +145,12 @@ end Norm
 namespace Autodiff
 /- Autodiff entrypoints for compiled and eager runtime programs. -/
 export _root_.Runtime.Autograd.TorchLean.Autodiff
-  (compileLoss compileOut
+  (compileLoss compileGraph
    gradParams gradInputs
    vjpOutParams vjpOutInputs
    jacrevOutParams jacrevOutInputs
-   jacfwd1
-   hessian1
+   jacfwdInput
+   hessianInput
    jvpLossParams jvpLossInputs
    hvpParams hvpInputs)
 end Autodiff
@@ -289,7 +289,7 @@ export _root_.Runtime.Autograd.TorchLean.NN
    multiHeadAttention conv2d
    maxPool2d maxPool2dPad avgPool2d avgPool2dPad
    globalAvgPool2dChw globalAvgPool2dNchw
-   seq1)
+   singleLayer)
 
 /-
 To keep example code "PyTorch-like", the `seq!` macro supports stacking either:
@@ -313,9 +313,9 @@ class AsSeqK (F : Spec.Shape → Spec.Shape → Sort u) where
   /-- Convert a layer-like thing into a `Seq` so `seq!` can compose it. -/
   asSeq : {σ τ : Spec.Shape} → F σ τ → Seq σ τ
 
-/-- A single `LayerDef` can always be viewed as a 1-layer sequential model (`seq1`). -/
+/-- A single `LayerDef` can always be viewed as a 1-layer sequential model (`singleLayer`). -/
 instance : AsSeqK LayerDef where
-  asSeq := fun {_σ _τ} layer => seq1 layer
+  asSeq := fun {_σ _τ} layer => singleLayer layer
 
 /-- A sequential model is already a sequential model (identity). -/
 instance : AsSeqK Seq where
@@ -335,12 +335,12 @@ def compAny {σ τ υ : Spec.Shape}
 namespace Seq
 export _root_.Runtime.Autograd.TorchLean.NN.Seq
   (paramShapes paramRequiresGrad initParams comp updateBuffers
-   programWithMode program
+   programWithMode forwardProgram
    scalarModuleDefWithMode scalarModuleDef
    mseScalarModuleDefWithMode mseScalarModuleDef
    crossEntropyOneHotScalarModuleDefWithMode crossEntropyOneHotScalarModuleDef
-   compileOutWithMode compileOut
-   predict1WithMode predict1 eval1 eval1NoGrad eval1CompiledNoGrad)
+   compileForwardWithMode compileForward
+   forward predict forwardArtifact)
 end Seq
 end NN
 

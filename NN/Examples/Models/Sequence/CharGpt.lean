@@ -130,7 +130,7 @@ def main (args : List String) : IO UInt32 := do
   if args.contains "--help" || args.contains "-h" then
     IO.println usage
     return 0
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := fun _ => s!"{exeName}: char-level GPT training")
     (k := fun opts rest => do
       if !opts.useGpu then
@@ -203,7 +203,7 @@ def main (args : List String) : IO UInt32 := do
           log := .disabled
           loadParams? := train.loadParams?
           saveParams? := train.saveParams? }
-      let (L0, L1) ←
+      let (beforeLoss, afterLoss) ←
         Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
           (steps? := some train.steps) (lr? := some train.lr)
       let promptIds := tok.encode train.prompt
@@ -213,14 +213,14 @@ def main (args : List String) : IO UInt32 := do
         else
           fun _ => true
       let outIds ←
-        generateSampledFromIds batch seqLen vocab trained.eval promptIds
+        generateSampledFromIds batch seqLen vocab trained.predict promptIds
           train.generate train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty
           (allowId := allowId) (padId := 0)
       let sampled := escapeCharIdsForDisplay tok outIds
       IO.println s!"  vocab={vocab} (unique chars)"
       IO.println s!"  sampled={sampled}"
       text.writeGenerationTrainLog
-        train.log "CharGPT (minGPT-style)" train.steps L0 L1
+        train.log "CharGPT (minGPT-style)" train.steps beforeLoss afterLoss
         train.toGenerationOptions sampled
         #[ModelZoo.deviceNote opts,
           s!"vocab={vocab}",

@@ -1,7 +1,7 @@
 # Model Examples
 
-This directory contains the maintained TorchLean model commands. The files are meant to read like
-ordinary training scripts: instantiate a model, prepare a dataset or token stream, train for several
+This directory contains the maintained TorchLean model commands. The files read like ordinary
+training scripts: instantiate a model, prepare a dataset or token stream, train for several
 optimizer updates, and optionally write a training curve.
 
 For the narrative walkthrough, use the website guide. This file is the local command map.
@@ -19,6 +19,31 @@ For the narrative walkthrough, use the website guide. This file is the local com
 | `RL/` | DQN and PPO examples |
 | `Runner.lean` | shared `lake exe torchlean ...` command dispatcher |
 
+## Command Catalog
+
+The runner currently exposes these model and workflow commands:
+
+| Family | Commands |
+| --- | --- |
+| Quickstart | `quickstart_tensors`, `quickstart_autograd`, `quickstart_mlp`, `quickstart_minibatch_mlp`, `quickstart_cnn` |
+| Supervised/tabular | `mlp`, `kan`, `lstm_regression` |
+| Vision | `cnn`, `vit` |
+| Sequence/text | `rnn`, `lstm`, `transformer`, `gpt2`, `gpt2_saved`, `text_gpt2`, `chargpt`, `gpt_adder`, `mamba` |
+| Generative | `autoencoder`, `mae`, `vae`, `vqvae`, `gan`, `diffusion` |
+| Operator learning | `fno1d_burgers` |
+| Reinforcement learning | `ppo_cartpole`, `ppo_gridworld`, `ppo_pong_ram`, `dqn_replay` |
+| Data/interoperability | `data_csv`, `data_npy`, `data_cifar10`, `pytorch_roundtrip`, `pytorch_export_check` |
+| Deep dives | `floats_arb_ieee_compare`, `float32_modes`, `graphspec`, `ir_axis_ops`, `one_semantic_universe`, `torch_ir_pytorch` |
+
+Use `lake exe torchlean --help` for the current command list and example invocations. Runtime flags
+such as `--cpu`, `--cuda`, `--dtype`, and `--backend` can appear before or after the command name.
+
+For a compact public-surface regression pass, run:
+
+```bash
+scripts/checks/example_regression.sh --skip-help
+```
+
 ## Data Preparation
 
 Most examples use datasets prepared outside Lean and loaded through `TorchLean.Data`.
@@ -30,6 +55,11 @@ python3 scripts/datasets/download_example_data.py --household-power --household-
 
 For custom image folders or tensor archives, convert once to `.npy` with
 `scripts/datasets/torchlean_data_convert.py`, then pass `--x` and `--y` to the relevant command.
+
+The conversion step is part of the example's boundary. If a command uses real data, the README or
+command help should make the source, shape, and output artifact path visible. If a generated
+prediction later becomes a verification fixture, the verification page should name the file format
+and checker that consumes it.
 
 ## Training Curves
 
@@ -55,7 +85,7 @@ commands do real convolution/attention work and are not good CPU quickchecks.
 
 TorchLean's verification/runtime personality should stay visible where it matters. Normal
 supervised examples should look like `Trainer.new ...; trainer.train ...`. Generated streams, PPO
-rollouts, CUDA/profiling, and certificate-style verification examples may use advanced runtime
+rollouts, CUDA/profiling, and certificate-style verification examples may use manual runtime
 hooks; those cases should be explicit in file comments rather than leaking into the ordinary
 training path by accident.
 
@@ -104,6 +134,13 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
 ## Generative, Operator, And RL Runs
 
 ```bash
+lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1 \
+  --log data/model_zoo/vae_trainlog.json
+lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1
+lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1 \
+  --log data/model_zoo/gan_trainlog.json
+
 lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
   --dataset cifar10 --n-total 800 --steps 200 --hidden-c 8 --T 100 --beta-end 0.12 \
   --sample-ppm data/model_zoo/diffusion_sample.ppm
@@ -112,9 +149,16 @@ lake exe -K cuda=true torchlean fno1d_burgers --cuda --steps 200 \
   --log data/model_zoo/fno1d_burgers_trainlog.json
 
 lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
-lake exe torchlean gpt_adder --steps 1 --a 7 --b 8
+lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --a 7 --b 8
 lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake exe torchlean dqn_replay
 ```
+
+These examples exercise runtime breadth: image models, attention, sequence state, generative losses,
+spectral operators, file-backed data, rollouts, and logs. When a model command produces an artifact
+that becomes a verification object, the verification command should say so explicitly and name the
+checker that consumes it.
 
 For 3D detector verification, use the verification examples rather than this model-training
 directory. The geometry path exports detector tensors as certificates, checks the projection
@@ -122,4 +166,6 @@ envelope in Lean, and renders accepted/rejected overlays:
 
 ```bash
 python3 scripts/verification/regenerate_assets.py --group geometry3d-wilddet3d --run
+lake exe verify -- camera-box3d-cert \
+  _external/geometry3d/wilddet3d/wilddet3d_cat_box3d_cert.json
 ```

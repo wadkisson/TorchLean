@@ -224,36 +224,6 @@ abbrev resolvePositiveNatFlag := NN.API.Common.resolvePositiveNatFlag
 def orThrow {α : Type} (exeName : String) (result : Except String α) : IO α :=
   NN.API.Common.orThrow exeName result
 
-@[inherit_doc NN.API.Common.runFloat]
-abbrev runFloat := NN.API.Common.runFloat
-
-@[inherit_doc NN.API.Common.runAnyOrFloat]
-abbrev runAnyOrFloat := NN.API.Common.runAnyOrFloat
-
-@[inherit_doc NN.API.Common.runAnyOrFloatNoCast]
-abbrev runAnyOrFloatNoCast := NN.API.Common.runAnyOrFloatNoCast
-
-@[inherit_doc NN.API.Common.selectsCompiledBackend]
-abbrev selectsCompiledBackend := NN.API.Common.selectsCompiledBackend
-
-@[inherit_doc NN.API.Common.forceGpuArgs]
-abbrev forceGpuArgs := NN.API.Common.forceGpuArgs
-
-@[inherit_doc NN.API.Common.requireEagerBackend]
-abbrev requireEagerBackend := NN.API.Common.requireEagerBackend
-
-@[inherit_doc NN.API.Common.forceGpuEagerArgs]
-abbrev forceGpuEagerArgs := NN.API.Common.forceGpuEagerArgs
-
-@[inherit_doc NN.API.Common.runForcedFloat]
-abbrev runForcedFloat := NN.API.Common.runForcedFloat
-
-@[inherit_doc NN.API.Common.runGpuFloat]
-abbrev runGpuFloat := NN.API.Common.runGpuFloat
-
-@[inherit_doc NN.API.Common.runGpuEagerFloat]
-abbrev runGpuEagerFloat := NN.API.Common.runGpuEagerFloat
-
 /-- Runtime device label used by example banners and notes. -/
 def deviceName (opts : Options) : String :=
   if opts.useGpu then "cuda" else "cpu"
@@ -291,16 +261,16 @@ def check (exeName msg : String) (b : Bool) : IO Unit :=
 
 @[inherit_doc NN.API.Common.writeBeforeAfterLossLog]
 def writeBeforeAfterLossLogPath (path : System.FilePath)
-    (title : String) (steps : Nat) (loss0 loss1 : Float) (notes : Array String := #[]) :
+    (title : String) (steps : Nat) (beforeLoss afterLoss : Float) (notes : Array String := #[]) :
     IO Unit :=
-  NN.API.Common.writeBeforeAfterLossLog path title steps loss0 loss1 notes
+  NN.API.Common.writeBeforeAfterLossLog path title steps beforeLoss afterLoss notes
 
 @[inherit_doc NN.API.Common.writeBeforeAfterLossLogTo]
 def writeBeforeAfterLossLog
     (dest : Training.LogDestination)
-    (title : String) (steps : Nat) (loss0 loss1 : Float) (notes : Array String := #[]) :
+    (title : String) (steps : Nat) (beforeLoss afterLoss : Float) (notes : Array String := #[]) :
     IO Unit :=
-  NN.API.Common.writeBeforeAfterLossLogTo dest title steps loss0 loss1 notes
+  NN.API.Common.writeBeforeAfterLossLogTo dest title steps beforeLoss afterLoss notes
 
 @[inherit_doc NN.API.Common.writeCurveLogTo]
 def writeCurveLog

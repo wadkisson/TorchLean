@@ -44,7 +44,7 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"Linear({inDim}, {outDim})"
     paramShapes := [WShape, bShape]
-    initParams := Torch.tlist2 w0 b0
+    initParams := Torch.tlistPair w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -68,7 +68,7 @@ def linear2d (batch inDim outDim : Nat) (seedW seedB : Nat := 0) :
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"Linear2d({inDim}, {outDim})"
     paramShapes := [WShape, bShape]
-    initParams := Torch.tlist2 w0 b0
+    initParams := Torch.tlistPair w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -100,7 +100,7 @@ def rnn (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { kind := s!"RNN({inputSize}, {hiddenSize})"
     paramShapes := [WShape, bShape]
-    initParams := Torch.tlist2 w0 b0
+    initParams := Torch.tlistPair w0 b0
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

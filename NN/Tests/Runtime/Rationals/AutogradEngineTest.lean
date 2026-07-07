@@ -44,29 +44,29 @@ abbrev tag : String := "autograd_engine_test (Rat)"
 -- Parameter node ids we want to read gradients for.
 structure ParamIds where
   /-- w 1 Id. -/
-  w1Id : Nat
+  hiddenWeightId : Nat
   /-- b 1 Id. -/
-  b1Id : Nat
+  hiddenBiasId : Nat
   /-- w 2 Id. -/
-  w2Id : Nat
+  outputWeightId : Nat
   /-- b 2 Id. -/
-  b2Id : Nat
+  outputBiasId : Nat
 
 /-!
 ## Fixed inputs and parameters
 
 We use a small deterministic 2-layer MLP so the gradients are stable.
 -/
-def W1 : Tensor ℚ (.dim hidDim (.dim inDim .scalar)) :=
+def hiddenWeight : Tensor ℚ (.dim hidDim (.dim inDim .scalar)) :=
   tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
-def b1 : Tensor ℚ (.dim hidDim .scalar) :=
+def hiddenBias : Tensor ℚ (.dim hidDim .scalar) :=
   tensorND! [hidDim] [0.1, 0.2, 0.3]
 
-def W2 : Tensor ℚ (.dim outDim (.dim hidDim .scalar)) :=
+def outputWeight : Tensor ℚ (.dim outDim (.dim hidDim .scalar)) :=
   tensorND! [outDim, hidDim] [0.7, 0.8, 0.9]
 
-def b2 : Tensor ℚ (.dim outDim .scalar) :=
+def outputBias : Tensor ℚ (.dim outDim .scalar) :=
   tensorND! [outDim] [0.4]
 
 def x : Tensor ℚ (.dim inDim .scalar) :=
@@ -75,11 +75,11 @@ def x : Tensor ℚ (.dim inDim .scalar) :=
 def dLdy : Tensor ℚ (.dim outDim .scalar) :=
   tensorND! [outDim] [1.0]
 
-def layer1 : Spec.LinearSpec ℚ inDim hidDim := { weights := W1, bias := b1 }
-def layer2 : Spec.LinearSpec ℚ hidDim outDim := { weights := W2, bias := b2 }
+def hiddenLayer : Spec.LinearSpec ℚ inDim hidDim := { weights := hiddenWeight, bias := hiddenBias }
+def outputLayer : Spec.LinearSpec ℚ hidDim outDim := { weights := outputWeight, bias := outputBias }
 
 def expected :=
-  Examples.mlpBackward layer1 layer2 x dLdy
+  Examples.mlpBackward hiddenLayer outputLayer x dLdy
 
 /-!
 ## Test: dynamic tape gradients vs. reference
@@ -92,21 +92,21 @@ def checkMlpGrads :
 
   -- Build the graph in TapeM for readability.
   let m : TapeM ℚ _ := do
-    let w1Id ← Train.TapeM.param W1 (name := some "W1")
-    let b1Id ← Train.TapeM.param b1 (name := some "b1")
-    let w2Id ← Train.TapeM.param W2 (name := some "W2")
-    let b2Id ← Train.TapeM.param b2 (name := some "b2")
+    let hiddenWeightId ← Train.TapeM.param hiddenWeight (name := some "hiddenWeight")
+    let hiddenBiasId ← Train.TapeM.param hiddenBias (name := some "hiddenBias")
+    let outputWeightId ← Train.TapeM.param outputWeight (name := some "outputWeight")
+    let outputBiasId ← Train.TapeM.param outputBias (name := some "outputBias")
     let xId ← Train.TapeM.const x (name := some "x")
 
     -- Forward pass: linear -> relu -> linear
-    let z1Id ← TapeM.linear (inDim:=inDim) (outDim:=hidDim) w1Id b1Id xId
+    let z1Id ← TapeM.linear (inDim:=inDim) (outDim:=hidDim) hiddenWeightId hiddenBiasId xId
     let a1Id ← TapeM.relu (s:=.dim hidDim .scalar) z1Id
-    let yId ← TapeM.linear (inDim:=hidDim) (outDim:=outDim) w2Id b2Id a1Id
+    let yId ← TapeM.linear (inDim:=hidDim) (outDim:=outDim) outputWeightId outputBiasId a1Id
 
     let t ← TapeM.getTape
     let grads ← liftM (Tape.backward (t:=t) yId (Runtime.Autograd.AnyTensor.mk dLdy))
 
-    let ids : ParamIds := { w1Id := w1Id, b1Id := b1Id, w2Id := w2Id, b2Id := b2Id }
+    let ids : ParamIds := { hiddenWeightId := hiddenWeightId, hiddenBiasId := hiddenBiasId, outputWeightId := outputWeightId, outputBiasId := outputBiasId }
     pure (ids, grads)
 
   let ((ids, grads), _) ← TapeM.run t0 m
@@ -114,13 +114,13 @@ def checkMlpGrads :
   let (dW1_exp, db1_exp, dW2_exp, db2_exp, _dX_exp) := expected
 
   let dW1_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim hidDim (.dim inDim .scalar)) grads ids.w1Id
+    (s:=.dim hidDim (.dim inDim .scalar)) grads ids.hiddenWeightId
   let db1_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim hidDim .scalar) grads ids.b1Id
+    (s:=.dim hidDim .scalar) grads ids.hiddenBiasId
   let dW2_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim outDim (.dim hidDim .scalar)) grads ids.w2Id
+    (s:=.dim outDim (.dim hidDim .scalar)) grads ids.outputWeightId
   let db2_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim outDim .scalar) grads ids.b2Id
+    (s:=.dim outDim .scalar) grads ids.outputBiasId
 
   let ok1 := decide (pretty dW1_dyn = pretty dW1_exp)
   let ok2 := decide (pretty db1_dyn = pretty db1_exp)

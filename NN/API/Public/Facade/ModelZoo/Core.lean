@@ -88,9 +88,9 @@ def trainOptionsWhenLogRequested (flags : ModelZoo.LoggedTrainFlags)
 def writeBeforeAfterLossLog
     (flags : ModelZoo.LoggedTrainFlags)
     (title : String)
-    (loss0 loss1 : Float)
+    (beforeLoss afterLoss : Float)
     (notes : Array String := #[]) : IO Unit :=
-  ModelZoo.writeBeforeAfterLossLog flags.log title flags.steps loss0 loss1 notes
+  ModelZoo.writeBeforeAfterLossLog flags.log title flags.steps beforeLoss afterLoss notes
 
 end LoggedTrainFlags
 
@@ -114,10 +114,10 @@ def trainOptions (flags : ModelZoo.TrainFlags)
 def writeBeforeAfterLossLog
     (flags : ModelZoo.TrainFlags)
     (title : String)
-    (loss0 loss1 : Float)
+    (beforeLoss afterLoss : Float)
     (notes : Array String := #[]) : IO Unit :=
   ModelZoo.LoggedTrainFlags.writeBeforeAfterLossLog
-    flags.toLoggedTrainFlags title loss0 loss1 notes
+    flags.toLoggedTrainFlags title beforeLoss afterLoss notes
 
 end TrainFlags
 

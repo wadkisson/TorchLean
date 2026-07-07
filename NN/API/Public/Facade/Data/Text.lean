@@ -20,14 +20,14 @@ namespace TorchLean
 
 namespace Data
 
-def regression2to1Grid (lo hi : Float) (count : Nat) (target : Float → Float → Float) :
+def regressionGrid (lo hi : Float) (count : Nat) (target : Float → Float → Float) :
     Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
   { build := fun {α} _ => pure <|
       let X : Tensor.T Float (.dim (count * count) (Shape.vec 2)) :=
-        NN.API.Samples.grid2Square lo hi count
+        NN.API.Samples.squareGrid lo hi count
       let Y : Tensor.T Float (.dim (count * count) (Shape.vec 1)) :=
-        NN.API.Samples.regression2to1Float X target
-      supervisedDim0F (α := α) X Y }
+        NN.API.Samples.regressionTargetsFloat X target
+      supervisedFromLeadingAxisFloat (α := α) X Y }
 
 /--
 Build a batched one-hot causal-language-model sample by repeating one token window across every

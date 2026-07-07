@@ -91,10 +91,10 @@ instance {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [Decidable
     Internal.EagerSession.bmm (α := α) sess (batch := batch) (m := mDim) (n := nDim) (p := pDim) a b
   concatVectors := fun {nDim mDim} a b => fun sess =>
     Internal.EagerSession.concatVectors (α := α) sess (n := nDim) (m := mDim) a b
-  concatDim0 := fun {nDim mDim} {s} a b => fun sess =>
-    Internal.EagerSession.concatDim0 (α := α) sess (n := nDim) (m := mDim) (sh := s) a b
-  sliceRange0 := fun {nDim} {s} start len h x => fun sess =>
-    Internal.EagerSession.sliceRange0 (α := α) sess (n := nDim) (sh := s) x start len h
+  concatLeadingAxis := fun {nDim mDim} {s} a b => fun sess =>
+    Internal.EagerSession.concatLeadingAxis (α := α) sess (n := nDim) (m := mDim) (sh := s) a b
+  sliceLeadingAxisRange := fun {nDim} {s} start len h x => fun sess =>
+    Internal.EagerSession.sliceLeadingAxisRange (α := α) sess (n := nDim) (sh := s) x start len h
   maxPool := fun {d C} {inSpatial kernel stride padding} {hKernel} x => fun sess =>
     Internal.EagerSession.maxPool (α := α) sess
       (d := d) (C := C)
@@ -258,11 +258,11 @@ instance {α : Type} [Context α] [DecidableEq Shape] {Γ : List Shape} :
       (p := pDim) a b
   concatVectors := fun {nDim mDim} a b =>
     Runtime.Autograd.Compiled.GraphM.concatVectors (α := α) (Γ := Γ) (n := nDim) (m := mDim) a b
-  concatDim0 := fun {nDim mDim} {s} a b =>
-    Runtime.Autograd.Compiled.GraphM.concatDim0 (α := α) (Γ := Γ) (n := nDim) (m := mDim) (s := s)
+  concatLeadingAxis := fun {nDim mDim} {s} a b =>
+    Runtime.Autograd.Compiled.GraphM.concatLeadingAxis (α := α) (Γ := Γ) (n := nDim) (m := mDim) (s := s)
       a b
-  sliceRange0 := fun {nDim} {s} start len h x =>
-    Runtime.Autograd.Compiled.GraphM.sliceRange0 (α := α) (Γ := Γ) (n := nDim) (s := s) x start len
+  sliceLeadingAxisRange := fun {nDim} {s} start len h x =>
+    Runtime.Autograd.Compiled.GraphM.sliceLeadingAxisRange (α := α) (Γ := Γ) (n := nDim) (s := s) x start len
       h
   maxPool := fun {d C} {inSpatial kernel stride padding} {hKernel} x =>
     Runtime.Autograd.Compiled.GraphM.maxPool (α := α) (Γ := Γ)

@@ -50,29 +50,29 @@ abbrev tag : String := "autograd_engine_test"
 -- Parameter node ids we want to read gradients for.
 structure ParamIds where
   /-- w 1 Id. -/
-  w1Id : Nat
+  hiddenWeightId : Nat
   /-- b 1 Id. -/
-  b1Id : Nat
+  hiddenBiasId : Nat
   /-- w 2 Id. -/
-  w2Id : Nat
+  outputWeightId : Nat
   /-- b 2 Id. -/
-  b2Id : Nat
+  outputBiasId : Nat
 
 /-!
 ## Fixed inputs and parameters
 
 We use a small deterministic 2-layer MLP so the gradients are stable.
 -/
-def W1 : Tensor Float (.dim hidDim (.dim inDim .scalar)) :=
+def hiddenWeight : Tensor Float (.dim hidDim (.dim inDim .scalar)) :=
   tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
-def b1 : Tensor Float (.dim hidDim .scalar) :=
+def hiddenBias : Tensor Float (.dim hidDim .scalar) :=
   tensorND! [hidDim] [0.1, 0.2, 0.3]
 
-def W2 : Tensor Float (.dim outDim (.dim hidDim .scalar)) :=
+def outputWeight : Tensor Float (.dim outDim (.dim hidDim .scalar)) :=
   tensorND! [outDim, hidDim] [0.7, 0.8, 0.9]
 
-def b2 : Tensor Float (.dim outDim .scalar) :=
+def outputBias : Tensor Float (.dim outDim .scalar) :=
   tensorND! [outDim] [0.4]
 
 def x : Tensor Float (.dim inDim .scalar) :=
@@ -81,11 +81,11 @@ def x : Tensor Float (.dim inDim .scalar) :=
 def dLdy : Tensor Float (.dim outDim .scalar) :=
   tensorND! [outDim] [1.0]
 
-def layer1 : Spec.LinearSpec Float inDim hidDim := { weights := W1, bias := b1 }
-def layer2 : Spec.LinearSpec Float hidDim outDim := { weights := W2, bias := b2 }
+def hiddenLayer : Spec.LinearSpec Float inDim hidDim := { weights := hiddenWeight, bias := hiddenBias }
+def outputLayer : Spec.LinearSpec Float hidDim outDim := { weights := outputWeight, bias := outputBias }
 
 def expected :=
-  Examples.mlpBackward layer1 layer2 x dLdy
+  Examples.mlpBackward hiddenLayer outputLayer x dLdy
 
 /-!
 ## Test: dynamic tape gradients vs. reference
@@ -98,21 +98,21 @@ def checkMlpGrads :
 
   -- Build the graph in TapeM for readability.
   let m : TapeM Float _ := do
-    let w1Id ← Train.TapeM.param W1 (name := some "W1")
-    let b1Id ← Train.TapeM.param b1 (name := some "b1")
-    let w2Id ← Train.TapeM.param W2 (name := some "W2")
-    let b2Id ← Train.TapeM.param b2 (name := some "b2")
+    let hiddenWeightId ← Train.TapeM.param hiddenWeight (name := some "hiddenWeight")
+    let hiddenBiasId ← Train.TapeM.param hiddenBias (name := some "hiddenBias")
+    let outputWeightId ← Train.TapeM.param outputWeight (name := some "outputWeight")
+    let outputBiasId ← Train.TapeM.param outputBias (name := some "outputBias")
     let xId ← Train.TapeM.const x (name := some "x")
 
     -- Forward pass: linear -> relu -> linear
-    let z1Id ← TapeM.linear (inDim:=inDim) (outDim:=hidDim) w1Id b1Id xId
+    let z1Id ← TapeM.linear (inDim:=inDim) (outDim:=hidDim) hiddenWeightId hiddenBiasId xId
     let a1Id ← TapeM.relu (s:=.dim hidDim .scalar) z1Id
-    let yId ← TapeM.linear (inDim:=hidDim) (outDim:=outDim) w2Id b2Id a1Id
+    let yId ← TapeM.linear (inDim:=hidDim) (outDim:=outDim) outputWeightId outputBiasId a1Id
 
     let t ← TapeM.getTape
     let grads ← liftM (Tape.backward (t:=t) yId (Runtime.Autograd.AnyTensor.mk dLdy))
 
-    let ids : ParamIds := { w1Id := w1Id, b1Id := b1Id, w2Id := w2Id, b2Id := b2Id }
+    let ids : ParamIds := { hiddenWeightId := hiddenWeightId, hiddenBiasId := hiddenBiasId, outputWeightId := outputWeightId, outputBiasId := outputBiasId }
     pure (ids, grads)
 
   let ((ids, grads), _) ← TapeM.run t0 m
@@ -120,13 +120,13 @@ def checkMlpGrads :
   let (dW1_exp, db1_exp, dW2_exp, db2_exp, _dX_exp) := expected
 
   let dW1_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim hidDim (.dim inDim .scalar)) grads ids.w1Id
+    (s:=.dim hidDim (.dim inDim .scalar)) grads ids.hiddenWeightId
   let db1_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim hidDim .scalar) grads ids.b1Id
+    (s:=.dim hidDim .scalar) grads ids.hiddenBiasId
   let dW2_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim outDim (.dim hidDim .scalar)) grads ids.w2Id
+    (s:=.dim outDim (.dim hidDim .scalar)) grads ids.outputWeightId
   let db2_dyn ← Train.requireGradTensor (tag := tag)
-    (s:=.dim outDim .scalar) grads ids.b2Id
+    (s:=.dim outDim .scalar) grads ids.outputBiasId
 
   let ok1 := decide (pretty dW1_dyn = pretty dW1_exp)
   let ok2 := decide (pretty db1_dyn = pretty db1_exp)
@@ -366,21 +366,21 @@ We keep parameters in a small structure so we can update them together after eac
 -/
 structure Params where
   /-- Weight matrix for layer 1. -/
-  W1 : Tensor Float (.dim hidDim (.dim inDim .scalar))
+  hiddenWeight : Tensor Float (.dim hidDim (.dim inDim .scalar))
   /-- Bias for layer 1. -/
-  b1 : Tensor Float (.dim hidDim .scalar)
+  hiddenBias : Tensor Float (.dim hidDim .scalar)
   /-- Weight matrix for layer 2. -/
-  W2 : Tensor Float (.dim outDim (.dim hidDim .scalar))
+  outputWeight : Tensor Float (.dim outDim (.dim hidDim .scalar))
   /-- Bias for layer 2. -/
-  b2 : Tensor Float (.dim outDim .scalar)
+  outputBias : Tensor Float (.dim outDim .scalar)
 
 -- A fixed initialization so the test is deterministic.
 def initParams : Params :=
   {
-    W1 := tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
-    b1 := tensorND! [hidDim] [0.1, 0.2, 0.3],
-    W2 := tensorND! [outDim, hidDim] [0.7, 0.8, 0.9],
-    b2 := tensorND! [outDim] [0.4]
+    hiddenWeight := tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+    hiddenBias := tensorND! [hidDim] [0.1, 0.2, 0.3],
+    outputWeight := tensorND! [outDim, hidDim] [0.7, 0.8, 0.9],
+    outputBias := tensorND! [outDim] [0.4]
   }
 
 def x : Tensor Float (.dim inDim .scalar) :=
@@ -396,17 +396,17 @@ We explicitly build the tape with `Tape.*` operations, then call `backwardScalar
 -/
 def trainStep (p : Params) (lr : Float := 0.1) : Runtime.Autograd.Result (Prod Params Float) := do
   let t0 : Tape Float := Tape.empty
-  let (t1, w1Id) := Tape.leaf (t:=t0) p.W1 (name := some "W1")
-  let (t2, b1Id) := Tape.leaf (t:=t1) p.b1 (name := some "b1")
-  let (t3, w2Id) := Tape.leaf (t:=t2) p.W2 (name := some "W2")
-  let (t4, b2Id) := Tape.leaf (t:=t3) p.b2 (name := some "b2")
+  let (t1, hiddenWeightId) := Tape.leaf (t:=t0) p.hiddenWeight (name := some "hiddenWeight")
+  let (t2, hiddenBiasId) := Tape.leaf (t:=t1) p.hiddenBias (name := some "hiddenBias")
+  let (t3, outputWeightId) := Tape.leaf (t:=t2) p.outputWeight (name := some "outputWeight")
+  let (t4, outputBiasId) := Tape.leaf (t:=t3) p.outputBias (name := some "outputBias")
   let (t5, xId)  := Tape.leaf (t:=t4) x (name := some "x") (requires_grad := false)
   let (t6, yId)  := Tape.leaf (t:=t5) yTarget (name := some "y") (requires_grad := false)
 
   -- Forward pass: linear -> relu -> linear -> mse_loss
-  let (t7, z1Id) ← Tape.linear (t:=t6) (inDim:=inDim) (outDim:=hidDim) w1Id b1Id xId
+  let (t7, z1Id) ← Tape.linear (t:=t6) (inDim:=inDim) (outDim:=hidDim) hiddenWeightId hiddenBiasId xId
   let (t8, a1Id) ← Tape.relu (t:=t7) (s:=.dim hidDim .scalar) z1Id
-  let (t9, yhatId) ← Tape.linear (t:=t8) (inDim:=hidDim) (outDim:=outDim) w2Id b2Id a1Id
+  let (t9, yhatId) ← Tape.linear (t:=t8) (inDim:=hidDim) (outDim:=outDim) outputWeightId outputBiasId a1Id
   let (t10, lossId) ← Tape.mseLoss (t:=t9) (s:=.dim outDim .scalar) yhatId yId
 
   -- Read loss and backpropagate from the scalar loss node.
@@ -414,17 +414,17 @@ def trainStep (p : Params) (lr : Float := 0.1) : Runtime.Autograd.Result (Prod P
   let grads ← Tape.backwardScalar (t:=t10) lossId
 
   -- Extract typed gradients and apply SGD updates.
-  let dW1 ← Train.requireGradTensor (tag := tag) (s:=.dim hidDim (.dim inDim .scalar)) grads w1Id
-  let db1 ← Train.requireGradTensor (tag := tag) (s:=.dim hidDim .scalar) grads b1Id
-  let dW2 ← Train.requireGradTensor (tag := tag) (s:=.dim outDim (.dim hidDim .scalar)) grads w2Id
-  let db2 ← Train.requireGradTensor (tag := tag) (s:=.dim outDim .scalar) grads b2Id
+  let hiddenWeightGrad ← Train.requireGradTensor (tag := tag) (s:=.dim hidDim (.dim inDim .scalar)) grads hiddenWeightId
+  let hiddenBiasGrad ← Train.requireGradTensor (tag := tag) (s:=.dim hidDim .scalar) grads hiddenBiasId
+  let outputWeightGrad ← Train.requireGradTensor (tag := tag) (s:=.dim outDim (.dim hidDim .scalar)) grads outputWeightId
+  let outputBiasGrad ← Train.requireGradTensor (tag := tag) (s:=.dim outDim .scalar) grads outputBiasId
 
-  let newW1 := Train.sgdUpdateTensor p.W1 dW1 lr
-  let newb1 := Train.sgdUpdateTensor p.b1 db1 lr
-  let newW2 := Train.sgdUpdateTensor p.W2 dW2 lr
-  let newb2 := Train.sgdUpdateTensor p.b2 db2 lr
+  let updatedHiddenWeight := Train.sgdUpdateTensor p.hiddenWeight hiddenWeightGrad lr
+  let updatedHiddenBias := Train.sgdUpdateTensor p.hiddenBias hiddenBiasGrad lr
+  let updatedOutputWeight := Train.sgdUpdateTensor p.outputWeight outputWeightGrad lr
+  let updatedOutputBias := Train.sgdUpdateTensor p.outputBias outputBiasGrad lr
 
-  pure ({ W1 := newW1, b1 := newb1, W2 := newW2, b2 := newb2 }, lossVal)
+  pure ({ hiddenWeight := updatedHiddenWeight, hiddenBias := updatedHiddenBias, outputWeight := updatedOutputWeight, outputBias := updatedOutputBias }, lossVal)
 
 /-!
 ## Training loop

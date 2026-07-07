@@ -13,7 +13,8 @@ public import NN.Examples.Data.Loaders.Csv
 public import NN.Examples.Data.Loaders.Npy
 public import NN.Examples.Models
 public import NN.Examples.Interop.PyTorch
-public import NN.Examples.Advanced
+public import NN.Examples.DeepDives
+public import NN.Examples.Optimization
 public import NN.Examples.Verification
 public import NN.Examples.Data.Loaders.Cifar10Images
 public import NN.Verification.Cert.AbCrownLeafCert
@@ -37,15 +38,15 @@ Single umbrella for TorchLean examples.
 
 The examples directory has one root Lean entrypoint. Import this module when you want to compile
 every maintained example module, including introductory examples, model examples,
-interop examples, widgets, advanced tutorials, and verification examples.
+interop examples, widgets, deep-dive tutorials, and verification examples.
 
 Typical usage:
 
 * Build the full example surface: `lake build NN.Examples.Zoo`
 * Run model examples through the CLI:
-  `lake exe torchlean mlp -- --steps 10`
-* Run standalone executables directly when they define their own root `main`
-  (for example `lake exe torchlean gpt_adder --steps 1`).
+  `lake exe torchlean mlp --steps 10`
+* Run CUDA-only model examples with both build-time and runtime CUDA selection:
+  `lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1`
 
 The heavier examples remain in their subdirectories so users can still build or run one example at a
 time. This umbrella avoids importing standalone executable roots that would collide on the global

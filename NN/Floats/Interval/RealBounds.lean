@@ -24,11 +24,11 @@ This module keeps the interval arithmetic fact separate from the IEEEExec32 soun
 namespace TorchLean.Floats.Interval
 
 /-- Minimum of four real numbers, grouped as `min (min a b) (min c d)`. -/
-def min4R (a b c d : ℝ) : ℝ :=
+def minOfFourReal (a b c d : ℝ) : ℝ :=
   min (min a b) (min c d)
 
 /-- Maximum of four real numbers, grouped as `max (max a b) (max c d)`. -/
-def max4R (a b c d : ℝ) : ℝ :=
+def maxOfFourReal (a b c d : ℝ) : ℝ :=
   max (max a b) (max c d)
 
 /--
@@ -38,13 +38,13 @@ If `x ∈ [a,b]` and `y ∈ [c,d]`, then:
 
 `min(ac, ad, bc, bd) ≤ x*y ≤ max(ac, ad, bc, bd)`,
 
-where the min/max are represented by `min4R`/`max4R` with the same grouping used by the IEEE32Exec
+where the min/max are represented by `minOfFourReal`/`maxOfFourReal` with the same grouping used by the IEEE32Exec
 4-corner rule implementations.
 -/
 theorem mul_bounds_Icc (a b c d x y : ℝ)
     (hx : x ∈ Set.Icc a b) (hy : y ∈ Set.Icc c d) :
-    min4R (a * c) (a * d) (b * c) (b * d) ≤ x * y ∧
-      x * y ≤ max4R (a * c) (a * d) (b * c) (b * d) := by
+    minOfFourReal (a * c) (a * d) (b * c) (b * d) ≤ x * y ∧
+      x * y ≤ maxOfFourReal (a * c) (a * d) (b * c) (b * d) := by
   rcases hx with ⟨hax, hxb⟩
   rcases hy with ⟨hcy, hyd⟩
 
@@ -117,28 +117,28 @@ theorem mul_bounds_Icc (a b c d x y : ℝ)
     exact le_min h1 h2
 
   have h_lower :
-      min4R (a * c) (a * d) (b * c) (b * d) ≤ x * y := by
+      minOfFourReal (a * c) (a * d) (b * c) (b * d) ≤ x * y := by
     -- Switch groupings to match the helper bound.
     have hgrp :
-        min4R (a * c) (a * d) (b * c) (b * d) =
+        minOfFourReal (a * c) (a * d) (b * c) (b * d) =
           min (min (a * c) (b * c)) (min (a * d) (b * d)) := by
       -- This is the same `min` of 4 numbers, regrouped.
-      simp [min4R, min_left_comm, min_comm]
+      simp [minOfFourReal, min_left_comm, min_comm]
     rw [hgrp]
     exact le_trans h_lower_corners h_lower_xy
 
-  -- Upper bound: x*y ≤ max(x*c,x*d) ≤ max corner maxes (regroup to our max4R).
+  -- Upper bound: x*y ≤ max(x*c,x*d) ≤ max corner maxes (regroup to our maxOfFourReal).
   have h_upper_corners :
       max (x * c) (x * d) ≤ max (max (a * c) (b * c)) (max (a * d) (b * d)) :=
     max_le_max hxc_upper hxd_upper
 
   have h_upper :
-      x * y ≤ max4R (a * c) (a * d) (b * c) (b * d) := by
+      x * y ≤ maxOfFourReal (a * c) (a * d) (b * c) (b * d) := by
     have hgrp :
         max (max (a * c) (b * c)) (max (a * d) (b * d)) =
-          max4R (a * c) (a * d) (b * c) (b * d) := by
+          maxOfFourReal (a * c) (a * d) (b * c) (b * d) := by
       -- Regroup `max` of 4 numbers.
-      simp [max4R, max_left_comm, max_comm]
+      simp [maxOfFourReal, max_left_comm, max_comm]
     exact le_trans (le_trans h_upper_xy h_upper_corners) (by simp [hgrp])
 
   exact ⟨h_lower, h_upper⟩

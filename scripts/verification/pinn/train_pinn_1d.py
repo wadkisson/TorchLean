@@ -112,12 +112,12 @@ def train(args):
             sampled = dataset.sample_columns("boundary", N_b, 3)
             if sampled is not None:
                 return sampled
-        t1 = torch.empty(N_b // 2, 1, device=device).uniform_(t_lo, t_hi)
-        x1 = torch.full_like(t1, x_lo)
-        t2 = torch.empty(N_b - N_b // 2, 1, device=device).uniform_(t_lo, t_hi)
-        x2 = torch.full_like(t2, x_hi)
-        x = torch.cat([x1, x2], dim=0)
-        t = torch.cat([t1, t2], dim=0)
+        left_t = torch.empty(N_b // 2, 1, device=device).uniform_(t_lo, t_hi)
+        left_x = torch.full_like(left_t, x_lo)
+        right_t = torch.empty(N_b - N_b // 2, 1, device=device).uniform_(t_lo, t_hi)
+        right_x = torch.full_like(right_t, x_hi)
+        x = torch.cat([left_x, right_x], dim=0)
+        t = torch.cat([left_t, right_t], dim=0)
         u_b = ensure_tensor(eval_pinn_expr(args.bc_expr, x=x, t=t, **constants), x)
         return x, t, u_b
 

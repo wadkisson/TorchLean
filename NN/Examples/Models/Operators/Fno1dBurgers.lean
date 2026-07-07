@@ -175,7 +175,7 @@ def loadDataset
 /-- Write one FNO prediction row to CSV for the companion plotting script. -/
 def writePredictionProbe (plotCsv : System.FilePath)
     (x target prediction : Tensor Float σ) : IO Unit := do
-  Data.writePredictionCsv1D plotCsv x target prediction
+  Data.writeVectorPredictionCsv plotCsv x target prediction
   IO.println s!"  wrote prediction CSV: {plotCsv}"
   IO.println s!"  plot with: python3 NN/Examples/Data/plot_fno1d_burgers.py --csv {plotCsv}"
 
@@ -405,7 +405,7 @@ def logRunHeader (opts : Options) (cfg : BurgersOptions) : IO Unit := do
   IO.println s!"  log  ={cfg.logPath}"
 
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "native FNO1D Burgers")
     (k := fun opts rest => do
       let (cfg, rest) ← ModelZoo.orThrow exeName <| BurgersOptions.parse rest

@@ -29,7 +29,7 @@ public import NN.Proofs.Autograd.Tape.Ops.Transformer.ResidualAttention
 # Autograd Proof Coverage
 
 This module is a curated import surface and roadmap for TorchLean's proved reverse-mode
-autograd stack. It does not introduce new theorems; it gathers the pieces users should import when
+autograd library. It does not introduce new theorems; it gathers the pieces users should import when
 working with the proof-level layer rather than only executable training.
 
 ## Primitive coverage

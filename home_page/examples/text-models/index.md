@@ -3,12 +3,12 @@ title: Text Models Walkthrough
 usemathjax: true
 ---
 
-The text-model examples run from corpus to continuation. The models are small, but the workflow is
+The text-model examples run from corpus to continuation. The models are small, but the path is
 complete: read a text file, build next-token training examples, run a training step, save
 parameters, reload them, and sample from the saved model.
 
-The useful part is visibility. Tokenization, sequence length, causal windows, parameter shapes,
-generation settings, and saved logs all appear as artifacts the reader can inspect.
+The examples make the hidden pieces visible. Tokenization, sequence length, causal windows,
+parameter shapes, generation settings, and saved logs all appear as artifacts the reader can inspect.
 
 ## Data: One Explicit Text File
 
@@ -26,10 +26,10 @@ The function that turns “flags and paths” into an actual corpus is shared ac
 GPT-2 example, `takeInputText` uses `text.Corpus.takeUtf8Input` to support a “use this known
 corpus” flag or an explicit `--data-file` path.
 
-## Tokenization: Bytes on Purpose
+## Tokenization: Bytes First, BPE When Requested
 
-These examples tokenize bytes directly. Every UTF-8 byte is a token, so the vocabulary is fixed
-and tiny (256). That choice is practical:
+The main tutorial path tokenizes bytes directly. Every UTF-8 byte is a token, so the vocabulary is
+fixed and tiny (256). That choice is practical:
 
 - there is no external BPE model file to keep in sync,
 - there is no “which tokenizer version did you mean?” ambiguity,
@@ -44,6 +44,21 @@ def vocab : Nat := text.Tokenizer.byte.vocabSize
 That line is from `NN.Examples.Models.Sequence.Gpt2`. It means the tutorial model is not silently
 depending on a tokenizer JSON, BPE merge table, or Hugging Face cache entry. The byte tokenizer is
 small enough that the input and target tensors can be written down directly.
+
+The larger `text_gpt2` command can also use GPT-2 BPE files:
+
+```bash
+lake exe -K cuda=true torchlean text_gpt2 --cuda \
+  --data-file data/real/text/tinystories_valid.txt \
+  --bpe-vocab data/real/gpt2/vocab.json \
+  --bpe-merges data/real/gpt2/merges.txt \
+  --allow-small-data --steps 1 --generate 0
+```
+
+That path is still a TorchLean training example with randomly initialized weights. The BPE files
+define the tokenizer boundary, while the Lean command projects the observed BPE ids into a compact
+local vocabulary for a runnable example. The tokenizer choice is visible
+in the command and in the shapes, rather than being an implicit cache dependency.
 
 ## Supervised Examples: Next-Token Prediction As Tensors
 
@@ -93,7 +108,7 @@ def model : nn.M (nn.Sequential σ τ) :=
       layers := layers }
 ```
 
-The training loop stays on the same public surface used by the simpler quickstarts:
+The training loop stays on the same public API used by the simpler quickstarts:
 
 ```lean
 let trainer := Trainer.new model <|
@@ -129,7 +144,7 @@ lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windo
 TorchLean’s checkpoint format is kept simple: a model’s parameters are a shape-indexed
 pack, and the save/load operations round-trip exact IEEE-754 bit patterns through JSON.
 
-That is why `gpt2_saved` is a separate example: it loads a parameter pack, checks that the shapes
+`gpt2_saved` is a separate example because it loads a parameter pack, checks that the shapes
 match the model architecture, and runs sampling without touching an optimizer.
 
 The GPT-2 command exposes parameter export through `--save-params`; the saved-parameter example
@@ -141,10 +156,10 @@ the model, loading fails before the weights are used.
 ## Mamba: State-Space Text In The Same Runtime
 
 `NN.Examples.Models.Sequence.Mamba` also runs on byte tokens, but swaps attention for a
-compact state-space block. It is useful as a contrast: sequence modeling without the quadratic
-attention path, using the same autograd and the same logging style.
+compact state-space block. The contrast is sequence modeling without the quadratic attention path,
+using the same autograd and the same logging style.
 
-That contrast is useful because it shows that the text pipeline is not tied to attention.
+The contrast shows that the text pipeline is not tied to attention.
 
 Algorithmically, the example replaces “attend over all previous tokens” with a learned recurrent
 state update. Each token updates a compact state, and the model projects the resulting sequence
@@ -189,7 +204,7 @@ A concrete starting point is the training-log widget documented near the top of
 
 Source entry points:
 
-- [`NN.Examples.Models.Sequence.Gpt2`]({{ '/docs/NN/Examples/Models/Sequence/Gpt2.html' | relative_url }})
-- [`NN.Examples.Models.Sequence.Gpt2Saved`]({{ '/docs/NN/Examples/Models/Sequence/Gpt2Saved.html' | relative_url }})
-- [`NN.Examples.Models.Sequence.Mamba`]({{ '/docs/NN/Examples/Models/Sequence/Mamba.html' | relative_url }})
-- [Model Zoo Deep Dive]({{ '/blueprint/Examples-and-Applications/Model-Zoo-Deep-Dive/' | relative_url }})
+- [`NN.Examples.Models.Sequence.Gpt2`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Gpt2.lean)
+- [`NN.Examples.Models.Sequence.Gpt2Saved`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Gpt2Saved.lean)
+- [`NN.Examples.Models.Sequence.Mamba`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Mamba.lean)
+- [Model Examples Deep Dive]({{ '/blueprint/Examples-and-Applications/Model-Examples-Deep-Dive/' | relative_url }})

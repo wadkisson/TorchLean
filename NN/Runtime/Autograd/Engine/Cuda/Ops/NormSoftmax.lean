@@ -43,13 +43,13 @@ def layerNorm {seqLen embedDim : Nat} (h_seq_pos : seqLen > 0) (h_embed_pos : em
   let gamma ← requireValue (t := t) gammaId (.dim embedDim .scalar)
   let beta ← requireValue (t := t) betaId (.dim embedDim .scalar)
   -- Forward intermediates.
-  let sum1 := Buffer.reduceSumAxis1 x rows32 cols32
+  let sum1 := Buffer.reduceSumByRow x rows32 cols32
   let invCols : Float := 1.0 / Float.ofNat embedDim
   let mean := Buffer.scale sum1 invCols                           -- (rows)
   let meanB := Buffer.broadcastVecToCols mean rows32 cols32        -- (rows,cols)
   let centered := Buffer.sub x meanB
   let centered2 := Buffer.mul centered centered
-  let varSum := Buffer.reduceSumAxis1 centered2 rows32 cols32
+  let varSum := Buffer.reduceSumByRow centered2 rows32 cols32
   let var := Buffer.scale varSum invCols                           -- (rows)
   let eps : Float := Numbers.epsilon
   let epsVec := Buffer.full rows32 eps
@@ -73,16 +73,16 @@ def layerNorm {seqLen embedDim : Nat} (h_seq_pos : seqLen > 0) (h_embed_pos : em
       backward := fun dLdyAny => do
         let dLdy ← requireGrad dLdyAny outShape
         -- dBeta / dGamma (sum over seqLen axis).
-        let dBeta := Buffer.reduceSumAxis0 dLdy.buf rows32 cols32
+        let dBeta := Buffer.reduceSumByColumn dLdy.buf rows32 cols32
         let dGammaPointwise := Buffer.mul dLdy.buf xHat
         let dGamma := Buffer.releaseThen dGammaPointwise <|
-          Buffer.reduceSumAxis0 dGammaPointwise rows32 cols32
+          Buffer.reduceSumByColumn dGammaPointwise rows32 cols32
         -- dX
         let dXhat := Buffer.mul dLdy.buf gammaB
-        let sumDXhat := Buffer.reduceSumAxis1 dXhat rows32 cols32         -- (rows)
+        let sumDXhat := Buffer.reduceSumByRow dXhat rows32 cols32         -- (rows)
         let dXhatXhat := Buffer.mul dXhat xHat
         let sumDXhatXhat := Buffer.releaseThen dXhatXhat <|
-          Buffer.reduceSumAxis1 dXhatXhat rows32 cols32
+          Buffer.reduceSumByRow dXhatXhat rows32 cols32
         let sum1B := Buffer.broadcastVecToCols sumDXhat rows32 cols32
         let sum2B := Buffer.broadcastVecToCols sumDXhatXhat rows32 cols32
         let scaledDXhat := Buffer.scale dXhat (Float.ofNat embedDim)
@@ -130,13 +130,13 @@ def batchnormChannelFirst
   let gamma ← requireValue (t := t) gammaId (.dim channels .scalar)
   let beta ← requireValue (t := t) betaId (.dim channels .scalar)
   -- Treat as a zero-copy (channels, cols) view; the underlying layout already matches.
-  let sum1 := Buffer.reduceSumAxis1 x rows32 cols32
+  let sum1 := Buffer.reduceSumByRow x rows32 cols32
   let invCols : Float := 1.0 / Float.ofNat cols
   let mean := Buffer.scale sum1 invCols
   let meanB := Buffer.broadcastVecToCols mean rows32 cols32
   let centered := Buffer.sub x meanB
   let centered2 := Buffer.mul centered centered
-  let varSum := Buffer.reduceSumAxis1 centered2 rows32 cols32
+  let varSum := Buffer.reduceSumByRow centered2 rows32 cols32
   let var := Buffer.scale varSum invCols
   let eps : Float := Numbers.epsilon
   let epsVec := Buffer.full rows32 eps
@@ -159,16 +159,16 @@ def batchnormChannelFirst
       backward := fun dLdyAny => do
         let dLdy ← requireGrad dLdyAny xShape
         -- dBeta / dGamma sum over spatial dimension (axis=1 of the folded matrix).
-        let dBeta := Buffer.reduceSumAxis1 dLdy.buf rows32 cols32
+        let dBeta := Buffer.reduceSumByRow dLdy.buf rows32 cols32
         let dGammaPointwise := Buffer.mul dLdy.buf xHat
         let dGamma := Buffer.releaseThen dGammaPointwise <|
-          Buffer.reduceSumAxis1 dGammaPointwise rows32 cols32
+          Buffer.reduceSumByRow dGammaPointwise rows32 cols32
         -- dX
         let dXhat := Buffer.mul dLdy.buf gammaB
-        let sumDXhat := Buffer.reduceSumAxis1 dXhat rows32 cols32
+        let sumDXhat := Buffer.reduceSumByRow dXhat rows32 cols32
         let dXhatXhat := Buffer.mul dXhat xHat
         let sumDXhatXhat := Buffer.releaseThen dXhatXhat <|
-          Buffer.reduceSumAxis1 dXhatXhat rows32 cols32
+          Buffer.reduceSumByRow dXhatXhat rows32 cols32
         let sum1B := Buffer.broadcastVecToCols sumDXhat rows32 cols32
         let sum2B := Buffer.broadcastVecToCols sumDXhatXhat rows32 cols32
         let scaledDXhat := Buffer.scale dXhat (Float.ofNat cols)

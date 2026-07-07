@@ -85,7 +85,7 @@ def linearParams {α : Type} {inDim outDim : Nat} {seedW seedB : Nat}
     (w : _root_.Spec.Tensor α (NN.Tensor.Shape.Mat outDim inDim))
     (b : _root_.Spec.Tensor α (NN.Tensor.Shape.Vec outDim)) :
     Params (API.TorchLean.Layers.linear inDim outDim seedW seedB) α :=
-  API.TorchLean.tensorpack2 w b
+  API.TorchLean.tensorpackPair w b
 
 namespace OutputLoss
 
@@ -121,7 +121,7 @@ end OutputLoss
 /--
 Build a TorchLean `Program` that computes a scalar loss from `(params, x, target)`.
 
-This is the bridge between `Seq.program` (which produces model outputs) and the autograd entry
+This is the bridge between `Seq.forwardProgram` (which produces model outputs) and the autograd entry
 points (which expect a scalar-valued program).
 -/
 def lossProgram {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ) :
@@ -139,13 +139,13 @@ def lossProgram {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (lo
             _root_.Runtime.Autograd.Torch.RefList.split
               (Ref := fun s => API.TorchLean.RefTy (m := m) (α := α) s)
               (ss₁ := API.TorchLean.NN.Seq.paramShapes model) (ss₂ := [σ, υ]) args
-          let (x, y) := RefList.unpack2 xy
+          let (x, y) := RefList.unpackPair xy
           let yhat ←
             _root_.Runtime.Autograd.Torch.CurriedRef.uncurry
               (Ref := fun s => API.TorchLean.RefTy (m := m) (α := α) s)
               (ss := API.TorchLean.NN.Seq.paramShapes model ++ [σ])
               (β := m (API.TorchLean.RefTy (m := m) (α := α) τ))
-              (API.TorchLean.NN.Seq.program (model := model) (α := α))
+              (API.TorchLean.NN.Seq.forwardProgram (model := model) (α := α))
               (_root_.Runtime.Autograd.Torch.RefList.append ps (.cons x .nil))
           loss (α := α) (m := m) yhat y)
 
@@ -157,8 +157,8 @@ def vjpParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
   _root_.Runtime.Autograd.TorchLean.Autodiff.vjpOutParams
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.program (model := model) (α := β))
-    params (API.TorchLean.tensorpack1 x) seedOut
+    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    params (API.TorchLean.tensorpackSingleton x) seedOut
 
 /-- VJP of the model output w.r.t. inputs. -/
 def vjpInputs {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
@@ -168,8 +168,8 @@ def vjpInputs {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
   _root_.Runtime.Autograd.TorchLean.Autodiff.vjpOutInputs
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.program (model := model) (α := β))
-    params (API.TorchLean.tensorpack1 x) seedOut
+    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    params (API.TorchLean.tensorpackSingleton x) seedOut
 
 /-- Jacobian (reverse-mode) of the model output w.r.t. parameters, returned as rows. -/
 def jacrevParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
@@ -179,8 +179,8 @@ def jacrevParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
   _root_.Runtime.Autograd.TorchLean.Autodiff.jacrevOutParams
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.program (model := model) (α := β))
-    params (API.TorchLean.tensorpack1 x)
+    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    params (API.TorchLean.tensorpackSingleton x)
 
 /-- Gradient of `loss(model(params, x), target)` w.r.t. parameters. -/
 def gradParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
@@ -191,7 +191,7 @@ def gradParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (los
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
-    params (API.TorchLean.tensorpack2 x target)
+    params (API.TorchLean.tensorpackPair x target)
 
 /-- Gradient of `loss(model(params, x), target)` w.r.t. inputs (`x` and `target`). -/
 def gradInputs {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
@@ -202,7 +202,7 @@ def gradInputs {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (los
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
-    params (API.TorchLean.tensorpack2 x target)
+    params (API.TorchLean.tensorpackPair x target)
 
 /-- JVP of a scalar loss w.r.t. parameters in direction `vparams`. -/
 def jvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
@@ -214,7 +214,7 @@ def jvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
-    params (API.TorchLean.tensorpack2 x target) vparams
+    params (API.TorchLean.tensorpackPair x target) vparams
 
 /-- HVP (Hessian-vector product) of a scalar loss w.r.t. parameters in direction `vparams`. -/
 def hvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
@@ -226,14 +226,14 @@ def hvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss
     (α := α)
     (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
-    params (API.TorchLean.tensorpack2 x target) vparams
+    params (API.TorchLean.tensorpackPair x target) vparams
 
 end Model
 
-namespace Function1
+namespace Function
 
 /-
-Function-1 autodiff helpers.
+Pure-function autodiff helpers.
 
 This is the "no parameters" case: treat a pure tensor function `f : Tensor σ -> Tensor τ` as the
 thing we differentiate, rather than a model with an explicit parameter list.
@@ -251,7 +251,7 @@ abbrev Fn (σ τ : Spec.Shape) :=
       m (API.TorchLean.RefTy (m := m) (α := α) τ)
 
 /-- Turn an `Fn` into a single-input TorchLean `Program`. -/
-def program {σ τ : Spec.Shape} (f : Fn σ τ) :
+def forwardProgram {σ τ : Spec.Shape} (f : Fn σ τ) :
     ∀ {α : Type}, [Context α] → [DecidableEq Spec.Shape] → API.TorchLean.Program α [σ] τ :=
   fun {α} _ _ =>
     fun {m} _ _ =>
@@ -267,18 +267,18 @@ def jacfwd {σ τ : Spec.Shape} (f : Fn σ τ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Array (Spec.Tensor α τ)) :=
-  _root_.Runtime.Autograd.TorchLean.Autodiff.jacfwd1
-    (α := α) (σ := σ) (τ := τ) (program f) x
+  _root_.Runtime.Autograd.TorchLean.Autodiff.jacfwdInput
+    (α := α) (σ := σ) (τ := τ) (forwardProgram f) x
 
 /-- Hessian for a scalar-valued pure function. -/
 def hessian {σ : Spec.Shape} (f : Fn σ Spec.Shape.scalar)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Array (Spec.Tensor α σ)) :=
-  _root_.Runtime.Autograd.TorchLean.Autodiff.hessian1
-    (α := α) (σ := σ) (program f) x
+  _root_.Runtime.Autograd.TorchLean.Autodiff.hessianInput
+    (α := α) (σ := σ) (forwardProgram f) x
 
-end Function1
+end Function
 
 end Autodiff
 

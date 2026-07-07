@@ -13,7 +13,7 @@ public import NN
 
 Small command-line parsers shared by the first-tour examples.
 
-These are example utilities, not part of the public training facade. The public surface remains
+These are example utilities, not part of the public training facade. User code should still start from
 `Trainer.new` and `trainer.train`; this file only keeps repeated
 quickstart flag parsing out of the tutorial bodies.
 -/

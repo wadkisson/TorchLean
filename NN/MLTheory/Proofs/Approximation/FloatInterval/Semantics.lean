@@ -195,12 +195,12 @@ open I
 @[inline] def max2 (x y : F) : F := IEEE32Exec.maximum x y
 
 /-- Minimum of four `IEEE32Exec` values, computed via nested `min2`. -/
-@[inline] def min4 (a b c d : F) : F := min2 (min2 a b) (min2 c d)
+@[inline] def minOfFour (a b c d : F) : F := min2 (min2 a b) (min2 c d)
 /-- Maximum of four `IEEE32Exec` values, computed via nested `max2`. -/
-@[inline] def max4 (a b c d : F) : F := max2 (max2 a b) (max2 c d)
+@[inline] def maxOfFour (a b c d : F) : F := max2 (max2 a b) (max2 c d)
 
 /-- Return `true` iff any of the four arguments is `NaN`. -/
-@[inline] def hasNaN4 (a b c d : F) : Bool :=
+@[inline] def hasNaNAmongFour (a b c d : F) : Bool :=
   IEEE32Exec.isNaN a || IEEE32Exec.isNaN b || IEEE32Exec.isNaN c || IEEE32Exec.isNaN d
 
 /-- Corner-based interval addition for `IEEE32Exec.add`. -/
@@ -212,10 +212,10 @@ def addSharpCorners : I → I → I
       let p01 := IEEE32Exec.add a d
       let p10 := IEEE32Exec.add b c
       let p11 := IEEE32Exec.add b d
-      if hasNaN4 p00 p01 p10 p11 then
+      if hasNaNAmongFour p00 p01 p10 p11 then
         I.top
       else
-        I.range (min4 p00 p01 p10 p11) (max4 p00 p01 p10 p11)
+        I.range (minOfFour p00 p01 p10 p11) (maxOfFour p00 p01 p10 p11)
 
 /-- Corner-based interval multiplication for `IEEE32Exec.mul`. -/
 def mulSharpCorners : I → I → I
@@ -226,10 +226,10 @@ def mulSharpCorners : I → I → I
       let p01 := IEEE32Exec.mul a d
       let p10 := IEEE32Exec.mul b c
       let p11 := IEEE32Exec.mul b d
-      if hasNaN4 p00 p01 p10 p11 then
+      if hasNaNAmongFour p00 p01 p10 p11 then
         I.top
   else
-        I.range (min4 p00 p01 p10 p11) (max4 p00 p01 p10 p11)
+        I.range (minOfFour p00 p01 p10 p11) (maxOfFour p00 p01 p10 p11)
 
 /-- Executable ReLU for `IEEE32Exec`, defined via `IEEE32Exec.maximum`. -/
 @[inline] def relu (x : F) : F := IEEE32Exec.maximum x (Numbers.zero : F)
@@ -673,7 +673,7 @@ end ExactImage
 
 /-! ## Two-layer interval evaluator using `OpsExact` -/
 
-namespace MLP2Exact
+namespace TwoLayerMLPExact
 
 open I OpsExact
 
@@ -804,7 +804,7 @@ theorem eval_sound_pointBox [OpsExact.Sound] {d h : Nat} (net : Net d h) (x : Fi
   have hxBox : x ∈ I.γ (I.pointBox (d := d) x) := I.mem_pointBox_of_isNaN_false (x := x) hx
   exact eval_sound (net := net) (B := I.pointBox (d := d) x) hW1 hb1 hW2 hb2 hxBox
 
-end MLP2Exact
+end TwoLayerMLPExact
 
 end
 

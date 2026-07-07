@@ -17,7 +17,7 @@ public import NN.Runtime.RL.Artifacts.DefaultPaths
 This example is small but complete:
 
 - **Environment**: external Python Gymnasium (started as a subprocess).
-- **Trust boundary**: every step is checked against a Lean-side contract
+- **Trust boundary**: every step is checked against a Lean side contract
   (`Runtime.RL.Boundary.Contract`) before being used for training data.
 - **Algorithm**: PPO with GAE (all update math is Lean definitions; the PPO loss is a TorchLean
   autograd program).
@@ -66,7 +66,7 @@ References (primary):
 - Williams, "Simple statistical gradient-following algorithms for connectionist reinforcement learning"
   (REINFORCE, 1992): https://doi.org/10.1007/BF00992696
 - Brockman et al., "OpenAI Gym" (2016): https://arxiv.org/abs/1606.01540
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`): https://gymnasium.farama.org/
 - CartPole environment docs: https://gymnasium.farama.org/environments/classic_control/cart_pole/
 -/
 
@@ -140,9 +140,9 @@ def sLogitsBatch : Shape := rl.ppo.LogitsBatchShape horizon nActions
 def sScalarBatch : Shape := rl.ppo.ScalarBatchShape horizon
 def sValueBatch : Shape := rl.ppo.ValueBatchShape horizon
 
-def sState1 : Shape := obsShape
-def sLogits1 : Shape := shape![nActions]
-def sValue1 : Shape := shape![1]
+def stateShape : Shape := obsShape
+def logitsShape : Shape := shape![nActions]
+def valueShape : Shape := shape![1]
 
 /-!
 ## Model (Actor + Critic)
@@ -168,7 +168,7 @@ def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.a
 We talk to a small Python service (`scripts/rl/gymnasium_server.py`) using the reusable runtime
 bridge exposed as `rl.gym.*`.
 
-The Lean-side trust-boundary contract (`rl.boundary.Contract`) is enforced on every step.
+The Lean side trust-boundary contract (`rl.boundary.Contract`) is enforced on every step.
 -/
 
 /-!
@@ -190,7 +190,7 @@ This executable:
 - writes a widget-friendly training curve JSON (default: `data/rl/ppo_cartpole_trainlog.json`).
 -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDeviceDetails
       exeName
       s!"PPO on {envId} (horizon={horizon})"
@@ -218,17 +218,17 @@ def main (args : List String) : IO UInt32 := do
         -- (`pfx = scalar`) and rollout-time batched shapes (`pfx = horizon`).
         let seedActor ← nn.freshSeed
         let seedCritic ← nn.freshSeed
-        let actorObs : nn.Sequential sState1 sLogits1 :=
+        let actorObs : nn.Sequential stateShape logitsShape :=
           nn.run seedActor (actorMk .scalar)
-        let criticObs : nn.Sequential sState1 sValue1 :=
+        let criticObs : nn.Sequential stateShape valueShape :=
           nn.run seedCritic (criticMk .scalar)
         let actorRollout : nn.Sequential sStateBatch sLogitsBatch :=
           nn.run seedActor (actorMk pfxBatch)
         let criticRollout : nn.Sequential sStateBatch sValueBatch :=
           nn.run seedCritic (criticMk pfxBatch)
 
-        let actorC ← nn.compileOut actorObs
-        let criticC ← nn.compileOut criticObs
+        let actorC ← actorObs.compile
+        let criticC ← criticObs.compile
 
         let m ← rl.ppo.instantiateActorCritic
           (α := Float) (opts := opts)
@@ -254,8 +254,8 @@ def main (args : List String) : IO UInt32 := do
         -- Evaluate the untrained policy once (step=0).
         do
           let psAll0 ← rl.ppo.params (α := Float) m
-          let policyLogits0 : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
-            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll0
+          let policyLogits0 : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
+            rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll0
           let avg0 ←
             rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
               mkSession policyLogits0 (baseSeed := 1000) (episodes := evalEpisodes)
@@ -265,10 +265,10 @@ def main (args : List String) : IO UInt32 := do
 
         for update in [0:updatesLimit] do
           let psAll ← rl.ppo.params (α := Float) m
-          let predictLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
-            rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll
+          let predictLogits : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
+            rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll
           let predictValue : Tensor.T Float obsShape → Float :=
-            rl.ppo.criticValueFromParams criticObs criticC actorRollout criticRollout psAll
+            rl.ppo.criticValueFromParams criticC actorRollout criticRollout psAll
           let (rollout, rngCounter') ←
             rl.ppo.collectRolloutWith (α := Float) (obsShape := obsShape) (nActions := nActions)
               (horizon := horizon) (castObs := id) (castReward := id) gym predictLogits predictValue
@@ -283,8 +283,8 @@ def main (args : List String) : IO UInt32 := do
 
           if update % evalEvery == 0 then
             let psAll' ← rl.ppo.params (α := Float) m
-            let policyLogits : Tensor.T Float obsShape → Tensor.T Float sLogits1 :=
-              rl.ppo.actorPolicyFromParams actorObs actorC actorRollout criticRollout psAll'
+            let policyLogits : Tensor.T Float obsShape → Tensor.T Float logitsShape :=
+              rl.ppo.actorPolicyFromParams actorC actorRollout criticRollout psAll'
             let avg ←
               rl.eval.averageEpisodeTotalReward (obsShape := obsShape) (nActions := nActions)
                 mkSession policyLogits (baseSeed := 1000 + update) (episodes := evalEpisodes)

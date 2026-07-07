@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-  lake build -R -K cuda=true && lake exe torchlean transformer --cuda --tiny-shakespeare --steps 1
+  lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
 -/
 
 module
@@ -26,7 +26,7 @@ regularly.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake build -R -K cuda=true && lake exe torchlean transformer --cuda --tiny-shakespeare --steps 1
+lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
 ```
 -/
 

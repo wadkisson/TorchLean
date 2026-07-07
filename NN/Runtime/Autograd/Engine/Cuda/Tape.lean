@@ -369,7 +369,7 @@ def backwardDenseFromStep (t : Tape) (acc : Array AnyBuffer) (id : Nat) : Result
 Reverse-mode accumulation over the first `n` nodes in reverse order.
 
 The recursion visits `n-1, n-2, ..., 0`; using `n = t.size` runs the full tape. We keep this as a
-structural loop rather than a list fold so proof-facing callers can reason about one node step at a
+structural loop rather than a list fold so proof layer callers can reason about one node step at a
 time.
 -/
 def backwardDenseFromLoop (t : Tape) : Nat → Array AnyBuffer → Result (Array AnyBuffer)

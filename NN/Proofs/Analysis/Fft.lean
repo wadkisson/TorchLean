@@ -28,7 +28,7 @@ live cleanly in mathlib for `ℂ`.
 The TorchLean runtime FFT code uses shape-indexed tensors and scalar-polymorphic twiddle factors
 written with `cos`/`sin`. Connecting that runtime representation to these exact matrices is a
 separate transport theorem in `NN.Proofs.Analysis.FftBridge`. Keeping the files split avoids making
-the pure DFT algebra import the runtime/autograd stack.
+the pure DFT algebra import the runtime/autograd implementation.
 
 References:
 - Any standard Fourier analysis / numerical linear algebra text (this is the classical DFT

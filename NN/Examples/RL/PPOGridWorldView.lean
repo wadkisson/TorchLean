@@ -42,7 +42,7 @@ References:
 open Spec.RL.Envs
 
 /-- A 4x4 GridWorld layout matching the executable example defaults. -/
-def gw44 : GridWorld 4 4 :=
+def defaultGridWorld : GridWorld 4 4 :=
   { start := (⟨0, by decide⟩, ⟨0, by decide⟩)
     goal := (⟨3, by decide⟩, ⟨3, by decide⟩)
     -- Discount is not used by the widgets.
@@ -60,10 +60,10 @@ def policyPath : System.FilePath :=
 def pathPath : System.FilePath :=
   Runtime.RL.Artifacts.DefaultPaths.ppoGridWorldPath
 
-#gridworld_view gw44, gw44.start
+#gridworld_view defaultGridWorld, defaultGridWorld.start
 
 #train_log_file_view trainLogPath
 
-#gridworld_policy_file_view gw44, policyPath
+#gridworld_policy_file_view defaultGridWorld, policyPath
 
-#gridworld_path_file_view gw44, pathPath
+#gridworld_path_file_view defaultGridWorld, pathPath

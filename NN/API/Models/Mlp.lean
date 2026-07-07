@@ -31,19 +31,19 @@ namespace nn
 namespace models
 
 /-- Configuration for a single-hidden-layer MLP over batched row vectors. -/
-structure Mlp1Config where
+structure MlpConfig where
   batch : Nat
   inDim : Nat
   hidDim : Nat
   outDim : Nat
 deriving Repr
 
-/-- Input shape `(batch × inDim)` for an `Mlp1Config`. -/
-abbrev mlp1InShape (cfg : Mlp1Config) : Shape :=
+/-- Input shape `(batch × inDim)` for an `MlpConfig`. -/
+abbrev mlpInShape (cfg : MlpConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.inDim
 
-/-- Output shape `(batch × outDim)` for an `Mlp1Config`. -/
-abbrev mlp1OutShape (cfg : Mlp1Config) : Shape :=
+/-- Output shape `(batch × outDim)` for an `MlpConfig`. -/
+abbrev mlpOutShape (cfg : MlpConfig) : Shape :=
   NN.Tensor.Shape.Mat cfg.batch cfg.outDim
 
 /--
@@ -51,8 +51,8 @@ Build a single-hidden-layer MLP with ReLU activation:
 
 `linear(inDim → hidDim) → relu → linear(hidDim → outDim)`.
 -/
-def mlp1Relu (cfg : Mlp1Config) :
-    nn.M (nn.Sequential (mlp1InShape cfg) (mlp1OutShape cfg)) :=
+def mlpRelu (cfg : MlpConfig) :
+    nn.M (nn.Sequential (mlpInShape cfg) (mlpOutShape cfg)) :=
   nn.Sequential![
     Linear cfg.inDim cfg.hidDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
     ReLU,

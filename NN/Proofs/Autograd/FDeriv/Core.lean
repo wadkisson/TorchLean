@@ -561,7 +561,7 @@ End-to-end analytic soundness for the 2-layer MLP `OpSpec`:
 the `OpSpec.backward` returned by the spec-level reverse-mode rule equals the adjoint of the true
 Fréchet derivative of the forward map (i.e. the analytic VJP), after vectorization.
 
-This is the proof-side analogue of PyTorch’s claim that `loss.backward()` computes the correct VJP
+This is the proof layer analogue of PyTorch’s claim that `loss.backward()` computes the correct VJP
 for the composed model, assuming the primitive backward rules are correct.
 -/
 theorem mlp_backward_eq_adjoint_fderiv {inDim hidDim outDim : Nat}

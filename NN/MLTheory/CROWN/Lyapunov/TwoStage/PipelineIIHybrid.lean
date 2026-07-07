@@ -151,7 +151,7 @@ Load stage-1 parameters exported by PyTorch as *float32 bit patterns*.
 We do this (instead of parsing JSON floats) so stage-2 runs under *bit-exact* float32 semantics
 (`IEEE32Exec`) without decimal conversion error.
 -/
-def loadStage1Params (width : Nat) (path : String) : IO (NN.API.TensorPack α (paramShapes
+def loadFirstStageParams (width : Nat) (path : String) : IO (NN.API.TensorPack α (paramShapes
   width)) := do
   let jsonStr ← IO.FS.readFile path
   let j ← match Json.parse jsonStr with
@@ -203,7 +203,7 @@ def pgdStepCompiled
       (ss₁ := paramShapes width) (ss₂ := [xShape]) gAll).2
   let .cons g .nil := gx
   let x' := Tensor.addSpec x (Tensor.scaleSpec g pgdStepSize)
-  clampVec2 (-rad) rad x'
+  clampStateVector (-rad) rad x'
 
 /--
 Final post-check: compile the TorchLean loss to the shared verifier IR, then run IBP and CROWN
@@ -216,7 +216,7 @@ def checkBox (width : Nat) (params : NN.API.TensorPack α (paramShapes width)) (
   epsCheck) : IO Unit := do
   IO.println "Stage 2 check: IBP + CROWN on the scalar loss over a small box"
   let compiled ←
-    match NN.Verification.TorchLean.compileForward1
+    match NN.Verification.TorchLean.compileForward
           (α := α) (paramShapes := paramShapes width) (inShape := xShape) (outShape := Shape.scalar)
           (lossProg width (β := α)) params with
     | .ok c => pure c
@@ -279,7 +279,7 @@ This is the only place pipeline (ii) depends on Python. The trust boundary is st
 - Stage 1 provides an **initialization only** (untrusted),
 - Stage 2 and the IBP/CROWN post-check run inside Lean under exact `IEEE32Exec` semantics.
 -/
-def ensureStage1Weights (width : Nat) (opts : HybridCliOptions) : IO String := do
+def ensureFirstStageWeights (width : Nat) (opts : HybridCliOptions) : IO String := do
   let weightsPath := opts.weightsPath
   let weightsExists := (← System.FilePath.pathExists (System.FilePath.mk weightsPath))
   if weightsExists && !opts.forceStage1 then
@@ -306,7 +306,7 @@ def ensureStage1Weights (width : Nat) (opts : HybridCliOptions) : IO String := d
   -/
 def run (width : Nat) (args : List String) : IO Unit := do
   let opts ← parseHybridCliOptions width args
-  let weightsPath ← ensureStage1Weights width opts
+  let weightsPath ← ensureFirstStageWeights width opts
 
   let stage2Rounds : Nat := (if opts.longRun then 10 else if opts.paperRun then 10 else 1)
   let pgdSteps : Nat := (if opts.longRun then 20 else if opts.paperRun then 10 else 1)
@@ -316,7 +316,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
     (s!"weights={weightsPath} width={width} stage2Rounds={stage2Rounds} " ++
       s!"candidates={opts.candidates} pgdSteps={pgdSteps}")
 
-  let initParams ← loadStage1Params width weightsPath
+  let initParams ← loadFirstStageParams width weightsPath
   let mod ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModule.create
     (α := α) (paramShapes := paramShapes width) (inputShapes := [xShape])
     (opts := { backend := .compiled })
@@ -333,9 +333,9 @@ def run (width : Nat) (args : List String) : IO Unit := do
   let mut foundViolations : Nat := 0
   for round in [0:stage2Rounds] do
     for _ci in [0:opts.candidates] do
-      let (seed', x0) := sampleVec2 seed rad
+      let (seed', x0) := sampleStateVector seed rad
       seed := seed'
-      let loss0 := _root_.Runtime.Autograd.Torch.scalarOf (←
+      let lossBeforePgd := _root_.Runtime.Autograd.Torch.scalarOf (←
         _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr (.cons x0 .nil))
       let params ← tr.getParams
       let mut x := x0
@@ -347,7 +347,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
       if (0 : α) < lossFound then
         foundViolations := foundViolations + 1
       _root_.Runtime.Autograd.Torch.ScalarTrainer.stepT tr lr xs
-      IO.println s!"[stage2] round {round}: lossBefore={loss0} lossAfterPGD={lossFound}"
+      IO.println s!"[stage2] round {round}: lossBefore={lossBeforePgd} lossAfterPGD={lossFound}"
 
   let params ← tr.getParams
   IO.println

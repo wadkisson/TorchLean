@@ -16,10 +16,10 @@ public import NN.Verification.TorchLean.Proved.Correctness.Eval.Transpose
 /-!
 # IR Evaluation Coverage
 
-This file is a proof-facing checklist for the local `Graph.evalAt` bridge lemmas.
+This file is a proof layer checklist for the local `Graph.evalAt` bridge lemmas.
 
 The bridge lemmas themselves live in the operation-specific files.  Here we keep a small,
-machine-checked summary of the IR operation tags currently covered by those local evaluator facts.
+machine-checked summary of the IR operation names currently covered by those local evaluator facts.
 When a new `OpKind` constructor is added, this list should be updated together with the
 corresponding `evalAt` theorem.
 -/

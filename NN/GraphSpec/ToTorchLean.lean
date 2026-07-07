@@ -116,7 +116,7 @@ def toSeqAux
           -- Thread a deterministic occurrence index for initialization.
           let i' := if p.countsAsLayer then i + 1 else i
           let ⟨l, _hps⟩ := mk i
-          return (_root_.Runtime.Autograd.TorchLean.NN.seq1 l, i')
+          return (_root_.Runtime.Autograd.TorchLean.NN.singleLayer l, i')
 
 /--
 Try to lower a sequential GraphSpec graph into a `TorchLean.NN.Seq`.

@@ -57,6 +57,24 @@ structure SgdConfig where
   momentum : Float := 0.0
 deriving Repr
 
+/-- AdaGrad optimizer configuration. -/
+structure AdaGradConfig where
+  /-- Learning rate. -/
+  lr : Float
+  /-- Numerical stabilizer. -/
+  epsilon : Float := 1e-10
+deriving Repr
+
+/-- RMSProp optimizer configuration. -/
+structure RMSPropConfig where
+  /-- Learning rate. -/
+  lr : Float
+  /-- Decay coefficient for the running average of squared gradients. -/
+  decay : Float := 0.99
+  /-- Numerical stabilizer. -/
+  epsilon : Float := 1e-8
+deriving Repr
+
 /-- Adam optimizer configuration. -/
 structure AdamConfig where
   /-- Learning rate. -/
@@ -75,6 +93,16 @@ structure AdamWConfig extends AdamConfig where
   weightDecay : Float := 0.01
 deriving Repr
 
+/-- Adadelta optimizer configuration. -/
+structure AdadeltaConfig where
+  /-- Learning rate. -/
+  lr : Float := 1.0
+  /-- Decay coefficient for gradient/update accumulators. -/
+  rho : Float := 0.9
+  /-- Numerical stabilizer. -/
+  epsilon : Float := 1e-6
+deriving Repr
+
 /-- SGD optimizer config, written `optim.sgd { lr := 0.05 }`. -/
 def sgd (cfg : SgdConfig) : Optimizer :=
   TorchLean.Trainer.sgd cfg.lr cfg.momentum
@@ -84,6 +112,14 @@ def momentumSGD (cfg : SgdConfig) : Optimizer :=
   TorchLean.Trainer.sgd cfg.lr
     (if cfg.momentum == 0.0 then 0.9 else cfg.momentum)
 
+/-- AdaGrad optimizer config, written `optim.adagrad { lr := 0.05 }`. -/
+def adagrad (cfg : AdaGradConfig) : Optimizer :=
+  TorchLean.Trainer.adagrad cfg.lr cfg.epsilon
+
+/-- RMSProp optimizer config, written `optim.rmsprop { lr := 1e-3 }`. -/
+def rmsprop (cfg : RMSPropConfig) : Optimizer :=
+  TorchLean.Trainer.rmsprop cfg.lr cfg.decay cfg.epsilon
+
 /-- Adam optimizer config, written `optim.adam { lr := 1e-3 }`. -/
 def adam (cfg : AdamConfig) : Optimizer :=
   TorchLean.Trainer.adam cfg.lr cfg.beta1 cfg.beta2 cfg.epsilon
@@ -91,6 +127,10 @@ def adam (cfg : AdamConfig) : Optimizer :=
 /-- AdamW optimizer config, written `optim.adamw { lr := 1e-3, weightDecay := 0.01 }`. -/
 def adamw (cfg : AdamWConfig) : Optimizer :=
   TorchLean.Trainer.adamw cfg.lr cfg.weightDecay cfg.beta1 cfg.beta2 cfg.epsilon
+
+/-- Adadelta optimizer config, written `optim.adadelta {}`. -/
+def adadelta (cfg : AdadeltaConfig) : Optimizer :=
+  TorchLean.Trainer.adadelta cfg.lr cfg.rho cfg.epsilon
 
 @[inherit_doc TorchLean.Trainer.OptimizerKind]
 abbrev Kind := TorchLean.Trainer.OptimizerKind
@@ -145,7 +185,7 @@ namespace train
 /-!
 Public training tools.
 
-This namespace is the public training surface: it wires together
+This namespace is the public training API: it wires together
 - a model (`nn.Sequential`)
 - a loss (regression or classification)
 - an optimizer config (`API.optim`)
@@ -158,7 +198,7 @@ Importantly, this module sits around the root public trainer facade:
 - use `TorchLean.Trainer.RunConfig` for persistent runtime settings,
 - use `TorchLean.Trainer.TrainOptions` for one training call,
 - use `Trainer.new ...` followed by `trainer.train ...` as the normal quickstart path,
-- use `API.train.Advanced` only when the dependent runner API is genuinely needed.
+- use `API.train.Manual` only when the dependent runner API is genuinely needed.
 
 ### PyTorch Mapping
 
@@ -170,11 +210,11 @@ These definitions correspond to the training loop code you would typically write
 -/
 
 /-!
-This module is the advanced training layer underneath the `Trainer` facade.
+Manual training layer underneath the `Trainer` facade.
 
 New examples should prefer `Trainer.new`, `trainer.train`, and trained-handle methods. This namespace
-remains useful for advanced runtime code that really does need direct steppers, epochs, or manual
-reporting, but it is no longer the surface we teach first.
+remains available for runtime code that really does need direct steppers, epochs, or manual
+reporting, but it is no longer the API we teach first.
 -/
 
 export TorchLean.Trainer
@@ -199,39 +239,39 @@ export _root_.Runtime.Training.ExperimentLog (init log logRow addArtifact toTrai
 export _root_.Runtime.Training.LogDestination (disabled json isEnabled path? writeTrainLog)
 export _root_.Runtime.Training.TrainLog (writeJson readJson)
 
-namespace Advanced
+namespace Manual
 
 /-!
-Advanced runner, callback, and custom-loop APIs.
+Manual runner, callback, and custom-loop APIs.
 
-This namespace keeps the dependent runtime surface available for CUDA entrypoints, custom loaders,
-RL/PDE streams, and proof-facing examples without making those names the default first stop for
+This namespace keeps the dependent runtime API available for CUDA entrypoints, custom loaders,
+RL/PDE streams, and proof layer examples without making those names the default first stop for
 ordinary training code.
 -/
 
 /--
-Advanced checked model-plus-loss package used by the direct runtime trainer APIs.
+Manual checked model-plus-loss package used by the direct runtime trainer APIs.
 
 Ordinary user code should prefer `Trainer.new` and `trainer.train`.
 -/
 abbrev Task := TorchLean.Trainer.Task
 
 /--
-Advanced instantiated executable training state used by the direct runtime trainer APIs.
+Manual instantiated executable training state used by the direct runtime trainer APIs.
 
 Ordinary user code should prefer the higher-level public trainer object.
 -/
 abbrev Runner := TorchLean.Trainer.Runner
 
 /--
-Advanced inner training-loop state used by the direct runtime trainer APIs.
+Manual inner training-loop state used by the direct runtime trainer APIs.
 
 Ordinary user code should prefer `trainer.train` unless it needs manual stepping.
 -/
 abbrev Stepper := TorchLean.Trainer.Stepper
 
 export TorchLean.Trainer
-  (instantiate instantiateWithOptions
+  (instantiate instantiateConfigured
    run
    params mode setMode trainMode evalMode isTraining
    backward
@@ -241,8 +281,8 @@ export TorchLean.Trainer
 /--
 Count correct predictions in a one-hot labeled **batched** dataset.
 
-This is the minibatch analogue of `accuracyOneHot`: the task already has a leading dim0 batch axis,
-so we score each row of the batch independently and accumulate totals.
+Minibatch analogue of `accuracyOneHot`. The task already has a leading batch axis, so the
+implementation scores each row independently and accumulates totals.
 
 Returns `(correct, total)` where `total = batch * numBatches`.
 -/
@@ -416,7 +456,7 @@ end StepBatchStream
 /--
 Run an action with the runner temporarily switched to `value` mode.
 
-This is useful for "evaluate on a validation set during training" in callback-based loops.
+Use this for callback-based validation passes during training.
 -/
 def withMode {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
@@ -431,13 +471,13 @@ def withMode {σ τ : Spec.Shape} {task : Task σ τ}
 /--
 Mean loss for an already-instantiated scalar module over a typed minibatch loader.
 
-This is the general streaming evaluation path used by the runtime examples. It is not
-CIFAR-specific: any supervised task whose loss module consumes
+General streaming evaluation path used by the runtime examples. It is not CIFAR-specific: any
+supervised task whose loss module consumes
 `[dim n σ, dim n τ]` can use the same loader.  The loader stores ordinary per-example samples
 `(x : σ, y : τ)`; this definition asks `Data.epoch` for raw minibatches and calls
 `Data.collateSupervised` to build one shape-typed batch at a time.
 
-Two details are important for larger examples:
+Two details matter for larger examples:
 
 - We force `shuffle := false` for evaluation so before/after metrics are deterministic.
 - We do not call `Data.BatchLoader.batchDataset`, because that would materialize every collated
@@ -469,10 +509,10 @@ def meanLossModuleLoader {σ τ : Spec.Shape} {n : Nat} {paramShapes : List Spec
     pure (total / (count : α))
 
 /--
-Mean loss over a typed minibatch loader through a `train.Advanced.Runner`.
+Mean loss over a typed minibatch loader through a `train.Manual.Runner`.
 
-This is the runner-facing form of `meanLossModuleLoader`. Use it when the example is built around
-`train.Advanced.run`, task modes, and the proof-facing trainer abstraction. Use
+Runner-facing form of `meanLossModuleLoader`. Use it when the example is built around
+`train.Manual.run`, task modes, and the proof layer trainer abstraction. Use
 `meanLossModuleLoader` directly when the example has already instantiated a runtime
 `TorchLean.Module.ScalarModule`, which is the common fast path for CUDA examples.
 -/
@@ -508,8 +548,8 @@ def accuracyOneHotBatchLoader
 /--
 Train a runtime scalar module from a typed minibatch loader.
 
-This is the shared "real epoch loop" for model examples that already have a runtime module,
-including CUDA runs. It mirrors the PyTorch structure:
+Shared real epoch loop for model examples that already have a runtime module, including CUDA runs.
+It mirrors the PyTorch structure:
 
 1. create an optimizer state for the module parameters;
 2. for each epoch, ask the general `Data.batchLoader` for shuffled raw batches;
@@ -566,8 +606,8 @@ variant is update-based, which is the convention used by runnable examples that 
 flag.
 
 The loop still draws shuffled minibatches from `Data.batchLoader` epoch by epoch, but it stops as
-soon as the requested number of optimizer updates has run. The returned loader is the advanced
-loader state, so callers can continue training from the next shuffled epoch if they want to.
+soon as the requested number of optimizer updates has run. The returned loader is the next loader
+state, so callers can continue training from the next shuffled epoch if they want to.
 -/
 def trainModuleLoaderStepsWith {σ τ : Spec.Shape} {n : Nat} {paramShapes : List Spec.Shape}
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
@@ -614,8 +654,8 @@ def trainModuleLoaderStepsWith {σ τ : Spec.Shape} {n : Nat} {paramShapes : Lis
 /--
 Train a scalar module from a step-indexed batch stream.
 
-This is the shared loop for workloads whose batches are produced step by step rather than by one
-finite `Data.batchLoader` epoch:
+Shared loop for workloads whose batches are produced step by step rather than by one finite
+`Data.batchLoader` epoch:
 
 - RL algorithms can sample replay or rollout batches,
 - PDE examples can resample collocation points,
@@ -707,7 +747,7 @@ def trainModuleStreamStepsCurveFloat {inputShapes : List Spec.Shape} {paramShape
 Train from a runner-backed loader with explicit callbacks instead of inline printing in example
 code.
 
-This is the runner-facing public path for PyTorch-style custom loops:
+Runner-facing public path for PyTorch-style custom loops:
 - keep the optimizer/scheduler logic in the library,
 - inject logging, evaluation, and prediction reporting through callbacks.
 
@@ -784,8 +824,8 @@ namespace Report
 These definitions factor out common "print a loss/accuracy table" patterns for runnable model
 commands.
 They do not affect semantics: they only call the underlying runner functions and print
-human-facing summaries. Public examples should reach them through `Trainer.Advanced` only when the
-ordinary `Trainer.new` / `trainer.train` surface is too small for the example.
+human-facing summaries. Public examples should reach them through `Trainer.Manual` only when the
+ordinary `Trainer.new` / `trainer.train` API is too small for the example.
 -/
 
 /-- Print a titled list of named report lines. -/
@@ -938,7 +978,7 @@ end Report
 /--
 Train a runtime module for a fixed number of optimizer updates with the standard runtime reports.
 
-This is the common path for direct-module training, not example-only code. It composes the
+Common path for direct-module training, not example-only code. It composes the
 generic step loop with before/after mean-loss reporting and CUDA allocator telemetry, while still
 accepting extra callbacks for projects that want their own metrics, validation, or tracing.
 -/
@@ -992,9 +1032,9 @@ def trainModuleLoaderStepsCurveFloat {σ τ : Spec.Shape} {n : Nat}
 /--
 Train a Float runtime module, write a standard scalar-curve log, and return the train report.
 
-This is the high-level path used by runnable training commands.  The caller provides the model,
-optimizer, loader, runtime options, and metadata notes; the library owns the callback composition,
-CUDA telemetry, before/after reports, and JSON curve emission.
+High-level path used by runnable training commands. The caller provides the model, optimizer,
+loader, runtime options, and metadata notes; the library owns the callback composition, CUDA
+telemetry, before/after reports, and JSON curve emission.
 -/
 def trainModuleLoaderStepsLoggedFloat {σ τ : Spec.Shape} {n : Nat}
     {paramShapes : List Spec.Shape}
@@ -1015,7 +1055,7 @@ def trainModuleLoaderStepsLoggedFloat {σ τ : Spec.Shape} {n : Nat}
   Common.writeCurveLogTo log title curve seriesName notes
   pure (report, loader')
 
-end Advanced
+end Manual
 
 end train
 

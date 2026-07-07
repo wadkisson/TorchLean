@@ -21,12 +21,13 @@ Why this exists:
 - Verification tooling already targets `NN.IR.Graph` (an op-tagged DAG with external payloads).
 - The runtime `.compiled` path executes `GraphData` (closures for each node).
 - To enforce a single shared IR contract, we provide a checked translation `IR.Graph → GraphData`.
-  The forward-correctness theorem connecting `GraphData.eval` to the IR denotation
+  The supported-fragment forward-correctness theorem connecting `GraphData.eval` to the IR denotation
   (`NN.IR.Graph.denote*`) lives in `NN.Runtime.Autograd.Compiled.IRExec.Correctness.SemanticEquivalence`
   (split out so routine runtime imports do not pull in the full semantic proof).
 
 Important:
-- The produced `GraphData` is **forward-correct** by construction.
+- The produced `GraphData` is meant for forward execution; the theorem layer states exactly which
+  fragment is forward-correct and which domain side conditions are assumed.
 - Today `jvp`/`vjp` are forward-only sentinels; this bridge is intended for forward execution and
   for closing the shared-IR semantics gap, not for training-style gradient computation.
 
@@ -289,7 +290,7 @@ total concatenated size as a sigma.
 
 This helper supports lowering of IR concat-style operators while preserving shape information.
 -/
-def concatDim0FromInfos
+def concatLeadingAxisFromInfos
     {α : Type} [Context α] {Γ : List Shape} {rest : Shape} (ctx : TList α Γ) :
     (infos : List (Sigma fun nP => Idx Γ (.dim nP rest))) →
       Sigma fun nSum => Tensor α (.dim nSum rest)
@@ -303,24 +304,24 @@ def concatDim0FromInfos
           match acc, nxt with
   | ⟨n1, t1⟩, ⟨n2, idx2⟩ =>
               let t2 := getIdx (α := α) (xs := ctx) idx2
-              ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n := n1) (m := n2) (s := rest) t1 t2⟩)
+              ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n := n1) (m := n2) (s := rest) t1 t2⟩)
         s0
 
 /--
-The concatenated size reported by `concatDim0FromInfos` is the sum of the input sizes.
+The concatenated size reported by `concatLeadingAxisFromInfos` is the sum of the input sizes.
 
 This theorem is used to justify the output-shape side conditions in concat lowering branches.
 -/
-theorem concatDim0FromInfos_fst_eq_sum
+theorem concatLeadingAxisFromInfos_size_eq_sum
     {α : Type} [Context α] {Γ : List Shape} {rest : Shape}
     (ctx : TList α Γ) (infos : List (Sigma fun nP => Idx Γ (.dim nP rest))) :
-    (concatDim0FromInfos (α := α) (Γ := Γ) (rest := rest) ctx infos).1 =
+    (concatLeadingAxisFromInfos (α := α) (Γ := Γ) (rest := rest) ctx infos).1 =
       infos.foldl (fun acc info => acc + info.1) 0 := by
   cases infos with
   | nil =>
-      simp [concatDim0FromInfos]
+      simp [concatLeadingAxisFromInfos]
   | cons info infosTail =>
-      -- `concatDim0FromInfos` is a foldl over `infosTail` starting from a sigma whose `.1` is
+      -- `concatLeadingAxisFromInfos` is a foldl over `infosTail` starting from a sigma whose `.1` is
       -- `info.1`.
       -- Its `.1` component is therefore the `Nat` foldl over the same list of `nP`s.
       let f :
@@ -331,7 +332,7 @@ theorem concatDim0FromInfos_fst_eq_sum
           match acc, nxt with
           | ⟨n1, t1⟩, ⟨n2, idx2⟩ =>
               let t2 := getIdx (α := α) (xs := ctx) idx2
-              ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n := n1) (m := n2) (s := rest) t1 t2⟩
+              ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n := n1) (m := n2) (s := rest) t1 t2⟩
       have hfold :
           ∀ acc0 : Sigma fun n => Tensor α (.dim n rest),
             (infosTail.foldl f acc0).1 = infosTail.foldl (fun acc nxt => acc + nxt.1) acc0.1 := by
@@ -342,7 +343,7 @@ theorem concatDim0FromInfos_fst_eq_sum
         | cons nxt infos ih =>
             simp [List.foldl, f, ih]
       -- Now rewrite the outer fold (starting at 0) and finish.
-      simpa [concatDim0FromInfos, List.foldl] using
+      simpa [concatLeadingAxisFromInfos, List.foldl] using
         (hfold ⟨info.1, getIdx (α := α) (xs := ctx) info.2⟩)
 
 /--
@@ -936,8 +937,9 @@ def buildFrom
               let ip ← parentIdx pId τ
               let forward := fun ctx : TList α ([inShape] ++ ss) =>
                 let x := getIdx (α := α) (xs := ctx) ip
-                -- Keep runtime behavior consistent with the eager autograd engine:
-                -- `log` rejects non-positive inputs; use `safe_log` for epsilon protection.
+                -- This compiled forward closure is pure, so it cannot return the eager engine's
+                -- `Except` error. A bad raw-log domain reaches a runtime panic; use `safe_log` for
+                -- total epsilon protection.
                 if Tensor.allSpec (α := α) (s := τ) (fun v => decide (v > (0 : α))) x then
                   Tensor.logSpec (α := α) x
                 else
@@ -1086,10 +1088,10 @@ def buildFrom
                 if hSum : nSum = nOut then
                   let forward := fun ctx : TList α ([inShape] ++ ss) =>
                     let outSigma : Sigma fun n => Tensor α (.dim n rest) :=
-                      concatDim0FromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx infos
+                      concatLeadingAxisFromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx infos
                     have houtSigma :
                         outSigma =
-                          concatDim0FromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx
+                          concatLeadingAxisFromInfos (α := α) (Γ := [inShape] ++ ss) (rest := rest) ctx
                             infos := rfl
                     let nSum' : Nat := outSigma.1
                     let tSum : Tensor α (.dim nSum' rest) := outSigma.2
@@ -1098,7 +1100,7 @@ def buildFrom
                       change outSigma.1 = nSum
                       rw [houtSigma]
                       simpa [nSum] using
-                        (concatDim0FromInfos_fst_eq_sum (α := α) (Γ := [inShape] ++ ss) (rest :=
+                        (concatLeadingAxisFromInfos_size_eq_sum (α := α) (Γ := [inShape] ++ ss) (rest :=
                           rest) ctx infos)
                     let tSum' : Tensor α (.dim nSum rest) :=
                       Tensor.castShape tSum (by simp [hn])
@@ -1198,7 +1200,7 @@ def buildFrom
                                   match acc, nxt with
                                   | ⟨n1, t1⟩, ⟨n2, get2⟩ =>
                                       let t2 : Tensor α (.dim n2 restFront) := get2 ctx
-                                      ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n := n1) (m := n2)
+                                      ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n := n1) (m := n2)
                                         (s := restFront) t1 t2⟩)
                                 ⟨0, empty⟩
                             let tSum : Tensor α (.dim nSum restFront) :=
@@ -1218,7 +1220,7 @@ def buildFrom
                                               match acc, nxt with
                                               | ⟨n1, t1⟩, ⟨n2, get2⟩ =>
                                                   let _t2 : Tensor α (.dim n2 restFront) := get2 ctx
-                                                  ⟨n1 + n2, Tensor.concatDim0Spec (α := α) (n :=
+                                                  ⟨n1 + n2, Tensor.concatLeadingAxisSpec (α := α) (n :=
                                                     n1) (m := n2) (s := restFront) t1 _t2⟩)
                                             (⟨n0, t0⟩ : Sigma fun n => Tensor α (.dim n
                                               restFront))).1 =
@@ -1235,7 +1237,7 @@ def buildFrom
                                         -- at `n0 + x.1`.
                                         simpa using
                                           (ih (n0 := n0 + x.1)
-                                            (t0 := Tensor.concatDim0Spec (α := α) (n := n0) (m :=
+                                            (t0 := Tensor.concatLeadingAxisSpec (α := α) (n := n0) (m :=
                                               x.1)
                                               (s := restFront) t0 (x.2 ctx)))
                                   simpa [outSigma] using (hGen getters 0 empty)

@@ -52,7 +52,7 @@ export _root_.Runtime.Autograd.Torch
   (TList
    TensorRef Param AnyParam
    CompiledScalar compileScalar
-   CompiledOut compileOut
+   CompiledGraph compileGraph
    ParamList ScalarTrainer scalarTrainer)
 
 -- Unified imperative session (choose eager vs compiled at `new` time):
@@ -62,14 +62,14 @@ export _root_.Runtime.Autograd.Torch
 /-! ## Training helpers -/
 
 export _root_.Runtime.Autograd.Torch
-  (scalarOf tlist1 tlist2 tlist3 tlist4 trainCycleSGD meanLoss)
+  (scalarOf tlistSingleton tlistPair tlistTriple tlistQuad trainCycleSGD meanLoss)
 
 namespace Init
 export _root_.Runtime.Autograd.Torch.Init (Scheme tensor xavierW kaimingW)
 end Init
 
 namespace Samples
-export _root_.Runtime.Autograd.Torch.Samples (vec1 vec2 affine2)
+export _root_.Runtime.Autograd.Torch.Samples (singletonVector pointVector affinePlane)
 end Samples
 
 namespace ScalarTrainer

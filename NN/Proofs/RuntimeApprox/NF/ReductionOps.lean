@@ -56,7 +56,7 @@ set_option maxHeartbeats 4000000
 -- Definitional unfoldings for 2D reductions (axis 0/1)
 -- ---------------------------------------------------------------------------
 
-private lemma reduce_sum_axis1_get
+private lemma reduce_sum_by_row_get
     {α : Type} [Add α] [Zero α]
     {m n : Nat} (x : Tensor α (.dim m (.dim n .scalar)))
     (hRed : Shape.reducibleAlong 1 (.dim m (.dim n .scalar))) (i : Fin m) :
@@ -74,7 +74,7 @@ private lemma reduce_sum_axis1_get
                 Spec.Tensor.reduceFirstDim, Spec.Tensor.shapeAfterSum, getAtSpec, sumSpec, h,
                 hRed', tensorFoldlSpec])
 
-private lemma reduce_mean_axis1_get
+private lemma reduce_mean_by_row_get
     {α : Type} [Context α]
     {m n : Nat} (x : Tensor α (.dim m (.dim n .scalar)))
     (hRed : Shape.reducibleAlong 1 (.dim m (.dim n .scalar))) (i : Fin m) :
@@ -94,7 +94,7 @@ private lemma reduce_mean_axis1_get
                 Spec.Tensor.getDimSize, getAtSpec, sumSpec, mapSpec, h, hRed',
                   tensorFoldlSpec])
 
-private lemma reduce_sum_axis0_get
+private lemma reduce_sum_by_column_get
     {α : Type} [Add α] [Zero α]
     {m n : Nat} (x : Tensor α (.dim m (.dim n .scalar)))
     (hRed : Shape.reducibleAlong 0 (.dim m (.dim n .scalar))) (j : Fin n) :
@@ -112,7 +112,7 @@ private lemma reduce_sum_axis0_get
 -- Row-wise sum (axis=1) on a 2D tensor
 -- ---------------------------------------------------------------------------
 
-theorem approxT_reduce_sum_axis1_2d
+theorem approxT_reduce_sum_by_row_2d
     {m n : Nat} (hm : 0 < m) (hn : 0 < n)
     {xS : SpecTensor (.dim m (.dim n .scalar))}
     {xR : Tensor R (.dim m (.dim n .scalar))}
@@ -204,7 +204,7 @@ theorem approxT_reduce_sum_axis1_2d
 -- Row-wise mean (axis=1) on a 2D tensor
 -- ---------------------------------------------------------------------------
 
-theorem approxT_reduce_mean_axis1_2d
+theorem approxT_reduce_mean_by_row_2d
     {m n : Nat} (hm : 0 < m) (hn : 0 < n)
     {xS : SpecTensor (.dim m (.dim n .scalar))}
     {xR : Tensor R (.dim m (.dim n .scalar))}
@@ -366,7 +366,7 @@ def colS {m n : Nat} (xSf : Fin m → SpecTensor (.dim n .scalar)) (j : Fin n) :
   .scalar) :=
   Tensor.dim (fun i => sliceSpec (xSf i) j)
 
-theorem approxT_reduce_sum_axis0_2d
+theorem approxT_reduce_sum_by_column_2d
     {m n : Nat} (hm : 0 < m) (_hn : 0 < n)
     {xS : SpecTensor (.dim m (.dim n .scalar))}
     {xR : Tensor R (.dim m (.dim n .scalar))}
@@ -460,9 +460,9 @@ theorem approxT_reduce_sum_axis0_2d
               (by
               simpa [abs_sub_comm] using this)
           have hEqS :=
-            reduce_sum_axis0_get (α := SpecScalar) (m := m) (n := n) (x := Tensor.dim xSf) hRed j
+            reduce_sum_by_column_get (α := SpecScalar) (m := m) (n := n) (x := Tensor.dim xSf) hRed j
           have hEqR :=
-            reduce_sum_axis0_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed j
+            reduce_sum_by_column_get (α := R) (m := m) (n := n) (x := Tensor.dim xRf) hRed j
           simp [colS, colR, sliceSpec] at hScalarApprox
           simp [getAtSpec, sliceSpec] at hEqS hEqR
           rw [← hEqS, ← hEqR] at hScalarApprox

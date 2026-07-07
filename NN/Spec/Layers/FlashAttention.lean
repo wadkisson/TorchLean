@@ -15,7 +15,7 @@ FlashAttention is an IO-aware implementation strategy for scaled dot-product att
 the attention computation and maintains online softmax summaries so the full `n × n` attention
 matrix does not need to be materialized. TorchLean models that idea in three layers:
 
-- this file gives the proof-facing semantic contract for a fused FlashAttention operator;
+- this file gives the proof layer semantic contract for a fused FlashAttention operator;
 - `NN/Runtime/Autograd/Engine/Cuda/Kernels.lean` exposes native CUDA/stub FFI kernels for the
   runtime path;
 - the CUDA FFI boundary is documented separately because Lean does not verify CUDA machine code.
@@ -37,7 +37,7 @@ The theorems in this file are compact but important:
 - `cudaLoopFlashAttention_eq_onlineSoftmaxTiledAttention` gives a Lean denotational target for the
   native kernel path and proves that target denotes the same online/tiled contract.
 
-These are definitional-equality theorems because the proof-facing contract spells out the same
+These are definitional-equality theorems because the proof layer contract spells out the same
 mathematical stages as standard attention. The native CUDA implementation is tested against this
 contract operationally and remains a runtime trust boundary, like the other CUDA kernels.
 
@@ -196,8 +196,8 @@ def cudaLoopFlashAttention
 /--
 The CUDA denotational target has the same spec meaning as standard SDPA.
 
-This is a definitional theorem about the denotational target, not a proof about CUDA machine code or
-an online softmax tile recurrence.
+This theorem is about the denotational target. CUDA machine code and online-softmax tiling enter
+through the runtime boundary documented for the native kernels.
 -/
 @[simp] theorem cudaLoopFlashAttention_eq_scaledDotProductAttention
     (cfg : FlashAttentionConfig)
@@ -209,7 +209,7 @@ an online softmax tile recurrence.
   rfl
 
 /--
-The proof-facing FlashAttention denotation equals standard SDPA.
+The proof layer FlashAttention denotation equals standard SDPA.
 
 This theorem is useful for graph-rewrite semantics, but should not be read as a verification of a
 particular CUDA implementation.
@@ -254,7 +254,7 @@ def flashAttentionBackward
      Tensor α (.dim nK (.dim dModel .scalar)) ×
      Tensor α (.dim nK (.dim dModel .scalar))) :=
   -- As with the forward operator, the tile metadata belongs to the implementation schedule.
-  -- The proof-facing VJP is the same local derivative contract as standard SDPA.
+  -- The proof layer VJP is the same local derivative contract as standard SDPA.
   let _blockQ := cfg.blockQ
   let _blockK := cfg.blockK
   scaledDotProductAttentionBackward (α := α) ctx dOut

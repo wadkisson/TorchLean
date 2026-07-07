@@ -280,7 +280,7 @@ PyTorch analogy: `torch.tensor(xs)` producing a 1D tensor.
 -/
 def tensor1d (α : Type := Float) (xs : List α) :
     Tensor α (.dim xs.length .scalar) :=
-  Spec.fromList1d xs
+  Spec.vectorFromList xs
 
 /-! ### One-hot vectors -/
 
@@ -311,7 +311,7 @@ PyTorch analogy: `torch.tensor(xss)` also refuses ragged inputs.
 def tensor2d? (α : Type := Float) [Inhabited α] (xss : List (List α)) :
     Option (Tensor α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar)))
       :=
-  Spec.fromList2d xss
+  Spec.matrixFromRows xss
 
 /-- 2-D tensor from nested lists, with a clear error message on failure. -/
 def tensor2d (α : Type := Float) [Inhabited α] (xss : List (List α)) :
@@ -333,14 +333,14 @@ PyTorch analogy: closer to `pad_sequence(..., batch_first=True)` followed by `to
 -/
 def tensor2dPadTo (α : Type := Float) [Inhabited α] (nCols : Nat) (xss : List (List α)) :
     Tensor α (.dim xss.length (.dim nCols .scalar)) :=
-  Spec.fromList2dPadTo (nCols := nCols) xss
+  Spec.matrixFromRowsPadTo (nCols := nCols) xss
 
 /-- 2-D tensor from nested lists, padding to the maximum row length (`0` if empty).
 
 This is convenient when you just want a rectangular tensor without precomputing `nCols`. -/
 def tensor2dPadRight (α : Type := Float) [Inhabited α] (xss : List (List α)) :
     Tensor α (.dim xss.length (.dim (Spec.maxRowLength xss) .scalar)) :=
-  Spec.fromList2dPadRight xss
+  Spec.matrixFromRowsPadRight xss
 
 /-! ### General N-D tensors from a flat list -/
 

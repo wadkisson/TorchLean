@@ -20,9 +20,8 @@ It is useful for:
 - tight bounds for monotone nonlinearities,
 - cross-checking TorchLean’s native float backends (`IEEE32Exec`, `FP32`/`NF`).
 
-Trust boundary: the Python/Arb stack is an oracle. This module parses and packages its output; it
+Trust boundary: the Python/Arb toolchain is an oracle. This module parses and packages its output; it
 does not by itself prove the Arb enclosure certificate inside Lean.
 -/
 
 @[expose] public section
-

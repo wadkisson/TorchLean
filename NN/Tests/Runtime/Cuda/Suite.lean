@@ -28,9 +28,9 @@ public import NN.Tests.Runtime.Cuda.Stress
 
 CUDA kernel-coverage regression tests.
 
-These tests are deliberately small and deterministic. They do not prove CUDA code correct in Lean;
-instead, they compare the Lean-facing eager/autograd behavior with the native CUDA FFI boundary so
-memory, shape, and numerical regressions are caught during CUDA regression testing.
+These tests are deliberately small and deterministic. CUDA correctness lives at the native trust
+boundary; this suite compares the Lean side eager/autograd behavior with the CUDA FFI path so
+memory, shape, and numerical regressions are caught during regression testing.
 -/
 
 @[expose] public section

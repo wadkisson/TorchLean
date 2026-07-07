@@ -17,7 +17,7 @@ Several `IEEE32Exec.Interval32` enclosure proofs need to establish that intermed
 computations do not produce NaNs:
 
 - directed-rounding kernels such as `roundDyadicDown` / `roundDyadicUp`,
-- comparison-based helpers `minimum` / `maximum` (used by `min4` / `max4`).
+- comparison-based helpers `minimum` / `maximum` (used by `minOfFour` / `maxOfFour`).
 
 This file centralizes those facts so the soundness proofs for interval multiplication/division can
 share the same non-NaN case analysis.
@@ -217,32 +217,32 @@ theorem isNaN_maximum_eq_false_of_isNaN_eq_false (x y : IEEE32Exec)
 
 namespace Interval32
 
-/-- `toEReal` semantics of `min4` in the non-NaN regime. -/
+/-- `toEReal` semantics of `minOfFour` in the non-NaN regime. -/
 theorem toEReal_min4_eq (a b c d : IEEE32Exec)
     (ha : isNaN a = false) (hb : isNaN b = false) (hc : isNaN c = false) (hd : isNaN d = false) :
-    toEReal (Interval32.min4 a b c d) =
+    toEReal (Interval32.minOfFour a b c d) =
       min (min (toEReal a) (toEReal b)) (min (toEReal c) (toEReal d)) := by
   have habNaN : isNaN (minimum a b) = false :=
     isNaN_minimum_eq_false_of_isNaN_eq_false (x := a) (y := b) ha hb
   have hcdNaN : isNaN (minimum c d) = false :=
     isNaN_minimum_eq_false_of_isNaN_eq_false (x := c) (y := d) hc hd
-  unfold Interval32.min4
+  unfold Interval32.minOfFour
   -- Outer minimum
   rw [IEEE32Exec.toEReal_minimum_eq_min (x := minimum a b) (y := minimum c d) habNaN hcdNaN]
   -- Inner minima
   simp [IEEE32Exec.toEReal_minimum_eq_min (x := a) (y := b) ha hb,
     IEEE32Exec.toEReal_minimum_eq_min (x := c) (y := d) hc hd]
 
-/-- `toEReal` semantics of `max4` in the non-NaN regime. -/
+/-- `toEReal` semantics of `maxOfFour` in the non-NaN regime. -/
 theorem toEReal_max4_eq (a b c d : IEEE32Exec)
     (ha : isNaN a = false) (hb : isNaN b = false) (hc : isNaN c = false) (hd : isNaN d = false) :
-    toEReal (Interval32.max4 a b c d) =
+    toEReal (Interval32.maxOfFour a b c d) =
       max (max (toEReal a) (toEReal b)) (max (toEReal c) (toEReal d)) := by
   have habNaN : isNaN (maximum a b) = false :=
     isNaN_maximum_eq_false_of_isNaN_eq_false (x := a) (y := b) ha hb
   have hcdNaN : isNaN (maximum c d) = false :=
     isNaN_maximum_eq_false_of_isNaN_eq_false (x := c) (y := d) hc hd
-  unfold Interval32.max4
+  unfold Interval32.maxOfFour
   rw [IEEE32Exec.toEReal_maximum_eq_max (x := maximum a b) (y := maximum c d) habNaN hcdNaN]
   simp [IEEE32Exec.toEReal_maximum_eq_max (x := a) (y := b) ha hb,
     IEEE32Exec.toEReal_maximum_eq_max (x := c) (y := d) hc hd]

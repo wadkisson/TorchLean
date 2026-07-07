@@ -128,21 +128,21 @@ def trainOnText (opts : Options) (input : String)
       (title := "Mamba text training")
       (notes := #[ModelZoo.deviceNote opts, s!"windows={train.windows}",
         s!"cuda_mem_watch={cudaMemWatch}"])).disableLog
-  let logits1 ← trained.eval (Sample.x reportSample)
-  printPredictionReport "after " train.prompt logits1
-  let (L0, L1) ←
+  let afterLogits ← trained.predict (Sample.x reportSample)
+  printPredictionReport "after " train.prompt afterLogits
+  let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some train.steps) (lr? := some train.lr)
-  let generated ← generateSampled trained.eval train.prompt train.generate
+  let generated ← generateSampled trained.predict train.prompt train.generate
     train.temperature train.topK train.seed
   IO.println s!"  generated={text.escapeForDisplay generated}"
   IO.println s!"  corpus_bytes={input.toByteArray.size} windows={samples.size}"
   IO.println s!"  sampling=top_k({train.topK}), temperature={train.temperature}, seed={train.seed}"
-  pure (L0, L1)
+  pure (beforeLoss, afterLoss)
 
 /-- CLI entrypoint for the Mamba text command. -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "Mamba text training")
     (k := fun opts rest => do
       let (corpus, rest) ← ModelZoo.orThrow exeName <| RealData.TextCorpusFlags.parse rest
@@ -159,13 +159,13 @@ def main (args : List String) : IO UInt32 := do
               asciiOnly := false }
       CLI.requireNoArgs exeName rest
       let input ← RealData.TextCorpusFlags.read exeName corpus
-      let (L0, L1) ← trainOnText opts input train
+      let (beforeLoss, afterLoss) ← trainOnText opts input train
       let extraNotes :=
         #[s!"data={corpus.path}", ModelZoo.deviceNote opts,
           s!"windows={train.windows}", s!"lr={train.lr}",
           ModelZoo.cudaMemWatchNote opts train.steps train.cudaMemWatch]
       text.writeGenerationTrainLog
-        train.log "Mamba text training" train.steps L0 L1
+        train.log "Mamba text training" train.steps beforeLoss afterLoss
         train.toGenerationOptions none extraNotes
     )
 

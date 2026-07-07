@@ -50,20 +50,20 @@ def hidDim : Nat := 1
 def outDim : Nat := 2
 
 /-- First-layer weight shape. -/
-def W1Shape : Shape := .dim hidDim (.dim inDim .scalar)
+def hiddenWeightShape : Shape := .dim hidDim (.dim inDim .scalar)
 /-- First-layer bias shape. -/
-def b1Shape : Shape := .dim hidDim .scalar
+def hiddenBiasShape : Shape := .dim hidDim .scalar
 /-- Second-layer weight shape. -/
-def W2Shape : Shape := .dim outDim (.dim hidDim .scalar)
+def outputWeightShape : Shape := .dim outDim (.dim hidDim .scalar)
 /-- Second-layer bias shape. -/
-def b2Shape : Shape := .dim outDim .scalar
+def outputBiasShape : Shape := .dim outDim .scalar
 /-- Shape of one input vector supplied to the certified two-layer network. -/
 def xShape : Shape := .dim inDim .scalar
 /-- Output/logit shape. -/
 def yShape : Shape := .dim outDim .scalar
 
-/-- Parameter shapes list used by the compiled TorchLean program (`[W1,b1,W2,b2]`). -/
-def paramShapes : List Shape := [W1Shape, b1Shape, W2Shape, b2Shape]
+/-- Parameter shapes list used by the compiled TorchLean program (`[hiddenWeight,hiddenBias,outputWeight,outputBias]`). -/
+def paramShapes : List Shape := [hiddenWeightShape, hiddenBiasShape, outputWeightShape, outputBiasShape]
 
 /-- Compute a (conservative) margin lower bound `lo0 - hi1` from logit bounds. -/
 def margin {α : Type} [Context α]
@@ -83,11 +83,11 @@ def certifiedMargin {α : Type} [Context α]
 def classifier {α : Type} [Context α] [DecidableEq Shape] :
     _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [xShape]) yShape :=
   fun {m} _ _ =>
-    fun w1 b1 w2 b2 x =>
+    fun w1 hiddenBias w2 outputBias x =>
       (do
-        let z1 ← Ops.linear (m := m) (α := α) (inDim := inDim) (outDim := hidDim) w1 b1 x
-        let h ← Ops.relu (m := m) (α := α) (s := b1Shape) z1
-        Ops.linear (m := m) (α := α) (inDim := hidDim) (outDim := outDim) w2 b2 h
+        let z1 ← Ops.linear (m := m) (α := α) (inDim := inDim) (outDim := hidDim) w1 hiddenBias x
+        let h ← Ops.relu (m := m) (α := α) (s := hiddenBiasShape) z1
+        Ops.linear (m := m) (α := α) (inDim := hidDim) (outDim := outDim) w2 outputBias h
         : m (Ops.RefTy (m := m) (α := α) yShape))
 
 /--
@@ -105,20 +105,20 @@ def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
   --
   -- The chosen weights keep the hidden pre-activation positive over the whole ε-box, so the ReLU
   -- stays linear and the expected certified margin is easy to inspect by hand.
-  let W1 : Tensor α W1Shape :=
+  let hiddenWeight : Tensor α hiddenWeightShape :=
     NN.Tensor.tensorNDOfLenEq (α := α) [1, 2] [cast 1.0, cast 1.0] (by rfl)
-  let b1 : Tensor α b1Shape :=
+  let hiddenBias : Tensor α hiddenBiasShape :=
     NN.Tensor.tensorNDOfLenEq (α := α) [1] [cast 0.0] (by rfl)
-  let W2 : Tensor α W2Shape :=
+  let outputWeight : Tensor α outputWeightShape :=
     NN.Tensor.tensorNDOfLenEq (α := α) [2, 1] [cast 1.0, cast (-1.0)] (by rfl)
-  let b2 : Tensor α b2Shape :=
+  let outputBias : Tensor α outputBiasShape :=
     NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.0, cast 0.0] (by rfl)
 
   let params : nn.ParamTensors α paramShapes :=
-    nn.ParamTensors.of4 W1 b1 W2 b2
+    nn.ParamTensors.quad hiddenWeight hiddenBias outputWeight outputBias
 
   let compiled ←
-    match Verification.compileProgram1
+    match Verification.compileProgram
           (α := α) (paramShapes := paramShapes) (σ := xShape) (τ := yShape)
           (classifier (α := α)) params with
     | .ok c => pure c

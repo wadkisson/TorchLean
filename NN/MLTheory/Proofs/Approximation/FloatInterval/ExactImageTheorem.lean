@@ -250,7 +250,7 @@ def eval (σ : F → F) : {din dout : Nat} → Net din dout → (Fin din → F) 
   | _, _, Net.step A n, x => eval σ n (fun i => σ (aff A x i))
 
 /-- Specialized evaluator for scalar-output (`dout = 1`) networks. -/
-def eval1 {din : Nat} (σ : F → F) (n : Net din 1) (x : Fin din → F) : F :=
+def evalScalar {din : Nat} (σ : F → F) (n : Net din 1) (x : Fin din → F) : F :=
   (eval σ n x) 0
 
 /-! ## Interval semantics using `OpsExact` -/
@@ -272,7 +272,7 @@ def evalSharp (σ : F → F) : {din dout : Nat} → Net din dout → I.Box din �
   | _, _, Net.step A n, B => evalSharp σ n (fun i => sigmaSharp σ ((affSharp A B) i))
 
 /-- Specialized interval evaluator for scalar-output (`dout = 1`) networks. -/
-def evalSharp1 {din : Nat} (σ : F → F) (n : Net din 1) (B : I.Box din) : I :=
+def evalSharpScalar {din : Nat} (σ : F → F) (n : Net din 1) (B : I.Box din) : I :=
   (evalSharp σ n B) 0
 
 end SigmaNet
@@ -332,7 +332,7 @@ open SigmaNet Indicators
 
 /-!
 We model “there exists a σ-network implementing a scaled threshold-indicator exactly under interval
-semantics on `I[a,b]`” using our `SigmaNet.Net` interval interpreter `evalSharp1`.
+semantics on `I[a,b]`” using our `SigmaNet.Net` interval interpreter `evalSharpScalar`.
 -/
 
 def IntervalDomain (a b : F) : Set I :=
@@ -352,13 +352,13 @@ ideal abstraction of scaled threshold indicators (`ι_{≤z}`, `ι_{≥z}`, and 
    (∀ z : F,
        (a ≤ z ∧ z ≤ b) →
       (∃ ϕle : SigmaNet.Net 1 1,
-          ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharp1 σ ϕle (fun _ => J) =
+          ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharpScalar σ ϕle (fun _ => J) =
             unaryIdealSharp (scale K (ιLe z)) J) ∧
         (∃ ϕge : SigmaNet.Net 1 1,
-          ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharp1 σ ϕge (fun _ => J) =
+          ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharpScalar σ ϕge (fun _ => J) =
             unaryIdealSharp (scale K (ιGe z)) J)) ∧
   (∃ ψη : SigmaNet.Net 1 1,
-      ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharp1 σ ψη (fun _ => J) =
+      ∀ J, J ∈ IntervalDomain (a := a) (b := b) → SigmaNet.evalSharpScalar σ ψη (fun _ => J) =
         unaryIdealSharp (scale K (ιGt η)) J)
 
 end Separability
@@ -529,7 +529,7 @@ def thresholdNetworksYieldExactIntervalSemantics (σ : F → F) : Prop :=
       ∀ {d : Nat} (h : (Fin d → F) → F),
         (∀ x, IEEE32Exec.isNaN (h x) = false) →
         ∃ n : SigmaNet.Net d 1,
-          ∀ B, BoxIn (d := d) (a := a) (b := b) B → SigmaNet.evalSharp1 σ n B = idealSharp (d := d)
+          ∀ B, BoxIn (d := d) (a := a) (b := b) B → SigmaNet.evalSharpScalar σ n B = idealSharp (d := d)
             h B
 
 /-- For any NaN-free rounded target `h`, there exists a σ-network with exact interval semantics. -/
@@ -537,7 +537,7 @@ def exactIntervalSemanticsUniversalOnCube (σ : F → F) : Prop :=
   ∀ {d : Nat} (h : (Fin d → F) → F),
     (∀ x, IEEE32Exec.isNaN (h x) = false) →
     ∃ n : SigmaNet.Net d 1,
-      ∀ B, CubeBox (d := d) B → SigmaNet.evalSharp1 σ n B = idealSharp (d := d) h B
+      ∀ B, CubeBox (d := d) B → SigmaNet.evalSharpScalar σ n B = idealSharp (d := d) h B
 
 /-- Separating activations and threshold-network composition imply exact interval semantics. -/
 theorem exactIntervalSemantics_universalOnCube_of_condition1_and_separableOn (σ : F → F) :
@@ -570,7 +570,7 @@ def roundedTargetExactIntervalImage (σ : F → F) : Prop :=
         ∃ m M,
           IsMinOn fHat (I.γ (d := d) B) m ∧
           IsMaxOn fHat (I.γ (d := d) B) M ∧
-          I.γI (SigmaNet.evalSharp1 σ n B) = Icc m M
+          I.γI (SigmaNet.evalSharpScalar σ n B) = Icc m M
 
 /-- Derive exact interval images from exact interval semantics by choosing finite min/max witnesses. -/
 theorem roundedTargetExactIntervalImage_of_exactIntervalSemantics (σ : F → F) :
@@ -579,7 +579,7 @@ theorem roundedTargetExactIntervalImage_of_exactIntervalSemantics (σ : F → F)
   rcases hL3 (d := d) (h := fHat) hfHat with ⟨n, hn⟩
   refine ⟨n, ?_⟩
   intro B hB hne
-  have hEq : SigmaNet.evalSharp1 σ n B = idealSharp (d := d) fHat B := hn B hB
+  have hEq : SigmaNet.evalSharpScalar σ n B = idealSharp (d := d) fHat B := hn B hB
   -- Choose min/max from the ideal hull.
   rcases IdealMinMax.exists_minmax_for_idealSharp (d := d) (h := fHat) (B := B) hne hfHat with
     ⟨m, M, hmin, hmax, hgamma⟩

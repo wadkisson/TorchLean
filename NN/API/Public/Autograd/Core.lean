@@ -54,7 +54,7 @@ namespace model
 /-
 Model-shaped autograd: a TorchLean `NN.Seq` plus an `OutputLoss` over its output.
 
-This is the common "training" use case.
+This covers the common training use case.
 -/
 
 @[inherit_doc TorchLean.Autodiff.Model.Params]
@@ -95,8 +95,7 @@ end OutputLoss
 /--
 Gradient of a model-loss w.r.t. the model parameters.
 
-This is the common training use case (PyTorch analogue: `loss.backward()` followed by parameter
-  updates).
+Common training use case. PyTorch analogue: `loss.backward()` followed by parameter updates.
 -/
 def gradParams {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
   TorchLean.Autodiff.Model.OutputLoss τ υ)
@@ -123,7 +122,7 @@ def gradX {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
     (x : Spec.Tensor α σ) (target : Spec.Tensor α υ) :
     IO (Spec.Tensor α σ) := do
   let gxs ← gradInputs (model := model) (loss := loss) (α := α) params x target
-  pure (tensorpack.get0 gxs)
+  pure (tensorpack.first gxs)
 
 /-- Convenience: gradient of the loss w.r.t. the `target` argument. -/
 def gradTarget {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
@@ -133,7 +132,7 @@ def gradTarget {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
     (x : Spec.Tensor α σ) (target : Spec.Tensor α υ) :
     IO (Spec.Tensor α υ) := do
   let gxs ← gradInputs (model := model) (loss := loss) (α := α) params x target
-  pure (tensorpack.get1 gxs)
+  pure (tensorpack.second gxs)
 
 /--
 Forward+backward result for a scalar loss built from a model output.
@@ -172,7 +171,7 @@ def valueAndGrads {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss
       (TorchLean.Autodiff.Model.lossProgram (model := model) loss)
 
   let args : TensorPack α (paramShapes ++ [σ, υ]) :=
-    tensorpack.append (ss₁ := paramShapes) (ss₂ := [σ, υ]) params (tensorpack.mk2 x target)
+    tensorpack.append (ss₁ := paramShapes) (ss₂ := [σ, υ]) params (tensorpack.pair x target)
 
   let value : Spec.Tensor α Spec.Shape.scalar :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.forward (α := α) (Γ := paramShapes ++ [σ, υ]) c
@@ -188,8 +187,8 @@ def valueAndGrads {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss
   pure
     { value := value
       dparams := dps
-      dx := tensorpack.get0 dxys
-      dtarget := tensorpack.get1 dxys }
+      dx := tensorpack.first dxys
+      dtarget := tensorpack.second dxys }
 
 /-- Return the scalar loss tensor together with gradients for the model parameters. -/
 def valueAndGradParams {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
@@ -234,8 +233,8 @@ def valueAndGradTarget {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) 
 /--
 Vector-Jacobian product (VJP) w.r.t. model parameters.
 
-This is the "grad of outputs back into parameters" primitive. It is useful for custom losses or
-analysis tooling when you already have a seed tensor `seedOut : τ`.
+Primitive for sending output cotangents back into parameters. Use it for custom losses or analysis
+tooling when you already have a seed tensor `seedOut : τ`.
 -/
 def vjpParams {σ τ : Spec.Shape} (model : TorchLean.NN.Seq σ τ)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
@@ -247,8 +246,8 @@ def vjpParams {σ τ : Spec.Shape} (model : TorchLean.NN.Seq σ τ)
 /--
 VJP w.r.t. the model input.
 
-This returns a one-element `TensorPack` to match the general "inputs list" API shape.
-For the common case, use `vjpInput` to get the tensor directly.
+Returns a one-element `TensorPack` to match the general "inputs list" API shape. For the common
+case, use `vjpInput` to get the tensor directly.
 -/
 def vjpInputs {σ τ : Spec.Shape} (model : TorchLean.NN.Seq σ τ)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
@@ -264,7 +263,7 @@ def vjpInput {σ τ : Spec.Shape} (model : TorchLean.NN.Seq σ τ)
     (x : Spec.Tensor α σ) (seedOut : Spec.Tensor α τ) :
     IO (Spec.Tensor α σ) := do
   let dxs ← vjpInputs (model := model) (α := α) params x seedOut
-  pure (tensorpack.unpack1 dxs)
+  pure (tensorpack.unpackSingleton dxs)
 
 /--
 Reverse-mode Jacobian (`jacrev`) of the model output w.r.t. parameters.
@@ -282,8 +281,8 @@ def jacrevParams {σ τ : Spec.Shape} (model : TorchLean.NN.Seq σ τ)
 /--
 Jacobian-vector product (JVP) of a scalar loss w.r.t. parameters.
 
-This is the directional derivative in the direction `vparams`.
-Conceptually: `d/dt loss(params + t*vparams, x, target) | t = 0`.
+Directional derivative in the direction `vparams`. Conceptually:
+`d/dt loss(params + t*vparams, x, target) | t = 0`.
 -/
 def jvpParams {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
   TorchLean.Autodiff.Model.OutputLoss τ υ)
@@ -309,10 +308,10 @@ def hvpParams {σ τ υ : Spec.Shape} (model : TorchLean.NN.Seq σ τ) (loss :
   TorchLean.Autodiff.Model.hvpParams (α := α) model loss params x target vparams
 end model
 
-namespace fn1
+namespace func
 
 /-
-Function-1 autograd: treat a pure function `f : Tensor σ -> Tensor τ` as the object of
+Pure-function autograd: treat a pure function `f : Tensor σ -> Tensor τ` as the object of
 differentiation (no parameters).
 -/
 
@@ -320,26 +319,26 @@ differentiation (no parameters).
 In PyTorch terms, this is the "functorch" style: differentiate plain functions, not modules.
 -/
 
-@[inherit_doc TorchLean.Autodiff.Function1.Fn]
+@[inherit_doc TorchLean.Autodiff.Function.Fn]
 abbrev Fn (σ τ : Spec.Shape) :=
-  TorchLean.Autodiff.Function1.Fn σ τ
+  TorchLean.Autodiff.Function.Fn σ τ
 
 /-- Forward-mode Jacobian (`jacfwd`) for a pure tensor function. -/
-def jacfwd {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ τ)
+def jacfwd {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ τ)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Array (Spec.Tensor α τ)) :=
-  TorchLean.Autodiff.Function1.jacfwd (α := α) f x
+  TorchLean.Autodiff.Function.jacfwd (α := α) f x
 
 /-- Hessian for a scalar-valued function. -/
-def hessian {σ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ Spec.Shape.scalar)
+def hessian {σ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ Spec.Shape.scalar)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Array (Spec.Tensor α σ)) :=
-  TorchLean.Autodiff.Function1.hessian (α := α) f x
+  TorchLean.Autodiff.Function.hessian (α := α) f x
 
 /-- Vector-Jacobian product (VJP) for a pure function. -/
-def vjp {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ τ)
+def vjp {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ τ)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) (seedOut : Spec.Tensor α τ) :
     IO (Spec.Tensor α σ) := do
@@ -347,16 +346,16 @@ def vjp {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ τ)
   let gxs ←
     TorchLean.Autodiff.vjpOutInputs (α := α)
       (paramShapes := ([] : List Spec.Shape)) (inputShapes := [σ]) (τ := τ)
-      (TorchLean.Autodiff.Function1.program (σ := σ) (τ := τ) f)
-      params (tensorpack.mk1 x) seedOut
-  pure (tensorpack.unpack1 gxs)
+      (TorchLean.Autodiff.Function.forwardProgram (σ := σ) (τ := τ) f)
+      params (tensorpack.singleton x) seedOut
+  pure (tensorpack.unpackSingleton gxs)
 
 /--
 Reverse-mode Jacobian (`jacrev`) of a pure tensor function.
 
 Returns the Jacobian rows as an array of `doutput/dinput` tensors.
 -/
-def jacrev {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ τ)
+def jacrev {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ τ)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Array (Spec.Tensor α σ)) := do
@@ -364,12 +363,12 @@ def jacrev {σ τ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ τ)
   let rows ←
     TorchLean.Autodiff.jacrevOutInputs (α := α)
       (paramShapes := ([] : List Spec.Shape)) (inputShapes := [σ]) (τ := τ)
-      (TorchLean.Autodiff.Function1.program (σ := σ) (τ := τ) f)
-      params (tensorpack.mk1 x)
-  pure <| rows.map tensorpack.unpack1
+      (TorchLean.Autodiff.Function.forwardProgram (σ := σ) (τ := τ) f)
+      params (tensorpack.singleton x)
+  pure <| rows.map tensorpack.unpackSingleton
 
 /-- Gradient of a scalar-valued function w.r.t. its input. -/
-def grad {σ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ Spec.Shape.scalar)
+def grad {σ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ Spec.Shape.scalar)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Spec.Tensor α σ) := do
@@ -377,34 +376,34 @@ def grad {σ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ Spec.Shape.sc
   let gxs ←
     TorchLean.Autodiff.gradInputs (α := α)
       (paramShapes := ([] : List Spec.Shape)) (inputShapes := [σ])
-      (TorchLean.Autodiff.Function1.program (σ := σ) (τ := Spec.Shape.scalar) f)
-      params (tensorpack.mk1 x)
-  pure (tensorpack.unpack1 gxs)
+      (TorchLean.Autodiff.Function.forwardProgram (σ := σ) (τ := Spec.Shape.scalar) f)
+      params (tensorpack.singleton x)
+  pure (tensorpack.unpackSingleton gxs)
 
 /-- Return `(value, grad)` for a scalar-valued function at `x`. -/
-def valueAndGrad {σ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ Spec.Shape.scalar)
+def valueAndGrad {σ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ Spec.Shape.scalar)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (Spec.Tensor α Spec.Shape.scalar × Spec.Tensor α σ) := do
   let c ←
     TorchLean.Autodiff.compileLoss (α := α)
       (paramShapes := ([] : List Spec.Shape)) (inputShapes := [σ])
-      (TorchLean.Autodiff.Function1.program (σ := σ) (τ := Spec.Shape.scalar) f)
-  let args : TensorPack α [σ] := tensorpack.mk1 x
+      (TorchLean.Autodiff.Function.forwardProgram (σ := σ) (τ := Spec.Shape.scalar) f)
+  let args : TensorPack α [σ] := tensorpack.singleton x
   let value : Spec.Tensor α Spec.Shape.scalar :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.forward (α := α) (Γ := [σ]) c args
   let gAll : TensorPack α [σ] :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.backward (α := α) (Γ := [σ]) c args
-  pure (value, tensorpack.unpack1 gAll)
+  pure (value, tensorpack.unpackSingleton gAll)
 
 /-- `valueAndGrad`, but convert the 0-dim value tensor to a scalar `α`. -/
-def valueAndGradScalar {σ : Spec.Shape} (f : TorchLean.Autodiff.Function1.Fn σ Spec.Shape.scalar)
+def valueAndGradScalar {σ : Spec.Shape} (f : TorchLean.Autodiff.Function.Fn σ Spec.Shape.scalar)
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape]
     (x : Spec.Tensor α σ) :
     IO (α × Spec.Tensor α σ) := do
   let (valueT, g) ← valueAndGrad (f := f) (α := α) x
   pure (Spec.Tensor.toScalar valueT, g)
-end fn1
+end func
 
 end autograd
 

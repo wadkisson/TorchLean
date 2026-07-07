@@ -28,7 +28,7 @@ PyTorch mental model:
 - this matches the common "U-Net block diagram" but written without a batch axis, so our tensor
   convention is `(C,H,W)` rather than `(N,C,H,W)`;
 - the skip connection concatenates on the channel axis (in PyTorch with a batch axis that would be
-  `torch.cat([skip, up], dim=1)`; here it is `concat_dim0_spec` because channels are axis `0`).
+  `torch.cat([skip, up], dim=1)`; here it is `concat_leading_axis_spec` because channels are axis `0`).
 
 Shape notes:
 - the 3x3 conv blocks are set up to preserve `H×W` (stride=1, padding=1),
@@ -206,7 +206,7 @@ forward" style: rebuild the same intermediates, then walk back through them usin
 layer-level backward specs.
 
 Key details:
-- `concat_dim0_spec` is split via `concat_dim0_backward_spec`,
+- `concat_leading_axis_spec` is split via `concat_leading_axis_backward_spec`,
 - pooling backward uses `max_pool2d_multi_backward_spec`,
 - ReLU is handled via elementwise gating `dZ = dY ⊙ ReLU'(Z)`.
 
@@ -342,7 +342,7 @@ def UNet2Spec.forward
 
   -- Skip connection: concatenate channels (no batch axis in this file, so channels are axis 0).
   let merged : MultiChannelImage (cfg.baseC + cfg.baseC) inH inW α :=
-    concatDim0Spec (t1 := skip1) (t2 := up)
+    concatLeadingAxisSpec (t1 := skip1) (t2 := up)
 
   -- Up block
   let u1_raw :=
@@ -436,7 +436,7 @@ def UNet2Spec.backward
     rwMultiChannelImage (α := α) upRaw (by rfl) h_upH h_upW
 
   let merged : MultiChannelImage (cfg.baseC + cfg.baseC) inH inW α :=
-    concatDim0Spec (t1 := skip1) (t2 := up)
+    concatLeadingAxisSpec (t1 := skip1) (t2 := up)
 
   let conv_up1_1 := conv2dSpec (α := α) m.up1_1 merged
   let u1_raw := reluSpec conv_up1_1
@@ -507,7 +507,7 @@ def UNet2Spec.backward
   -- Channel-concat is linear, so its backward just splits the incoming gradient into the two
   -- channel ranges.
   let (d_skip1_from_merge, d_up) :=
-    concatDim0BackwardSpec (α := α) (n := cfg.baseC) (m := cfg.baseC)
+    concatLeadingAxisBackwardSpec (α := α) (n := cfg.baseC) (m := cfg.baseC)
       (s := .dim inH (.dim inW .scalar))
       d_merged
 

@@ -11,7 +11,7 @@ public import NN.MLTheory.CROWN.Proofs.GraphCertSoundness.Semantics
 /-!
 # IBP Certificate Step
 
-Safe, option-returning certificate-step semantics for the graph IBP checker.  This is the proof-side
+Safe, option-returning certificate-step semantics for the graph IBP checker.  This is the proof layer
 counterpart of the executable bound propagation step.
 -/
 

@@ -22,7 +22,8 @@ This module defines `#ir_view g`, which renders an `NN.IR.Graph` as an interacti
 - a per-node expandable view,
 - and a DOT snippet you can paste into GraphViz if needed.
 
-Like other widgets, this is meant for *examples* and *debugging*, not proof scripts.
+Like other widgets, this is an inspection surface for examples and pass debugging. Proof scripts
+should cite the underlying graph definitions and theorems directly.
 
 ## Main definitions
 

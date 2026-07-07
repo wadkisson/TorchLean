@@ -55,7 +55,7 @@ def getScalar {n : Nat} (t : Tensor α (.dim n .scalar)) (i : Fin n) : α :=
 /--
 Componentwise validity of a flat interval box: `lo ≤ hi` for every coordinate.
 
-This is a proof-facing predicate; it uses the order carried by `Context α`, which keeps all CROWN
+This is a proof layer predicate; it uses the order carried by `Context α`, which keeps all CROWN
 box predicates in the same scalar universe as the executable operators.
 -/
 def Valid (B : FlatBox α) : Prop :=

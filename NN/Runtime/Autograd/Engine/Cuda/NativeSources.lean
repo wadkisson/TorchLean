@@ -37,7 +37,7 @@ prove the compiled CUDA binary correct. The trusted pieces include:
 - the C/CUDA FFI boundary and Lean external-object finalizers;
 - platform behavior such as atomics, floating-point contraction, and library math.
 
-TorchLean's proof-side CUDA contract therefore lives one level up: Lean states pure kernel specs,
+TorchLean's proof layer CUDA contract therefore lives one level up: Lean states pure kernel specs,
 float32 agreement assumptions, and graph-level semantics; tests validate that the native backend
 agrees with CPU stubs and reference cases on the supported path.
 
@@ -45,7 +45,7 @@ agrees with CPU stubs and reference cases on the supported path.
 
 - `csrc/cuda/common/torchlean_cuda_buffer.h`
   Shared boxed-buffer ABI, size guards, deterministic-reduction toggles, and helper declarations.
-  Lean-facing modules: `NN.Runtime.Autograd.Engine.Cuda.Trusted`,
+  Lean side modules: `NN.Runtime.Autograd.Engine.Cuda.Trusted`,
   `NN.Runtime.Autograd.Engine.Cuda.Buffer`.
 
 - `csrc/cuda/common/torchlean_cuda_common.h`
@@ -53,7 +53,7 @@ agrees with CPU stubs and reference cases on the supported path.
 
 - `csrc/cuda/common/torchlean_cublas_common.h`
   Thread-local cuBLAS handle management and cuBLAS error checking for matrix kernels.
-  Lean-facing modules: `NN.Runtime.Autograd.Engine.Cuda.Kernels`,
+  Lean side modules: `NN.Runtime.Autograd.Engine.Cuda.Kernels`,
   `NN.Runtime.Autograd.Engine.Cuda.DGemm`.
 
 - `csrc/cuda/common/torchlean_cuda_deterministic_reductions_env.h`
@@ -66,7 +66,7 @@ agrees with CPU stubs and reference cases on the supported path.
 - `csrc/cuda/tensor/torchlean_cuda_tensor.cu`
   Device allocation, host/device copies, scalar elementwise kernels, reductions, seeded RNG, and
   buffer release hooks.
-  Lean-facing module: `NN.Runtime.Autograd.Engine.Cuda.Buffer`.
+  Lean side module: `NN.Runtime.Autograd.Engine.Cuda.Buffer`.
 
 - `csrc/cuda/tensor/torchlean_cuda_tensor_stub.c`
   Portable CPU implementation of the tensor-buffer FFI symbols used when TorchLean is built without
@@ -75,7 +75,7 @@ agrees with CPU stubs and reference cases on the supported path.
 - `csrc/cuda/kernels/torchlean_cuda_kernels.cu`
   Broadcasting, reductions over axes, gather/scatter, transpose, batched matmul, selective scan,
   attention helpers, FFT, and fused spectral convolution kernels.
-  Lean-facing modules: `NN.Runtime.Autograd.Engine.Cuda.Kernels`,
+  Lean side modules: `NN.Runtime.Autograd.Engine.Cuda.Kernels`,
   `NN.Runtime.Autograd.Engine.Cuda.Ops`, `NN.Runtime.Autograd.Engine.Cuda.Tape`.
 
 - `csrc/cuda/kernels/torchlean_cuda_kernels_stub.c`
@@ -87,14 +87,14 @@ agrees with CPU stubs and reference cases on the supported path.
 - `csrc/cuda/conv_pool/torchlean_cuda_conv_pool.cu`
   2D and N-D convolution, transposed convolution, max/average/smooth-max pooling, and backward
   kernels.
-  Lean-facing module: `NN.Runtime.Autograd.Engine.Cuda.ConvPool`.
+  Lean side module: `NN.Runtime.Autograd.Engine.Cuda.ConvPool`.
 
 - `csrc/cuda/conv_pool/torchlean_cuda_conv_pool_stub.c`
   Portable CPU mirror of the convolution and pooling FFI surface.
 
 - `csrc/cuda/blas/torchlean_dgemm_cuda.cu`
   Double-precision Lean `FloatArray` matrix multiplication through cuBLAS.
-  Lean-facing module: `NN.Runtime.Autograd.Engine.Cuda.DGemm`.
+  Lean side module: `NN.Runtime.Autograd.Engine.Cuda.DGemm`.
 
 - `csrc/cuda/blas/torchlean_dgemm_cuda_stub.c`
   Portable CPU mirror of the DGEMM FFI symbol.

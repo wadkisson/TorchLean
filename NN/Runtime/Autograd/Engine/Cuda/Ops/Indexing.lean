@@ -24,11 +24,11 @@ open Tensor
 namespace Tape
 
 /-!
-## Concat / slice (1D)
+## Vector concat / slice
 -/
 
-/-- Concatenate two 1D buffers. -/
-def concat1d {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
+/-- Concatenate two one-dimensional CUDA buffers. -/
+def concatVectorBuffers {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
   let n32 ← u32 n
   let m32 ← u32 m
   let σ₁ : Shape := .dim n .scalar
@@ -36,11 +36,11 @@ def concat1d {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
   let τ : Shape := .dim (n + m) .scalar
   let nm32 ← u32 (n + m)
   let startN32 ← u32 n
-  binary (t := t) "concat1d" aId bId σ₁ σ₂ τ
-    (forward := fun a b => Buffer.concat1d a b n32 m32)
+  binary (t := t) "concat_vector_buffers" aId bId σ₁ σ₂ τ
+    (forward := fun a b => Buffer.concatVectorBuffers a b n32 m32)
     (backward := fun _a _b dLdy =>
-      let dA := Buffer.slice1d dLdy nm32 0 n32
-      let dB := Buffer.slice1d dLdy nm32 startN32 m32
+      let dA := Buffer.sliceVectorBuffer dLdy nm32 0 n32
+      let dB := Buffer.sliceVectorBuffer dLdy nm32 startN32 m32
       (dA, dB))
 
 /-- Concatenate two 1D tensors (CPU tape name). -/
@@ -50,23 +50,23 @@ def concatVectors {n m : Nat} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) 
   let nm32 ← u32 (n + m)
   let startN32 ← u32 n
   binary (t := t) "concat_vectors" aId bId (.dim n .scalar) (.dim m .scalar) (.dim (n + m) .scalar)
-    (forward := fun a b => Buffer.concat1d a b n32 m32)
+    (forward := fun a b => Buffer.concatVectorBuffers a b n32 m32)
     (backward := fun _a _b dLdy =>
-      let dA := Buffer.slice1d dLdy nm32 0 n32
-      let dB := Buffer.slice1d dLdy nm32 startN32 m32
+      let dA := Buffer.sliceVectorBuffer dLdy nm32 0 n32
+      let dB := Buffer.sliceVectorBuffer dLdy nm32 startN32 m32
       (dA, dB))
 
 /-- Slice `len` entries from a one-dimensional CUDA buffer starting at `start`. -/
-def slice1d {n start len : Nat} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
+def sliceVectorBuffer {n start len : Nat} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
   if start + len ≤ n then
     let n32 ← u32 n
     let start32 ← u32 start
     let len32 ← u32 len
     let outShape : Shape := .dim len .scalar
     let x ← requireValue (t := t) xId (.dim n .scalar)
-    let y := Buffer.slice1d x n32 start32 len32
+    let y := Buffer.sliceVectorBuffer x n32 start32 len32
     let node : Node :=
-      { name := some s!"slice1d[{start}:{start+len}]"
+      { name := some s!"slice_vector_buffer[{start}:{start+len}]"
         value := { s := outShape, buf := y }
         requires_grad := true
         parents := [xId]
@@ -76,38 +76,38 @@ def slice1d {n start len : Nat} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
           let postLen : Nat := n - start - len
           let post32 ← u32 postLen
           let post := Buffer.zeros post32
-          let tmp := Buffer.concat1d pre dLdy.buf start32 len32
+          let tmp := Buffer.concatVectorBuffers pre dLdy.buf start32 len32
           let startLen32 ← u32 (start + len)
           let dx := Buffer.releaseThen pre <|
             Buffer.releaseThen post <|
               Buffer.releaseThen tmp <|
-                Buffer.concat1d tmp post startLen32 post32
+                Buffer.concatVectorBuffers tmp post startLen32 post32
           pure [(xId, { s := .dim n .scalar, buf := dx })] }
     pure (t.addNode node)
   else
-    throw "autograd: slice1d: start+len out of bounds"
+    throw "autograd: slice_vector_buffer: start+len out of bounds"
 
 /-!
 ## Concat / slice along dim 0
 -/
 
 /-- Concatenate along dim 0 for tensors with leading dimension (CPU tape name). -/
-def concatDim0 {n m : Nat} {s : Shape} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
+def concatLeadingAxis {n m : Nat} {s : Shape} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
   let inner : Nat := Shape.size s
   let nLen : Nat := n * inner
   let mLen : Nat := m * inner
   let nLen32 ← u32 nLen
   let mLen32 ← u32 mLen
   let nmLen32 ← u32 (nLen + mLen)
-  binary (t := t) "concat_dim0" aId bId (.dim n s) (.dim m s) (.dim (n + m) s)
-    (forward := fun a b => Buffer.concat1d a b nLen32 mLen32)
+  binary (t := t) "concat_leading_axis" aId bId (.dim n s) (.dim m s) (.dim (n + m) s)
+    (forward := fun a b => Buffer.concatVectorBuffers a b nLen32 mLen32)
     (backward := fun _a _b dLdy =>
-      let dA := Buffer.slice1d dLdy nmLen32 0 nLen32
-      let dB := Buffer.slice1d dLdy nmLen32 nLen32 mLen32
+      let dA := Buffer.sliceVectorBuffer dLdy nmLen32 0 nLen32
+      let dB := Buffer.sliceVectorBuffer dLdy nmLen32 nLen32 mLen32
       (dA, dB))
 
 /-- Slice along dim 0: `x[start:start+len]` (CPU tape name). -/
-def sliceRange0 {n : Nat} {s : Shape} (t : Tape) (xId : Nat) (start len : Nat)
+def sliceLeadingAxisRange {n : Nat} {s : Shape} (t : Tape) (xId : Nat) (start len : Nat)
     (_h : len + start ≤ n) : Result (Tape × Nat) := do
   let inner : Nat := Shape.size s
   let nTot : Nat := n * inner
@@ -119,16 +119,16 @@ def sliceRange0 {n : Nat} {s : Shape} (t : Tape) (xId : Nat) (start len : Nat)
   let len32 ← u32 lenTot
   let right32 ← u32 rightTot
   let midLen32 ← u32 (startOff + lenTot)
-  unary (t := t) "slice_range0" xId (.dim n s) (.dim len s)
-    (forward := fun x => Buffer.slice1d x nTot32 start32 len32)
+  unary (t := t) "slice_leading_axis_range" xId (.dim n s) (.dim len s)
+    (forward := fun x => Buffer.sliceVectorBuffer x nTot32 start32 len32)
     (backward := fun _x dLdy =>
       let left := Buffer.zeros start32
       let right := Buffer.zeros right32
-      let tmp := Buffer.concat1d left dLdy start32 len32
+      let tmp := Buffer.concatVectorBuffers left dLdy start32 len32
       Buffer.releaseThen left <|
         Buffer.releaseThen right <|
           Buffer.releaseThen tmp <|
-            Buffer.concat1d tmp right midLen32 right32)
+            Buffer.concatVectorBuffers tmp right midLen32 right32)
 
 /-!
 ## Gather / scatter (host Nat indices)

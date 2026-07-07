@@ -60,7 +60,7 @@ def castTensor {α : Type} [Context α] {s s' : Shape} (h : s = s') (t : Tensor 
   cast (congrArg (fun s : Shape => Tensor α s) h) t
 
 /-- Evaluate a `CompiledIR` forward graph on an input tensor, returning a shape-checked tensor. -/
-def evalCompiledForward1
+def runForwardIR
     {α : Type} [Context α] [DecidableEq Shape]
     {inShape outShape : Shape}
     (c : CompiledIR α) (x : Tensor α inShape) : Except String (Tensor α outShape) := do

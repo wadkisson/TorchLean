@@ -32,7 +32,8 @@ This module provides infoview panels for TorchLean’s eager-mode autograd tape:
 
 ## Implementation notes
 
-- These widgets are intended for debugging and teaching, not proof scripts.
+- These widgets are intended for debugging and teaching. Proof scripts should cite the underlying
+  tape definitions and theorems directly.
 - DOT output is clipped for large tapes to keep infoview rendering responsive.
 - Reverse traces use `seed = 1` at the output node, matching `loss.backward()` intuition.
 

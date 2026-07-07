@@ -77,7 +77,7 @@ Practical checklist:
    - If you recompute intermediates, say so once (and keep the recomputation structurally aligned with the forward).
 
 6. Hook it into the public spec entrypoint
-   - Add an import in the relevant focused umbrella, usually `NN/Spec/Models.lean`.
+   - Add an import in the relevant focused umbrella, such as `NN/Spec/Models.lean`.
    - If it should be part of the whole spec doorway, make sure `NN/Entrypoint/Spec.lean` reaches that
      umbrella.
    - If it should be part of ordinary model code, also expose a clean root spelling through
@@ -95,7 +95,7 @@ Practical checklist:
 
 - Comparisons (`>` / `max` / `argmax`) require decidability: you may need
   `[DecidableRel ((· > ·) : α → α → Prop)]` on the scalar backend.
-- Output shapes follow the same arithmetic formulas as PyTorch layer definitions. If you "expect"
-  a conv to preserve `H×W`, you usually need the corresponding equality proof to rewrite the type.
+- Output shapes follow the same arithmetic formulas as PyTorch layer definitions. If a conv should
+  preserve `H×W`, add the corresponding equality proof that rewrites the type.
 - Avoid duplicating derivative logic in two places. Prefer one authoritative backward/VJP and call
   it from training wrappers (as in `svm.lean`).

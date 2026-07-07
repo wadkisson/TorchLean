@@ -26,7 +26,7 @@ The split is intentional:
   small sample builders, and trainer loops.
 
 `TorchLean/*` builds the higher-level model/program API on top of this layer. So `Torch` is the
-low-level session/ref bridge; `TorchLean` is the nicer user-facing model stack.
+low-level session/ref bridge; `TorchLean` is the nicer user-facing model API.
 -/
 
 @[expose] public section

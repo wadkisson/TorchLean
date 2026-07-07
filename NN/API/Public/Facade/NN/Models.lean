@@ -22,17 +22,17 @@ namespace nn
 
 namespace models
 
-@[inherit_doc NN.API.nn.models.Mlp1Config]
-abbrev Mlp1Config := NN.API.nn.models.Mlp1Config
+@[inherit_doc NN.API.nn.models.MlpConfig]
+abbrev MlpConfig := NN.API.nn.models.MlpConfig
 
-@[inherit_doc NN.API.nn.models.mlp1InShape]
-abbrev mlp1InShape := NN.API.nn.models.mlp1InShape
+@[inherit_doc NN.API.nn.models.mlpInShape]
+abbrev mlpInShape := NN.API.nn.models.mlpInShape
 
-@[inherit_doc NN.API.nn.models.mlp1OutShape]
-abbrev mlp1OutShape := NN.API.nn.models.mlp1OutShape
+@[inherit_doc NN.API.nn.models.mlpOutShape]
+abbrev mlpOutShape := NN.API.nn.models.mlpOutShape
 
-@[inherit_doc NN.API.nn.models.mlp1Relu]
-abbrev Mlp1ReLU := NN.API.nn.models.mlp1Relu
+@[inherit_doc NN.API.nn.models.mlpRelu]
+abbrev MlpReLU := NN.API.nn.models.mlpRelu
 
 @[inherit_doc NN.API.nn.models.KANEdgeFamily]
 abbrev KANEdgeFamily := NN.API.nn.models.KANEdgeFamily
@@ -110,7 +110,7 @@ abbrev vitInShape := NN.API.nn.models.vitInShape
 @[inherit_doc NN.API.nn.models.vitOutShape]
 abbrev vitOutShape := NN.API.nn.models.vitOutShape
 
-@[inherit_doc NN.API.nn.models.vit1]
+@[inherit_doc NN.API.nn.models.vit]
 def ViT (cfg : VitConfig)
     (h_inC : cfg.inC ≠ 0 := by decide)
     (h_patchH : cfg.patchH ≠ 0 := by decide)
@@ -118,7 +118,7 @@ def ViT (cfg : VitConfig)
     (h_seqLen : cfg.seqLen ≠ 0 := by decide)
     (h_dModel : cfg.dModel ≠ 0 := by decide) :
     M (Sequential (vitInShape cfg) (vitOutShape cfg)) :=
-  NN.API.nn.models.vit1 cfg h_inC h_patchH h_patchW h_seqLen h_dModel
+  NN.API.nn.models.vit cfg h_inC h_patchH h_patchW h_seqLen h_dModel
 
 @[inherit_doc NN.API.nn.models.SeqRnnHeadConfig]
 abbrev SeqRnnHeadConfig := NN.API.nn.models.SeqRnnHeadConfig

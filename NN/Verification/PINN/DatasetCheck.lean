@@ -27,7 +27,7 @@ as `train_pinn_1d.py --dataset-json`, evaluates the network on the dataset's
 value is contained in the output interval (with a tolerance).
 
 This does **not** prove that the network solves the PDE; it is a bridge for
-using a real reference dataset while exercising the same Lean-side bound
+using a real reference dataset while exercising the same Lean side bound
 propagation machinery as the PINN CLI.
 
 References:
@@ -57,7 +57,7 @@ def defaultDatasetPath : String :=
 structure DatasetCheckOpts where
   /-- Optional JSON file containing exported PINN weights. -/
   weights : Option String := none
-  /-- Dataset JSON containing initial, boundary, residual, or data points to check. -/
+  /-- Dataset JSON containing initial, boundary, or supervised data points to check. -/
   dataset : Option String := none
   /-- Radius used to seed the input interval around each dataset point. -/
   eps     : Float := 0.0
@@ -110,7 +110,7 @@ def loadGraphAndParams (weightsPath? : Option String) : IO (Graph × ParamStore 
 
 /-- Check one dataset section and return `(contained, missed, maxAbsMidpointError)`. -/
 def checkSection
-    (g : Graph) (ps0 : ParamStore Float) (opts : DatasetCheckOpts)
+    (g : Graph) (baseParams : ParamStore Float) (opts : DatasetCheckOpts)
     (sectionName : String) (pts : Array Dataset.Point) : IO (Nat × Nat × Float) := do
   let outId := SequentialPINNArch.graphOutputId g
   let pts := pts.take opts.maxPts
@@ -118,7 +118,7 @@ def checkSection
   let mut badCount : Nat := 0
   let mut maxAbsErr : Float := 0.0
   for point in pts do
-    let ps := seedInputFloat2D ps0 point.x point.yOrT opts.eps
+    let ps := seedInputFloat2D baseParams point.x point.yOrT opts.eps
     let ibp := runIBP (α := Float) g ps
     let outB ←
       match NN.MLTheory.CROWN.Graph.outputBox? ibp outId with
@@ -149,14 +149,14 @@ def main (args : List String) : IO Unit := do
     | .ok o => pure o
     | .error msg => throw <| IO.userError s!"{msg}\n\n{usage}"
   let some datasetPath := opts.dataset | throw <| IO.userError usage
-  let (g, ps0) ← loadGraphAndParams opts.weights
+  let (g, baseParams) ← loadGraphAndParams opts.weights
   let initial ← Dataset.loadSection datasetPath "initial"
   let boundary ← Dataset.loadSection datasetPath "boundary"
   let data ← Dataset.loadSection datasetPath "data"
 
-  let (okI, badI, maxI) ← checkSection g ps0 opts "initial" initial
-  let (okB, badB, maxB) ← checkSection g ps0 opts "boundary" boundary
-  let (okD, badD, maxD) ← checkSection g ps0 opts "data" data
+  let (okI, badI, maxI) ← checkSection g baseParams opts "initial" initial
+  let (okB, badB, maxB) ← checkSection g baseParams opts "boundary" boundary
+  let (okD, badD, maxD) ← checkSection g baseParams opts "data" data
 
   IO.println s!"[PINN dataset] initial: ok={okI} bad={badI} max|err|≈{maxI}"
   IO.println s!"[PINN dataset] boundary: ok={okB} bad={badB} max|err|≈{maxB}"

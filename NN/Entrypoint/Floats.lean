@@ -16,16 +16,16 @@ public import NN.Floats.NeuralFloat
 /-!
 # Floats entrypoint
 
-This is the “all floating-point semantics in one import” entrypoint:
+Import this file when you want the floating-point semantics in one place:
 
 - proof-oriented real-valued models (`FP32`, `NeuralFloat`),
 - the executable bit-level model (`IEEEExec`),
 - interval/enclosure utilities (`Interval`),
-- and the external Arb oracle integration (`Arb`),
+- the external Arb oracle integration (`Arb`),
 - and the shared error-bound vocabulary used across the library.
 
-This module is the chapter boundary for the floating-point surface. It imports the focused
-`NN.Floats.*` subsystems directly so downstream users have one stable entrypoint.
+The entrypoint imports the focused `NN.Floats.*` subsystems directly so downstream users have one
+stable path.
 -/
 
 @[expose] public section

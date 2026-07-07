@@ -4,19 +4,29 @@ TorchLean uses Lean to state and check mathematical claims about neural-network 
 parts of the system are inside Lean's proof kernel; others are executable tools, native runtimes, or
 external producers whose outputs may be checked by Lean.
 
-This file is the project's trust inventory. It records the assumptions that matter for correctness
-claims: Lean axioms, Prop-valued contracts, CUDA and FFI code, external numeric oracles, PyTorch
-import/export scripts, Julia/Python producers, and artifact-checking conventions.
+This document records the assumptions that matter for correctness claims: Lean axioms, Prop-valued
+contracts, CUDA and FFI code, external numeric oracles, PyTorch import/export scripts, Julia/Python
+producers, and artifact-checking conventions.
 
 ## Reading This File
 
 | Layer | Example | How to read it |
 | --- | --- | --- |
-| Lean theorem | graph semantics, autograd correctness | checked by Lean |
+| Lean theorem | graph semantics, selected autograd correctness theorems | checked by Lean |
 | Executable checker | certificate parser, shape checker | checked by code/tests |
 | Prop-valued contract | runtime Float32 agreement | assumption supplied by caller |
 | FFI/native runtime | CUDA kernels, cuBLAS, cuFFT | external implementation path |
 | External producer | Python, Julia, Arb, alpha-beta-CROWN | produces artifacts Lean may check |
+
+When writing a correctness claim, name the layer explicitly:
+
+- theorem claim: cite the Lean theorem and its hypotheses;
+- executable-checker claim: cite the checker command, artifact schema, and accepted predicate;
+- runtime claim: cite the backend, tests, sanitizer/parity evidence, and remaining native boundary;
+- producer claim: cite the external tool or script and the artifact that Lean later checks.
+
+This avoids collapsing "the command ran", "the checker accepted this artifact", and "Lean proved a
+mathematical statement" into one sentence.
 
 ## Lean Axioms
 
@@ -53,10 +63,10 @@ Important examples include:
 
 - `TorchLean.Floats.IEEE754.Float32Bridge.RuntimeFloat32MatchesIEEE32Exec`, the runtime contract
   that Lean `Float32` primitives match the executable IEEE32 model at the bit level.
-- `NN.MLTheory.CROWN.CrownTransferSound`, the transfer-rule soundness assumption used by
-  graph-CROWN certificate theorems for backend/oracle-dependent relaxations.
-- `NN.MLTheory.Proofs.Approximation.FloatInterval.OpsExact.Sound`, the local operation level exact
-  interval soundness contract for finite IEEE32 interval arithmetic.
+- `NN.MLTheory.CROWN.Graph.CrownCertSoundness.CrownTransferSound`, the transfer-rule soundness
+  assumption used by graph-CROWN certificate theorems for backend/oracle-dependent relaxations.
+- `NN.MLTheory.Proofs.UniversalApproximation.FloatIntervalApprox.OpsExact.Sound`, the local
+  operation level exact interval soundness contract for finite IEEE32 interval arithmetic.
 
 ## Opaque Non-FFI Declarations
 
@@ -109,13 +119,13 @@ Important examples include:
   `NN/Runtime/Autograd/Engine/Cuda/Kernels.lean` and implemented in
   `csrc/cuda/kernels/torchlean_cuda_kernels.cu`. Those kernels favor clarity and correctness: fused
   forward/VJP kernels over already-split heads, not a production clone of Dao-AILab's tiled
-  implementation. The Lean equalities are definitional denotation checks, not proofs of a tiled
-  online-softmax recurrence. CUDA memory behavior and float32 arithmetic remain an FFI trust
-  boundary; TorchLean regression-tests them against the composed attention path, but does not claim
-  to verify CUDA machine code. References: FlashAttention (arXiv:2205.14135), FlashAttention-2
-  (arXiv:2307.08691), FlashAttention-3 (arXiv:2407.08608), and the Dao-AILab `flash-attention`
-  implementation.
-- Boolean attention masks use hard masking throughout the spec-facing path: blocked entries
+  implementation. The Lean equalities cover the denotational target; online-softmax tiling, CUDA
+  memory behavior, and float32 arithmetic remain part of the native runtime boundary. TorchLean
+  regression-tests the fused kernels against the composed attention path, and theorem claims should
+  cite the spec denotation rather than the CUDA machine code. References: FlashAttention
+  (arXiv:2205.14135), FlashAttention-2 (arXiv:2307.08691), FlashAttention-3 (arXiv:2407.08608),
+  and the Dao-AILab `flash-attention` implementation.
+- Boolean attention masks use hard masking throughout the spec semantics: blocked entries
   contribute zero softmax numerator, matching true `-inf` masking at the denotational level. The
   CUDA attention kernels implement that same hard-mask convention. Separate finite additive-bias
   attention lemmas still exist for models that intentionally add a fixed score bias, but those
@@ -132,14 +142,33 @@ Important examples include:
 - Transcendental functions such as `exp`, `log`, and `tanh` are deterministic approximations unless
   a file states a stronger theorem for a specific operation.
 
+Use the float layers as follows:
+
+| Claim | Layer to cite |
+| --- | --- |
+| executable binary32 behavior inside Lean | `NN/Floats/IEEEExec` |
+| finite rounded-real float32 error bound | `NN/Floats/FP32` |
+| precision-parametric rounding theorem | `NN/Floats/NeuralFloat` |
+| endpoint interval enclosure | `NN/Floats/Interval` |
+| external high-precision enclosure evidence | `NN/Floats/Arb` plus the oracle boundary |
+| runtime CUDA/ATen/Lean `Float` behavior | runtime bridge or trust-boundary statement |
+
 ## External Numeric Oracles
 
+- ATen/libtorch may be used as an external forward-kernel provider for selected runtime paths. In
+  inference/no-grad mode, that means the returned value is trusted under the stated runtime
+  agreement assumption. In training mode, TorchLean should still record the TorchLean graph/tape
+  node and use the TorchLean backward rule; otherwise the run has crossed into libtorch autograd and
+  no longer has the same proof boundary. ATen backward, libtorch `requires_grad`, gradient
+  extraction, and optimizer handoff are separate external-backend assumptions unless a future module
+  explicitly checks or proves them.
 - CROWN/Lyapunov certificate generation is an external evidence producer when used through the
-  oracle-backed workflow. Lean isolates that assumption behind `crown_oracle`; it does not prove that
-  the external CROWN run was complete or correctly implemented.
+  oracle-backed workflow. Lean isolates that assumption behind `crown_oracle`; theorem claims should
+  state exactly which certificate predicate was checked and which external completeness assumption is
+  being used.
 - The Arb / `python-flint` integration under `NN/Floats/Arb/` is an external subprocess backend. It
-  is useful for producing high-quality interval evidence, but an Arb response is still an oracle
-  result unless the relevant certificate is independently checked in Lean.
+  can produce high-quality interval evidence, but an Arb response is still an oracle result unless
+  the relevant certificate is independently checked in Lean.
 - PyTorch import/export scripts and training helpers are external producers of weights, examples,
   or JSON artifacts. TorchLean can parse and replay those artifacts, but PyTorch training itself is
   not part of Lean's trusted kernel.

@@ -20,13 +20,13 @@ Public training starts from one handle:
 let trainer := Trainer.new model
   { task := .regression
     optimizer := optim.adam { lr := 0.03 } }
-let y0 ← trainer.eval x
+let y0 ← trainer.predict x
 let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
 trained.printSummary
 ```
 
-Runtime modules, tensor packs, and callback runners remain available under `Trainer.Advanced`.
-Application code should usually construct one `Trainer` value, call `trainer.eval` for initial
+Runtime modules, tensor packs, and callback runners remain available under `Trainer.Manual`.
+Application code should usually construct one `Trainer` value, call `trainer.predict` for initial
 inference, and call `trainer.train` to get a trained handle.
 -/
 
@@ -43,10 +43,10 @@ export NN.API.train
    constantLR stepLR exponentialLR
    constantEpochLR stepEpochLR exponentialEpochLR)
 
-namespace Advanced
+namespace Manual
 
 /-!
-Advanced training hooks.
+Manual training hooks.
 
 Runtime trainer hooks for code that needs direct control.
 
@@ -54,9 +54,9 @@ Use this namespace for manual callbacks, explicit runtime mode changes, custom s
 verification bridges. Model examples should stay on `Trainer.new` and `trainer.train`.
 -/
 
-export NN.API.train.Advanced
+export NN.API.train.Manual
   (StepBatchStream trainModuleStreamStepsWith trainModuleStreamStepsReport trainModuleStreamStepsCurveFloat
-   instantiate instantiateWithOptions
+   instantiate instantiateConfigured
    run
    params mode setMode trainMode evalMode isTraining
    backward
@@ -67,7 +67,7 @@ export NN.API.train.Advanced
    withMode onTrainStart onStep onTrainEnd onEpochEnd
    trainModuleLoaderStepsLoggedFloat)
 
-end Advanced
+end Manual
 
 /-- Runtime settings carried by a public trainer. -/
 structure RuntimeSettings where
@@ -149,7 +149,7 @@ namespace Implementation
 Typed dispatch record for supervised regression.
 
 The exported API still has one trainer handle. This record exists so the runtime implementation can
-carry task-specific equalities without splitting the public surface into separate trainer classes.
+carry task-specific equalities without splitting the public API into separate trainer classes.
 -/
 structure Regression (σ τ : Shape) where
   /-- The checked TorchLean model used by this trainer. -/
@@ -203,7 +203,7 @@ structure Custom (σ τ : Shape) where
 namespace Regression
 
 /-- Checked TorchLean task induced by this regression dispatch record. -/
-def task {σ τ : Shape} (trainer : Regression σ τ) : NN.API.train.Advanced.Task σ τ :=
+def task {σ τ : Shape} (trainer : Regression σ τ) : NN.API.train.Manual.Task σ τ :=
   NN.API.TorchLean.Trainer.runtimeRegressionTask trainer.model trainer.reduction
 
 /-- Checked model summary for this trainer. -/
@@ -242,7 +242,7 @@ end Regression
 namespace CrossEntropy
 
 /-- Checked TorchLean task induced by this cross-entropy dispatch record. -/
-def task {σ τ : Shape} (trainer : CrossEntropy σ τ) : NN.API.train.Advanced.Task σ τ :=
+def task {σ τ : Shape} (trainer : CrossEntropy σ τ) : NN.API.train.Manual.Task σ τ :=
   NN.API.TorchLean.Trainer.runtimeClassifierTask trainer.model trainer.reduction
 
 /-- Checked model summary for this trainer. -/

@@ -21,7 +21,7 @@ This file provides the semiring-level dot-product API and supporting fold/sum le
 autograd and tape soundness proofs. The point of this file is to avoid baking `ℝ`, topology, or
 calculus assumptions into algebra that only needs addition, multiplication, and finite sums.
 
-`NN.Proofs.Tensor.Basic` imports this file and adds the `ℝ`-specialized spec-facing toolkit
+`NN.Proofs.Tensor.Basic` imports this file and adds the `ℝ`-specialized tensor toolkit
 (norms, shape facts, Frobenius identities, and convenience lemmas for analysis proofs). Keeping this
 file generic lets correctness theorems reuse the same algebra over exact rationals, real numbers, or
 other semiring-like scalar models.

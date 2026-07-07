@@ -33,15 +33,15 @@ This entrypoint imports the widget implementation modules directly. We avoid a s
 `NN.Widgets` alias so the root namespace stays focused on the library umbrella and subsystem
 entrypoints.
 
-The entrypoint is editor-facing:
+The entrypoint is for editor and inspection workflows:
 
 - ordinary runtime/proof files should import the concrete library modules they need;
 - example and inspection files can import this one module to get all widget commands;
 - adding a widget here does not make it part of TorchLean's trusted semantics.
 
 `NN.Widgets.Interop.PyTorchTranslator` is included here because it is exactly that kind of
-editor-side assistant: useful for navigating PyTorch-to-TorchLean workflows, but not a proof that
-arbitrary Python has been verified.
+editor-side assistant. It helps navigate PyTorch-to-TorchLean workflows; checked import still goes
+through the explicit artifact bridges and verifier/proof layers.
 -/
 
 @[expose] public section

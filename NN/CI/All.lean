@@ -26,7 +26,7 @@ public import NN.Entrypoint.Runtime
 public import NN.Entrypoint.Spec
 public import NN.Entrypoint.TorchLeanModels
 public import NN.Examples.Zoo
-public import NN.Examples.Advanced
+public import NN.Examples.DeepDives
 public import NN.Verification.Cert.AbCrownLeafCert
 public import NN.Verification.PINN.CLI
 public import NN.Verification.PINN.Certificate
@@ -138,6 +138,8 @@ public import NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.IEEE32Exec
 public import NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.IEEE32Exec.Core
 public import NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.IEEE32Exec.ExampleDataset
 public import NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.Real
+public import NN.MLTheory.Optimization.Muon
+public import NN.MLTheory.Optimization.OptimizerLaws
 public import NN.MLTheory.Proofs.Approximation.FloatInterval.ConstantTarget
 public import NN.MLTheory.Proofs.Approximation.FloatInterval.ExactImageTheorem
 public import NN.MLTheory.Proofs.Approximation.FloatInterval.Semantics
@@ -145,7 +147,7 @@ public import NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximation
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationFP32
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec
-public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2
+public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationND
 public import NN.MLTheory.Proofs.Hopfield.Basic
 public import NN.MLTheory.Proofs.Hopfield.Convergence
@@ -345,7 +347,7 @@ public import NN.Entrypoint.Widgets
 # Broad CI Import Surface
 
 CI-only umbrella: import the maintained API, example, verification, floating-point, CROWN, and
-runtime surfaces that should stay buildable together. Use this as a build target, not as the default
+runtime modules that should stay buildable together. Use this as a build target, not as the default
 import for model code.
 
 Local usage:

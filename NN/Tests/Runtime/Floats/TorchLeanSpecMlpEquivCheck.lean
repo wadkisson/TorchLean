@@ -68,18 +68,18 @@ def run : IO Unit := do
   -- Spec forward reference.
   let ySpec : Tensor Float yShape := Examples.mlpForward (α := Float) l1 l2 x
 
-  -- TorchLean forward reference (compiled-out evaluation of the TorchLean program).
-  let compiled ← TorchLean.Autodiff.compileOut (α := Float)
+  -- TorchLean forward reference (compiled-out evaluation of the TorchLean forwardProgram).
+  let compiled ← TorchLean.Autodiff.compileGraph (α := Float)
     (paramShapes := Runtime.Autograd.TorchLean.NN.Seq.paramShapes model)
     (inputShapes := [xShape]) (τ := yShape)
-    (fun {β} _ _ => Runtime.Autograd.TorchLean.NN.Seq.program (model := model) (α := β))
+    (fun {β} _ _ => Runtime.Autograd.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
 
   let args : TorchLean.TensorPack Float (Runtime.Autograd.TorchLean.NN.Seq.paramShapes model ++ [xShape])
     :=
     tensorpack! w1, b1, w2, b2, x
 
   let yTorch : Tensor Float yShape :=
-    _root_.Runtime.Autograd.Torch.CompiledOut.forward compiled args
+    _root_.Runtime.Autograd.Torch.CompiledGraph.forward compiled args
 
   -- Since `outDim = 1`, check the single coordinate. (Kept structured so it scales to `outDim >
   -- 1`.)

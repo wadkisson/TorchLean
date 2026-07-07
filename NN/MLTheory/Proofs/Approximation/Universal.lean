@@ -10,7 +10,7 @@ public import NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximation
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationFP32
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec
-public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2
+public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationND
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationRate
 

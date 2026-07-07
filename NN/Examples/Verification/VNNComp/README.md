@@ -1,7 +1,14 @@
-# VNN-COMP Verification Assets
+# VNN-COMP-Style MNIST-FC Artifacts
 
-`NN.Verification.VNNComp.MnistFC` is the reusable checker for VNN-COMP style JSON exports.
-This examples directory documents the local artifact layout used by the runnable verification CLI.
+This folder documents TorchLean's current VNN-COMP-facing shape: exported JSON artifacts for a
+small MNIST fully-connected benchmark family, checked by Lean through
+`NN.Verification.VNNComp.MnistFC`.
+
+The goal is not to mirror the whole VNN-COMP infrastructure inside the repository. VNN-COMP uses
+standard benchmark packages, network formats, property files, timeouts, and solver reporting rules.
+TorchLean's current entry point is narrower and more formalization-friendly: convert the benchmark
+instance into explicit JSON objects, then run a Lean side checker over the exported weights,
+properties, and optional verifier metadata.
 
 Expected local layout:
 
@@ -20,7 +27,16 @@ lake exe verify -- vnncomp-mnistfc \
   --max=2
 ```
 
-If you keep the artifacts somewhere else, pass `--weights=...`, `--suite=...`, and optionally
+If the artifacts live somewhere else, pass `--weights=...`, `--suite=...`, and optionally
 `--alphas=...`.
 
-Full VNN-COMP model dumps and suite exports live in `_external/` or another local data directory.
+The checked object is the exported suite item: network weights, input region, expected label or
+margin property, and any optional bound data attached to the item. The external preparation step is
+responsible for converting the original benchmark files into this JSON shape. Full benchmark dumps,
+large model files, and solver outputs belong in `_external/` or another local data directory rather
+than in git.
+
+The long-term direction is a native Lean verifier path that can read standard benchmark objects
+more directly. This example is the small, reviewable bridge: VNN-COMP-style problem data enters
+TorchLean as explicit artifacts, and Lean checks the part of the property represented in those
+artifacts.

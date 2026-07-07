@@ -57,10 +57,10 @@ theorem interval_sub_sound {x y a b c d : ℝ}
 /-! ### Multiplication Interval Soundness -/
 
 /-- Helper: minimum of four values -/
-def min4 (p q r s : ℝ) : ℝ := min (min p q) (min r s)
+def minOfFour (p q r s : ℝ) : ℝ := min (min p q) (min r s)
 
 /-- Helper: maximum of four values -/
-def max4 (p q r s : ℝ) : ℝ := max (max p q) (max r s)
+def maxOfFour (p q r s : ℝ) : ℝ := max (max p q) (max r s)
 
 /-- For multiplication, the interval is [min(ac,ad,bc,bd), max(ac,ad,bc,bd)].
 
@@ -80,11 +80,11 @@ def max4 (p q r s : ℝ) : ℝ := max (max p q) (max r s)
 -/
 theorem interval_mul_sound {x y a b c d : ℝ}
     (hx : inInterval x a b) (hy : inInterval y c d) :
-    inInterval (x * y) (min4 (a*c) (a*d) (b*c) (b*d)) (max4 (a*c) (a*d) (b*c) (b*d)) := by
+    inInterval (x * y) (minOfFour (a*c) (a*d) (b*c) (b*d)) (maxOfFour (a*c) (a*d) (b*c) (b*d)) := by
   -- The key insight: for bilinear f(x,y) = xy over [a,b] × [c,d], extrema occur at corners.
   -- For fixed y, f(x,y) = xy is linear in x, achieving min/max at x=a or x=b.
   -- Similarly for fixed x. So global extrema are at corners.
-  unfold inInterval min4 max4
+  unfold inInterval minOfFour maxOfFour
   have hab : a ≤ b := le_trans hx.1 hx.2
   have hcd : c ≤ d := le_trans hy.1 hy.2
   constructor
@@ -103,10 +103,10 @@ theorem interval_mul_sound {x y a b c d : ℝ}
           (le_of_lt hy_nonneg))
         rw [hmin_eq]
         exact mul_le_mul_of_nonpos_right hx.2 (le_of_lt hy_nonneg)
-    -- Step 2: Show min4(...) ≤ min(ay, by)
+    -- Step 2: Show minOfFour(...) ≤ min(ay, by)
     have h_min4_le : min (min (a*c) (a*d)) (min (b*c) (b*d)) ≤ min (a*y) (b*y) := by
       by_cases hy_nonneg : 0 ≤ y
-      · -- y ≥ 0: min(ay, by) = ay, need min4 ≤ ay
+      · -- y ≥ 0: min(ay, by) = ay, need minOfFour ≤ ay
         have hmin_ab : min (a*y) (b*y) = a*y := min_eq_left (mul_le_mul_of_nonneg_right hab
           hy_nonneg)
         rw [hmin_ab]
@@ -147,10 +147,10 @@ theorem interval_mul_sound {x y a b c d : ℝ}
           (le_of_lt hy_nonneg))
         rw [hmax_eq]
         exact mul_le_mul_of_nonpos_right hx.1 (le_of_lt hy_nonneg)
-    -- Step 2: Show max(ay, by) ≤ max4(...)
+    -- Step 2: Show max(ay, by) ≤ maxOfFour(...)
     have h_max_le_max4 : max (a*y) (b*y) ≤ max (max (a*c) (a*d)) (max (b*c) (b*d)) := by
       by_cases hy_nonneg : 0 ≤ y
-      · -- y ≥ 0: max(ay, by) = by, need by ≤ max4
+      · -- y ≥ 0: max(ay, by) = by, need by ≤ maxOfFour
         have hmax_ab : max (a*y) (b*y) = b*y := max_eq_right (mul_le_mul_of_nonneg_right hab
           hy_nonneg)
         rw [hmax_ab]

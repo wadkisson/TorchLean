@@ -7,8 +7,8 @@ Bug Zoo is TorchLean’s collection of small case studies for semantic bugs that
 runtime checks. These examples focus on cases where code still returns tensors, losses, or tokens,
 but the returned value no longer satisfies the intended contract.
 
-Bug Zoo is the easiest place to understand the motivation for TorchLean: many ML failures are not
-type errors or crashes, but silent changes in meaning.
+Bug Zoo shows the motivation for TorchLean in miniature: many ML failures are not type errors or
+crashes, but silent changes in meaning.
 
 Each card starts with a bug pattern, then isolates the small mathematical contract that would have
 made the intended behavior explicit. Some cards make a mistake unrepresentable in the checked
@@ -18,7 +18,7 @@ named.
 ## A Few Case Studies
 
 <div class="showcase-grid bug-zoo-grid">
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/AttentionMask.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/attention-masks.png' | relative_url }}" alt="Attention mask Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">Attention Masks</span>
@@ -26,7 +26,7 @@ named.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/KVCache.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/kv-cache-rope.png' | relative_url }}" alt="KV cache and RoPE Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">KV Cache and RoPE</span>
@@ -34,7 +34,7 @@ named.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/TokenizerBoundary.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/tokenizer-boundaries.png' | relative_url }}" alt="Tokenizer boundary Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">Tokenizer Boundaries</span>
@@ -42,7 +42,7 @@ named.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/NormalizationState.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/normalization-state.png' | relative_url }}" alt="Normalization state Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">Normalization State</span>
@@ -50,7 +50,7 @@ named.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/BatchInvariance.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/batch-invariance.png' | relative_url }}" alt="Batch invariance Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">Batch Invariance</span>
@@ -58,14 +58,53 @@ named.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/docs/NN/Examples/BugZoo/FloatBoundary.html' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="#what-a-checked-claim-looks-like-here">
     <img class="showcase-media" src="{{ '/assets/media/examples/bug-zoo/float-autograd-boundaries.png' | relative_url }}" alt="Float and autograd boundaries Bug Zoo case study"/>
     <span class="showcase-body">
       <span class="showcase-title">Float and Autograd Boundaries</span>
-      <span class="showcase-text">Shows how runtime `Float32` and reverse-mode claims are connected through named assumptions and proof-facing statements.</span>
+      <span class="showcase-text">Shows how runtime <code>Float32</code> and reverse-mode claims are connected through named assumptions and proof statements.</span>
     </span>
   </a>
 </div>
+
+## How To Read The Zoo
+
+Each Bug Zoo file is small enough to read directly. Read the whole chain: the bug
+family, the bad pattern, the TorchLean object that names the intended behavior, and the theorem or
+checker condition that makes the contract explicit.
+
+Build the whole set:
+
+```bash
+lake build NN.Examples.BugZoo.All
+```
+
+For the cases that also have runnable checker commands, use:
+
+```bash
+lake exe verify -- camera-box3d-cert
+lake exe verify -- all
+```
+
+The Lean files are the primary artifacts:
+
+| Source file | Bug family | Contract exposed |
+| --- | --- | --- |
+| `AttentionMask.lean` | Causal masks, mask polarity, finite sentinels standing in for `-∞` | Future positions receive exactly zero attention weight under hard-mask semantics. |
+| `KVCache.lean` | Shifted or malformed key/value caches in autoregressive decoding | The appended key/value vector is exactly the final cache entry. |
+| `RoPEPosition.lean` | Off-by-one or mismatched rotary/absolute positions | Appending a token assigns the next sequence position. |
+| `TokenizerBoundary.lean` | Vocabulary-size and special-token mismatches | Imported token ids inhabit `Fin vocabSize`. |
+| `BatchInvariance.lean` | Dynamic batching changing per-sample outputs | Selecting one row from a batched reference run equals evaluating that row alone. |
+| `NormalizationState.lean` | BatchNorm formula/state mistakes | Epsilon placement and eval-time running statistics are explicit objects. |
+| `LayerNormDegenerateAxis.lean` | One-feature LayerNorm corner cases | The output is the bias, with zero input and scale-gradient contribution. |
+| `ConstantNormalizationSlice.lean` | Cancellation in normalization kernels on constant slices | Affine normalization returns the bias and contributes zero scale gradient. |
+| `IgnoredLabelLoss.lean` | All-ignored cross-entropy reductions | Ignored labels and the empty-reduction policy are named. |
+| `AutogradDomain.lean` | Masking after undefined division | The safe graph records epsilon-protected division before masking. |
+| `StableLoss.lean` | Numerically unstable losses and domain-sensitive ops | Logit losses use the stable log-softmax path. |
+| `ShapeAndBroadcast.lean` | Missing axes and silent broadcasts | Dimension changes are explicit terms with shape evidence. |
+| `CompilerBoundary.lean` | Optimized graphs silently changing semantics | Backend acceptance is a preservation obligation over ops, shapes, dtypes, weights, and buffers. |
+| `FloatBoundary.lean` | Real-valued reasoning applied to Float32 runs | Runtime Float32 claims pass through a named IEEE-style bridge assumption. |
+| `Geometry3DProjection.lean` | Camera convention, depth, layout, and projection-box errors | The checker recomputes projection, positive depth, and 2D box enclosure. |
 
 ## What “A Checked Claim” Looks Like Here
 
@@ -88,4 +127,4 @@ theorem runtimeFloat32_add_rewrites_to_ieee32
     toIEEE32Exec (a + b) = IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b)
 ```
 
-Those are the statement shapes Bug Zoo is meant to make routine.
+Those are the statement shapes Bug Zoo makes routine.

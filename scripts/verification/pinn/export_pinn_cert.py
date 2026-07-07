@@ -10,20 +10,20 @@ from typing import List, Dict, Any, Tuple
 # a conservative bound on the finite-difference residual r ≈ (u(x+h) - 2u(x) + u(x-h)) / h^2.
 # Use f(x) = 0 (homogeneous Poisson) so the exported certificate stays small and deterministic.
 
-W1_H, W2_W = 16, 16
+HIDDEN_WIDTH, MIDDLE_WIDTH = 16, 16
 
 
 def seed_weights() -> Tuple[List[List[float]], List[float], List[List[float]], List[float]]:
     """Return deterministic tanh-MLP weights used by the bundled PINN fixture."""
-    # W1: 16x1 with pattern; b1: 16; W2: 1x16; b2: 1
-    W1 = [[(i + 1) * 0.1] for i in range(W1_H)]
-    b1 = [0.05 * (i - 8) for i in range(W1_H)]
-    W2 = [[0.1 + 0.01 * j for j in range(W2_W)]]
-    b2 = [0.0]
+    first_weight = [[(i + 1) * 0.1] for i in range(HIDDEN_WIDTH)]
+    first_bias = [0.05 * (i - 8) for i in range(HIDDEN_WIDTH)]
+    output_weight = [[0.1 + 0.01 * j for j in range(MIDDLE_WIDTH)]]
+    output_bias = [0.0]
     # Middle layer 16x16 with mild coupling
-    Wm = [[(1.0 if i == j else 0.05) for j in range(W2_W)] for i in range(W1_H)]
-    bm = [0.0 for _ in range(W1_H)]
-    return W1, b1, Wm, bm, W2, b2
+    middle_weight = [[(1.0 if i == j else 0.05) for j in range(MIDDLE_WIDTH)]
+                     for i in range(HIDDEN_WIDTH)]
+    middle_bias = [0.0 for _ in range(HIDDEN_WIDTH)]
+    return first_weight, first_bias, middle_weight, middle_bias, output_weight, output_bias
 
 
 def ibp_linear(W: List[List[float]], b: List[float], lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]]:
@@ -52,15 +52,20 @@ def ibp_tanh(lo: List[float], hi: List[float]) -> Tuple[List[float], List[float]
     return out_lo, out_hi
 
 
-def fd_residual_bounds(u_minus: Tuple[float, float], u0: Tuple[float, float], u_plus: Tuple[float, float], h: float) -> Tuple[float, float]:
+def fd_residual_bounds(
+    u_minus: Tuple[float, float],
+    u_center: Tuple[float, float],
+    u_plus: Tuple[float, float],
+    h: float,
+) -> Tuple[float, float]:
     """Bound the centered finite-difference second derivative residual."""
-    # u_minus, u0, u_plus are (lo, hi)
+    # u_minus, u_center, u_plus are (lo, hi)
     l_minus, h_minus = u_minus
-    l0, h0 = u0
+    center_lo, center_hi = u_center
     l_plus, h_plus = u_plus
     # r_num = u+ - 2u0 + u-
-    num_lo = l_plus - 2.0 * h0 + l_minus
-    num_hi = h_plus - 2.0 * l0 + h_minus
+    num_lo = l_plus - 2.0 * center_hi + l_minus
+    num_hi = h_plus - 2.0 * center_lo + h_minus
     s = 1.0 / (h * h)
     return num_lo * s, num_hi * s
 
@@ -69,8 +74,8 @@ def fd_residual_bounds(u_minus: Tuple[float, float], u0: Tuple[float, float], u_
 def mul_interval(a: Tuple[float, float], b: Tuple[float, float]) -> Tuple[float, float]:
     """Multiply two scalar intervals."""
     (al, ah), (bl, bh) = a, b
-    p1, p2, p3, p4 = al * bl, al * bh, ah * bl, ah * bh
-    return min(p1, p2, p3, p4), max(p1, p2, p3, p4)
+    products = [al * bl, al * bh, ah * bl, ah * bh]
+    return min(products), max(products)
 
 
 def add_interval(a: Tuple[float, float], b: Tuple[float, float]) -> Tuple[float, float]:
@@ -81,10 +86,10 @@ def add_interval(a: Tuple[float, float], b: Tuple[float, float]) -> Tuple[float,
 def square_interval(a: Tuple[float, float]) -> Tuple[float, float]:
     """Square one scalar interval."""
     l, u = a
-    l2, u2 = l * l, u * u
+    lower_sq, upper_sq = l * l, u * u
     if l <= 0.0 <= u:
-        return 0.0, max(l2, u2)
-    return (min(l2, u2), max(l2, u2))
+        return 0.0, max(lower_sq, upper_sq)
+    return (min(lower_sq, upper_sq), max(lower_sq, upper_sq))
 
 
 def lin_deriv(W: List[List[float]], d_lo: List[float], d_hi: List[float]) -> Tuple[List[float], List[float]]:
@@ -130,72 +135,91 @@ def tanh_second_bounds(y_lo: float, y_hi: float) -> Tuple[float, float]:
 
 
 def deriv_and_second_for_mlp(
-    W1: List[List[float]], b1: List[float],
-    Wm: List[List[float]], bm: List[float],
-    W2: List[List[float]], b2: List[float],
+    first_weight: List[List[float]], first_bias: List[float],
+    middle_weight: List[List[float]], middle_bias: List[float],
+    output_weight: List[List[float]], output_bias: List[float],
     x_lo: List[float], x_hi: List[float]
 ) -> Tuple[Tuple[List[float], List[float]], Tuple[List[float], List[float]]]:
     """Propagate first- and second-derivative intervals through the tanh MLP."""
     # Value bounds through the network
-    h1_lo, h1_hi = ibp_linear(W1, b1, x_lo, x_hi)
-    y1_lo, y1_hi = ibp_tanh(h1_lo, h1_hi)
-    h2_lo, h2_hi = ibp_linear(Wm, bm, y1_lo, y1_hi)
-    y2_lo, y2_hi = ibp_tanh(h2_lo, h2_hi)
-    out_lo, out_hi = ibp_linear(W2, b2, y2_lo, y2_hi)
+    first_linear_lo, first_linear_hi = ibp_linear(first_weight, first_bias, x_lo, x_hi)
+    first_activation_lo, first_activation_hi = ibp_tanh(first_linear_lo, first_linear_hi)
+    middle_linear_lo, middle_linear_hi = ibp_linear(
+        middle_weight,
+        middle_bias,
+        first_activation_lo,
+        first_activation_hi,
+    )
+    middle_activation_lo, middle_activation_hi = ibp_tanh(middle_linear_lo, middle_linear_hi)
+    _out_lo, _out_hi = ibp_linear(output_weight, output_bias, middle_activation_lo, middle_activation_hi)
     # First derivative intervals
-    dz1_lo, dz1_hi = [1.0], [1.0]
-    dz2_lo, dz2_hi = [0.0], [0.0]
+    first_deriv_lo, first_deriv_hi = [1.0], [1.0]
+    second_deriv_lo, second_deriv_hi = [0.0], [0.0]
     # Through first linear
-    dz1_lo, dz1_hi = lin_deriv(W1, dz1_lo, dz1_hi)
-    dz2_lo, dz2_hi = lin_deriv(W1, dz2_lo, dz2_hi)
+    first_deriv_lo, first_deriv_hi = lin_deriv(first_weight, first_deriv_lo, first_deriv_hi)
+    second_deriv_lo, second_deriv_hi = lin_deriv(first_weight, second_deriv_lo, second_deriv_hi)
     # Through tanh1
-    d1_t1_lo: List[float] = []
-    d1_t1_hi: List[float] = []
-    d2_t1_lo: List[float] = []
-    d2_t1_hi: List[float] = []
-    for yl, yh, z1l, z1h, z2l, z2h in zip(y1_lo, y1_hi, dz1_lo, dz1_hi, dz2_lo, dz2_hi):
-        p1_lo, p1_hi = tanh_prime_bounds(yl, yh)
-        s2_lo, s2_hi = tanh_second_bounds(yl, yh)
+    first_tanh_deriv_lo: List[float] = []
+    first_tanh_deriv_hi: List[float] = []
+    first_tanh_second_lo: List[float] = []
+    first_tanh_second_hi: List[float] = []
+    for value_lo, value_hi, deriv_lo, deriv_hi, second_lo, second_hi in zip(
+        first_activation_lo,
+        first_activation_hi,
+        first_deriv_lo,
+        first_deriv_hi,
+        second_deriv_lo,
+        second_deriv_hi,
+    ):
+        tanh_prime_lo, tanh_prime_hi = tanh_prime_bounds(value_lo, value_hi)
+        tanh_second_lo, tanh_second_hi = tanh_second_bounds(value_lo, value_hi)
         # first derivative
-        d1_lo, d1_hi = mul_interval((p1_lo, p1_hi), (z1l, z1h))
-        d1_t1_lo.append(d1_lo); d1_t1_hi.append(d1_hi)
+        deriv_out_lo, deriv_out_hi = mul_interval((tanh_prime_lo, tanh_prime_hi), (deriv_lo, deriv_hi))
+        first_tanh_deriv_lo.append(deriv_out_lo); first_tanh_deriv_hi.append(deriv_out_hi)
         # second derivative: p2*(z')^2 + p1*z''
-        z1_sq = square_interval((z1l, z1h))
-        tA = mul_interval((s2_lo, s2_hi), z1_sq)
-        tB = mul_interval((p1_lo, p1_hi), (z2l, z2h))
-        d2_lo, d2_hi = add_interval(tA, tB)
-        d2_t1_lo.append(d2_lo); d2_t1_hi.append(d2_hi)
-    dz1_lo, dz1_hi = d1_t1_lo, d1_t1_hi
-    dz2_lo, dz2_hi = d2_t1_lo, d2_t1_hi
+        deriv_sq = square_interval((deriv_lo, deriv_hi))
+        curvature_term = mul_interval((tanh_second_lo, tanh_second_hi), deriv_sq)
+        chain_term = mul_interval((tanh_prime_lo, tanh_prime_hi), (second_lo, second_hi))
+        second_out_lo, second_out_hi = add_interval(curvature_term, chain_term)
+        first_tanh_second_lo.append(second_out_lo); first_tanh_second_hi.append(second_out_hi)
+    first_deriv_lo, first_deriv_hi = first_tanh_deriv_lo, first_tanh_deriv_hi
+    second_deriv_lo, second_deriv_hi = first_tanh_second_lo, first_tanh_second_hi
     # Through middle linear
-    dz1_lo, dz1_hi = lin_deriv(Wm, dz1_lo, dz1_hi)
-    dz2_lo, dz2_hi = lin_deriv(Wm, dz2_lo, dz2_hi)
+    first_deriv_lo, first_deriv_hi = lin_deriv(middle_weight, first_deriv_lo, first_deriv_hi)
+    second_deriv_lo, second_deriv_hi = lin_deriv(middle_weight, second_deriv_lo, second_deriv_hi)
     # Through tanh2
-    d1_t2_lo: List[float] = []
-    d1_t2_hi: List[float] = []
-    d2_t2_lo: List[float] = []
-    d2_t2_hi: List[float] = []
-    for yl, yh, z1l, z1h, z2l, z2h in zip(y2_lo, y2_hi, dz1_lo, dz1_hi, dz2_lo, dz2_hi):
-        p1_lo, p1_hi = tanh_prime_bounds(yl, yh)
-        s2_lo, s2_hi = tanh_second_bounds(yl, yh)
-        d1_lo, d1_hi = mul_interval((p1_lo, p1_hi), (z1l, z1h))
-        d1_t2_lo.append(d1_lo); d1_t2_hi.append(d1_hi)
-        z1_sq = square_interval((z1l, z1h))
-        tA = mul_interval((s2_lo, s2_hi), z1_sq)
-        tB = mul_interval((p1_lo, p1_hi), (z2l, z2h))
-        d2_lo, d2_hi = add_interval(tA, tB)
-        d2_t2_lo.append(d2_lo); d2_t2_hi.append(d2_hi)
-    dz1_lo, dz1_hi = d1_t2_lo, d1_t2_hi
-    dz2_lo, dz2_hi = d2_t2_lo, d2_t2_hi
+    second_tanh_deriv_lo: List[float] = []
+    second_tanh_deriv_hi: List[float] = []
+    second_tanh_second_lo: List[float] = []
+    second_tanh_second_hi: List[float] = []
+    for value_lo, value_hi, deriv_lo, deriv_hi, second_lo, second_hi in zip(
+        middle_activation_lo,
+        middle_activation_hi,
+        first_deriv_lo,
+        first_deriv_hi,
+        second_deriv_lo,
+        second_deriv_hi,
+    ):
+        tanh_prime_lo, tanh_prime_hi = tanh_prime_bounds(value_lo, value_hi)
+        tanh_second_lo, tanh_second_hi = tanh_second_bounds(value_lo, value_hi)
+        deriv_out_lo, deriv_out_hi = mul_interval((tanh_prime_lo, tanh_prime_hi), (deriv_lo, deriv_hi))
+        second_tanh_deriv_lo.append(deriv_out_lo); second_tanh_deriv_hi.append(deriv_out_hi)
+        deriv_sq = square_interval((deriv_lo, deriv_hi))
+        curvature_term = mul_interval((tanh_second_lo, tanh_second_hi), deriv_sq)
+        chain_term = mul_interval((tanh_prime_lo, tanh_prime_hi), (second_lo, second_hi))
+        second_out_lo, second_out_hi = add_interval(curvature_term, chain_term)
+        second_tanh_second_lo.append(second_out_lo); second_tanh_second_hi.append(second_out_hi)
+    first_deriv_lo, first_deriv_hi = second_tanh_deriv_lo, second_tanh_deriv_hi
+    second_deriv_lo, second_deriv_hi = second_tanh_second_lo, second_tanh_second_hi
     # Final linear to scalar output
-    dz1_lo, dz1_hi = lin_deriv(W2, dz1_lo, dz1_hi)
-    dz2_lo, dz2_hi = lin_deriv(W2, dz2_lo, dz2_hi)
-    return (dz1_lo, dz1_hi), (dz2_lo, dz2_hi)
+    first_deriv_lo, first_deriv_hi = lin_deriv(output_weight, first_deriv_lo, first_deriv_hi)
+    second_deriv_lo, second_deriv_hi = lin_deriv(output_weight, second_deriv_lo, second_deriv_hi)
+    return (first_deriv_lo, first_deriv_hi), (second_deriv_lo, second_deriv_hi)
 
 
 def run_ibp() -> Dict[str, Any]:
     """Compute the bundled PINN certificate payload."""
-    W1, b1, Wm, bm, W2, b2 = seed_weights()
+    first_weight, first_bias, middle_weight, middle_bias, output_weight, output_bias = seed_weights()
     h = 1e-2
     eps = 0.01
     points = [0.25, 0.5, 0.75]
@@ -205,36 +229,45 @@ def run_ibp() -> Dict[str, Any]:
     resid_hi_deriv: List[float] = []
     u_bounds: List[Dict[str, List[float]]] = []
 
-    for x0 in points:
+    for center in points:
         def box(x: float) -> Tuple[List[float], List[float]]:
             """Return the local interval around one scalar point."""
             return [x - eps], [x + eps]
 
         # Evaluate IBP through MLP at x-h, x, x+h
         res_u: List[Tuple[float, float]] = []
-        for x in (x0 - h, x0, x0 + h):
+        for x in (center - h, center, center + h):
             x_lo, x_hi = box(x)
-            h1_lo, h1_hi = ibp_linear(W1, b1, x_lo, x_hi)
-            h1_lo, h1_hi = ibp_tanh(h1_lo, h1_hi)
-            h2_lo, h2_hi = ibp_linear(Wm, bm, h1_lo, h1_hi)
-            h2_lo, h2_hi = ibp_tanh(h2_lo, h2_hi)
-            y_lo, y_hi = ibp_linear(W2, b2, h2_lo, h2_hi)
+            hidden_lo, hidden_hi = ibp_linear(first_weight, first_bias, x_lo, x_hi)
+            hidden_lo, hidden_hi = ibp_tanh(hidden_lo, hidden_hi)
+            middle_lo, middle_hi = ibp_linear(middle_weight, middle_bias, hidden_lo, hidden_hi)
+            middle_lo, middle_hi = ibp_tanh(middle_lo, middle_hi)
+            y_lo, y_hi = ibp_linear(output_weight, output_bias, middle_lo, middle_hi)
             # output is scalar
             res_u.append((y_lo[0], y_hi[0]))
 
-        # FD residual at x0
+        # Finite-difference residual at the center point.
         lo_fd, hi_fd = fd_residual_bounds(res_u[0], res_u[1], res_u[2], h)
         resid_lo.append(lo_fd)
         resid_hi.append(hi_fd)
 
-        # Derivative-based residual: compute u''(x0) bounds via derivative passes at x0
-        x_lo, x_hi = box(x0)
-        (_, _), (d2_lo, d2_hi) = deriv_and_second_for_mlp(W1, b1, Wm, bm, W2, b2, x_lo, x_hi)
+        # Derivative-based residual: compute u'' bounds at the center point.
+        x_lo, x_hi = box(center)
+        (_, _), (d2_lo, d2_hi) = deriv_and_second_for_mlp(
+            first_weight,
+            first_bias,
+            middle_weight,
+            middle_bias,
+            output_weight,
+            output_bias,
+            x_lo,
+            x_hi,
+        )
         resid_lo_deriv.append(d2_lo[0])
         resid_hi_deriv.append(d2_hi[0])
 
         u_bounds.append({
-            "x": x0,
+            "x": center,
             "u_minus": {"lo": res_u[0][0], "hi": res_u[0][1]},
             "u": {"lo": res_u[1][0], "hi": res_u[1][1]},
             "u_plus": {"lo": res_u[2][0], "hi": res_u[2][1]},
@@ -245,9 +278,9 @@ def run_ibp() -> Dict[str, Any]:
             "arch": [1, 16, 16, 1],
             "activations": ["tanh", "tanh"],
             "weights": {
-                "W1": W1, "b1": b1,
-                "Wm": Wm, "bm": bm,
-                "W2": W2, "b2": b2,
+                "W1": first_weight, "b1": first_bias,
+                "Wm": middle_weight, "bm": middle_bias,
+                "W2": output_weight, "b2": output_bias,
             }
         },
         "pinn": {

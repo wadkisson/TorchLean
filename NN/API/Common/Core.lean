@@ -128,8 +128,8 @@ The function uses `Runtime.Training.TrainLog.beforeAfterLoss` and the stable Tra
 The output schema is independent of the model, dataset, and runtime backend.
 -/
 def writeBeforeAfterLossLog (path : System.FilePath) (title : String) (steps : Nat)
-    (loss0 loss1 : Float) (notes : Array String := #[]) : IO Unit := do
-  let log := _root_.Runtime.Training.TrainLog.beforeAfterLoss title steps loss0 loss1 notes
+    (beforeLoss afterLoss : Float) (notes : Array String := #[]) : IO Unit := do
+  let log := _root_.Runtime.Training.TrainLog.beforeAfterLoss title steps beforeLoss afterLoss notes
   writeTrainLog path log
 
 /--
@@ -139,15 +139,15 @@ Write a before/after loss log to an explicit logging destination.
 on stdout only.
 -/
 def writeBeforeAfterLossLogTo (dest : _root_.Runtime.Training.LogDestination)
-    (title : String) (steps : Nat) (loss0 loss1 : Float) (notes : Array String := #[]) :
+    (title : String) (steps : Nat) (beforeLoss afterLoss : Float) (notes : Array String := #[]) :
     IO Unit := do
-  let log := _root_.Runtime.Training.TrainLog.beforeAfterLoss title steps loss0 loss1 notes
+  let log := _root_.Runtime.Training.TrainLog.beforeAfterLoss title steps beforeLoss afterLoss notes
   writeTrainLogTo dest log
 
 /-- Print the standard before/after loss summary returned by `fit` helpers. -/
 def printTrainReport {α : Type} [ToString α] (steps : Nat)
     (report : TorchLean.Trainer.TrainReport α) : IO Unit :=
-  IO.println s!"  steps={steps} loss0={report.before} loss1={report.after}"
+  IO.println s!"  steps={steps} loss_before={report.before} loss_after={report.after}"
 
 /-- First and last point of a scalar training curve, ready for summaries. -/
 structure CurveEndpoints where
@@ -184,7 +184,7 @@ def printCurveLossSummary (steps : Nat) (curve : _root_.Runtime.Training.Curve) 
   let endpoints ← requireCurveEndpoints "printCurveLossSummary" curve
   let finalStep :=
     if curve.steps.isEmpty then steps else endpoints.finalStep
-  IO.println s!"  steps={finalStep} loss0={endpoints.first} loss{finalStep}={endpoints.last}"
+  IO.println s!"  steps={finalStep} loss_before={endpoints.first} loss_after={endpoints.last}"
 
 /-- Write a one-series scalar curve as a standard `TrainLog` JSON artifact. -/
 def writeCurveLog (path : System.FilePath) (title : String)
@@ -388,7 +388,7 @@ This is the common shape for public examples that support all executable scalar 
 the `Float` path for CUDA bridges, decoded reports, or JSON artifacts whose metrics are stored as
 `Float`.
 -/
-def runAnyOrFloat
+def runSelectedOrFloat
     (exeName : String) (args : List String)
     (preferFloat : List String → Bool)
     (banner : TorchLean.Options → String)
@@ -409,7 +409,7 @@ def runAnyOrFloat
 Run an executable on either the selected scalar backend or the concrete `Float` path when the
 generic branch does not need an explicit `Float → α` cast helper.
 -/
-def runAnyOrFloatNoCast
+def runSelectedOrFloatSimple
     (exeName : String) (args : List String)
     (preferFloat : List String → Bool)
     (banner : TorchLean.Options → String)
@@ -419,7 +419,7 @@ def runAnyOrFloatNoCast
         (opts : TorchLean.Options) → (rest : List String) → IO Unit)
     (floatK : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
     (printOk : Bool := true) : IO UInt32 :=
-  runAnyOrFloat exeName args preferFloat banner
+  runSelectedOrFloat exeName args preferFloat banner
     (fun {α} _ _ _ _ _cast opts rest => anyK (α := α) opts rest)
     floatK printOk
 
@@ -428,7 +428,7 @@ Run an executable on the concrete `Float` runtime path.
 
 We use this for runnable training commands that produce Float-valued artifacts: CPU/CUDA eager
 execution, native kernels, and JSON loss curves. Commands that need to expose another scalar backend
-can use `runAnyOrFloat`.
+can use `runSelectedOrFloat`.
 -/
 def runFloat
     (exeName : String) (args : List String)
@@ -441,10 +441,10 @@ def runFloat
 /-! ### Runtime-flag normalization -/
 
 /-- Detect `--backend compiled` in either `--backend=compiled` or split-flag form. -/
-def selectsCompiledBackend : List String → Bool
+def requestsCompiledBackend : List String → Bool
   | "--backend=compiled" :: _ => true
   | "--backend" :: "compiled" :: _ => true
-  | _ :: rest => selectsCompiledBackend rest
+  | _ :: rest => requestsCompiledBackend rest
   | [] => false
 
 /--
@@ -453,7 +453,7 @@ Reject `--cpu` and add CUDA/runtime flags expected by GPU-first commands.
 This helper only rewrites command-line intent before the standard runtime parser runs. It does not
 change the lower-level runtime semantics.
 -/
-def forceGpuArgs
+def cudaArgs
     (exeName : String)
     (args : List String)
     (extraFlags : List String := ["--fast-kernels"]) :
@@ -468,17 +468,17 @@ def forceGpuArgs
 /-- Reject the proof-compiled backend for commands that require eager runtime execution. -/
 def requireEagerBackend (exeName : String) (args : List String) :
     Except String Unit := do
-  if selectsCompiledBackend args then
+  if requestsCompiledBackend args then
     throw s!"{exeName} requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
 
 /-- Reject compiled backend and force the CUDA-first flags expected by eager GPU examples. -/
-def forceGpuEagerArgs
+def cudaEagerArgs
     (exeName : String)
     (args : List String)
     (extraFlags : List String := ["--fast-kernels"]) :
     Except String (List String) := do
   requireEagerBackend exeName args
-  forceGpuArgs exeName args extraFlags
+  cudaArgs exeName args extraFlags
 
 /--
 Run a Float-only command after normalizing its runtime flags.
@@ -486,7 +486,7 @@ Run a Float-only command after normalizing its runtime flags.
 GPU-first examples use this to keep the public `Runtime.runFloat` path while inserting required
 CUDA/eager flags before the standard parser runs.
 -/
-def runForcedFloat
+def runNormalizedFloat
     (exeName : String)
     (args : List String)
     (normalize : List String → Except String (List String))
@@ -501,24 +501,24 @@ def runForcedFloat
       runFloat exeName normalized banner k printOk
 
 /-- Run a Float-only command after forcing CUDA runtime flags. -/
-def runGpuFloat
+def runCudaFloat
     (exeName : String)
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
     (extraFlags : List String := ["--fast-kernels"])
     (printOk : Bool := true) : IO UInt32 :=
-  runForcedFloat exeName args (fun args => forceGpuArgs exeName args extraFlags) banner k printOk
+  runNormalizedFloat exeName args (fun args => cudaArgs exeName args extraFlags) banner k printOk
 
 /-- Run a Float-only command after forcing CUDA eager-runtime flags. -/
-def runGpuEagerFloat
+def runCudaEagerFloat
     (exeName : String)
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
     (extraFlags : List String := ["--fast-kernels"])
     (printOk : Bool := true) : IO UInt32 :=
-  runForcedFloat exeName args (fun args => forceGpuEagerArgs exeName args extraFlags) banner k printOk
+  runNormalizedFloat exeName args (fun args => cudaEagerArgs exeName args extraFlags) banner k printOk
 
 /-! ### Common model-run parsers -/
 

@@ -13,7 +13,7 @@ public import NN.Runtime.Autograd.Compiled.IRExec.Correctness.Common
 
 Normalization correctness lemmas for the IR -> compiled runtime bridge.
 
-TorchLean’s LayerNorm proof stack has two layers:
+TorchLean’s LayerNorm correctness argument has two layers:
 
 * the spec layer (`Spec.layerNorm`) defines the mathematical normalization over a tensor axis,
   matching the original Layer Normalization formulation from Ba et al. (2016) and the public

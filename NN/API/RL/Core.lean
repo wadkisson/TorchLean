@@ -33,7 +33,7 @@ References (background and terminology):
   http://incompleteideas.net/book/the-book-2nd.html
 - Puterman, *Markov Decision Processes* (finite discounted MDPs):
   https://doi.org/10.1002/9780470316887
-- Gymnasium API docs (reset/step, `terminated` vs `truncated`):
+- Gymnasium API reference (reset/step, `terminated` vs `truncated`):
   https://gymnasium.farama.org/
 -/
 

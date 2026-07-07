@@ -17,7 +17,7 @@ Today it is used as the shared target for:
 - TorchLean → verifier compilation (`NN/Verification/TorchLean/Compile.lean`),
 - bound-propagation / verification tooling (CROWN/LiRPA) (`NN/MLTheory/CROWN/Graph.lean`),
 - IR → PyTorch emission (`NN/Runtime/PyTorch/Export/IRPyTorch.lean`),
-- compact example graphs (e.g. `NN/Examples/Advanced/GraphSpec/Tutorial.lean`).
+- compact example graphs (e.g. `NN/Examples/DeepDives/GraphSpec/Tutorial.lean`).
 
 Longer-term, the intent is to use the same IR as a bridge target for:
 - spec-level graphs (compile a model spec to an IR graph),

@@ -306,7 +306,7 @@ def ResNetBlockSpec.forward {inChannels outChannels inH inW : Nat}
       -- In standard ResNet this situation is usually handled by a projection shortcut
       -- (a 1×1 conv). This branch keeps the model total even when `shortcut_conv = none`.
       have h_le : outChannels ≤ inChannels := Nat.le_of_not_gt h_lt
-      sliceRange0Spec (α := α) (n := inChannels)
+      sliceLeadingAxisRangeSpec (α := α) (n := inChannels)
         (s := .dim inH (.dim inW .scalar)) 0 outChannels (by simpa using h_le) x
 
   -- Residual connection + ReLU
@@ -489,7 +489,7 @@ def ResNetBlockSpec.backward {inChannels outChannels inH inW : Nat}
         have h_le : outChannels ≤ inChannels := Nat.le_of_not_gt h_lt
         let x' : MultiChannelImage inChannels H2 W2 α :=
           rwMultiChannelImage x (by rfl) hH2_eq.symm hW2_eq.symm
-        sliceRange0Spec (α := α) (n := inChannels) (s := .dim H2 (.dim W2 .scalar))
+        sliceLeadingAxisRangeSpec (α := α) (n := inChannels) (s := .dim H2 (.dim W2 .scalar))
           0 outChannels (by simpa using h_le) x'
 
   let residual_out := addSpec bn2_out shortcut
@@ -593,14 +593,14 @@ def ResNetBlockSpec.backward {inChannels outChannels inH inW : Nat}
         -- pad forward: adjoint slices the first `inChannels` channels.
         have h_le : inChannels ≤ outChannels := Nat.le_of_lt h_lt
         let dX :=
-          sliceRange0Spec (α := α) (n := outChannels) (s := .dim inH (.dim inW .scalar))
+          sliceLeadingAxisRangeSpec (α := α) (n := outChannels) (s := .dim inH (.dim inW .scalar))
             0 inChannels (by simpa using h_le) d_shortcut_inH
         (dX, none, none, none)
       else
         -- slice forward: adjoint injects into the first `outChannels` channels and zeros the rest.
         have h_le : outChannels ≤ inChannels := Nat.le_of_not_gt h_lt
         let dX :=
-          sliceRange0BackwardSpec (α := α) (n := inChannels) (s := .dim inH (.dim inW .scalar))
+          sliceLeadingAxisRangeBackwardSpec (α := α) (n := inChannels) (s := .dim inH (.dim inW .scalar))
             0 outChannels (by simpa using h_le) d_shortcut_inH
         (dX, none, none, none)
 
@@ -1149,7 +1149,7 @@ def BottleneckResNetBlockSpec.forward {inChannels outChannels inH inW : Nat}
       have h_le : outChannels ≤ inChannels := Nat.le_of_not_gt h_lt
       let x' : MultiChannelImage inChannels Hmain Wmain α :=
         rwMultiChannelImage x (by rfl) (by grind) (by grind)
-      sliceRange0Spec (α := α) (n := inChannels) (s := .dim Hmain (.dim Wmain .scalar))
+      sliceLeadingAxisRangeSpec (α := α) (n := inChannels) (s := .dim Hmain (.dim Wmain .scalar))
         0 outChannels (by simpa using h_le) x'
 
   -- Residual connection + ReLU

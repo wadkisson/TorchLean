@@ -13,7 +13,7 @@ public import NN.Proofs.RuntimeApprox.FP32.MLP
 /-!
 # FP32 Runtime Approximation
 
-Specialization of the backend-generic approximation stack to TorchLean's FP32 rounding model.
+Specialization of the backend-generic approximation library to TorchLean's FP32 rounding model.
 
 These modules package layer, MLP, and CROWN/IBP margin lemmas so downstream examples can state
 “real spec result plus explicit FP32 error budget” without reassembling the numeric backend each
@@ -21,4 +21,3 @@ time.
 -/
 
 @[expose] public section
-

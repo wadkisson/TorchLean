@@ -15,11 +15,11 @@ that larger model proofs reuse.
 Large model proofs are rarely proved from scratch. They are assembled from small local facts. This
 page names the local facts that should be reused instead of reproved ad hoc.
 
-The useful mental model is:
+The reusable pieces are:
 
 - *Diffusion noising*: a Gaussian law pushed through an affine map, so generative model proofs can
   cite the forward kernel directly.
-- *Linear gradients*: derivatives with respect to input, weights, and bias, useful when a local
+- *Linear gradients*: derivatives with respect to input, weights, and bias, used when a local
   layer proof does not need the whole tape theorem.
 - *Activation gradients*: scalar derivative rules with domain side conditions, so kink points and
   guarded domains stay visible.
@@ -44,7 +44,7 @@ $$`\operatorname{forwardKernel}(a,b)(x)
 
 The exact schedule that chooses the coefficients belongs to the model spec. The probability proof
 material records the measure and kernel facts that can be reused independently of one executable
-diffusion example. The important theorem names are:
+diffusion example. The theorem names are:
 
 - `forwardNoising_eq_map`: the measure is the map of Gaussian noise through the affine noising
   function.
@@ -58,7 +58,7 @@ utility API gives the forward noising construction a reusable theorem home.
 
 # Local Gradient Theorems
 
-The gradient pages contain direct facts for individual operators. They are useful when a proof only
+The gradient pages contain direct facts for individual operators. They help when a proof only
 needs a local derivative and pulling in a whole tape theorem would be too much machinery.
 
 For a linear layer, the forward map has the familiar shape:
@@ -93,7 +93,7 @@ and `smooth_abs_deriv_correct`. The ReLU and ELU style theorems state their diff
 from kink points; the smooth activations state the ordinary derivative law everywhere their domains
 permit.
 
-These local theorems are not a replacement for the autograd tape proof. They are useful in a
+These local theorems are not a replacement for the autograd tape proof. They help in a
 different way. If a theorem only needs a local statement about one layer, it can cite a small local
 gradient theorem instead of pulling in the whole graph backprop layer.
 

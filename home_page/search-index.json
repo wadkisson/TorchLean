@@ -6,13 +6,13 @@ layout: null
     "title": "Home",
     "url": "{{ '/' | relative_url }}",
     "section": "Overview",
-    "text": "TorchLean executable neural networks formal specifications graph semantics CUDA trust boundaries proof-checkable ML artifacts"
+    "text": "TorchLean executable neural networks formal specifications graph semantics CUDA trust boundaries proof-checkable ML artifacts optimizer laws Muon CROWN PINN"
   },
   {
     "title": "Guide",
     "url": "{{ '/blueprint/' | relative_url }}",
     "section": "Guide",
-    "text": "TorchLean guide introduction semantics graphs runtime autograd interop verification certificates floating point native boundaries"
+    "text": "TorchLean guide introduction semantics graphs runtime autograd interop verification certificates floating point native boundaries optimizer laws scientific ML"
   },
   {
     "title": "Getting Started",
@@ -39,16 +39,28 @@ layout: null
     "text": "CUDA GPU kernels native runtime trust boundary fast kernels memcheck device buffers"
   },
   {
+    "title": "Backend Selection and Trust",
+    "url": "{{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}",
+    "section": "Guide",
+    "text": "backend eager compiled CUDA ATen PyTorch runtime provider graph tape backward trust boundary"
+  },
+  {
     "title": "Floating-Point Semantics",
     "url": "{{ '/blueprint/Floating-Point-and-Native-Boundaries/Floating-Point-Semantics/' | relative_url }}",
     "section": "Guide",
     "text": "FP32 IEEE floating point real semantics rounding runtime approximation"
   },
   {
+    "title": "Optimization Theory",
+    "url": "{{ '/blueprint/Verification-and-Certificates/Optimization-Theory/' | relative_url }}",
+    "section": "Guide",
+    "text": "optimization theory optimizer laws TensorOptimizer StepSpec Muon orthogonalization GaLore projected SGD convergence strong convexity gradient descent"
+  },
+  {
     "title": "Examples",
     "url": "{{ '/examples/' | relative_url }}",
     "section": "Examples",
-    "text": "examples models training diffusion text verification bug zoo PyTorch round trip"
+    "text": "examples models training diffusion text verification bug zoo PyTorch round trip scientific ML 3D geometry"
   },
   {
     "title": "Bug Zoo",
@@ -60,7 +72,7 @@ layout: null
     "title": "Verification Examples",
     "url": "{{ '/examples/verification/' | relative_url }}",
     "section": "Examples",
-    "text": "verification IBP CROWN certificates interval bounds affine bounds model robustness"
+    "text": "verification IBP CROWN alpha beta alpha-beta-CROWN certificates interval bounds affine bounds model robustness VNN-COMP PINN ODE geometry"
   },
   {
     "title": "Text Models",
@@ -91,12 +103,6 @@ layout: null
     "url": "{{ '/cuda/' | relative_url }}",
     "section": "Runtime",
     "text": "CUDA build flags kernels fast kernels native backend tests sanitizer profiling"
-  },
-  {
-    "title": "API Docs",
-    "url": "{{ '/docs/' | relative_url }}",
-    "section": "Reference",
-    "text": "DocGen API modules namespaces definitions theorems Lean reference"
   },
   {
     "title": "Dependency Graphs",

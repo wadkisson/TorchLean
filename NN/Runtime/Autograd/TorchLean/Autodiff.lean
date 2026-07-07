@@ -134,23 +134,23 @@ def compileLoss {α : Type} [Context α] [DecidableEq Shape]
   okOrThrow (_root_.Runtime.Autograd.Torch.compileScalar (α := α) (Γ := Γ) build)
 
 /--
-Compile a TorchLean program to a reusable `CompiledOut` (static SSA/DAG + output node).
+Compile a TorchLean program to a reusable `CompiledGraph` (static SSA/DAG + output node).
 
 This is the non-scalar analogue of `compileLoss`. It is used by `jacrevOut*` and `vjpOut*`.
 -/
-def compileOut {α : Type} [Context α] [DecidableEq Shape]
+def compileGraph {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes inputShapes : List Shape} {τ : Shape}
     (f :
       ∀ {β : Type}, [Context β] → [DecidableEq Shape] →
         TorchLean.Program β (paramShapes ++ inputShapes) τ) :
-    IO (_root_.Runtime.Autograd.Torch.CompiledOut α (paramShapes ++ inputShapes) τ) := do
+    IO (_root_.Runtime.Autograd.Torch.CompiledGraph α (paramShapes ++ inputShapes) τ) := do
   let Γ : List Shape := paramShapes ++ inputShapes
   let build : Runtime.Autograd.Compiled.GraphM.M α Γ (Runtime.Autograd.Compiled.GraphM.Var τ) := do
     let vs ← Runtime.Autograd.Compiled.GraphM.args (α := α) (Γ := Γ)
     CurriedRef.applyVarList (Γ := Γ)
       (β := Runtime.Autograd.Compiled.GraphM.M α Γ (Runtime.Autograd.Compiled.GraphM.Var τ))
       (f (β := α) (m := Runtime.Autograd.Compiled.GraphM.M α Γ)) vs
-  okOrThrow (_root_.Runtime.Autograd.Torch.compileOut (α := α) (Γ := Γ) (τ := τ) build)
+  okOrThrow (_root_.Runtime.Autograd.Torch.compileGraph (α := α) (Γ := Γ) (τ := τ) build)
 
 /-- Jacobian (reverse-mode) of a tensor output w.r.t. parameters, as an array of VJPs. -/
 def jacrevOutParams {α : Type} [Context α] [DecidableEq Shape]
@@ -161,14 +161,14 @@ def jacrevOutParams {α : Type} [Context α] [DecidableEq Shape]
     (params : TList α paramShapes)
     (xs : TList α inputShapes) :
     IO (Array (TList α paramShapes)) := do
-  let c ← compileOut (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
+  let c ← compileGraph (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
   let Γ : List Shape := paramShapes ++ inputShapes
   let args : TList α Γ := tlistAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) params xs
   let seeds : Array (Tensor α τ) := basisTensors (α := α) τ
   let rows : Array (TList α paramShapes) :=
     seeds.map (fun seedOut =>
       let gAll : TList α Γ :=
-        _root_.Runtime.Autograd.Torch.CompiledOut.vjpWithSeed (α := α) (Γ := Γ) (τ := τ) c args
+        _root_.Runtime.Autograd.Torch.CompiledGraph.vjpWithSeed (α := α) (Γ := Γ) (τ := τ) c args
           seedOut
       (tlistSplitAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) gAll).1)
   pure rows
@@ -182,14 +182,14 @@ def jacrevOutInputs {α : Type} [Context α] [DecidableEq Shape]
     (params : TList α paramShapes)
     (xs : TList α inputShapes) :
     IO (Array (TList α inputShapes)) := do
-  let c ← compileOut (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
+  let c ← compileGraph (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
   let Γ : List Shape := paramShapes ++ inputShapes
   let args : TList α Γ := tlistAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) params xs
   let seeds : Array (Tensor α τ) := basisTensors (α := α) τ
   let rows : Array (TList α inputShapes) :=
     seeds.map (fun seedOut =>
       let gAll : TList α Γ :=
-        _root_.Runtime.Autograd.Torch.CompiledOut.vjpWithSeed (α := α) (Γ := Γ) (τ := τ) c args
+        _root_.Runtime.Autograd.Torch.CompiledGraph.vjpWithSeed (α := α) (Γ := Γ) (τ := τ) c args
           seedOut
       (tlistSplitAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) gAll).2)
   pure rows
@@ -203,7 +203,7 @@ Implementation note: this uses **dual-number forward evaluation** (compile/run u
 instead of graph-level `jvp`, because the compiled graph provides VJPs broadly but not
 JVP rules for every op.
 -/
-def jacfwd1 {α : Type} [Context α] [DecidableEq Shape]
+def jacfwdInput {α : Type} [Context α] [DecidableEq Shape]
     {σ τ : Shape}
     (f :
       ∀ {β : Type}, [Context β] → [DecidableEq Shape] →
@@ -211,14 +211,14 @@ def jacfwd1 {α : Type} [Context α] [DecidableEq Shape]
     (x : Tensor α σ) :
     IO (Array (Tensor α τ)) := do
   let αD := Dual α
-  let c ← compileOut (α := αD)
+  let c ← compileGraph (α := αD)
     (paramShapes := ([] : List Shape)) (inputShapes := [σ]) (τ := τ)
     (fun {β} _ _ => f (β := β))
   let dirs : Array (Tensor α σ) := basisTensors (α := α) σ
   pure <| dirs.map (fun dx =>
     let xD : Tensor αD σ := DualTensor.withTangents (α := α) (s := σ) x dx
     let outD : Tensor αD τ :=
-      _root_.Runtime.Autograd.Torch.CompiledOut.forward (α := αD) (Γ := [σ]) (τ := τ) c (.cons xD
+      _root_.Runtime.Autograd.Torch.CompiledGraph.forward (α := αD) (Γ := [σ]) (τ := τ) c (.cons xD
         .nil)
     DualTensor.tangent (α := α) (s := τ) outD)
 
@@ -264,10 +264,10 @@ def vjpOutParams {α : Type} [Context α] [DecidableEq Shape]
     (xs : TList α inputShapes)
     (seedOut : Tensor α τ) :
     IO (TList α paramShapes) := do
-  let c ← compileOut (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
+  let c ← compileGraph (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
   let Γ : List Shape := paramShapes ++ inputShapes
   let args : TList α Γ := tlistAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) params xs
-  let gAll : TList α Γ := _root_.Runtime.Autograd.Torch.CompiledOut.vjpWithSeed (α := α) (Γ := Γ) (τ
+  let gAll : TList α Γ := _root_.Runtime.Autograd.Torch.CompiledGraph.vjpWithSeed (α := α) (Γ := Γ) (τ
     := τ) c args seedOut
   pure (tlistSplitAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) gAll).1
 
@@ -281,10 +281,10 @@ def vjpOutInputs {α : Type} [Context α] [DecidableEq Shape]
     (xs : TList α inputShapes)
     (seedOut : Tensor α τ) :
     IO (TList α inputShapes) := do
-  let c ← compileOut (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
+  let c ← compileGraph (α := α) (paramShapes := paramShapes) (inputShapes := inputShapes) (τ := τ) f
   let Γ : List Shape := paramShapes ++ inputShapes
   let args : TList α Γ := tlistAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) params xs
-  let gAll : TList α Γ := _root_.Runtime.Autograd.Torch.CompiledOut.vjpWithSeed (α := α) (Γ := Γ) (τ
+  let gAll : TList α Γ := _root_.Runtime.Autograd.Torch.CompiledGraph.vjpWithSeed (α := α) (Γ := Γ) (τ
     := τ) c args seedOut
   pure (tlistSplitAppend (α := α) (ss₁ := paramShapes) (ss₂ := inputShapes) gAll).2
 
@@ -439,7 +439,7 @@ Full Hessian (as an array of columns) for a scalar function of a *single* tensor
 Returns `Array (Tensor α σ)` where each element is `H * e_i` in the flattened coordinate basis of
   `σ`.
 -/
-def hessian1 {α : Type} [Context α] [DecidableEq Shape]
+def hessianInput {α : Type} [Context α] [DecidableEq Shape]
     {σ : Shape}
     (f :
       ∀ {β : Type}, [Context β] → [DecidableEq Shape] →

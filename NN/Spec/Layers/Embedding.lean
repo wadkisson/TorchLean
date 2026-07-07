@@ -27,7 +27,7 @@ References / analogies:
   framing in neural language models.
 - Mikolov et al., "Efficient Estimation of Word Representations in Vector Space" (2013) for the
   modern word-embedding perspective.
-- PyTorch API docs:
+- PyTorch API reference:
   - `torch.nn.Embedding`: https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html
   - `torch.nn.functional.one_hot`:
     https://pytorch.org/docs/stable/generated/torch.nn.functional.one_hot.html

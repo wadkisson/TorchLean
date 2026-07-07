@@ -20,7 +20,7 @@ The preceding files prove the smooth residual components:
 * `x ↦ x + MultiHeadSelfAttention(x)`;
 * `x ↦ x + W₂ GELU(W₁x + b₁) + b₂`.
 
-This module proves the next runtime-facing boundary:
+This module proves the next runtime layer boundary:
 
 `residual_stream ↦ LayerNorm(residual_stream, gamma, beta)`.
 

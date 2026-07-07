@@ -45,7 +45,7 @@ namespace FastKernels
 Precision selector for GPU-backed fast matmul over Lean `Float` tensors.
 
 - `.fp32` routes through `Cuda.Buffer` and cuBLAS SGEMM, matching the precision used by the eager
-  CUDA tensor-buffer stack.
+  CUDA tensor-buffer path.
 - `.fp64` routes through the host `FloatArray` DGEMM bridge and cuBLAS DGEMM, preserving Lean
   `Float` precision for matmul-only research paths.
 -/
@@ -312,7 +312,7 @@ def matmulForwardcuBLAS64 {m n p : Nat}
       Tensor.scalar (flatC.get! (i.val * p + j.val))))
 
 /--
-2D matmul forward via the float32 CUDA buffer stack.
+2D matmul forward via the float32 CUDA buffer path.
 
 This path uploads Lean `Float` values to `Cuda.Buffer` (rounding to float32), calls the existing
 `Buffer.bmm` SGEMM implementation with `batch = 1`, then downloads the float32 result back to Lean

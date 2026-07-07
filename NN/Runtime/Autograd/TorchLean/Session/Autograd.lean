@@ -29,8 +29,7 @@ namespace Session
 /--
 Run a backward pass and return a dense array of gradients for *all* leaf tensors.
 
-This is the TorchLean analogue of calling `backward()` and then reading `.grad` for every leaf,
-but in an explicit "dense array" form.
+This is the explicit dense-array version of calling backward and then reading every leaf gradient.
 -/
 def backwardDenseAll {α : Type} (s : Session α) [Add α] [Zero α] [DecidableEq Shape]
   [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
@@ -104,7 +103,7 @@ def backwardScalarDenseAllWithHook {α : Type} (s : Session α) [Add α] [Zero �
 /--
 Extract the gradient for a particular tensor ref from a dense gradient array.
 
-This is the TorchLean analogue of reading `x.grad` (but without mutation).
+This is the non-mutating counterpart of reading `x.grad`.
 -/
 def grad {α : Type} {sh : Shape} [DecidableEq Shape]
   (grads : Array (_root_.Runtime.AnyTensor α)) (x : _root_.Runtime.Autograd.Torch.TensorRef α sh) :

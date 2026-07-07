@@ -52,8 +52,8 @@ public import NN.Proofs.Verification
 /-!
 Proof entry point used by downstream packages.
 
-This module collects the maintained proof surface: tensor facts, autograd correctness,
-runtime-approximation theorems, model proofs, and verification soundness results.
+This module collects the maintained proof API: tensor facts, selected autograd correctness
+theorems, runtime-approximation theorems, model proofs, and verification soundness results.
 -/
 
 /-!
@@ -61,18 +61,18 @@ runtime-approximation theorems, model proofs, and verification soundness results
 
 Umbrella import for TorchLean's core proof infrastructure.
 
-This is the set of proof modules that `NN.Library` considers part of the supported
-library surface area (as opposed to tests, examples, or executable workflows).
+These are the proof modules that `NN.Library` considers supported library code, separate from tests,
+examples, and executable workflows.
 
 Notes:
 - This is curated rather than "import everything under `NN/Proofs`".
-- If you add a new proof module that should be part of the stable surface,
+- If you add a new proof module that should be part of the stable proof API,
   add it here.
 
-Proof-facing landmarks:
-- real-analysis and numerics-facing helper theorems: `NN.Proofs.Analysis`,
-- analytic autograd correctness: `NN.Proofs.Autograd.FDeriv.*`,
-- tape/DAG reverse-mode correctness: `NN.Proofs.Autograd.Tape.*`,
+Proof landmarks:
+- real-analysis and numerics helper theorems: `NN.Proofs.Analysis`,
+- analytic autograd correctness fragments: `NN.Proofs.Autograd.FDeriv.*`,
+- tape/DAG reverse-mode correctness fragments: `NN.Proofs.Autograd.Tape.*`,
 - model-level invariants: `NN.Proofs.Models`,
 - probability-kernel facts: `NN.Proofs.Probability`,
 - runtime-approximation bounds: `NN.Proofs.RuntimeApprox.*`,

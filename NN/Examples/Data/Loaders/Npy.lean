@@ -63,7 +63,7 @@ def outDim : Nat := 1
 
 /-- A small 2-layer batched MLP `2 -> 8 -> 1`. -/
 def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
-  nn.models.Mlp1ReLU
+  nn.models.MlpReLU
     { batch := batch, inDim := inDim, hidDim := 8, outDim := outDim }
 
 /-- Command-line help for the NPY loader tutorial. -/
@@ -81,7 +81,7 @@ def usage : String :=
     , "  --seed N"
     , "  --batch N"
     , "  --steps N"
-    , "  --dtype float|ieee32"
+    , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
     , "  --cpu | --cuda"
     ]

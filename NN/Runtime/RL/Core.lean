@@ -15,7 +15,7 @@ public import NN.Tensor.API
 /-!
 # Core Reinforcement-Learning Runtime Helpers
 
-This module adds the tensor-shaped and runtime-facing pieces that sit on top of the mathematical
+This module adds the tensor-shaped and runtime layer pieces that sit on top of the mathematical
 RL core in `NN.Spec.RL.Core`.
 
 Keeping Bellman / return / GAE definitions in the spec layer avoids an awkward split where the

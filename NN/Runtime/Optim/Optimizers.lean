@@ -29,7 +29,7 @@ The intent is to mimic the standard textbook formulas closely. We do not try to 
 implementation detail of `torch.optim.*` (e.g. foreach kernels, fused updates, or every optional
 flag); those live at a different layer than the math we specify here.
 
-Where this file sits in the stack:
+How this file fits with the runtime and API:
 - this file owns the scalar-polymorphic, per-tensor update equations;
 - `NN.Runtime.Autograd.TorchLean.Optim` lifts those equations to runtime parameter lists; and
 - `NN.API.Runtime` exposes ergonomic `optim.sgd`, `optim.adam`, and related configuration helpers.
@@ -41,7 +41,8 @@ Why each optimizer has its own `State` structure:
 - Lean structures do not inherit from one another the way Python classes do.
 - More importantly, optimizer state is not uniform: SGD stores only `lr`, momentum SGD stores a
   buffer, Adam/AdamW store two moment buffers and a step counter, Adadelta stores gradient/update
-  EMAs, and Muon/GaLore carry backend functions.
+  EMAs, Muon carries an orthogonalization backend, and GaLore-style projected updates carry a
+  projection backend.
 - Keeping these as separate typed states makes impossible states unrepresentable. For example, an
   SGD state cannot accidentally contain a stale Adam `v` buffer, and AdamW cannot forget its
   decoupled `weight_decay` coefficient.
@@ -547,7 +548,7 @@ def Adadelta.update {α : Type} [Context α] [DecidableRel ((· > ·) : α → �
     state.rho))
   ({ state with v := newV, u := newU }, newParams)
 
-/-! ## Projected / low-rank optimizers -/
+/-! ## Projected / low-rank gradient transforms -/
 
 namespace GaLore
 

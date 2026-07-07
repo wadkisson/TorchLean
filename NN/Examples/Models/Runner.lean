@@ -8,7 +8,7 @@ module
 
 public import NN
 public import NN.Examples.Models
-public import NN.Examples.Advanced
+public import NN.Examples.DeepDives
 public import NN.Examples.Quickstart
 public import NN.Examples.Data.Loaders.Csv
 public import NN.Examples.Data.Loaders.Npy
@@ -68,7 +68,7 @@ def usage : String :=
     , "  lake exe -K cuda=true torchlean cnn --cuda --steps 10 --n-total 1"
     , "  lake exe torchlean quickstart_tensors"
     , "  lake exe torchlean quickstart_autograd"
-    , "  lake exe torchlean quickstart_mlp --steps 20 --dtype float --backend eager"
+    , "  lake exe torchlean quickstart_mlp --steps 20 --dtype float32 --backend eager"
     , "  lake exe torchlean quickstart_minibatch_mlp --steps 30 --batch 5 --dtype float --backend eager"
     , "  lake exe torchlean quickstart_cnn --steps 5 --batch 2 --dtype float --backend eager"
     , "  lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0"
@@ -96,7 +96,7 @@ def usage : String :=
     , "  lake exe torchlean ir_axis_ops --dtype float --backend eager"
     , "  lake exe torchlean one_semantic_universe --samples 50"
     , "  lake exe torchlean torch_ir_pytorch --arch mlp > exported_model.py"
-    , "  lake exe torchlean gpt_adder --steps 1 --a 7 --b 8"
+    , "  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --a 7 --b 8"
     ]
 
 /--
@@ -171,21 +171,21 @@ def runCmd (cmd : String) (args : List String) : IO UInt32 := do
       NN.Examples.Interop.PyTorch.Roundtrip.main args
       pure 0
   | "pytorch_export_check" => NN.Examples.Interop.PyTorch.TorchExportCheck.main args
-  | "floats_arb_ieee_compare" => NN.Examples.Advanced.Floats.ArbIEEEExecCompare.main args
+  | "floats_arb_ieee_compare" => NN.Examples.DeepDives.Floats.ArbIEEEExecCompare.main args
   | "float32_modes" =>
-      NN.Examples.Advanced.Floats.Float32Modes.main args
+      NN.Examples.DeepDives.Floats.Float32Modes.main args
       pure 0
   | "graphspec" =>
-      NN.Examples.Advanced.GraphSpec.Tutorial.main args
+      NN.Examples.DeepDives.GraphSpec.Tutorial.main args
       pure 0
   | "ir_axis_ops" =>
-      NN.Examples.Advanced.IRAxisOps.main args
+      NN.Examples.DeepDives.IRAxisOps.main args
       pure 0
   | "one_semantic_universe" =>
-      NN.Examples.Advanced.OneSemanticUniverse.main args
+      NN.Examples.DeepDives.OneSemanticUniverse.main args
       pure 0
   | "torch_ir_pytorch" =>
-      NN.Examples.Advanced.TorchIRPyTorch.main args
+      NN.Examples.DeepDives.TorchIRPyTorch.main args
       pure 0
   | _ =>
       IO.eprintln s!"Unknown example: {cmd}"

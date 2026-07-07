@@ -10,12 +10,12 @@ public import NN.Floats.IEEEExec.BridgeFP32Total
 public import NN.Floats.Interval.IEEEExec32
 
 /-!
-# `min4`/`max4` real semantics (finite regime)
+# `minOfFour`/`maxOfFour` real semantics (finite regime)
 
 `NN/Floats/Interval/IEEEExec32.lean` exposes helper combinators:
 
-- `IEEE32Exec.Interval32.min4`
-- `IEEE32Exec.Interval32.max4`
+- `IEEE32Exec.Interval32.minOfFour`
+- `IEEE32Exec.Interval32.maxOfFour`
 
 used to implement the classical 4-corner multiplication enclosure rule.
 
@@ -39,15 +39,15 @@ namespace Interval32
 noncomputable section
 
 /--
-Real semantics of `Interval32.min4` in the finite regime.
+Real semantics of `Interval32.minOfFour` in the finite regime.
 
-If all four arguments are finite, then `toReal (min4 a b c d)` is the corresponding nested `min`
+If all four arguments are finite, then `toReal (minOfFour a b c d)` is the corresponding nested `min`
 of the four real values.
 -/
 theorem toReal_min4_eq_min_of_isFinite (a b c d : IEEE32Exec)
     (ha : isFinite a = true) (hb : isFinite b = true) (hc : isFinite c = true) (hd : isFinite d =
       true) :
-    toReal (TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.min4 a b c d) =
+    toReal (TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.minOfFour a b c d) =
       min (min (toReal a) (toReal b)) (min (toReal c) (toReal d)) := by
   have hab : toReal (minimum a b) = min (toReal a) (toReal b) :=
     toReal_minimum_eq_min_of_isFinite (x := a) (y := b) ha hb
@@ -71,18 +71,18 @@ theorem toReal_min4_eq_min_of_isFinite (a b c d : IEEE32Exec)
           = min (toReal (minimum a b)) (toReal (minimum c d)) := houter
       _ = min (min (toReal a) (toReal b)) (min (toReal c) (toReal d)) := by
           rw [hab, hcd]
-  simpa [TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.min4] using houter'
+  simpa [TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.minOfFour] using houter'
 
 /--
-Real semantics of `Interval32.max4` in the finite regime.
+Real semantics of `Interval32.maxOfFour` in the finite regime.
 
-If all four arguments are finite, then `toReal (max4 a b c d)` is the corresponding nested `max`
+If all four arguments are finite, then `toReal (maxOfFour a b c d)` is the corresponding nested `max`
 of the four real values.
 -/
 theorem toReal_max4_eq_max_of_isFinite (a b c d : IEEE32Exec)
     (ha : isFinite a = true) (hb : isFinite b = true) (hc : isFinite c = true) (hd : isFinite d =
       true) :
-    toReal (TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.max4 a b c d) =
+    toReal (TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.maxOfFour a b c d) =
       max (max (toReal a) (toReal b)) (max (toReal c) (toReal d)) := by
   have hab : toReal (maximum a b) = max (toReal a) (toReal b) :=
     toReal_maximum_eq_max_of_isFinite (x := a) (y := b) ha hb
@@ -104,7 +104,7 @@ theorem toReal_max4_eq_max_of_isFinite (a b c d : IEEE32Exec)
           = max (toReal (maximum a b)) (toReal (maximum c d)) := houter
       _ = max (max (toReal a) (toReal b)) (max (toReal c) (toReal d)) := by
           rw [hab, hcd]
-  simpa [TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.max4] using houter'
+  simpa [TorchLean.Floats.IEEE754.IEEE32Exec.Interval32.maxOfFour] using houter'
 
 end
 

@@ -20,8 +20,7 @@ public import NN.GraphSpec.ToTorchLean
 
 Curated umbrella import for GraphSpec.
 
-This is the public single-import surface for GraphSpec users. For the full model-spec interface,
-use:
+Use this import when working with GraphSpec models, primitives, lowering, and bridge theorems:
 
 ```lean
 import NN.Entrypoint.GraphSpec
@@ -29,7 +28,7 @@ import NN.Entrypoint.GraphSpec
 
 It gives you:
 
-- the canonical DAG model surface (`NN.GraphSpec.DAG.Term`, `NN.GraphSpec.DAG.Model`),
+- the canonical DAG model API (`NN.GraphSpec.DAG.Term`, `NN.GraphSpec.DAG.Model`),
 - the sequential authoring sugar (`NN.GraphSpec.Graph` + `>>>`) for chain models and its lowering
   into DAG,
 - the Spec semantics (`NN.GraphSpec.Interp.spec`) and TorchLean compiler
@@ -39,8 +38,7 @@ It gives you:
 - the optional lowering to `TorchLean.NN.Seq` when primitives provide `toLayerDefM?`,
 - and the model/primitive bridge theorems that connect GraphSpec syntax to Spec references.
 
-This file is an umbrella re-export. It has no real logic; the implementation lives in the imported
-modules.
+Umbrella re-export; the implementation lives in the imported modules.
 -/
 
 @[expose] public section

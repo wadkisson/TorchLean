@@ -6,8 +6,8 @@ Authors: TorchLean Team
 CUDA/cuBLAS FFI: host `FloatArray` DGEMM (FP64 / Lean `Float`).
 Implementation: `csrc/cuda/blas/torchlean_dgemm_cuda.cu` (`cublasDgemm`).
 
-The FP32 matmul path lives in `Engine.Cuda.Kernels` as `Buffer.bmm`, which uses the CUDA buffer
-stack and cuBLAS SGEMM.
+The FP32 matmul path lives in `Engine.Cuda.Kernels` as `Buffer.bmm`, which uses CUDA buffers and
+cuBLAS SGEMM.
 -/
 
 module

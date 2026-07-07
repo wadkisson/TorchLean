@@ -607,7 +607,7 @@ theorem bbox_encloses_perturbed_of_margin
   · linarith
 
 /--
-The end-user theorem-facing statement.
+The checked 3D box statement exposed by the certificate workflow.
 
 This says the exported detector artifact is internally coherent under its stated camera model:
 positive image dimensions, ordered in-frame 2D box, positive camera depth, projected corners inside

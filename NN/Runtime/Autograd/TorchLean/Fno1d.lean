@@ -63,7 +63,7 @@ inductive Activation where
 /-! ## Small shape views -/
 
 /-- Reshape a `grid`-vector into a `grid×1` matrix. -/
-def reshapeVecToMat1 (grid : Nat) :
+def reshapeVectorToMatrix (grid : Nat) :
     LayerDef (vec grid) (mat grid 1) :=
   let s₁ : Shape := vec grid
   let s₂ : Shape := mat grid 1
@@ -76,8 +76,8 @@ def reshapeVecToMat1 (grid : Nat) :
         fun x => TorchLean.reshape (m := m) (α := α) (s₁ := s₁) (s₂ := s₂) x h
   }
 
-/-- Inverse of `reshapeVecToMat1`: view a `grid×1` matrix back as a length-`grid` vector. -/
-def reshapeMatToVec1 (grid : Nat) :
+/-- Inverse of `reshapeVectorToMatrix`: view a `grid×1` matrix back as a length-`grid` vector. -/
+def reshapeMatrixToVector (grid : Nat) :
     LayerDef (mat grid 1) (vec grid) :=
   let s₁ : Shape := mat grid 1
   let s₂ : Shape := vec grid
@@ -104,7 +104,7 @@ def matAffine
   let b0 : Tensor Float bShape :=
     Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { paramShapes := [WShape, bShape]
-    initParams := Torch.tlist2 w0 b0
+    initParams := Torch.tlistPair w0 b0
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
         fun w b x =>
@@ -189,7 +189,7 @@ def block
   let midLen : Nat := grid - 2 * modes
 
   { paramShapes := [wLowShape, wHighShape, wSkipShape, bSkipShape]
-    initParams := Torch.tlist4 wLow0 wHigh0 wSkip0 bSkip0
+    initParams := Torch.tlistQuad wLow0 wHigh0 wSkip0 bSkip0
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
         fun wLow wHigh wSkip bSkip x =>
@@ -205,13 +205,13 @@ def block
 
             -- Low frequencies: rows [0, modes)
             let xLow ←
-              TorchLean.sliceRange0 (m := m) (α := α)
+              TorchLean.sliceLeadingAxisRange (m := m) (α := α)
                 (nDim := grid) (s := .dim width .scalar)
                 (start := 0) (len := modes) (by simpa using hModes') xHat
 
             -- High frequencies: rows [grid - modes, grid)
             let xHigh ←
-              TorchLean.sliceRange0 (m := m) (α := α)
+              TorchLean.sliceLeadingAxisRange (m := m) (α := α)
                 (nDim := grid) (s := .dim width .scalar)
                 (start := grid - modes) (len := modes)
                 (by
@@ -241,10 +241,10 @@ def block
 
             -- Concatenate [low, mid, high] back to a `grid×width` spectrum
             let yLowMid ←
-              TorchLean.concatDim0 (m := m) (α := α)
+              TorchLean.concatLeadingAxis (m := m) (α := α)
                 (nDim := modes) (mDim := midLen) (s := .dim width .scalar) yLow yMid
             let yHat' ←
-              TorchLean.concatDim0 (m := m) (α := α)
+              TorchLean.concatLeadingAxis (m := m) (α := α)
                 (nDim := modes + midLen) (mDim := modes) (s := .dim width .scalar) yLowMid yHigh
             let yHat : RefTy (m := m) (α := α) (mat grid width) := by
               have hSum : (modes + midLen) + modes = grid := by
@@ -349,12 +349,12 @@ def model
     (seed : Nat := 0)
     (hModes : 2 * modes ≤ grid) :
     Seq (vec grid) (vec grid) :=
-  let reshapeIn := reshapeVecToMat1 (grid := grid)
+  let reshapeIn := reshapeVectorToMatrix (grid := grid)
   let lift :=
     matAffine (grid := grid) (inC := 1) (outC := width) (seedW := seed) (seedB := seed + 1)
   let proj :=
     matAffine (grid := grid) (inC := width) (outC := 1) (seedW := seed + 100) (seedB := seed + 101)
-  let reshapeOut := reshapeMatToVec1 (grid := grid)
+  let reshapeOut := reshapeMatrixToVector (grid := grid)
   Seq.cons reshapeIn <|
     Seq.cons lift <|
       blocksSeq (grid := grid) (width := width) (modes := modes) (blocks := blocks)
@@ -375,7 +375,7 @@ theorem model_paramShapes (grid width modes blocks : Nat) (activation : Activati
         blocksParamShapes (width := width) (modes := modes) (blocks := blocks) ++
         [mat width 1, vec 1] := by
   simp [model, Seq.paramShapes, blocksSeq_paramShapes, paramShapes_comp,
-    reshapeVecToMat1, reshapeMatToVec1, matAffine]
+    reshapeVectorToMatrix, reshapeMatrixToVector, matAffine]
 
 
 namespace Real
@@ -476,16 +476,16 @@ def block
             let xHatIm ← _root_.Runtime.Autograd.Torch.matmul (m := m) (α := α)
               (mDim := grid) (nDim := grid) (pDim := width) fNegSin x
 
-            let lowRe ← _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+            let lowRe ← _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
               (nDim := grid) (s := .dim width .scalar) (start := 0) (len := modes)
               (by simpa using hModes') xHatRe
-            let lowIm ← _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+            let lowIm ← _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
               (nDim := grid) (s := .dim width .scalar) (start := 0) (len := modes)
               (by simpa using hModes') xHatIm
-            let highRe ← _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+            let highRe ← _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
               (nDim := grid) (s := .dim width .scalar) (start := grid - modes) (len := modes)
               (by simp [Nat.add_sub_of_le hModes']) xHatRe
-            let highIm ← _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+            let highIm ← _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
               (nDim := grid) (s := .dim width .scalar) (start := grid - modes) (len := modes)
               (by simp [Nat.add_sub_of_le hModes']) xHatIm
 
@@ -527,13 +527,13 @@ def block
             let mid0 : Tensor α (mat midLen width) := Spec.fill (0 : α) (mat midLen width)
             let yMidRe ← _root_.Runtime.Autograd.Torch.const (m := m) (α := α) (s := mat midLen width) mid0
             let yMidIm ← _root_.Runtime.Autograd.Torch.const (m := m) (α := α) (s := mat midLen width) mid0
-            let yLowMidRe ← _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+            let yLowMidRe ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
               (nDim := modes) (mDim := midLen) (s := .dim width .scalar) yLowRe yMidRe
-            let yLowMidIm ← _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+            let yLowMidIm ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
               (nDim := modes) (mDim := midLen) (s := .dim width .scalar) yLowIm yMidIm
-            let yHatRe' ← _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+            let yHatRe' ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
               (nDim := modes + midLen) (mDim := modes) (s := .dim width .scalar) yLowMidRe yHighRe
-            let yHatIm' ← _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+            let yHatIm' ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
               (nDim := modes + midLen) (mDim := modes) (s := .dim width .scalar) yLowMidIm yHighIm
             let yHatRe : _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α) (mat grid width) := by
               have hSum : (modes + midLen) + modes = grid := by
@@ -593,14 +593,14 @@ def model
     (seed : Nat := 0)
     (hModes : 2 * modes ≤ grid) :
     Seq (vec grid) (vec grid) :=
-  let reshapeIn := _root_.Runtime.Autograd.TorchLean.NN.FNO1D.reshapeVecToMat1 (grid := grid)
+  let reshapeIn := _root_.Runtime.Autograd.TorchLean.NN.FNO1D.reshapeVectorToMatrix (grid := grid)
   let lift :=
     _root_.Runtime.Autograd.TorchLean.NN.FNO1D.matAffine (grid := grid) (inC := 1) (outC := width)
       (seedW := seed) (seedB := seed + 1)
   let proj :=
     _root_.Runtime.Autograd.TorchLean.NN.FNO1D.matAffine (grid := grid) (inC := width) (outC := 1)
       (seedW := seed + 1000) (seedB := seed + 1001)
-  let reshapeOut := _root_.Runtime.Autograd.TorchLean.NN.FNO1D.reshapeMatToVec1 (grid := grid)
+  let reshapeOut := _root_.Runtime.Autograd.TorchLean.NN.FNO1D.reshapeMatrixToVector (grid := grid)
   Seq.cons reshapeIn <|
     Seq.cons lift <|
       blocksSeq (grid := grid) (width := width) (modes := modes) (blocks := blocks) (seed := seed) (hModes := hModes) >>>

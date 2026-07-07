@@ -101,8 +101,8 @@ def parseBetaVec? (dim : Nat) (j : Json) : IO (Option (Array Int)) := do
 `AlphaBetaCROWNNodeCertificate` is the in-memory representation of an alpha/beta-CROWN node
 certificate read from JSON.
 
-This is part of the public surface of the checker because `readAlphaBetaCROWNNodeCertificate`
-returns it, and because the blueprint points to it as the “shape of the artifact” being checked.
+The checker returns this structure from `readAlphaBetaCROWNNodeCertificate`, and the blueprint uses
+it as the documented shape of the artifact being checked.
 -/
 structure AlphaBetaCROWNNodeCertificate where
   /-- Affine-propagation context, including the chosen input node and flattened input dimension. -/

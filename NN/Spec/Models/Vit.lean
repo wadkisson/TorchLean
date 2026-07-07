@@ -233,12 +233,12 @@ def ViTSpec.forward
 
   -- Mean pool over tokens (PyTorch analogy: `encoded.mean(dim=0)` in our `(T,D)` convention).
   have h_tok_ne0 : tokN ≠ 0 := Nat.ne_of_gt h_tok
-  have h_axis0 :
+  have hLeadingAxis :
       Shape.valid_axis_inst 0 (Shape.dim tokN (Shape.dim cfg.embedDim Shape.scalar)) :=
     Shape.validAxisInstZeroAlt h_tok_ne0
 
   let pooled : Tensor α (.dim cfg.embedDim .scalar) :=
-    reduceMeanAuto 0 h_axis0 encoded
+    reduceMeanAuto 0 hLeadingAxis encoded
 
   linearSpec (α := α) m.head pooled
 
@@ -442,7 +442,7 @@ def ViTClsSpec.forward
     Tensor.dim (fun _ : Fin 1 => m.clsToken)
 
   let tokensWithCls0 : Tensor α (.dim (1 + tokN) (.dim cfg.embedDim .scalar)) :=
-    concatDim0Spec clsSeq tokens
+    concatLeadingAxisSpec clsSeq tokens
 
   let tokensWithCls : Tensor α (.dim (tokN + 1) (.dim cfg.embedDim .scalar)) :=
     tensorCast (.dim (tokN + 1) (.dim cfg.embedDim .scalar)) (by
@@ -498,7 +498,7 @@ def ViTClsSpec.backward
     Tensor.dim (fun _ : Fin 1 => m.clsToken)
 
   let tokensWithCls0 : Tensor α (.dim (1 + tokN) (.dim cfg.embedDim .scalar)) :=
-    concatDim0Spec clsSeq tokens
+    concatLeadingAxisSpec clsSeq tokens
 
   let tokensWithCls : Tensor α (.dim (tokN + 1) (.dim cfg.embedDim .scalar)) :=
     tensorCast (.dim (tokN + 1) (.dim cfg.embedDim .scalar)) (by
@@ -536,14 +536,14 @@ def ViTClsSpec.backward
 
   -- Split CLS token vs patch tokens.
   let d_clsSeq : Tensor α (.dim 1 (.dim cfg.embedDim .scalar)) :=
-    sliceRange0Spec (α := α) (n := tokN + 1) (s := .dim cfg.embedDim .scalar)
+    sliceLeadingAxisRangeSpec (α := α) (n := tokN + 1) (s := .dim cfg.embedDim .scalar)
       0 1 (by simp) d_tokensWithCls
 
   let d_clsToken : Tensor α (.dim cfg.embedDim .scalar) :=
     _root_.Spec.get d_clsSeq ⟨0, by decide⟩
 
   let d_tokens : Tensor α (.dim tokN (.dim cfg.embedDim .scalar)) :=
-    sliceRange0Spec (α := α) (n := tokN + 1) (s := .dim cfg.embedDim .scalar)
+    sliceLeadingAxisRangeSpec (α := α) (n := tokN + 1) (s := .dim cfg.embedDim .scalar)
       1 tokN (by simp) d_tokensWithCls
 
   -- Undo the cast+swap+reshape sequence (gradient w.r.t. patch-embedding output).

@@ -280,7 +280,7 @@ def parseNpy (tag : String) (bs : ByteArray) : Result NpyData := do
 Parse only the requested leading rows of a C-order `.npy` array.
 
 This supports large exported tensors kept on disk while a run uses only the first `n` rows. The rank
-and trailing dimensions must match exactly; only dim 0 may be larger than requested.
+and trailing dimensions must match exactly; only the leading axis may be larger than requested.
 
 The implementation shares header and dtype parsing with `parseNpy`, then decodes only the requested
 prefix. This avoids building a full `Array Float` when a command asks for a small leading slice of a
@@ -292,7 +292,7 @@ prefix is interleaved across the payload, so prefix decoding would be unsound.  
 silently returning bad rows, we reject Fortran-order prefix loading and ask callers to convert the
 array to C-order first.
 -/
-def parseNpyPrefixDim0 (tag : String) (expectedShape : List Nat) (bs : ByteArray) : Result NpyData := do
+def parseNpyLeadingAxisPrefix (tag : String) (expectedShape : List Nat) (bs : ByteArray) : Result NpyData := do
   let hdr <- parseNpyHeaderMeta tag bs
   let bytesPer <- npyElementBytes tag hdr.descr
   if hdr.fortran then
@@ -331,14 +331,14 @@ def readNpy (path : System.FilePath) : IO (Result NpyData) := do
 /--
 Read a `.npy` file but decode only the requested leading rows.
 
-This is the file-system wrapper around `parseNpyPrefixDim0`.  It still reads the file bytes into
+This is the file-system wrapper around `parseNpyLeadingAxisPrefix`.  It still reads the file bytes into
 memory, but it avoids building a full `Array Float` for rows the run did not ask to use.  The
 public `API.Data` layer uses this when a dataset source says "load the first `n` examples" from a
 larger exported NPY tensor.
 -/
-def readNpyPrefixDim0 (path : System.FilePath) (expectedShape : List Nat) : IO (Result NpyData) := do
+def readNpyLeadingAxisPrefix (path : System.FilePath) (expectedShape : List Nat) : IO (Result NpyData) := do
   let bs <- IO.FS.readBinFile path
-  pure (parseNpyPrefixDim0 (tag := "npy") expectedShape bs)
+  pure (parseNpyLeadingAxisPrefix (tag := "npy") expectedShape bs)
 
 /--
 Read a 1D `.npy` file as a typed TorchLean vector tensor.

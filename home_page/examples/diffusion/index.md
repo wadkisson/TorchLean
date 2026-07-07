@@ -21,7 +21,7 @@ For a short runtime check, use the CUDA path with a tiny model:
 lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
-For a more useful local run, use CUDA if available. The command writes a JSON loss log and a PPM
+For a more informative local run, use CUDA if available. The command writes a JSON loss log and a PPM
 image artifact for inspecting both numbers and pixels:
 
 ```bash
@@ -60,20 +60,20 @@ Inside the example, the loader path is straightforward:
 That last step is a single line in the example code:
 
 ```lean
-def toDiffusionRange (x01 : Tensor Float (x0Shape c h w)) :
-    Tensor Float (x0Shape c h w) :=
-  Spec.Tensor.mapSpec (fun x => 2.0 * x - 1.0) x01
+def toDiffusionRange (unitImage : Tensor Float (cleanImageShape c h w)) :
+    Tensor Float (cleanImageShape c h w) :=
+  Spec.Tensor.mapSpec (fun x => 2.0 * x - 1.0) unitImage
 ```
 
 ## The Spec Layer: What We Mean By “Diffusion”
 
 TorchLean keeps diffusion vocabulary in `NN.Spec.Generative.Diffusion.*`, so training code, sampler
-code, and theorem-facing modules talk about the same objects.
+code, and proof modules talk about the same objects.
 
 The DDPM picture is simple enough to state before the formulas: add noise to an image at timestep
 `t`, train a model to predict the noise that was added, then run reverse steps that use the model’s
 noise prediction to move back toward a clean image. TorchLean gives each component a named
-definition so the runtime command and theorem-facing modules use the same vocabulary.
+definition so the runtime command and proof modules use the same vocabulary.
 
 At the center is an interface for an epsilon-prediction denoiser:
 
@@ -156,8 +156,8 @@ def epsResidualConvNet (cfg : EpsConvNetConfig) :
   ]
 ```
 
-The important bit for the tutorial is the contract: input is noisy `NCHW` image plus time channel,
-output is predicted noise with the original image shape.
+The tutorial contract is precise: input is noisy `NCHW` image plus time channel, output is predicted
+noise with the original image shape.
 
 ## Training: What Gets Optimized
 
@@ -200,7 +200,7 @@ The reverse update used by the runnable example is `NN.API.diffusion.ddimPrev`. 
 - clamp it to `[-1, 1]`,
 - recombine it using the previous schedule coefficients.
 
-The implementation is just that recipe. Here is the compact form, with the schedule coefficients
+The implementation follows that recipe. Here is the compact form, with the schedule coefficients
 shown by name:
 
 ```lean
@@ -225,9 +225,9 @@ The sampler also produces the “three pictures” view:
 
 ## What To Look At After A Run
 
-Diffusion is one of the easiest places to fool yourself, so the example pushes you toward artifacts:
-images on disk and a JSON curve log. That gives you something concrete to compare across CPU/CUDA,
-fast-kernel switches, schedule tweaks, or model width changes.
+Diffusion runs are easy to misread from terminal loss alone, so the example pushes you toward
+artifacts: images on disk and a JSON curve log. Those files give you something concrete to compare across
+CPU/CUDA, fast-kernel switches, schedule tweaks, or model width changes.
 
 For interactive inspection, open `NN.Examples.Models.Generative.Diffusion` in VS Code with the Lean
 Infoview enabled. The widgets can display tensor summaries, graph and shape views, and saved JSON
@@ -235,6 +235,6 @@ logs next to the source.
 
 Source entry points:
 
-- [`NN.Examples.Models.Generative.Diffusion`]({{ '/docs/NN/Examples/Models/Generative/Diffusion.html' | relative_url }})
-- [`NN.Examples.Models.Generative`]({{ '/docs/NN/Examples/Models/Generative.html' | relative_url }})
+- [`NN.Examples.Models.Generative.Diffusion`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean)
+- [`NN.Examples.Models.Generative`](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/Generative)
 - [Generative Models and ML Theory]({{ '/blueprint/Examples-and-Applications/Generative-Models-and-ML-Theory/' | relative_url }})

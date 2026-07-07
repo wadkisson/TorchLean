@@ -263,7 +263,7 @@ def sliceRangeAxisDyn {α : Type} [Context α] [DecidableEq Shape]
   | ⟨.scalar, _⟩ => pure none
   | ⟨.dim nDim rest, x0⟩ =>
       if h : len + start ≤ nDim then
-        let y0 ← _root_.Runtime.Autograd.Torch.sliceRange0 (m := m) (α := α)
+        let y0 ← _root_.Runtime.Autograd.Torch.sliceLeadingAxisRange (m := m) (α := α)
           (nDim := nDim) (s := rest) start len h x0
         let yFront : Σ s' : Shape, RefTy (m := m) (α := α) s' := ⟨.dim len rest, y0⟩
         let y ← Einsum.permuteBySwaps (α := α) (m := m) yFront swapsBack
@@ -393,7 +393,7 @@ def squeezeDyn {α : Type} [Context α] [DecidableEq Shape]
 /--
 Dynamic concatenation of two tensors along `axis` (existential output shape).
 
-This is the binary helper used by `cat_axisDyn`. It lowers to `concat_dim0` by moving the
+This is the binary helper used by `cat_axisDyn`. It lowers to `concat_leading_axis` by moving the
 requested axis to the front.
 -/
 def catAxis2Dyn {α : Type} [Context α] [DecidableEq Shape]
@@ -415,7 +415,7 @@ def catAxis2Dyn {α : Type} [Context α] [DecidableEq Shape]
       if hRest : restX = restY then
         match hRest with
         | rfl =>
-            let zFront ← _root_.Runtime.Autograd.Torch.concatDim0 (m := m) (α := α)
+            let zFront ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
               (nDim := nDim) (mDim := mDim) (s := restX) xRef yRef
             let outFront : Σ s' : Shape, RefTy (m := m) (α := α) s' := ⟨.dim (nDim + mDim) restX,
               zFront⟩

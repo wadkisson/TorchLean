@@ -3,15 +3,6 @@ title: Updates
 usemathjax: true
 ---
 
-# TorchLean Updates
-
-<div class="updates-hero">
-  <p class="lede">
-    A project timeline for public releases, runtime fixes, proof-facing changes,
-    validation notes, and user-visible migration details.
-  </p>
-</div>
-
 <nav class="timeline-nav" aria-label="TorchLean update timeline">
   <a href="#june-2026-reliability">June 2026 reliability</a>
   <a href="#june-2026-lean-431">Lean 4.31</a>
@@ -32,8 +23,8 @@ usemathjax: true
 
 <p class="update-kicker">Native runtime, certificates, scientific ML</p>
 <p class="update-summary">
-Runtime edges around CUDA are tighter, CROWN certificate statements are more concrete, and duplicated
-PINN training infrastructure is gone.
+The June reliability pass tightened CUDA allocation checks, made CROWN certificate statements more
+direct, and moved duplicated PINN training code into shared helpers.
 </p>
 
 <div class="update-grid">
@@ -41,19 +32,19 @@ PINN training infrastructure is gone.
     <h3>Runtime checks</h3>
     <p>
       CUDA and CPU stubs now use shared checked size arithmetic for products,
-      byte counts, and additions at the Lean FFI boundary. Broadcast, reduce,
+      byte counts, and additions at the Lean FFI boundary. Broadcast, reduction,
       swap, gather/scatter, attention, convolution/pooling, tensor-copy, and
       spectral-convolution paths reject impossible sizes before allocation or
       kernel launch.
     </p>
   </section>
   <section>
-    <h3>Proof surface</h3>
+    <h3>Proof API</h3>
     <p>
       The graph CROWN certificate theorem now returns the enclosure for the
-      checked node. The IEEE32 version requires a no-self-dependency condition
-      on the evaluator trace, and the two-layer MLP CROWN code exposes the
-      affine forms used by <code>boundAffineCrown</code>.
+      node being checked. The IEEE32 version records the no-self-dependency
+      condition on the evaluator trace, and the two-layer MLP CROWN code exposes
+      the affine forms used by <code>boundAffineCrown</code>.
     </p>
   </section>
   <section>
@@ -66,10 +57,10 @@ PINN training infrastructure is gone.
   </section>
 </div>
 
-The focused API import now pulls in short `TorchLean.*` namespaces directly.
-That means `import NN.Entrypoint.API` exposes `TorchLean.nn`,
-`TorchLean.optim`, `TorchLean.Trainer`, `TorchLean.Data`, `TorchLean.Loss`, and
-`TorchLean.Metrics` without requiring the broader `NN` umbrella import.
+The focused API import now exposes the short `TorchLean.*` namespaces directly.
+With `import NN.Entrypoint.API`, users get `TorchLean.nn`, `TorchLean.optim`,
+`TorchLean.Trainer`, `TorchLean.Data`, `TorchLean.Loss`, and
+`TorchLean.Metrics` without importing the broader `NN` umbrella.
 
 <div class="validation-list" markdown="1">
   <h3>Validation</h3>
@@ -80,7 +71,7 @@ That means `import NN.Entrypoint.API` exposes `TorchLean.nn`,
 - `scripts/checks/check.sh --cuda --cuda-home /usr/local/cuda-13.0`
 - `scripts/checks/cuda_sanitize_tests.sh --cuda-home /usr/local/cuda-13.0 --all-tools`
 - focused Lean checks for the CROWN MLP and graph CROWN certificate modules
-- PyTorch CUDA smoke tests for the PINN trainers on an A100 GPU
+- PyTorch CUDA regression runs for the PINN trainers on an A100 GPU
 
 CUDA sanitizer reported zero memcheck/initcheck/synccheck errors and no
 racecheck hazards on the exercised runtime suite.
@@ -97,14 +88,14 @@ racecheck hazards on the exercised runtime suite.
 
 <p class="update-kicker">Toolchain alignment</p>
 <p class="update-summary">
-TorchLean now builds with <code>leanprover/lean4:v4.31.0</code>, with the root
-Lake manifest, Mathlib pin, documentation generator pin, Verso blueprint
-toolchain, website metadata, README, and formalization metadata moved together.
+TorchLean now builds with <code>leanprover/lean4:v4.31.0</code>. The root Lake
+manifest, Mathlib pin, documentation generator pin, Verso blueprint toolchain,
+website metadata, README, and formalization metadata were moved together.
 </p>
 
 The migration fixed proof-term breakages in differentiability and autograd
 composition files where Lean 4.31 became stricter about composed functions and
-eventual equality. The full repository build was rerun on 4.31.
+eventual equality. The full repository build was rerun on the new toolchain.
 
   </div>
 </article>
@@ -133,7 +124,7 @@ TorchLean's intended behavior.
   <section>
     <h3>Documentation</h3>
     <p>
-      Comments were rewritten in a more mathlib-style voice: definitions explain
+      Comments were rewritten in a more mathlib-style voice: definitions state
       mathematical intent, runtime boundaries name assumptions, and examples
       avoid stale narration.
     </p>
@@ -146,8 +137,7 @@ TorchLean's intended behavior.
   </section>
 </div>
 
-Examples, API docs, the Verso guide, and website pages were rebuilt against the
-new module layout.
+The examples and website pages were rebuilt against the new module layout.
 
   </div>
 </article>
@@ -160,35 +150,39 @@ new module layout.
 
 <p class="update-kicker">Training loops, streams, initialization</p>
 <p class="update-summary">
-Runtime pieces needed for longer training runs now sit behind a cleaner public API.
+Longer examples now use the same public runtime API for initialization, minibatches, optimizer
+steps, logging, and checkpoint-style parameter files.
 </p>
 
 <div class="update-grid">
   <section>
     <h3>Initialization</h3>
     <p>
-      Runtime-side Float initializers and shape-indexed initializer plans make
-      sure each parameter receives exactly one initializer.
+      Runtime-side Float initializers and shape-indexed initializer plans give parameter bundles a
+      clear construction story: the model declares the parameter shape, the initializer plan selects
+      the distribution or constant, and the runtime builds each tensor once.
     </p>
   </section>
   <section>
     <h3>Streams</h3>
     <p>
-      Step-indexed training streams support batches produced by a rule,
-      simulator, replay buffer, or file-backed window source.
+      Step-indexed training streams make minibatches explicit. A batch may come from a rule, a
+      simulator, a replay buffer, or a file-backed window source, but the training loop sees a typed
+      stream of inputs, targets, and metadata.
     </p>
   </section>
   <section>
     <h3>Language models</h3>
     <p>
-      Integer-token embedding and row-wise cross-entropy helpers support
-      GPT-style training examples.
+      Integer-token embedding and row-wise cross-entropy helpers let GPT-style examples train on
+      token ids directly, instead of expanding every target into a one-hot vector.
     </p>
   </section>
 </div>
 
-The guide now has dedicated sections for step streams, runtime initialization,
-CUDA memory ownership, and integer-token GPT training.
+The runtime documentation now follows the same path as the examples: initialize parameters, produce
+batches, run forward/autograd, update parameters, save reports, and state the native or external
+boundary when a backend is selected.
 
   </div>
 </article>
@@ -205,12 +199,11 @@ Longer CUDA training runs exposed allocator pressure from intermediate values
 that could stay attached to a run longer than needed.
 </p>
 
-The issue was not that the model suddenly needed more parameters. Some
-intermediate values created during training -- tape entries, gradient buffers,
-and kernel workspace buffers -- could remain alive across many optimizer steps.
-The fix made the training loop and CUDA eager backend explicit about which
-values are returned to the caller and which buffers can be released after the
-step finishes.
+The issue was not model size. Some intermediate values created during training
+-- tape entries, gradient buffers, and kernel workspace buffers -- could remain
+alive across many optimizer steps. The fix made the training loop and CUDA eager
+backend explicit about which values are returned to the caller and which buffers
+can be released after the step finishes.
 
 <div class="update-grid">
   <section>
@@ -259,7 +252,7 @@ Some examples use public datasets and do not download them during
 deterministic and avoids silently committing large external data.
 </p>
 
-For the README MLP example:
+For the model-zoo MLP example:
 
 ```bash
 python3 scripts/datasets/download_example_data.py --auto-mpg
@@ -312,7 +305,7 @@ and verifying neural-network programs.
   </section>
 </div>
 
-The README example is the quickest entry point; the Guide and Examples pages carry the longer
+The README example is the shortest entry point; the Guide and Examples pages carry the longer
 walkthroughs.
 
   </div>

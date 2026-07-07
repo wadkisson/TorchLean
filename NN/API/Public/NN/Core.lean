@@ -36,27 +36,26 @@ under `NN.API.nn`; the split only keeps the source file small enough to maintain
 
 namespace nn
 
-/-- Sequential model type (TorchLean `Seq`). This is the analogue of PyTorch `nn.Sequential`. -/
+/-- Sequential model type (TorchLean `Seq`), analogous to PyTorch `nn.Sequential`. -/
 abbrev Sequential := TorchLean.NN.Seq
 
-/-- Single-layer definition type (TorchLean `LayerDef`). This is the analogue of PyTorch
-  `nn.Module`. -/
+/-- Single-layer definition type (TorchLean `LayerDef`), analogous to PyTorch `nn.Module`. -/
 abbrev LayerDef := TorchLean.NN.LayerDef
 
 /-!
 Re-export common `Seq` helpers under `API.nn.*` so examples can use the stable public API.
 
 The names mirror the TorchLean runtime layer so users can move between the public API and
-runtime-facing code without learning a second vocabulary.
+runtime layer code without learning a second vocabulary.
 -/
 export TorchLean.NN.Seq
   (paramShapes paramRequiresGrad initParams updateBuffers
-   programWithMode program
+   programWithMode forwardProgram
    scalarModuleDefWithMode scalarModuleDef
    mseScalarModuleDefWithMode mseScalarModuleDef
    crossEntropyOneHotScalarModuleDefWithMode crossEntropyOneHotScalarModuleDef
-   compileOutWithMode compileOut
-   predict1WithMode predict1 eval1 eval1NoGrad eval1CompiledNoGrad)
+   compileForwardWithMode compileForward
+   forward predict forwardArtifact)
 
 /-- Lift a single layer definition into a sequential model. -/
 def of {σ τ : Spec.Shape} (layer : LayerDef σ τ) : Sequential σ τ :=
@@ -198,9 +197,9 @@ def lstm (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
 /--
 Embedding table initialization configuration (one-hot / token-distribution inputs).
 
-This is the TorchLean-friendly analogue of `torch.nn.Embedding` in the common setting where
-token ids are represented as one-hot vectors (or soft token distributions), so lookup is a matrix
-multiplication rather than integer indexing.
+TorchLean-friendly analogue of `torch.nn.Embedding` in the common setting where token ids are
+represented as one-hot vectors (or soft token distributions), so lookup is a matrix multiplication
+rather than integer indexing.
 -/
 structure Embedding where
   /-- Seed for deterministic embedding-table initialization. -/
@@ -293,8 +292,8 @@ def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPosit
 /--
 Sinusoidal positional encoding configuration.
 
-This is the classic (non-trainable) Transformer sinusoidal encoding, added to token embeddings.
-`startPos` is an absolute-position offset (useful for KV-cache decoding).
+Classic non-trainable Transformer sinusoidal encoding, added to token embeddings. `startPos` is an
+absolute-position offset for KV-cache decoding.
 -/
 structure SinusoidalPositionalEncoding where
   /-- Absolute position offset for the first row of the encoding table. -/
@@ -331,7 +330,7 @@ def sinusoidalPositionalEncoding {batch seqLen embedDim : Nat}
 /--
 Rotary positional embedding (RoPE) configuration.
 
-`startPos` is an absolute-position offset (useful for KV-cache decoding).
+`startPos` is an absolute-position offset for KV-cache decoding.
 -/
 structure RoPE where
   /-- Absolute position offset for the first row of RoPE angles. -/
@@ -485,14 +484,6 @@ def flattenBatch {n : Nat} {s : Spec.Shape} :
               x (by simp [Spec.Shape.size])
     }
 
-/--
-Flatten a batched tensor starting at dimension 1 (keep dim0).
-
-Synonym for `flattenBatch`, matching PyTorch’s `start_dim=1` wording.
--/
-def flattenStart1 {n : Nat} {s : Spec.Shape} :
-    Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s)) :=
-  flattenBatch (n := n) (s := s)
 /--
 Dropout layer (active in train mode, identity in eval mode).
 

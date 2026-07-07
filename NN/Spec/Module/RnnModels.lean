@@ -362,12 +362,12 @@ This helper lifts a scalar comparison over aligned sequence elements.
 -/
 def map2SequenceSpec {seqLen dim1 dim2 : Nat}
   (f : Tensor α (.dim dim1 .scalar) → Tensor α (.dim dim2 .scalar) → α)
-  (seq1 : Tensor α (.dim seqLen (.dim dim1 .scalar)))
-  (seq2 : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
+  (leftSeq : Tensor α (.dim seqLen (.dim dim1 .scalar)))
+  (rightSeq : Tensor α (.dim seqLen (.dim dim2 .scalar))) :
   Tensor α (.dim seqLen .scalar) :=
-  match seq1, seq2 with
-  | Tensor.dim fn1, Tensor.dim fn2 =>
-    Tensor.dim (fun i => Tensor.scalar (f (fn1 i) (fn2 i)))
+  match leftSeq, rightSeq with
+  | Tensor.dim func, Tensor.dim rightFn =>
+    Tensor.dim (fun i => Tensor.scalar (f (func i) (rightFn i)))
 
 -- Loss function for sequence classification
 /--

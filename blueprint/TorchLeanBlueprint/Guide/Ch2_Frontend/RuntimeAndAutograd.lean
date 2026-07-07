@@ -11,9 +11,9 @@ The runtime layer is where a typed model becomes a run. It allocates values, rec
 computes gradients, updates parameters, writes logs, and produces artifacts that can be inspected
 later.
 
-The main thing to remember is that TorchLean has more than one runtime artifact. Eager execution
-produces a tape. Compiled execution produces a reusable graph-shaped object. Verification uses an
-operation-tagged IR. These artifacts are related, but they are not the same data structure.
+TorchLean has more than one runtime artifact. Eager execution produces a tape. Compiled execution
+produces a reusable graph object. Verification uses an IR whose nodes name their operations. These
+artifacts are related, but they are not the same data structure.
 
 If a compact model has not run all the way through yet, *Training From Scratch* is the best first
 stop; it makes the runtime layer much easier to ground.
@@ -35,37 +35,48 @@ TorchLean keeps the rhythm but changes where the objects live:
 - the dynamic autograd tape becomes a Lean `Tape`;
 - `.grad` accumulation becomes explicit gradient values returned by reverse mode;
 - the normal user-facing loop is `trainer.train`; manual `optimizer.step()`-style loops live behind
-  `Trainer.Advanced.step`/`stepper` for runtime work;
-- eager mode produces a tape, while compiled mode produces a reusable graph-shaped artifact.
+  `Trainer.Manual.step`/`stepper` for runtime work;
+- eager mode produces a tape, while compiled mode produces a reusable graph artifact.
 
-That mapping is useful because it lets a PyTorch reader recognize the workflow without treating the
-runtime state as hidden global context.
+That mapping lets a PyTorch reader recognize the workflow without treating the runtime state as
+hidden global context.
 
 # Runtime Artifacts
 
-It is useful to separate artifacts by what they are for.
+Separate the artifacts by what they are for.
 
 An eager tape is for debugging and reverse mode. It records runtime values, parent links, and local
 VJP closures. It is the closest TorchLean analogue of PyTorch eager autograd.
 
-A compiled graph is for repeated execution. It fixes the graph-shaped structure once and reuses it
-across many calls. This is the "compile once, run many times" path for supported programs.
+A compiled graph is for repeated execution. It fixes the graph structure once and reuses it across
+many calls. For supported programs, this is the "compile once, run many times" path; it is not a
+separate model API.
 
-An `NN.IR.Graph` is for inspection and verification. Its nodes carry operation tags, shapes, and
+An `NN.IR.Graph` is for inspection and verification. Its nodes carry operation names, shapes, and
 parent ids. A verifier can read this object without executing arbitrary closures.
 
 A runtime context is for named values and training state. It records parameters, gradients, RNG
-state, backend selection, and values useful for debugging.
+state, backend selection, and debugging values.
 
 A training log is for audit and debugging. It records losses, metrics, and reports produced during
 the run. It is not the model semantics, but it is the artifact that tells us what happened.
+
+It helps to give each artifact a question:
+
+- tape: "how did this eager value depend on earlier values?"
+- compiled graph: "what fixed computation will be replayed?"
+- IR graph: "what operation DAG can a checker or verifier inspect?"
+- runtime context: "which named tensors, parameters, modes, and backend settings were alive?"
+- training log: "what did this run report over time?"
+
+The same training command may produce several of these. They are related evidence, not one object.
 
 # Two Execution Modes
 
 TorchLean exposes one front end with two execution backends:
 
 - *Eager*: tape recording and reverse-mode backprop in the style familiar from PyTorch.
-- *Compiled*: a stable SSA/DAG-like artifact for repeated evaluation and proof alignment.
+- *Compiled*: a stable SSA/DAG artifact for repeated evaluation and proof alignment.
 
 Many curated examples accept `--backend eager|compiled`.
 
@@ -75,10 +86,10 @@ lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 50 --d
 ```
 
 With matching seeds and supported operators, the forward computation should agree. What changes is
-the artifact:
+the runtime artifact:
 
 - eager is easier to step through;
-- compiled is easier to replay and connect to graph-shaped proof artifacts.
+- compiled is easier to replay and connect to graph proof artifacts.
 
 # Runtime Contexts And Named Values
 
@@ -90,7 +101,7 @@ Spec tensors are indexed by shape, but realistic training loops need registries:
 
 TorchLean therefore uses an existential container, `Runtime.AnyTensor α`, which pairs a `Shape` with
 the corresponding tensor. That preserves the strongly typed spec layer while still supporting
-runtime-style tooling.
+runtime tooling.
 
 See the [runtime context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Context.lean)
 and the runtime-context widgets for the concrete declarations.
@@ -129,8 +140,22 @@ The widgets make this visible:
 - `#tape_trace_view t, outId` shows the reverse traversal step by step;
 - `#runtime_ctx_view ctx` shows the value and gradient registries.
 
-The [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Widgets.lean)
+The [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
 contains compact examples for these views.
+
+A useful reading habit is to follow one scalar loss backward:
+
+```
+prediction -> loss
+loss cotangent = 1
+reverse traversal sends cotangents to parents
+parameter cotangents become gradients
+optimizer consumes parameters + gradients
+```
+
+TorchLean's eager tape exposes those intermediate objects. A theorem about the tape proves a
+statement about the reverse traversal under its hypotheses. A training run merely executes the path
+for the selected model, data, scalar backend, and runtime options.
 
 # Compiled Graphs
 
@@ -141,9 +166,9 @@ for forward evaluation and derivative propagation:
 - `jvp` computes a forward-mode pushforward;
 - `vjp` computes a reverse-mode pullback.
 
-The reason to keep this compiled form separate from the eager tape is practical. Eager mode is best
-for debugging and notebook-style iteration. Compiled mode is best for a stable, replayable artifact
-that proof code can reason about. Both paths can be produced from the public model definition.
+The compiled form is separate from the eager tape for a practical reason. Eager mode is best for
+debugging and interactive iteration. Compiled mode is best for a stable, replayable artifact that
+proof code can reason about. Both paths are produced from the same public model definition.
 
 API starting points:
 
@@ -151,16 +176,24 @@ API starting points:
 - [compiled runtime core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core.lean)
 - [runtime overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Overview.lean)
 
+The compiled path still has a derivative story. A compiled node records enough local structure to
+evaluate forward values and propagate derivative information. That is why compiled execution is more
+than a cache of numbers. It is a reusable executable representation of the same typed computation.
+
 # IR Execution Bridge
 
-For verification, TorchLean standardizes on `NN.IR.Graph`, the operation-tagged DAG described in
-*Graphs and IR*. Runtime closures are good for execution, but a verifier needs explicit operation
+For verification, TorchLean standardizes on `NN.IR.Graph`, the DAG described in *Graphs and IR*.
+Runtime closures are good for execution, but a verifier needs explicit operation
 tags, shapes, and parent ids.
 
 The [IR execution compiler](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/IRExec.lean)
-connects the operation-tagged IR to the compiled runtime backend. In words, `execGraphOfIR` produces
+connects that IR to the compiled runtime backend. In words, `execGraphOfIR` produces
 a compiled graph whose forward evaluation agrees with the IR evaluator on the same payload and
 input, for the supported operator fragment.
+
+That last phrase matters: *for the supported operator fragment*. If an imported or generated graph
+contains an operation outside the fragment, the bridge must extend its semantics or reject the graph.
+Otherwise a checker would be reasoning about a different program than the runtime executed.
 
 # Proof Link
 
@@ -179,19 +212,19 @@ For a proof tour, use:
 
 # CUDA Is A Backend Choice
 
-CUDA details have their own guide page. The runtime-level mental model is short: GPU mode accelerates
-supported Float32 buffer operations, while Lean still owns the model structure, typed interfaces,
-logs, graph artifacts, and proof/checker statements.
+CUDA details have their own guide page. The runtime rule is short: GPU mode accelerates supported
+Float32 buffer operations, while Lean still owns the model structure, typed interfaces, logs, graph
+artifacts, and proof/checker statements.
 
 Use eager mode for stepping through compact examples. Use compiled mode for repeated evaluation over a
-stable graph-shaped artifact. Use CUDA when the supported Float32 runtime should place numeric work
+stable graph artifact. Use CUDA when the supported Float32 runtime should place numeric work
 on device buffers.
 
 # Where To Look
 
 For runnable examples close to this runtime layer:
 
-- [Float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Advanced/Floats/Float32Modes.lean)
+- [Float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/Float32Modes.lean)
 - [AutogradBasics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
 - [SimpleMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
 - [MinibatchMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/MinibatchMlpTrain.lean)

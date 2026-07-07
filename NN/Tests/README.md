@@ -18,6 +18,37 @@ The suite is organized as follows:
 * `NN/Tests/Runtime/Cuda` compares Lean driven CPU/eager behavior against the CUDA FFI layer on
   small deterministic inputs.
 
+## What Tests Are For
+
+Tests are evidence about executable behavior. They are still important because TorchLean deliberately
+crosses runtime boundaries:
+
+- native CUDA kernels and FFI buffers,
+- executable `Float` and Float32 paths,
+- file parsers and serializers,
+- public CLI commands,
+- PyTorch/ONNX/export adapters,
+- training-loop plumbing, logs, and saved artifacts.
+
+The proof files state mathematical facts under hypotheses. The tests make sure the actual code path
+that users run still satisfies closed-form checks, parity checks, parser checks, rejection checks,
+and artifact-shape expectations. When a theorem and a runtime test cover the same feature, cite
+both: the theorem says what the object means, and the test says the executable path being shipped
+still reaches that object on representative cases.
+
+## What The Main Buckets Cover
+
+| Bucket | Examples of coverage |
+| --- | --- |
+| Float runtime | closed-form tensor/autograd checks, model equivalence checks, IR execution parity, spec-vs-runtime MLP checks |
+| Rational runtime | exact small scalar checks that avoid floating-point noise |
+| CUDA runtime | matmul, reductions, views, broadcast, gather/scatter, attention, convolution/pooling, deterministic reductions, and stress checks |
+| Verification-facing runtime | PINN residual paths, TorchLean-to-IR execution checks, and small certificate-style command paths |
+| Public command surface | registered `torchlean` and `verify` commands, flags, output shapes, and artifact paths |
+
+When adding a runtime feature, add a small test near the boundary that can fail loudly before a large
+model run silently changes meaning.
+
 Normal CI should build and run the curated executable:
 
 ```bash
@@ -41,3 +72,27 @@ scripts/checks/cuda_sanitize_tests.sh --all-tools
 
 The sanitizer harness is intentionally Lean driven: it checks the CUDA kernels through the same FFI
 surface used by TorchLean training and inference.
+
+## When To Add A Test
+
+Add a test when the feature:
+
+- crosses an FFI or external-tool boundary,
+- depends on file parsing or serialization,
+- changes public trainer, prediction, or loader behavior,
+- adds a CUDA kernel or VJP rule,
+- adds a runtime approximation path that is easy to regress,
+- introduces a checker CLI where a malformed artifact should be rejected.
+
+Do not put long proof obligations here. If the claim is mathematical and reusable, put the theorem
+under `NN/Proofs`, `NN/MLTheory`, or `NN/Verification` and keep the test as the executable guard.
+
+## Evidence Matrix
+
+| Change | Useful executable evidence |
+| --- | --- |
+| Public trainer, prediction, optimizer, or loader behavior | `lake exe nn_tests_suite` plus a focused `lake exe torchlean ...` command |
+| New verifier command or certificate schema | malformed-artifact rejection, accepted fixture check, and `lake exe verify -- all` when feasible |
+| CUDA kernel or VJP rule | `lake exe -K cuda=true nn_tests_suite` plus `scripts/checks/cuda_sanitize_tests.sh` for native memory behavior |
+| PyTorch/ONNX/ATen/Julia/Gymnasium bridge | round-trip or fixture test that names the imported artifact and remaining producer boundary |
+| Documentation for public commands | `lake exe torchlean --help`, `lake exe verify --help`, and the relevant Jekyll/Verso build |

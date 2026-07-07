@@ -11,7 +11,7 @@ public import NN.API.Public.Facade.NN
 /-!
 # TorchLean Supervised Runtime Facade
 
-Supervised runtime names for advanced code.
+Supervised runtime names for manual code.
 -/
 
 @[expose] public section

@@ -20,14 +20,14 @@ The client is compact and reusable across examples:
 - spawn a Python subprocess hosting an external Gymnasium environment,
 - send one JSON object per line to stdin,
 - read one JSON object response per line from stdout,
-- validate observations/rewards/flags against a Lean-side trust-boundary contract
+- validate observations/rewards/flags against a Lean side trust-boundary contract
   (`Runtime.RL.Boundary.Contract`).
 
 Startup performs a `describe` handshake, checking that the external environment's declared spaces
-match the Lean-side expectations (`obsShape`, `nActions`).
+match the Lean side expectations (`obsShape`, `nActions`).
 
 References:
-- Gymnasium API docs (`reset`/`step`, `terminated` vs `truncated`): https://gymnasium.farama.org/
+- Gymnasium API reference (`reset`/`step`, `terminated` vs `truncated`): https://gymnasium.farama.org/
 - The original Gym API paper (background on the env interface): https://arxiv.org/abs/1606.01540
 - Gymnasium source repository (implementation reference): https://github.com/Farama-Foundation/Gymnasium
 - Trust-boundary rationale and contract definition: `NN.Runtime.RL.Boundary`.
@@ -65,12 +65,12 @@ abbrev Child : Type := IO.Process.Child stdio
 Typed handle to a running Gymnasium subprocess environment.
 
 `Client` provides request/response JSON helpers and enforces a
-Lean-side `Boundary.Contract` on all values received from the external process.
+Lean side `Boundary.Contract` on all values received from the external process.
 -/
 structure Client (obsShape : Shape) (nActions : Nat) where
   /-- The Python subprocess. -/
   child : Child
-  /-- Lean-side contract enforced on every transition. -/
+  /-- Lean side contract enforced on every transition. -/
   contract : Boundary.Contract obsShape nActions
 
 namespace Client
@@ -215,7 +215,7 @@ def reset {obsShape : Shape} {nActions : Nat}
 Step the environment with a raw action index.
 
 The action is “raw” because the Python bridge receives a `Nat`; the checked session layer normally
-passes `action.1` from a `Fin nActions`. The response is still parsed through the Lean-side
+passes `action.1` from a `Fin nActions`. The response is still parsed through the Lean side
 observation/reward/done contract before it is returned.
 -/
 def stepRaw {obsShape : Shape} {nActions : Nat}

@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Device-agnostic example:
   lake exe torchlean rnn --cpu
-  lake build -R -K cuda=true && lake exe torchlean rnn --cuda
+  lake exe -K cuda=true torchlean rnn --cuda
 
 This example trains a tiny byte-level RNN on real text:
 - load a corpus through `--tiny-shakespeare` or `--data-file`,
@@ -35,7 +35,7 @@ longer contexts, use `chargpt`, `gpt2`, or `text_gpt2`.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake build -R -K cuda=true && lake exe torchlean rnn --cuda --tiny-shakespeare --steps 1
+lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
 ```
 -/
 

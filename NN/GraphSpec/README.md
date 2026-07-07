@@ -19,6 +19,11 @@ import NN.Entrypoint.GraphSpec
 an authoring layer that can feed the broader TorchLean pipeline; it is not a replacement for
 `NN.IR.Graph`.
 
+The intended reader is someone who wants more structure than `nn.Sequential` but still wants a
+model-level object, not raw IR nodes. This includes residual models, shared subgraphs, architecture
+families with named parameter lists, and examples where the same definition should be read as a
+specification and as executable TorchLean code.
+
 ## Where GraphSpec Fits
 
 | Layer | Best for |
@@ -26,6 +31,19 @@ an authoring layer that can feed the broader TorchLean pipeline; it is not a rep
 | `nn.Sequential` | ordinary tutorials and training examples |
 | `GraphSpec` | typed architecture authoring with explicit parameter layout and sharing |
 | `NN.IR.Graph` | op-tagged graph artifacts for verification, widgets, and export |
+
+The layers should not compete. A good workflow often uses all three:
+
+1. write a model with the public API or GraphSpec,
+2. lower it into a runtime or IR artifact,
+3. use the IR artifact for execution traces, bound propagation, certificate replay, or a compiler
+   theorem.
+
+GraphSpec is most valuable when the architecture itself is part of the claim. If all you need is a
+small training example, `nn.Sequential` is simpler. If all you have is an imported artifact, `NN.IR`
+is the right boundary. GraphSpec sits between them: it gives a name to the model family, its
+parameter order, its pure interpretation, and the executable lowering that should agree with that
+interpretation.
 
 ## Main Files
 
@@ -78,6 +96,24 @@ DAG models provide:
 Use DAG terms when a model needs residual connections, multiple inputs, or explicit reuse of an
 intermediate value.
 
+This is the place to represent architecture structure, not runtime state. Optimizer buffers, CUDA
+device buffers, imported checkpoint bytes, and certificate JSON belong to the runtime,
+interop, or verification layers. GraphSpec should describe the typed computation that those later
+artifacts refer to.
+
+## Architecture-Level Boundaries
+
+When a model family is written in GraphSpec, there are several boundaries to keep explicit:
+
+- the parameter ABI: list order, tensor shapes, and which tensors are shared;
+- the pure semantics: what the architecture means over the spec scalar context;
+- the executable lowering: which TorchLean runtime program is produced;
+- the artifact boundary: which IR, JSON, or checker object later refers to this architecture.
+
+This is why GraphSpec is a good home for residual networks, typed blocks, and shared-subgraph
+families. It lets a proof talk about the architecture before a training run or imported checkpoint
+adds runtime data.
+
 ## Adding A Primitive
 
 A primitive must provide both a pure meaning and an executable TorchLean meaning.
@@ -116,7 +152,7 @@ For true multi-input operations, define a `DAG.PrimOp ins τ` directly in `DAG.l
 
 ## Proof Pattern
 
-GraphSpec proofs usually compare the interpreter with an existing specification:
+GraphSpec proofs compare the interpreter with an existing specification:
 
 1. choose a compact model, such as an MLP or residual block;
 2. state equality between `Interp.spec` or `DAG.Term.eval` and the reference forward function;
@@ -124,6 +160,26 @@ GraphSpec proofs usually compare the interpreter with an existing specification:
 4. use the model-specific tensor lemmas for the remaining arithmetic.
 
 See `NN/GraphSpec/Models/MlpSpecEquivalence.lean` for the smallest version of this pattern.
+
+For a larger model, the same proof pattern should scale by proving facts about named primitives and
+blocks first. The goal is not to unfold an entire architecture by hand every time; it is to make
+model-family facts reusable, so later verification or export code can cite the architecture theorem
+instead of re-deriving the shape and semantic story.
+
+## What GraphSpec Can Support
+
+GraphSpec is useful evidence when a claim needs an architecture-level statement:
+
+- the parameter list has a specific shape and order,
+- a residual connection really reuses the intended intermediate,
+- a model family lowers to executable TorchLean code,
+- a pure interpreter agrees with a reference spec for a compact architecture,
+- the later IR/export/checker path is attached to a named model structure.
+
+Robustness, native-runtime agreement, and checkpoint provenance are later claims. GraphSpec gives
+those layers a named architecture, parameter ABI, and pure semantics to cite; verification, runtime,
+and trust-boundary modules then state the additional assumptions or checks needed for the full
+claim.
 
 ## References
 

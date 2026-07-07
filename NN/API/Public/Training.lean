@@ -11,7 +11,7 @@ public import NN.API.Public.Training.Core
 /-!
 # Public Training Entrypoint
 
-Import-only entrypoint for advanced public training APIs. Ordinary code should use
+Import-only entrypoint for manual public training APIs. Ordinary code should use
 `import NN` and train through `Trainer.new` plus `trainer.train`; advanced manual-loop
 operations live in `NN.API.Public.Training.Core`.
 -/

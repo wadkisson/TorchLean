@@ -232,24 +232,24 @@ match A, c, B.lo, B.hi with
 
 /-- Affine (CROWN) bounds with rounding for a 2-layer MLP -/
 noncomputable def boundAffineFloat {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (xB : Box ℝ (.dim inDim .scalar)) : Box ℝ (.dim outDim .scalar) :=
   -- 1) Pre-activation bounds via rounded IBP
-  let b1B : Box ℝ (.dim hidDim .scalar) := { lo := net.b1, hi := net.b1 }
-  let z1B := ibpLinearFloat (β := β) (fexp := fexp) rnd net.W1 xB b1B
+  let b1B : Box ℝ (.dim hidDim .scalar) := { lo := net.hiddenBias, hi := net.hiddenBias }
+  let z1B := ibpLinearFloat (β := β) (fexp := fexp) rnd net.hiddenWeight xB b1B
   -- 2) ReLU relaxation
   let relax := ReLU.relaxVector (α:=ℝ) (n:=hidDim) z1B.lo z1B.hi
   let slopeVec := reluRelaxSlopeVec (n:=hidDim) relax
   let biasVec  := reluRelaxBiasVec  (n:=hidDim) relax
   -- 3) Compose affine with rounding
-  let W2scaled := matColScaleFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.W2
+  let W2scaled := matColScaleFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.outputWeight
     slopeVec
   let A := matMulFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) (p:=inDim) W2scaled
-    net.W1
-  let s_b1 := vecMulFloat (β := β) (fexp := fexp) rnd slopeVec net.b1
+    net.hiddenWeight
+  let s_b1 := vecMulFloat (β := β) (fexp := fexp) rnd slopeVec net.hiddenBias
   let inner := vecAddFloat (β := β) (fexp := fexp) rnd s_b1 biasVec
-  let W2inner := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.W2 inner
-  let c := match W2inner, net.b2 with
+  let W2inner := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.outputWeight inner
+  let c := match W2inner, net.outputBias with
     | .dim w2i, .dim b2v =>
       Tensor.dim (fun i =>
         let wi := match w2i i with | .scalar v => v
@@ -260,41 +260,41 @@ noncomputable def boundAffineFloat {inDim hidDim outDim : Nat}
 
 /-- End-to-end rounded IBP for 2-layer MLP (mirrors CROWN.bound_ibp). -/
 noncomputable def boundIbpFloat {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (xB : Box ℝ (.dim inDim .scalar)) : Box ℝ (.dim outDim .scalar) :=
-  let b1B : Box ℝ (.dim hidDim .scalar) := { lo := net.b1, hi := net.b1 }
-  let z1B := ibpLinearFloat (β := β) (fexp := fexp) rnd net.W1 xB b1B
+  let b1B : Box ℝ (.dim hidDim .scalar) := { lo := net.hiddenBias, hi := net.hiddenBias }
+  let z1B := ibpLinearFloat (β := β) (fexp := fexp) rnd net.hiddenWeight xB b1B
   let a1B := ibpReluFloat (β := β) (fexp := fexp) rnd (n:=hidDim) z1B
-  let b2B : Box ℝ (.dim outDim .scalar) := { lo := net.b2, hi := net.b2 }
-  ibpLinearFloat (β := β) (fexp := fexp) rnd net.W2 a1B b2B
+  let b2B : Box ℝ (.dim outDim .scalar) := { lo := net.outputBias, hi := net.outputBias }
+  ibpLinearFloat (β := β) (fexp := fexp) rnd net.outputWeight a1B b2B
 
 /-- Public API: float-rounded CROWN IBP bounds wrapper with default config. -/
-noncomputable def crownMlp2BoundsFloat
+noncomputable def crownTwoLayerMlpBoundsFloat
     {inDim hidDim outDim : Nat}
-    (l1 : Spec.LinearSpec ℝ inDim hidDim)
-    (l2 : Spec.LinearSpec ℝ hidDim outDim)
+    (hiddenLayer : Spec.LinearSpec ℝ inDim hidDim)
+    (outputLayer : Spec.LinearSpec ℝ hidDim outDim)
     (x_center : Tensor ℝ (.dim inDim .scalar)) (eps : ℝ)
     (β : NeuralRadix := binaryRadix) (fexp : ℤ → ℤ := fun k => k)
     (rnd : ℝ → ℤ := neuralNearestEven)
     [NeuralValidExp fexp] [NeuralValidRnd rnd] :
     Box ℝ (.dim outDim .scalar) :=
-  let net : MLP2 ℝ inDim hidDim outDim := ofLinearSpecs (α:=ℝ) l1 l2
+  let net : TwoLayerMLP ℝ inDim hidDim outDim := ofLinearSpecs (α:=ℝ) hiddenLayer outputLayer
   let rad := Tensor.scaleSpec (Spec.fill (α:=ℝ) eps (.dim inDim .scalar)) 1
   let xB : Box ℝ (.dim inDim .scalar) := { lo := Tensor.subSpec x_center rad,
                                            hi := Tensor.addSpec x_center rad }
   boundIbpFloat (β := β) (fexp := fexp) rnd net xB
 
 /-- Public API: float-rounded (IBP, Affine) bounds wrapper, mirroring CROWN.Examples. -/
-noncomputable def crownMlp2BoundsFloatFull
+noncomputable def crownTwoLayerMlpBoundsFloatFull
     {inDim hidDim outDim : Nat}
-    (l1 : Spec.LinearSpec ℝ inDim hidDim)
-    (l2 : Spec.LinearSpec ℝ hidDim outDim)
+    (hiddenLayer : Spec.LinearSpec ℝ inDim hidDim)
+    (outputLayer : Spec.LinearSpec ℝ hidDim outDim)
     (x_center : Tensor ℝ (.dim inDim .scalar)) (eps : ℝ)
     (β : NeuralRadix := binaryRadix) (fexp : ℤ → ℤ := fun k => k)
     (rnd : ℝ → ℤ := neuralNearestEven)
     [NeuralValidExp fexp] [NeuralValidRnd rnd] :
     Box ℝ (.dim outDim .scalar) × Box ℝ (.dim outDim .scalar) :=
-  let net : MLP2 ℝ inDim hidDim outDim := ofLinearSpecs (α:=ℝ) l1 l2
+  let net : TwoLayerMLP ℝ inDim hidDim outDim := ofLinearSpecs (α:=ℝ) hiddenLayer outputLayer
   let rad := Tensor.scaleSpec (Spec.fill (α:=ℝ) eps (.dim inDim .scalar)) 1
   let xB : Box ℝ (.dim inDim .scalar) := { lo := Tensor.subSpec x_center rad,
                                            hi := Tensor.addSpec x_center rad }
@@ -313,13 +313,13 @@ match x with
 
 /-- Rounded forward pass for a 2-layer MLP (linear → ReLU → linear). -/
 noncomputable def forwardFloat {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (x : Tensor ℝ (.dim inDim .scalar)) : Tensor ℝ (.dim outDim .scalar) :=
-  let z1 := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=hidDim) (n:=inDim) net.W1 x
-  let z1b := vecAddFloat (β := β) (fexp := fexp) rnd (n:=hidDim) z1 net.b1
+  let z1 := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=hidDim) (n:=inDim) net.hiddenWeight x
+  let z1b := vecAddFloat (β := β) (fexp := fexp) rnd (n:=hidDim) z1 net.hiddenBias
   let a1 := reluVecFloat (β := β) (fexp := fexp) rnd (n:=hidDim) z1b
-  let z2 := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.W2 a1
-  vecAddFloat (β := β) (fexp := fexp) rnd (n:=outDim) z2 net.b2
+  let z2 := matVecMulFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.outputWeight a1
+  vecAddFloat (β := β) (fexp := fexp) rnd (n:=outDim) z2 net.outputBias
 
 /-- Round every scalar in a vector tensor to the target float grid. -/
 noncomputable def roundVecFloat {n : Nat}
@@ -342,12 +342,12 @@ match A with
         let aij := match cols j with | .scalar a => a
         Tensor.scalar (neuralRound (β := β) (fexp := fexp) rnd aij)))
 
-/-- Pre-quantize an MLP2's parameters (W1, b1, W2, b2) onto the float grid. -/
+/-- Pre-quantize a `TwoLayerMLP` parameter record onto the float grid. -/
 noncomputable def quantizeParamsFloat {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim) : MLP2 ℝ inDim hidDim outDim :=
-  { W1 := roundMatFloat (β := β) (fexp := fexp) rnd (m:=hidDim) (n:=inDim) net.W1
-  , b1 := roundVecFloat (β := β) (fexp := fexp) rnd (n:=hidDim) net.b1
-  , W2 := roundMatFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.W2
-  , b2 := roundVecFloat (β := β) (fexp := fexp) rnd (n:=outDim) net.b2 }
+  (net : TwoLayerMLP ℝ inDim hidDim outDim) : TwoLayerMLP ℝ inDim hidDim outDim :=
+  { hiddenWeight := roundMatFloat (β := β) (fexp := fexp) rnd (m:=hidDim) (n:=inDim) net.hiddenWeight
+  , hiddenBias := roundVecFloat (β := β) (fexp := fexp) rnd (n:=hidDim) net.hiddenBias
+  , outputWeight := roundMatFloat (β := β) (fexp := fexp) rnd (m:=outDim) (n:=hidDim) net.outputWeight
+  , outputBias := roundVecFloat (β := β) (fexp := fexp) rnd (n:=outDim) net.outputBias }
 
 end NN.MLTheory.CROWN.Float

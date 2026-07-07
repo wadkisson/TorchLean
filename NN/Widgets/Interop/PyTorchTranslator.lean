@@ -339,7 +339,7 @@ Generate a TorchLean skeleton from the recognized layer sequence.
 The emitted code is meant to be a starting point, not a final theorem. It imports the public
 TorchLean umbrella, opens the user-facing API namespaces, emits direct sequential terms for the safe
 subset, and then appends boundary notes as Lean comments. The next intended step is to add a concrete
-shape contract and wrap the model in a `train.Advanced.Task` / `SeqTask`.
+shape contract and wrap the model in a `train.Manual.Task` / `SeqTask`.
 -/
 def torchLeanSkeleton (r : Report) (name : String := "translatedModel") : String :=
   let translatedLines :=
@@ -369,7 +369,7 @@ def torchLeanSkeleton (r : Report) (name : String := "translatedModel") : String
     "",
     "-- Next steps:",
     "-- 1. Add the concrete input/output shape contract.",
-    "-- 2. Choose a loss and wrap this in a `train.Advanced.Task` / `SeqTask`.",
+    "-- 2. Choose a loss and wrap this in a `train.Manual.Task` / `SeqTask`.",
     "-- 3. If this came from a real PyTorch module, use `torch.export` capture for a checked graph path."
   ]
 
@@ -428,8 +428,8 @@ The panel has four sections:
 3. warnings / unsupported diagnostics;
 4. a generated Lean skeleton plus a trust-boundary explanation.
 
-That layout mirrors the intended editor-facing view: useful generated code beside an
-equally visible account of what has *not* been checked.
+That layout is meant for use inside the editor: useful generated code beside an equally visible
+account of what has *not* been checked.
 -/
 def html (snippet : String) : ProofWidgets.Html :=
   let r := analyze snippet
@@ -483,7 +483,7 @@ def html (snippet : String) : ProofWidgets.Html :=
     <details style={json% {"margin-top": "10px"}}>
       <summary>{.text "Trust boundary"}</summary>
       <ul>
-        <li>{.text "This widget is a heuristic editor assistant, not a proof about arbitrary Python."}</li>
+        <li>{.text "This widget is a heuristic editor assistant; checked import uses the explicit artifact bridge."}</li>
         <li>{.text "A skeleton becomes executable only after you add the typed input/output shape contract."}</li>
         <li>{.text "For real PyTorch modules, use the existing torch.export JSON bridge to capture and validate the graph."}</li>
       </ul>
@@ -558,9 +558,9 @@ syntax (name := pytorchTranslateFileCmd) "#pytorch_translate_file " str : comman
 /--
 Command frontend that reads a `.py` file and renders the translator widget.
 
-This is still not a proof about Python. It is the file-based translator widget over real source
-text. For checked model import, use the existing `torch.export` JSON bridge after the report tells
-you the model is close to the supported subset.
+This is the file-based translator widget over real source text. For checked model import, use the
+existing `torch.export` JSON bridge after the report tells you the model is close to the supported
+subset.
 -/
 macro "#pytorch_translate_file " path:str : command =>
   Lean.TSyntax.mkInfoCanonical <$>

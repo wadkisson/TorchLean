@@ -23,7 +23,7 @@ namespace rl
 /-!
 Reinforcement-learning APIs used by the executable examples.
 
-The public namespace mirrors the shape of the checked RL stack:
+The public namespace mirrors the shape of the checked RL library:
 
 - `rl.core`, `rl.mdp`, and friends expose the mathematical objects,
 - `rl.replay`, `rl.dqn`, and `rl.policy` expose runtime update formulas,
@@ -147,10 +147,59 @@ export NN.API.rl.ppo
    optimizerInputs
    params
    splitActorCriticParams
-   actorPolicyFromParams criticValueFromParams
    collectRolloutSessionWith collectRolloutCheckedSessionWith collectRolloutWith)
 export _root_.Runtime.RL.PPO.Rollout
   (toActorCriticSample)
+
+/--
+Build a single-observation actor policy from the parameter pack of a rollout-shaped actor-critic
+module.
+
+The compiled actor carries the single-observation parameter ABI and compiled forward artifact, so the
+public API only needs that one value instead of a separate raw artifact.
+-/
+def actorPolicyFromParams
+    {obsShape logitsShape rolloutStateShape rolloutLogitsShape rolloutValueShape : Shape}
+    {actorParamShapes : List Shape}
+    {α : Type} [Runtime.TensorScalar α]
+    (actorCompiled : nn.Compiled actorParamShapes obsShape logitsShape α)
+    (actorRollout : nn.Sequential rolloutStateShape rolloutLogitsShape)
+    (criticRollout : nn.Sequential rolloutStateShape rolloutValueShape)
+    (psAll : _root_.Runtime.Autograd.Torch.TList α
+      (nn.paramShapes actorRollout ++ nn.paramShapes criticRollout))
+    (sameActorParams :
+      nn.paramShapes actorRollout =
+        actorParamShapes := by rfl) :
+    Tensor.T α obsShape → Tensor.T α logitsShape :=
+  let (psActor, _psCritic) := NN.API.rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
+  let psActorObs : ParamTensors α actorParamShapes :=
+    Eq.mp (by rw [← sameActorParams]) psActor
+  fun obs => actorCompiled.forward psActorObs obs
+
+/--
+Build a single-observation critic-value function from the parameter pack of a rollout-shaped
+actor-critic module.
+-/
+def criticValueFromParams
+    {obsShape rolloutStateShape rolloutLogitsShape rolloutValueShape : Shape}
+    {criticParamShapes : List Shape}
+    {α : Type} [Runtime.TensorScalar α]
+    (criticCompiled : nn.Compiled criticParamShapes obsShape (.dim 1 .scalar) α)
+    (actorRollout : nn.Sequential rolloutStateShape rolloutLogitsShape)
+    (criticRollout : nn.Sequential rolloutStateShape rolloutValueShape)
+    (psAll : _root_.Runtime.Autograd.Torch.TList α
+      (nn.paramShapes actorRollout ++ nn.paramShapes criticRollout))
+    (sameCriticParams :
+      nn.paramShapes criticRollout =
+        criticParamShapes := by rfl) :
+    Tensor.T α obsShape → α :=
+  let (_psActor, psCritic) := NN.API.rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
+  let psCriticObs : ParamTensors α criticParamShapes :=
+    Eq.mp (by rw [← sameCriticParams]) psCritic
+  fun obs =>
+    _root_.Spec.Tensor.vecGet
+      (criticCompiled.forward psCriticObs obs)
+      ⟨0, by decide⟩
 end ppo
 
 namespace eval

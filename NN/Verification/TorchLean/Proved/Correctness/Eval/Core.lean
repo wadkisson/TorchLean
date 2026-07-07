@@ -447,7 +447,7 @@ theorem getVal_eq_ok
   /--
   `getVal` succeeds from a well-shaped executable context.
 
-  This is the proof-facing form of `getVal_eq_ok`: callers use the semantic invariant
+  This is the proof layer form of `getVal_eq_ok`: callers use the semantic invariant
   `shapesOfVals vals = Ctx inShape ss`, and the lemma derives the array-bounds fact internally.
   -/
   theorem getVal_eq_ok_of_hShapes

@@ -23,6 +23,9 @@ public import NN.Verification.Robustness.MarginCertCLI
 public import NN.Verification.Robustness.TorchLean
 public import NN.Verification.Splines.PiecewiseLinearCLI
 public import NN.Verification.VNNComp.MnistFC
+public import NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIPythonOnly
+public import NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIIHybrid
+public import NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIIIAllInLean
 
 /-!
 # CLI
@@ -159,7 +162,7 @@ def otherTools : List Tool :=
         NN.Verification.PINN.CLI.main args }
   , { name := "abcrown-leaf"
       description := "α,β-CROWN leaf artifact structural check"
-      defaultArg := some NN.Verification.Cert.AbCrownLeafCert.defaultCertPath
+      defaultArg := some NN.Verification.Cert.AbCrownLeafCert.defaultArtifactPath
       run := fun args => NN.Verification.Cert.AbCrownLeafCert.run args }
   , { name := "margin-cert"
       description := "logit-margin certificate check (bounds ⇒ certified label)"
@@ -203,7 +206,7 @@ def otherTools : List Tool :=
       run := fun args =>
         NN.Verification.ODE.Verify.main args }
   , { name := "digits"
-      description := "run Lean IBP/CROWN certified-accuracy workflow (not a cert checker)"
+      description := "run Lean IBP/CROWN certified-accuracy workflow over sklearn digits"
       includeInAll := false
       run := fun args =>
         NN.Verification.Robustness.Digits.main args }
@@ -217,6 +220,21 @@ def otherTools : List Tool :=
       includeInAll := false
       run := fun args =>
         NN.Verification.VNNComp.MnistFC.main args }
+  , { name := "twostage-pythononly-certgen"
+      description := "two-stage Lyapunov certificate generation via external CROWN script"
+      includeInAll := false
+      run := fun args =>
+        NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineI.PythonOnly.main args }
+  , { name := "twostage-hybrid-van-stage2"
+      description := "hybrid PyTorch-init to Lean IEEE32Exec Lyapunov refinement"
+      includeInAll := false
+      run := fun args =>
+        NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineII.Hybrid.main args }
+  , { name := "twostage-torchlean-cegis-van"
+      description := "all-in-Lean two-stage/CEGIS Lyapunov refinement and bound check"
+      includeInAll := false
+      run := fun args =>
+        NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIII.AllInLean.main args }
   ]
 
 /-- The full list of registered verification tools (LiRPA plus other workflows/checkers). -/
@@ -282,3 +300,7 @@ This entry point delegates to the unified dispatcher `NN.Verification.CLI.dispat
 -/
 def main (args : List String) : IO Unit :=
   NN.Verification.CLI.dispatch args
+
+@[export lean_main]
+def exportedMain (args : List String) : IO Unit :=
+  main args

@@ -115,11 +115,11 @@ def split {Ref : Shape → Type} : {ss₁ ss₂ : List Shape} →
       (.cons x l, r)
 
 /-- Split a `RefList Ref (ss ++ [τ])` into its prefix and last element. -/
-def splitAppend1 {Ref : Shape → Type} : {ss : List Shape} → {τ : Shape} →
+def splitLast {Ref : Shape → Type} : {ss : List Shape} → {τ : Shape} →
     RefList Ref (ss ++ [τ]) → RefList Ref ss × Ref τ
   | [], _τ, .cons x .nil => (.nil, x)
   | _s :: ss, τ, .cons x xs =>
-      let (l, last) := splitAppend1 (Ref := Ref) (ss := ss) (τ := τ) xs
+      let (l, last) := splitLast (Ref := Ref) (ss := ss) (τ := τ) xs
       (.cons x l, last)
 
 end RefList
@@ -224,11 +224,11 @@ class Ops (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape] where
     Ref (.dim nDim .scalar) →
     Ref (.dim mDim .scalar) →
     m (Ref (.dim (nDim + mDim) .scalar))
-  concatDim0 {nDim mDim : Nat} {s : Shape} :
+  concatLeadingAxis {nDim mDim : Nat} {s : Shape} :
     Ref (.dim nDim s) →
     Ref (.dim mDim s) →
     m (Ref (.dim (nDim + mDim) s))
-  sliceRange0 {nDim : Nat} {s : Shape} :
+  sliceLeadingAxisRange {nDim : Nat} {s : Shape} :
     (start len : Nat) → (h : len + start ≤ nDim) →
     Ref (.dim nDim s) → m (Ref (.dim len s))
   maxPool {d C : Nat}
@@ -488,17 +488,17 @@ def concatVectors {nDim mDim : Nat}
   (b : Ref (m := m) (α := α) (.dim mDim .scalar)) :
   m (Ref (m := m) (α := α) (.dim (nDim + mDim) .scalar)) :=
   Ops.concatVectors (m := m) (α := α) (nDim := nDim) (mDim := mDim) a b
-/-- Re-export of `Ops.concat_dim0`. PyTorch: `torch.cat(..., dim=0)`. -/
-def concatDim0 {nDim mDim : Nat} {s : Shape}
+/-- Re-export of `Ops.concat_leading_axis`. PyTorch: `torch.cat(..., dim=0)`. -/
+def concatLeadingAxis {nDim mDim : Nat} {s : Shape}
   (a : Ref (m := m) (α := α) (.dim nDim s))
   (b : Ref (m := m) (α := α) (.dim mDim s)) :
   m (Ref (m := m) (α := α) (.dim (nDim + mDim) s)) :=
-  Ops.concatDim0 (m := m) (α := α) (nDim := nDim) (mDim := mDim) (s := s) a b
-/-- Re-export of `Ops.slice_range0`. PyTorch: `x[start:start+len]` on the leading dimension. -/
-def sliceRange0 {nDim : Nat} {s : Shape} (start len : Nat) (h : len + start ≤ nDim)
+  Ops.concatLeadingAxis (m := m) (α := α) (nDim := nDim) (mDim := mDim) (s := s) a b
+/-- Re-export of `Ops.slice_leading_axis_range`. PyTorch: `x[start:start+len]` on the leading dimension. -/
+def sliceLeadingAxisRange {nDim : Nat} {s : Shape} (start len : Nat) (h : len + start ≤ nDim)
   (x : Ref (m := m) (α := α) (.dim nDim s)) :
   m (Ref (m := m) (α := α) (.dim len s)) :=
-  Ops.sliceRange0 (m := m) (α := α) (nDim := nDim) (s := s) start len h x
+  Ops.sliceLeadingAxisRange (m := m) (α := α) (nDim := nDim) (s := s) start len h x
 /--
 Re-export of `Ops.max_pool` (generic N-D max pooling, channels-first; no batch axis).
 

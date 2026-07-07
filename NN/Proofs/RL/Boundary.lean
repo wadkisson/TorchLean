@@ -31,7 +31,7 @@ References:
 
 - Meyer, *Object-Oriented Software Construction* (2nd ed., 1997): “Design by Contract” as a general
   specification pattern at software boundaries.
-- Gymnasium API docs (reset/step, terminated vs truncated): https://gymnasium.farama.org/
+- Gymnasium API reference (reset/step, terminated vs truncated): https://gymnasium.farama.org/
 - Sutton and Barto, *Reinforcement Learning: An Introduction* (2nd ed., 2018),
   discussion of episodic termination semantics:
   http://incompleteideas.net/book/the-book-2nd.html

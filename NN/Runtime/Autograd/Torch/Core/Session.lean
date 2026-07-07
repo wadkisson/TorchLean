@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.Torch.Core.Types
+public import NN.Floats.IEEEExec.Exec32.Compare
 
 /-!
 # Eager Session and CUDA Bridge
@@ -77,6 +78,24 @@ instance (priority := 1000) : TensorConv Float where
       Runtime.Autograd.Cuda.Convert.unflattenFloatUnsafe (s := any.s) a
     pure { s := any.s, t := t }
   toFloat := fun x => pure x
+
+/-! #### Executable IEEE32 host scalar implementation -/
+
+/--
+Host-side conversion for TorchLean's executable IEEE-754 binary32 scalar.
+
+`IEEE32Exec` is a Lean-defined bit-level scalar semantics, not the CUDA eager tape's float32 device
+wire format. We allow scalar readback to `Float` so CPU examples can print predictions and
+summaries, but CUDA upload/download remains an explicit unsupported boundary.
+-/
+instance (priority := 1000) : TensorConv TorchLean.Floats.IEEE754.IEEE32Exec where
+  toAnyBuffer := fun {_s} _ =>
+    throw <| IO.userError
+      "torch: cuda: IEEE32Exec has host-side scalar conversion only; use Float for eager CUDA"
+  ofAnyBuffer := fun _ =>
+    throw <| IO.userError
+      "torch: cuda: IEEE32Exec has host-side scalar conversion only; use Float for eager CUDA"
+  toFloat := fun x => pure (TorchLean.Floats.IEEE754.IEEE32Exec.toFloat x)
 
 /--
 Generic CPU-preserving fallback for scalar types without a CUDA wire-format bridge.

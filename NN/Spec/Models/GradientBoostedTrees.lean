@@ -634,14 +634,15 @@ def gbtBinaryCrossentropyLossSpec {batch nTrees maxDepth nFeatures : Nat}
   let sigmoid_preds := mapSpec (fun x => 1 / (1 + MathFunctions.exp (-x))) predictions
   let log_preds := mapSpec MathFunctions.log sigmoid_preds
   let log_one_minus_preds := mapSpec (fun x => MathFunctions.log (1 - x)) sigmoid_preds
-  let loss1 := mulSpec target log_preds
-  let loss2 := mulSpec (subSpec (broadcastLike target (Tensor.scalar (1 : α))) target)
+  let positiveLogLikelihood := mulSpec target log_preds
+  let negativeTarget := subSpec (broadcastLike target (Tensor.scalar (1 : α))) target
+  let negativeLogLikelihood := mulSpec negativeTarget
     log_one_minus_preds
-  let total_loss := subSpec loss1 loss2
+  let logLikelihood := addSpec positiveLogLikelihood negativeLogLikelihood
   have inst : Shape.valid_axis_inst 0 (Shape.dim batch Shape.scalar) := by
     apply Shape.validAxisInstZeroAlt h
-  let mse := reduceSumAuto 0 total_loss
-  negSpec (scaleSpec mse (1 / (batch : α)))
+  let summedLogLikelihood := reduceSumAuto 0 logLikelihood
+  negSpec (scaleSpec summedLogLikelihood (1 / (batch : α)))
 
 /-- Gradient of MSE loss w.r.t. predictions (elementwise). -/
 def gbtMseGradSpec {batch : Nat}

@@ -14,9 +14,8 @@ public import Mathlib.Data.List.GetD
 # Correctness of the exact matrix factorizations (Cholesky and QR)
 
 This file sets up the **formal correctness layer** for the two exact, finite spec-layer factorizations
-in [`NN.Spec.Core.Tensor.Factorizations`](../../../Spec/Core/Tensor/Factorizations.lean)
-(`choleskySpec`, `qrSpec`): the factorization predicates over real matrices, and the first structural
-theorem about the executable Cholesky factor.
+in `NN.Spec.Core.Tensor.Factorizations` (`choleskySpec`, `qrSpec`): the factorization predicates
+over real matrices, and the first structural theorem about the executable Cholesky factor.
 
 ## Architecture (refinement)
 
@@ -35,10 +34,10 @@ theorem about the executable Cholesky factor.
 
 This file proves only the predicates and the lower-triangularity fact. The exact algebraic
 reconstructions — `A = L · Lᵀ` for Cholesky (under positive pivots) and `A = Q · R` with `Qᵀ Q = 1`
-for Gram–Schmidt (under full column rank) — are proved in the companion files
-[`FactorizationsReconstruction`](FactorizationsReconstruction.lean) and
-[`FactorizationsOrthonormal`](FactorizationsOrthonormal.lean). Everything here is an exact identity
-over `ℝ`; the only hypotheses are the genuine success conditions of the algorithms.
+for Gram–Schmidt (under full column rank) — are proved in the companion modules
+`NN.Proofs.Tensor.Basic.FactorizationsReconstruction` and
+`NN.Proofs.Tensor.Basic.FactorizationsOrthonormal`. Everything here is an exact identity over `ℝ`;
+the only hypotheses are the genuine success conditions of the algorithms.
 -/
 
 @[expose] public section

@@ -86,10 +86,10 @@ syntax (name := tensorpackLit) "tensorpack!" term,+ : term
 
 macro_rules (kind := tensorpackLit)
   | `(tensorpack! $x:term) =>
-      let f := mkGlobalIdent `NN.API.tensorpack.mk1
+      let f := mkGlobalIdent `NN.API.tensorpack.singleton
       `($f $x)
   | `(tensorpack! $x:term, $y:term) =>
-      let f := mkGlobalIdent `NN.API.tensorpack.mk2
+      let f := mkGlobalIdent `NN.API.tensorpack.pair
       `($f $x $y)
   | `(tensorpack! $x:term, $y:term, $rest:term,*) =>
       `(.cons $x (tensorpack! $y, $rest,*))

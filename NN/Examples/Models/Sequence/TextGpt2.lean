@@ -383,29 +383,29 @@ def trainCorpusFloat (opts : Options)
     { steps := totalSteps
       log := .disabled
       logEvery := Nat.max 1 (totalSteps / 10) }
-  let (L0, L1) ←
+  let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some totalSteps)
-  let generated ← generateByteGreedy trained.eval trainOpts.prompt trainOpts.generate
+  let generated ← generateByteGreedy trained.predict trainOpts.prompt trainOpts.generate
   IO.println s!"  greedy generated={text.escapeForDisplay generated}"
   text.writePromptTrainLog
-    trainOpts.log "GPT-2 byte corpus training" totalSteps L0 L1
+    trainOpts.log "GPT-2 byte corpus training" totalSteps beforeLoss afterLoss
     trainOpts.toPromptGenerationOptions (some generated)
     #[s!"data={trainOpts.corpus.dataFile}", ModelZoo.deviceNote opts,
       s!"bytes={bytes.size}"]
   if trainOpts.interactive then
-    interactiveByteLoop trained.eval trainOpts.generate
+    interactiveByteLoop trained.predict trainOpts.generate
 
 /-- Load and tokenize the text corpus with GPT-2 BPE. -/
 def loadBpeCorpusTokens
     (trainOpts : text.CorpusLoggedPromptInteractiveOptions)
     (tok : text.Gpt2Bpe.Tokenizer) :
     IO (Array Nat) := do
-  let corpusText0 ← IO.FS.readFile trainOpts.corpus.dataFile
+  let fullCorpusText ← IO.FS.readFile trainOpts.corpus.dataFile
   let corpusText :=
     match trainOpts.bpe.maxChars? with
-    | some n => (corpusText0.take n).toString
-    | none => corpusText0
+    | some n => (fullCorpusText.take n).toString
+    | none => fullCorpusText
   let ids ← ModelZoo.orThrow exeName <| text.Gpt2Bpe.encode tok corpusText
   let arr := ids.toArray
   if arr.size <= BpeGpt2.seqLen then
@@ -450,21 +450,21 @@ def trainBpeCorpusFloat (opts : Options)
     { steps := trainOpts.steps
       log := .disabled
       logEvery := Nat.max 1 (trainOpts.steps / 10) }
-  let (L0, L1) ←
+  let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some trainOpts.steps)
-  printBpePredictionProbe tok lv trained.eval "after " trainOpts.prompt
-  let generated ← generateBpeGreedy tok lv trained.eval trainOpts.prompt trainOpts.generate
+  printBpePredictionProbe tok lv trained.predict "after " trainOpts.prompt
+  let generated ← generateBpeGreedy tok lv trained.predict trainOpts.prompt trainOpts.generate
   IO.println s!"  greedy generated={text.escapeForDisplay generated}"
   text.writePromptTrainLog
-    trainOpts.log "GPT-2 BPE corpus training" trainOpts.steps L0 L1
+    trainOpts.log "GPT-2 BPE corpus training" trainOpts.steps beforeLoss afterLoss
     trainOpts.toPromptGenerationOptions (some generated)
     #[s!"data={trainOpts.corpus.dataFile}", ModelZoo.deviceNote opts,
       s!"localVocab={lv.size}/{BpeGpt2.vocab}", s!"tokens={tokens.size}"]
 
 /-- CLI entrypoint for CUDA byte/BPE corpus training. -/
 def main (args : List String) : IO UInt32 := do
-  ModelZoo.runGpuFloat exeName args
+  Runtime.runCudaFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "GPU corpus trainer")
     (k := fun opts rest => do
       if !opts.useGpu then

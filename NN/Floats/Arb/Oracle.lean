@@ -20,8 +20,8 @@ This module provides a small Lean wrapper around an external Arb/FLINT process:
 - expose the result in a structured way (including an exact `Rat` enclosure reconstructed from
   Arb's `mid_rad_10exp` integers).
 
-Trust boundary: this is an **oracle**. The Lean side parses and packages the returned enclosure; it
-does not prove the Arb computation itself.
+Trust boundary: this is an **oracle**. The Lean side parses and packages the returned enclosure; the
+Arb computation is the external trusted producer behind that enclosure.
 
 ## Notes on design
 

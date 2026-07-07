@@ -16,8 +16,8 @@ The GPT-2 pre-tokenizer regex uses Unicode properties `\p{L}`, `\p{N}`, and `\s`
 needs explicit Unicode tables.  The letter/number ranges below were generated from Python
 `unicodedata` 15.1.0 by grouping code points whose general category starts with `L` or `N`.
 
-These tables are runtime data, not proof axioms. They keep the tokenizer deterministic and
-Lean-native while making the Unicode dependency visible in one small API module.
+These tables are runtime data. They keep the tokenizer deterministic and Lean-native while making
+the Unicode dependency visible in one small API module.
 -/
 
 @[expose] public section

@@ -1,65 +1,65 @@
 {
   "code_stats": {
-    "blank_or_comment_lines": 103689,
-    "code_lines": 196307,
+    "blank_or_comment_lines": 106105,
+    "code_lines": 202978,
     "declaration_counts": {
-      "abbrev": 1004,
+      "abbrev": 1048,
       "axiom": 2,
       "class": 25,
-      "def": 8128,
-      "inductive": 92,
-      "instance": 234,
-      "lemma": 643,
+      "def": 8259,
+      "inductive": 93,
+      "instance": 235,
+      "lemma": 647,
       "opaque": 100,
-      "structure": 570,
-      "theorem": 1528
+      "structure": 596,
+      "theorem": 1820
     },
-    "declarations": 12326,
+    "declarations": 12825,
     "layer_sizes": [
       {
         "files": 160,
         "layer": "NN.Proofs",
-        "lines": 59560
+        "lines": 59559
       },
       {
         "files": 186,
         "layer": "NN.Runtime",
-        "lines": 50809
+        "lines": 50750
       },
       {
-        "files": 128,
+        "files": 130,
         "layer": "NN.MLTheory",
-        "lines": 41270
+        "lines": 46379
       },
       {
         "files": 126,
         "layer": "NN.Spec",
-        "lines": 31518
-      },
-      {
-        "files": 77,
-        "layer": "NN.Floats",
-        "lines": 24740
+        "lines": 31530
       },
       {
         "files": 130,
         "layer": "NN.API",
-        "lines": 24690
+        "lines": 25342
+      },
+      {
+        "files": 77,
+        "layer": "NN.Floats",
+        "lines": 24737
       },
       {
         "files": 89,
         "layer": "NN.Verification",
-        "lines": 18138
+        "lines": 18258
       },
       {
-        "files": 105,
-        "layer": "NN.Examples",
-        "lines": 14993
-      },
-      {
-        "files": 51,
+        "files": 52,
         "layer": "blueprint",
-        "lines": 13475
+        "lines": 16340
+      },
+      {
+        "files": 107,
+        "layer": "NN.Examples",
+        "lines": 15387
       },
       {
         "files": 40,
@@ -69,7 +69,7 @@
       {
         "files": 17,
         "layer": "Widgets",
-        "lines": 4765
+        "lines": 4767
       },
       {
         "files": 21,
@@ -79,7 +79,7 @@
       {
         "files": 7,
         "layer": "NN.IR",
-        "lines": 2575
+        "lines": 2571
       },
       {
         "files": 1,
@@ -89,12 +89,12 @@
       {
         "files": 12,
         "layer": "NN.Entrypoint",
-        "lines": 526
+        "lines": 525
       },
       {
         "files": 3,
         "layer": "NN.CI",
-        "lines": 409
+        "lines": 410
       },
       {
         "files": 1,
@@ -117,16 +117,16 @@
         "lines": 29
       }
     ],
-    "lean_files": 1157,
-    "theorem_like_declarations": 2171,
+    "lean_files": 1162,
+    "theorem_like_declarations": 2467,
     "top_level_files": [
       {
         "directory": "NN",
-        "files": 1103
+        "files": 1107
       },
       {
         "directory": "blueprint",
-        "files": 51
+        "files": 52
       },
       {
         "directory": "NN.lean",
@@ -141,7 +141,7 @@
         "files": 1
       }
     ],
-    "total_lines": 299996
+    "total_lines": 309083
   },
   "edges": [
     {
@@ -1932,16 +1932,16 @@
     {
       "dst": "NN.API.Public.Facade.Trainer.Train",
       "line": 9,
-      "path": "NN/API/Public/Facade/Trainer/Eval.lean",
+      "path": "NN/API/Public/Facade/Trainer/Predict.lean",
       "public": true,
-      "src": "NN.API.Public.Facade.Trainer.Eval"
+      "src": "NN.API.Public.Facade.Trainer.Predict"
     },
     {
       "dst": "NN.API.Public.Facade.Trainer.Verify",
       "line": 10,
-      "path": "NN/API/Public/Facade/Trainer/Eval.lean",
+      "path": "NN/API/Public/Facade/Trainer/Predict.lean",
       "public": true,
-      "src": "NN.API.Public.Facade.Trainer.Eval"
+      "src": "NN.API.Public.Facade.Trainer.Predict"
     },
     {
       "dst": "NN.API.Public.Facade.Trainer.Core",
@@ -2112,7 +2112,7 @@
       "src": "NN.API.Public.Facade.Trainer"
     },
     {
-      "dst": "NN.API.Public.Facade.Trainer.Eval",
+      "dst": "NN.API.Public.Facade.Trainer.Predict",
       "line": 15,
       "path": "NN/API/Public/Facade/Trainer.lean",
       "public": true,
@@ -3687,7 +3687,7 @@
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Examples.Advanced",
+      "dst": "NN.Examples.DeepDives",
       "line": 29,
       "path": "NN/CI/All.lean",
       "public": true,
@@ -4464,1415 +4464,1429 @@
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.ConstantTarget",
+      "dst": "NN.MLTheory.Optimization.Muon",
       "line": 141,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.ExactImageTheorem",
+      "dst": "NN.MLTheory.Optimization.OptimizerLaws",
       "line": 142,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.Semantics",
+      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.ConstantTarget",
       "line": 143,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore",
+      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.ExactImageTheorem",
       "line": 144,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximation",
+      "dst": "NN.MLTheory.Proofs.Approximation.FloatInterval.Semantics",
       "line": 145,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationFP32",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore",
       "line": 146,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximation",
       "line": 147,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationFP32",
       "line": 148,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationND",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec",
       "line": 149,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Hopfield.Basic",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp",
       "line": 150,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Hopfield.Convergence",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationND",
       "line": 151,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Hopfield.Dynamics",
+      "dst": "NN.MLTheory.Proofs.Hopfield.Basic",
       "line": 152,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Hopfield.Energy",
+      "dst": "NN.MLTheory.Proofs.Hopfield.Convergence",
       "line": 153,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Hopfield.Progress",
+      "dst": "NN.MLTheory.Proofs.Hopfield.Dynamics",
       "line": 154,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.ReLU.Approx.ReLUMulApprox",
+      "dst": "NN.MLTheory.Proofs.Hopfield.Energy",
       "line": 155,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.ReLU.Bridge.ReLUMlpBridge",
+      "dst": "NN.MLTheory.Proofs.Hopfield.Progress",
       "line": 156,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.ReLU.Approximation.CompactSet",
+      "dst": "NN.MLTheory.Proofs.ReLU.Approx.ReLUMulApprox",
       "line": 157,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.StateSpace.Scan",
+      "dst": "NN.MLTheory.Proofs.ReLU.Bridge.ReLUMlpBridge",
       "line": 158,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Verification.Robustness.MlpRobustness",
+      "dst": "NN.MLTheory.Proofs.ReLU.Approximation.CompactSet",
       "line": 159,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Analysis",
+      "dst": "NN.MLTheory.Proofs.StateSpace.Scan",
       "line": 160,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Coverage",
+      "dst": "NN.MLTheory.Proofs.Verification.Robustness.MlpRobustness",
       "line": 161,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Core.RealCorrectness",
+      "dst": "NN.Proofs.Analysis",
       "line": 162,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Core.SemiringCorrectness",
+      "dst": "NN.Proofs.Autograd.Coverage",
       "line": 163,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Core.Vectorization",
+      "dst": "NN.Proofs.Autograd.Core.RealCorrectness",
       "line": 164,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.Core",
+      "dst": "NN.Proofs.Autograd.Core.SemiringCorrectness",
       "line": 165,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.Elementwise",
+      "dst": "NN.Proofs.Autograd.Core.Vectorization",
       "line": 166,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.LogSoftmax",
+      "dst": "NN.Proofs.Autograd.FDeriv.Core",
       "line": 167,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.MlpMse",
+      "dst": "NN.Proofs.Autograd.FDeriv.Elementwise",
       "line": 168,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.OpSpec",
+      "dst": "NN.Proofs.Autograd.FDeriv.LogSoftmax",
       "line": 169,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.Params",
+      "dst": "NN.Proofs.Autograd.FDeriv.MlpMse",
       "line": 170,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.FDeriv.Softmax",
+      "dst": "NN.Proofs.Autograd.FDeriv.OpSpec",
       "line": 171,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Notation",
+      "dst": "NN.Proofs.Autograd.FDeriv.Params",
       "line": 172,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Overview",
+      "dst": "NN.Proofs.Autograd.FDeriv.Softmax",
       "line": 173,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Runtime.Link",
+      "dst": "NN.Proofs.Autograd.Notation",
       "line": 174,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Algebra.Nodes",
+      "dst": "NN.Proofs.Autograd.Overview",
       "line": 175,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Algebra.Soundness",
+      "dst": "NN.Proofs.Autograd.Runtime.Link",
       "line": 176,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Core.FDeriv",
+      "dst": "NN.Proofs.Autograd.Tape.Algebra.Nodes",
       "line": 177,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Core.Soundness",
+      "dst": "NN.Proofs.Autograd.Tape.Algebra.Soundness",
       "line": 178,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Nodes",
+      "dst": "NN.Proofs.Autograd.Tape.Core.FDeriv",
       "line": 179,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Nodes.Batched",
+      "dst": "NN.Proofs.Autograd.Tape.Core.Soundness",
       "line": 180,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Nodes.Shape",
+      "dst": "NN.Proofs.Autograd.Tape.Nodes",
       "line": 181,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Attention.MultiHeadSelfAttention",
+      "dst": "NN.Proofs.Autograd.Tape.Nodes.Batched",
       "line": 182,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Attention.ScaledDotProduct",
+      "dst": "NN.Proofs.Autograd.Tape.Nodes.Shape",
       "line": 183,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Conv.BackwardDot",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Attention.MultiHeadSelfAttention",
       "line": 184,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Conv.FDeriv",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Attention.ScaledDotProduct",
       "line": 185,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Embedding.GatherRows",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Conv.BackwardDot",
       "line": 186,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Norm.BatchNormChannelFirst",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Conv.FDeriv",
       "line": 187,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Ops.Norm.LayerNorm",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Embedding.GatherRows",
       "line": 188,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Tape.Util.Idx",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Norm.BatchNormChannelFirst",
       "line": 189,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Autograd.Training.StepAlgebra",
+      "dst": "NN.Proofs.Autograd.Tape.Ops.Norm.LayerNorm",
       "line": 190,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Gradients.Activation",
+      "dst": "NN.Proofs.Autograd.Tape.Util.Idx",
       "line": 191,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Gradients.Linear",
+      "dst": "NN.Proofs.Autograd.Training.StepAlgebra",
       "line": 192,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.RuntimeApprox",
+      "dst": "NN.Proofs.Gradients.Activation",
       "line": 193,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Tensor",
+      "dst": "NN.Proofs.Gradients.Linear",
       "line": 194,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Proofs.Verification",
+      "dst": "NN.Proofs.RuntimeApprox",
       "line": 195,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Compiled",
+      "dst": "NN.Proofs.Tensor",
       "line": 196,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Engine",
+      "dst": "NN.Proofs.Verification",
       "line": 197,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Overview",
+      "dst": "NN.Runtime.Autograd.Compiled",
       "line": 198,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Torch",
+      "dst": "NN.Runtime.Autograd.Engine",
       "line": 199,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean",
+      "dst": "NN.Runtime.Autograd.Overview",
       "line": 200,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Autodiff",
+      "dst": "NN.Runtime.Autograd.Torch",
       "line": 201,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Backend",
+      "dst": "NN.Runtime.Autograd.TorchLean",
       "line": 202,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.CompileExec",
+      "dst": "NN.Runtime.Autograd.TorchLean.Autodiff",
       "line": 203,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Dual",
+      "dst": "NN.Runtime.Autograd.TorchLean.Backend",
       "line": 204,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Fno1d",
+      "dst": "NN.Runtime.Autograd.TorchLean.CompileExec",
       "line": 205,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Functional",
+      "dst": "NN.Runtime.Autograd.TorchLean.Dual",
       "line": 206,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Loss",
+      "dst": "NN.Runtime.Autograd.TorchLean.Fno1d",
       "line": 207,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Metrics",
+      "dst": "NN.Runtime.Autograd.TorchLean.Functional",
       "line": 208,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Module",
+      "dst": "NN.Runtime.Autograd.TorchLean.Loss",
       "line": 209,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.NN",
+      "dst": "NN.Runtime.Autograd.TorchLean.Metrics",
       "line": 210,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Norm",
+      "dst": "NN.Runtime.Autograd.TorchLean.Module",
       "line": 211,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Optim",
+      "dst": "NN.Runtime.Autograd.TorchLean.NN",
       "line": 212,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Random",
+      "dst": "NN.Runtime.Autograd.TorchLean.Norm",
       "line": 213,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.TorchLean.Session",
+      "dst": "NN.Runtime.Autograd.TorchLean.Optim",
       "line": 214,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Train",
+      "dst": "NN.Runtime.Autograd.TorchLean.Random",
       "line": 215,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Autograd.Utils",
+      "dst": "NN.Runtime.Autograd.TorchLean.Session",
       "line": 216,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Context",
+      "dst": "NN.Runtime.Autograd.Train",
       "line": 217,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Optim",
+      "dst": "NN.Runtime.Autograd.Utils",
       "line": 218,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.PyTorch",
+      "dst": "NN.Runtime.Context",
       "line": 219,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Scalar",
+      "dst": "NN.Runtime.Optim",
       "line": 220,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Training.Log",
+      "dst": "NN.Runtime.PyTorch",
       "line": 221,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Runtime.Variable",
+      "dst": "NN.Runtime.Scalar",
       "line": 222,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Autograd.AutogradSpec",
+      "dst": "NN.Runtime.Training.Log",
       "line": 223,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Autograd.Ops",
+      "dst": "NN.Runtime.Variable",
       "line": 224,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Context",
+      "dst": "NN.Spec.Autograd.AutogradSpec",
       "line": 225,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Scalar",
+      "dst": "NN.Spec.Autograd.Ops",
       "line": 226,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Sequence",
+      "dst": "NN.Spec.Core.Context",
       "line": 227,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Shape",
+      "dst": "NN.Spec.Core.Scalar",
       "line": 228,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Tensor",
+      "dst": "NN.Spec.Core.Sequence",
       "line": 229,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Tensor.Constructors",
+      "dst": "NN.Spec.Core.Shape",
       "line": 230,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Tensor.Core",
+      "dst": "NN.Spec.Core.Tensor",
       "line": 231,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Tensor.Linalg",
+      "dst": "NN.Spec.Core.Tensor.Constructors",
       "line": 232,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Tensor.Vec",
+      "dst": "NN.Spec.Core.Tensor.Core",
       "line": 233,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.TensorArray",
+      "dst": "NN.Spec.Core.Tensor.Linalg",
       "line": 234,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.TensorBridge",
+      "dst": "NN.Spec.Core.Tensor.Vec",
       "line": 235,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.TensorGrad",
+      "dst": "NN.Spec.Core.TensorArray",
       "line": 236,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.TensorOps",
+      "dst": "NN.Spec.Core.TensorBridge",
       "line": 237,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.TensorReductionShape",
+      "dst": "NN.Spec.Core.TensorGrad",
       "line": 238,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Core.Utils",
+      "dst": "NN.Spec.Core.TensorOps",
       "line": 239,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Dynamics.System",
+      "dst": "NN.Spec.Core.TensorReductionShape",
       "line": 240,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Dynamics.StateSpace",
+      "dst": "NN.Spec.Core.Utils",
       "line": 241,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Activation",
+      "dst": "NN.Spec.Dynamics.System",
       "line": 242,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Attention",
+      "dst": "NN.Spec.Dynamics.StateSpace",
       "line": 243,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Conv",
+      "dst": "NN.Spec.Layers.Activation",
       "line": 244,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Dropout",
+      "dst": "NN.Spec.Layers.Attention",
       "line": 245,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Embedding",
+      "dst": "NN.Spec.Layers.Conv",
       "line": 246,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.FlashAttention",
+      "dst": "NN.Spec.Layers.Dropout",
       "line": 247,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.GlobalPooling",
+      "dst": "NN.Spec.Layers.Embedding",
       "line": 248,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Gnn",
+      "dst": "NN.Spec.Layers.FlashAttention",
       "line": 249,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Gru",
+      "dst": "NN.Spec.Layers.GlobalPooling",
       "line": 250,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Linear",
+      "dst": "NN.Spec.Layers.Gnn",
       "line": 251,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Loss",
+      "dst": "NN.Spec.Layers.Gru",
       "line": 252,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Lstm",
+      "dst": "NN.Spec.Layers.Linear",
       "line": 253,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Normalization",
+      "dst": "NN.Spec.Layers.Loss",
       "line": 254,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Pooling",
+      "dst": "NN.Spec.Layers.Lstm",
       "line": 255,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.PositionalEncoding",
+      "dst": "NN.Spec.Layers.Normalization",
       "line": 256,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Rnn",
+      "dst": "NN.Spec.Layers.Pooling",
       "line": 257,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.SelectiveScan",
+      "dst": "NN.Spec.Layers.PositionalEncoding",
       "line": 258,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Layers.Utils",
+      "dst": "NN.Spec.Layers.Rnn",
       "line": 259,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Autoencoder",
+      "dst": "NN.Spec.Layers.SelectiveScan",
       "line": 260,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Cnn",
+      "dst": "NN.Spec.Layers.Utils",
       "line": 261,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.CommonHelpers",
+      "dst": "NN.Spec.Models.Autoencoder",
       "line": 262,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Gmm",
+      "dst": "NN.Spec.Models.Cnn",
       "line": 263,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Gnn",
+      "dst": "NN.Spec.Models.CommonHelpers",
       "line": 264,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.GradientBoostedTrees",
+      "dst": "NN.Spec.Models.Gmm",
       "line": 265,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Hmm",
+      "dst": "NN.Spec.Models.Gnn",
       "line": 266,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Hopfield",
+      "dst": "NN.Spec.Models.GradientBoostedTrees",
       "line": 267,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Knn",
+      "dst": "NN.Spec.Models.Hmm",
       "line": 268,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.LinearRegression",
+      "dst": "NN.Spec.Models.Hopfield",
       "line": 269,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.LogisticRegression",
+      "dst": "NN.Spec.Models.Knn",
       "line": 270,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Mamba",
+      "dst": "NN.Spec.Models.LinearRegression",
       "line": 271,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Mlp",
+      "dst": "NN.Spec.Models.LogisticRegression",
       "line": 272,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.NaiveBayes",
+      "dst": "NN.Spec.Models.Mamba",
       "line": 273,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Pca",
+      "dst": "NN.Spec.Models.Mlp",
       "line": 274,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.RandomForest",
+      "dst": "NN.Spec.Models.NaiveBayes",
       "line": 275,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Resnet",
+      "dst": "NN.Spec.Models.Pca",
       "line": 276,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.S4",
+      "dst": "NN.Spec.Models.RandomForest",
       "line": 277,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Seq2seq",
+      "dst": "NN.Spec.Models.Resnet",
       "line": 278,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Svm",
+      "dst": "NN.Spec.Models.S4",
       "line": 279,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Transformer",
+      "dst": "NN.Spec.Models.Seq2seq",
       "line": 280,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Unet",
+      "dst": "NN.Spec.Models.Svm",
       "line": 281,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Models.Vit",
+      "dst": "NN.Spec.Models.Transformer",
       "line": 282,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Activation",
+      "dst": "NN.Spec.Models.Unet",
       "line": 283,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Attention",
+      "dst": "NN.Spec.Models.Vit",
       "line": 284,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Autoencoder",
+      "dst": "NN.Spec.Module.Activation",
       "line": 285,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Conv",
+      "dst": "NN.Spec.Module.Attention",
       "line": 286,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.DecisionTree",
+      "dst": "NN.Spec.Module.Autoencoder",
       "line": 287,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Dropout",
+      "dst": "NN.Spec.Module.Conv",
       "line": 288,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Embedding",
+      "dst": "NN.Spec.Module.DecisionTree",
       "line": 289,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Flatten",
+      "dst": "NN.Spec.Module.Dropout",
       "line": 290,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.GlobalPooling",
+      "dst": "NN.Spec.Module.Embedding",
       "line": 291,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Gmm",
+      "dst": "NN.Spec.Module.Flatten",
       "line": 292,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Gnn",
+      "dst": "NN.Spec.Module.GlobalPooling",
       "line": 293,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.GradientBoostedTrees",
+      "dst": "NN.Spec.Module.Gmm",
       "line": 294,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.GruModels",
+      "dst": "NN.Spec.Module.Gnn",
       "line": 295,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Hmm",
+      "dst": "NN.Spec.Module.GradientBoostedTrees",
       "line": 296,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Linear",
+      "dst": "NN.Spec.Module.GruModels",
       "line": 297,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.LinearRegression",
+      "dst": "NN.Spec.Module.Hmm",
       "line": 298,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.LogisticRegression",
+      "dst": "NN.Spec.Module.Linear",
       "line": 299,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.LstmModels",
+      "dst": "NN.Spec.Module.LinearRegression",
       "line": 300,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Normalization",
+      "dst": "NN.Spec.Module.LogisticRegression",
       "line": 301,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Pca",
+      "dst": "NN.Spec.Module.LstmModels",
       "line": 302,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Pooling",
+      "dst": "NN.Spec.Module.Normalization",
       "line": 303,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.PositionalEncoding",
+      "dst": "NN.Spec.Module.Pca",
       "line": 304,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Resnet",
+      "dst": "NN.Spec.Module.Pooling",
       "line": 305,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Rnn",
+      "dst": "NN.Spec.Module.PositionalEncoding",
       "line": 306,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.RnnModels",
+      "dst": "NN.Spec.Module.Resnet",
       "line": 307,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Seq2seq",
+      "dst": "NN.Spec.Module.Rnn",
       "line": 308,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.SpecModule",
+      "dst": "NN.Spec.Module.RnnModels",
       "line": 309,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Spec.Module.Svm",
+      "dst": "NN.Spec.Module.Seq2seq",
       "line": 310,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Entrypoint.Tensor",
+      "dst": "NN.Spec.Module.SpecModule",
       "line": 311,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.AllAutogradTests",
+      "dst": "NN.Spec.Module.Svm",
       "line": 312,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.KnnCheck",
+      "dst": "NN.Entrypoint.Tensor",
       "line": 313,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.ModelsCheck",
+      "dst": "NN.Tests.Runtime.Floats.AllAutogradTests",
       "line": 314,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.PINNDerivResidual",
+      "dst": "NN.Tests.Runtime.Floats.KnnCheck",
       "line": 315,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.RnnGruLstmBpttCheck",
+      "dst": "NN.Tests.Runtime.Floats.ModelsCheck",
       "line": 316,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.Suite",
+      "dst": "NN.Tests.Runtime.Floats.PINNDerivResidual",
       "line": 317,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.TorchLeanIRExecEquivCheck",
+      "dst": "NN.Tests.Runtime.Floats.RnnGruLstmBpttCheck",
       "line": 318,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.TorchLeanIndexShapeCheck",
+      "dst": "NN.Tests.Runtime.Floats.Suite",
       "line": 319,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.TorchLeanOpsCheck",
+      "dst": "NN.Tests.Runtime.Floats.TorchLeanIRExecEquivCheck",
       "line": 320,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivCheck",
+      "dst": "NN.Tests.Runtime.Floats.TorchLeanIndexShapeCheck",
       "line": 321,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Floats.Utils",
+      "dst": "NN.Tests.Runtime.Floats.TorchLeanOpsCheck",
       "line": 322,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Rationals.AutogradEngineTest",
+      "dst": "NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivCheck",
       "line": 323,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Rationals.MlpTest",
+      "dst": "NN.Tests.Runtime.Floats.Utils",
       "line": 324,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Tests.Runtime.Rationals.Suite",
+      "dst": "NN.Tests.Runtime.Rationals.AutogradEngineTest",
       "line": 325,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Cert.CROWNNodeCert",
+      "dst": "NN.Tests.Runtime.Rationals.MlpTest",
       "line": 326,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Cert.CROWNNodeCertAlphaBeta",
+      "dst": "NN.Tests.Runtime.Rationals.Suite",
       "line": 327,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Cert.IBPCert",
+      "dst": "NN.Verification.Cert.CROWNNodeCert",
       "line": 328,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Cert.IBPNodeCert",
+      "dst": "NN.Verification.Cert.CROWNNodeCertAlphaBeta",
       "line": 329,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.ODE.Ast",
+      "dst": "NN.Verification.Cert.IBPCert",
       "line": 330,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.ODE.Parse",
+      "dst": "NN.Verification.Cert.IBPNodeCert",
       "line": 331,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.PINN.Architecture",
+      "dst": "NN.Verification.ODE.Ast",
       "line": 332,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.TorchLean.Compile",
+      "dst": "NN.Verification.ODE.Parse",
       "line": 333,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.TorchLean.CompileExec",
+      "dst": "NN.Verification.PINN.Architecture",
       "line": 334,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.TorchLean.Correctness",
+      "dst": "NN.Verification.TorchLean.Compile",
       "line": 335,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.TorchLean.Verified",
+      "dst": "NN.Verification.TorchLean.CompileExec",
       "line": 336,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.TorchLean.SpecEval",
+      "dst": "NN.Verification.TorchLean.Correctness",
       "line": 337,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Util.Array",
+      "dst": "NN.Verification.TorchLean.Verified",
       "line": 338,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Util.FloatApprox",
+      "dst": "NN.Verification.TorchLean.SpecEval",
       "line": 339,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Util.Json",
+      "dst": "NN.Verification.Util.Array",
       "line": 340,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Verification.Util.Tensor",
+      "dst": "NN.Verification.Util.FloatApprox",
       "line": 341,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
     },
     {
-      "dst": "NN.Entrypoint.Widgets",
+      "dst": "NN.Verification.Util.Json",
       "line": 342,
+      "path": "NN/CI/All.lean",
+      "public": true,
+      "src": "NN.CI.All"
+    },
+    {
+      "dst": "NN.Verification.Util.Tensor",
+      "line": 343,
+      "path": "NN/CI/All.lean",
+      "public": true,
+      "src": "NN.CI.All"
+    },
+    {
+      "dst": "NN.Entrypoint.Widgets",
+      "line": 344,
       "path": "NN/CI/All.lean",
       "public": true,
       "src": "NN.CI.All"
@@ -6760,265 +6774,6 @@
       "src": "NN.Entrypoint.Widgets"
     },
     {
-      "dst": "NN.Floats.Arb.Oracle",
-      "line": 9,
-      "path": "NN/Examples/Advanced/Floats/ArbIEEEExecCompare.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    },
-    {
-      "dst": "NN.Floats.Interval.IEEEExec32ArbTrans",
-      "line": 10,
-      "path": "NN/Examples/Advanced/Floats/ArbIEEEExecCompare.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    },
-    {
-      "dst": "NN.Floats.Interval.Comparison",
-      "line": 11,
-      "path": "NN/Examples/Advanced/Floats/ArbIEEEExecCompare.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    },
-    {
-      "dst": "NN.API.CLI.Core",
-      "line": 12,
-      "path": "NN/Examples/Advanced/Floats/ArbIEEEExecCompare.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    },
-    {
-      "dst": "Std",
-      "line": 13,
-      "path": "NN/Examples/Advanced/Floats/ArbIEEEExecCompare.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    },
-    {
-      "dst": "Batteries.Lean.Float",
-      "line": 9,
-      "path": "NN/Examples/Advanced/Floats/Float32Modes.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.Float32Modes"
-    },
-    {
-      "dst": "NN",
-      "line": 10,
-      "path": "NN/Examples/Advanced/Floats/Float32Modes.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Floats.Float32Modes"
-    },
-    {
-      "dst": "NN.Entrypoint.Widgets",
-      "line": 11,
-      "path": "NN/Examples/Advanced/Floats/Float32Modes.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Floats.Float32Modes"
-    },
-    {
-      "dst": "NN",
-      "line": 9,
-      "path": "NN/Examples/Advanced/GraphSpec/Tutorial.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.GraphSpec.Tutorial"
-    },
-    {
-      "dst": "NN.GraphSpec.Models",
-      "line": 10,
-      "path": "NN/Examples/Advanced/GraphSpec/Tutorial.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.GraphSpec.Tutorial"
-    },
-    {
-      "dst": "NN.GraphSpec.ToTorchLean",
-      "line": 11,
-      "path": "NN/Examples/Advanced/GraphSpec/Tutorial.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.GraphSpec.Tutorial"
-    },
-    {
-      "dst": "NN",
-      "line": 9,
-      "path": "NN/Examples/Advanced/IRAxisOps.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.IRAxisOps"
-    },
-    {
-      "dst": "NN.IR.Check",
-      "line": 10,
-      "path": "NN/Examples/Advanced/IRAxisOps.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.IRAxisOps"
-    },
-    {
-      "dst": "NN.Runtime.Autograd.Compiled.IRExec",
-      "line": 11,
-      "path": "NN/Examples/Advanced/IRAxisOps.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.IRAxisOps"
-    },
-    {
-      "dst": "NN",
-      "line": 9,
-      "path": "NN/Examples/Advanced/OneSemanticUniverse.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.OneSemanticUniverse"
-    },
-    {
-      "dst": "NN.IR.Semantics",
-      "line": 10,
-      "path": "NN/Examples/Advanced/OneSemanticUniverse.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.OneSemanticUniverse"
-    },
-    {
-      "dst": "NN.MLTheory.CROWN.Graph",
-      "line": 11,
-      "path": "NN/Examples/Advanced/OneSemanticUniverse.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.OneSemanticUniverse"
-    },
-    {
-      "dst": "NN.Entrypoint.Widgets",
-      "line": 9,
-      "path": "NN/Examples/Advanced/Tensors/Basic.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Tensors.Basic"
-    },
-    {
-      "dst": "NN.Spec.Core.TensorBridge",
-      "line": 10,
-      "path": "NN/Examples/Advanced/Tensors/Basic.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.Tensors.Basic"
-    },
-    {
-      "dst": "NN",
-      "line": 9,
-      "path": "NN/Examples/Advanced/TorchIRPyTorch.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.TorchIRPyTorch"
-    },
-    {
-      "dst": "NN.Runtime.PyTorch.Export.IRPyTorch",
-      "line": 10,
-      "path": "NN/Examples/Advanced/TorchIRPyTorch.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.TorchIRPyTorch"
-    },
-    {
-      "dst": "NN.Verification.TorchLean.Compile",
-      "line": 11,
-      "path": "NN/Examples/Advanced/TorchIRPyTorch.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced.TorchIRPyTorch"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 9,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.IR.Graph",
-      "line": 10,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.IR.Semantics",
-      "line": 11,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.MLTheory.CROWN.Graph",
-      "line": 12,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.Runtime.Autograd.Engine.Core",
-      "line": 13,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.Spec.RL.Envs.GridWorld",
-      "line": 14,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.Entrypoint.Widgets",
-      "line": 15,
-      "path": "NN/Examples/Advanced/Widgets.lean",
-      "public": false,
-      "src": "NN.Examples.Advanced.Widgets"
-    },
-    {
-      "dst": "NN.Examples.Advanced.Floats.ArbIEEEExecCompare",
-      "line": 9,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.Floats.Float32Modes",
-      "line": 10,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.GraphSpec.Tutorial",
-      "line": 11,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.IRAxisOps",
-      "line": 12,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.OneSemanticUniverse",
-      "line": 13,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.Tensors.Basic",
-      "line": 14,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.TorchIRPyTorch",
-      "line": 15,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
-      "dst": "NN.Examples.Advanced.Widgets",
-      "line": 16,
-      "path": "NN/Examples/Advanced.lean",
-      "public": true,
-      "src": "NN.Examples.Advanced"
-    },
-    {
       "dst": "NN.Examples.BugZoo.ShapeAndBroadcast",
       "line": 9,
       "path": "NN/Examples/BugZoo/All.lean",
@@ -7313,6 +7068,265 @@
       "src": "NN.Examples.Data.SamplePaths"
     },
     {
+      "dst": "NN.Floats.Arb.Oracle",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/Floats/ArbIEEEExecCompare.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    },
+    {
+      "dst": "NN.Floats.Interval.IEEEExec32ArbTrans",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/Floats/ArbIEEEExecCompare.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    },
+    {
+      "dst": "NN.Floats.Interval.Comparison",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/Floats/ArbIEEEExecCompare.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    },
+    {
+      "dst": "NN.API.CLI.Core",
+      "line": 12,
+      "path": "NN/Examples/DeepDives/Floats/ArbIEEEExecCompare.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    },
+    {
+      "dst": "Std",
+      "line": 13,
+      "path": "NN/Examples/DeepDives/Floats/ArbIEEEExecCompare.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    },
+    {
+      "dst": "Batteries.Lean.Float",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/Floats/Float32Modes.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.Float32Modes"
+    },
+    {
+      "dst": "NN",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/Floats/Float32Modes.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.Float32Modes"
+    },
+    {
+      "dst": "NN.Entrypoint.Widgets",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/Floats/Float32Modes.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Floats.Float32Modes"
+    },
+    {
+      "dst": "NN",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/GraphSpec/Tutorial.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.GraphSpec.Tutorial"
+    },
+    {
+      "dst": "NN.GraphSpec.Models",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/GraphSpec/Tutorial.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.GraphSpec.Tutorial"
+    },
+    {
+      "dst": "NN.GraphSpec.ToTorchLean",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/GraphSpec/Tutorial.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.GraphSpec.Tutorial"
+    },
+    {
+      "dst": "NN",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/IRAxisOps.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.IRAxisOps"
+    },
+    {
+      "dst": "NN.IR.Check",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/IRAxisOps.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.IRAxisOps"
+    },
+    {
+      "dst": "NN.Runtime.Autograd.Compiled.IRExec",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/IRAxisOps.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.IRAxisOps"
+    },
+    {
+      "dst": "NN",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/OneSemanticUniverse.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.OneSemanticUniverse"
+    },
+    {
+      "dst": "NN.IR.Semantics",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/OneSemanticUniverse.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.OneSemanticUniverse"
+    },
+    {
+      "dst": "NN.MLTheory.CROWN.Graph",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/OneSemanticUniverse.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.OneSemanticUniverse"
+    },
+    {
+      "dst": "NN.Entrypoint.Widgets",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/Tensors/Basic.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Tensors.Basic"
+    },
+    {
+      "dst": "NN.Spec.Core.TensorBridge",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/Tensors/Basic.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Tensors.Basic"
+    },
+    {
+      "dst": "NN",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/TorchIRPyTorch.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.TorchIRPyTorch"
+    },
+    {
+      "dst": "NN.Runtime.PyTorch.Export.IRPyTorch",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/TorchIRPyTorch.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.TorchIRPyTorch"
+    },
+    {
+      "dst": "NN.Verification.TorchLean.Compile",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/TorchIRPyTorch.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.TorchIRPyTorch"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32",
+      "line": 9,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.IR.Graph",
+      "line": 10,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.IR.Semantics",
+      "line": 11,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.MLTheory.CROWN.Graph",
+      "line": 12,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.Runtime.Autograd.Engine.Core",
+      "line": 13,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.Spec.RL.Envs.GridWorld",
+      "line": 14,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.Entrypoint.Widgets",
+      "line": 15,
+      "path": "NN/Examples/DeepDives/Widgets.lean",
+      "public": false,
+      "src": "NN.Examples.DeepDives.Widgets"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare",
+      "line": 9,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.Floats.Float32Modes",
+      "line": 10,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.GraphSpec.Tutorial",
+      "line": 11,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.IRAxisOps",
+      "line": 12,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.OneSemanticUniverse",
+      "line": 13,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.Tensors.Basic",
+      "line": 14,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.TorchIRPyTorch",
+      "line": 15,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
+      "dst": "NN.Examples.DeepDives.Widgets",
+      "line": 16,
+      "path": "NN/Examples/DeepDives.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives"
+    },
+    {
       "dst": "NN.Examples.Factorization.Common",
       "line": 9,
       "path": "NN/Examples/Factorization/Cholesky.lean",
@@ -7357,6 +7371,13 @@
     {
       "dst": "NN",
       "line": 9,
+      "path": "NN/Examples/Functional/Transcendentals.lean",
+      "public": true,
+      "src": "NN.Examples.Functional.Transcendentals"
+    },
+    {
+      "dst": "NN.Proofs.Autograd.FDeriv.Elementwise",
+      "line": 10,
       "path": "NN/Examples/Functional/Transcendentals.lean",
       "public": true,
       "src": "NN.Examples.Functional.Transcendentals"
@@ -7936,7 +7957,7 @@
       "src": "NN.Examples.Models.Runner"
     },
     {
-      "dst": "NN.Examples.Advanced",
+      "dst": "NN.Examples.DeepDives",
       "line": 11,
       "path": "NN/Examples/Models/Runner.lean",
       "public": true,
@@ -8028,7 +8049,7 @@
     },
     {
       "dst": "NN",
-      "line": 17,
+      "line": 16,
       "path": "NN/Examples/Models/Sequence/GptAdder.lean",
       "public": true,
       "src": "NN.Examples.Models.Sequence.GptAdder"
@@ -8319,6 +8340,20 @@
       "path": "NN/Examples/Models.lean",
       "public": true,
       "src": "NN.Examples.Models"
+    },
+    {
+      "dst": "NN.MLTheory.Optimization.Muon",
+      "line": 9,
+      "path": "NN/Examples/Optimization/MuonCertificates.lean",
+      "public": true,
+      "src": "NN.Examples.Optimization.MuonCertificates"
+    },
+    {
+      "dst": "NN.Examples.Optimization.MuonCertificates",
+      "line": 9,
+      "path": "NN/Examples/Optimization.lean",
+      "public": true,
+      "src": "NN.Examples.Optimization"
     },
     {
       "dst": "NN",
@@ -8762,113 +8797,120 @@
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Examples.Advanced",
+      "dst": "NN.Examples.DeepDives",
       "line": 16,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Examples.Verification",
+      "dst": "NN.Examples.Optimization",
       "line": 17,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Examples.Data.Loaders.Cifar10Images",
+      "dst": "NN.Examples.Verification",
       "line": 18,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.Cert.AbCrownLeafCert",
+      "dst": "NN.Examples.Data.Loaders.Cifar10Images",
       "line": 19,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.CLI",
+      "dst": "NN.Verification.Cert.AbCrownLeafCert",
       "line": 20,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.Certificate",
+      "dst": "NN.Verification.PINN.CLI",
       "line": 21,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.Core",
+      "dst": "NN.Verification.PINN.Certificate",
       "line": 22,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.DatasetCheck",
+      "dst": "NN.Verification.PINN.Core",
       "line": 23,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.PdeAst",
+      "dst": "NN.Verification.PINN.DatasetCheck",
       "line": 24,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.PdeParse",
+      "dst": "NN.Verification.PINN.PdeAst",
       "line": 25,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.PINN.ResidualAffine",
+      "dst": "NN.Verification.PINN.PdeParse",
       "line": 26,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.ProofBackedCertificates",
+      "dst": "NN.Verification.PINN.ResidualAffine",
       "line": 27,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.Robustness.Digits",
+      "dst": "NN.Verification.ProofBackedCertificates",
       "line": 28,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Verification.ODE.Verify",
+      "dst": "NN.Verification.Robustness.Digits",
       "line": 29,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Examples.RL",
+      "dst": "NN.Verification.ODE.Verify",
       "line": 30,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
     },
     {
-      "dst": "NN.Examples.BugZoo.All",
+      "dst": "NN.Examples.RL",
       "line": 31,
+      "path": "NN/Examples/Zoo.lean",
+      "public": true,
+      "src": "NN.Examples.Zoo"
+    },
+    {
+      "dst": "NN.Examples.BugZoo.All",
+      "line": 32,
       "path": "NN/Examples/Zoo.lean",
       "public": true,
       "src": "NN.Examples.Zoo"
@@ -11079,113 +11121,127 @@
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.Optimization.SmoothStrongConvexBridge",
+      "dst": "NN.MLTheory.Optimization.Muon",
       "line": 16,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.Optimization.StronglyConvexGD",
+      "dst": "NN.MLTheory.Optimization.OptimizerLaws",
       "line": 17,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.SelfSupervised",
+      "dst": "NN.MLTheory.Optimization.SmoothStrongConvexBridge",
       "line": 18,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.Proofs",
+      "dst": "NN.MLTheory.Optimization.StronglyConvexGD",
       "line": 19,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Core",
+      "dst": "NN.MLTheory.SelfSupervised",
+      "line": 20,
+      "path": "NN/MLTheory/API.lean",
+      "public": true,
+      "src": "NN.MLTheory.API"
+    },
+    {
+      "dst": "NN.MLTheory.Proofs",
       "line": 21,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Extras.AlphaConfig",
-      "line": 22,
-      "path": "NN/MLTheory/API.lean",
-      "public": true,
-      "src": "NN.MLTheory.API"
-    },
-    {
-      "dst": "NN.MLTheory.CROWN.Extras.FloatIntegration",
+      "dst": "NN.MLTheory.CROWN.Core",
       "line": 23,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Extras.IntervalLemmas",
+      "dst": "NN.MLTheory.CROWN.Extras.AlphaConfig",
       "line": 24,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Graph",
+      "dst": "NN.MLTheory.CROWN.Extras.FloatIntegration",
       "line": 25,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Models.Mlp",
+      "dst": "NN.MLTheory.CROWN.Extras.IntervalLemmas",
       "line": 26,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Operators",
+      "dst": "NN.MLTheory.CROWN.Graph",
       "line": 27,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Operators.Conv",
+      "dst": "NN.MLTheory.CROWN.Models.Mlp",
       "line": 28,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Proofs.Distillation",
+      "dst": "NN.MLTheory.CROWN.Operators",
       "line": 29,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Proofs.SoundnessProofs",
+      "dst": "NN.MLTheory.CROWN.Operators.Conv",
       "line": 30,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.MLTheory.CROWN.Propagation.LinearSignsplit",
+      "dst": "NN.MLTheory.CROWN.Proofs.Distillation",
       "line": 31,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
     },
     {
-      "dst": "NN.Floats.NeuralFloat.ErrorBounds",
+      "dst": "NN.MLTheory.CROWN.Proofs.SoundnessProofs",
+      "line": 32,
+      "path": "NN/MLTheory/API.lean",
+      "public": true,
+      "src": "NN.MLTheory.API"
+    },
+    {
+      "dst": "NN.MLTheory.CROWN.Propagation.LinearSignsplit",
       "line": 33,
+      "path": "NN/MLTheory/API.lean",
+      "public": true,
+      "src": "NN.MLTheory.API"
+    },
+    {
+      "dst": "NN.Floats.NeuralFloat.ErrorBounds",
+      "line": 35,
       "path": "NN/MLTheory/API.lean",
       "public": true,
       "src": "NN.MLTheory.API"
@@ -13081,7 +13137,7 @@
       "src": "NN.MLTheory.LearningTheory"
     },
     {
-      "dst": "NN.Runtime.Optim.Optimizers",
+      "dst": "NN.MLTheory.Optimization.OptimizerLaws",
       "line": 9,
       "path": "NN/MLTheory/Optimization/FirstOrder.lean",
       "public": true,
@@ -13128,6 +13184,34 @@
       "path": "NN/MLTheory/Optimization/LowRank.lean",
       "public": true,
       "src": "NN.MLTheory.Optimization.LowRank"
+    },
+    {
+      "dst": "NN.MLTheory.Optimization.OptimizerLaws",
+      "line": 9,
+      "path": "NN/MLTheory/Optimization/Muon.lean",
+      "public": true,
+      "src": "NN.MLTheory.Optimization.Muon"
+    },
+    {
+      "dst": "NN.Proofs.Tensor.Basic.FactorizationsOrthonormal",
+      "line": 10,
+      "path": "NN/MLTheory/Optimization/Muon.lean",
+      "public": true,
+      "src": "NN.MLTheory.Optimization.Muon"
+    },
+    {
+      "dst": "NN.Proofs.Tensor.Basic.LinearAlgebra",
+      "line": 11,
+      "path": "NN/MLTheory/Optimization/Muon.lean",
+      "public": true,
+      "src": "NN.MLTheory.Optimization.Muon"
+    },
+    {
+      "dst": "NN.Runtime.Optim.Optimizers",
+      "line": 9,
+      "path": "NN/MLTheory/Optimization/OptimizerLaws.lean",
+      "public": true,
+      "src": "NN.MLTheory.Optimization.OptimizerLaws"
     },
     {
       "dst": "NN.MLTheory.Optimization.GDLinearConvergence",
@@ -13454,9 +13538,9 @@
     {
       "dst": "NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore",
       "line": 9,
-      "path": "NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationIEEE32ExecMlp2.lean",
+      "path": "NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationIEEE32ExecTwoLayerMlp.lean",
       "public": true,
-      "src": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2"
+      "src": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp"
     },
     {
       "dst": "Mathlib.Topology.ContinuousMap.StoneWeierstrass",
@@ -13529,7 +13613,7 @@
       "src": "NN.MLTheory.Proofs.Approximation.Universal"
     },
     {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2",
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp",
       "line": 13,
       "path": "NN/MLTheory/Proofs/Approximation/Universal.lean",
       "public": true,
@@ -18809,6 +18893,13 @@
     {
       "dst": "NN.Runtime.Autograd.Torch.Core.Types",
       "line": 9,
+      "path": "NN/Runtime/Autograd/Torch/Core/Session.lean",
+      "public": true,
+      "src": "NN.Runtime.Autograd.Torch.Core.Session"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32.Compare",
+      "line": 10,
       "path": "NN/Runtime/Autograd/Torch/Core/Session.lean",
       "public": true,
       "src": "NN.Runtime.Autograd.Torch.Core.Session"
@@ -24750,6 +24841,27 @@
       "src": "NN.Verification.CLI"
     },
     {
+      "dst": "NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIPythonOnly",
+      "line": 26,
+      "path": "NN/Verification/CLI.lean",
+      "public": true,
+      "src": "NN.Verification.CLI"
+    },
+    {
+      "dst": "NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIIHybrid",
+      "line": 27,
+      "path": "NN/Verification/CLI.lean",
+      "public": true,
+      "src": "NN.Verification.CLI"
+    },
+    {
+      "dst": "NN.MLTheory.CROWN.Lyapunov.TwoStage.PipelineIIIAllInLean",
+      "line": 28,
+      "path": "NN/Verification/CLI.lean",
+      "public": true,
+      "src": "NN.Verification.CLI"
+    },
+    {
       "dst": "NN.API.CLI",
       "line": 9,
       "path": "NN/Verification/Cert/AbCrownLeafCert.lean",
@@ -26410,7 +26522,14 @@
     },
     {
       "dst": "NN",
-      "line": 46,
+      "line": 50,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/API_Tour.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.API_Tour"
+    },
+    {
+      "dst": "NN",
+      "line": 77,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/API_Tour.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.API_Tour"
@@ -26438,14 +26557,14 @@
     },
     {
       "dst": "NN",
-      "line": 43,
+      "line": 48,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/RunningExample.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.RunningExample"
     },
     {
       "dst": "NN",
-      "line": 165,
+      "line": 237,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/RunningExample.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.RunningExample"
@@ -26459,14 +26578,14 @@
     },
     {
       "dst": "NN",
-      "line": 119,
+      "line": 178,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/TheLeanLanguage.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.TheLeanLanguage"
     },
     {
       "dst": "NN",
-      "line": 171,
+      "line": 235,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/TheLeanLanguage.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.TheLeanLanguage"
@@ -26480,7 +26599,7 @@
     },
     {
       "dst": "NN",
-      "line": 59,
+      "line": 70,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch1_Introduction/TorchLeanVsPyTorch.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.TorchLeanVsPyTorch"
@@ -26505,6 +26624,13 @@
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/AutogradWalkthrough.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.AutogradWalkthrough"
+    },
+    {
+      "dst": "VersoManual",
+      "line": 1,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/BackendSelection.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.BackendSelection"
     },
     {
       "dst": "VersoManual",
@@ -26550,7 +26676,7 @@
     },
     {
       "dst": "torch",
-      "line": 200,
+      "line": 227,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/PyTorchRoundtrip.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.PyTorchRoundtrip"
@@ -26578,42 +26704,42 @@
     },
     {
       "dst": "torch",
-      "line": 50,
+      "line": 51,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
     },
     {
       "dst": "NN",
-      "line": 60,
+      "line": 61,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
     },
     {
       "dst": "NN",
-      "line": 81,
+      "line": 82,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
     },
     {
       "dst": "NN",
-      "line": 142,
+      "line": 164,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
     },
     {
       "dst": "NN",
-      "line": 168,
+      "line": 190,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
     },
     {
       "dst": "NN",
-      "line": 308,
+      "line": 330,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TensorsAndShapes.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TensorsAndShapes"
@@ -26634,28 +26760,35 @@
     },
     {
       "dst": "NN",
-      "line": 45,
+      "line": 68,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TorchLeanAPI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TorchLeanAPI"
     },
     {
       "dst": "NN",
-      "line": 243,
+      "line": 115,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TorchLeanAPI.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TorchLeanAPI"
+    },
+    {
+      "dst": "NN",
+      "line": 342,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TorchLeanAPI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TorchLeanAPI"
     },
     {
       "dst": "NN.Entrypoint.Verification",
-      "line": 249,
+      "line": 348,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TorchLeanAPI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TorchLeanAPI"
     },
     {
       "dst": "NN.Entrypoint.Floats",
-      "line": 254,
+      "line": 353,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch2_Frontend/TorchLeanAPI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.TorchLeanAPI"
@@ -26732,14 +26865,14 @@
     },
     {
       "dst": "NN.Runtime.External.Julia",
-      "line": 167,
+      "line": 168,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/ExternalToolsAndFFI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.ExternalToolsAndFFI"
     },
     {
       "dst": "NN.Floats.Arb",
-      "line": 194,
+      "line": 195,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/ExternalToolsAndFFI.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.ExternalToolsAndFFI"
@@ -26753,6 +26886,13 @@
     },
     {
       "dst": "NN.MLTheory.Proofs.Approximation",
+      "line": 119,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/FloatingPointLiterature.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.FloatingPointLiterature"
+    },
+    {
+      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec",
       "line": 120,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/FloatingPointLiterature.lean",
       "public": false,
@@ -26760,14 +26900,7 @@
     },
     {
       "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec",
-      "line": 121,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/FloatingPointLiterature.lean",
-      "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.FloatingPointLiterature"
-    },
-    {
-      "dst": "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec",
-      "line": 166,
+      "line": 165,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/FloatingPointLiterature.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.FloatingPointLiterature"
@@ -26781,84 +26914,84 @@
     },
     {
       "dst": "NN.Floats.Float32",
-      "line": 77,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
-      "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
-    },
-    {
-      "dst": "NN.Floats.FP32",
       "line": 78,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec",
+      "dst": "NN.Floats.FP32",
       "line": 79,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec",
       "line": 80,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.BridgeFP32",
       "line": 81,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
       "line": 82,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
-      "line": 129,
+      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "line": 83,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.BridgeFP32",
       "line": 130,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
+      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "line": 131,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
+    },
+    {
       "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
-      "line": 225,
+      "line": 271,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.Float32Contract",
-      "line": 244,
+      "line": 290,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.KernelSpec",
-      "line": 245,
+      "line": 291,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 266,
+      "line": 312,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
@@ -26872,35 +27005,35 @@
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.Float32Contract",
-      "line": 165,
+      "line": 190,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GPUAndCUDA.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.KernelSpec",
-      "line": 166,
+      "line": 191,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GPUAndCUDA.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.NativeSources",
-      "line": 167,
+      "line": 192,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GPUAndCUDA.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.Float32Contract",
-      "line": 209,
+      "line": 234,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GPUAndCUDA.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA"
     },
     {
       "dst": "NN.Spec.Layers.FlashAttention",
-      "line": 415,
+      "line": 463,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GPUAndCUDA.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA"
@@ -26914,7 +27047,7 @@
     },
     {
       "dst": "NN.Entrypoint.GraphSpec",
-      "line": 172,
+      "line": 171,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GraphSpec.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GraphSpec"
@@ -26928,14 +27061,14 @@
     },
     {
       "dst": "NN",
-      "line": 312,
+      "line": 353,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GraphsAndIR.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GraphsAndIR"
     },
     {
       "dst": "NN.Entrypoint.IR",
-      "line": 313,
+      "line": 354,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/GraphsAndIR.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.GraphsAndIR"
@@ -26949,14 +27082,14 @@
     },
     {
       "dst": "NN",
-      "line": 64,
+      "line": 62,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/SpecLayer.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.SpecLayer"
     },
     {
       "dst": "NN",
-      "line": 181,
+      "line": 179,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/SpecLayer.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.SpecLayer"
@@ -26998,49 +27131,49 @@
     },
     {
       "dst": "NN.Proofs.RuntimeApprox.FP32.Layers",
+      "line": 142,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
+    },
+    {
+      "dst": "NN.Proofs.RuntimeApprox.FP32.MLP",
       "line": 143,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
     },
     {
-      "dst": "NN.Proofs.RuntimeApprox.FP32.MLP",
+      "dst": "NN.Proofs.RuntimeApprox.FP32.CROWN",
       "line": 144,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
     },
     {
-      "dst": "NN.Proofs.RuntimeApprox.FP32.CROWN",
-      "line": 145,
+      "dst": "NN.Proofs.RuntimeApprox.FP32.Layers",
+      "line": 220,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
     },
     {
       "dst": "NN.Proofs.RuntimeApprox.FP32.Layers",
-      "line": 221,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
-      "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
-    },
-    {
-      "dst": "NN.Proofs.RuntimeApprox.FP32.Layers",
-      "line": 248,
+      "line": 247,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
     },
     {
       "dst": "NN.Proofs.RuntimeApprox.FP32.MLP",
-      "line": 259,
+      "line": 258,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
     },
     {
       "dst": "NN.Proofs.RuntimeApprox.FP32.CROWN",
-      "line": 272,
+      "line": 271,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/FP32Soundness.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness"
@@ -27117,14 +27250,14 @@
     },
     {
       "dst": "NN",
-      "line": 332,
+      "line": 351,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/Verification.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.Verification"
     },
     {
       "dst": "NN.Verification.TorchLean.Compile",
-      "line": 333,
+      "line": 352,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch4_Verification/Verification.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.Verification"
@@ -27132,128 +27265,128 @@
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/BugZooCatalog.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/BugZooCatalog.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.BugZooCatalog"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.BugZooCatalog"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/CLI.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/CLI.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.CLI"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.CLI"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Examples.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Examples.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Examples"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Examples"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/GenerativeModels.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/GenerativeModels.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.GenerativeModels"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.GenerativeModels"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/ModelZooDeepDive.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/ModelZooDeepDive.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ModelZooDeepDive"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ModelZooDeepDive"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/ModernModels.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/ModernModels.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ModernModels"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ModernModels"
     },
     {
       "dst": "NN",
-      "line": 98,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/ModernModels.lean",
+      "line": 108,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/ModernModels.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ModernModels"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ModernModels"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/ReinforcementLearning.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/ReinforcementLearning.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ReinforcementLearning"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ReinforcementLearning"
     },
     {
       "dst": "VersoManual",
       "line": 1,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Entrypoint.Widgets",
       "line": 2,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Spec.Core.Tensor.Core",
       "line": 3,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.IR.Graph",
       "line": 4,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.IR.Semantics",
       "line": 5,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 6,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.MLTheory.CROWN.Graph",
       "line": 7,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Core",
       "line": 8,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Runtime.Training.Log",
       "line": 9,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "NN.Runtime.Context",
       "line": 10,
-      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Advanced/Widgets.lean",
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Widgets.lean",
       "public": false,
-      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets"
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets"
     },
     {
       "dst": "VersoManual",
@@ -27361,246 +27494,253 @@
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.AutogradWalkthrough",
+      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.BackendSelection",
       "line": 15,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.ScientificForwardModels",
+      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.AutogradWalkthrough",
       "line": 16,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.RuntimeAndAutograd",
+      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.ScientificForwardModels",
       "line": 17,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.PyTorchRoundtrip",
+      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.RuntimeAndAutograd",
       "line": 18,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GraphsAndIR",
+      "dst": "TorchLeanBlueprint.Guide.Ch2_Frontend.PyTorchRoundtrip",
       "line": 19,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.SpecLayer",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GraphsAndIR",
       "line": 20,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GraphSpec",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.SpecLayer",
       "line": 21,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.Floats",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GraphSpec",
       "line": 22,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.FloatingPointLiterature",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.Floats",
       "line": 23,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.FloatingPointLiterature",
       "line": 24,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.ExternalToolsAndFFI",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.GPUAndCUDA",
       "line": 25,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.Verification",
+      "dst": "TorchLeanBlueprint.Guide.Ch3_Backend.ExternalToolsAndFFI",
       "line": 26,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ProofSystems",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.Verification",
       "line": 27,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.AutogradProofs",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ProofSystems",
       "line": 28,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.RuntimeApproximation",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.AutogradProofs",
       "line": 29,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.LearningTheory",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.RuntimeApproximation",
       "line": 30,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.OptimizationTheory",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.LearningTheory",
       "line": 31,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.SelfSupervisedTheory",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.OptimizationTheory",
       "line": 32,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ApproximationTheory",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.SelfSupervisedTheory",
       "line": 33,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ClassicalMLProofs",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ApproximationTheory",
       "line": 34,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ProbabilityAndGradients",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ClassicalMLProofs",
       "line": 35,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ScientificMLVerification",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ProbabilityAndGradients",
       "line": 36,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.FactorizationsCholeskyQR",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.ScientificMLVerification",
       "line": 37,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.Certificates",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.FactorizationsCholeskyQR",
       "line": 38,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.Certificates",
       "line": 39,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.TwoStageWorkflows",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.FP32Soundness",
       "line": 40,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.ModernModels",
+      "dst": "TorchLeanBlueprint.Guide.Ch4_Verification.TwoStageWorkflows",
       "line": 41,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.ModelZooDeepDive",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.ModernModels",
       "line": 42,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.GenerativeModels",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.ModelZooDeepDive",
       "line": 43,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.ReinforcementLearning",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.GenerativeModels",
       "line": 44,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.ReinforcementLearning",
       "line": 45,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.BugZooCatalog",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.Widgets",
       "line": 46,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.Examples",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.BugZooCatalog",
       "line": 47,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch5_Advanced.CLI",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.Examples",
       "line": 48,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
     },
     {
-      "dst": "TorchLeanBlueprint.Guide.Ch6_Conclusion.Conclusion",
+      "dst": "TorchLeanBlueprint.Guide.Ch5_Applications.CLI",
       "line": 49,
+      "path": "blueprint/TorchLeanBlueprint/Guide.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide"
+    },
+    {
+      "dst": "TorchLeanBlueprint.Guide.Ch6_Conclusion.Conclusion",
+      "line": 50,
       "path": "blueprint/TorchLeanBlueprint/Guide.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide"
@@ -27657,7 +27797,7 @@
       "src_layer": "NN.Proofs"
     },
     {
-      "count": 222,
+      "count": 226,
       "dst_layer": "NN.MLTheory",
       "src_layer": "NN.MLTheory"
     },
@@ -27672,7 +27812,7 @@
       "src_layer": "NN.Verification"
     },
     {
-      "count": 143,
+      "count": 145,
       "dst_layer": "NN.Examples",
       "src_layer": "NN.Examples"
     },
@@ -27687,7 +27827,7 @@
       "src_layer": "NN.MLTheory"
     },
     {
-      "count": 69,
+      "count": 71,
       "dst_layer": "NN.MLTheory",
       "src_layer": "NN.CI"
     },
@@ -27767,14 +27907,19 @@
       "src_layer": "NN.Examples"
     },
     {
+      "count": 26,
+      "dst_layer": "NN",
+      "src_layer": "blueprint"
+    },
+    {
       "count": 25,
       "dst_layer": "NN.GraphSpec",
       "src_layer": "NN.GraphSpec"
     },
     {
-      "count": 24,
-      "dst_layer": "NN",
-      "src_layer": "blueprint"
+      "count": 23,
+      "dst_layer": "NN.MLTheory",
+      "src_layer": "NN.Verification"
     },
     {
       "count": 21,
@@ -27785,11 +27930,6 @@
       "count": 20,
       "dst_layer": "NN.Entrypoint",
       "src_layer": "NN.Tests"
-    },
-    {
-      "count": 20,
-      "dst_layer": "NN.MLTheory",
-      "src_layer": "NN.Verification"
     },
     {
       "count": 19,
@@ -27892,6 +28032,11 @@
       "src_layer": "NN.IR"
     },
     {
+      "count": 8,
+      "dst_layer": "NN.Proofs",
+      "src_layer": "NN.MLTheory"
+    },
+    {
       "count": 7,
       "dst_layer": "NN.Runtime",
       "src_layer": "NN.GraphSpec"
@@ -27928,6 +28073,11 @@
     },
     {
       "count": 6,
+      "dst_layer": "NN.MLTheory",
+      "src_layer": "NN.Examples"
+    },
+    {
+      "count": 6,
       "dst_layer": "NN.IR",
       "src_layer": "NN.IR"
     },
@@ -27938,8 +28088,8 @@
     },
     {
       "count": 6,
-      "dst_layer": "NN.Proofs",
-      "src_layer": "NN.MLTheory"
+      "dst_layer": "NN.Floats",
+      "src_layer": "NN.Runtime"
     },
     {
       "count": 5,
@@ -27958,16 +28108,6 @@
     },
     {
       "count": 5,
-      "dst_layer": "NN.MLTheory",
-      "src_layer": "NN.Examples"
-    },
-    {
-      "count": 5,
-      "dst_layer": "NN.Floats",
-      "src_layer": "NN.Runtime"
-    },
-    {
-      "count": 5,
       "dst_layer": "NN.Runtime",
       "src_layer": "Widgets"
     },
@@ -27975,6 +28115,11 @@
       "count": 5,
       "dst_layer": "NN.Entrypoint",
       "src_layer": "blueprint"
+    },
+    {
+      "count": 4,
+      "dst_layer": "NN.Proofs",
+      "src_layer": "NN.Examples"
     },
     {
       "count": 4,
@@ -28010,11 +28155,6 @@
       "count": 3,
       "dst_layer": "NN.Examples",
       "src_layer": "NN.CI"
-    },
-    {
-      "count": 3,
-      "dst_layer": "NN.Proofs",
-      "src_layer": "NN.Examples"
     },
     {
       "count": 3,
@@ -28371,7 +28511,7 @@
       "autograd",
       "model",
       "OutputLoss",
-      "fn1"
+      "func"
     ],
     "NN.API.Public.Facade": [],
     "NN.API.Public.Facade.Base": [],
@@ -28490,7 +28630,13 @@
     ],
     "NN.API.Public.Facade.NN.Runtime": [
       "TorchLean",
-      "nn"
+      "nn",
+      "Compiled",
+      "Runtime",
+      "Autograd",
+      "TorchLean",
+      "NN",
+      "Seq"
     ],
     "NN.API.Public.Facade.NN.Summary": [
       "TorchLean",
@@ -28509,7 +28655,7 @@
       "autograd",
       "model",
       "OutputLoss",
-      "fn1"
+      "func"
     ],
     "NN.API.Public.Facade.Runtime.Core": [],
     "NN.API.Public.Facade.Runtime.LossMetrics": [
@@ -28529,7 +28675,8 @@
     "NN.API.Public.Facade.Runtime.Optim": [
       "TorchLean",
       "optim",
-      "Kind"
+      "Kind",
+      "galore"
     ],
     "NN.API.Public.Facade.Runtime.RL": [
       "TorchLean",
@@ -28594,14 +28741,14 @@
     "NN.API.Public.Facade.Trainer.Core": [
       "TorchLean",
       "Trainer",
-      "Advanced",
+      "Manual",
       "Handle",
       "Implementation",
       "Regression",
       "CrossEntropy",
       "Custom"
     ],
-    "NN.API.Public.Facade.Trainer.Eval": [
+    "NN.API.Public.Facade.Trainer.Predict": [
       "TorchLean",
       "Trainer",
       "Implementation",
@@ -28751,7 +28898,7 @@
       "loss",
       "metrics",
       "train",
-      "Advanced",
+      "Manual",
       "Callbacks",
       "StepBatchStream",
       "Report"
@@ -28811,7 +28958,7 @@
       "Autodiff",
       "Model",
       "OutputLoss",
-      "Function1"
+      "Function"
     ],
     "NN.API.Runtime.Core": [
       "NN",
@@ -28958,32 +29105,6 @@
     ],
     "NN.Entrypoint.Verification": [],
     "NN.Entrypoint.Widgets": [],
-    "NN.Examples.Advanced": [],
-    "NN.Examples.Advanced.Floats.ArbIEEEExecCompare": [
-      "TorchLean.Floats.Interval.ComparisonTutorial",
-      "NN.Examples.Advanced.Floats.ArbIEEEExecCompare"
-    ],
-    "NN.Examples.Advanced.Floats.Float32Modes": [
-      "NN.Examples.Advanced.Floats.Float32Modes"
-    ],
-    "NN.Examples.Advanced.GraphSpec.Tutorial": [
-      "NN.Examples.Advanced.GraphSpec.Tutorial"
-    ],
-    "NN.Examples.Advanced.IRAxisOps": [
-      "NN.Examples.Advanced.IRAxisOps"
-    ],
-    "NN.Examples.Advanced.OneSemanticUniverse": [
-      "NN.Examples.Advanced.OneSemanticUniverse"
-    ],
-    "NN.Examples.Advanced.Tensors.Basic": [
-      "NN.Examples.Advanced.Tensors.Basic"
-    ],
-    "NN.Examples.Advanced.TorchIRPyTorch": [
-      "NN.Examples.Advanced.TorchIRPyTorch"
-    ],
-    "NN.Examples.Advanced.Widgets": [
-      "GridWorldWidgets"
-    ],
     "NN.Examples.BugZoo.All": [],
     "NN.Examples.BugZoo.AttentionMask": [
       "NN.Examples.BugZoo.AttentionMask"
@@ -29051,6 +29172,32 @@
       "Examples",
       "Data",
       "SamplePaths"
+    ],
+    "NN.Examples.DeepDives": [],
+    "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare": [
+      "TorchLean.Floats.Interval.ComparisonTutorial",
+      "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
+    ],
+    "NN.Examples.DeepDives.Floats.Float32Modes": [
+      "NN.Examples.DeepDives.Floats.Float32Modes"
+    ],
+    "NN.Examples.DeepDives.GraphSpec.Tutorial": [
+      "NN.Examples.DeepDives.GraphSpec.Tutorial"
+    ],
+    "NN.Examples.DeepDives.IRAxisOps": [
+      "NN.Examples.DeepDives.IRAxisOps"
+    ],
+    "NN.Examples.DeepDives.OneSemanticUniverse": [
+      "NN.Examples.DeepDives.OneSemanticUniverse"
+    ],
+    "NN.Examples.DeepDives.Tensors.Basic": [
+      "NN.Examples.DeepDives.Tensors.Basic"
+    ],
+    "NN.Examples.DeepDives.TorchIRPyTorch": [
+      "NN.Examples.DeepDives.TorchIRPyTorch"
+    ],
+    "NN.Examples.DeepDives.Widgets": [
+      "GridWorldWidgets"
     ],
     "NN.Examples.Factorization": [],
     "NN.Examples.Factorization.Cholesky": [
@@ -29203,6 +29350,12 @@
     ],
     "NN.Examples.Models.Vision.Vit": [
       "NN.Examples.Models.Vision.Vit"
+    ],
+    "NN.Examples.Optimization": [],
+    "NN.Examples.Optimization.MuonCertificates": [
+      "TorchLean",
+      "Examples",
+      "MuonCertificates"
     ],
     "NN.Examples.Quickstart": [],
     "NN.Examples.Quickstart.AutogradBasics": [
@@ -29987,6 +30140,26 @@
       "GaLore",
       "Muon"
     ],
+    "NN.MLTheory.Optimization.Muon": [
+      "Optim",
+      "Muon",
+      "TorchLean",
+      "optim",
+      "muon"
+    ],
+    "NN.MLTheory.Optimization.OptimizerLaws": [
+      "Optim",
+      "TensorOptimizer",
+      "StepSpec",
+      "SGD",
+      "MomentumSGD",
+      "AdaGrad",
+      "RMSProp",
+      "Adam",
+      "AdamW",
+      "Adadelta",
+      "Muon"
+    ],
     "NN.MLTheory.Optimization.SmoothStrongConvexBridge": [
       "Optim",
       "GD"
@@ -30023,7 +30196,7 @@
       "I",
       "OpsExact",
       "ExactImage",
-      "MLP2Exact"
+      "TwoLayerMLPExact"
     ],
     "NN.MLTheory.Proofs.Approximation.Universal": [],
     "NN.MLTheory.Proofs.Approximation.Universal.IEEE32ExecCore": [
@@ -30040,9 +30213,9 @@
       "NN.MLTheory.Proofs.UniversalApproximation",
       "IEEE32ExecReLUApprox"
     ],
-    "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecMlp2": [
+    "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32ExecTwoLayerMlp": [
       "NN.MLTheory.Proofs.UniversalApproximation",
-      "IEEE32ExecMLP2"
+      "IEEE32ExecTwoLayerMLP"
     ],
     "NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationND": [
       "NN.MLTheory.Proofs.UniversalApproximationND",
@@ -31126,7 +31299,7 @@
       "Autograd",
       "Torch",
       "CompiledScalar",
-      "CompiledOut"
+      "CompiledGraph"
     ],
     "NN.Runtime.Autograd.Torch.Core.Functional": [
       "Runtime",
@@ -32744,6 +32917,7 @@
     "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.TorchLeanVsPyTorch": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch1_Introduction.WhyFunctionalProgramming": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.AutogradWalkthrough": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.BackendSelection": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.BuildingModels": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.DataAndLoaders": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch2_Frontend.ExecutionModes": [],
@@ -32789,14 +32963,14 @@
     "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.SelfSupervisedTheory": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.TwoStageWorkflows": [],
     "blueprint.TorchLeanBlueprint.Guide.Ch4_Verification.Verification": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.BugZooCatalog": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.CLI": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Examples": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.GenerativeModels": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ModelZooDeepDive": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ModernModels": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.ReinforcementLearning": [],
-    "blueprint.TorchLeanBlueprint.Guide.Ch5_Advanced.Widgets": [
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.BugZooCatalog": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.CLI": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Examples": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.GenerativeModels": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ModelZooDeepDive": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ModernModels": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.ReinforcementLearning": [],
+    "blueprint.TorchLeanBlueprint.Guide.Ch5_Applications.Widgets": [
       "Float32Demo"
     ],
     "blueprint.TorchLeanBlueprint.Guide.Ch6_Conclusion.Conclusion": [],
@@ -32822,8 +32996,8 @@
     "critical_path_import_edges": 121,
     "errors": 0,
     "findings": 0,
-    "import_edges": 3927,
-    "internal_import_edges": 3392,
+    "import_edges": 3947,
+    "internal_import_edges": 3410,
     "layers": [
       "Library",
       "NN",
@@ -32846,14 +33020,14 @@
       "lakefile",
       "scripts"
     ],
-    "modules": 1157,
-    "private_import_edges": 314,
-    "public_import_edges": 3613,
+    "modules": 1162,
+    "private_import_edges": 318,
+    "public_import_edges": 3629,
     "warnings": 0
   },
   "top_fan_in": [
     {
-      "count": 78,
+      "count": 80,
       "module": "NN"
     },
     {
@@ -32935,7 +33109,7 @@
   ],
   "top_fan_out": [
     {
-      "count": 333,
+      "count": 335,
       "module": "NN.CI.All"
     },
     {
@@ -32951,12 +33125,16 @@
       "module": "NN.Spec.Models"
     },
     {
-      "count": 23,
+      "count": 25,
+      "module": "NN.MLTheory.API"
+    },
+    {
+      "count": 24,
       "module": "NN.Examples.Zoo"
     },
     {
-      "count": 23,
-      "module": "NN.MLTheory.API"
+      "count": 20,
+      "module": "NN.Verification.CLI"
     },
     {
       "count": 19,
@@ -32993,10 +33171,6 @@
     {
       "count": 17,
       "module": "NN.Floats.IEEEExec"
-    },
-    {
-      "count": 17,
-      "module": "NN.Verification.CLI"
     },
     {
       "count": 16,

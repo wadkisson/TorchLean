@@ -53,7 +53,7 @@ abbrev paramShapes {σ τ : Shape} (model : Sequential σ τ) : List Shape :=
   NN.API.nn.paramShapes model
 
 export NN.API.nn
-  (paramRequiresGrad initParams updateBuffers programWithMode program)
+  (paramRequiresGrad initParams updateBuffers programWithMode forwardProgram)
 
 end nn
 

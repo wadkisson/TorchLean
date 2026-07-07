@@ -11,7 +11,7 @@ public import NN.API.Public.Facade.NN.Params
 /-!
 # TorchLean NN Runtime
 
-Compiled/eager prediction and scalar-module operations for checked sequential models.
+Forward, prediction, compiled inference, and scalar-module operations for checked sequential models.
 -/
 
 @[expose] public section
@@ -23,39 +23,76 @@ namespace nn
 abbrev TensorConv (α : Type) :=
   _root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α
 
-/-- Evaluate one model input without building an autograd tape. -/
-abbrev eval1NoGrad {σ τ : Shape}
-    (opts : Options)
+/-- Evaluation-mode layer behavior, matching PyTorch's `model.eval()` concept. -/
+abbrev eval : NN.API.TorchLean.NN.Mode :=
+  .eval
+
+/-- Training-mode layer behavior, matching PyTorch's `model.train()` concept. -/
+abbrev train : NN.API.TorchLean.NN.Mode :=
+  .train
+
+/-- Run one eager forward pass under an explicit mode. -/
+abbrev forward {σ τ : Shape}
     (model : Sequential σ τ)
+    (opts : Options)
+    (mode : NN.API.TorchLean.NN.Mode)
     {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape]
     [TensorConv α]
     (params : NN.API.TorchLean.ParamList α (paramShapes model))
     (x : Tensor.T α σ) : IO (Tensor.T α τ) :=
-  NN.API.TorchLean.NN.Seq.eval1NoGrad (α := α) opts model params x
+  NN.API.TorchLean.NN.Seq.forward (α := α) opts mode model params x
 
-/-- Evaluate one model input with the selected runtime options. -/
-abbrev eval1 {σ τ : Shape}
-    (opts : Options)
+/-- Run eval-mode eager inference from live parameters. -/
+abbrev predict {σ τ : Shape}
     (model : Sequential σ τ)
+    (opts : Options)
     {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape]
     [TensorConv α]
     (params : NN.API.TorchLean.ParamList α (paramShapes model))
     (x : Tensor.T α σ) : IO (Tensor.T α τ) :=
-  NN.API.TorchLean.NN.Seq.eval1 (α := α) opts model params x
+  NN.API.TorchLean.NN.Seq.predict (α := α) opts model params x
 
-/-- Compile a sequential model for repeated prediction. -/
-abbrev compileOut {σ τ : Shape} (model : Sequential σ τ)
-    {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape] :
-    IO (_root_.Runtime.Autograd.Torch.CompiledOut α (paramShapes model ++ [σ]) τ) :=
-  NN.API.TorchLean.NN.Seq.compileOut (α := α) model
+/--
+A compiled sequential model.
 
-/-- Run one compiled prediction with explicit parameter tensors. -/
-abbrev predict1 {σ τ : Shape} (model : Sequential σ τ)
-    {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape]
-    (compiled : _root_.Runtime.Autograd.Torch.CompiledOut α (paramShapes model ++ [σ]) τ)
-    (params : ParamTensors α (paramShapes model))
+Public wrapper returned by `nn.compile`. It stores the compiled artifact and carries the
+parameter-shape ABI in its type, so callers can run `compiled.forward params x` without passing the
+source model again.
+-/
+structure Compiled (paramShapes : List Shape) (σ τ : Shape) (α : Type) where
+  artifact : _root_.Runtime.Autograd.Torch.CompiledGraph α (paramShapes ++ [σ]) τ
+
+namespace Compiled
+
+/-- Run a compiled model forward with explicit parameter tensors. -/
+def forward {σ τ : Shape} {α : Type}
+    [Runtime.TensorScalar α] [DecidableEq Shape]
+    {paramShapes : List Shape}
+    (compiled : Compiled paramShapes σ τ α)
+    (params : ParamTensors α paramShapes)
     (x : Tensor.T α σ) : Tensor.T α τ :=
-  NN.API.TorchLean.NN.Seq.predict1 (α := α) model compiled params x
+  let args : NN.API.TorchLean.TList α (paramShapes ++ [σ]) :=
+    _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
+      (ss₁ := paramShapes) (ss₂ := [σ]) params (.cons x .nil)
+  _root_.Runtime.Autograd.Torch.CompiledGraph.forward compiled.artifact args
+
+end Compiled
+
+/-- Compile a sequential model into a reusable callable wrapper. -/
+def compile {σ τ : Shape} (model : Sequential σ τ)
+    {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape] :
+    IO (Compiled (paramShapes model) σ τ α) := do
+  let artifact ← NN.API.TorchLean.NN.Seq.compileForward (α := α) model
+  pure { artifact := artifact }
+
+/-- Compile a sequential model under an explicit mode. -/
+def compileWithMode {σ τ : Shape}
+    (model : Sequential σ τ)
+    (mode : NN.API.TorchLean.NN.Mode)
+    {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape] :
+    IO (Compiled (paramShapes model) σ τ α) := do
+  let artifact ← NN.API.TorchLean.NN.Seq.compileForwardWithMode (α := α) mode model
+  pure { artifact := artifact }
 
 @[inherit_doc NN.API.nn.withModel]
 abbrev withModel {σ τ : Shape} {β : Type}
@@ -84,3 +121,30 @@ abbrev crossEntropyOneHotScalarModuleDef {σ τ : Shape} (model : Sequential σ 
 end nn
 
 end TorchLean
+
+namespace Runtime
+namespace Autograd
+namespace TorchLean
+namespace NN
+namespace Seq
+
+/-- Dot-notation wrapper for the public compiled-model API: `let c ← model.compile`. -/
+def compile {σ τ : _root_.Spec.Shape}
+    (model : _root_.Runtime.Autograd.TorchLean.NN.Seq σ τ)
+    {α : Type} [_root_.Context α] [DecidableEq _root_.Spec.Shape] :
+    IO (_root_.TorchLean.nn.Compiled (_root_.TorchLean.nn.paramShapes model) σ τ α) :=
+  _root_.TorchLean.nn.compile (α := α) model
+
+/-- Dot-notation wrapper for explicit-mode compilation: `let c ← model.compileWithMode nn.train`. -/
+def compileWithMode {σ τ : _root_.Spec.Shape}
+    (model : _root_.Runtime.Autograd.TorchLean.NN.Seq σ τ)
+    (mode : _root_.Runtime.Autograd.TorchLean.NN.Mode)
+    {α : Type} [_root_.Context α] [DecidableEq _root_.Spec.Shape] :
+    IO (_root_.TorchLean.nn.Compiled (_root_.TorchLean.nn.paramShapes model) σ τ α) :=
+  _root_.TorchLean.nn.compileWithMode (α := α) model mode
+
+end Seq
+end NN
+end TorchLean
+end Autograd
+end Runtime

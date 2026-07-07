@@ -84,6 +84,28 @@ irrelevant near `1e9`. A relative tolerance captures "small compared with the sc
 TorchLean uses both styles, but it makes the choice explicit instead of burying it in test
 thresholds.
 
+## Reading A Tolerance Statement As A Contract
+
+The tolerance relation is deliberately stronger than a unit test. A test has observed inputs. A
+tolerance theorem has quantified inputs and a stated scalar interpretation:
+
+```
+toSpec : RuntimeScalar -> SpecScalar
+runtime : Tensor RuntimeScalar s
+spec    : Tensor SpecScalar s
+eps     : ApproxTol
+```
+
+The proposition says every coordinate of `tensorToSpec toSpec runtime` is close to the matching
+coordinate of `spec` under `eps`. That makes the trusted boundary easy to locate. If `toSpec`
+interprets an executable rounded-real model, the theorem is about that rounded-real model. If the
+actual deployment path is CUDA, cuBLAS, PyTorch, or a fused native kernel, a separate agreement
+statement is needed before the theorem says anything about that path.
+
+The most common deployment mistake is to skip this last sentence. A real theorem plus a numerical
+test is useful evidence, but it is not a theorem about the tested runtime unless the tested runtime
+is connected to the theorem's scalar model.
+
 # Forward Graph Approximation
 
 The forward graph theorem is in
@@ -103,8 +125,8 @@ The local theorem on a `FwdNode` says: if each runtime input approximates the co
 input, then the runtime output approximates the spec output within this node's bound.
 
 `FwdGraph.eval_approx` composes those local statements. When a graph appends a node, the proof uses
-the node's local `sound` theorem, appends the new bound to the error context, and continues. This is
-the same architectural choice as the autograd soundness theorem: local correctness first, then a
+the node's local `sound` theorem, appends the new bound to the error context, and continues. It uses
+the same architecture as the autograd soundness theorem: local correctness first, then a
 global induction over the graph.
 
 A tiny example is multiplication. The spec value is the real product, while the runtime value is the
@@ -132,10 +154,10 @@ reverse pass, provided the input context, forward tape, and seed cotangents are 
 related. Addition during gradient accumulation is not treated as automatic; the theorem takes an
 explicit `addBound` and `addSound` describing how accumulation affects error.
 
-This matters for backward passes. Backward passes are often dominated by sums: cotangents from
-fanout, reductions, convolution gradients, and parameter gradient accumulation. Floating point
-addition is not associative, and accumulation order matters. By making addition soundness an
-explicit parameter, the theorem states the arithmetic model being used.
+Backward passes are often dominated by sums: cotangents from fanout, reductions, convolution
+gradients, and parameter gradient accumulation. Floating point addition is not associative, and
+accumulation order matters. By making addition soundness an explicit parameter, the theorem states
+the arithmetic model being used.
 
 # Link Back To Autograd Algebra
 
@@ -165,7 +187,7 @@ ideal semantics. The second is an approximation theorem with a tolerance.
 
 The largest collection of local rules is
 [NN.Proofs.RuntimeApprox.NF.Ops API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Ops.lean). `NF` is
-TorchLean's rounded real neural float model. It gives proof side arithmetic that resembles finite
+TorchLean's rounded real neural float model. It gives arithmetic for proofs that resembles finite
 precision without claiming that every hardware corner case has disappeared.
 
 The file includes scalar and tensor approximation lemmas for common operations:
@@ -189,10 +211,35 @@ approximates the guarded spec value under the declared tolerance.
 The theorem is not about arbitrary division at `y = 0`. It uses a guarded operation because the
 proof should match the stable programming pattern users ought to deploy.
 
+## Reductions And Softmax: Where Error Budgets Grow
+
+Elementwise operations are only half the story. Reductions and normalization layers create coupled
+error terms because many inputs flow into one output. TorchLean has explicit reduction approximation
+lemmas in
+[NN.Proofs.RuntimeApprox.NF.ReductionOps](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ReductionOps.lean):
+
+```
+#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_sum_by_row_2d
+#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_mean_by_row_2d
+#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_sum_by_column_2d
+```
+
+The row-sum theorem is not just "sum is close to sum." It accounts for the number of accumulated
+terms and for the same row/column indexing used by the executable reducer. That is the sort of
+detail that matters for LayerNorm, attention logits, pooled features, and minibatch losses.
+
+Softmax needs even more care. Scalar logistic-style bounds are not a proof of axis softmax, because
+axis softmax couples every coordinate through the denominator. TorchLean keeps that boundary
+visible in
+[NN.Proofs.RuntimeApprox.NF.SoftmaxAxis](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/SoftmaxAxis.lean):
+the file states the intended location for a future vector/axis theorem and explicitly avoids
+pretending that scalar bounds cover the coupled denominator proof. That is a useful negative result:
+the absence of a theorem is recorded as a boundary, not papered over by an approximate-looking name.
+
 # Convolution Forward And Backward
 
-Convolution is a useful stress test because it mixes indexing, padding, nested sums, and gradients
-with respect to inputs and parameters. TorchLean has dedicated normal form APIs:
+Convolution stresses the approximation layer because it mixes indexing, padding, nested sums, and
+gradients with respect to inputs and parameters. TorchLean has dedicated normal form APIs:
 
 - [NN.Proofs.RuntimeApprox.NF.ConvForward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvForward.lean)
 - [NN.Proofs.RuntimeApprox.NF.ConvBackward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvBackward.lean)
@@ -209,15 +256,15 @@ read the same padded input entries. Lemmas such as `foldl_flatMap`,
 `entry_eq_scalar_get_at_or_zero3`, and facts about padded input alignment are essential; they are
 what prevents the proof from silently comparing two different convolutions.
 
-The convolution backward API covers the three reverse surfaces:
+The convolution backward API covers the three reverse operators:
 
 - `approxT_conv2d_bias_deriv_spec`;
 - `approxT_conv2d_kernel_deriv_spec`;
 - `approxT_conv2d_input_deriv_spec`.
 
 It also packages the result as `conv2dRevNode`, so the backward approximation theorem can compose
-convolution with the rest of a reverse graph. This is one of the best examples of the local to global
-pattern: first prove the hard local operator approximation, then hand it to `RevGraph`.
+convolution with the rest of a reverse graph. Here is the local-to-global pattern in its cleanest
+form: first prove the hard local operator approximation, then hand it to `RevGraph`.
 
 # Scale Aware Tolerances
 
@@ -228,10 +275,10 @@ The scale layer is split across
 [backward scale propagation](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Scale/BackwardScale.lean).
 
 The scale approximation API defines `BList`, a list of nonnegative scale bounds indexed by shape,
-plus helpers such as `scaleT`, `scaleCtx`, and `tolFromEpsScale`. The idea is simple: an absolute
-error budget is computed from a machine-like epsilon times a local scale bound.
+plus helpers such as `scaleT`, `scaleCtx`, and `tolFromEpsScale`. An absolute error budget is
+computed from a machine-like epsilon times a local scale bound.
 
-This lets a graph carry both "how close" and "at what scale" information. The lemmas
+A graph can then carry both "how close" and "at what scale" information. The lemmas
 `approxTTol_from_scale` and `approxCtx_get_tolFromEpsScale` connect scale estimates back to the
 tolerance API used by graph theorems.
 
@@ -247,16 +294,16 @@ The [FP32 layer approximation API](https://github.com/lean-dojo/TorchLean/blob/m
 [FP32 CROWN bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/FP32/CROWN.lean) connect the approximation
 style to layerwise and verifier reasoning.
 
-The CROWN connection is the most important guide idea. A verifier over the reals may prove a
-margin, but a float runtime can differ from ideal real arithmetic. To transfer the claim, the real
-margin must dominate the runtime approximation budget. In other words, the certified lower margin
-after subtracting the runtime error still has to be positive.
+The CROWN connection is where runtime approximation meets certification. A verifier over the reals
+may prove a margin, but a float runtime can differ from ideal real arithmetic. To transfer the claim,
+the real margin must dominate the runtime approximation budget: the certified lower margin after
+subtracting the runtime error still has to be positive.
 
 When that inequality is proved, the runtime prediction is still certified.
 
-This is the same separation emphasized by the Float32 soundness layer. `FP32` is a proof side
-model, `IEEE32Exec` is an executable bit oriented model, and native hardware remains a named
-assumption unless a bridge theorem covers the path being used.
+The Float32 soundness layer uses the same separation. `FP32` is a proof model, `IEEE32Exec` is an
+executable bit oriented model, and native hardware remains a named assumption unless a bridge
+theorem covers the path being used.
 
 # A Worked Mental Example
 
@@ -266,9 +313,8 @@ Suppose we have a two layer classifier whose hidden layer is `ReLU (W1 x + b1)` 
 The ideal proof might establish that, for all inputs in a box, the margin over the reals for class `0`
 over class `1` is at least `0.05`.
 
-That is not yet a float deployment theorem. A runtime approximation proof would add a statement
-like: for every input in the same box, `runtime_y` approximates `real_y` within `0.01` per relevant
-logit.
+A float deployment theorem adds the runtime approximation statement: for every input in the same
+box, `runtime_y` approximates `real_y` within `0.01` per relevant logit.
 
 Then the margin proof must be adjusted:
 
@@ -279,9 +325,30 @@ $$`f_0^{\mathrm{run}}(x)-f_1^{\mathrm{run}}(x)
 The calculation is small, but it is the whole point of the layer. The real theorem, the runtime
 approximation theorem, and the final runtime claim each spend a named budget.
 
-Only after that bridge do we get a classification claim about runtime behavior. This is why TorchLean
-keeps autograd algebra, verifier bounds, FP32 semantics, and runtime approximation as separate proof
-layers. They are different mathematical facts that happen to support one deployment workflow.
+Only after that bridge do we get a classification claim about runtime behavior. TorchLean keeps
+autograd algebra, verifier bounds, FP32 semantics, and runtime approximation as separate proof
+layers because they are different mathematical facts that happen to support one deployment
+workflow.
+
+# End To End NF Graph Snippets
+
+The normal-form end-to-end file packages the graph story into two declarations:
+
+```
+#check NN.Proofs.RuntimeApprox.NF.eval_approx_graphData
+#check NN.Proofs.RuntimeApprox.NF.backprop_approx_graphData
+```
+
+Read these as graph-level bridge theorems:
+
+- `eval_approx_graphData` says evaluating the executable forward graph is close to evaluating the
+  spec forward graph when the local node approximation obligations have been supplied.
+- `backprop_approx_graphData` says the same style of statement for reverse accumulation, with the
+  accumulation error model still explicit.
+
+That is the runtime approximation analogue of the autograd proof architecture. Local operator
+lemmas are the leaves; graph theorems compose them; deployment claims then combine the graph theorem
+with any scalar/backend assumptions.
 
 # Practical Reading Order
 
@@ -309,9 +376,9 @@ computation stays within a stated tolerance of a spec computation. CUDA kernels,
 paths, compiler rewrites, and PyTorch-exported graphs need their own agreement statements when a
 claim is about those paths.
 
-This is the intended TorchLean shape: fast code and imported artifacts are allowed, while the
-mathematical promise stays visible and readable. A deployment claim combines a real proof, an
-approximation theorem, and any finite/runtime assumptions that remain outside the theorem.
+The intended TorchLean shape is to allow fast code and imported artifacts while keeping the
+mathematical promise visible. A deployment claim combines a real proof, an approximation theorem,
+and any finite or runtime assumptions that remain outside the theorem.
 
 When the approximation theorem is present, the bridge is proved. When it is not present, the claim
 should say which runtime path or external producer supplies the remaining evidence.

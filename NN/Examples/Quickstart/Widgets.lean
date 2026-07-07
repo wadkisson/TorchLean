@@ -22,10 +22,10 @@ Try these commands in the editor:
 - put the cursor on a `#tensor_view`, `#float32_view`, `#ir_view`, or `#train_log_view` command;
 - put the cursor on `#pytorch_translate_file` to preview a PyTorch-to-TorchLean skeleton;
 - Lean's infoview renders an interactive panel;
-- if you want the full gallery, open `NN.Examples.Advanced.Widgets`.
+- if you want the full gallery, open `NN.Examples.DeepDives.Widgets`.
 
 This quickstart keeps only the smallest useful examples; the full widget gallery lives in
-`NN.Examples.Advanced.Widgets`.
+`NN.Examples.DeepDives.Widgets`.
 -/
 
 @[expose] public section

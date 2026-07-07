@@ -28,7 +28,7 @@ This file is a compact implementation that sits on top of:
 What is implemented:
 - Per-neuron ReLU linear relaxations derived from pre-activation bounds (`ReLU.relax_scalar*`).
 - A basic IBP forward pass for common activations (ReLU/sigmoid/tanh/etc.).
-- A 2-layer ReLU MLP wrapper `MLP2` with a simple end-to-end bounding API.
+- A two-layer ReLU MLP wrapper `TwoLayerMLP` with a simple end-to-end bounding API.
 
 Scope boundaries in this MLP-focused module:
 - General computation graphs. Use `NN.MLTheory.CROWN.Graph` for the
@@ -281,37 +281,40 @@ def elu {n : Nat} (alpha : α) (xB : Box α (.dim n .scalar)) : Box α (.dim n .
 end IBP
 
 /--
-2-layer MLP payload used by this file.
+Two-layer MLP payload used by this file.
 
-Semantics: `y = W2 * relu(W1 * x + b1) + b2`.
+Semantics: `y = outputWeight * relu(hiddenWeight * x + hiddenBias) + outputBias`.
 
 PyTorch analogue: `torch.nn.Sequential(Linear(inDim,hidDim), ReLU(), Linear(hidDim,outDim))`.
 -/
-structure MLP2 (α : Type) (inDim hidDim outDim : Nat) where
+structure TwoLayerMLP (α : Type) (inDim hidDim outDim : Nat) where
   /-- First layer weight matrix. -/
-  W1 : Tensor α (.dim hidDim (.dim inDim .scalar))
+  hiddenWeight : Tensor α (.dim hidDim (.dim inDim .scalar))
   /-- First layer bias vector. -/
-  b1 : Tensor α (.dim hidDim .scalar)
+  hiddenBias : Tensor α (.dim hidDim .scalar)
   /-- Second layer weight matrix. -/
-  W2 : Tensor α (.dim outDim (.dim hidDim .scalar))
+  outputWeight : Tensor α (.dim outDim (.dim hidDim .scalar))
   /-- Second layer bias vector. -/
-  b2 : Tensor α (.dim outDim .scalar)
+  outputBias : Tensor α (.dim outDim .scalar)
 
-/-- Forward semantics for `MLP2` (used to state soundness theorems). -/
+/-- Forward semantics for `TwoLayerMLP` (used to state soundness theorems). -/
 def forward {inDim hidDim outDim : Nat}
-  (net : MLP2 α inDim hidDim outDim)
+  (net : TwoLayerMLP α inDim hidDim outDim)
   (x : Tensor α (.dim inDim .scalar)) : Tensor α (.dim outDim .scalar) :=
-  let l1 : Spec.LinearSpec α inDim hidDim := { weights := net.W1, bias := net.b1 }
-  let l2 : Spec.LinearSpec α hidDim outDim := { weights := net.W2, bias := net.b2 }
-  let z1 := Spec.linearSpec (α:=α) l1 x
-  let a1 := Activation.reluSpec (α:=α) z1
-  Spec.linearSpec (α:=α) l2 a1
+  let hiddenLayer : Spec.LinearSpec α inDim hidDim := { weights := net.hiddenWeight, bias := net.hiddenBias }
+  let outputLayer : Spec.LinearSpec α hidDim outDim := { weights := net.outputWeight, bias := net.outputBias }
+  let hiddenPreactivation := Spec.linearSpec (α:=α) hiddenLayer x
+  let hiddenActivation := Activation.reluSpec (α:=α) hiddenPreactivation
+  Spec.linearSpec (α:=α) outputLayer hiddenActivation
 
-/-- Build an `MLP2` from two `LinearSpec` records. -/
+/-- Build a `TwoLayerMLP` from two `LinearSpec` records. -/
 def ofLinearSpecs {inDim hidDim outDim : Nat}
-  (l1 : Spec.LinearSpec α inDim hidDim) (l2 : Spec.LinearSpec α hidDim outDim) :
-  MLP2 α inDim hidDim outDim :=
-  { W1 := l1.weights, b1 := l1.bias, W2 := l2.weights, b2 := l2.bias }
+  (hiddenLayer : Spec.LinearSpec α inDim hidDim) (outputLayer : Spec.LinearSpec α hidDim outDim) :
+  TwoLayerMLP α inDim hidDim outDim :=
+  { hiddenWeight := hiddenLayer.weights
+    hiddenBias := hiddenLayer.bias
+    outputWeight := outputLayer.weights
+    outputBias := outputLayer.bias }
 
 /--
 Compute an output interval box via pure IBP.
@@ -319,14 +322,14 @@ Compute an output interval box via pure IBP.
 This is fast and always sound, but typically looser than CROWN/DeepPoly affine bounds.
 -/
 def boundIbp {inDim hidDim outDim : Nat}
-  (net : MLP2 α inDim hidDim outDim)
+  (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
-  -- z1 = W1 x + b1
-  let b1B : Box α (.dim hidDim .scalar) := { lo := net.b1, hi := net.b1 }
-  let z1B := IBP.linear net.W1 xB b1B
+  -- z1 = hiddenWeight x + hiddenBias
+  let b1B : Box α (.dim hidDim .scalar) := { lo := net.hiddenBias, hi := net.hiddenBias }
+  let z1B := IBP.linear net.hiddenWeight xB b1B
   let a1B := IBP.relu (n:=hidDim) z1B
-  let b2B : Box α (.dim outDim .scalar) := { lo := net.b2, hi := net.b2 }
-  IBP.linear net.W2 a1B b2B
+  let b2B : Box α (.dim outDim .scalar) := { lo := net.outputBias, hi := net.outputBias }
+  IBP.linear net.outputWeight a1B b2B
 
 /--
 The lower and upper affine CROWN forms for this two-layer ReLU MLP.
@@ -335,12 +338,12 @@ The returned pair is `(lower, upper)`. `boundAffineCrown` evaluates these forms 
 takes the lower and upper endpoints.
 -/
 def affineCrownForms {inDim hidDim outDim : Nat}
-  (net : MLP2 α inDim hidDim outDim)
+  (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : AffineVec α inDim outDim × AffineVec α inDim outDim :=
-  -- First get the ReLU intervals. Then W2's sign tells us which relaxation feeds the lower or
+  -- First get the ReLU intervals. Then outputWeight's sign tells us which relaxation feeds the lower or
   -- upper affine form.
-  let b1B : Box α (.dim hidDim .scalar) := { lo := net.b1, hi := net.b1 }
-  let z1B := IBP.linear (α:=α) net.W1 xB b1B
+  let b1B : Box α (.dim hidDim .scalar) := { lo := net.hiddenBias, hi := net.hiddenBias }
+  let z1B := IBP.linear (α:=α) net.hiddenWeight xB b1B
   let relaxU := ReLU.relaxVector (α:=α) (n:=hidDim) z1B.lo z1B.hi
   let relaxL := ReLU.relaxVectorLower (α:=α) (n:=hidDim) z1B.lo z1B.hi
   let slopeU := reluRelaxSlopeVec (α:=α) (n:=hidDim) relaxU
@@ -348,34 +351,34 @@ def affineCrownForms {inDim hidDim outDim : Nat}
   let slopeL := reluRelaxSlopeVec (α:=α) (n:=hidDim) relaxL
   let biasL  := reluRelaxBiasVec  (α:=α) (n:=hidDim) relaxL
 
-  let W2pos := matPosSpec (α:=α) (m:=outDim) (n:=hidDim) net.W2
-  let W2neg := matNegSpec (α:=α) (m:=outDim) (n:=hidDim) net.W2
+  let W2pos := matPosSpec (α:=α) (m:=outDim) (n:=hidDim) net.outputWeight
+  let W2neg := matNegSpec (α:=α) (m:=outDim) (n:=hidDim) net.outputWeight
 
   -- Upper affine: W2pos uses ReLU upper, W2neg uses ReLU lower.
   let W2posU := matColScaleSpec (α:=α) (m:=outDim) (n:=hidDim) W2pos slopeU
   let W2negL := matColScaleSpec (α:=α) (m:=outDim) (n:=hidDim) W2neg slopeL
-  let AU := Spec.matMulSpec (α:=α) (Tensor.addSpec W2posU W2negL) net.W1
-  let innerU_pos := Tensor.addSpec (Tensor.mulSpec slopeU net.b1) biasU
-  let innerL_neg := Tensor.addSpec (Tensor.mulSpec slopeL net.b1) biasL
+  let AU := Spec.matMulSpec (α:=α) (Tensor.addSpec W2posU W2negL) net.hiddenWeight
+  let innerU_pos := Tensor.addSpec (Tensor.mulSpec slopeU net.hiddenBias) biasU
+  let innerL_neg := Tensor.addSpec (Tensor.mulSpec slopeL net.hiddenBias) biasL
   let cU :=
     Tensor.addSpec
       (Tensor.addSpec
         (Spec.matVecMulSpec (α:=α) W2pos innerU_pos)
         (Spec.matVecMulSpec (α:=α) W2neg innerL_neg))
-      net.b2
+      net.outputBias
 
   -- Lower affine: W2pos uses ReLU lower, W2neg uses ReLU upper.
   let W2posL := matColScaleSpec (α:=α) (m:=outDim) (n:=hidDim) W2pos slopeL
   let W2negU := matColScaleSpec (α:=α) (m:=outDim) (n:=hidDim) W2neg slopeU
-  let AL := Spec.matMulSpec (α:=α) (Tensor.addSpec W2posL W2negU) net.W1
-  let innerL_pos := Tensor.addSpec (Tensor.mulSpec slopeL net.b1) biasL
-  let innerU_neg := Tensor.addSpec (Tensor.mulSpec slopeU net.b1) biasU
+  let AL := Spec.matMulSpec (α:=α) (Tensor.addSpec W2posL W2negU) net.hiddenWeight
+  let innerL_pos := Tensor.addSpec (Tensor.mulSpec slopeL net.hiddenBias) biasL
+  let innerU_neg := Tensor.addSpec (Tensor.mulSpec slopeU net.hiddenBias) biasU
   let cL :=
     Tensor.addSpec
       (Tensor.addSpec
         (Spec.matVecMulSpec (α:=α) W2pos innerL_pos)
         (Spec.matVecMulSpec (α:=α) W2neg innerU_neg))
-      net.b2
+      net.outputBias
 
   let affU : AffineVec α inDim outDim := AffineVec.ofLinear (α:=α) AU cU
   let affL : AffineVec α inDim outDim := AffineVec.ofLinear (α:=α) AL cL
@@ -388,7 +391,7 @@ This path is only the direct two-layer MLP version. The graph-level code is stil
 API.
 -/
 def boundAffineCrown {inDim hidDim outDim : Nat}
-  (net : MLP2 α inDim hidDim outDim)
+  (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
   let forms := affineCrownForms (α:=α) net xB
   let BL := AffineVec.evalOnBox (α:=α) forms.1 xB
@@ -402,7 +405,7 @@ This API returns the IBP bound (sound for all backends); `bound_affine_crown` is
 reference implementation for the 2-layer ReLU case.
 -/
 def boundAffine {inDim hidDim outDim : Nat}
-  (net : MLP2 α inDim hidDim outDim)
+  (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
   boundIbp (α:=α) net xB
 
@@ -425,7 +428,7 @@ open NN.MLTheory.CROWN
 This is a small sanity theorem for the wrapper; semantic soundness is proved separately.
 -/
 theorem bound_affine_crown_eq_affine_forms_eval {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (xB : Box ℝ (.dim inDim .scalar)) :
   boundAffineCrown (α:=ℝ) net xB =
     let forms := affineCrownForms (α:=ℝ) net xB
@@ -1112,18 +1115,18 @@ private theorem ibp_relu_sound_real {n : Nat}
 
 /-- Soundness of pure IBP bounds for a 2-layer MLP over `ℝ`. -/
 theorem bound_ibp_sound {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (xB : Box ℝ (.dim inDim .scalar))
   (x : Tensor ℝ (.dim inDim .scalar))
   (hx : Box.contains (α:=ℝ) xB x) :
   Box.contains (α:=ℝ) (boundIbp (α:=ℝ) net xB) (forward (α:=ℝ) net x) := by
   classical
   -- Unfold bound_ibp and forward
-  -- Step 1: z1 ∈ IBP.linear(W1, xB, b1)
-  -- Bias box is dirac at b1
+  -- Step 1: z1 ∈ IBP.linear(hiddenWeight, xB, hiddenBias)
+  -- Bias box is dirac at hiddenBias
   -- pointwise containment is trivial when lo=hi=b
-  have hb1 : Box.contains (α:=ℝ) { lo := net.b1, hi := net.b1 } net.b1 := by
-    cases net.b1 with
+  have hb1 : Box.contains (α:=ℝ) { lo := net.hiddenBias, hi := net.hiddenBias } net.hiddenBias := by
+    cases net.hiddenBias with
     | dim b1f =>
       intro i
       cases b1f i with
@@ -1131,37 +1134,37 @@ theorem bound_ibp_sound {inDim hidDim outDim : Nat}
         simp [Box.contains]
   -- z1 containment
   have hz1 : Box.contains (α:=ℝ)
-      (IBP.linear (α:=ℝ) net.W1 xB { lo := net.b1, hi := net.b1 })
-      (Spec.linearSpec (α:=ℝ) { weights := net.W1, bias := net.b1 } x) := by
-    exact ibp_linear_sound_real net.W1 xB { lo := net.b1, hi := net.b1 } x net.b1 hx hb1
+      (IBP.linear (α:=ℝ) net.hiddenWeight xB { lo := net.hiddenBias, hi := net.hiddenBias })
+      (Spec.linearSpec (α:=ℝ) { weights := net.hiddenWeight, bias := net.hiddenBias } x) := by
+    exact ibp_linear_sound_real net.hiddenWeight xB { lo := net.hiddenBias, hi := net.hiddenBias } x net.hiddenBias hx hb1
   -- Step 2: a1 ∈ IBP.relu(z1B)
   have ha1 : Box.contains (α:=ℝ)
-      (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.W1 xB { lo := net.b1, hi := net.b1 }))
+      (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.hiddenWeight xB { lo := net.hiddenBias, hi := net.hiddenBias }))
       (Activation.reluSpec (α:=ℝ)
-        (Spec.linearSpec (α:=ℝ) { weights := net.W1, bias := net.b1 } x)) := by
+        (Spec.linearSpec (α:=ℝ) { weights := net.hiddenWeight, bias := net.hiddenBias } x)) := by
     exact ibp_relu_sound_real _ _ hz1
-  -- Step 3: y ∈ IBP.linear(W2, a1B, b2)
+  -- Step 3: y ∈ IBP.linear(outputWeight, a1B, outputBias)
   -- Build a1B and b2B as in bound_ibp
-  have hb2 : Box.contains (α:=ℝ) { lo := net.b2, hi := net.b2 } net.b2 := by
-    cases net.b2 with
+  have hb2 : Box.contains (α:=ℝ) { lo := net.outputBias, hi := net.outputBias } net.outputBias := by
+    cases net.outputBias with
     | dim b2f =>
       intro i
       cases b2f i with
       | scalar _ =>
         simp [Box.contains]
   have hy : Box.contains (α:=ℝ)
-      (IBP.linear (α:=ℝ) net.W2
-        (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.W1 xB { lo := net.b1, hi := net.b1 }))
-        { lo := net.b2, hi := net.b2 })
-      (Spec.linearSpec (α:=ℝ) { weights := net.W2, bias := net.b2 }
+      (IBP.linear (α:=ℝ) net.outputWeight
+        (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.hiddenWeight xB { lo := net.hiddenBias, hi := net.hiddenBias }))
+        { lo := net.outputBias, hi := net.outputBias })
+      (Spec.linearSpec (α:=ℝ) { weights := net.outputWeight, bias := net.outputBias }
         (Activation.reluSpec (α:=ℝ)
-          (Spec.linearSpec (α:=ℝ) { weights := net.W1, bias := net.b1 } x))) := by
-    exact ibp_linear_sound_real net.W2
-      (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.W1 xB { lo := net.b1, hi := net.b1 }))
-      { lo := net.b2, hi := net.b2 }
+          (Spec.linearSpec (α:=ℝ) { weights := net.hiddenWeight, bias := net.hiddenBias } x))) := by
+    exact ibp_linear_sound_real net.outputWeight
+      (IBP.relu (α:=ℝ) (IBP.linear (α:=ℝ) net.hiddenWeight xB { lo := net.hiddenBias, hi := net.hiddenBias }))
+      { lo := net.outputBias, hi := net.outputBias }
       (Activation.reluSpec (α:=ℝ)
-        (Spec.linearSpec (α:=ℝ) { weights := net.W1, bias := net.b1 } x))
-      net.b2
+        (Spec.linearSpec (α:=ℝ) { weights := net.hiddenWeight, bias := net.hiddenBias } x))
+      net.outputBias
       ha1 hb2
   -- Combine: bound_ibp is exactly the composition of the above boxes
   -- Unfold bound_ibp and forward to match hy
@@ -1174,7 +1177,7 @@ In this module `bound_affine` delegates to the IBP implementation, so this theor
 corollary of `bound_ibp_sound`.
 -/
 theorem bound_affine_sound {inDim hidDim outDim : Nat}
-  (net : MLP2 ℝ inDim hidDim outDim)
+  (net : TwoLayerMLP ℝ inDim hidDim outDim)
   (xB : Box ℝ (.dim inDim .scalar))
   (x : Tensor ℝ (.dim inDim .scalar))
   (hx : Box.contains (α:=ℝ) xB x) :
@@ -1188,16 +1191,16 @@ end Theorems
 namespace Examples
 
 /--
-Compute both IBP bounds and affine-CROWN bounds for a 2-layer MLP around an `ε`-box.
+Compute both IBP bounds and affine-CROWN bounds for a two-layer MLP around an `ε`-box.
 
 The input set is the axis-aligned box centered at `x_center` with radius `eps` in each coordinate.
 -/
-def crownMlp2Bounds {inDim hidDim outDim : Nat}
-  (l1 : Spec.LinearSpec α inDim hidDim)
-  (l2 : Spec.LinearSpec α hidDim outDim)
+def crownTwoLayerMlpBounds {inDim hidDim outDim : Nat}
+  (hiddenLayer : Spec.LinearSpec α inDim hidDim)
+  (outputLayer : Spec.LinearSpec α hidDim outDim)
   (x_center : Tensor α (.dim inDim .scalar)) (eps : α) :
   Box α (.dim outDim .scalar) × Box α (.dim outDim .scalar) :=
-  let net := ofLinearSpecs (α:=α) l1 l2
+  let net := ofLinearSpecs (α:=α) hiddenLayer outputLayer
   let xB : Box α (.dim inDim .scalar) :=
     let rad := Tensor.scaleSpec (Spec.fill (α:=α) eps (.dim inDim .scalar)) 1
     { lo := Tensor.subSpec x_center rad, hi := Tensor.addSpec x_center rad }

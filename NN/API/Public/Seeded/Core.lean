@@ -144,7 +144,7 @@ export pure.blocks
    Conv2dAct conv2dAct
    Conv2dNormAct conv2dNormActCHW conv2dNormAct
    Conv2dNormActPool conv2dNormActPoolCHW conv2dNormActPool
-   down2 down2_pos
+   strideTwoOutput strideTwoOutput_pos
    conv3x3Same conv3x3Down conv1x1Same conv1x1Down
    conv3x3SameImages conv3x3DownImages conv1x1SameImages conv1x1DownImages
    ResNetBasicBlock resnetBasicBlock
@@ -188,7 +188,7 @@ def withSeed {α : Type 2} (k : Nat → α) : M α :=
     (k seed, st')
 
 /-- Consume two fresh seeds and pass them to `k` (in order). -/
-def withSeeds2 {α : Type 2} (k : Nat → Nat → α) : M α :=
+def withSeedPair {α : Type 2} (k : Nat → Nat → α) : M α :=
   fun st =>
     let (a, st') := rand.SeedStream.next st
     let (b, st'') := rand.SeedStream.next st'
@@ -258,11 +258,6 @@ abbrev FlattenBatch {n : Nat} {s : Spec.Shape} :
     M (Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s))) :=
   flattenBatch (n := n) (s := s)
 
-@[inherit_doc pure.flattenStart1]
-def flattenStart1 {n : Nat} {s : Spec.Shape} :
-    M (Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s))) :=
-  lift (pure.flattenStart1 (n := n) (s := s))
-
 @[inherit_doc pure.maxPool2d]
 def maxPool2d {n inC inH inW : Nat} (cfg : MaxPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
     M (Sequential
@@ -300,7 +295,7 @@ def avgPool {n inC inH inW : Nat} (cfg : AvgPool) [NeZero cfg.kH] [NeZero cfg.kW
 @[inherit_doc pure.linear]
 def linear (inDim outDim : Nat) (pfx : Spec.Shape := Spec.Shape.scalar) :
     M (Sequential (pfx.appendDim inDim) (pfx.appendDim outDim)) :=
-  withSeeds2 (fun seedW seedB =>
+  withSeedPair (fun seedW seedB =>
     pure.linear inDim outDim seedW seedB (pfx := pfx))
 
 @[inherit_doc linear]
@@ -323,7 +318,7 @@ def rnn (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
       (NN.Tensor.Shape.Mat seqLen inputSize)
       (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
-  withSeeds2 (fun seedW seedB =>
+  withSeedPair (fun seedW seedB =>
     pure.rnn seqLen inputSize hiddenSize seedW seedB)
 
 @[inherit_doc pure.gru]
@@ -331,7 +326,7 @@ def gru (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
       (NN.Tensor.Shape.Mat seqLen inputSize)
       (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
-  withSeeds2 (fun seedW seedB =>
+  withSeedPair (fun seedW seedB =>
     pure.gru seqLen inputSize hiddenSize seedW seedB)
 
 @[inherit_doc pure.mamba]
@@ -339,7 +334,7 @@ def mamba (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
       (NN.Tensor.Shape.Mat seqLen inputSize)
       (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
-  withSeeds2 (fun seedW seedB =>
+  withSeedPair (fun seedW seedB =>
     pure.mamba seqLen inputSize hiddenSize seedW seedB)
 
 @[inherit_doc pure.lstm]
@@ -347,7 +342,7 @@ def lstm (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
       (NN.Tensor.Shape.Mat seqLen inputSize)
       (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
-  withSeeds2 (fun seedW seedB =>
+  withSeedPair (fun seedW seedB =>
     pure.lstm seqLen inputSize hiddenSize seedW seedB)
 
 @[inherit_doc pure.conv2d]
@@ -357,7 +352,7 @@ def conv2d {n inC inH inW : Nat} (cfg : Conv2d) [NeZero inC] [NeZero cfg.kH] [Ne
       (NN.Tensor.Shape.Images n cfg.outC
         ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
         ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1))) :=
-  withSeeds2 (fun seedK seedB =>
+  withSeedPair (fun seedK seedB =>
     let cfg' : Conv2d := { cfg with seedK := seedK, seedB := seedB }
     pure.conv2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg')
 
@@ -373,7 +368,7 @@ def conv {n inC inH inW : Nat} (cfg : Conv) [NeZero inC] [NeZero cfg.kH] [NeZero
 def batchNorm2d {n c h w : Nat} (cfg : BatchNorm2d := {})
     [NeZero n] [NeZero c] [NeZero h] [NeZero w] :
     M (Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w)) :=
-  withSeeds2 (fun seedGamma seedBeta =>
+  withSeedPair (fun seedGamma seedBeta =>
     let cfg' : BatchNorm2d := { cfg with seedGamma := seedGamma, seedBeta := seedBeta }
     pure.batchNorm2d (n := n) (c := c) (h := h) (w := w) cfg')
 
@@ -422,7 +417,7 @@ def layerNorm {batch seqLen embedDim : Nat} [NeZero seqLen] [NeZero embedDim] :
     M (Sequential
       (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
       (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))) :=
-  withSeeds2 (fun seedGamma seedBeta =>
+  withSeedPair (fun seedGamma seedBeta =>
     pure.layerNorm (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
       { seedGamma := seedGamma, seedBeta := seedBeta })
 
@@ -467,8 +462,8 @@ def resnetBasicBlock {n inC h w : Nat} (cfg : blocks.ResNetBasicBlock)
     M (Sequential
       (NN.Tensor.Shape.Images n inC h w)
       (NN.Tensor.Shape.Images n cfg.outC
-        (if cfg.downsample then blocks.down2 h else h)
-        (if cfg.downsample then blocks.down2 w else w))) :=
+        (if cfg.downsample then blocks.strideTwoOutput h else h)
+        (if cfg.downsample then blocks.strideTwoOutput w else w))) :=
   withSeed (fun seedBase =>
     let cfg' : blocks.ResNetBasicBlock := { cfg with seedBase := seedBase }
     blocks.resnetBasicBlock (n := n) (inC := inC) (h := h) (w := w) cfg')

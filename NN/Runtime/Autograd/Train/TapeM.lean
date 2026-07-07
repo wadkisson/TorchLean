@@ -29,7 +29,7 @@ values, but it does not record the backward pass itself as a differentiable grap
 the right place for ordinary training losses, not for Hessians or differentiating-through-backward.
 
 For higher derivatives, use the functional autodiff surface in `NN.Runtime.Autograd.TorchLean`
-(`hvpInputs`, `hessian1`, and the public API wrappers). That path rebuilds the program over dual
+(`hvpInputs`, `hessianInput`, and the public API wrappers). That path rebuilds the program over dual
 numbers / compiled graph structure and is the correct architecture for JVP-over-VJP style
 derivatives.
 -/

@@ -18,7 +18,7 @@ Small forward/backward comparisons (CPU tape vs CUDA tape) for:
 - `linear`
 - `mse_loss`
 - `concat_vectors`
-- `slice_range0`
+- `slice_leading_axis_range`
 - `gather_scalar`, `gather_row`, `gather_scalar_nat`
 -/
 
@@ -101,8 +101,8 @@ def run : IO Unit := do
   Utils.assertTensorApprox (s := sB) "linear+mse db" db_cuda db_cpu (tol := 2e-3)
   Utils.assertTensorApprox (s := sX) "linear+mse dx" dx_cuda dx_cpu (tol := 2e-3)
 
-  -- concat_vectors + slice_range0
-  IO.println "== concat_vectors + slice_range0 =="
+  -- concat_vectors + slice_leading_axis_range
+  IO.println "== concat_vectors + slice_leading_axis_range =="
   let n : Nat := 2
   let m : Nat := 3
   let sA : Shape := shape![n]
@@ -120,7 +120,7 @@ def run : IO Unit := do
   let (t1s, aId) := Tape.leaf (t := t0s) a (name := some "a")
   let (t2s, bId) := Tape.leaf (t := t1s) bV (name := some "b")
   let (t3s, catId) ← Utils.okOrThrow (Tape.concatVectors (α := Float) (t := t2s) (n := n) (m := m) aId bId)
-  let (t4s, ySliceId) ← Utils.okOrThrow (Tape.sliceRange0 (α := Float) (t := t3s) (n := n + m) (s := Shape.scalar) catId start len hSlice)
+  let (t4s, ySliceId) ← Utils.okOrThrow (Tape.sliceLeadingAxisRange (α := Float) (t := t3s) (n := n + m) (s := Shape.scalar) catId start len hSlice)
   let yCpuSlice ← Utils.cpuValue (s := shape![len]) t4s ySliceId
   let seedCpuSlice : Runtime.AnyTensor Float := AnyTensor.mk (fill (1.0 : Float) (shape![len]))
   let gradsCpuSlice ← Utils.okOrThrow (Tape.backwardDenseAll (α := Float) (t := t4s) ySliceId seedCpuSlice)
@@ -135,7 +135,7 @@ def run : IO Unit := do
     (name := some "b")
   let (t3sc, catIdc) ← Utils.okOrThrow (Runtime.Autograd.Cuda.Tape.concatVectors (t := t2sc) (n := n) (m := m) aIdc bIdc)
   let (t4sc, ySliceIdc) ← Utils.okOrThrow
-    (Runtime.Autograd.Cuda.Tape.sliceRange0 (t := t3sc) (n := n + m) (s := Shape.scalar) catIdc start len hSlice)
+    (Runtime.Autograd.Cuda.Tape.sliceLeadingAxisRange (t := t3sc) (n := n + m) (s := Shape.scalar) catIdc start len hSlice)
   let yCudaSlice ← Utils.cudaValue (s := shape![len]) t4sc ySliceIdc
   let seedCudaSlice : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := shape![len]

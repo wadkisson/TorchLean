@@ -125,7 +125,7 @@ It supports:
 This generalizes `CompiledScalar` to arbitrary output shapes and provides forward-mode JVP and
 reverse-mode VJP (with explicit seed).
 -/
-structure CompiledOut (α : Type) (Γ : List Shape) (τ : Shape) where
+structure CompiledGraph (α : Type) (Γ : List Shape) (τ : Shape) where
   /-- Shapes of internal SSA nodes preceding the output node. -/
   ssPrev : List Shape
   /-- Proved graph prefix that computes all preceding SSA nodes. -/
@@ -133,19 +133,19 @@ structure CompiledOut (α : Type) (Γ : List Shape) (τ : Shape) where
   /-- Final output node over the leaf context plus graph prefix. -/
   node : Proofs.Autograd.Algebra.NodeData α Unit (Γ ++ ssPrev) τ
 
-namespace CompiledOut
+namespace CompiledGraph
 
 /-- Convenience alias for the proved heterogeneous tensor list over a shape context. -/
 abbrev TList (α : Type) (ss : List Shape) := Proofs.Autograd.Algebra.TList α ss
 
 /-- Evaluate the output tensor for leaf values `x`. -/
 def forward {α : Type} {Γ : List Shape} {τ : Shape}
-  (c : CompiledOut α Γ τ) (x : TList α Γ) : Tensor α τ :=
+  (c : CompiledGraph α Γ τ) (x : TList α Γ) : Tensor α τ :=
   c.node.forward (Proofs.Autograd.Algebra.GraphData.eval (g := c.gPrev) x ()) ()
 
 /-- Forward-mode Jacobian-vector product (JVP) at `x` with tangent `dx`. -/
 def jvp {α : Type} {Γ : List Shape} {τ : Shape}
-  (c : CompiledOut α Γ τ) (x dx : TList α Γ) : Tensor α τ :=
+  (c : CompiledGraph α Γ τ) (x dx : TList α Γ) : Tensor α τ :=
   let ctx := Proofs.Autograd.Algebra.GraphData.eval (g := c.gPrev) x ()
   let dctx := Proofs.Autograd.Algebra.GraphData.jvpCtx (g := c.gPrev) x dx ()
   c.node.jvp ctx dctx ()
@@ -158,7 +158,7 @@ PyTorch comparison: `out.backward(gradient=seedOut)` (for a tensor output).
 -/
 def vjpWithSeed {α : Type} [Add α] [Zero α]
     {Γ : List Shape} {τ : Shape}
-    (c : CompiledOut α Γ τ) (x : TList α Γ) (seedOut : Tensor α τ) : TList α Γ :=
+    (c : CompiledGraph α Γ τ) (x : TList α Γ) (seedOut : Tensor α τ) : TList α Γ :=
   let ssPrev := c.ssPrev
   let full : Proofs.Autograd.Algebra.GraphData α Unit Γ (ssPrev ++ [τ]) :=
     .snoc (ss := ssPrev) c.gPrev c.node
@@ -169,7 +169,7 @@ def vjpWithSeed {α : Type} [Add α] [Zero α]
     TList.cast (α := α) (h := List.append_assoc Γ ssPrev [τ]) seed'
   Proofs.Autograd.Algebra.GraphData.backpropCtx (α := α) (Δ := Unit) (Γ := Γ) (g := full) x () seed
 
-end CompiledOut
+end CompiledGraph
 
 /--
 Compile a scalar-output graph builder into a `CompiledScalar`.
@@ -201,20 +201,20 @@ def compileScalar {α : Type} [DecidableEq Shape] {Γ : List Shape}
               .error "torch.compile: output node is not scalar (expected Shape.scalar)"
 
 /--
-Compile a tensor-output graph builder into a `CompiledOut`.
+Compile a tensor-output graph builder into a `CompiledGraph`.
 
 We require that the returned `Var τ` is the *last* node produced by the builder, so the wrapper can
 store the prefix graph and final output node cleanly.
 -/
-def compileOut {α : Type} [DecidableEq Shape] {Γ : List Shape} {τ : Shape}
+def compileGraph {α : Type} [DecidableEq Shape] {Γ : List Shape} {τ : Shape}
   (build : Runtime.Autograd.Compiled.GraphM.M α Γ (Runtime.Autograd.Compiled.GraphM.Var τ)) :
-  Runtime.Autograd.Result (CompiledOut α Γ τ) := do
+  Runtime.Autograd.Result (CompiledGraph α Γ τ) := do
   let (outVar, st) ← Runtime.Autograd.Compiled.GraphM.run (α := α) (Γ := Γ) build
   match st with
   | ⟨_ss, g⟩ =>
       match g with
       | .nil =>
-          .error "torch.compileOut: graph produced no nodes (need an explicit output node)"
+          .error "torch.compileGraph: graph produced no nodes (need an explicit output node)"
       | .snoc (ss := ssPrev) (τ := τ') gPrev node =>
           let expectedOutId := Γ.length + ssPrev.length
           if _hOut : outVar.id = expectedOutId then
@@ -223,11 +223,11 @@ def compileOut {α : Type} [DecidableEq Shape] {Γ : List Shape} {τ : Shape}
               | rfl => .ok { ssPrev := ssPrev, gPrev := gPrev, node := node }
             else
               .error
-                (s!"torch.compileOut: output node shape mismatch (expected " ++
+                (s!"torch.compileGraph: output node shape mismatch (expected " ++
                   s!"{Shape.pretty τ}, got {Shape.pretty τ'})")
           else
             .error
-              (s!"torch.compileOut: output Var is not the last node (got " ++
+              (s!"torch.compileGraph: output Var is not the last node (got " ++
                 s!"id={outVar.id}, expected id={expectedOutId})")
 end Torch
 end Autograd

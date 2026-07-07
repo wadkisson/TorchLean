@@ -13,7 +13,7 @@ public import NN.Proofs.Models.Attention.Weights
 /-!
 # Attention Model Proofs
 
-This is the proof-facing umbrella for attention model facts.
+This is the proof layer umbrella for attention model facts.
 
 The executable/spec definitions live under `NN.Spec.Layers.Attention`. This module collects theorems
 about those definitions: exact causal-mask semantics, attention-weight normalization, and

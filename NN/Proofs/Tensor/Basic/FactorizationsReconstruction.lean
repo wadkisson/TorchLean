@@ -15,11 +15,11 @@ public import Mathlib.Algebra.BigOperators.Fin
 # Exact reconstruction of the finite factorizations (Cholesky and QR)
 
 This file proves the *exact* algebraic reconstruction of the finite executable Cholesky and QR
-factorizations from [`NN.Spec.Core.Tensor.Factorizations`](../../../Spec/Core/Tensor/Factorizations.lean),
-building on the predicates and fold-indexing lemmas of `NN.Proofs.Tensor.Basic.Factorizations`. Because
-Cholesky and Gram–Schmidt are *direct, finite* constructions — no iteration, no convergence caveat —
-over `ℝ` they reconstruct their input on the nose under the success hypotheses (positive pivots / full
-column rank), an exact identity rather than an a-posteriori bound.
+factorizations from `NN.Spec.Core.Tensor.Factorizations`, building on the predicates and
+fold-indexing lemmas of `NN.Proofs.Tensor.Basic.Factorizations`. Because Cholesky and Gram–Schmidt
+are *direct, finite* constructions — no iteration, no convergence caveat — over `ℝ` they reconstruct
+their input on the nose under the success hypotheses (positive pivots / full column rank), an exact
+identity rather than an a-posteriori bound.
 
 ## Main results
 
@@ -47,9 +47,8 @@ positive-pivot hypotheses discharge the `√`-radicand and divisor side conditio
 
 This file proves `A = L · Lᵀ` and `A = Q · R` purely algebraically. The remaining QR property —
 orthonormality of the `Q` factor, `Qᵀ Q = 1` — is proved in the companion file
-[`NN.Proofs.Tensor.Basic.FactorizationsOrthonormal`](FactorizationsOrthonormal.lean) by bridging the
-executable Gram–Schmidt to Mathlib's `gramSchmidt`, completing the full `Spec.Factorization.IsQR`
-predicate (`isQR_of_pos`).
+`NN.Proofs.Tensor.Basic.FactorizationsOrthonormal` by bridging the executable Gram–Schmidt to
+Mathlib's `gramSchmidt`, completing the full `Spec.Factorization.IsQR` predicate (`isQR_of_pos`).
 -/
 
 @[expose] public section

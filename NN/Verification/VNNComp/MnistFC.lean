@@ -312,8 +312,8 @@ def buildGraphAndParams (layers : Array LayerWB) : IO (Graph × ParamStore Float
         parents := []
         kind := .input
         outShape := .dim inDim .scalar }]
-  let ps0 : ParamStore Float := {}
-  let (nodes, ps, outId) := go 0 nodes0 ps0 layersL
+  let baseParams : ParamStore Float := {}
+  let (nodes, ps, outId) := go 0 nodes0 baseParams layersL
   let g : Graph := { nodes := nodes }
   pure (g, ps, inDim, outDim, outId)
 
@@ -565,7 +565,7 @@ def main (args : List String) : IO Unit := do
       pure (some (← loadAlphas opts.alphas))
     else
       pure none
-  let (g, ps0, inDim, outDim, outId) ← buildGraphAndParams layers
+  let (g, baseParams, inDim, outDim, outId) ← buildGraphAndParams layers
   let inId := 0
   IO.println s!"[mnist_fc] layers={layers.size} nodes={g.nodes.size} inDim={inDim} outDim={outDim}"
   IO.println s!"[mnist_fc] instances={instances.size} mode={opts.mode}"
@@ -580,7 +580,7 @@ def main (args : List String) : IO Unit := do
     let some hiT := NN.Verification.Util.Tensor.vecOfArray inDim inst.inputHi
       | throw <| IO.userError s!"Instance {inst.id}: bad input_hi"
     let xB : FlatBox Float := { dim := inDim, lo := loT, hi := hiT }
-    let ps : ParamStore Float := ps0.seedInputBox inId xB
+    let ps : ParamStore Float := baseParams.seedInputBox inId xB
     let isSafe ←
       if opts.mode = .crownObj then
         vnnlibRefutedByCROWNObjectives g ps xB inId outId inDim outDim inst.spec

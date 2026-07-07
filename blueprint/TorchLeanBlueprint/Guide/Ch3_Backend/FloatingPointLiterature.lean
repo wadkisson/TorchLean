@@ -12,10 +12,9 @@ words: approximation, robustness, bounds, finite precision. The words are not en
 a theorem, the relevant semantics must be clear: real-valued networks, rounded-real FP32 semantics,
 executable IEEE-754 behavior, or an abstract verifier enclosure.
 
-The purpose is to avoid citing the right theorem for the wrong semantics. Citations next to a
-TorchLean theorem should name whether the claim is over reals, `FP32`, `IEEE32Exec`, or a
-verifier-style enclosure, and should name the quantity being bounded: pointwise error, image of a
-set, or an interval overapproximation.
+Good citations name the semantics of the claim. A TorchLean theorem should say whether it is about
+reals, `FP32`, `IEEE32Exec`, or a verifier enclosure, and it should name the quantity being bounded:
+pointwise error, the image of a set, or an interval overapproximation.
 
 # Three Questions Before Citing A Result
 
@@ -23,7 +22,7 @@ For a "floating-point universal approximation" claim, three concrete checks appl
 
 1. Is the theorem about reals, about a rounded real model, or about actual executable IEEE-754 bits?
 2. What is the approximation target (a pointwise function, a direct image of a set, or an interval enclosure)?
-3. If the theorem is meant to feed a verifier, what semantics is the verifier using?
+3. If the theorem feeds a verifier, what semantics is the verifier using?
 
 TorchLean keeps these cases separate in code:
 
@@ -68,11 +67,11 @@ Flocq is the closest proof-engineering precedent for TorchLean's `FP32` layer: i
 floating-point arithmetic in Coq using reusable rounded-real models. FloatSpec is a Lean 4 project
 with the same broad ambition for IEEE-style arithmetic and executable reference operations.
 
-Gappa is the reference to cite when the point is automatic certification of floating-point bounds:
+Gappa is the reference for automatic certification of floating-point bounds:
 it automates interval/error propagation and can emit independently checkable proof artifacts.
 
-CompCert is useful background for the compilation side of the story: it is a verified compiler with
-machine floating-point models in its formal development.
+CompCert is the compilation-side background: it is a verified compiler whose formal development
+includes machine floating point models.
 
 ## Classical Universal Approximation
 
@@ -96,8 +95,8 @@ Gehr et al., *AI2: Safety and Robustness Certification of Neural Networks with A
 Interpretation* (2018), Singh et al., *An Abstract Domain for Certifying Neural Networks* (POPL
 2019), and the CROWN / LiRPA line of work.
 
-This is the lineage behind interval boxes and affine relaxations. It is the background for
-TorchLean's verification and bound propagation passes.
+This line of work is the background for interval boxes, affine relaxations, and TorchLean's
+verification and bound propagation passes.
 
 ## Floating Point Neural Networks As Robust Approximators
 
@@ -199,7 +198,7 @@ $$`\varepsilon_{\mathrm{total}}
 +
 \varepsilon_{\mathrm{verify}}`
 
-That is where the verification and floating-point chapters should be cited together.
+At that point, the verification and floating-point chapters belong together.
 
 A typical citation bundle for this combined topic is:
 
@@ -211,7 +210,7 @@ A typical citation bundle for this combined topic is:
 
 ## A practical citation map
 
-When writing a paper, proposal, or technical note, a useful division is:
+When writing a paper, proposal, or technical note, divide the claim as follows:
 
 - classical approximation over reals:
   cite `relu_universal_approximation_Icc` and the classical UAT references;

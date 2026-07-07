@@ -28,7 +28,7 @@ They are semantic bugs: the code runs, but it is no longer the math people think
 | `StableLoss.lean` | TensorFuzz targeted rare numerical failures and broken losses; numerical studies repeatedly find bad domains for `log`, `sqrt`, division, and reductions. | Stable loss and domain sensitive ops become named specs with stated finite value obligations. |
 | `IgnoredLabelLoss.lean` | PyTorch issue #75181 reported `CrossEntropyLoss(ignore_index=...)` returning `nan` for an all-ignored target case. | Ignored labels become explicit zero contributions, and the empty-reduction policy is named instead of hidden in a backend kernel. |
 | `AutogradDomain.lean` | PyTorch's autograd docs show that masking after `x / 0` can still leave `nan` gradients because the undefined division remains in the backward graph. | The safe domain graph records epsilon protected division before masking, so importers can distinguish it from "divide first, mask later." |
-| `FloatBoundary.lean` | Floating point verification attacks show that real valued proofs do not automatically imply deployed Float32 behavior. | Runtime Float32 operations are tied back to explicit IEEE style semantics rather than silently borrowing real number reasoning. |
+| `FloatBoundary.lean` | Floating point verification attacks show why real-valued proofs need an explicit bridge before they describe deployed Float32 behavior. | Runtime Float32 operations are tied back to explicit IEEE style semantics rather than silently borrowing real number reasoning. |
 | `LayerNormDegenerateAxis.lean` | Backend LayerNorm kernels can mishandle the `normalized_shape=(1,)` case even though the math is a constant function. | The one-feature LayerNorm contract says the output is the bias, with zero input gradient and zero scale gradient; the repro script checks PyTorch against this contract. |
 | `ConstantNormalizationSlice.lean` | GroupNorm, InstanceNorm, and BatchNorm kernels can suffer cancellation on large constant slices even when their saved mean/rstd imply zero normalized activation. | The constant-slice normalization theorem says affine normalization returns the bias and has zero scale-gradient contribution. |
 | `Geometry3DProjection.lean` | 3D perception glue fails through camera convention mismatches, negative depth, swapped `xyxy`/axis layouts, malformed corner tensors, and projected 3D boxes that do not actually enclose their 2D claims. | The Geometry3D checker recomputes tensor native projection, checks positive depth and bbox enclosure, includes a theorem for homogeneous projection intervals, and renders accepted/rejected PNG overlays for human inspection. |
@@ -49,10 +49,11 @@ They are semantic bugs: the code runs, but it is no longer the math people think
 | Constant normalization slice | output equals bias and the scale-gradient contribution is zero |
 | Geometry3D projection | projected 3D corners have positive depth and enclose the claimed 2D box |
 
-Scope: this BugZoo pass does not verify distributed training
-setups, NCCL/collective semantics, paged attention allocators, mixed quantization, or arbitrary CUDA
-kernels. Those can be separate boundary examples, but they are not part of the checked TorchLean scope
-shown here.
+The checked scope here is the semantic contract for each failure mode: masks, caches, positions,
+token ids, batching, normalization, stable losses, compiler boundaries, Float32 bridges, and 3D
+projection envelopes. Distributed training setups, NCCL/collective semantics, paged attention
+allocators, mixed quantization, and arbitrary CUDA kernels belong in separate boundary examples with
+their own contracts.
 
 ## Source Trail
 
@@ -76,8 +77,8 @@ The case studies are motivated by published bug studies and systems reports:
 - [FreeFuzz](https://github.com/ise-uiuc/FreeFuzz) and
   [NNSmith](https://arxiv.org/abs/2207.13066): fuzzing and generated valid models expose
   framework/API and compiler semantic mismatches.
-- [DL compiler bug studies](https://haoyang9804.github.io/papers/fse21.pdf): wrong code bugs are
-  common enough to need semantic oracles, not just crash tests.
+- [DL compiler bug studies](https://haoyang9804.github.io/papers/fse21.pdf): wrong-code bugs call
+  for semantic oracles alongside crash tests.
 - [PyTorch compiler correctness study](https://arxiv.org/abs/2604.08720): silent `torch.compile`
   correctness bugs can produce incorrect outputs without exceptions, crashes, or warnings.
 - [Mobile deployment fault studies](https://arxiv.org/abs/2101.04930): model conversion fails
@@ -105,7 +106,7 @@ BugZoo files should read like small case studies. Each file should answer, in or
 - what real bug family is being modeled;
 - what the bad framework side pattern looks like;
 - what exact TorchLean object is the trusted contract;
-- what the theorem proves, and what it does not prove.
+- what the theorem proves, and which runtime or producer assumptions remain.
 
 That keeps the prose explanation close to the checked Lean artifact without claiming more than the
 example proves.

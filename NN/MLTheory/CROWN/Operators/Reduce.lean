@@ -310,7 +310,7 @@ namespace AxisReduce
 /-- IBP for ReduceSum along axis 0 (sum over rows) for 2D: [rows, cols] → [1, cols].
     Each output column j = Σ_i input[i,j].
 -/
-def ibpReduceSumAxis0 {rows cols : Nat}
+def ibpReduceSumByColumn {rows cols : Nat}
     (xB : Box α (.dim rows (.dim cols .scalar))) : Box α (.dim 1 (.dim cols .scalar)) :=
   match xB.lo, xB.hi with
   | .dim loRows, .dim hiRows =>
@@ -335,7 +335,7 @@ def ibpReduceSumAxis0 {rows cols : Nat}
 /-- IBP for ReduceSum along axis 1 (sum over columns) for 2D: [rows, cols] → [rows, 1].
     Each output row i = Σ_j input[i,j].
 -/
-def ibpReduceSumAxis1 {rows cols : Nat}
+def ibpReduceSumByRow {rows cols : Nat}
     (xB : Box α (.dim rows (.dim cols .scalar))) : Box α (.dim rows (.dim 1 .scalar)) :=
   match xB.lo, xB.hi with
   | .dim loRows, .dim hiRows =>

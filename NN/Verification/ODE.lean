@@ -13,7 +13,7 @@ public import NN.Verification.ODE.Verify
 /-!
 # ODE Verification
 
-Public umbrella import for TorchLean's ODE corridor verification stack:
+Public umbrella import for TorchLean's ODE corridor verifier:
 
 - a small ODE expression AST,
 - parsers and JSON loaders for certificate artifacts, and
@@ -24,4 +24,3 @@ Keeping this index module makes `NN.Verification` mirror the other subfolders (`
 -/
 
 @[expose] public section
-

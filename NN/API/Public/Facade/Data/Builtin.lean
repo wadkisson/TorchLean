@@ -46,7 +46,7 @@ end Bands
 namespace TensorSource
 
 export NN.API.Data.TensorSource
-  (loadCsvTensorND loadFloatAs loadFloatPrefixDim0As loadFloat)
+  (loadCsvTensorND loadFloatAs loadFloatLeadingPrefixAs loadFloat)
 
 end TensorSource
 

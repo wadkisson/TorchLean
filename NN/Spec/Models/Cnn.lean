@@ -78,46 +78,46 @@ abbrev poolOut (input kernel stride : Nat) : Nat :=
   (input - kernel) / stride + 1
 
 /-- Output height after the first convolution stage. -/
-abbrev outH1 (inH kH stride1 padding1 : Nat) : Nat :=
+abbrev firstConvOutHeight (inH kH stride1 padding1 : Nat) : Nat :=
   convOut inH kH stride1 padding1
 
 /-- Output width after the first convolution stage. -/
-abbrev outW1 (inW kW stride1 padding1 : Nat) : Nat :=
+abbrev firstConvOutWidth (inW kW stride1 padding1 : Nat) : Nat :=
   convOut inW kW stride1 padding1
 
 /-- Output height after the first pooling stage. -/
-abbrev poolH1 (inH kH stride1 padding1 poolKH poolStride1 : Nat) : Nat :=
-  poolOut (outH1 inH kH stride1 padding1) poolKH poolStride1
+abbrev firstPoolOutHeight (inH kH stride1 padding1 poolKH poolStride1 : Nat) : Nat :=
+  poolOut (firstConvOutHeight inH kH stride1 padding1) poolKH poolStride1
 
 /-- Output width after the first pooling stage. -/
-abbrev poolW1 (inW kW stride1 padding1 poolKW poolStride1 : Nat) : Nat :=
-  poolOut (outW1 inW kW stride1 padding1) poolKW poolStride1
+abbrev firstPoolOutWidth (inW kW stride1 padding1 poolKW poolStride1 : Nat) : Nat :=
+  poolOut (firstConvOutWidth inW kW stride1 padding1) poolKW poolStride1
 
 /-- Output height after the second convolution stage (after pool1). -/
-abbrev outH2 (inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 : Nat) : Nat :=
-  convOut (poolH1 inH kH stride1 padding1 poolKH poolStride1) kH stride2 padding2
+abbrev secondConvOutHeight (inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 : Nat) : Nat :=
+  convOut (firstPoolOutHeight inH kH stride1 padding1 poolKH poolStride1) kH stride2 padding2
 
 /-- Output width after the second convolution stage (after pool1). -/
-abbrev outW2 (inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 : Nat) : Nat :=
-  convOut (poolW1 inW kW stride1 padding1 poolKW poolStride1) kW stride2 padding2
+abbrev secondConvOutWidth (inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 : Nat) : Nat :=
+  convOut (firstPoolOutWidth inW kW stride1 padding1 poolKW poolStride1) kW stride2 padding2
 
 /-- Output height after the second pooling stage. -/
-abbrev poolH2 (inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 poolStride2 : Nat) : Nat
+abbrev secondPoolOutHeight (inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 poolStride2 : Nat) : Nat
   :=
-  poolOut (outH2 inH kH stride1 padding1 stride2 padding2 poolKH poolStride1) poolKH poolStride2
+  poolOut (secondConvOutHeight inH kH stride1 padding1 stride2 padding2 poolKH poolStride1) poolKH poolStride2
 
 /-- Output width after the second pooling stage. -/
-abbrev poolW2 (inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 poolStride2 : Nat) : Nat
+abbrev secondPoolOutWidth (inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 poolStride2 : Nat) : Nat
   :=
-  poolOut (outW2 inW kW stride1 padding1 stride2 padding2 poolKW poolStride1) poolKW poolStride2
+  poolOut (secondConvOutWidth inW kW stride1 padding1 stride2 padding2 poolKW poolStride1) poolKW poolStride2
 
 /-- Feature-map shape after the second pooling stage: `(c2, H2, W2)`. -/
 abbrev featShape
   (c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1 poolStride2 : Nat) :
     Shape :=
   Shape.dim c2
-    (.dim (poolH2 inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 poolStride2)
-      (.dim (poolW2 inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 poolStride2)
+    (.dim (secondPoolOutHeight inH kH stride1 padding1 stride2 padding2 poolKH poolStride1 poolStride2)
+      (.dim (secondPoolOutWidth inW kW stride1 padding1 stride2 padding2 poolKW poolStride1 poolStride2)
         .scalar))
 
 /-- Flattened feature size after the second pooling stage: `c2 * H2 * W2`. -/
@@ -197,15 +197,15 @@ def cnnWithReluSpec
   let relu1_module :=
     ReLUModuleSpec (α := α)
       (.dim outC
-        (.dim (CNN.outH1 inH kH stride1 padding1)
-          (.dim (CNN.outW1 inW kW stride1 padding1) .scalar)))
+        (.dim (CNN.firstConvOutHeight inH kH stride1 padding1)
+          (.dim (CNN.firstConvOutWidth inW kW stride1 padding1) .scalar)))
   let pool1_module := MaxPool2DModuleSpec pool1_spec
   let conv2_module := Conv2DModuleSpec conv2_spec
   let relu2_module :=
     ReLUModuleSpec (α := α)
       (.dim outC
-        (.dim (CNN.outH2 inH kH stride1 padding1 stride2 padding2 poolKH poolstride1)
-          (.dim (CNN.outW2 inW kW stride1 padding1 stride2 padding2 poolKW poolstride1) .scalar)))
+        (.dim (CNN.secondConvOutHeight inH kH stride1 padding1 stride2 padding2 poolKH poolstride1)
+          (.dim (CNN.secondConvOutWidth inW kW stride1 padding1 stride2 padding2 poolKW poolstride1) .scalar)))
   let pool2_module := MaxPool2DModuleSpec pool2_spec
   let flatten_module :=
     FlattenModuleSpec α (CNN.featShape outC inH inW kH kW stride1 padding1 stride2 padding2 poolKH
@@ -440,8 +440,8 @@ def CNN2Spec.backward
       cfg.poolKH cfg.poolKW cfg.poolStride1 cfg.poolStride2
 
   let d_p2 : Spec.MultiChannelImage cfg.c2
-      (CNN.poolH2 inH cfg.kH cfg.stride1 cfg.padding1 cfg.stride2 cfg.padding2 cfg.poolKH cfg.poolStride1 cfg.poolStride2)
-      (CNN.poolW2 inW cfg.kW cfg.stride1 cfg.padding1 cfg.stride2 cfg.padding2 cfg.poolKW cfg.poolStride1 cfg.poolStride2) α :=
+      (CNN.secondPoolOutHeight inH cfg.kH cfg.stride1 cfg.padding1 cfg.stride2 cfg.padding2 cfg.poolKH cfg.poolStride1 cfg.poolStride2)
+      (CNN.secondPoolOutWidth inW cfg.kW cfg.stride1 cfg.padding1 cfg.stride2 cfg.padding2 cfg.poolKW cfg.poolStride1 cfg.poolStride2) α :=
     Tensor.unflattenSpec featShape d_flat
 
   -- Pool2 backward.
@@ -456,8 +456,8 @@ def CNN2Spec.backward
     Spec.conv2dBackwardSpec (α := α)
       (inC := cfg.c1) (outC := cfg.c2) (kH := cfg.kH) (kW := cfg.kW)
       (stride := cfg.stride2) (padding := cfg.padding2)
-      (inH := (CNN.poolH1 inH cfg.kH cfg.stride1 cfg.padding1 cfg.poolKH cfg.poolStride1))
-      (inW := (CNN.poolW1 inW cfg.kW cfg.stride1 cfg.padding1 cfg.poolKW cfg.poolStride1))
+      (inH := (CNN.firstPoolOutHeight inH cfg.kH cfg.stride1 cfg.padding1 cfg.poolKH cfg.poolStride1))
+      (inW := (CNN.firstPoolOutWidth inW cfg.kW cfg.stride1 cfg.padding1 cfg.poolKW cfg.poolStride1))
       (h1 := hCfg.c1_ne0) (h2 := hCfg.kH_ne0) (h3 := hCfg.kW_ne0)
       m.conv2 p1 d_y2
 

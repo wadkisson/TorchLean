@@ -20,7 +20,7 @@ Trust boundary
 This is an *external oracle* unless you also check its outputs in Lean:
   Lean → (Python) → python-flint → (C) Arb/FLINT.
 
-Do NOT treat the returned bounds as trusted facts in proofs without a Lean-side checker.
+Do NOT treat the returned bounds as trusted facts in proofs without a Lean side checker.
 
 Scope (what this script does today)
 -----------------------------------

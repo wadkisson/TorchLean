@@ -14,12 +14,12 @@ public import NN.Examples.Interop.PyTorch.TorchExportCheck
 /-!
 # PyTorch Interop Examples
 
-Curated umbrella for PyTorch-facing examples.
+Curated umbrella for PyTorch interop examples.
 
 The folder has two paths:
 
 - `TorchExportCheck`: model-agnostic `nn.Module` graph capture into `torchlean.ir.v1`, followed by
-  Lean-side parsing, value-graph handling, and tensor-IR shape validation.
+  Lean side parsing, value-graph handling, and tensor-IR shape validation.
 - `Roundtrip`: small MLP/CNN/Transformer state-dict examples that generate/read JSON weights.
 
 The reusable bridge lives under `NN.Runtime.PyTorch`; this module only collects examples.

@@ -18,7 +18,7 @@ appending future tokens cannot change outputs already emitted for a prefix.
 We state the theorem at the list-runner level rather than for a particular CUDA kernel. Runtime
 implementations may use chunked or parallel selective scan, but they must refine these spec
 runners. Combined with `NN.MLTheory.StateSpace.diagonalSelectiveScan_append`, this gives the
-proof-facing contract for Mamba/S4-style causal sequence processing.
+proof layer contract for Mamba/S4-style causal sequence processing.
 
 References:
 * Albert Gu and Tri Dao, "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",

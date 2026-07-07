@@ -17,10 +17,10 @@ If the margin is larger than the rounding error budget, the property survives fi
 Recurring vocabulary:
 
 - `FP32`: TorchLean's proof model for binary32 style rounding on the reals.
-- `IEEE32Exec`: the executable IEEE-754 kernel, useful for checking actual bit behavior.
+- `IEEE32Exec`: the executable IEEE-754 kernel, used for checking actual bit behavior.
 - `bound/approximation theorem`: a theorem of the form "the float32 execution stays within `eps`
   of the real spec".
-- `soundness`: the claim that a proof side bound actually covers the runtime behavior being
+- `soundness`: the claim that a bound proved in Lean actually covers the runtime behavior being
   modeled.
 
 The guiding transfer lemma is simple:
@@ -29,7 +29,7 @@ The guiding transfer lemma is simple:
 - the real specification is above the target threshold by more than `ε`;
 - therefore the decoded FP32 result is still above the target threshold.
 
-A real-valued margin of `10^-4` is not useful if the Float32 error budget is `10^-3`. A real-valued
+A real-valued margin of `10^-4` does not help if the Float32 error budget is `10^-3`. A real-valued
 margin of `0.1` may survive the same rounding budget. The theorem has to say which case we are in.
 
 For example, suppose a real-valued verifier proves a margin lower bound of `0.12`. Suppose the FP32
@@ -39,7 +39,7 @@ classification claim survives rounding.
 
 # Finite Path First
 
-TorchLean deliberately separates two questions:
+TorchLean separates two questions:
 
 1. What happens on the ordinary finite path, where every operation produces a finite float32 value?
 2. What happens for every IEEE-754 corner case, including NaN, Inf, subnormal behavior, signed zero,
@@ -51,7 +51,7 @@ transfer theorems, forward error bounds, and verifier enclosure inflation. The e
 does. Bridge theorems and explicit assumptions connect the two where the finite side conditions are
 available.
 
-This is a practical mathematical choice. If every robustness theorem had to carry the full IEEE
+The split is a practical mathematical choice. If every robustness theorem had to carry the full IEEE
 state machine directly, most theorem statements would become harder to read than the property they
 are trying to prove.
 
@@ -59,7 +59,7 @@ The finite path includes normal values and subnormals. It excludes computations 
 path produces NaN or infinity. For example, a small underflowed subnormal output may still be a
 finite value covered by a finite-path theorem, while `0/0`, overflow to `Inf`, or `sqrt` of a
 negative finite value are handled by the executable `IEEE32Exec` layer and total `toReal?` bridge,
-not by pretending they are ordinary real numbers.
+where the special cases remain visible.
 
 # Proof Float32 Model
 
@@ -91,8 +91,7 @@ This division matters because paper claims usually want the cleanest theorem sta
 - the executable model gives a checkable implementation account,
 - and the bridge theorems say when the executable and proof views coincide on the finite path.
 
-So the relevant claim is never just "Float32 is close." It is a statement with an
-interpretation map:
+So the relevant claim is an interpretation statement, not the slogan "Float32 is close":
 
 $$`\operatorname{IEEE32Exec}
 \xrightarrow{\operatorname{toReal}}
@@ -114,11 +113,11 @@ enough to remain sound for float32 execution.
 Theorem names that tend to matter first in this area:
 
 - `approxT_linear_fp32`: float aware forward error for `y = Wx + b`
-- `approxT_tanhMlp3_fp32` / `approxT_reluMlp2_fp32`: float aware forward error for common MLP
+- `approxT_tanhMlp3_fp32` / `approxT_reluTwoLayerMlp_float32`: float aware forward error for common MLP
   patterns
 - `fp32_le_of_real_le_sub_margin` / `fp32_ge_of_real_ge_add_margin`: margin lemmas for lifting
   real-spec inequalities
-- `ibpBound_contains_reluMlp2_fp32`: inflate a real IBP/CROWN box to cover FP32 execution of the
+- `ibpBound_contains_reluTwoLayerMlp_float32`: inflate a real IBP/CROWN box to cover FP32 execution of the
   two-layer ReLU MLP fragment
 
 Behind those statements sit more generic rounded-runtime lemmas for operators and linear algebra.
@@ -149,16 +148,16 @@ open NN.Proofs.RuntimeApprox.FP32
 -- If the real valued network stays above a threshold by more than `eps`,
 -- then the FP32-rounded execution still stays above the threshold.
 #check approxT_linear_fp32
-#check approxT_reluMlp2_fp32
+#check approxT_reluTwoLayerMlp_float32
 #check approxT_tanhMlp3_fp32
-#check ibpBound_contains_reluMlp2_fp32
+#check ibpBound_contains_reluTwoLayerMlp_float32
 #check fp32_le_of_real_le_sub_margin
 #check fp32_ge_of_real_ge_add_margin
 ```
 
-That is the shape to keep in mind when reading the declarations. One theorem gives the approximation
-error, and another theorem uses that approximation error to preserve the property one actually
-cares about.
+Keep this shape in mind when reading the declarations. One theorem gives the approximation error,
+and another theorem uses that approximation error to preserve the property one actually cares
+about.
 
 The recurring scalar pattern is:
 
@@ -185,7 +184,7 @@ classes before concluding that the argmax is unchanged.
 
 # Template Statement
 
-The most useful mental model here is a transfer lemma with explicit side conditions:
+The template is a transfer lemma with explicit side conditions:
 
 > Assume a real valued network output stays above a threshold by margin `δ`.
 > Assume the corresponding FP32 execution stays within error `ε`.
@@ -197,7 +196,7 @@ TorchLean splits that argument into reusable pieces instead of reproving it from
 - one theorem packages verifier side enclosure inflation,
 - and one margin lemma moves the property across the `ε` gap.
 
-That is why this theorem family matters beyond small MLP examples. The same pattern shows up again
+This theorem family matters beyond small MLP examples. The same pattern shows up again
 in layerwise proofs, in verifier side corollaries, and in the kinds of robustness statements one
 would actually want to cite in a paper.
 
@@ -209,7 +208,7 @@ In theorem statements, this usually appears as three named ingredients:
 
 # A Concrete Linear Layer Walkthrough
 
-The linear theorem is the smallest useful example because it already has the same ingredients as a
+The linear theorem is the smallest example because it already has the same ingredients as a
 network:
 
 1. real tensors and real parameters define the ideal layer `y = Wx + b`;
@@ -227,9 +226,9 @@ open NN.Proofs.RuntimeApprox.FP32
 #check fp32_ge_of_real_ge_add_margin
 ```
 
-The important point is that the result is not "linear layers are close" as prose. The theorem names
-the input approximation, parameter approximation, output tolerance, and scalar semantics. Larger MLP
-and CROWN statements reuse that shape.
+The theorem is stronger than the prose claim "linear layers are close." It names the input
+approximation, parameter approximation, output tolerance, and scalar semantics. Larger MLP and CROWN
+statements reuse that shape.
 
 # How The FP32 Theorems Fit The Tensor Implementation
 
@@ -242,7 +241,7 @@ specifications used elsewhere in TorchLean:
 - `approxT` is the relation saying the interpreted runtime tensor is within a tolerance of the
   real tensor, componentwise in the relevant norm.
 
-The linear theorem is therefore a real implementation bridge, not just a scalar exercise:
+The linear theorem is therefore an implementation bridge for a full layer:
 
 ```
 import NN.Proofs.RuntimeApprox.FP32.Layers
@@ -261,7 +260,7 @@ import NN.Proofs.RuntimeApprox.FP32.MLP
 open NN.Proofs.RuntimeApprox.FP32
 
 -- Whole-network approximation statements for common examples.
-#check approxT_reluMlp2_fp32
+#check approxT_reluTwoLayerMlp_float32
 #check approxT_tanhMlp3_fp32
 ```
 
@@ -273,10 +272,10 @@ import NN.Proofs.RuntimeApprox.FP32.CROWN
 
 open NN.Proofs.RuntimeApprox.FP32
 
-#check ibpBound_contains_reluMlp2_fp32
+#check ibpBound_contains_reluTwoLayerMlp_float32
 ```
 
-That is the intended user workflow: train or import a model, lower or specify its tensor computation,
+The intended workflow is to train or import a model, lower or specify its tensor computation,
 prove/check a real valued enclosure, and then spend an explicit FP32 error budget to keep the
 checked claim connected to rounded execution.
 

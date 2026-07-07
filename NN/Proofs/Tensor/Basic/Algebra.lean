@@ -13,7 +13,7 @@ public import NN.Proofs.Tensor.Basic.BoundsNorms
 
 This file collects foundational algebraic lemmas for `Spec.Tensor`: extensionality, map/fold
 rewrites, and pointwise arithmetic facts used throughout the autograd and runtime-correctness proof
-stack.
+files.
 -/
 
 @[expose] public section

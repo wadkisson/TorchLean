@@ -272,8 +272,8 @@ def longest_path_len(nodes: set[str], edges: list[ImportEdge]) -> int | None:
     """Compute the longest direct-import chain, or `None` if the graph has a cycle.
 
     The “critical path” reported by this script is an approximate layering metric over
-    direct imports. It is not a theorem-dependency graph and should not be read
-    as a proof of semantic dependency between declarations.
+    direct imports. Semantic theorem dependencies require declaration-level proof data,
+    which this source-import scan intentionally does not compute.
     """
     outgoing: dict[str, list[str]] = defaultdict(list)
     indeg: Counter[str] = Counter()
@@ -457,6 +457,20 @@ def render_markdown(report: dict, *, max_findings: int) -> str:
     s = report["summary"]
     lines: list[str] = []
     lines.append("# TorchLean Dependency Audit")
+    lines.append("")
+    lines.append(
+        "This report measures the Lean import graph: which source modules import which other "
+        "modules. It is an architecture and maintenance artifact. It is not the runtime graph IR "
+        "used to represent neural-network computations, and it is not a declaration-level proof "
+        "dependency graph."
+    )
+    lines.append("")
+    lines.append(
+        "The audit is still useful for TorchLean because the library has intentional layer "
+        "boundaries: specifications should not depend on runtime backends, reusable runtime code "
+        "should not depend on examples, and broad imports should mostly stay at public entrypoints "
+        "or tutorial surfaces."
+    )
     lines.append("")
     lines.append(
         "Inspired by Li, Peng, Severini, and Shafto, "

@@ -14,8 +14,8 @@ public import Mathlib.Analysis.InnerProductSpace.PiL2
 # Orthonormality of the executable Gram–Schmidt `Q` factor (`Qᵀ Q = 1`)
 
 This file closes the one finite-fold property left open by
-[`NN.Proofs.Tensor.Basic.FactorizationsReconstruction`](FactorizationsReconstruction.lean): the
-orthonormality of the `Q` factor produced by the executable classical Gram–Schmidt `gramSchmidtFn`.
+`NN.Proofs.Tensor.Basic.FactorizationsReconstruction`: the orthonormality of the `Q` factor produced
+by the executable classical Gram–Schmidt `gramSchmidtFn`.
 
 The strategy is to **unify the executable variant with Mathlib's `gramSchmidt`** rather than re-derive
 the orthogonality induction by hand. Reading the columns of `A` as vectors of

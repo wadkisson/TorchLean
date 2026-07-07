@@ -17,7 +17,7 @@ public import NN.Floats.Interval.IEEEExec32
 This module is the foundation for TorchLean's explicit binary32 RL diagnostics. It defines the
 `IEEE32Exec` aliases used by the runtime and checks host `Float` values after casting to binary32.
 The checked arithmetic combinators live with the return/GAE recurrences in
-`NN.Runtime.RL.Numerics.Float32.Returns`, where the proof-side bridge lemmas unfold them.
+`NN.Runtime.RL.Numerics.Float32.Returns`, where the proof layer bridge lemmas unfold them.
 
 References: IEEE 754-2019 for binary32 arithmetic, IEEE 1788-2015 for interval endpoints, and
 Goldberg's floating-point survey for the practical motivation behind fail-fast finite checks.

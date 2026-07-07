@@ -35,7 +35,8 @@ This module ties the per-op correctness lemmas together into the recursive prese
 ## Main definitions
 
 - `buildFrom_preserves_denotation`: recursive preservation theorem for `buildFrom`.
-- `execGraphOfIR_semantics_eq`: end-to-end forward semantic equivalence theorem.
+- `execGraphOfIR_semantics_eq`: end-to-end forward semantic equivalence theorem for the named
+  supported fragment.
 
 ## Implementation notes
 
@@ -74,9 +75,8 @@ set_option maxHeartbeats 12000000 in
 Recursive semantic preservation lemma for `buildFrom`.
 
 If `buildFrom` successfully compiles the IR tail starting at node `i`, extending an existing
-  compiled
-prefix `st` to `st'`, then the IR evaluator `NN.IR.Graph.denoteAllFrom` produces exactly the same
-value table as `denoteAllState` for the compiled state.
+compiled prefix `st` to `st'`, then the IR evaluator `NN.IR.Graph.denoteAllFrom` produces exactly
+the same value table as `denoteAllState` for the compiled state, for the named supported fragment.
 
 This theorem is the workhorse behind `execGraphOfIR_semantics_eq`.
 -/
@@ -85,6 +85,7 @@ private theorem buildFrom_preserves_denotation
     (g : NN.IR.Graph) (payload : Payload α) {inShape : Shape}
     (i : Nat) (st st' : State α inShape)
     (hNoMSE : NoMSELoss g)
+    (hNoRawLog : NoRawLog g)
     (h : buildFrom (α := α) (g := g) (payload := payload) (inShape := inShape) (i := i) st = .ok
       st') :
     ∀ x : Tensor α inShape,
@@ -136,7 +137,7 @@ private theorem buildFrom_preserves_denotation
           -- discharge from the `hi : i < g.nodes.size` step-case hypothesis.
           simpa [input] using
             (buildFrom_preserves_denotation (α := α) (g := g) (payload := payload) (inShape := inShape)
-              (i := i + 1) (st := st1) (st' := st') hNoMSE hRec x)
+              (i := i + 1) (st := st1) (st' := st') hNoMSE hNoRawLog hRec x)
           all_goals
             simpa using Nat.sub_succ_lt_self (a := g.nodes.size) (i := i) hi
         -- Common tail step: unfold `denoteAllFrom` once, rewrite by the `evalAt` step result, then
@@ -278,9 +279,8 @@ private theorem buildFrom_preserves_denotation
                 (gd := gd) (i := i) (st' := st') (x := x) (n := n)
                 hN hk hi hBuild0 tail
           | log =>
-              exact buildFrom_denoteAllFrom_log (α := α) (g := g) (payload := payload)
-                (gd := gd) (i := i) (st' := st') (x := x) (n := n)
-                hN hk hi hBuild0 tail
+              have hImpossible : False := hNoRawLog i n hN hk
+              cases hImpossible
           | sin =>
               exact buildFrom_denoteAllFrom_sin (α := α) (g := g) (payload := payload)
                 (gd := gd) (i := i) (st' := st') (x := x) (n := n)
@@ -333,15 +333,17 @@ decreasing_by
   simpa using Nat.sub_succ_lt_self (a := g.nodes.size) (i := i) hi
 
 /--
-End-to-end semantic equivalence for successful IR compilation.
+End-to-end semantic equivalence for successful IR compilation over the named supported fragment.
 
 If `execGraphOfIR` returns an executable graph, evaluating that executable graph on any input
-matches the denotational semantics of the original IR graph.
+matches the denotational semantics of the original IR graph, provided the graph avoids operators
+whose current compiler proof needs extra side conditions.
 -/
 theorem execGraphOfIR_semantics_eq
     {α : Type} [Context α] [DecidableEq Shape]
     (g : NN.IR.Graph) (payload : Payload α) (exec : ExecGraphData α)
     (hNoMSE : NoMSELoss g)
+    (hNoRawLog : NoRawLog g)
     (h : execGraphOfIR (α := α) g payload = .ok exec) :
     ∀ x : Tensor α exec.inShape,
       NN.IR.Graph.denoteAll (α := α) (g := g) (payload := payload)
@@ -413,7 +415,7 @@ theorem execGraphOfIR_semantics_eq
                   (buildFrom_preserves_denotation (α := α) (g := g) (payload := payload) (inShape :=
                     n0.outShape)
                       (i := 1) (st := (⟨[], .nil⟩ : State α n0.outShape)) (st' := stFinal)
-                      hNoMSE hSt x)
+                      hNoMSE hNoRawLog hSt x)
               -- Now unfold `denoteAllFrom` at `i=0` and rewrite by `h0`/`hTail`.
               have hSize : 0 < g.nodes.size := by
                 -- If `g.nodes.size = 0`, `getNode 0` would be out of bounds.

@@ -1,22 +1,38 @@
 # `NN.Spec.Core`
 
-This directory defines the spec level core of TorchLean: shapes, scalar contexts, and a
-shape-indexed tensor type with the minimal set of operations we want to reason about (and, for
-executable scalar backends, also run).
+This directory is the spec-level core of TorchLean: shapes, scalar contexts, and shape-indexed
+tensors. It is the vocabulary used by layers, losses, graph semantics, runtime approximation
+theorems, and many verification statements.
 
-The code is organized by theme:
+The key idea is that a tensor carries more than a blob of numbers. Its shape, scalar
+interpretation, and allowed operations are part of the object being specified.
 
-- `context.lean`: the `Context` typeclass for scalar backends (algebraic ops, comparisons, casts).
-- `scalar.lean`: small scalar helpers and instances used across the spec layer.
-- `shape.lean`: the `Shape` datatype, axis validity, well formedness, and broadcasting evidence (`CanBroadcastTo`).
-- `tensor/`: the core tensor datatype and the most basic constructors/accessors and linear algebra primitives.
-- `tensor.lean`: umbrella import for the core tensor API (`tensor/Core`, `tensor/Constructors`, `tensor/Linalg`).
-- `tensor_ops.lean`: elementwise maps and pointwise tensor operations (no reductions).
-- `tensor_reduction_shape.lean`: reductions, reshape/flatten/unflatten, and other shape changing helpers.
-- `sequence.lean`: sequence helpers for common time and sequence axis patterns.
-- `tensor_array.lean`: array backed representations and helpers used by runtime/backends.
-- `tensor_grad.lean`: gradient helpers, such as gradient clipping specs.
-- `utils.lean`: small glue utilities (casting maps, `*_like` constructors, list↔tensor helpers, pretty printing).
+## Files
 
-Model and layer APIs live under `NN/Spec/Layers` and `NN/Spec/Models`, and are typically built using
-the primitives in this directory.
+- `Context.lean`: the `Context` typeclass for scalar backends: algebraic operations, comparisons,
+  casts, and the small amount of structure needed by specs.
+- `Scalar.lean`: scalar helpers and instances used across the spec layer.
+- `Shape.lean`: the `Shape` datatype, axis validity, well-formedness, and broadcasting evidence
+  such as `CanBroadcastTo`.
+- `Tensor/`: the core tensor datatype plus constructors, vector helpers, linear algebra, and
+  factorizations.
+- `Tensor.lean`: umbrella import for the core tensor API.
+- `TensorOps.lean`: elementwise maps and pointwise tensor operations.
+- `TensorReductionShape.lean` and `TensorReductionShape/`: reductions, reshape/flatten/unflatten,
+  concat/slice, broadcasting, and shape-changing helpers.
+- `Sequence.lean`: helpers for common time and sequence-axis patterns.
+- `TensorArray.lean`: array-backed representations and helpers used by runtime/backend code.
+- `TensorBridge.lean`: bridges between spec tensors and runtime layer tensor representations.
+- `TensorGrad.lean`: gradient-related specs, including clipping helpers.
+- `Complex.lean`: small complex-number support used by FFT/FNO-style specifications.
+- `Utils.lean`: glue utilities: casting maps, `*_like` constructors, list/tensor helpers, and
+  pretty-printing.
+
+Model and layer APIs live under `NN/Spec/Layers` and `NN/Spec/Models`. They should be built from
+these primitives rather than inventing a second tensor language.
+
+## Boundary
+
+This folder defines meanings, not fast kernels. Runtime code may execute the same operations over
+`Float`, `IEEE32Exec`, CUDA buffers, or external providers, but a theorem should say which spec
+object that runtime path is meant to approximate or preserve.

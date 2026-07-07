@@ -17,7 +17,12 @@ Grammar (informal):
   expr   := term (('+' | '-') term)*
   term   := factor ('*' factor)*
   factor := primary ('^' int)?
-  primary:= 'u' | 'ux' | 'uy' | 'uxx' | 'uyy' | number | ident | '(' expr ')'
+  primary:= derivative | number | ident | '(' expr ')'
+
+Derivative names accept both compact and subscript-style spellings:
+`u`, `ux`, `uy`, `ut`, `uxx`, `uyy`, `utt`, `u_x`, `u_y`, `u_t`, `u_xx`, `u_yy`, and `u_tt`.
+For 1D-in-time PINN examples, the parser treats `t` as the second axis, so `u_t` is the same
+primitive as `u_y`.
 
 Numbers are parsed as Floats. Idents look up a value from `env : String → Option Float`.
 Unsupported tokens produce an error.
@@ -136,6 +141,15 @@ def parseIdent (st : State) : Except String (String × State) := do
   let (txt, st1) := takeWhile (fun c => c.isAlpha || c.isDigit || c = '_' ) "" st
   if txt = "" then .error "expected identifier" else .ok (txt, st1)
 
+/-- Parse the built-in PDE primitive names before falling back to external constants. -/
+def builtinIdent? : String → Option Expr
+  | "u" => some .u
+  | "ux" | "u_x" => some (.du .X)
+  | "uy" | "ut" | "u_y" | "u_t" => some (.du .Y)
+  | "uxx" | "u_xx" => some (.d2u .X)
+  | "uyy" | "utt" | "u_yy" | "u_tt" => some (.d2u .Y)
+  | _ => none
+
 mutual
   /-- Parse an additive/subtractive expression with an explicit recursion budget. -/
   def parseExprCoreFuel (fuel : Nat) (env : String → Option Float) (st : State) : Except String
@@ -220,29 +234,17 @@ mutual
         | some ')' => .ok (e, bump st3)
         | _ => .error "expected ')'"
       | some c =>
-        if c = 'u' then
-          let st1 := bump st'
-          -- accept u / ux / uy / uxx / uyy
-          match peek st1 with
-          | some 'x' =>
-            let st2 := bump st1
-            match peek st2 with
-            | some 'x' => .ok (.d2u .X, bump st2)
-            | _ => .ok (.du .X, st2)
-          | some 'y' =>
-            let st2 := bump st1
-            match peek st2 with
-            | some 'y' => .ok (.d2u .Y, bump st2)
-            | _ => .ok (.du .Y, st2)
-          | _ => .ok (.u, st1)
-        else if c.isDigit || c = '.' || c = '-' then
+        if c.isDigit || c = '.' || c = '-' then
           let (v, st2) ← parseNumber st'
           .ok (.const v, st2)
         else if c.isAlpha then
           let (id, st2) ← parseIdent st'
-          match env id with
-          | some v => .ok (.const v, st2)
-          | none => .error s!"unknown identifier: {id}"
+          match builtinIdent? id with
+          | some e => .ok (e, st2)
+          | none =>
+              match env id with
+              | some v => .ok (.const v, st2)
+              | none => .error s!"unknown identifier: {id}"
         else
           .error s!"unexpected char: {c}"
       | none => .error "unexpected end of input"
@@ -255,7 +257,14 @@ def parseExprCore (env : String → Option Float) (st : State) : Except String (
 /-- Entry point: parse a string to Expr using `env` for identifiers. -/
 def parseExpr (env : String → Option Float) (s : String) : Except String Expr :=
   match parseExprCore env { s := s } with
-  | .ok (e, _) => .ok e
+  | .ok (e, st) =>
+      let st := skipWs st
+      if eof st then
+        .ok e
+      else
+        match peek st with
+        | some c => .error s!"unexpected trailing input near '{c}'"
+        | none => .error "unexpected trailing input"
   | .error msg => .error msg
 
 end NN.Verification.PINN.PdeParse

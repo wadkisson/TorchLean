@@ -9,7 +9,7 @@ module
 public import NN.MLTheory.CROWN.Models.Mlp
 
 /-!
-# Distillation / Equivalence certificates (MLP2)
+# Distillation / Equivalence certificates (TwoLayerMLP)
 
 This module adds a distillation-style certificate:
 
@@ -155,8 +155,8 @@ theorem boxContains_vecGet {n : Nat} {B : Box ℝ (.dim n .scalar)} {x : Tensor 
 Computable checker: returns `true` if IBP proves the student matches the teacher
 up to `eps` (componentwise) on the given input box.
 -/
-noncomputable def checkEquivalenceMlp2 {inDim hidDim outDim : Nat}
-    (teacher student : NN.MLTheory.CROWN.MLP2 ℝ inDim hidDim outDim)
+noncomputable def checkEquivalenceTwoLayerMlp {inDim hidDim outDim : Nat}
+    (teacher student : NN.MLTheory.CROWN.TwoLayerMLP ℝ inDim hidDim outDim)
     (xB : Box ℝ (.dim inDim .scalar))
     (eps : ℝ) : Bool :=
   let tB := NN.MLTheory.CROWN.boundIbp (α := ℝ) teacher xB
@@ -164,14 +164,14 @@ noncomputable def checkEquivalenceMlp2 {inDim hidDim outDim : Nat}
   checkBoxWithinAbs (n := outDim) (boxSub (n := outDim) tB sB) eps
 
 /--
-Soundness: if `checkEquivalence_mlp2` returns `true`, then for all inputs `x` in `xB`,
+Soundness: if `checkEquivalenceTwoLayerMlp` returns `true`, then for all inputs `x` in `xB`,
 the outputs are `eps`-close componentwise: `|T(x)_i - S(x)_i| ≤ eps`.
 -/
-theorem checkEquivalence_mlp2_sound {inDim hidDim outDim : Nat}
-    (teacher student : NN.MLTheory.CROWN.MLP2 ℝ inDim hidDim outDim)
+theorem checkEquivalence_twoLayerMlp_sound {inDim hidDim outDim : Nat}
+    (teacher student : NN.MLTheory.CROWN.TwoLayerMLP ℝ inDim hidDim outDim)
     (xB : Box ℝ (.dim inDim .scalar))
     (eps : ℝ)
-    (hcheck : checkEquivalenceMlp2 (inDim := inDim) (hidDim := hidDim) (outDim := outDim)
+    (hcheck : checkEquivalenceTwoLayerMlp (inDim := inDim) (hidDim := hidDim) (outDim := outDim)
       teacher student xB eps = true) :
     ∀ x : Tensor ℝ (.dim inDim .scalar),
       Box.contains (α := ℝ) xB x →
@@ -193,7 +193,7 @@ theorem checkEquivalence_mlp2_sound {inDim hidDim outDim : Nat}
               (NN.MLTheory.CROWN.boundIbp (α := ℝ) teacher xB)
               (NN.MLTheory.CROWN.boundIbp (α := ℝ) student xB))
             eps = true := by
-      simpa [checkEquivalenceMlp2] using hcheck
+      simpa [checkEquivalenceTwoLayerMlp] using hcheck
     exact (checkBoxWithinAbs_spec (n := outDim)
       (B := boxSub (n := outDim)
         (NN.MLTheory.CROWN.boundIbp (α := ℝ) teacher xB)

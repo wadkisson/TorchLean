@@ -29,8 +29,8 @@
       <a href="{{ '/' | relative_url }}" class="btn">Home</a>
       <a href="{{ '/blueprint/' | relative_url }}" class="btn">Guide</a>
       <a href="{{ '/examples/' | relative_url }}" class="btn">Examples</a>
+      <a href="{{ '/docs/' | relative_url }}" class="btn">API Reference</a>
       <a href="{{ '/updates/' | relative_url }}" class="btn">Updates</a>
-      <a href="{{ '/docs/' | relative_url }}" class="btn">API Docs</a>
       <a href="{{ '/graphs/' | relative_url }}" class="btn">Graphs</a>
       <button class="btn icon-btn search-open" type="button" data-search-open aria-label="Search">
         <svg aria-hidden="true" viewBox="0 0 24 24">
@@ -95,9 +95,14 @@
       <input
         class="search-input"
         type="search"
-        placeholder="Search guide, examples, API docs..."
+        placeholder="Search site pages..."
         autocomplete="off"
         data-search-input />
+      <div class="search-modes" role="tablist" aria-label="Search category">
+        <button class="search-mode active" type="button" role="tab" aria-selected="true" data-search-mode="site">Site pages</button>
+        <button class="search-mode" type="button" role="tab" aria-selected="false" data-search-mode="api">API declarations</button>
+      </div>
+      <a class="search-route" href="{{ '/docs/search.html' | relative_url }}" data-search-route>Search API declarations</a>
       <div class="search-results" data-search-results aria-live="polite"></div>
     </div>
   </div>

@@ -14,7 +14,7 @@ classical mathematical question: what functions can networks represent, and with
 
 The quantifiers are different in each setting:
 
-- *CROWN style verifier approximation*: one network, one input region, and sound bounds; the
+- *CROWN verifier approximation*: one network, one input region, and sound bounds; the
   artifact is a certificate over activations or margins.
 - *Runtime approximation*: one executable path compared with one specification path; the artifact
   is a tolerance proof for Float32 or `IEEE32Exec`.
@@ -98,7 +98,7 @@ The theorem shape is:
 $$`x\in\gamma(B)\quad\Longrightarrow\quad
 \operatorname{eval}(net,x)\in\gamma_I(\operatorname{evalSharp}(net,B))`
 
-That is the same soundness pattern as verification certificates, but here the carrier is finite
+This follows the same soundness pattern as verification certificates, but here the carrier is finite
 float semantics and interval images. The
 [exact image theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/ExactImageTheorem.lean)
 then states stronger exact image style conditions, including `ExactIntervalImage` and
@@ -106,7 +106,7 @@ then states stronger exact image style conditions, including `ExactIntervalImage
 [constant target example](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/ConstantTarget.lean)
 is the small case readers can use to see the definitions without the full network machinery.
 
-This is close in spirit to verification, but it is still a different layer. A verifier certificate
+This sits close to verification, but it is still a different layer. A verifier certificate
 usually checks a specific network on a specific input region. The approximation theory layer is
 about representability and semantic approximation statements.
 

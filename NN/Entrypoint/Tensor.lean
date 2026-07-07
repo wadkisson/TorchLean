@@ -13,10 +13,9 @@ public import NN.Tensor.API
 
 Curated umbrella import for TorchLean's core tensor/shape API.
 
-This is the stable subsystem import path for tensor literals, shape aliases, dynamic tensors, and
-small executable tensor helpers. `NN.Tensor.API` remains the implementation leaf; downstream users
-should prefer either `NN.Library` for the broad public surface or `NN.Entrypoint.Tensor` for just
-the tensor layer.
+Use this import for tensor literals, shape aliases, dynamic tensors, and small executable tensor
+helpers. `NN.Tensor.API` remains the implementation leaf; downstream users should prefer either
+`NN.Library` for the full public API or `NN.Entrypoint.Tensor` for the tensor layer alone.
 -/
 
 @[expose] public section

@@ -25,64 +25,75 @@ abbrev ParamTensors := TorchLean.ParamTensors
 namespace ParamTensors
 
 /-- Build a one-tensor parameter pack. -/
-def of1 {α : Type} {s1 : Shape}
-    (x1 : Tensor.T α s1) : ParamTensors α [s1] :=
-  tensorpack! x1
+def singleton {α : Type} {shape : Shape}
+    (value : Tensor.T α shape) : ParamTensors α [shape] :=
+  tensorpack! value
 
 /-- Unpack a one-tensor parameter pack. -/
-def unpack1 {α : Type} {s1 : Shape}
-    (xs : ParamTensors α [s1]) : Tensor.T α s1 :=
-  NN.API.tensorpack.unpack1 xs
+def unpackSingleton {α : Type} {shape : Shape}
+    (params : ParamTensors α [shape]) : Tensor.T α shape :=
+  NN.API.tensorpack.unpackSingleton params
 
 /-- Build a two-tensor parameter pack. -/
-def of2 {α : Type} {s1 s2 : Shape}
-    (x1 : Tensor.T α s1) (x2 : Tensor.T α s2) : ParamTensors α [s1, s2] :=
-  tensorpack! x1, x2
+def pair {α : Type} {leftShape rightShape : Shape}
+    (left : Tensor.T α leftShape) (right : Tensor.T α rightShape) :
+    ParamTensors α [leftShape, rightShape] :=
+  tensorpack! left, right
 
 /-- Unpack a two-tensor parameter pack. -/
-def unpack2 {α : Type} {s1 s2 : Shape}
-    (xs : ParamTensors α [s1, s2]) : Tensor.T α s1 × Tensor.T α s2 :=
-  NN.API.tensorpack.unpack2 xs
+def unpackPair {α : Type} {leftShape rightShape : Shape}
+    (params : ParamTensors α [leftShape, rightShape]) :
+    Tensor.T α leftShape × Tensor.T α rightShape :=
+  NN.API.tensorpack.unpackPair params
 
 /-- Build a three-tensor parameter pack. -/
-def of3 {α : Type} {s1 s2 s3 : Shape}
-    (x1 : Tensor.T α s1) (x2 : Tensor.T α s2) (x3 : Tensor.T α s3) :
-    ParamTensors α [s1, s2, s3] :=
-  tensorpack! x1, x2, x3
+def triple {α : Type} {firstShape secondShape thirdShape : Shape}
+    (first : Tensor.T α firstShape) (second : Tensor.T α secondShape)
+    (third : Tensor.T α thirdShape) :
+    ParamTensors α [firstShape, secondShape, thirdShape] :=
+  tensorpack! first, second, third
 
 /-- Unpack a three-tensor parameter pack. -/
-def unpack3 {α : Type} {s1 s2 s3 : Shape}
-    (xs : ParamTensors α [s1, s2, s3]) :
-    Tensor.T α s1 × Tensor.T α s2 × Tensor.T α s3 :=
-  NN.API.tensorpack.unpack3 xs
+def unpackTriple {α : Type} {firstShape secondShape thirdShape : Shape}
+    (params : ParamTensors α [firstShape, secondShape, thirdShape]) :
+    Tensor.T α firstShape × Tensor.T α secondShape × Tensor.T α thirdShape :=
+  NN.API.tensorpack.unpackTriple params
 
 /-- Build a four-tensor parameter pack. -/
-def of4 {α : Type} {s1 s2 s3 s4 : Shape}
-    (x1 : Tensor.T α s1) (x2 : Tensor.T α s2) (x3 : Tensor.T α s3) (x4 : Tensor.T α s4) :
-    ParamTensors α [s1, s2, s3, s4] :=
-  tensorpack! x1, x2, x3, x4
+def quad {α : Type} {firstShape secondShape thirdShape fourthShape : Shape}
+    (first : Tensor.T α firstShape) (second : Tensor.T α secondShape)
+    (third : Tensor.T α thirdShape) (fourth : Tensor.T α fourthShape) :
+    ParamTensors α [firstShape, secondShape, thirdShape, fourthShape] :=
+  tensorpack! first, second, third, fourth
 
 /-- Unpack a four-tensor parameter pack. -/
-def unpack4 {α : Type} {s1 s2 s3 s4 : Shape}
-    (xs : ParamTensors α [s1, s2, s3, s4]) :
-    Tensor.T α s1 × Tensor.T α s2 × Tensor.T α s3 × Tensor.T α s4 :=
-  NN.API.tensorpack.unpack4 xs
+def unpackQuad {α : Type} {firstShape secondShape thirdShape fourthShape : Shape}
+    (params : ParamTensors α [firstShape, secondShape, thirdShape, fourthShape]) :
+    Tensor.T α firstShape × Tensor.T α secondShape × Tensor.T α thirdShape × Tensor.T α fourthShape :=
+  NN.API.tensorpack.unpackQuad params
 
 /-- Build a seven-tensor parameter pack. -/
-def of7 {α : Type} {s1 s2 s3 s4 s5 s6 s7 : Shape}
-    (x1 : Tensor.T α s1) (x2 : Tensor.T α s2) (x3 : Tensor.T α s3) (x4 : Tensor.T α s4)
-    (x5 : Tensor.T α s5) (x6 : Tensor.T α s6) (x7 : Tensor.T α s7) :
-    ParamTensors α [s1, s2, s3, s4, s5, s6, s7] :=
-  tensorpack! x1, x2, x3, x4, x5, x6, x7
+def septuple {α : Type}
+    {firstShape secondShape thirdShape fourthShape fifthShape sixthShape seventhShape : Shape}
+    (first : Tensor.T α firstShape) (second : Tensor.T α secondShape)
+    (third : Tensor.T α thirdShape) (fourth : Tensor.T α fourthShape)
+    (fifth : Tensor.T α fifthShape) (sixth : Tensor.T α sixthShape)
+    (seventh : Tensor.T α seventhShape) :
+    ParamTensors α
+      [firstShape, secondShape, thirdShape, fourthShape, fifthShape, sixthShape, seventhShape] :=
+  tensorpack! first, second, third, fourth, fifth, sixth, seventh
 
 /-- Unpack a seven-tensor parameter pack. -/
-def unpack7 {α : Type} {s1 s2 s3 s4 s5 s6 s7 : Shape}
-    (xs : ParamTensors α [s1, s2, s3, s4, s5, s6, s7]) :
-    Tensor.T α s1 × Tensor.T α s2 × Tensor.T α s3 × Tensor.T α s4 ×
-      Tensor.T α s5 × Tensor.T α s6 × Tensor.T α s7 :=
-  match xs with
-  | .cons x1 (.cons x2 (.cons x3 (.cons x4 (.cons x5 (.cons x6 (.cons x7 .nil)))))) =>
-      (x1, x2, x3, x4, x5, x6, x7)
+def unpackSeptuple {α : Type}
+    {firstShape secondShape thirdShape fourthShape fifthShape sixthShape seventhShape : Shape}
+    (params : ParamTensors α
+      [firstShape, secondShape, thirdShape, fourthShape, fifthShape, sixthShape, seventhShape]) :
+    Tensor.T α firstShape × Tensor.T α secondShape × Tensor.T α thirdShape ×
+      Tensor.T α fourthShape × Tensor.T α fifthShape × Tensor.T α sixthShape ×
+      Tensor.T α seventhShape :=
+  match params with
+  | .cons first (.cons second (.cons third (.cons fourth (.cons fifth (.cons sixth (.cons seventh .nil)))))) =>
+      (first, second, third, fourth, fifth, sixth, seventh)
 
 end ParamTensors
 

@@ -27,5 +27,5 @@ Torch-style runtime front-end for eager execution, compiled wrappers, and traini
 - `Core.Functional`: backend-generic `Ops` interface and curried syntax.
 - `Core.Trainer`: `Ops` instances, parameter packs, and scalar trainer construction.
 
-Most callers can import this module directly and let it bring the Torch runtime surface into scope.
+Most callers can import this module directly to bring the Torch runtime API into scope.
 -/

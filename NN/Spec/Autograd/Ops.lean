@@ -645,30 +645,30 @@ def squeezeColOp {n : Nat} {s : Shape} :
 
 /-- Concatenate along the leading dimension with a captured RHS, returning the gradient slice for
 the LHS input. -/
-def concatDim0LeftOp {n m : Nat} {s : Shape}
+def concatLeadingAxisLeftOp {n m : Nat} {s : Shape}
   (rhs : Tensor α (.dim m s)) :
   OpSpec α (.dim n s) (.dim (n + m) s) :=
-{ forward      := fun lhs => concatDim0Spec lhs rhs
+{ forward      := fun lhs => concatLeadingAxisSpec lhs rhs
 , backward     := fun _lhs dLdz =>
-    sliceRange0Spec (α:=α) (n := n + m) (s := s) 0 n (by
+    sliceLeadingAxisRangeSpec (α:=α) (n := n + m) (s := s) 0 n (by
       simp) dLdz }
 
 /-- Concatenate along the leading dimension with a captured LHS, returning the gradient slice for
 the RHS input. -/
-def concatDim0RightOp {n m : Nat} {s : Shape}
+def concatLeadingAxisRightOp {n m : Nat} {s : Shape}
   (lhs : Tensor α (.dim n s)) :
   OpSpec α (.dim m s) (.dim (n + m) s) :=
-{ forward      := fun rhs => concatDim0Spec lhs rhs
+{ forward      := fun rhs => concatLeadingAxisSpec lhs rhs
 , backward     := fun _rhs dLdz =>
-    sliceRange0Spec (α:=α) (n := n + m) (s := s) n m (by
+    sliceLeadingAxisRangeSpec (α:=α) (n := n + m) (s := s) n m (by
       rw [Nat.add_comm m n]) dLdz }
 
 /-- Slice a leading-axis range; backward inserts the upstream gradient into the original shape. -/
-def sliceRange0Op {n : Nat} {s : Shape}
+def sliceLeadingAxisRangeOp {n : Nat} {s : Shape}
   (start len : Nat) (h : len + start ≤ n) :
   OpSpec α (.dim n s) (.dim len s) :=
-{ forward      := fun x => sliceRange0Spec (α:=α) (n := n) (s := s) start len h x
-, backward     := fun _x dLdy => sliceRange0BackwardSpec (α:=α) (n := n) (s := s) start len h dLdy }
+{ forward      := fun x => sliceLeadingAxisRangeSpec (α:=α) (n := n) (s := s) start len h x
+, backward     := fun _x dLdy => sliceLeadingAxisRangeBackwardSpec (α:=α) (n := n) (s := s) start len h dLdy }
 
 /-! ## Reductions and broadcasting -/
 

@@ -31,71 +31,71 @@ open NN.MLTheory.Proofs.UniversalApproximation
 open NN.MLTheory.Proofs.ReLUMlpBridge
 
 /-- `TensorVec` specialized to the 2D (rank-2) tensor-vector shape. -/
-abbrev TensorVec2 : Type := TensorVec 2
+abbrev PlaneTensorVec : Type := TensorVec 2
 
-/-- First coordinate projection `x ↦ x0` for `TensorVec2`. -/
-noncomputable def x0 (x : TensorVec2) : ℝ := toVec x ⟨0, by decide⟩
+/-- First coordinate projection for `PlaneTensorVec`. -/
+noncomputable def firstCoordinate (x : PlaneTensorVec) : ℝ := toVec x ⟨0, by decide⟩
 
-/-- Second coordinate projection `x ↦ x1` for `TensorVec2`. -/
-noncomputable def x1 (x : TensorVec2) : ℝ := toVec x ⟨1, by decide⟩
+/-- Second coordinate projection for `PlaneTensorVec`. -/
+noncomputable def secondCoordinate (x : PlaneTensorVec) : ℝ := toVec x ⟨1, by decide⟩
 
-/-- The closed box domain `[-M,M] × [-M,M]` inside `TensorVec2`. -/
-noncomputable def box (M : ℝ) : Set TensorVec2 :=
-  fun x => x0 x ∈ Set.Icc (-M) M ∧ x1 x ∈ Set.Icc (-M) M
+/-- The closed box domain `[-M,M] × [-M,M]` inside `PlaneTensorVec`. -/
+noncomputable def box (M : ℝ) : Set PlaneTensorVec :=
+  fun x => firstCoordinate x ∈ Set.Icc (-M) M ∧ secondCoordinate x ∈ Set.Icc (-M) M
 
-/-- The target multiplication map `x ↦ x0 * x1`. -/
-noncomputable def mulFun (x : TensorVec2) : ℝ := x0 x * x1 x
+/-- The target multiplication map: multiply the two coordinates. -/
+noncomputable def mulFun (x : PlaneTensorVec) : ℝ := firstCoordinate x * secondCoordinate x
 
-/-- Ridge direction with `dot wPlus x = x0 + x1`. -/
+/-- Ridge direction with `dot wPlus x` equal to the sum of the two coordinates. -/
 noncomputable def wPlus : Fin 2 → ℝ := fun _ => 1
 
-/-- Ridge direction with `dot wMinus x = x0 - x1`. -/
+/-- Ridge direction with `dot wMinus x` equal to the first coordinate minus the second. -/
 noncomputable def wMinus : Fin 2 → ℝ := fun i => if i.1 = 0 then 1 else (-1 : ℝ)
 
-/-- Evaluate the ridge `wPlus`: `dot wPlus x = x0 + x1`. -/
-lemma dot_wPlus (x : TensorVec2) : dot wPlus x = x0 x + x1 x := by
+/-- Evaluate the ridge `wPlus`: it sums the two coordinates. -/
+lemma dot_wPlus (x : PlaneTensorVec) : dot wPlus x = firstCoordinate x + secondCoordinate x := by
   classical
   -- Expand the `Fin 2` sum explicitly.
-  simp [dot, wPlus, x0, x1, Fin.sum_univ_two]
+  simp [dot, wPlus, firstCoordinate, secondCoordinate, Fin.sum_univ_two]
 
-/-- Evaluate the ridge `wMinus`: `dot wMinus x = x0 - x1`. -/
-lemma dot_wMinus (x : TensorVec2) : dot wMinus x = x0 x - x1 x := by
+/-- Evaluate the ridge `wMinus`: `dot wMinus x = the first coordinate minus secondCoordinate`. -/
+lemma dot_wMinus (x : PlaneTensorVec) : dot wMinus x = firstCoordinate x - secondCoordinate x := by
   classical
-  simp [dot, wMinus, x0, x1, Fin.sum_univ_two, sub_eq_add_neg]
+  simp [dot, wMinus, firstCoordinate, secondCoordinate, Fin.sum_univ_two, sub_eq_add_neg]
 
 /-- Algebraic identity expressing multiplication via a difference of squares. -/
 lemma mul_identity (x y : ℝ) : x * y = ((x + y) * (x + y) - (x - y) * (x - y)) / 4 := by
   ring
 
 /-- Unpack the defining bounds of membership in `box M`. -/
-lemma box_bounds {M : ℝ} (_hM : 0 ≤ M) {x : TensorVec2} (hx : x ∈ box M) :
-    x0 x ∈ Set.Icc (-M) M ∧ x1 x ∈ Set.Icc (-M) M := hx
+lemma box_bounds {M : ℝ} (_hM : 0 ≤ M) {x : PlaneTensorVec} (hx : x ∈ box M) :
+    firstCoordinate x ∈ Set.Icc (-M) M ∧ secondCoordinate x ∈ Set.Icc (-M) M := hx
 
-/-- If `x ∈ box M`, then the ridge input `x0 + x1` lies in `[-2M, 2M]`. -/
-lemma sum_mem_Icc {M : ℝ} (_hM : 0 ≤ M) {x : TensorVec2} (hx : x ∈ box M) :
+/-- If `x ∈ box M`, then the ridge input `the first coordinate plus secondCoordinate` lies in `[-2M, 2M]`. -/
+lemma sum_mem_Icc {M : ℝ} (_hM : 0 ≤ M) {x : PlaneTensorVec} (hx : x ∈ box M) :
     dot wPlus x ∈ Set.Icc (-2*M) (2*M) := by
   have hx0 := hx.1
   have hx1 := hx.2
-  have hx0l : -M ≤ x0 x := hx0.1
-  have hx0u : x0 x ≤ M := hx0.2
-  have hx1l : -M ≤ x1 x := hx1.1
-  have hx1u : x1 x ≤ M := hx1.2
+  have hx0l : -M ≤ firstCoordinate x := hx0.1
+  have hx0u : firstCoordinate x ≤ M := hx0.2
+  have hx1l : -M ≤ secondCoordinate x := hx1.1
+  have hx1u : secondCoordinate x ≤ M := hx1.2
   -- bounds on sum
-  have hl : -(2*M) ≤ x0 x + x1 x := by linarith
-  have hu : x0 x + x1 x ≤ 2*M := by linarith
+  have hl : -(2*M) ≤ firstCoordinate x + secondCoordinate x := by linarith
+  have hu : firstCoordinate x + secondCoordinate x ≤ 2*M := by linarith
   simpa [dot_wPlus] using And.intro hl hu
 
-/-- If `x ∈ box M`, then the ridge input `x0 - x1` lies in `[-2M, 2M]`. -/
-lemma diff_mem_Icc {M : ℝ} (_hM : 0 ≤ M) {x : TensorVec2} (hx : x ∈ box M) :
+/-- If `x ∈ box M`, then the ridge input `the first coordinate minus secondCoordinate` lies in `[-2M, 2M]`. -/
+lemma diff_mem_Icc {M : ℝ} (_hM : 0 ≤ M) {x : PlaneTensorVec} (hx : x ∈ box M) :
     dot wMinus x ∈ Set.Icc (-2*M) (2*M) := by
   have hx0 := hx.1
   have hx1 := hx.2
-  have hx0l : -M ≤ x0 x := hx0.1
-  have hx0u : x0 x ≤ M := hx0.2
-  have hx1l : -M ≤ x1 x := hx1.1
-  have hx1u : x1 x ≤ M := hx1.2
-  have hl : -(2*M) ≤ x0 x - x1 x := by linarith
-  have hu : x0 x - x1 x ≤ 2*M := by linarith
+  have hx0l : -M ≤ firstCoordinate x := hx0.1
+  have hx0u : firstCoordinate x ≤ M := hx0.2
+  have hx1l : -M ≤ secondCoordinate x := hx1.1
+  have hx1u : secondCoordinate x ≤ M := hx1.2
+  have hl : -(2*M) ≤ firstCoordinate x - secondCoordinate x := by linarith
+  have hu : firstCoordinate x - secondCoordinate x ≤ 2*M := by linarith
   simpa [dot_wMinus] using And.intro hl hu
 
 /-- Lipschitz bound for `square` on `[-R,R]`: `|x^2 - y^2| ≤ (2R) * |x - y|`. -/
@@ -150,7 +150,7 @@ noncomputable def mat1Get {n : Nat} (A : Tensor ℝ (.dim 1 (.dim n .scalar))) (
     | .dim cols => (cols j).toScalar
 
 /-- `mat1_get` agrees with the `matrixMN` constructor. -/
-lemma mat1_get_matrixMN {n : Nat} (f : Fin 1 → Fin n → ℝ) (j : Fin n) :
+lemma singleRowMatrix_get_matrixMN {n : Nat} (f : Fin 1 → Fin n → ℝ) (j : Fin n) :
     mat1Get (matrixMN 1 n (fun i j => f i j)) j = f 0 j := by
   simp [mat1Get, matrixMN, Tensor.toScalar]
 
@@ -238,7 +238,7 @@ lemma mat_vec_mul_spec_oneRow {n : Nat} (A : Tensor ℝ (.dim 1 (.dim n .scalar)
         simp [vfun, vecGet, Tensor.toScalar, hvj]
   -- Rewrite and apply the general lemma.
   rw [hA, hv]
-  simpa [c, vfun, mat1_get_matrixMN, vecGet, Tensor.toScalar] using
+  simpa [c, vfun, singleRowMatrix_get_matrixMN, vecGet, Tensor.toScalar] using
     (mat_vec_mul_spec_matrixMN_vector (m := 1) (n := n) (c := c) (v := vfun))
 
 /--
@@ -276,14 +276,14 @@ lemma mlp_eval_nd_eq_bias_sum
     -- `Spec.linear_spec` unfolds to a `Tensor.map2_spec` term; rewrite `hmv` to match that form.
     have hmv' : Spec.matVecMulSpec l2.weights
         (Activation.reluSpec (α := ℝ) (s := .dim hidDim .scalar)
-          (Tensor.map2Spec (fun x1 x2 ↦ x1 + x2) (Spec.matVecMulSpec l1.weights x) l1.bias))
+          (Tensor.map2Spec (fun secondCoordinate x2 ↦ secondCoordinate + x2) (Spec.matVecMulSpec l1.weights x) l1.bias))
         =
         Tensor.dim (fun _ : Fin 1 =>
           Tensor.scalar (∑ j : Fin hidDim,
             mat1Get l2.weights j *
               vecGet
                 (Activation.reluSpec (α := ℝ) (s := .dim hidDim .scalar)
-                  (Tensor.map2Spec (fun x1 x2 ↦ x1 + x2) (Spec.matVecMulSpec l1.weights x)
+                  (Tensor.map2Spec (fun secondCoordinate x2 ↦ secondCoordinate + x2) (Spec.matVecMulSpec l1.weights x)
                     l1.bias))
                 j)) := by
       simpa [Spec.linearSpec, Spec.Tensor.addSpec, Spec.Tensor.map2Spec] using hmv
@@ -402,7 +402,7 @@ theorem mlp_eval_append_linear
               j)))
     -- Rewrite the `castAdd` / `natAdd` branches using the selector lemmas above.
     -- `combineOutput` uses `Fin.addCases` in its weights.
-    simpa [combineOutput, mat1_get_matrixMN, relu,
+    simpa [combineOutput, singleRowMatrix_get_matrixMN, relu,
       vec_get_linear_spec_append_left (l1a := l1a) (l1b := l1b) (x := x),
       vec_get_linear_spec_append_right (l1a := l1a) (l1b := l1b) (x := x),
       Fin.addCases_left, Fin.addCases_right, mul_assoc, mul_left_comm, mul_comm] using hsum
@@ -474,7 +474,7 @@ theorem relu_mul_universal_approximation_box
     convert h using 1; ring
   rcases relu_universal_approximation_Icc (f := fun u => u*u) (a := -2*M) (b := 2*M) (L := 4*M)
       h_ab hL h_lip δ hδ with ⟨hidSq, l1Sq, l2Sq, hSq⟩
-  -- Step 2: lift to `u = x0+x1` and `u = x0-x1`.
+  -- Step 2: lift to `u = firstCoordinate+secondCoordinate` and `u = firstCoordinate-secondCoordinate`.
   let l1Plus : LinearSpec ℝ 2 hidSq := liftLayer1From1d (n := 2) l1Sq wPlus 0
   let l1Minus : LinearSpec ℝ 2 hidSq := liftLayer1From1d (n := 2) l1Sq wMinus 0
   -- Step 3: combine the two lifted square nets to form a product approximator.
@@ -518,7 +518,7 @@ theorem relu_mul_universal_approximation_box
   -- Expand `mulFun` and rewrite the network output using `hcomb` and the lift equalities.
   have hmul : mulFun x = ((dot wPlus x) * (dot wPlus x) - (dot wMinus x) * (dot wMinus x)) / 4 := by
     -- Convert to scalar coordinates and use the algebraic identity.
-    have := mul_identity (x0 x) (x1 x)
+    have := mul_identity (firstCoordinate x) (secondCoordinate x)
     -- Rewrite `x+y` / `x-y` as `dot` expressions.
     simpa [mulFun, dot_wPlus, dot_wMinus, sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using
       this

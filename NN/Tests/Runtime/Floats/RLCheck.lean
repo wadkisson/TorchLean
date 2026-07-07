@@ -42,7 +42,7 @@ def run : IO Unit := do
       assertApprox "discounted return[2]" g2 3.0 1e-6
   | _ => throw <| IO.userError "discounted returns length mismatch"
 
-  let rewardsVec : Tensor Float (.dim 3 .scalar) := Spec.fromList1d [1.0, 2.0, 3.0]
+  let rewardsVec : Tensor Float (.dim 3 .scalar) := Spec.vectorFromList [1.0, 2.0, 3.0]
   let returnsVec := Runtime.RL.Core.discountedReturnsVec (α := Float) 0.5 rewardsVec
   assertApprox "discountedReturnsVec[0]" (Tensor.vecGet returnsVec ⟨0, by decide⟩) 2.75 1e-6
   assertApprox "discountedReturnsVec[1]" (Tensor.vecGet returnsVec ⟨1, by decide⟩) 3.5 1e-6
@@ -80,10 +80,10 @@ def run : IO Unit := do
   | .ok _ => throw <| IO.userError "expected Float→IEEE32Exec cast to reject huge value"
   | .error _ => pure ()
 
-  let gaeRewards : Tensor Float (.dim 3 .scalar) := Spec.fromList1d [1.0, 1.0, 1.0]
+  let gaeRewards : Tensor Float (.dim 3 .scalar) := Spec.vectorFromList [1.0, 1.0, 1.0]
   let gaeValues : Tensor Float (.dim 3 .scalar) := fill 0 (.dim 3 .scalar)
   let gaeNext : Tensor Float (.dim 3 .scalar) := fill 0 (.dim 3 .scalar)
-  let gaeDones : Tensor Bool (.dim 3 .scalar) := Spec.fromList1d [false, false, false]
+  let gaeDones : Tensor Bool (.dim 3 .scalar) := Spec.vectorFromList [false, false, false]
 
   -- Run PPO-relevant transforms (TD residual, GAE, z-score normalization, PPO clip objective).
   let one32 : Runtime.RL.Numerics.Float32.Float32Exec ←
@@ -178,9 +178,9 @@ def run : IO Unit := do
     (get2 q1 ⟨0, by decide⟩ ⟨1, by decide⟩) 0.5 1e-6
 
   let qPred : Tensor Float (.dim 3 .scalar) :=
-    Spec.fromList1d [1.0, 2.0, 0.5]
+    Spec.vectorFromList [1.0, 2.0, 0.5]
   let qNext : Tensor Float (.dim 3 .scalar) :=
-    Spec.fromList1d [0.1, 1.4, 0.3]
+    Spec.vectorFromList [0.1, 1.4, 0.3]
   let dqnTarget := Runtime.RL.ValueLearning.dqnTarget (α := Float) 1.0 0.9 false qNext
   assertApprox "dqn target" dqnTarget 2.26 1e-6
   let dqnLoss := Runtime.RL.ValueLearning.dqnMSELoss qPred ⟨1, by decide⟩ 1.0 0.9 false qNext
@@ -188,8 +188,8 @@ def run : IO Unit := do
 
   -- Replay + minibatch DQN layer: store typed transitions, sample deterministically, and compute
   -- the same DQN loss through caller-provided Q-functions.
-  let obs2 : Tensor Float (.dim 2 .scalar) := Spec.fromList1d [0.0, 1.0]
-  let nextObs2 : Tensor Float (.dim 2 .scalar) := Spec.fromList1d [1.0, 0.0]
+  let obs2 : Tensor Float (.dim 2 .scalar) := Spec.vectorFromList [0.0, 1.0]
+  let nextObs2 : Tensor Float (.dim 2 .scalar) := Spec.vectorFromList [1.0, 0.0]
   let tr0 : Runtime.RL.Core.Transition Float (.dim 2 .scalar) 3 :=
     { state := obs2
       action := ⟨1, by decide⟩
@@ -209,7 +209,7 @@ def run : IO Unit := do
   let soft := Runtime.RL.DQN.softUpdateScalar (α := Float) 0.1 10.0 0.0
   assertApprox "soft target update" soft 1.0 1e-6
 
-  let logits : Tensor Float (.dim 2 .scalar) := Spec.fromList1d [0.0, 1.0]
+  let logits : Tensor Float (.dim 2 .scalar) := Spec.vectorFromList [0.0, 1.0]
   let logp := Runtime.RL.PolicyGradient.actionLogProbability (α := Float) logits ⟨1, by decide⟩
   assertBool "log-prob should be finite" (!Float.isNaN logp)
   let ppoObj := Runtime.RL.PolicyGradient.ppoClippedObjective (α := Float) logits ⟨1, by decide⟩
@@ -220,7 +220,7 @@ def run : IO Unit := do
   let a2cLoss := Runtime.RL.PolicyGradient.a2cLoss (α := Float) logits ⟨1, by decide⟩
     1.0 0.2 0.5 1.0 0.01
   assertBool "a2c loss should be finite" (!Float.isNaN a2cLoss)
-  let qForPolicy : Tensor Float (.dim 2 .scalar) := Spec.fromList1d [0.1, 0.8]
+  let qForPolicy : Tensor Float (.dim 2 .scalar) := Spec.vectorFromList [0.1, 0.8]
   let sacActor := Runtime.RL.PolicyGradient.sacCategoricalActorLoss (α := Float)
     logits qForPolicy ⟨1, by decide⟩ 0.2
   assertBool "sac categorical actor loss should be finite" (!Float.isNaN sacActor)

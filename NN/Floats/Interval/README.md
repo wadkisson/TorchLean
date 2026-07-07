@@ -1,4 +1,4 @@
-# Interval arithmetic (`NN/Floats/Interval`)
+# Interval Arithmetic (`NN/Floats/Interval`)
 
 This folder collects interval and enclosure utilities that sit between:
 
@@ -6,8 +6,8 @@ This folder collects interval and enclosure utilities that sit between:
 - executable bit-level kernels (`NN/Floats/IEEEExec`), and
 - external validated numerics backends (`NN/Floats/Arb`).
 
-The interval layer supports bound propagation (IBP/CROWN style) and numerical soundness envelopes
-reusable across the codebase, while keeping the trust boundary explicit.
+The interval layer supports bound propagation, numerical soundness envelopes, and executable
+endpoint checks reusable across the codebase, while keeping the trust boundary explicit.
 
 ## Files
 
@@ -24,7 +24,7 @@ reusable across the codebase, while keeping the trust boundary explicit.
   dyadic rounding), used by the interval soundness proofs.
 - `IEEEExec32AddSoundness.lean`: enclosure theorems for executable interval `add/sub/neg` in the
   finite regime.
-- `IEEEExec32MinMaxSoundness.lean`: small lemmas computing `toReal` semantics of the `min4/max4`
+- `IEEEExec32MinMaxSoundness.lean`: small lemmas computing `toReal` semantics of the `minOfFour/maxOfFour`
   helpers (finite regime).
 - `IEEEExec32MulSoundness.lean`: enclosure theorem for executable interval multiplication
   (`Interval32.mul`) via the 4-corner rule.
@@ -36,12 +36,32 @@ reusable across the codebase, while keeping the trust boundary explicit.
 - `IEEEExec32ArbTrans.lean`: Arb-backed interval endpoints for `tanh/exp/log/sqrt` on `Interval32`,
   returning outward-rounded float32 endpoints while keeping the transcendental soundness boundary
   explicit (oracle).
-- Arb-backed comparison workflows live under `NN/Examples/Advanced/Floats/`.
+- Arb-backed comparison workflows live under `NN/Examples/DeepDives/Floats/`.
+
+## Which Interval Layer To Use
+
+- Use `Quantized.lean` when the proof should be about outward-rounded real intervals on a discrete
+  grid.
+- Use `FP32.lean` when the result is an enclosure for the proof-oriented `FP32` rounded-real model.
+- Use `IEEEExec32.lean` and the `IEEEExec32*Soundness.lean` files when the interval endpoints are
+  executable binary32 values and the theorem should mention `IEEE32Exec` behavior.
+- Use `IEEEExec32ArbTrans.lean` when the endpoint computation for a transcendental depends on the
+  Arb/python-flint oracle.
+
+The final bullet is intentionally different from the others: Arb-backed endpoints are useful and
+often rigorous in practice, but the Lean claim must name the oracle boundary unless a separate
+certificate checker has discharged it.
 
 ## Running an example workflow
 
 ```bash
 lake exe torchlean floats_arb_ieee_compare
+```
+
+For a lower-level runtime comparison without the Arb oracle, use:
+
+```bash
+lake exe torchlean float32_modes
 ```
 
 ## References

@@ -59,7 +59,7 @@ def batchNorm2dNchwEvalTensor {α : Type} [Context α]
 /--
 Coordinate-level semantics for `Graph.evalBatchNorm2DNchwEval`.
 
-This is the proof-facing version of the BatchNorm parity test: the payload-backed IR evaluator is
+This is the proof layer version of the BatchNorm parity test: the payload-backed IR evaluator is
 definitionally the channel-wise eval-mode BatchNorm equation over NCHW tensors.
 -/
 theorem evalBatchNorm2DNchwEval_eq_nchw_formula

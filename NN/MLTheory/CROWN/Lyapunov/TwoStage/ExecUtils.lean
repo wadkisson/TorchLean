@@ -57,8 +57,8 @@ def defaultEpsCheck : α := nat 1 / nat 10
 def clamp (lo hi x : α) : α :=
   if x < lo then lo else if x > hi then hi else x
 
-/-- Clamp a 2D state vector to `[lo, hi]^2`. -/
-def clampVec2 (lo hi : α) (x : Tensor α Core.xShape) : Tensor α Core.xShape :=
+/-- Clamp the two-dimensional state vector to `[lo, hi]^2`. -/
+def clampStateVector (lo hi : α) (x : Tensor α Core.xShape) : Tensor α Core.xShape :=
   Tensor.dim (fun i =>
     let xi := Tensor.vecGet x i
     Tensor.scalar (clamp lo hi xi))
@@ -80,11 +80,11 @@ def lcgU24 (s : UInt64) : UInt64 × Nat :=
   (s', u.toNat)
 
 /-- Convert a 24-bit integer `u ∈ [0, 2^24)` to a scalar in `[0,1)`. -/
-def u01 (u : Nat) : α :=
+def unitIntervalSample (u : Nat) : α :=
   (u : α) / ((0x1000000 : Nat) : α) -- divide by 2^24
 
-/-- Build a length-2 state vector. -/
-def vec2 (x1 x2 : α) : Tensor α Core.xShape :=
+/-- Build a state vector for the two-dimensional Lyapunov example. -/
+def stateVector (x1 x2 : α) : Tensor α Core.xShape :=
   Tensor.dim (n := Core.xDim) (s := .scalar) (fun i =>
     Tensor.scalar <|
       match i.val with
@@ -92,15 +92,15 @@ def vec2 (x1 x2 : α) : Tensor α Core.xShape :=
       | _ => x2)
 
 /-- Sample a point uniformly from `[-rad, rad]^2` using a deterministic PRNG seed. -/
-def sampleVec2 (seed : UInt64) (rad : α) : UInt64 × Tensor α Core.xShape :=
+def sampleStateVector (seed : UInt64) (rad : α) : UInt64 × Tensor α Core.xShape :=
   let (s1, u1) := lcgU24 seed
   let (s2, u2) := lcgU24 s1
-  let r1 : α := u01 u1
-  let r2 : α := u01 u2
+  let firstUniform : α := unitIntervalSample u1
+  let secondUniform : α := unitIntervalSample u2
   let two : α := nat 2
   let one : α := nat 1
-  let x1 := (two * r1 - one) * rad
-  let x2 := (two * r2 - one) * rad
-  (s2, vec2 x1 x2)
+  let x1 := (two * firstUniform - one) * rad
+  let x2 := (two * secondUniform - one) * rad
+  (s2, stateVector x1 x2)
 
 end NN.MLTheory.CROWN.Lyapunov.TwoStage.ExecUtils

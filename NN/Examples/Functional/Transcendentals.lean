@@ -7,9 +7,10 @@ Authors: TorchLean Team
 module
 
 public import NN
+public import NN.Proofs.Autograd.FDeriv.Elementwise
 
 /-!
-# Functional transcendentals + scalar-affine: autograd correctness
+# Functional transcendentals + scalar-affine: proofs and runtime regression checks
 
 Positive / negative example for the `nn.functional.{exp, log, scale, shift, affine}`
 ops added for scientific forward models — e.g. the soil-moisture retrieval that
@@ -19,8 +20,20 @@ whose surface term is `exp(-2·b·NDVI)·c·|R|²`.
 
 The point is that these ops are differentiated by the **autograd engine**, so a
 forward model written once yields its gradient with no hand-coded derivative.
-Each check differentiates a tiny function and compares the autograd gradient to
-the closed form:
+This file has two layers:
+
+* a proof layer handle for the real-valued `exp` op, using
+  `Proofs.Autograd.OpSpecFDerivCorrect.exp` and the generic
+  `backward_eq_adjoint_fderiv` theorem;
+* runtime regression checks that differentiate tiny Float functions and compare the
+  autograd gradient to the closed form.
+
+The runtime checks below are not the proof. They make sure the executable tape path used by
+scientific examples still follows the expected derivative numerically. The proof layer declarations
+show where the corresponding theorem-backed op-spec story lives.
+
+Each runtime check differentiates a tiny function and compares the autograd gradient to the closed
+form:
 
 * positive controls — the gradient matches the analytic value;
 * negative controls — a deliberately *wrong* analytic value (notably the
@@ -43,21 +56,49 @@ open Tensor
 open NN.Tensor
 open NN.API
 
+/-! ## Proof objects and runtime checks -/
+
+noncomputable section
+
+/--
+The theorem-backed real-valued exp op used by the proof layer.
+
+This is the actual proof layer object: it packages the forward op, its JVP, a Fréchet-derivative
+candidate, and the theorem that the JVP is the true derivative. The runtime checks below exercise
+the executable Float tape; this declaration points to the corresponding real-valued theorem.
+-/
+def expProofSurface : Proofs.Autograd.OpSpecFDerivCorrect 1 1 :=
+  Proofs.Autograd.OpSpecFDerivCorrect.exp (n := 1)
+
+/--
+For scalar exp over `ℝ`, the proved backward rule is the adjoint of the Fréchet derivative.
+
+This is the theorem-level statement that the executable regression check is meant to complement.
+-/
+theorem expBackward_eq_adjoint_fderiv
+    (x δ : Spec.Tensor ℝ (.dim 1 .scalar)) :
+    Proofs.Autograd.toVecE (expProofSurface.correct.op.backward x δ) =
+      Proofs.Autograd.vjp expProofSurface.forwardVec (Proofs.Autograd.toVecE x)
+        (Proofs.Autograd.toVecE δ) :=
+  Proofs.Autograd.OpSpecFDerivCorrect.backward_eq_adjoint_fderiv expProofSurface x δ
+
+end
+
 /-! ## Functions under test (written once; gradients come from autograd) -/
 
 /-- `f(x) = eˣ`. -/
-def expFn : autograd.fn1.Fn Spec.Shape.scalar Spec.Shape.scalar :=
+def expFn : autograd.func.Fn Spec.Shape.scalar Spec.Shape.scalar :=
   fun x => nn.functional.exp x
 
 /-- `f(x) = e^{-2x}` — the shape of the AVS canopy two-way transmittance as a
 function of the attenuation parameter. -/
-def expNeg2Fn : autograd.fn1.Fn Spec.Shape.scalar Spec.Shape.scalar :=
+def expNegativeTwoFn : autograd.func.Fn Spec.Shape.scalar Spec.Shape.scalar :=
   fun x => do
     let u ← nn.functional.scale x (-Numbers.two)
     nn.functional.exp u
 
 /-- `f(x) = 3·x + 1` via the scalar-affine op. -/
-def affineFn : autograd.fn1.Fn Spec.Shape.scalar Spec.Shape.scalar :=
+def affineFn : autograd.func.Fn Spec.Shape.scalar Spec.Shape.scalar :=
   fun x => nn.functional.affine x Numbers.three Numbers.one
 
 /-! ## Float checks -/
@@ -80,10 +121,10 @@ def expectNot (name : String) (got wrong : Float) (tol : Float := 1e-6) : IO Uni
     IO.println s!"[PASS-NEG] {name}: grad = {got} ≠ {wrong} (test discriminates)"
 
 /-- Differentiate a scalar→scalar `Fn` at a Float point, returning the gradient. -/
-def gradAt (f : autograd.fn1.Fn Spec.Shape.scalar Spec.Shape.scalar) (x0 : Float) :
+def gradAt (f : autograd.func.Fn Spec.Shape.scalar Spec.Shape.scalar) (x0 : Float) :
     IO Float := do
   let x : Spec.Tensor Float Spec.Shape.scalar := Spec.fill (x0 : Float) Spec.Shape.scalar
-  let g ← autograd.fn1.grad (α := Float) f x
+  let g ← autograd.func.grad (α := Float) f x
   pure (Spec.toScalarSpec g)
 
 def checkAll : IO Unit := do
@@ -98,7 +139,7 @@ def checkAll : IO Unit := do
   expectNot  "affine≠1"       ga 1.0              -- the slope is 3, not 1
 
   -- exp(-2x):  d/dx e^{-2x} = -2·e^{-2x}
-  let gn ← gradAt expNeg2Fn 0.5
+  let gn ← gradAt expNegativeTwoFn 0.5
   expectGrad "exp(-2x)"      gn ((-2.0) * Float.exp (-1.0))
   -- THE AVS bug class: the wrong-SIGN analytic (+2·e^{-2x}) must NOT match.
   expectNot  "exp(-2x) sign" gn (( 2.0) * Float.exp (-1.0))

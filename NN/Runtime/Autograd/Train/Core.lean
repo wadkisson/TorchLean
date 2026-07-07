@@ -112,7 +112,7 @@ The SGD helper is the same formula as the canonical pure optimizer.
 
 We keep `sgdUpdateTensor` because it has a small algebraic signature (`Sub`/`Mul`) that is convenient
 in tests, but this theorem pins it to the canonical optimizer equation used by the runtime
-optimizer stack.
+optimizer layer.
 -/
 theorem sgdUpdateTensor_eq_optimSGD {a : Type} [Context a]
     [DecidableRel ((· > ·) : a → a → Prop)] {s : Shape}

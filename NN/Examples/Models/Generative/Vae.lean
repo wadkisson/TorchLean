@@ -55,7 +55,7 @@ abbrev τ := nn.models.vectorVaeOutShape cfg
 Trainable VAE-style vector model.
 
 The executable target is still an MSE-style supervised sample; the imported spec/theory files state
-the theorem-facing VAE objective separately.
+the VAE objective separately.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
   nn.models.VectorVAE cfg

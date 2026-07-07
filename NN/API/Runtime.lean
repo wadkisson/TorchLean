@@ -17,7 +17,7 @@ public import NN.API.Runtime.Training
 /-!
 # TorchLean Runtime Facade
 
-`NN.API.Runtime` exposes the executable runtime surface under `NN.API.TorchLean`: tensor
+`NN.API.Runtime` exposes the executable runtime API under `NN.API.TorchLean`: tensor
 primitives, functional ops, losses, optimizer configs, sequential model APIs, module execution,
 autograd, supervised training, and session-level tools.
 

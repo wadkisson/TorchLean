@@ -4,10 +4,96 @@ layout: default
 usemathjax: true
 ---
 
-<meta http-equiv="refresh" content="0; url={{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}">
-
 # CUDA
 
-CUDA docs now live in the Guide.
+CUDA is a runtime path, not a separate mathematical model. When CUDA is enabled, TorchLean can use
+native GPU kernels for selected tensor operations while the graph IR, verification artifacts, and
+proof statements keep their own stated semantics and assumptions.
 
-[Open GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }})
+The rule is simple:
+
+- the spec layer owns the mathematical meaning;
+- the TorchLean runtime owns the graph/tape node and backward rule used for training;
+- CUDA owns selected Float32 kernels, device buffers, launches, and library calls;
+- tests, sanitizer runs, and trust-boundary docs say what evidence supports the native path.
+
+The distinction matters because "ran on GPU" is not the same statement as "proved correct." CUDA can
+make training and inference realistic without making the CUDA machine code part of Lean's kernel.
+
+## Build and Run
+
+Build with CUDA support:
+
+```bash
+lake build -K cuda=true
+```
+
+Run a small CUDA example:
+
+```bash
+lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 100
+```
+
+Run a broader CUDA regression pass:
+
+```bash
+scripts/checks/example_regression.sh --cuda
+```
+
+Run the CUDA sanitizer suite when changing native kernels:
+
+```bash
+scripts/checks/cuda_sanitize_tests.sh --all-tools
+```
+
+## What CUDA Covers
+
+The CUDA path is used for supported Float32 tensor operations: elementwise arithmetic, reductions,
+matmul/cuBLAS paths, convolution/pooling kernels, shape/view operations, attention kernels, FFT/FNO
+support where enabled, and model examples that choose `--cuda` or `--fast-kernels`.
+
+The public API should still look like one model with a backend choice. A user should not need a
+separate "CUDA forward" function in ordinary code. The backend changes where supported kernels run;
+it should not silently change tensor shapes, graph identities, mask semantics, parameter layout, or
+the theorem statement attached to a checker.
+
+## Training Boundary
+
+For training, TorchLean must keep the derivative story visible. A fast native kernel may compute a
+forward value, but the operation still has to be represented in TorchLean's tape or graph and use
+the TorchLean backward rule. If a kernel cannot preserve that relation yet, the training path should
+fall back to the TorchLean-native operation for that case.
+
+The same rule explains the ATen/libtorch boundary. ATen can provide fast forward kernels, but handing
+backward to an external autograd tape changes the proof boundary.
+
+## Determinism and Evidence
+
+Some CUDA reduction and backward paths use floating-point accumulation. Because Float32 addition is
+not associative, atomic accumulation can be schedule-dependent. TorchLean also provides an opt-in
+deterministic reductions mode for the covered reduction, gather/scatter, and pooling-backward paths:
+
+```lean
+let _ := Runtime.Autograd.Cuda.Buffer.setDeterministicReductionsChecked true
+```
+
+or:
+
+```bash
+TORCHLEAN_CUDA_DETERMINISTIC_REDUCTIONS=1 lake exe -K cuda=true torchlean mlp --cuda
+```
+
+Evidence levels should be stated carefully:
+
+| Statement | Meaning |
+| --- | --- |
+| CUDA example ran | The native runtime path executed for that command. |
+| CUDA parity/regression test passed | Tested kernels matched reference cases on the exercised inputs. |
+| cuda-memcheck passed | The sanitizer did not find the checked memory/synchronization issue class on that suite. |
+| Lean theorem applies | A Lean theorem connects Lean side specifications, graph semantics, or certificate checks. |
+| Native kernel verified | A theorem about the native CUDA implementation itself, rather than only the Lean side spec or boundary contract. |
+
+For the full explanation, read
+[GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+For the public runtime choice, read
+[Backend Selection and Trust]({{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}).

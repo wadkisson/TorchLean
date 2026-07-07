@@ -30,6 +30,27 @@ $$`\text{theorem} : \text{kernel-checked proof connecting the two}`
 TorchLean does not pull all numerical computing into Lean. It puts the semantic object in Lean,
 then makes every handoff to Python, CUDA, Julia, Arb, or a verifier explicit enough to inspect.
 
+# One Language, Several Kinds Of Object
+
+Lean code can introduce ordinary executable definitions, propositions, and theorems. The distinction
+matters throughout TorchLean.
+
+```
+def executableScore (x : Nat) : Nat :=
+  x + 1
+
+def scoreIsPositive (x : Nat) : Prop :=
+  executableScore x > 0
+
+theorem scoreIsPositive_zero : scoreIsPositive 0 := by
+  decide
+```
+
+The first definition is a program. The second definition is a proposition about that program. The
+third declaration proves one instance of the proposition. When the guide talks about a verifier,
+this is the shape to remember: a checker can be executable code, while soundness is a theorem about
+what acceptance by that checker means.
+
 # Lean In Mathematics
 
 Over the last few years, Lean has become increasingly visible in research mathematics. Projects such
@@ -40,6 +61,12 @@ Today, *Mathlib*, Lean's community-driven mathematical library, is among the lar
 mathematical repositories in existence. Lean also appears in theorem-proving research because its
 kernel gives a small trusted base. When Lean accepts a theorem, the proof term has been checked by
 that kernel.
+
+That kernel check is narrower and stronger than a test. It does not say an external CUDA kernel is
+correct, or that a dataset file is clean, or that a model is accurate. It says that the proof term
+for a stated proposition typechecks in Lean's trusted core. TorchLean uses that strength where it
+fits: semantic preservation, shape theorems, derivative statements, bound soundness, and
+approximation results for supported fragments.
 
 The relevance for TorchLean is not that neural networks are pure mathematics in the usual textbook
 sense. It is that the same ecosystem that supports large formal libraries can also support reusable
@@ -61,21 +88,38 @@ Lean 4 made a few engineering choices that matter for TorchLean:
 TorchLean uses those properties to bring Lean's strengths into scientific computing. The same
 artifact can support computation, gradients, graph extraction, and formal reasoning.
 
-The FFI part is useful, but it is also a boundary. A call into C, CUDA, Python, Julia, Arb, or
-another numerical library can be part of a workflow, but it is not automatically proof evidence.
-The TorchLean pattern is to import a result through a small typed interface, check whatever can be
-checked in Lean, and state the remaining external assumption clearly. That is the difference between
-"we called a tool" and "we have a theorem about the artifact we imported."
+The FFI part matters, but it is also a boundary. A call into C, CUDA, Python, Julia, Arb, or another
+numerical library can be part of a workflow; proof evidence appears when the result crosses a small
+typed interface, Lean checks the relevant predicate, and the remaining external assumption is stated
+clearly. The difference is between "we called a tool" and "we have a theorem about the artifact we
+imported."
 
 A Python test can tell us that a script behaved a certain way on a finite set of examples. A Lean
 theorem can state a quantified property of the object being checked. TorchLean needs both kinds of
 evidence. The reason to host the semantic core in Lean is that definitions, executable checkers, and
 theorem statements can share names rather than being synchronized by prose.
 
-External verifiers remain useful. Many optimizers and solvers belong outside Lean. The
+External verifiers still belong in the story. Many optimizers and solvers belong outside Lean. The
 host-language choice is about where the final claim is stated. A solver can produce a certificate;
 Lean can parse it, check it against the graph semantics, and record the theorem or assumption that
 follows.
+
+# Executable Lean And Native Boundaries
+
+Lean 4 can compile programs and run command-line tools, so TorchLean examples are not limited to
+static proof scripts. But "Lean executed this command" and "Lean proved this native computation
+correct" are different sentences.
+
+For example, a command can load a file:
+
+```
+def readCheckpointManifest (path : System.FilePath) : IO String := do
+  IO.FS.readFile path
+```
+
+The type says this is an effectful action. A later pure function may parse the string into a
+structured payload and check names or shapes. A theorem may then talk about the parser or checker.
+The file system itself remains an external source of bytes.
 
 # Reading The Lean Snippets
 
@@ -106,9 +150,24 @@ def scaleThenShift (a b x : Float) : Float :=
   a * x + b
 ```
 
-This looks ordinary because it is ordinary executable code. Its usefulness for TorchLean comes from
-the fact that Lean can also ask for its type, unfold its definition in a proof, or compile it as part
-of a program.
+This looks ordinary because it is ordinary executable code. For TorchLean, the extra value is that
+Lean can also ask for its type, unfold its definition in a proof, or compile it as part of a program.
+
+## `structure` names a payload
+Model code usually needs bundles of related values. Lean structures make those bundles explicit.
+
+```
+structure LinearParams1D where
+  weight : Float
+  bias : Float
+
+def runLinear1D (p : LinearParams1D) (x : Float) : Float :=
+  p.weight * x + p.bias
+```
+
+This tiny structure is the same design idea as a parameter store: the numbers used by the forward
+pass are named data. A theorem or checker can mention `p.weight` and `p.bias` directly, instead of
+reconstructing them from a mutable object.
 
 ## Tensor shapes can appear in types
 In Python, a tensor's type is usually just `Tensor`; the shape is checked dynamically, if it is
@@ -137,8 +196,13 @@ is a different type from
 $$`\operatorname{Tensor}(\mathrm{Float}, [3,224,224])`.
 
 If the program really wants to remove a batch dimension, add one, broadcast, or reshape, that move
-should appear as a named operation. This is a practical design choice: deployment bugs often come
-from silent shape conventions, so TorchLean tries to make those conventions inspectable.
+should appear as a named operation. The choice is practical: deployment bugs often come from silent
+shape conventions, so TorchLean tries to make those conventions inspectable.
+
+The shape in the type is not a runtime benchmark. It is a contract. A typed tensor can still contain
+bad values for a particular task: NaNs, out-of-range token ids, a misnormalized image, or labels
+encoded under the wrong convention. Types catch dimensional mistakes; task-specific predicates and
+checkers handle the next layer of meaning.
 
 ## `let` creates a local binding
 By default, `let` bindings in Lean do not change. Once a value is bound, it is permanent for that
@@ -159,8 +223,8 @@ def updateWeight (eta grad w : Float) : Float :=
   w - eta * grad
 ```
 
-The point is not syntax. The point is that a theorem about the training step can name exactly which
-weights were used before the update and which weights were produced after it.
+The syntax matters less than the object it names. A theorem about the training step can say exactly
+which weights were used before the update and which weights were produced after it.
 
 ## `#check` and `#eval` are your microscope
 Lean is heavily interactive. Your IDE runs the Lean server continuously. If you type `#check`, Lean
@@ -199,8 +263,26 @@ TorchLean relies on this distinction. A model denotation should be a pure object
 theorem. Loading a checkpoint, calling a native kernel, or writing a log is an effectful action whose
 boundary should be visible.
 
+## `Prop` and theorem statements are ordinary citizens
+A proposition is a type whose values are proofs. That is why a theorem can be used by later code and
+later proofs as a named object.
+
+```
+def IsNonnegative (x : Int) : Prop :=
+  x >= 0
+
+theorem zero_nonnegative : IsNonnegative 0 := by
+  decide
+```
+
+TorchLean theorem statements are larger, but they follow the same idea. A graph soundness theorem
+might say that an accepted certificate encloses all values of a denotation. A runtime approximation
+theorem might say that an executable float result lies inside a rounding envelope. The theorem's
+type records the hypotheses; the proof term records why the conclusion follows.
+
 ## Further reading
 
 - Lean documentation hub (including how to cite Lean 4): https://lean-lang.org/learn/
+- Lean 4 system paper: https://lean-lang.org/papers/lean4.pdf
 - Liquid Tensor Experiment blueprint: https://leanprover-community.github.io/liquid/
 - Mathlib (Lean's main community library): https://github.com/leanprover-community/mathlib4

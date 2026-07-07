@@ -15,7 +15,7 @@ public import NN.Proofs.Tensor.Basic
 This file proves the exact Boolean semantics of TorchLean's causal and future masks and connects
 those mask facts to the true hard-masked attention primitive.
 
-TorchLean's main attention spec uses the proof-facing semantics corresponding to
+TorchLean's main attention spec uses the proof layer semantics corresponding to
 `scores.masked_fill(~mask, -torch.inf)`: blocked entries receive zero softmax numerator, hence zero
 attention mass.
 

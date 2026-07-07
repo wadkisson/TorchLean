@@ -34,13 +34,13 @@ open NN.IR
 
 /-- Compile a TorchLean forward model (single distinguished input) to both IR and executable SSA
   graph. -/
-def compileForward1Exec
+def compileForwardExec
     {α : Type} [Context α] [DecidableEq Shape]
     {paramShapes : List Shape} {inShape outShape : Shape}
     (model : Runtime.Autograd.TorchLean.Program α (paramShapes ++ [inShape]) outShape)
     (params : Runtime.Autograd.Torch.TList α paramShapes) :
     Except String (CompiledIR α × Runtime.Autograd.Compiled.ExecGraphData α) := do
-  let c ← compileForward1 (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape :=
+  let c ← compileForward (α := α) (paramShapes := paramShapes) (inShape := inShape) (outShape :=
     outShape) model params
   let payload : Payload α := payloadOfParamStore (α := α) c.ps
   let exec ← Runtime.Autograd.Compiled.execGraphOfIR (α := α) c.graph payload

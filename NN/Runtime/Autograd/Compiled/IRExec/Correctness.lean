@@ -33,6 +33,8 @@ imported here.
 ## Main definitions
 
 - `NoMSELoss`: side condition used by the semantic equivalence theorem to state its exact fragment.
+- `NoRawLog`: side condition for the current theorem fragment, until raw-log positivity is carried
+  through the end-to-end compiler proof.
 - Per-operator compiler-step lemmas from `...Correctness.Ops`.
 
 ## Implementation notes

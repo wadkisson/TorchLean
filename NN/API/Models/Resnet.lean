@@ -50,12 +50,12 @@ def ResnetConfig.stage2C (cfg : ResnetConfig) : Nat :=
   cfg.stemC * 2
 
 /-- Spatial height after the downsampling block. -/
-def ResnetConfig.h2 (cfg : ResnetConfig) : Nat :=
-  nn.blocks.down2 cfg.inH
+def ResnetConfig.downsampledHeight (cfg : ResnetConfig) : Nat :=
+  nn.blocks.strideTwoOutput cfg.inH
 
 /-- Spatial width after the downsampling block. -/
-def ResnetConfig.w2 (cfg : ResnetConfig) : Nat :=
-  nn.blocks.down2 cfg.inW
+def ResnetConfig.downsampledWidth (cfg : ResnetConfig) : Nat :=
+  nn.blocks.strideTwoOutput cfg.inW
 
 /-- Batched image input shape for the ResNet helper. -/
 abbrev resnetInShape (cfg : ResnetConfig) : Shape :=
@@ -92,20 +92,20 @@ def resnet (cfg : ResnetConfig)
 
   let hb : cfg.batch > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := cfg.batch))
   let hc : cfg.stage2C > 0 := Nat.pos_of_ne_zero (NeZero.ne (n := cfg.stage2C))
-  let hh2 : cfg.h2 > 0 := by
-    simp [ResnetConfig.h2]
-  let hw2 : cfg.w2 > 0 := by
-    simp [ResnetConfig.w2]
+  let hDownsampledHeight : cfg.downsampledHeight > 0 := by
+    simp [ResnetConfig.downsampledHeight]
+  let hDownsampledWidth : cfg.downsampledWidth > 0 := by
+    simp [ResnetConfig.downsampledWidth]
 
-  let pool : nn.Sequential (NN.Tensor.Shape.Images cfg.batch cfg.stage2C cfg.h2 cfg.w2)
+  let pool : nn.Sequential (NN.Tensor.Shape.Images cfg.batch cfg.stage2C cfg.downsampledHeight cfg.downsampledWidth)
       (NN.Tensor.Shape.Mat cfg.batch cfg.stage2C) :=
-    nn.globalAvgPoolNCHW cfg.batch cfg.stage2C cfg.h2 cfg.w2
-      (hN := hb) (hC := hc) (hH := hh2) (hW := hw2)
+    nn.globalAvgPoolNCHW cfg.batch cfg.stage2C cfg.downsampledHeight cfg.downsampledWidth
+      (hN := hb) (hC := hc) (hH := hDownsampledHeight) (hW := hDownsampledWidth)
 
   nn.Sequential![
     -- Use the ResNet helper conv so the output shape is definitionally `H×W` (not a conv-formula
     -- expression), while still allocating seeds from the `nn.M` seed stream.
-    withSeeds2 (fun seedK seedB =>
+    withSeedPair (fun seedK seedB =>
       _root_.NN.API.nn.pure.blocks.conv3x3SameImages (n := cfg.batch) (inC := cfg.inC) (outC := cfg.stemC)
         (h := cfg.inH) (w := cfg.inW) (seedK := seedK) (seedB := seedB)
         (kInit := .uniform (-0.1) 0.1)),

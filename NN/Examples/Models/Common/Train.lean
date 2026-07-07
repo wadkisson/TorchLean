@@ -33,7 +33,7 @@ def runParsedWith {φ ρ : Type}
     (train : Options → φ → IO ρ)
     (finish : Options → φ → ρ → IO Unit) :
     IO UInt32 :=
-  ModelZoo.runFloat exeName args
+  Runtime.runFloat exeName args
     (banner := banner)
     (k := fun opts rest => do
       let (flags, rest) ← ModelZoo.orThrow exeName <| parseFlags rest
@@ -130,7 +130,8 @@ def usage {δ : Type} (cfg : Config δ) : String :=
     [ s!"{cfg.exeName}: {cfg.description}"
     , ""
     , "Usage:"
-    , s!"  lake exe torchlean {cfg.exeName.drop 10} [--cpu|--cuda] [data flags] [training flags]"
+    , s!"  lake exe torchlean {cfg.exeName.drop 10} --cpu [data flags] [training flags]"
+    , s!"  lake exe -K cuda=true torchlean {cfg.exeName.drop 10} --cuda [data flags] [training flags]"
     , ""
     , "Common training flags:"
     , s!"  --steps N          optimizer updates (default: {cfg.defaultSteps})"
@@ -145,7 +146,7 @@ def run {δ : Type} (cfg : Config δ) (args : List String) : IO UInt32 := do
   if args.contains "--help" || args.contains "-h" then
     IO.println (usage cfg)
     return 0
-  ModelZoo.runFloat cfg.exeName args
+  Runtime.runFloat cfg.exeName args
     (banner := ModelZoo.bannerWithDevice cfg.exeName cfg.description)
     (k := fun opts rest => do
       let (dataArgs, rest) ← ModelZoo.orThrow cfg.exeName <| cfg.parseData rest
