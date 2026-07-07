@@ -81,6 +81,10 @@ instance {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [Decidable
     Internal.EagerSession.gatherVecNat (α := α) sess (n := n) (k := k) x idx
   gatherRowsNat := fun {rows cols k} x idx => fun sess =>
     Internal.EagerSession.gatherRowsNat (α := α) sess (rows := rows) (cols := cols) (k := k) x idx
+  -- Eager execution can inspect concrete float input values, so it is the backend that validates
+  -- token-id batches before embedding lookup or cross entropy.
+  tokenIdsFromFloatVec := fun {k} x => fun sess =>
+    Internal.EagerSession.tokenIdsFromFloatVec (α := α) sess (k := k) x
   scatterAddVec := fun {n} x v i => fun sess =>
     Internal.EagerSession.scatterAddVec (α := α) sess (n := n) x v i
   scatterAddRow := fun {rows cols} x v i => fun sess =>
@@ -245,6 +249,10 @@ instance {α : Type} [Context α] [DecidableEq Shape] {Γ : List Shape} :
   gatherRowsNat := fun {rows cols k} x idx =>
     Runtime.Autograd.Compiled.GraphM.gatherRowsNat (α := α) (Γ := Γ) (rows := rows) (cols := cols)
       (k := k) x idx
+  -- Dynamic token-id parsing reads runtime tensor contents. The compiled graph builder records
+  -- symbolic tensor operations, so this adapter must stay on the eager path for now.
+  tokenIdsFromFloatVec := fun {_k} _x =>
+    throw "compiled GraphM: tokenIdsFromFloatVec requires eager backend (dynamic token ids)"
   scatterAddVec := fun {n} x v i =>
     Runtime.Autograd.Compiled.GraphM.scatterAddVec (α := α) (Γ := Γ) (n := n) x v i
   scatterAddRow := fun {rows cols} x v i =>

@@ -487,9 +487,13 @@ The returned `TensorRef` is the handle you pass to ops. The leaf id is stored in
 optimizer steps (e.g. SGD) can update parameters after `backward`.
 PyTorch comparison: like using a `torch.nn.Parameter` in a forward pass (it becomes a leaf in the
 autograd graph).
+
+When `s.opts.trackGradients = false`, the parameter is still registered as a leaf so CUDA cleanup
+can recognize persistent parameter buffers, but the leaf itself is marked non-differentiable.
 -/
 def use {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) {sh : Shape} [DecidableEq Shape]
   (p : Param α sh) : IO (TensorRef α sh) := do
+  let requiresGrad := s.opts.trackGradients && p.requiresGrad
   let id ←
     if Options.device s.opts == .cuda then
       let anyBuf ←
@@ -516,7 +520,7 @@ def use {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) {sh : Shape
       let t0 ← s.cudaTape.get
       let (t1, id) :=
         Runtime.Autograd.Cuda.Tape.leaf (t := t0) (value := anyBuf) (name := p.name)
-          (requires_grad := p.requiresGrad)
+          (requires_grad := requiresGrad)
       s.cudaTape.set t1
       pure id
     else
@@ -525,7 +529,7 @@ def use {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) {sh : Shape
       let t0 ← s.tape.get
       let (t1, id) :=
         Runtime.Autograd.Tape.leaf (t := t0) (s := sh)
-          (value := v) (name := p.name) (requires_grad := p.requiresGrad)
+          (value := v) (name := p.name) (requires_grad := requiresGrad)
       s.tape.set t1
       pure id
   s.paramsByLeaf.modify (fun m => m.insert id (AnyParam.ofParam p))
@@ -536,10 +540,15 @@ Record an external input tensor as a leaf on the tape.
 
 PyTorch comparison: like introducing a tensor into the autograd graph with a chosen
 `requires_grad` flag.
+
+The session-level `trackGradients` flag is a final gate on the caller's requested `requiresGrad`.
+This keeps inference helpers from accidentally building a trainable tape even when a lower-level
+caller asks for a differentiable input.
 -/
 def input {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) {sh : Shape} [DecidableEq Shape]
   (v : Tensor α sh) (name : Option String := none) (requiresGrad : Bool := false) :
   IO (TensorRef α sh) := do
+  let requiresGrad := s.opts.trackGradients && requiresGrad
   if Options.device s.opts == .cuda then
     let anyBuf ← CudaBridge.TensorConv.toAnyBuffer (α := α) (s := sh) v
     let t0 ← s.cudaTape.get

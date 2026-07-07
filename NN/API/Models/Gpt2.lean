@@ -180,6 +180,96 @@ def causalTransformerTokenScalarModuleDef (cfg : CausalOneHotConfig)
   causalTransformerTokenScalarModuleDefWithMode .train cfg body tokens targets
     (reduction := reduction)
 
+/--
+Flattened token-id input shape for causal-LM training.
+
+The sequence batch is represented as one vector of length `batch * seqLen`. The values are token
+ids encoded as floats by the data loader, then checked and converted back to `Nat` inside the eager
+runtime. Keeping this as a flat vector matches the existing scalar-module input convention.
+-/
+abbrev causalTokenIdLmInputShape (cfg : CausalOneHotConfig) : Shape :=
+  .dim (cfg.batch * cfg.seqLen) .scalar
+
+/--
+Scalar loss for causal language modeling with per-step float-encoded token ids as inputs.
+
+`xTokens` and `yTokens` are flattened `(batch * seqLen)` float vectors holding integer token ids.
+The float representation is a runtime transport format, not a mathematical relaxation of token
+ids: the eager backend rejects negative or fractional values before indexing the embedding table.
+
+This gives the PyTorch-shaped training path, `nn.Embedding` followed by row-wise cross entropy,
+without rebuilding the module at every text window. Optimizer state therefore stays attached to the
+same persistent parameter session.
+-/
+def causalTransformerTokenIdLmScalarModuleDefWithMode
+    (mode : _root_.Runtime.Autograd.TorchLean.NN.Mode)
+    (cfg : CausalOneHotConfig)
+    (body : nn.Sequential (causalEmbeddingShape cfg) (causalOneHotShape cfg))
+    (initParams : _root_.Runtime.Autograd.Torch.TList Float
+      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body))
+    (reduction : TorchLean.Loss.Reduction := .mean) :
+    TorchLean.Module.ScalarModuleDef
+      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
+      [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg] :=
+  { initParams := initParams
+    initRequiresGrad :=
+      List.replicate (((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body).length) true
+    loss := fun {α} => by
+      intro _ _
+      exact fun {m} _ _ =>
+        _root_.Runtime.Autograd.Torch.CurriedRef.curry
+          (Ref := _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α))
+          (ss := ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body) ++
+            [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg])
+          (β := m (_root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α)
+            Spec.Shape.scalar))
+          (fun args => do
+            let (ps, ins) :=
+              _root_.Runtime.Autograd.Torch.RefList.split
+                (Ref := _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α))
+                (ss₁ := (.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
+                (ss₂ := [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg]) args
+            let .cons xFloat (.cons yFloat .nil) := ins
+            let .cons tokenEmbedding bodyParams := ps
+            -- Token ids enter the scalar-module API as float tensors so batches can change at
+            -- runtime. This boundary checks that the floats are genuine integer ids before the
+            -- embedding lookup sees them.
+            let tokens ← _root_.Runtime.Autograd.TorchLean.F.tokenIdsFromFloatVec (m := m) (α := α)
+              (k := cfg.batch * cfg.seqLen) xFloat
+            let targets ← _root_.Runtime.Autograd.TorchLean.F.tokenIdsFromFloatVec (m := m) (α := α)
+              (k := cfg.batch * cfg.seqLen) yFloat
+            let x ← _root_.Runtime.Autograd.TorchLean.F.embeddingBatchSeqNat (m := m) (α := α)
+              (vocab := cfg.vocab) (dim := cfg.dModel) (batch := cfg.batch)
+              (seqLen := cfg.seqLen) tokenEmbedding tokens
+            let logits ← _root_.Runtime.Autograd.TorchLean.NN.Seq.forwardParams
+              (model := body) (α := α) (m := m) mode bodyParams x
+            -- The transformer returns `(batch, seqLen, vocab)`. Cross entropy expects one row per
+            -- prediction site, so the batch and time axes are flattened together.
+            let logitsRows ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
+              (s₁ := .dim cfg.batch (.dim cfg.seqLen (.dim cfg.vocab .scalar)))
+              (s₂ := .dim (cfg.batch * cfg.seqLen) (.dim cfg.vocab .scalar))
+              logits (by
+                simp [_root_.Spec.Shape.size, Nat.mul_assoc])
+            _root_.Runtime.Autograd.TorchLean.Loss.crossEntropyRowsNat (m := m) (α := α)
+              (rows := cfg.batch * cfg.seqLen) (classes := cfg.vocab)
+              logitsRows targets (reduction := reduction)) }
+
+/--
+Training-mode wrapper for float-encoded token-id causal language modeling.
+
+Use this when the body consumes embeddings and emits logits, while the dataset supplies changing
+integer token-id windows.
+-/
+def causalTransformerTokenIdLmScalarModuleDef (cfg : CausalOneHotConfig)
+    (body : nn.Sequential (causalEmbeddingShape cfg) (causalOneHotShape cfg))
+    (initParams : _root_.Runtime.Autograd.Torch.TList Float
+      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body))
+    (reduction : TorchLean.Loss.Reduction := .mean) :
+    TorchLean.Module.ScalarModuleDef
+      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
+      [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg] :=
+  causalTransformerTokenIdLmScalarModuleDefWithMode .train cfg body initParams (reduction := reduction)
+
 end models
 end nn
 

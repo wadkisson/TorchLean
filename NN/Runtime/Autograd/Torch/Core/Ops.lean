@@ -61,6 +61,29 @@ def dispatchCudaOpt {α β : Type} (s : EagerSession α) (opName : String)
   else
     cpu
 
+/--
+Validate one float-encoded token id and return the corresponding `Nat`.
+
+This is intentionally stricter than `Float.floor`: language-model targets are discrete labels, so a
+fractional value is almost certainly a bad dataset or adapter boundary. Rejecting it here prevents a
+quiet change of class label before the embedding or cross-entropy code sees the id.
+-/
+def natOfTokenFloat (i : Nat) (x : Float) : IO Nat := do
+  if x.isNaN || x.isInf then
+    throw <| IO.userError s!"torch: token id at index {i} is not finite"
+  else if x < 0.0 then
+    throw <| IO.userError s!"torch: token id at index {i} is negative: {x}"
+  else
+    let y := Float.floor x
+    if y != x then
+      throw <| IO.userError s!"torch: token id at index {i} is not an integer: {x}"
+    else
+      let n := y.toUInt64.toNat
+      if Float.ofNat n == x then
+        pure n
+      else
+        throw <| IO.userError s!"torch: token id at index {i} is outside the supported Nat range: {x}"
+
 /-- Record elementwise addition `a + b`. PyTorch: `torch.add`. -/
 def add {α : Type} (s : EagerSession α) [Add α] [DecidableEq Shape] {sh : Shape}
   (a b : TensorRef α sh) : IO (TensorRef α sh) := do
@@ -680,6 +703,26 @@ def gatherRowsNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.cudaTape.set t1
     pure (some { id := id })
   dispatchCudaOpt (α := α) s "gather_rows_nat" cpu cuda
+
+/--
+Read a float input vector and return the corresponding `Tensor Nat` index vector.
+
+Non-differentiable: used by token-id language-model losses that accept float-encoded ids as inputs.
+The conversion reads the concrete runtime value, validates every entry with `natOfTokenFloat`, and
+then returns the checked index tensor used by embedding and cross entropy.
+-/
+def tokenIdsFromFloatVec {α : Type} (s : EagerSession α) [CudaBridge.TensorConv α] [DecidableEq Shape]
+    {k : Nat} (x : TensorRef α (.dim k .scalar)) : IO (Tensor Nat (.dim k .scalar)) := do
+  let v ← getValue (α := α) s (sh := .dim k .scalar) x
+  match v with
+  | .dim f =>
+      let ns ← (List.finRange k).mapM (fun i => do
+        match f i with
+        | .scalar fl => do
+            let ff ← CudaBridge.TensorConv.toFloat (α := α) fl
+            natOfTokenFloat i.val ff)
+      pure <|
+        Tensor.dim (fun i => Tensor.scalar (ns.getD i.val 0))
 
 /-- Gather `k` scalars using indices stored in the nat-environment (`NatVecRef`). -/
 def gatherVecRef {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]

@@ -166,6 +166,10 @@ def programWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
       [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
       (params : _root_.Runtime.Autograd.Torch.ParamList α (paramShapes model))
       (x : Spec.Tensor α σ) : IO (Spec.Tensor α τ) := do
+    -- `Seq.forward` is an inference helper. It still uses the eager session machinery to run the
+    -- model, but leaves are marked non-differentiable so calling forward does not build a training
+    -- tape by accident.
+    let opts := { opts with trackGradients := false }
     let sess ← _root_.Runtime.Autograd.Torch.Internal.EagerSession.new (α := α) opts
     sess.resetTape
     let outRef ← (do

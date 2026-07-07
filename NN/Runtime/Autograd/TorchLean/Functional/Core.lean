@@ -222,6 +222,18 @@ def embeddingBatchSeqNat {α : Type} [Context α] [DecidableEq Shape]
     gathered (by
       simp [Shape.size, Nat.mul_assoc])
 
+/--
+Read float-encoded token ids as a `Tensor Nat` index vector.
+
+This is a runtime adapter rather than a tensor operation: it validates concrete input values and
+does not contribute a differentiable node to the model.
+-/
+def tokenIdsFromFloatVec {α : Type} [Context α] [DecidableEq Shape]
+    {m : Type → Type} [Monad m] [Ops (m := m) (α := α)] {k : Nat}
+    (x : RefTy (m := m) (α := α) (.dim k .scalar)) :
+    m (Tensor Nat (.dim k .scalar)) :=
+  _root_.Runtime.Autograd.Torch.tokenIdsFromFloatVec (m := m) (α := α) (k := k) x
+
 /-! ## Reductions -/
 
 /--

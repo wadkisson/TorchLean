@@ -86,6 +86,60 @@ def causalLmOneHotSampleRowsFromTokenArray
   causalLmOneHotSampleRows (α := α) batch seqLen vocab idsAt (padId := padId)
 
 /--
+Flatten one `(seqLen + 1)` token window into causal-LM `(x, y)` id lists.
+
+For a window `[t0, t1, ..., t_seqLen]`, the model input is `[t0, ..., t_{seqLen-1}]` and the target
+is `[t1, ..., t_seqLen]`. Short windows are padded rather than rejected so tiny toy corpora can still
+exercise the training loop.
+-/
+def causalLmTokenIdRows (seqLen : Nat) (window : List Nat) (padId : Nat := 0) :
+    List Nat × List Nat :=
+  let x := (List.range seqLen).map (fun i => window.getD i padId)
+  let y := (List.range seqLen).map (fun i => window.getD (i + 1) padId)
+  (x, y)
+
+/--
+Build a float tensor of integer token ids from a flat `List Nat` of length `batch * seqLen`.
+
+The float encoding is deliberately narrow: it is only a transport format for the scalar-module
+runtime API. The receiving runtime checks that these floats are still exact, nonnegative integer
+token ids before using them as embedding indices.
+-/
+def causalLmTokenIdFloatVec {α : Type} [Runtime.SemanticScalar α] [Runtime.Scalar α]
+    (batch seqLen : Nat) (tokens : List Nat) :
+    Tensor.T α (.dim (batch * seqLen) .scalar) :=
+  let xF : _root_.Spec.Tensor Float (.dim (batch * seqLen) .scalar) :=
+    _root_.Spec.Tensor.dim (fun i : Fin (batch * seqLen) =>
+      _root_.Spec.Tensor.scalar (Float.ofNat (tokens.getD i.val 0)))
+  Tensor.castFloat Runtime.ofFloat xF
+
+/--
+Build a batched token-id causal-language-model sample from an array-backed corpus.
+
+Token ids are passed as float inputs so the training loop can swap windows each step without
+re-instantiating the scalar module.
+
+This is the token-id analogue of `causalLmOneHotSampleRowsFromTokenArray`: it keeps the same
+sampling policy, but avoids materializing `(batch, seqLen, vocab)` one-hot tensors.
+-/
+def causalLmTokenIdSampleRowsFromTokenArray
+    {α : Type} [Runtime.SemanticScalar α] [Runtime.Scalar α]
+    (batch seqLen : Nat) (tokens : Array Nat) (seed step : Nat) (padId : Nat := 0) :
+    SupervisedSample α (.dim (batch * seqLen) .scalar) (.dim (batch * seqLen) .scalar) :=
+  let idsAt :=
+    text.Corpus.randomBatchTokenWindows tokens batch seqLen seed step (padId := padId)
+  -- Keep the flattening order explicit: batch rows are concatenated, and each row contributes
+  -- `seqLen` input ids plus `seqLen` next-token targets.
+  let (xList, yList) :=
+    (List.finRange batch).foldl (fun (acc : List Nat × List Nat) bi =>
+      let (xs, ys) := acc
+      let (xRow, yRow) := causalLmTokenIdRows seqLen (idsAt bi) (padId := padId)
+      (xs ++ xRow, ys ++ yRow)) ([], [])
+  NN.API.Sample.mk
+    (causalLmTokenIdFloatVec (α := α) batch seqLen xList)
+    (causalLmTokenIdFloatVec (α := α) batch seqLen yList)
+
+/--
 Build one unbatched one-hot causal-language-model sample directly from a token list.
 
 The token list represents a `seqLen + 1` window. Shorter lists are padded and longer lists are

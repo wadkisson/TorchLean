@@ -109,6 +109,15 @@ structure Options where
   -/
   fastGpuMatmulPrecision : Runtime.Autograd.FastKernels.GpuMatmulPrecision := .fp32
   /--
+  Track gradients for newly recorded leaves.
+
+  Inference helpers set this to `false`: forward values are still materialized so they can be read
+  back, but parameter/input leaves are recorded with `requires_grad = false`. The tape may still
+  exist as a runtime value store; this flag controls whether newly recorded leaves participate in
+  backward, not whether forward execution is allowed to allocate intermediate values.
+  -/
+  trackGradients : Bool := true
+  /--
   Eager execution on CUDA.
 
   When `true` and `backend = .eager`, the eager session uses the CUDA tape

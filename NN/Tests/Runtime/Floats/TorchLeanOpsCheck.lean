@@ -17,7 +17,12 @@ public import Std
 /-!
 # TorchLeanOpsCheck
 
- Runtime checks for TorchLean operator wrappers over the float runtime. -/
+Runtime checks for TorchLean operator wrappers over the float runtime.
+
+The file is intentionally fixture-driven: each helper builds one small tensor example, runs it
+through the relevant backend boundary, and compares the result against either another TorchLean
+backend, a closed form, or PyTorch when it is available.
+-/
 
 @[expose] public section
 
@@ -31,19 +36,82 @@ namespace Tests
 namespace Floats
 namespace TorchLeanOpsCheck
 
+/-! ## Shared fixtures -/
+
+/-- BatchNorm parity fixture: batch size. -/
 abbrev bnN : Nat := 2
+/-- BatchNorm parity fixture: channel count. -/
 abbrev bnC : Nat := 2
+/-- BatchNorm parity fixture: image height. -/
 abbrev bnH : Nat := 2
+/-- BatchNorm parity fixture: image width. -/
 abbrev bnW : Nat := 2
+/-- NCHW shape used by the BatchNorm runtime and PyTorch parity checks. -/
 abbrev bnShape : Shape := .dim bnN (.dim bnC (.dim bnH (.dim bnW .scalar)))
 
+/-- Scratch directory for small Python parity scripts emitted by this test module. -/
 def workDir : System.FilePath :=
   Runtime.External.Process.artifactWorkDir "ops_check"
 
+/-- Path for the generated BatchNorm parity script. -/
 def batchNormParityScriptPath : System.FilePath :=
   workDir / "batchnorm_parity.py"
 
-def evalMatmul (backend : TorchLean.Backend) : IO (Tensor Float (.dim 2 (.dim 2 .scalar))) := do
+/-- Assert that an IO action fails. Used for runtime boundary checks where rejection is success. -/
+def expectRuntimeRejection {α : Type} (msg : String) (act : IO α) : IO Unit := do
+  let mut rejected := false
+  try
+    let _ ← act
+  catch _ =>
+    rejected := true
+  unless rejected do
+    throw <| IO.userError msg
+
+/-- Flatten a typed Nat vector into an array for simple test comparison. -/
+def natTensorToArray {n : Nat} (t : Tensor Nat (.dim n .scalar)) : Array Nat := Id.run do
+  let mut out := #[]
+  match t with
+  | Tensor.dim f =>
+      for i in List.finRange n do
+        match f i with
+        | Tensor.scalar x => out := out.push x
+  out
+
+/--
+Run the eager token-id conversion on a fixed three-element float vector.
+
+The helper is intentionally small: the test below wants to isolate the adapter boundary, not the
+full GPT loss.
+-/
+def readTokenIdsFromFloatVector (xs : Tensor Float (.dim 3 .scalar)) :
+    IO (Tensor Nat (.dim 3 .scalar)) := do
+  let sess ← Runtime.Autograd.Torch.Internal.EagerSession.new (α := Float)
+  let xRef ← Runtime.Autograd.Torch.Internal.EagerSession.input
+    (α := Float) sess (sh := .dim 3 .scalar) xs
+  Runtime.Autograd.Torch.Internal.EagerSession.tokenIdsFromFloatVec
+    (α := Float) sess (k := 3) xRef
+
+/--
+Regression check for float-encoded token ids.
+
+Good integer-valued floats must round-trip to Nat ids, while fractional and negative values must be
+rejected. This protects the causal-LM path from silently turning bad labels into different labels.
+-/
+def checkTokenIdFloatVectorConversion : IO Unit := do
+  let good ← readTokenIdsFromFloatVector (tensor! [0.0, 2.0, 5.0])
+  let got := natTensorToArray good
+  if got != #[0, 2, 5] then
+    throw <| IO.userError s!"token id conversion: got {got}, expected #[0, 2, 5]"
+  expectRuntimeRejection "token id conversion accepted a fractional id" <|
+    readTokenIdsFromFloatVector (tensor! [0.0, 1.5, 2.0])
+  expectRuntimeRejection "token id conversion accepted a negative id" <|
+    readTokenIdsFromFloatVector (tensor! [0.0, -1.0, 2.0])
+
+/-! ## Eager/compiled operator parity -/
+
+/-- Evaluate a fixed 2x3 by 3x2 matrix product through the selected public backend. -/
+def evalMatmulFixture (backend : TorchLean.Backend) :
+    IO (Tensor Float (.dim 2 (.dim 2 .scalar))) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
   let a : Tensor Float (.dim 2 (.dim 3 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (Float.ofNat (i.val + 2 * j.val + 1))))
@@ -54,7 +122,8 @@ def evalMatmul (backend : TorchLean.Backend) : IO (Tensor Float (.dim 2 (.dim 2 
   let cR ← TorchLean.Session.matmul sess (m := 2) (n := 3) (p := 2) aR bR
   TorchLean.Session.getValue sess (sh := .dim 2 (.dim 2 .scalar)) cR
 
-def evalConcat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 5 .scalar)) := do
+/-- Evaluate a fixed length-2 plus length-3 vector concatenation through the selected backend. -/
+def evalConcatFixture (backend : TorchLean.Backend) : IO (Tensor Float (.dim 5 .scalar)) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
   let a : Tensor Float (.dim 2 .scalar) := Tensor.dim (fun i => Tensor.scalar (Float.ofNat (i.val +
     1)))
@@ -65,8 +134,9 @@ def evalConcat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 5 .scalar)
   let cR ← TorchLean.Session.concatVectors sess (n := 2) (m := 3) aR bR
   TorchLean.Session.getValue sess (sh := .dim 5 .scalar) cR
 
-def evalMaxPool (backend : TorchLean.Backend) : IO (Tensor Float (.dim 1 (.dim 2 (.dim 2 .scalar))))
-  := do
+/-- Evaluate a fixed 2D max-pooling example through the selected public backend. -/
+def evalMaxPool2dFixture (backend : TorchLean.Backend) :
+    IO (Tensor Float (.dim 1 (.dim 2 (.dim 2 .scalar)))) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
   let x : Tensor Float (.dim 1 (.dim 4 (.dim 4 .scalar))) :=
     Tensor.dim (fun _c =>
@@ -79,8 +149,9 @@ def evalMaxPool (backend : TorchLean.Backend) : IO (Tensor Float (.dim 1 (.dim 2
     (h1 := by decide) (h2 := by decide) xR
   TorchLean.Session.getValue sess (sh := .dim 1 (.dim 2 (.dim 2 .scalar))) yR
 
-def evalAvgPool (backend : TorchLean.Backend) : IO (Tensor Float (.dim 1 (.dim 2 (.dim 2 .scalar))))
-  := do
+/-- Evaluate a fixed 2D average-pooling example through the selected public backend. -/
+def evalAvgPool2dFixture (backend : TorchLean.Backend) :
+    IO (Tensor Float (.dim 1 (.dim 2 (.dim 2 .scalar)))) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
   let x : Tensor Float (.dim 1 (.dim 4 (.dim 4 .scalar))) :=
     Tensor.dim (fun _c =>
@@ -93,6 +164,9 @@ def evalAvgPool (backend : TorchLean.Backend) : IO (Tensor Float (.dim 1 (.dim 2
     (by decide) (by decide) xR
   TorchLean.Session.getValue sess (sh := .dim 1 (.dim 2 (.dim 2 .scalar))) yR
 
+/-! ## BatchNorm fixture and PyTorch parity -/
+
+/-- NCHW input with different signs per channel, chosen so mean/variance are easy to inspect. -/
 def bnInput : Tensor Float bnShape :=
   Tensor.dim (fun n =>
     Tensor.dim (fun c =>
@@ -101,18 +175,27 @@ def bnInput : Tensor Float bnShape :=
           let base := Float.ofNat (n.val * 8 + c.val * 4 + h.val * 2 + w.val + 1)
           Tensor.scalar (if c.val = 0 then base else -base)))))
 
+/-- BatchNorm scale parameter for the two channels. -/
 def bnGamma : Tensor Float (.dim bnC .scalar) :=
   tensor! [1.0, 0.5]
 
+/-- BatchNorm shift parameter for the two channels. -/
 def bnBeta : Tensor Float (.dim bnC .scalar) :=
   tensor! [0.0, 0.1]
 
+/-- Running mean used by the eval-mode BatchNorm fixture. -/
 def bnMean : Tensor Float (.dim bnC .scalar) :=
   tensor! [2.0, -3.0]
 
+/-- Running variance used by the eval-mode BatchNorm fixture. -/
 def bnVar : Tensor Float (.dim bnC .scalar) :=
   tensor! [4.0, 9.0]
 
+/--
+Run training-mode BatchNorm and return the output together with the computed channel statistics.
+
+This checks the TorchLean runtime wrapper directly, not only the exported graph path.
+-/
 def evalBatchNormNchwTrain :
     IO (Tensor Float bnShape × Tensor Float (.dim bnC .scalar) × Tensor Float (.dim bnC .scalar)) :=
     do
@@ -142,6 +225,7 @@ def evalBatchNormNchwTrain :
       pure (y, mean, var)
   action sess
 
+/-- Run eval-mode BatchNorm using fixed running statistics. -/
 def evalBatchNormNchwEval :
     IO (Tensor Float bnShape) := do
   let sess ← Runtime.Autograd.Torch.Internal.EagerSession.new (α := Float)
@@ -169,13 +253,16 @@ def evalBatchNormNchwEval :
       (α := Float) (sh := bnShape) sess yR
   action sess
 
-def expectedBatchNormTrain (x gamma beta mean var : Float) : Float :=
+/-- Closed-form BatchNorm expression when the mean and variance come from the current batch. -/
+def expectedBatchNormFromBatchStats (x gamma beta mean var : Float) : Float :=
   ((x - mean) / Float.sqrt (var + Numbers.epsilon)) * gamma + beta
 
-def expectedBatchNormEval (x gamma beta mean var : Float) : Float :=
+/-- Closed-form BatchNorm expression when the mean and variance are fixed running statistics. -/
+def expectedBatchNormFromRunningStats (x gamma beta mean var : Float) : Float :=
   ((x - mean) / Float.sqrt (var + Numbers.epsilon)) * gamma + beta
 
-def flattenNchw {n c h w : Nat}
+/-- Flatten an NCHW tensor in PyTorch's row-major order for JSON parity comparisons. -/
+def flattenNchwRowMajor {n c h w : Nat}
     (t : Tensor Float (.dim n (.dim c (.dim h (.dim w .scalar))))) : Array Float := Id.run do
   let mut out := #[]
   for ni in List.finRange n do
@@ -185,6 +272,7 @@ def flattenNchw {n c h w : Nat}
           out := out.push (nchwVal t ni ci hi wi)
   out
 
+/-- Small Python program used to compare TorchLean BatchNorm against PyTorch. -/
 def batchNormParityScript : String :=
   String.intercalate "\n"
     [ "import json"
@@ -212,6 +300,12 @@ def batchNormParityScript : String :=
     , "}))"
     ]
 
+/--
+Compare TorchLean BatchNorm output and statistics against PyTorch, when PyTorch is installed.
+
+The fallback skip is deliberate: the Lean-side closed-form checks still run on machines without a
+Python/PyTorch environment.
+-/
 def checkBatchNormNchwAgainstPyTorch
     (trainY evalY : Tensor Float bnShape)
     (mean var : Tensor Float (.dim bnC .scalar)) : IO Unit := do
@@ -237,9 +331,12 @@ def checkBatchNormNchwAgainstPyTorch
     #[vecVal mean ⟨0, by decide⟩, vecVal mean ⟨1, by decide⟩] (← readField "mean")
   assertArrayApprox "batchnorm_nchw pytorch var"
     #[vecVal var ⟨0, by decide⟩, vecVal var ⟨1, by decide⟩] (← readField "var")
-  assertArrayApprox "batchnorm_nchw pytorch train" (flattenNchw trainY) (← readField "train")
-  assertArrayApprox "batchnorm_nchw pytorch eval" (flattenNchw evalY) (← readField "eval")
+  assertArrayApprox "batchnorm_nchw pytorch train" (flattenNchwRowMajor trainY) (← readField "train")
+  assertArrayApprox "batchnorm_nchw pytorch eval" (flattenNchwRowMajor evalY) (← readField "eval")
 
+/--
+Run the full BatchNorm check: closed-form expectations first, then optional PyTorch parity.
+-/
 def checkBatchNormNchw : IO Unit := do
   let (trainY, mean, var) ← evalBatchNormNchwTrain
   let evalY ← evalBatchNormNchwEval
@@ -257,9 +354,9 @@ def checkBatchNormNchw : IO Unit := do
           let gamma := vecVal bnGamma c
           let beta := vecVal bnBeta c
           let trainExpected :=
-            expectedBatchNormTrain x gamma beta (vecVal mean c) (vecVal var c)
+            expectedBatchNormFromBatchStats x gamma beta (vecVal mean c) (vecVal var c)
           let evalExpected :=
-            expectedBatchNormEval x gamma beta (vecVal bnMean c) (vecVal bnVar c)
+            expectedBatchNormFromRunningStats x gamma beta (vecVal bnMean c) (vecVal bnVar c)
           assertApprox s!"batchnorm_nchw train[{n.val},{c.val},{h.val},{w.val}] expected"
             (nchwVal trainY n c h w) trainExpected 1e-5
           assertApprox s!"batchnorm_nchw eval[{n.val},{c.val},{h.val},{w.val}] expected"
@@ -267,22 +364,24 @@ def checkBatchNormNchw : IO Unit := do
 
   checkBatchNormNchwAgainstPyTorch trainY evalY mean var
 
+/-- Entrypoint called by the curated float runtime suite. -/
 def run : IO Unit := do
   IO.println "torchlean_ops_check: begin"
+  checkTokenIdFloatVectorConversion
 
-  let mmE ← evalMatmul .eager
-  let mmC ← evalMatmul .compiled
+  let mmE ← evalMatmulFixture .eager
+  let mmC ← evalMatmulFixture .compiled
   for i in List.finRange 2 do
     for j in List.finRange 2 do
       assertApprox s!"matmul[{i.val},{j.val}] eager/compiled" (matVal mmE i j) (matVal mmC i j) 1e-5
 
-  let cvE ← evalConcat .eager
-  let cvC ← evalConcat .compiled
+  let cvE ← evalConcatFixture .eager
+  let cvC ← evalConcatFixture .compiled
   for i in List.finRange 5 do
     assertApprox s!"concat[{i.val}] eager/compiled" (vecVal cvE i) (vecVal cvC i) 1e-5
 
-  let mpE ← evalMaxPool .eager
-  let mpC ← evalMaxPool .compiled
+  let mpE ← evalMaxPool2dFixture .eager
+  let mpC ← evalMaxPool2dFixture .compiled
   for hi in List.finRange 2 do
     for wi in List.finRange 2 do
       assertApprox s!"max_pool2d[{hi.val},{wi.val}] eager/compiled"
@@ -290,8 +389,8 @@ def run : IO Unit := do
         (chwVal mpC ⟨0, by decide⟩ hi wi)
         1e-5
 
-  let apE ← evalAvgPool .eager
-  let apC ← evalAvgPool .compiled
+  let apE ← evalAvgPool2dFixture .eager
+  let apC ← evalAvgPool2dFixture .compiled
   for hi in List.finRange 2 do
     for wi in List.finRange 2 do
       assertApprox s!"avg_pool2d[{hi.val},{wi.val}] eager/compiled"
@@ -306,9 +405,3 @@ def run : IO Unit := do
 end TorchLeanOpsCheck
 end Floats
 end Tests
-/-!
-TorchLean op-surface runtime checks (floats).
-
-This file exercises a broad subset of the runtime op surface to catch missing instances, backend
-breakage, and shape mismatches early.
--/

@@ -18,6 +18,17 @@ static inline void checkCuda(cudaError_t e, const char* msg) {
   }
 }
 
+// CUDA records the last asynchronous launch error per host thread. Clear it immediately before a
+// launch when the next check is meant to diagnose that launch, not an older unchecked kernel.
+static inline void torchlean_cuda_clear_pending_error() {
+  (void)cudaGetLastError();
+}
+
+// Check the launch error recorded by the kernel that was just submitted.
+static inline void torchlean_cuda_check_launch(const char* msg) {
+  checkCuda(cudaGetLastError(), msg);
+}
+
 static inline void torchlean_cuda_free_checked(void** ptr, const char* msg) {
   if (ptr && *ptr) {
     checkCuda(cudaFree(*ptr), msg);

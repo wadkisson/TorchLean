@@ -189,6 +189,10 @@ Default dtype policy:
 - If the user does not specify `--dtype` / `--float32-mode` and `--cuda` is present, default to
   `dtype=float` (CUDA eager supports `Float` upload/download).
 - Otherwise default to `dtype=float32` (executable IEEE-754 float32 semantics).
+
+When `--cuda` is selected, also enable the CUDA fast path (`--fast-kernels`) by default. Users who
+choose CUDA get the best available CUDA runtime path; backend-debugging flags can still disable or
+override behavior at the call site when a particular executable exposes them.
 -/
 def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
     Except String (ExecConfig × List String) := do
@@ -210,11 +214,14 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
         else
           go useGpu fastKernels (a :: acc) as
   let (useGpu, fastKernels, rest) := go false false [] args3
+  -- Public CLI policy: `--cuda` means "use the CUDA runtime path", and the runtime path should pick
+  -- the fast CUDA kernels when they are available. This keeps ordinary commands short while still
+  -- preserving the explicit `--fast-kernels` flag for CPU/diagnostic runs.
   pure ({
     dtype := dtype,
     backend := backend,
     useGpu := useGpu,
-    fastKernels := fastKernels,
+    fastKernels := fastKernels || useGpu,
     fastGpuMatmulPrecision := fastGpuMatmulPrecision
   }, rest)
 

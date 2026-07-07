@@ -311,6 +311,10 @@ instance {α : Type} [Context α] [DecidableEq Shape] :
     fail (α := α) "TorchLean→IR: gather is outside the verifier IR fragment"
   gatherRowsNat := fun {_rows _cols _k} _x _idx =>
     fail (α := α) "TorchLean→IR: gather is outside the verifier IR fragment"
+  -- Token-id parsing inspects concrete runtime values; the current verifier fragment only lowers
+  -- tensor operations with static Lean-side indices and shapes.
+  tokenIdsFromFloatVec := fun {_k} _x =>
+    fail (α := α) "TorchLean→IR: token_ids_from_float_vec is outside the verifier IR fragment"
 
   scatterAddVec := fun {_n} _x _val _i =>
     fail (α := α) "TorchLean→IR: scatter is outside the verifier IR fragment"
