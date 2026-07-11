@@ -61,8 +61,8 @@ end Counters
 def checkOneExample (numClasses : Nat) (ex : Json) : IO (Bool × Bool) := do
   let exObj ← expectObj ex "example"
   let label ← expectFieldNat exObj "label" "example"
-  let lo ← expectFieldFloatArray exObj "logits_lo" "example"
-  let hi ← expectFieldFloatArray exObj "logits_hi" "example"
+  let lo ← expectFieldFiniteFloatArray exObj "logits_lo" "example"
+  let hi ← expectFieldFiniteFloatArray exObj "logits_hi" "example"
   if lo.size ≠ numClasses || hi.size ≠ numClasses then
     throw <| IO.userError s!"example logits length mismatch (expected {numClasses})"
   if !allPairwise lo hi NN.Verification.Util.Array.floatLe then

@@ -26,16 +26,16 @@ runs.
 ## Commands
 
 ```bash
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
-lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
 ```
 
 For runtime profiling or fast kernels:
 
 ```bash
-lake build -R -K cuda=true
-lake exe -K cuda=true torchlean cnn --cuda --fast-kernels --n-total 1 --steps 1
-lake exe -K cuda=true torchlean vit --cuda --fast-kernels --n-total 1 --steps 1
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
 ```
 
 ## What To Inspect

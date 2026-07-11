@@ -32,4 +32,10 @@ lemma mathfunc_sinh_eq_rsinh (x : ℝ) : MathFunctions.sinh x = Real.sinh x := r
 /-- `MathFunctions.cosh` is definitional equal to `Real.cosh` for `ℝ`. -/
 lemma mathfunc_cosh_eq_rcosh (x : ℝ) : MathFunctions.cosh x = Real.cosh x := rfl
 
+/-- `MathFunctions.tanh` is definitional equal to `Real.tanh` for `ℝ`. -/
+lemma mathfunc_tanh_eq_rtanh (x : ℝ) : MathFunctions.tanh x = Real.tanh x := rfl
+
+/-- `MathFunctions.sqrt` is definitional equal to `Real.sqrt` for `ℝ`. -/
+lemma mathfunc_sqrt_eq_rsqrt (x : ℝ) : MathFunctions.sqrt x = Real.sqrt x := rfl
+
 end Proofs

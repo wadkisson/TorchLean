@@ -106,7 +106,6 @@ class Numbers (α : Type) where
   log10 : α
   log10000 : α
   epsilon : α
-  neg_thousand : α
 
 /-!
 Friendly aliases: these keep the original names (`MathFunctions`, `Numbers`) and give more
@@ -184,7 +183,6 @@ instance : Numbers Float where
   log10     := Float.log 10
   log10000  := Float.log 10000
   epsilon   := 1e-6
-  neg_thousand := -1000
 
 /-- `Numbers` literals for `ℝ` (proof backend, noncomputable). -/
 noncomputable instance : Numbers ℝ where
@@ -202,7 +200,6 @@ noncomputable instance : Numbers ℝ where
   log10     := Real.log 10
   log10000  := Real.log 10000
   epsilon   := 1e-6
-  neg_thousand := -1000
 
 /-- Coerce naturals into `Float` using `Float.ofNat`. -/
 instance : Coe Nat Float where
@@ -294,7 +291,6 @@ scoped instance instNumbersRat : Numbers ℚ where
   log10 := 0
   log10000 := 0
   epsilon := 1/1000000
-  neg_thousand := -1000
 
 /-- Full opt-in `Context` dictionary for exact rational algebraic fragments. -/
 scoped instance instContextRat : Context ℚ where

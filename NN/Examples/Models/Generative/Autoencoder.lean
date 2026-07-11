@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Run:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
+  lake -R -K cuda=true exe torchlean autoencoder --device cuda --steps 1 --n-total 1
 -/
 
 module

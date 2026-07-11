@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.Backend.Attention
 public import NN.Runtime.Autograd.Engine.Cuda.Ops.NormSoftmax
 
 /-!
@@ -33,8 +34,11 @@ Forward structure matches `Spec.MultiHeadAttention.forward`:
 4. combine heads, then output projection `@ Wo`
 
 Masking:
-- If `mask` is provided, we upload it as a float32 `{0,1}` matrix and apply hard-mask semantics:
-  blocked entries contribute zero softmax numerator, and their score gradients are zero.
+- If `useFlash = false`, the composed TorchLean fallback uses hard-mask semantics: blocked entries
+  contribute zero softmax numerator, matching the proof-facing attention spec.
+- If `useFlash = true`, the current CUDA build dispatches to the native fused runtime capsule.
+  Optional LibTorch SDPA capsules use the same hard boolean-mask semantics, but remain separate
+  external runtime and autograd boundaries.
 - This incurs a host-to-device copy for the mask (since the mask is a host `Tensor Bool`).
 -/
 
@@ -42,8 +46,9 @@ def multiHeadAttention
   {n numHeads dModel headDim : Nat} (h1 : n ≠ 0)
   (t : Tape) (wqId wkId wvId woId xId : Nat)
   (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none)
-  (useFlash : Bool := true) :
+  (attentionCapsule : NN.Backend.KernelCapsule := NN.Backend.Attention.nativeFlashAttention) :
   Result (Tape × Nat) := do
+  let useFlash ← NN.Backend.Attention.cudaUsesNativeFlash attentionCapsule
   have _ := h1
   let one32 : UInt32 := 1
   let depth0 : UInt32 := 0
@@ -72,7 +77,7 @@ def multiHeadAttention
   let Kh := Buffer.swapAdjacentAtDepth K dimsView depth0  -- (numHeads,n,headDim)
   let Vh := Buffer.swapAdjacentAtDepth V dimsView depth0  -- (numHeads,n,headDim)
   let scale : Float := 1.0 / Float.sqrt (Float.ofNat headDim)
-  -- Optional mask: `mask[i,j]=true` means allowed; false entries contribute zero numerator.
+  -- Optional mask: `mask[i,j]=true` means allowed for every attention provider.
   let (maskB, hasMask) : Buffer × UInt32 :=
     match mask with
     | none => (Buffer.zeros 0, 0)
@@ -99,8 +104,7 @@ def multiHeadAttention
         | none => rowSoftmaxForward scaled0 rowsFold32 n32
         | some _ => rowHardMaskedSoftmaxForward scaled0 maskB rowsFold32 n32
       let outHeads := Buffer.bmm attnOwned.value Vh h32 n32 n32 head32
-      pure (outHeads, [KhT, scores, scaled0, attnOwned.value] ++
-        attnOwned.workspace)
+      pure (outHeads, [KhT, scores, scaled0, attnOwned.value] ++ attnOwned.workspace)
   -- combine heads: swap to (n,numHeads,headDim), then reshape to (n,projDim)
   let swapped := Buffer.swapAdjacentAtDepth outHeads dimsHead depth0  -- (n,numHeads,headDim)
   let concat := swapped  -- view as (n,projDim)
@@ -127,13 +131,7 @@ def multiHeadAttention
         let dOutHeads := Buffer.swapAdjacentAtDepth dSwapped dimsView depth0 -- (numHeads,n,headDim)
         let (dQh, dKh, dVh) ←
           if useFlash then
-            -- Fused VJP for the native attention primitive. The kernels recompute the row-wise
-            -- softmax summaries instead of materializing/storing the full attention matrix.
-            let dQh := Buffer.flashAttentionBwdQ Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-            let dKh := Buffer.flashAttentionBwdK Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-            let dVh := Buffer.releaseThen dOutHeads <|
-              Buffer.flashAttentionBwdV Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-            pure (dQh, dKh, dVh)
+            pure <| Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
           else
             let dimsAttn : Array Nat := #[numHeads, n, n]
             let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1

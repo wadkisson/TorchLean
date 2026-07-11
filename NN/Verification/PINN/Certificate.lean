@@ -56,17 +56,26 @@ open Json
 def defaultCertPath : String :=
   "NN/Examples/Verification/PINN/pinn_cert.json"
 
+/-- Reject a certificate interval that differs from Lean's recomputed interval. -/
+def requireApproxPair (ctx : String) (leanPair artifactPair : Float × Float) : IO Unit :=
+  if approxEq leanPair.1 artifactPair.1 && approxEq leanPair.2 artifactPair.2 then
+    pure ()
+  else
+    throw <| IO.userError
+      s!"{ctx}: Lean {leanPair} differs from certificate {artifactPair}"
+
 /-- IO entry that reads the cert, recomputes bounds, and prints comparisons. -/
 def verifyCert (path : String) : IO Unit := do
   let j ← NN.Verification.Json.readJsonFile path
   match parseCert j with
   | .error msg => throw <| IO.userError s!"Bad Cert JSON: {msg}"
-  | .ok (cfg, residPairs, residPairsDeriv, _uTriples) => do
+  | .ok (cfg, residPairs, residPairsDeriv, uTriples) => do
     let g := buildGraph
     let outId := g.nodes.size - 1
     let basePs := seedParamsFloat
     let residA := residPairs.toArray
     let residDerivA := residPairsDeriv.toArray
+    let uTriplesA := uTriples.toArray
     for i in List.finRange cfg.nPts do
       let x := Tensor.vecGet cfg.pts i
       let xs := #[x - cfg.h, x, x + cfg.h]
@@ -84,23 +93,35 @@ def verifyCert (path : String) : IO Unit := do
         let hiVal := Spec.Tensor.sumSpec outB.hi
         uTrip := uTrip ++ [(loVal, hiVal)]
         let dboxes := NN.MLTheory.CROWN.Graph.runDeriv1D (α:=Float) g ps boxes
-        match NN.MLTheory.CROWN.Graph.outputBox? dboxes outId with
-        | .ok dB =>
-          let dlo := Spec.Tensor.sumSpec dB.lo
-          let dhi := Spec.Tensor.sumSpec dB.hi
-          duTrip := duTrip ++ [(dlo, dhi)]
-        | .error _ =>
-          duTrip := duTrip ++ [(0.0, 0.0)]
+        let dB ←
+          match NN.MLTheory.CROWN.Graph.outputBox? dboxes outId with
+          | .ok dB => pure dB
+          | .error msg => throw <| IO.userError s!"PINN first-derivative propagation failed: {msg}"
+        let dlo := Spec.Tensor.sumSpec dB.lo
+        let dhi := Spec.Tensor.sumSpec dB.hi
+        duTrip := duTrip ++ [(dlo, dhi)]
         let d2boxes := NN.MLTheory.CROWN.Graph.runDeriv2D (α:=Float) g ps boxes dboxes
-        match NN.MLTheory.CROWN.Graph.outputBox? d2boxes outId with
-        | .ok d2B =>
-          let d2lo := Spec.Tensor.sumSpec d2B.lo
-          let d2hi := Spec.Tensor.sumSpec d2B.hi
-          d2uTrip := d2uTrip ++ [(d2lo, d2hi)]
-        | .error _ =>
-          d2uTrip := d2uTrip ++ [(0.0, 0.0)]
+        let d2B ←
+          match NN.MLTheory.CROWN.Graph.outputBox? d2boxes outId with
+          | .ok d2B => pure d2B
+          | .error msg => throw <| IO.userError s!"PINN second-derivative propagation failed: {msg}"
+        let d2lo := Spec.Tensor.sumSpec d2B.lo
+        let d2hi := Spec.Tensor.sumSpec d2B.hi
+        d2uTrip := d2uTrip ++ [(d2lo, d2hi)]
       match uTrip with
       | [(lm, hm), (l0, h0), (lp, hp)] =>
+        let (xArtifact, umArtifact, u0Artifact, upArtifact) ←
+          match uTriplesA[i.1]? with
+          | some entry => pure entry
+          | none =>
+              throw <| IO.userError
+                s!"PINN certificate u_bounds list missing index {i.1} (size={uTriplesA.size})"
+        if !approxEq x xArtifact then
+          throw <| IO.userError
+            s!"PINN certificate point mismatch at index {i.1}: Lean {x}, certificate {xArtifact}"
+        requireApproxPair s!"u(x-h) mismatch at x={x}" (lm, hm) umArtifact
+        requireApproxPair s!"u(x) mismatch at x={x}" (l0, h0) u0Artifact
+        requireApproxPair s!"u(x+h) mismatch at x={x}" (lp, hp) upArtifact
         let (rlo, rhi) := fdResidualBounds (lm,hm) (l0,h0) (lp,hp) cfg.h
         let (eradLo, eradHi) ←
           match residA[i.1]? with
@@ -108,50 +129,44 @@ def verifyCert (path : String) : IO Unit := do
           | none =>
               throw <| IO.userError
                 s!"PINN certificate residual list missing index {i.1} (size={residA.size})"
-        if ¬(approxEq rlo eradLo) ∨ ¬(approxEq rhi eradHi) then
-          IO.println s!"FD residual mismatch at x={x}: Lean ({rlo},{rhi}) vs Py ({eradLo},{eradHi})"
-        else
-          pure ()
+        requireApproxPair s!"finite-difference residual mismatch at x={x}"
+          (rlo, rhi) (eradLo, eradHi)
         let (dLoPy, dHiPy) ←
           match residDerivA[i.1]? with
           | some pair => pure pair
           | none =>
               throw <| IO.userError
                 s!"PINN certificate derivative-residual list missing index {i.1} (size={residDerivA.size})"
-        match d2uTrip with
-        | [_, (_d2l, _d2h), _] =>
-          IO.println s!"u''(x) residual bound (derivative-based, Py): [{dLoPy},{dHiPy}]"
-        | _ => pure ()
-        match d2uTrip with
-        | [_, (d2l, d2h), _] =>
-          IO.println s!"u''(x) residual bound (derivative-based): [{d2l},{d2h}]"
-        | _ => pure ()
         -- Compute and print residual bounds from the PDE specification via the parser/AST.
         -- We support a small DSL: u, ux, uxx, uy, uyy, +, -, *, scaling constants, parentheses, and
         -- powers by ^n.
         let env : String → Option Float := fun _ => none
         -- identifiers map, can be extended to constants
-        let pdeParsed : Option NN.Verification.PINN.PdeAst.Expr :=
+        let pdeParsed ←
           match parseExpr env cfg.pde with
-          | .ok e => some e
-          | .error _ => none
+          | .ok e => pure e
+          | .error msg => throw <| IO.userError s!"PINN PDE parse failed: {msg}"
         -- Build primitive bounds at the central point x using computed intervals
-        let primsOpt : Option Prims :=
+        let prims ←
           match uTrip, duTrip, d2uTrip with
           | [_, (u0l,u0h), _], [_, (d1l,d1h), _], [_, (d2l,d2h), _] =>
-            some
+            pure
               { u := some (u0l, u0h)
                 duX := some (d1l, d1h)
                 duY := none
                 d2uX := some (d2l, d2h)
                 d2uY := none }
-          | _, _, _ => none
-        match pdeParsed, primsOpt with
-        | some e, some prims =>
-          match eval prims e with
-          | some (rpLo, rpHi) => IO.println s!"Residual R(x) from PDE '{cfg.pde}': [{rpLo},{rpHi}]"
-          | none => IO.println s!"PDE '{cfg.pde}' evaluation failed (insufficient primitives)"
-        | _, _ => pure ()
+          | _, _, _ => throw <| IO.userError "PINN derivative triplets are incomplete"
+        let pdeResidual ←
+          match eval prims pdeParsed with
+          | some residual => pure residual
+          | none =>
+              throw <| IO.userError
+                s!"PINN PDE '{cfg.pde}' evaluation failed because required primitives are missing"
+        requireApproxPair s!"derivative residual mismatch at x={x}"
+          pdeResidual (dLoPy, dHiPy)
+        IO.println
+          s!"Residual R(x) from PDE '{cfg.pde}': [{pdeResidual.1},{pdeResidual.2}]"
         match duTrip with
         | [d1, d2, d3] =>
           let (d1l, d1h) := d1; let (d2l, d2h) := d2; let (d3l, d3h) := d3
@@ -163,6 +178,6 @@ def verifyCert (path : String) : IO Unit := do
           IO.println s!"u''(x-h)∈[{dd1l},{dd1h}], u''(x)∈[{dd2l},{dd2h}], u''(x+h)∈[{dd3l},{dd3h}]"
         | _ => pure ()
       | _ => throw <| IO.userError "unexpected uTrip structure"
-    IO.println "PINN certificate verified: Python and Lean agree on residual bounds."
+    IO.println "PINN artifact replay matched Lean's recomputed residual bounds."
 
 end NN.Verification.PINN.Certificate

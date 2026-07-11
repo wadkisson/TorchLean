@@ -31,9 +31,8 @@ The transfer rules in this file are **optional** and have different proof status
 - `sin`/`cos` delegate to the conservative 1-Lipschitz enclosure rules in
   `NN.MLTheory.CROWN.Runtime.Ops.IBP.sin/cos`. This avoids endpoint-only periodic reasoning, which
   can miss internal extrema.
-- `tan`/`atan` require the extra `TanAtan α` class. `atan` is monotone, so interval propagation is
-  direct. `tan` is only meaningful under the caller-side precondition that the interval
-  stays inside one monotone branch and away from poles.
+- `tan`/`atan` require the extra `TanAtan α` class. Their endpoint rules are named with an explicit
+  caller-side monotonicity assumption; for `tan`, the interval must additionally avoid poles.
 - Affine transfer rules here are executable relaxation candidates. A downstream theorem should
   provide or assume the corresponding enclosure property for the scalar backend being used.
 
@@ -57,20 +56,12 @@ open NN.MLTheory.CROWN
 
 variable {α : Type} [Context α]
 
-/-- Float approximation of π used only by optional Float-facing examples. -/
-private def piApprox : Float := 3.14159265358979323846
-
 /-- Extra trigonometric functions outside the base `Spec.MathFunctions` / `Context` interface. -/
 class TanAtan (α : Type) where
   /-- Tangent. -/
   tan : α → α
   /-- Arctangent. -/
   atan : α → α
-
-/-- Helper to extract scalar from dim-scalar tensor. -/
-private def getDimScalarFn {n : Nat} (t : Tensor α (.dim n .scalar)) : (Fin n → Tensor α .scalar) :=
-  match t with
-  | .dim f => f
 
 /-- IBP for `sin`.
 
@@ -94,7 +85,8 @@ def ibpCos {n : Nat} (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
 This rule is intended for intervals contained in a single branch of `tan` and away from poles. If a
 workflow may cross a pole, it should reject the certificate or provide a different enclosure rule.
 -/
-def ibpTan {n : Nat} [TanAtan α] (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+def ibpTanAssumingMonotoneBranch {n : Nat} [TanAtan α]
+    (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match xB.lo, xB.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
@@ -109,10 +101,12 @@ def ibpTan {n : Nat} [TanAtan α] (xB : Box α (.dim n .scalar)) : Box α (.dim 
         Tensor.scalar (TanAtan.tan u))
     { lo := outLo, hi := outHi }
 
-/-- IBP for Atan: atan is monotonically increasing and bounded in (-π/2, π/2).
-    This makes IBP straightforward: [atan(l), atan(u)].
+/--
+Endpoint interval propagation for `atan`, under the caller-side assumption that the supplied
+`TanAtan.atan` implementation is monotone on every input interval.
 -/
-def ibpAtan {n : Nat} [TanAtan α] (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+def ibpAtanAssumingMonotone {n : Nat} [TanAtan α]
+    (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match xB.lo, xB.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
@@ -123,114 +117,76 @@ def ibpAtan {n : Nat} [TanAtan α] (xB : Box α (.dim n .scalar)) : Box α (.dim
       | .scalar u => Tensor.scalar (TanAtan.atan u))
     { lo := outLo, hi := outHi }
 
-/-- Derivative bounds for sin: d(sin)/dx = cos ∈ [-1, 1].
-    For interval [l, u], d(sin)/dx ∈ [min(cos(l), cos(u)), max(cos(l), cos(u))]
-    if interval is small; [-1, 1] otherwise.
+/-- Minimum of two scalar endpoints using the executable order from `Context`. -/
+def scalarMin (x y : α) : α :=
+  if x < y then x else y
+
+/-- Maximum of two scalar endpoints using the executable order from `Context`. -/
+def scalarMax (x y : α) : α :=
+  if x > y then x else y
+
+/-- Multiply two scalar intervals using all four endpoint products. -/
+def scalarIntervalMul (aLo aHi bLo bHi : α) : α × α :=
+  let p1 := aLo * bLo
+  let p2 := aLo * bHi
+  let p3 := aHi * bLo
+  let p4 := aHi * bHi
+  (scalarMin (scalarMin p1 p2) (scalarMin p3 p4),
+    scalarMax (scalarMax p1 p2) (scalarMax p3 p4))
+
+/-- Square a scalar interval. -/
+def scalarIntervalSquare (lo hi : α) : α × α :=
+  let lo2 := lo * lo
+  let hi2 := hi * hi
+  if lo < Numbers.zero then
+    if hi > Numbers.zero then
+      (Numbers.zero, scalarMax lo2 hi2)
+    else
+      (hi2, lo2)
+  else
+    (lo2, hi2)
+
+/--
+Derivative propagation for `sin` using the global enclosure `cos(x) ∈ [-1, 1]`.
+
+This deliberately avoids endpoint-only trigonometric bounds, which are unsound whenever an interval
+contains an interior extremum.
 -/
-def derivSin {n : Nat} (xB : Box α (.dim n .scalar))
+def derivSin {n : Nat} (_xB : Box α (.dim n .scalar))
     (dB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
-  match xB.lo, xB.hi, dB.lo, dB.hi with
-  | .dim xlo, .dim xhi, .dim dlo, .dim dhi =>
+  match dB.lo, dB.hi with
+  | .dim dlo, .dim dhi =>
     let outLo := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh =>
-        let width := xu - xl
-        -- Derivative of sin is cos, which is bounded in [-1, 1]
-        let cos_lo := if width > Numbers.three then (-(Numbers.one))
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 < c2 then c1 else c2
-        let cos_hi := if width > Numbers.three then Numbers.one
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 > c2 then c1 else c2
-        -- Multiply derivative by cos bounds
-        let p1 := cos_lo * dl
-        let p2 := cos_lo * dh
-        let p3 := cos_hi * dl
-        let p4 := cos_hi * dh
-        let m1 := if p1 < p2 then p1 else p2
-        let m2 := if p3 < p4 then p3 else p4
-        Tensor.scalar (if m1 < m2 then m1 else m2))
+      match dlo i, dhi i with
+      | .scalar dl, .scalar dh =>
+        Tensor.scalar (scalarIntervalMul (-Numbers.one) Numbers.one dl dh).1)
     let outHi := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh =>
-        let width := xu - xl
-        let cos_lo := if width > Numbers.three then (-(Numbers.one))
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 < c2 then c1 else c2
-        let cos_hi := if width > Numbers.three then Numbers.one
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 > c2 then c1 else c2
-        let p1 := cos_lo * dl
-        let p2 := cos_lo * dh
-        let p3 := cos_hi * dl
-        let p4 := cos_hi * dh
-        let M1 := if p1 > p2 then p1 else p2
-        let M2 := if p3 > p4 then p3 else p4
-        Tensor.scalar (if M1 > M2 then M1 else M2))
+      match dlo i, dhi i with
+      | .scalar dl, .scalar dh =>
+        Tensor.scalar (scalarIntervalMul (-Numbers.one) Numbers.one dl dh).2)
     { lo := outLo, hi := outHi }
 
-/-- Derivative bounds for cos: d(cos)/dx = -sin ∈ [-1, 1]. -/
-def derivCos {n : Nat} (xB : Box α (.dim n .scalar))
+/-- Derivative propagation for `cos` using the global enclosure `-sin(x) ∈ [-1, 1]`. -/
+def derivCos {n : Nat} (_xB : Box α (.dim n .scalar))
     (dB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
-  match xB.lo, xB.hi, dB.lo, dB.hi with
-  | .dim xlo, .dim xhi, .dim dlo, .dim dhi =>
+  match dB.lo, dB.hi with
+  | .dim dlo, .dim dhi =>
     let outLo := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh =>
-        let width := xu - xl
-        -- Derivative of cos is -sin
-        let neg_sin_lo := if width > Numbers.three then (-(Numbers.one))
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 < s2 then s1 else s2
-        let neg_sin_hi := if width > Numbers.three then Numbers.one
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 > s2 then s1 else s2
-        let p1 := neg_sin_lo * dl
-        let p2 := neg_sin_lo * dh
-        let p3 := neg_sin_hi * dl
-        let p4 := neg_sin_hi * dh
-        let m1 := if p1 < p2 then p1 else p2
-        let m2 := if p3 < p4 then p3 else p4
-        Tensor.scalar (if m1 < m2 then m1 else m2))
+      match dlo i, dhi i with
+      | .scalar dl, .scalar dh =>
+        Tensor.scalar (scalarIntervalMul (-Numbers.one) Numbers.one dl dh).1)
     let outHi := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh =>
-        let width := xu - xl
-        let neg_sin_lo := if width > Numbers.three then (-(Numbers.one))
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 < s2 then s1 else s2
-        let neg_sin_hi := if width > Numbers.three then Numbers.one
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 > s2 then s1 else s2
-        let p1 := neg_sin_lo * dl
-        let p2 := neg_sin_lo * dh
-        let p3 := neg_sin_hi * dl
-        let p4 := neg_sin_hi * dh
-        let M1 := if p1 > p2 then p1 else p2
-        let M2 := if p3 > p4 then p3 else p4
-        Tensor.scalar (if M1 > M2 then M1 else M2))
+      match dlo i, dhi i with
+      | .scalar dl, .scalar dh =>
+        Tensor.scalar (scalarIntervalMul (-Numbers.one) Numbers.one dl dh).2)
     { lo := outLo, hi := outHi }
 
-/-- Derivative bounds for atan: d(atan)/dx = 1/(1 + x²) ∈ (0, 1].
-    This is always positive and bounded.
+/--
+Derivative bounds for arctangent under the standard ordered-field, absolute-value, and arctangent
+laws. The `TanAtan` class supplies executable functions but does not itself prove these laws, so the
+assumption is kept in the declaration name.
 -/
-def derivAtan {n : Nat} (xB : Box α (.dim n .scalar))
+def derivAtanAssumingStandardLaws {n : Nat} (xB : Box α (.dim n .scalar))
     (dB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match xB.lo, xB.hi, dB.lo, dB.hi with
   | .dim xlo, .dim xhi, .dim dlo, .dim dhi =>
@@ -277,95 +233,30 @@ def derivAtan {n : Nat} (xB : Box α (.dim n .scalar))
         Tensor.scalar (if M1 > M2 then M1 else M2))
     { lo := outLo, hi := outHi }
 
-/-- Second derivative bounds for sin: d²(sin)/dx² = -sin. -/
-def secondDerivSin {n : Nat} (xB : Box α (.dim n .scalar))
+/--
+Second-derivative propagation for `sin` using global `[-1,1]` enclosures for both `cos` and
+`-sin`, together with full interval multiplication.
+-/
+def secondDerivSin {n : Nat} (_xB : Box α (.dim n .scalar))
     (dB d2B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   -- y'' = f''(x) * (dx)² + f'(x) * d²x
   -- where f'(x) = cos(x) and f''(x) = -sin(x)
-  match xB.lo, xB.hi, dB.lo, dB.hi, d2B.lo, d2B.hi with
-  | .dim xlo, .dim xhi, .dim dlo, .dim dhi, .dim d2lo, .dim d2hi =>
+  match dB.lo, dB.hi, d2B.lo, d2B.hi with
+  | .dim dlo, .dim dhi, .dim d2lo, .dim d2hi =>
     let outLo := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i, d2lo i, d2hi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh, .scalar d2l, .scalar _d2h =>
-        let width := xu - xl
-        -- -sin bounds
-        let neg_sin_lo := if width > Numbers.three then (-(Numbers.one))
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 < s2 then s1 else s2
-        -- cos bounds
-        let cos_lo := if width > Numbers.three then (-(Numbers.one))
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 < c2 then c1 else c2
-        -- Compute (dx)²
-        let dx_sq_lo :=
-          let dl2 := dl * dl
-          let dh2 := dh * dh
-          if dl < Numbers.zero then
-            if dh > Numbers.zero then Numbers.zero
-            else dh2
-          else dl2
-        -- term1 = -sin * dx²
-        -- term2 = cos * d²x
-        -- Conservative: combine both terms with full interval arithmetic
-        let lo := neg_sin_lo * dx_sq_lo + cos_lo * d2l
-        Tensor.scalar lo)
+      match dlo i, dhi i, d2lo i, d2hi i with
+      | .scalar dl, .scalar dh, .scalar d2l, .scalar d2h =>
+        let dxSq := scalarIntervalSquare dl dh
+        let first := scalarIntervalMul (-Numbers.one) Numbers.one dxSq.1 dxSq.2
+        let second := scalarIntervalMul (-Numbers.one) Numbers.one d2l d2h
+        Tensor.scalar (first.1 + second.1))
     let outHi := Tensor.dim (fun i =>
-      match xlo i, xhi i, dlo i, dhi i, d2lo i, d2hi i with
-      | .scalar xl, .scalar xu, .scalar dl, .scalar dh, .scalar _d2l, .scalar d2h =>
-        let width := xu - xl
-        let neg_sin_hi := if width > Numbers.three then Numbers.one
-                          else
-                            let s1 := -(MathFunctions.sin xl)
-                            let s2 := -(MathFunctions.sin xu)
-                            if s1 > s2 then s1 else s2
-        let cos_hi := if width > Numbers.three then Numbers.one
-                      else
-                        let c1 := MathFunctions.cos xl
-                        let c2 := MathFunctions.cos xu
-                        if c1 > c2 then c1 else c2
-        let dx_sq_hi :=
-          let dl2 := dl * dl
-          let dh2 := dh * dh
-          if dl2 > dh2 then dl2 else dh2
-        let hi := neg_sin_hi * dx_sq_hi + cos_hi * d2h
-        Tensor.scalar hi)
+      match dlo i, dhi i, d2lo i, d2hi i with
+      | .scalar dl, .scalar dh, .scalar d2l, .scalar d2h =>
+        let dxSq := scalarIntervalSquare dl dh
+        let first := scalarIntervalMul (-Numbers.one) Numbers.one dxSq.1 dxSq.2
+        let second := scalarIntervalMul (-Numbers.one) Numbers.one d2l d2h
+        Tensor.scalar (first.2 + second.2))
     { lo := outLo, hi := outHi }
-
-namespace Theorems
-
-/-- IBP for sin produces a valid Box structure. -/
-theorem ibp_sin_returns_box {n : Nat} (xB : Box α (.dim n .scalar)) :
-    ∃ lo hi : Tensor α (.dim n .scalar), ibpSin xB = { lo := lo, hi := hi } := by
-  simp only [ibpSin]
-  match xB.lo, xB.hi with
-  | .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-/-- IBP for cos produces a valid Box structure. -/
-theorem ibp_cos_returns_box {n : Nat} (xB : Box α (.dim n .scalar)) :
-    ∃ lo hi : Tensor α (.dim n .scalar), ibpCos xB = { lo := lo, hi := hi } := by
-  simp only [ibpCos]
-  match xB.lo, xB.hi with
-  | .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-omit [Context α] in
-/-- IBP for atan produces a valid Box structure. -/
-theorem ibp_atan_returns_box {n : Nat} [TanAtan α] (xB : Box α (.dim n .scalar)) :
-    ∃ lo hi : Tensor α (.dim n .scalar), ibpAtan xB = { lo := lo, hi := hi } := by
-  simp only [ibpAtan]
-  match xB.lo, xB.hi with
-  | .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-/-- Derivative bounds for sin produce valid Box. -/
-theorem deriv_sin_returns_box {n : Nat} (xB dB : Box α (.dim n .scalar)) :
-    ∃ lo hi : Tensor α (.dim n .scalar), derivSin xB dB = { lo := lo, hi := hi } := by
-  simp only [derivSin]
-  match xB.lo, xB.hi, dB.lo, dB.hi with
-  | .dim _, .dim _, .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-end Theorems
 
 end NN.MLTheory.CROWN.Operators.Trigonometric

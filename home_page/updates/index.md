@@ -224,13 +224,13 @@ can be released after the step finishes.
   <h3>Validation</h3>
 
 - `lake build`
-- `lake build -K cuda=true`
-- `lake exe torchlean mlp --cpu --steps 10 --log false`
+- `lake -R -K cuda=true build`
+- `lake exe torchlean mlp --device cpu --steps 10 --log false`
 - `lake exe torchlean mlp --steps 10 --dtype float --backend eager --log false`
-- `lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000 --log false`
-- `lake exe -K cuda=true torchlean cnn --cuda --steps 1000 --log false`
-- `lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --steps 1200 --generate 0 --log false`
-- `lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 50 --log false`
+- `lake -R -K cuda=true exe torchlean mlp --device cuda --steps 1000 --log false`
+- `lake -R -K cuda=true exe torchlean cnn --device cuda --steps 1000 --log false`
+- `lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1200 --generate 0 --log false`
+- `lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 50 --log false`
 
 The validation checked representative losses or MSE values going down and the
 CUDA allocator staying bounded on the exercised runs.

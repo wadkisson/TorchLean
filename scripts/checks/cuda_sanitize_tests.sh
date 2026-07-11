@@ -9,7 +9,7 @@ Build TorchLean with native CUDA externs and run the curated CUDA/Lean test suit
 NVIDIA Compute Sanitizer.
 
 Default:
-  lake build -R -K cuda=true nn_tests_suite
+  lake -R -K cuda=true build nn_tests_suite
   lake env compute-sanitizer --tool memcheck .lake/build/bin/nn_tests_suite
 
 Options:

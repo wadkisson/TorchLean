@@ -109,8 +109,9 @@ def geluIntervalBoundsFloat (l u : Float) : Float × Float :=
   else
     (minEndpoints, maxEndpoints)
 
-/-- IBP for GELU activation (Float specialized) -/
-def ibpGeluFloat {n : Nat} (xB : Box Float (.dim n .scalar)) : Box Float (.dim n .scalar) :=
+/-- Approximate IBP for GELU activation (Float specialized). -/
+def ibpGeluApproxFloat {n : Nat} (xB : Box Float (.dim n .scalar)) :
+    Box Float (.dim n .scalar) :=
   match xB.lo, xB.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
@@ -206,26 +207,32 @@ variable {α : Type} [Context α]
 
 The theorem using this helper must provide the relevant transfer-soundness hypothesis for the
 chosen scalar semantics and interval restrictions. -/
-def geluBoundsConservative (l u : α) : α × α :=
+def geluBoundsAssumingStandardRange (l u : α) : α × α :=
   -- Lower proxy: min(0, l). Upper proxy: max(0, u).
   let zeroVal : α := Numbers.zero
   let minBound := if l < zeroVal then l else zeroVal
   let maxBound := if u > zeroVal then u else zeroVal
   (minBound, maxBound)
 
-/-- IBP for GELU activation (generic, conservative) -/
-def ibpGelu {n : Nat} (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/--
+Generic GELU interval candidate under the standard law `min(0,x) ≤ GELU(x) ≤ max(0,x)`.
+
+`Context` supplies executable scalar operations but does not prove that law, so the assumption is
+kept in the declaration name.
+-/
+def ibpGeluAssumingStandardRange {n : Nat} (xB : Box α (.dim n .scalar)) :
+    Box α (.dim n .scalar) :=
   match xB.lo, xB.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        let (minVal, _) := geluBoundsConservative l u
+        let (minVal, _) := geluBoundsAssumingStandardRange l u
         Tensor.scalar minVal)
     let outHi := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        let (_, maxVal) := geluBoundsConservative l u
+        let (_, maxVal) := geluBoundsAssumingStandardRange l u
         Tensor.scalar maxVal)
     { lo := outLo, hi := outHi }
 

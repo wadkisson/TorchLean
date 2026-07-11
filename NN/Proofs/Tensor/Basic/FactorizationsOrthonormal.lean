@@ -70,7 +70,7 @@ theorem dotFn_eq_inner {p : Nat} (u v : Fin p → ℝ) :
 /-- The executable Euclidean norm is the `EuclideanSpace` norm over `ℝ`. -/
 theorem normFn_eq_norm {p : Nat} (v : Fin p → ℝ) :
     Spec.normFn v = ‖(WithLp.toLp 2 v : EuclideanSpace ℝ (Fin p))‖ := by
-  rw [Spec.normFn, mfsqrt_eq, EuclideanSpace.norm_eq]
+  rw [Spec.normFn, Proofs.mathfunc_sqrt_eq_rsqrt, EuclideanSpace.norm_eq]
   congr 1
   rw [dotFn_eq_sum]
   apply Finset.sum_congr rfl

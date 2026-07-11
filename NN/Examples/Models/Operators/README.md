@@ -35,13 +35,13 @@ burgers_meta.json
 Quick CUDA check:
 
 ```bash
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 1
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 1
 ```
 
 Longer run with a prediction artifact:
 
 ```bash
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda \
   --steps 700 --lr 0.003 \
   --plot-csv data/real/fno/predictions.csv \
   --log data/real/fno/trainlog.json

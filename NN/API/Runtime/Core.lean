@@ -48,7 +48,6 @@ The exported names fall into these groups:
 -/
 
 export _root_.Runtime.Autograd.TorchLean (Backend Options TensorRef Param AnyParam)
-export _root_.Runtime.Autograd.FastKernels (GpuMatmulPrecision)
 export _root_.Runtime.Autograd.TorchLean (CompiledScalar compileScalar)
 export _root_.Runtime.Autograd.TorchLean (CompiledGraph compileGraph)
 export _root_.Runtime.Autograd.TorchLean (ParamList ScalarTrainer scalarTrainer)

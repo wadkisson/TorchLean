@@ -96,15 +96,33 @@ def asFloat? (j : Json) : Option Float :=
       | _ => none
   | _ => none
 
+/-- Parse a finite `Float` from a JSON number or a string containing a JSON number. -/
+def asFiniteFloat? (j : Json) : Option Float := do
+  let x ← asFloat? j
+  if x.isFinite then
+    some x
+  else
+    none
+
 /-- Require a floating-point value in an `Except` parser. -/
 def expectFloatE (ctx : String) (j : Json) : Except String Float :=
   match asFloat? j with
   | some x => pure x
   | none => throw s!"{ctx}: expected float"
 
+/-- Require a finite floating-point value in an `Except` parser. -/
+def expectFiniteFloatE (ctx : String) (j : Json) : Except String Float :=
+  match asFiniteFloat? j with
+  | some x => pure x
+  | none => throw s!"{ctx}: expected finite float"
+
 /-- Extract a floating-point-valued field in an `Except` parser. -/
 def expectFieldFloatE (ctx key : String) (j : Json) : Except String Float := do
   expectFloatE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
+
+/-- Extract a finite floating-point-valued field in an `Except` parser. -/
+def expectFieldFiniteFloatE (ctx key : String) (j : Json) : Except String Float := do
+  expectFiniteFloatE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
 
 /-- Extract a string-valued field in an `Except` parser. -/
 def expectFieldStringE (ctx key : String) (j : Json) : Except String String := do
@@ -121,6 +139,12 @@ def expectFloat (j : Json) (ctx : String) : IO Float := do
   match asFloat? j with
   | some x => pure x
   | none => throw <| IO.userError s!"{ctx}: expected float"
+
+/-- Require a finite floating-point value, accepting JSON numbers and string-encoded numbers. -/
+def expectFiniteFloat (j : Json) (ctx : String) : IO Float := do
+  match asFiniteFloat? j with
+  | some x => pure x
+  | none => throw <| IO.userError s!"{ctx}: expected finite float"
 
 /-- Require a JSON boolean and report `ctx` on mismatch. -/
 def expectBool (j : Json) (ctx : String) : IO Bool := do
@@ -146,11 +170,21 @@ def expectFloatArray (j : Json) (ctx : String) : IO (Array Float) := do
   | some xs => pure xs
   | none => throw <| IO.userError s!"{ctx}: expected float array"
 
+/-- Parse a JSON array of finite floats with contextual errors. -/
+def expectFiniteFloatArray (j : Json) (ctx : String) : IO (Array Float) := do
+  let xs ← expectArray j ctx
+  xs.mapIdxM fun i x => expectFiniteFloat x s!"{ctx}[{i}]"
+
 /-- Parse a JSON matrix of floats with contextual errors. -/
 def expectFloatMatrix (j : Json) (ctx : String) : IO (Array (Array Float)) := do
   match parseFloatMatrix j with
   | some rows => pure rows
   | none => throw <| IO.userError s!"{ctx}: expected array of float arrays"
+
+/-- Parse a JSON matrix whose entries are all finite floats. -/
+def expectFiniteFloatMatrix (j : Json) (ctx : String) : IO (Array (Array Float)) := do
+  let rows ← expectArray j ctx
+  rows.mapIdxM fun i row => expectFiniteFloatArray row s!"{ctx}[{i}]"
 
 /-- Extract an object-valued field. -/
 def expectFieldObj (j : Json) (k : String) (ctx : String) : IO Json := do
@@ -182,10 +216,19 @@ def optionalFieldArrayD (ctx key : String) (j : Json) : Except String (Array Jso
 def expectFieldFloatArray (j : Json) (k : String) (ctx : String) : IO (Array Float) := do
   expectFloatArray (← expectField j k ctx) s!"{ctx}.{k}"
 
+/-- Extract a finite-float-array-valued field. -/
+def expectFieldFiniteFloatArray (j : Json) (k : String) (ctx : String) : IO (Array Float) := do
+  expectFiniteFloatArray (← expectField j k ctx) s!"{ctx}.{k}"
+
 /-- Extract a float-matrix-valued field. -/
 def expectFieldFloatMatrix (j : Json) (k : String) (ctx : String) :
     IO (Array (Array Float)) := do
   expectFloatMatrix (← expectField j k ctx) s!"{ctx}.{k}"
+
+/-- Extract a finite-float-matrix-valued field. -/
+def expectFieldFiniteFloatMatrix (j : Json) (k : String) (ctx : String) :
+    IO (Array (Array Float)) := do
+  expectFiniteFloatMatrix (← expectField j k ctx) s!"{ctx}.{k}"
 
 /-- Extract an optional string-valued field. -/
 def optionalFieldString? (j : Json) (k : String) (ctx : String) : IO (Option String) := do

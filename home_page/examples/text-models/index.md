@@ -48,7 +48,7 @@ small enough that the input and target tensors can be written down directly.
 The larger `text_gpt2` command can also use GPT-2 BPE files:
 
 ```bash
-lake exe -K cuda=true torchlean text_gpt2 --cuda \
+lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
   --data-file data/real/text/tinystories_valid.txt \
   --bpe-vocab data/real/gpt2/vocab.json \
   --bpe-merges data/real/gpt2/merges.txt \
@@ -127,7 +127,7 @@ familiar.
 Try the short CUDA run:
 
 ```bash
-lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
   --steps 300 --windows 32 --lr 0.001 --prompt "ROMEO:" --generate 220 \
   --temperature 0.85 --top-k 24 --repeat-penalty 1.25 --repeat-window 24 \
   --sample-seed 11 --log data/model_zoo/gpt2_trainlog.json
@@ -136,7 +136,7 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
 For a tiny runtime check, keep the same CUDA path and shrink the workload:
 
 ```bash
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 ## Saving and Reloading Parameters
@@ -188,7 +188,7 @@ trained.printSummary
 Run it with:
 
 ```bash
-lake exe -K cuda=true torchlean mamba --cuda --fast-kernels --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare \
   --steps 1 --windows 1 --generate 0
 ```
 

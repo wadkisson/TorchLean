@@ -234,12 +234,12 @@ def maxPool2dMultiSpec {kH kW inH inW inC stride : ℕ} {h1 : kH ≠ 0} {h2 : kW
   Tensor.dim (fun c => maxPool2dSpec layer (getAtSpec input c))
 
 /--
-Forward-mode JVP for hard max-pooling (single-channel).
+Selected-branch linearization for hard max-pooling (single-channel).
 
-The tangent is read at the argmax chosen by the primal input. At ties the first row-major
-maximizer is used, matching `maxPool2dBackwardSpec` and PyTorch's index convention.
+Away from ties this is the JVP. At ties it reads the tangent at the first row-major primal
+maximizer, matching `maxPool2dBackwardSpec` and PyTorch's index convention.
 -/
-def maxPool2dJvpSpec {kH kW inH inW stride : ℕ} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
+def maxPool2dLinearizationSpec {kH kW inH inW stride : ℕ} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   {hStride : stride ≠ 0}
   (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
   (input tangent : Image inH inW α) :
@@ -267,14 +267,15 @@ def maxPool2dJvpSpec {kH kW inH inW stride : ℕ} {h1 : kH ≠ 0} {h2 : kW ≠ 0
       else
         Tensor.scalar 0))
 
-/-- Multi-channel JVP for hard max-pooling (channel-wise application). -/
-def maxPool2dMultiJvpSpec {kH kW inH inW inC stride : ℕ} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
+/-- Multi-channel selected-branch linearization for hard max-pooling. -/
+def maxPool2dMultiLinearizationSpec {kH kW inH inW inC stride : ℕ} {h1 : kH ≠ 0}
+  {h2 : kW ≠ 0}
   {hStride : stride ≠ 0}
   (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
   (input tangent : MultiChannelImage inC inH inW α) :
   MultiChannelImage inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1) α :=
   Tensor.dim (fun c =>
-    maxPool2dJvpSpec (layer := layer)
+    maxPool2dLinearizationSpec (layer := layer)
       (input := getAtSpec input c) (tangent := getAtSpec tangent c))
 
 /--
@@ -428,7 +429,7 @@ def adaptiveMaxPool2dSpec {inH inW inC : ℕ} (outH outW : ℕ)
         let actual_kW := end_j - start_j
 
         -- Find max in the region
-        -- We seed the fold with the first element instead of using a sentinel like `-1000`.
+        -- We seed the fold with the first element instead of using a finite sentinel.
         -- That choice works for arbitrary scalar types and scales.
         let init : Tensor α .scalar :=
           -- `getValueAtPosition` performs the bounds check for us, so we don't have to thread a

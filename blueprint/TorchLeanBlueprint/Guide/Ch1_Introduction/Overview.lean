@@ -7,9 +7,9 @@ open Verso.Genre Manual
 tag := "overview"
 %%%
 
-TorchLean is a Lean 4 framework for neural networks that can be run as programs and discussed as
-mathematical objects. The central design constraint is simple: the model we execute, the graph we
-inspect, and the object we mention in a theorem should still be recognizably the same model.
+TorchLean is a Lean 4 framework for building neural networks and making precise claims about them.
+Its central requirement is that the model being executed, the graph being inspected, and the object
+named in a theorem remain connected by definitions that a reader can follow.
 
 That sentence is easy to say and surprisingly hard to maintain in an ML system. A model starts as
 source code. It may become initialized parameters, a trained checkpoint, a graph, a compiled
@@ -19,21 +19,19 @@ layout, logits or probabilities, train mode or evaluation mode, real arithmetic 
 or open input bounds. TorchLean is interested in the places where those conventions stop being
 obvious.
 
-Modern ML systems are larger than a model definition. A serious workflow may include a parameter
+Modern ML systems are larger than a model definition. A working system may include a parameter
 file, a tokenizer, a graph export, a runtime mode, a fused kernel, a floating point convention, a
 verifier certificate, and a scientific claim. TorchLean gives those pieces names inside one Lean
 development, so runnable examples, graph semantics, numerical models, and checked artifacts can be
 read together instead of treated as unrelated files.
 
-PyTorch remains the everyday training ecosystem for many projects. TorchLean starts where meaning
-has to survive movement: from model code to graph, from graph to runtime, from runtime to
-certificate, and from certificate to theorem. Exported graphs, generated kernels, and verifier
-artifacts are now easy to produce. The harder question is whether the artifact says what the paper,
-experiment, or deployment claim says it does.
+PyTorch remains the everyday training ecosystem for many projects. TorchLean addresses a different
+problem: preserving meaning when a model moves from source code to a graph, from a graph to a
+runtime, and from a runtime artifact to a mathematical claim. Producing an export is easy; showing
+that it contains the intended model, parameters, scalar convention, and property is the harder part.
 
-The ordinary user import is [`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean).
-The implementation umbrella remains
-[NN](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean), and narrower entry points include
+Most files begin with [`import NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean).
+Files that deliberately work inside one subsystem can use narrower entry points such as
 [NN.Entrypoint.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/API.lean),
 [NN.Entrypoint.GraphSpec](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/GraphSpec.lean),
 [NN.Entrypoint.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/IR.lean), and
@@ -112,8 +110,6 @@ not as a comment beside a script.
 
 # Claim Vocabulary
 
-This guide uses a few words carefully.
-
 - A *runtime result* is what an executable path produced on some inputs. It can be useful evidence,
   especially when compared against another backend, but it is not by itself a theorem.
 - A *check* is an executable validation step. Shape inference, JSON parsing, certificate replay, and
@@ -124,9 +120,9 @@ This guide uses a few words carefully.
 - A *trust boundary* is a place where TorchLean names an external producer or runtime rather than
   pretending Lean has proved its internals.
 
-This vocabulary is deliberately modest. It lets the guide say "the CUDA path agrees with this
-reference on these test cases," "the checker recomputed this bound," and "the theorem proves this
-enclosure for the supported graph fragment" as three different sentences.
+These words prevent three different results from being collapsed into one: a CUDA parity test, a
+checker that recomputes a bound, and a theorem that proves an enclosure for a supported graph
+fragment.
 
 # Three Views Of One Model
 
@@ -140,9 +136,8 @@ Under the hood, the same model appears in three representations:
 - *Graph IR*: the DAG with named operations shared by runtime tooling, widgets, export, and verification.
 - *Runtime layer*: eager or compiled execution, autograd, optimizers, logging, and optional CUDA.
 
-The goal is not to make every layer look the same. The goal is to connect the model you run, the
-model you inspect, and the model you state theorems about by explicit translations rather than by
-informal correspondence.
+The layers are intentionally different representations. Their translations, rather than similar
+names or neighboring files, establish that they describe the same model.
 
 # The Object We Keep In View
 
@@ -184,8 +179,8 @@ so effective for day-to-day deep learning engineering; see Paszke et al.,
 Lean supplies the dependent type theory and small-kernel proof-checking discipline described in the
 [Lean language reference](https://lean-lang.org/doc/reference/latest/) and in de Moura et al.,
 ["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf). Neural-network verification
-contributes the bound-propagation and certificate ideas used later in the guide, including IBP,
-CROWN, and LiRPA-style graph relaxations.
+contributes the bound-propagation and certificate ideas behind TorchLean's IBP, CROWN, and
+LiRPA-style graph relaxations.
 
 Those references are background, not claims that TorchLean inherits their results automatically.
 TorchLean reuses ideas from the surrounding ecosystem while keeping its own proof objects, executable
@@ -194,8 +189,8 @@ checks, and external assumptions explicit.
 # Fast When Needed, Explicit When It Matters
 
 TorchLean separates fast execution from proof, but it does not treat them as unrelated worlds. For
-prototyping, examples can use the host runtime or optional CUDA backed float32 paths. For guarantees,
-we move to graph denotations, Float32 models, certificate checkers, and Lean theorems. The boundary
+prototyping, examples can use the host runtime or optional CUDA-backed float32 paths. Formal
+guarantees use graph denotations, Float32 models, certificate checkers, and Lean theorems. The boundary
 is visible: some parts are proved in Lean, and some parts are external systems that must be named
 and checked around.
 
@@ -206,15 +201,16 @@ deployed computation. TorchLean's design pushes parameter payloads, graph loweri
 into explicit data so that this kind of agreement can be inspected and, where the library has the
 theorem support, proved.
 
-# How To Read The Rest
+# References
 
-The next chapters follow the same model through several forms. First it is ordinary user code. Then
-it becomes a parameterized computation, a runtime value, a graph, a floating point computation, and
-a verification target. Later examples add the details that real systems need: token ids, masks,
-spectral convolutions, optimizer state, CUDA kernels, imported certificates, and scientific
-residuals.
-
-You do not need to know all of Lean before reading the ML examples. Keep track of which object is
-being discussed. When a chapter writes a theorem, ask what it denotes. When a chapter runs a command,
-ask what artifact the command produced. When a chapter crosses into CUDA, PyTorch, Julia, Arb, or an
-external verifier, ask which part is checked in Lean and which part is an explicitly named producer.
+- de Moura et al., ["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf), CADE 2015.
+- de Moura and Ullrich, ["The Lean 4 Theorem Prover and Programming
+  Language"](https://lean-lang.org/papers/lean4.pdf), CADE 2021.
+- Paszke et al., ["PyTorch: An Imperative Style, High-Performance Deep Learning
+  Library"](https://arxiv.org/abs/1912.01703), NeurIPS 2019.
+- Gowal et al., ["On the Effectiveness of Interval Bound Propagation for Training Verifiably Robust
+  Models"](https://arxiv.org/abs/1810.12715), 2018.
+- Zhang et al., ["Efficient Neural Network Robustness Certification with General Activation
+  Functions"](https://arxiv.org/abs/1811.00866), NeurIPS 2018.
+- Xu et al., ["Automatic Perturbation Analysis for Scalable Certified Robustness and
+  Beyond"](https://arxiv.org/abs/2002.12920), NeurIPS 2020.

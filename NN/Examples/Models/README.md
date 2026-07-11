@@ -36,7 +36,7 @@ The runner currently exposes these model and workflow commands:
 | Deep dives | `floats_arb_ieee_compare`, `float32_modes`, `graphspec`, `ir_axis_ops`, `one_semantic_universe`, `torch_ir_pytorch` |
 
 Use `lake exe torchlean --help` for the current command list and example invocations. Runtime flags
-such as `--cpu`, `--cuda`, `--dtype`, and `--backend` can appear before or after the command name.
+such as `--device cpu`, `--device cuda`, `--dtype`, and `--backend` can appear before or after the command name.
 
 For a compact public-surface regression pass, run:
 
@@ -90,23 +90,23 @@ hooks; those cases should be explicit in file comments rather than leaking into 
 training path by accident.
 
 ```bash
-lake exe -K cuda=true torchlean mlp --cuda --steps 100 --lr 0.003 \
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 100 --lr 0.003 \
   --log data/model_zoo/mlp_trainlog.json
 
-lake exe torchlean kan --cpu --steps 50 --lr 0.01 \
+lake exe torchlean kan --device cpu --steps 50 --lr 0.01 \
   --log data/model_zoo/kan_trainlog.json
 
-lake exe -K cuda=true torchlean cnn --cuda --fast-kernels --n-total 1 \
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 \
   --steps 1 --lr 0.001 --log data/model_zoo/cnn_trainlog.json
 
-lake exe -K cuda=true torchlean vit --cuda --fast-kernels --n-total 1 \
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 \
   --steps 1 --lr 0.001 --log data/model_zoo/vit_trainlog.json
 ```
 
 The LSTM regression example trains on household-power windows and prints before/after forecast rows:
 
 ```bash
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 1 --windows 4 \
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 1 --windows 4 \
   --log data/model_zoo/lstm_regression_trainlog.json
 ```
 
@@ -116,12 +116,12 @@ Text models read a corpus, tokenize it, and build causal language-model windows 
 targets. The shared token APIs live in `TorchLean.text`.
 
 ```bash
-lake exe -K cuda=true torchlean mamba --cuda --fast-kernels --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare \
   --steps 2000 --windows 384 --lr 0.004 --prompt "ROMEO:" --generate 260 \
   --temperature 0.75 --top-k 10 --sample-seed 11 \
   --log data/model_zoo/mamba_seq64_fixedsampler_2000.json
 
-lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
   --steps 300 --windows 32 --lr 0.001 --prompt "ROMEO:" --generate 220 \
   --temperature 0.85 --top-k 24 --repeat-penalty 1.25 --repeat-window 24 \
   --sample-seed 11 --log data/model_zoo/gpt2_trainlog.json
@@ -134,24 +134,24 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare \
 ## Generative, Operator, And RL Runs
 
 ```bash
-lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1 \
+lake -R -K cuda=true exe torchlean autoencoder --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean vae --device cuda --steps 1 --n-total 1 \
   --log data/model_zoo/vae_trainlog.json
-lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1 \
+lake -R -K cuda=true exe torchlean vqvae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean gan --device cuda --steps 1 --n-total 1 \
   --log data/model_zoo/gan_trainlog.json
 
-lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset cifar10 --n-total 800 --steps 200 --hidden-c 8 --T 100 --beta-end 0.12 \
   --sample-ppm data/model_zoo/diffusion_sample.ppm
 
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --steps 200 \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 200 \
   --log data/model_zoo/fno1d_burgers_trainlog.json
 
-lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --a 7 --b 8
-lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
-lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean mae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1 --a 7 --b 8
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 lake exe torchlean dqn_replay
 ```
 

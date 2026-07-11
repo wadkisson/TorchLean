@@ -669,6 +669,54 @@ __global__ void reduce_max_by_row_f32(const float* in, float* out, uint32_t rows
   }
 }
 
+__global__ void hard_masked_softmax_by_row_f32(const float* scores, const float* mask, float* out,
+                                                uint32_t rows, uint32_t cols) {
+  if (blockDim.x != kBlockSize) return;
+  const uint32_t row = (uint32_t)blockIdx.x;
+  if (row >= rows) return;
+
+  __shared__ float sdata[kBlockSize];
+  const int tid = threadIdx.x;
+  const size_t base = (size_t)row * (size_t)cols;
+
+  float m = -INFINITY;
+  for (uint32_t c = (uint32_t)tid; c < cols; c += (uint32_t)blockDim.x) {
+    if (mask[base + (size_t)c] != 0.0f) {
+      m = fmaxf(m, scores[base + (size_t)c]);
+    }
+  }
+  sdata[tid] = m;
+  __syncthreads();
+  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) sdata[tid] = fmaxf(sdata[tid], sdata[tid + s]);
+    __syncthreads();
+  }
+  const float rowMax = sdata[0];
+
+  float z = 0.0f;
+  if (rowMax != -INFINITY) {
+    for (uint32_t c = (uint32_t)tid; c < cols; c += (uint32_t)blockDim.x) {
+      if (mask[base + (size_t)c] != 0.0f) {
+        z += expf(scores[base + (size_t)c] - rowMax);
+      }
+    }
+  }
+  sdata[tid] = z;
+  __syncthreads();
+  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (tid < s) sdata[tid] += sdata[tid + s];
+    __syncthreads();
+  }
+  const float denom = sdata[0];
+
+  for (uint32_t c = (uint32_t)tid; c < cols; c += (uint32_t)blockDim.x) {
+    const size_t idx = base + (size_t)c;
+    out[idx] = (mask[idx] != 0.0f && denom != 0.0f)
+        ? expf(scores[idx] - rowMax) / denom
+        : 0.0f;
+  }
+}
+
 __global__ void concat1d_f32(const float* a, size_t n, const float* b, size_t m, float* out) {
   const size_t idx = (size_t)blockIdx.x * (size_t)blockDim.x + (size_t)threadIdx.x;
   const size_t total = n + m;
@@ -918,6 +966,29 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_reduce_max_by_row(b_le
   dim3 threads = dim3(kBlockSize);
   reduce_max_by_row_f32<<<blocks, threads>>>(b->data, out->data, rows, cols);
   checkCuda(cudaGetLastError(), "cuda reduceMaxByRow kernel launch failed");
+  return torchlean_cuda_buffer_box(out);
+}
+
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_hard_masked_softmax_by_row(
+    b_lean_obj_arg ScoresObj, b_lean_obj_arg MaskObj, uint32_t rows, uint32_t cols) {
+  torchlean_cuda_buffer* scores = torchlean_cuda_buffer_unbox(ScoresObj);
+  torchlean_cuda_buffer* mask = torchlean_cuda_buffer_unbox(MaskObj);
+  const size_t R = (size_t)rows;
+  const size_t C = (size_t)cols;
+  const size_t total = checked_mul_size(
+      R, C, "torchlean_cuda_buffer_hard_masked_softmax_by_row: R*C overflow");
+  if (scores->size != total || mask->size != total) {
+    lean_internal_panic("torchlean_cuda_buffer_hard_masked_softmax_by_row: size mismatch");
+  }
+
+  torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(total);
+  if (R == 0 || C == 0) return torchlean_cuda_buffer_box(out);
+
+  check_axis_grid_size(
+      R, "torchlean_cuda_buffer_hard_masked_softmax_by_row: rows exceed CUDA x-grid range");
+  hard_masked_softmax_by_row_f32<<<dim3((unsigned int)R), dim3(kBlockSize)>>>(
+      scores->data, mask->data, out->data, rows, cols);
+  checkCuda(cudaGetLastError(), "cuda hardMaskedSoftmaxByRow kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 
@@ -1869,47 +1940,42 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_flash_attention_fwd(
   return torchlean_cuda_buffer_box(out);
 }
 
-#define TORCHLEAN_FLASH_BWD_EXPORT(name, kernel, label)                                           \
-  extern "C" LEAN_EXPORT lean_obj_res name(                                                       \
-      b_lean_obj_arg QObj, b_lean_obj_arg KObj, b_lean_obj_arg VObj, b_lean_obj_arg MaskObj,       \
-      b_lean_obj_arg DOutObj, uint32_t hasMask, uint32_t batch, uint32_t n, uint32_t d,            \
-      double scaleHost) {                                                                          \
-    torchlean_cuda_buffer* Q = torchlean_cuda_buffer_unbox(QObj);                                  \
-    torchlean_cuda_buffer* K = torchlean_cuda_buffer_unbox(KObj);                                  \
-    torchlean_cuda_buffer* V = torchlean_cuda_buffer_unbox(VObj);                                  \
-    torchlean_cuda_buffer* mask = torchlean_cuda_buffer_unbox(MaskObj);                            \
-    torchlean_cuda_buffer* dOut = torchlean_cuda_buffer_unbox(DOutObj);                            \
-    const size_t qkvSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)d,                    \
-                                           label ": Q/K/V/dOut size overflow");                   \
-    const size_t maskSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)n,                   \
-                                           label ": mask size overflow");                         \
-    if (Q->size != qkvSz || K->size != qkvSz || V->size != qkvSz || dOut->size != qkvSz) {         \
-      lean_internal_panic(label ": Q/K/V/dOut size mismatch");                                    \
-    }                                                                                              \
-    if (hasMask != 0 && mask->size != maskSz) {                                                    \
-      lean_internal_panic(label ": mask size mismatch");                                          \
-    }                                                                                              \
-    torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc(qkvSz);                               \
-    if (qkvSz == 0) return torchlean_cuda_buffer_box(out);                                         \
-    dim3 blocks = blocks_for(qkvSz);                                                               \
-    dim3 threads = dim3(kBlockSize);                                                               \
-    kernel<<<blocks, threads>>>(Q->data, K->data, V->data, mask->data, dOut->data, hasMask, batch, \
-                                n, d, (float)scaleHost, out->data);                                \
-    checkCuda(cudaGetLastError(), label " kernel launch failed");                                 \
-    return torchlean_cuda_buffer_box(out);                                                         \
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_flash_attention_bwd(
+    b_lean_obj_arg QObj, b_lean_obj_arg KObj, b_lean_obj_arg VObj, b_lean_obj_arg MaskObj,
+    b_lean_obj_arg DOutObj, uint32_t hasMask, uint32_t batch, uint32_t n, uint32_t d,
+    double scaleHost) {
+  torchlean_cuda_buffer* Q = torchlean_cuda_buffer_unbox(QObj);
+  torchlean_cuda_buffer* K = torchlean_cuda_buffer_unbox(KObj);
+  torchlean_cuda_buffer* V = torchlean_cuda_buffer_unbox(VObj);
+  torchlean_cuda_buffer* mask = torchlean_cuda_buffer_unbox(MaskObj);
+  torchlean_cuda_buffer* dOut = torchlean_cuda_buffer_unbox(DOutObj);
+  const size_t qkvSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)d,
+                                         "cuda flashAttention backward: Q/K/V/dOut size overflow");
+  const size_t maskSz = checked_mul3_size((size_t)batch, (size_t)n, (size_t)n,
+                                          "cuda flashAttention backward: mask size overflow");
+  if (Q->size != qkvSz || K->size != qkvSz || V->size != qkvSz || dOut->size != qkvSz) {
+    lean_internal_panic("cuda flashAttention backward: Q/K/V/dOut size mismatch");
   }
-
-TORCHLEAN_FLASH_BWD_EXPORT(torchlean_cuda_buffer_flash_attention_bwd_q,
-                           flash_attention_bwd_q_f32,
-                           "cuda flashAttention backward Q")
-TORCHLEAN_FLASH_BWD_EXPORT(torchlean_cuda_buffer_flash_attention_bwd_k,
-                           flash_attention_bwd_k_f32,
-                           "cuda flashAttention backward K")
-TORCHLEAN_FLASH_BWD_EXPORT(torchlean_cuda_buffer_flash_attention_bwd_v,
-                           flash_attention_bwd_v_f32,
-                           "cuda flashAttention backward V")
-
-#undef TORCHLEAN_FLASH_BWD_EXPORT
+  if (hasMask != 0 && mask->size != maskSz) {
+    lean_internal_panic("cuda flashAttention backward: mask size mismatch");
+  }
+  torchlean_cuda_buffer* dQ = torchlean_cuda_buffer_alloc(qkvSz);
+  torchlean_cuda_buffer* dK = torchlean_cuda_buffer_alloc(qkvSz);
+  torchlean_cuda_buffer* dV = torchlean_cuda_buffer_alloc(qkvSz);
+  if (qkvSz == 0) return torchlean_cuda_box_three_buffers(dQ, dK, dV);
+  dim3 blocks = blocks_for(qkvSz);
+  dim3 threads = dim3(kBlockSize);
+  flash_attention_bwd_q_f32<<<blocks, threads>>>(Q->data, K->data, V->data, mask->data, dOut->data,
+                                                 hasMask, batch, n, d, (float)scaleHost, dQ->data);
+  checkCuda(cudaGetLastError(), "cuda flashAttention backward Q kernel launch failed");
+  flash_attention_bwd_k_f32<<<blocks, threads>>>(Q->data, K->data, V->data, mask->data, dOut->data,
+                                                 hasMask, batch, n, d, (float)scaleHost, dK->data);
+  checkCuda(cudaGetLastError(), "cuda flashAttention backward K kernel launch failed");
+  flash_attention_bwd_v_f32<<<blocks, threads>>>(Q->data, K->data, V->data, mask->data, dOut->data,
+                                                 hasMask, batch, n, d, (float)scaleHost, dV->data);
+  checkCuda(cudaGetLastError(), "cuda flashAttention backward V kernel launch failed");
+  return torchlean_cuda_box_three_buffers(dQ, dK, dV);
+}
 
 extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_transpose2d(b_lean_obj_arg BObj,
                                                                      uint32_t rows, uint32_t cols) {

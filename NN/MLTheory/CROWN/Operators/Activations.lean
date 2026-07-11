@@ -99,17 +99,28 @@ def tanhApprox (x : α) : α :=
 def leakyRelu (negSlope : α) (x : α) : α :=
   if x > Numbers.zero then x else negSlope * x
 
+/-- Minimum of two scalar values using the executable order from the scalar context. -/
+def min2 (x y : α) : α :=
+  if x < y then x else y
+
+/-- Maximum of two scalar values using the executable order from the scalar context. -/
+def max2 (x y : α) : α :=
+  if x > y then x else y
+
 /-- IBP for Leaky ReLU on scalars. -/
 def ibpLeakyReluScalar (negSlope : α) (l u : α) : α × α :=
-  -- Both branches are linear, just apply to endpoints
   let fl := leakyRelu negSlope l
   let fu := leakyRelu negSlope u
   -- For the usual positive slope, the function is monotone increasing.
   if negSlope > Numbers.zero then
     (fl, fu)
   else
-    -- If negative slope, need min/max
-    (if fl < fu then fl else fu, if fl > fu then fl else fu)
+    -- For non-positive negative-branch slopes, a crossing interval has a kink value at zero.
+    -- Endpoint-only min/max is unsound, e.g. α=-1 on [-1,2] has minimum 0 at the kink.
+    if (!(l > Numbers.zero)) && (!(u < Numbers.zero)) then
+      (min2 (min2 fl fu) Numbers.zero, max2 (max2 fl fu) Numbers.zero)
+    else
+      (min2 fl fu, max2 fl fu)
 
 /-- IBP for Leaky ReLU on boxes. -/
 def ibpLeakyRelu (n : Nat) (negSlope : α) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
@@ -137,13 +148,20 @@ def affLeakyRelu (negSlope : α) (l u : α) : α × α × α × α :=
     -- Negative region: y = αx
     (negSlope, Numbers.zero, negSlope, Numbers.zero)
   else
-    -- Crossing region: both branches active
-    -- Use triangle relaxation similar to ReLU
-    let slope_upper := (u - negSlope * l) / (u - l)
-    let bias_upper := u * (Numbers.one - slope_upper)
-    -- Lower bound: use minimum slope (α if α < 1, else 1)
-    let slope_lower := if negSlope < Numbers.one then negSlope else Numbers.one
-    (slope_lower, Numbers.zero, slope_upper, bias_upper)
+    if !(u > l) then
+      -- The only valid degenerate crossing interval is `[0,0]`; use its exact zero map and avoid
+      -- the secant's `0/0` denominator.
+      (Numbers.zero, Numbers.zero, Numbers.zero, Numbers.zero)
+    else
+      -- The secant joins `(l, αl)` to `(u, u)`. For α ≤ 1 the kink is convex, so the
+      -- negative-branch line is a lower support and the secant is upper. For α > 1 the kink is
+      -- concave and those roles reverse.
+      let secantSlope := (u - negSlope * l) / (u - l)
+      let secantBias := u * (Numbers.one - secantSlope)
+      if negSlope > Numbers.one then
+        (secantSlope, secantBias, negSlope, Numbers.zero)
+      else
+        (negSlope, Numbers.zero, secantSlope, secantBias)
 
 /-- Derivative bounds for Leaky ReLU (for Lyapunov). -/
 def derivLeakyRelu (negSlope : α) (l u : α) : α × α :=
@@ -158,13 +176,13 @@ def derivLeakyRelu (negSlope : α) (l u : α) : α × α :=
 
 /-! ### ELU (Exponential Linear Unit) -/
 
-/-- ELU: f(x) = x if x > 0, α(exp(x) - 1) if x ≤ 0. -/
-def elu (scale : α) (x : α) : α :=
+/-- Executable ELU approximation using `expApprox` on the negative branch. -/
+def eluApprox (scale : α) (x : α) : α :=
   if x > Numbers.zero then x
   else scale * (expApprox x - Numbers.one)
 
-/-- Scalar interval rule for ELU over an input interval `[l,u]`. -/
-def ibpEluScalar (scale : α) (l u : α) : α × α :=
+/-- Approximate scalar interval rule for ELU over an input interval `[l,u]`. -/
+def ibpEluApproxScalar (scale : α) (l u : α) : α × α :=
   if l > Numbers.zero then
     -- Pure positive region
     (l, u)
@@ -176,23 +194,23 @@ def ibpEluScalar (scale : α) (l u : α) : α × α :=
     let negMin := scale * (expApprox l - Numbers.one)
     (negMin, u)
 
-/-- Interval propagation for ELU on a vector box. -/
-def ibpElu (n : Nat) (scale : α) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/-- Approximate interval propagation for ELU on a vector box. -/
+def ibpEluApprox (n : Nat) (scale : α) (B : Box α (.dim n .scalar)) :
+    Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpEluScalar scale l u).1)
+        Tensor.scalar (ibpEluApproxScalar scale l u).1)
     let outHi := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpEluScalar scale l u).2)
+        Tensor.scalar (ibpEluApproxScalar scale l u).2)
     { lo := outLo, hi := outHi }
 
-/-- Affine bounds for ELU.
-    Positive branch is linear, negative branch is nonlinear (exp). -/
-def affElu (scale : α) (l u : α) : α × α × α × α :=
+/-- Approximate affine ELU candidates; no enclosure theorem is claimed. -/
+def affEluApprox (scale : α) (l u : α) : α × α × α × α :=
   if l > Numbers.zero then
     (Numbers.one, Numbers.zero, Numbers.one, Numbers.zero)
   else if u < Numbers.zero then
@@ -211,8 +229,8 @@ def affElu (scale : α) (l u : α) : α × α × α × α :=
     let slope_lower := scale * expApprox l  -- derivative at l
     (slope_lower, fl - slope_lower * l, slope_upper, bias_upper)
 
-/-- Derivative bounds for ELU. -/
-def derivElu (scale : α) (l u : α) : α × α :=
+/-- Approximate ELU derivative range computed with `expApprox`. -/
+def derivEluApprox (scale : α) (l u : α) : α × α :=
   if l > Numbers.zero then
     (Numbers.one, Numbers.one)
   else if u < Numbers.zero then
@@ -224,19 +242,12 @@ def derivElu (scale : α) (l u : α) : α × α :=
 
 /-! ### Softplus -/
 
-/-- Softplus: f(x) = log(1 + exp(x)).
-    Using approximation since Numbers.log may not be available. -/
-def softplus (x : α) : α :=
-  -- For numerical stability: log(1 + exp(x)) ≈ x for large x
-  -- Use approximation
-  softplusApprox x
-
-/-- IBP for Softplus. Softplus is monotone increasing. -/
-def ibpSoftplusScalar (l u : α) : α × α :=
+/-- Approximate IBP for Softplus. Softplus is monotone increasing for the intended function. -/
+def ibpSoftplusApproxScalar (l u : α) : α × α :=
   (softplusApprox l, softplusApprox u)
 
-/-- IBP for Softplus on boxes. -/
-def ibpSoftplus (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/-- Approximate IBP for Softplus on boxes. -/
+def ibpSoftplusApprox (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
@@ -249,14 +260,14 @@ def ibpSoftplus (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar
 
 /-! ### SiLU/Swish -/
 
-/-- SiLU/Swish: f(x) = x · sigmoid(x). -/
-def silu (x : α) : α :=
+/-- Executable SiLU approximation using `sigmoidApprox`. -/
+def siluApprox (x : α) : α :=
   x * sigmoidApprox x
 
-/-- IBP for SiLU. Not monotone, has global minimum around x ≈ -1.28. -/
-def ibpSiluScalar (l u : α) : α × α :=
-  let fl := silu l
-  let fu := silu u
+/-- Approximate IBP for SiLU. Not monotone, has global minimum around x ≈ -1.28. -/
+def ibpSiluApproxScalar (l u : α) : α × α :=
+  let fl := siluApprox l
+  let fu := siluApprox u
   -- SiLU minimum is at x ≈ -1.28, value ≈ -0.28
   let critX := -(Numbers.one + Numbers.pointfive * Numbers.pointfive)  -- approx -1.25
   let critVal := critX * sigmoidApprox critX
@@ -270,33 +281,33 @@ def ibpSiluScalar (l u : α) : α × α :=
     -- Spans minimum
     (critVal, if fl > fu then fl else fu)
 
-/-- Apply the scalar SiLU interval rule coordinatewise to a vector box. -/
-def ibpSilu (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/-- Apply the approximate scalar SiLU interval rule coordinatewise to a vector box. -/
+def ibpSiluApprox (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpSiluScalar l u).1)
+        Tensor.scalar (ibpSiluApproxScalar l u).1)
     let outHi := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpSiluScalar l u).2)
+        Tensor.scalar (ibpSiluApproxScalar l u).2)
     { lo := outLo, hi := outHi }
 
 /-! ### Mish -/
 
-/-- Mish: f(x) = x · tanh(softplus(x)). -/
-def mish (x : α) : α :=
+/-- Executable Mish approximation using the local tanh and softplus approximations. -/
+def mishApprox (x : α) : α :=
   x * tanhApprox (softplusApprox x)
 
-/-- IBP for Mish. Similar behavior to SiLU. -/
-def ibpMishScalar (l u : α) : α × α :=
-  let fl := mish l
-  let fu := mish u
+/-- Approximate IBP for Mish. Similar behavior to SiLU. -/
+def ibpMishApproxScalar (l u : α) : α × α :=
+  let fl := mishApprox l
+  let fu := mishApprox u
   -- Mish minimum is around x ≈ -1.22
   let critX := -(Numbers.one + Numbers.pointfive * Numbers.pointfive)
-  let critVal := mish critX
+  let critVal := mishApprox critX
   if l > critX then
     (fl, fu)
   else if u < critX then
@@ -304,47 +315,18 @@ def ibpMishScalar (l u : α) : α × α :=
   else
     (critVal, if fl > fu then fl else fu)
 
-/-- Apply the scalar Mish interval rule coordinatewise to a vector box. -/
-def ibpMish (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/-- Apply the approximate scalar Mish interval rule coordinatewise to a vector box. -/
+def ibpMishApprox (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
     let outLo := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpMishScalar l u).1)
+        Tensor.scalar (ibpMishApproxScalar l u).1)
     let outHi := Tensor.dim (fun i =>
       match lo i, hi i with
       | .scalar l, .scalar u =>
-        Tensor.scalar (ibpMishScalar l u).2)
+        Tensor.scalar (ibpMishApproxScalar l u).2)
     { lo := outLo, hi := outHi }
-
-namespace Theorems
-
-/-- Leaky ReLU definition structure. -/
-theorem leaky_relu_def (negSlope x : α) :
-    leakyRelu negSlope x = if x > Numbers.zero then x else negSlope * x := by
-  rfl
-
-/-- Definitional unfolding lemma for the ELU scalar approximation used by CROWN operators. -/
-theorem elu_def (scale x : α) :
-    elu scale x = if x > Numbers.zero then x else scale * (expApprox x - Numbers.one) := by
-  rfl
-
-/-- Softplus definition structure. -/
-theorem softplus_def (x : α) :
-    softplus x = softplusApprox x := by
-  rfl
-
-/-- IBP for leaky ReLU returns a pair. -/
-theorem ibp_leaky_relu_scalar_pair (negSlope l u : α) :
-    ∃ lo hi : α, ibpLeakyReluScalar negSlope l u = (lo, hi) := by
-  exact ⟨(ibpLeakyReluScalar negSlope l u).1, (ibpLeakyReluScalar negSlope l u).2, rfl⟩
-
-/-- IBP for ELU returns a pair. -/
-theorem ibp_elu_scalar_pair (scale l u : α) :
-    ∃ lo hi : α, ibpEluScalar scale l u = (lo, hi) := by
-  exact ⟨(ibpEluScalar scale l u).1, (ibpEluScalar scale l u).2, rfl⟩
-
-end Theorems
 
 end NN.MLTheory.CROWN.Operators.Activations

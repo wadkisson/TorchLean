@@ -17,8 +17,8 @@ This is the load-and-sample half of the byte-level GPT example.
 1. Train and save parameters:
 
 ```bash
-lake build -R -K cuda=true torchlean:exe
-lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 \
+lake -R -K cuda=true build torchlean:exe
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 \
   --prompt "First Citizen:" --generate 0 \
   --save-params data/model_zoo/gpt2_shakespeare.params.json
 ```
@@ -26,7 +26,7 @@ lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --
 2. Load the saved weights and sample text (no training loop, no optimizer state):
 
 ```bash
-lake exe -K cuda=true torchlean gpt2_saved --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean gpt2_saved --device cuda \
   --params data/model_zoo/gpt2_shakespeare.params.json \
   --prompt "First Citizen:" --generate 0
 ```
@@ -61,7 +61,7 @@ def exeName : String := "torchlean gpt2_saved"
 def usage : String :=
   String.intercalate "\n"
     [ "Usage:"
-    , "  lake exe -K cuda=true torchlean gpt2_saved --cuda --params PATH [generation flags]"
+    , "  lake -R -K cuda=true exe torchlean gpt2_saved --device cuda --params PATH [generation flags]"
     , ""
     , "Required:"
     , "  --params PATH        JSON parameter checkpoint written by `torchlean gpt2 --save-params`"

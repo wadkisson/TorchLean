@@ -52,10 +52,10 @@ def expectFieldObjE (ctx key : String) (j : Json) :
 def expectFieldArrayE (ctx key : String) (j : Json) : Except String (Array Json) := do
   NN.API.Json.expectArrayE s!"{ctx}.{key}" (← NN.API.Json.expectFieldE ctx key j)
 
-/-- Require a JSON array whose entries are all floats. -/
+/-- Require a JSON array whose entries are all finite floats. -/
 def expectFloatArrayE (ctx : String) (j : Json) : Except String (Array Float) := do
   let xs ← NN.API.Json.expectArrayE ctx j
-  xs.mapIdxM (fun i x => NN.Verification.Json.expectFloatE s!"{ctx}[{i}]" x)
+  xs.mapIdxM (fun i x => NN.Verification.Json.expectFiniteFloatE s!"{ctx}[{i}]" x)
 
 /-- Require a float-array field. -/
 def expectFieldFloatArrayE (ctx key : String) (j : Json) :
@@ -64,8 +64,8 @@ def expectFieldFloatArrayE (ctx key : String) (j : Json) :
 
 /-- Require an interval object `{ "lo": ..., "hi": ... }`. -/
 def expectIntervalPairE (ctx : String) (j : Json) : Except String (Float × Float) := do
-  let lo ← NN.Verification.Json.expectFieldFloatE ctx "lo" j
-  let hi ← NN.Verification.Json.expectFieldFloatE ctx "hi" j
+  let lo ← NN.Verification.Json.expectFieldFiniteFloatE ctx "lo" j
+  let hi ← NN.Verification.Json.expectFieldFiniteFloatE ctx "hi" j
   pure (lo, hi)
 
 /-- Require an array of interval pairs with an expected length. -/
@@ -88,7 +88,7 @@ def expectIntervalPairArrayE (ctx : String) (j : Json) (expected : Nat) :
 /-- Require one finite-difference `u_bounds` entry. -/
 def expectUBoundsEntryE (ctx : String) (j : Json) :
     Except String (Float × (Float × Float) × (Float × Float) × (Float × Float)) := do
-  let x ← NN.Verification.Json.expectFieldFloatE ctx "x" j
+  let x ← NN.Verification.Json.expectFieldFiniteFloatE ctx "x" j
   let uMinus ← expectIntervalPairE s!"{ctx}.u_minus" (← NN.API.Json.expectFieldE ctx "u_minus" j)
   let u ← expectIntervalPairE s!"{ctx}.u" (← NN.API.Json.expectFieldE ctx "u" j)
   let uPlus ← expectIntervalPairE s!"{ctx}.u_plus" (← NN.API.Json.expectFieldE ctx "u_plus" j)
@@ -259,7 +259,7 @@ def laplacianBounds2D (g : Graph) (ps : ParamStore Float) : Option (Float × Flo
 /-- Parse the JSON certificate consumed by the PINN verification CLI. -/
 def parseCert (j : Json) : Except String (PinnCfg × (List (Float × Float)) × (List (Float × Float))
   × (List (Float × (Float×Float) × (Float×Float) × (Float×Float)))) := do
-  let o ← NN.API.Json.expectObjE "PINN certificate" j
+  let _ ← NN.API.Json.expectObjE "PINN certificate" j
   let po ← expectFieldObjE "PINN certificate" "pinn" j
   let pdeStr ←
     match Std.TreeMap.Raw.get? po "pde" with
@@ -269,20 +269,17 @@ def parseCert (j : Json) : Except String (PinnCfg × (List (Float × Float)) × 
         match pdeJ with
         | .str s => pure s
         | _ => throw "PINN certificate.pinn.pde: expected string"
-  let h ← NN.Verification.Json.expectFieldFloatE "PINN certificate.pinn" "h" (.obj po)
-  let eps ← NN.Verification.Json.expectFieldFloatE "PINN certificate.pinn" "eps" (.obj po)
+  let h ← NN.Verification.Json.expectFieldFiniteFloatE "PINN certificate.pinn" "h" (.obj po)
+  let eps ← NN.Verification.Json.expectFieldFiniteFloatE "PINN certificate.pinn" "eps" (.obj po)
   let ptsA ← expectFieldFloatArrayE "PINN certificate.pinn" "points" (.obj po)
   let nPts := ptsA.size
   let pts : Spec.Tensor Float (.dim nPts .scalar) :=
     Spec.Tensor.dim (fun i => Spec.Tensor.scalar ptsA[i])
   let rb ← NN.API.Json.expectFieldE "PINN certificate" "residual_bounds" j
   let resPairs ← expectIntervalPairArrayE "PINN certificate.residual_bounds" rb nPts
-  -- optional derivative-based residuals
+  let derivJ ← NN.API.Json.expectFieldE "PINN certificate" "residual_bounds_deriv" j
   let resPairsDeriv ←
-    match Std.TreeMap.Raw.get? o "residual_bounds_deriv" with
-    | some Json.null => pure <| List.replicate nPts (0.0, 0.0)
-    | some derivJ => expectIntervalPairArrayE "PINN certificate.residual_bounds_deriv" derivJ nPts
-    | _ => pure <| List.replicate nPts (0.0, 0.0)
+    expectIntervalPairArrayE "PINN certificate.residual_bounds_deriv" derivJ nPts
   let ubA ← expectFieldArrayE "PINN certificate" "u_bounds" j
   let uTriples ← (List.finRange ubA.size).mapM (fun (i : Fin ubA.size) =>
     expectUBoundsEntryE s!"PINN certificate.u_bounds[{i.val}]" ubA[i.val])

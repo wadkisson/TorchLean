@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 Device-agnostic example:
-  lake exe torchlean rnn --cpu
-  lake exe -K cuda=true torchlean rnn --cuda
+  lake exe torchlean rnn --device cpu
+  lake -R -K cuda=true exe torchlean rnn --device cuda
 
 This example trains a tiny byte-level RNN on real text:
 - load a corpus through `--tiny-shakespeare` or `--data-file`,
@@ -35,7 +35,7 @@ longer contexts, use `chargpt`, `gpt2`, or `text_gpt2`.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean rnn --device cuda --tiny-shakespeare --steps 1
 ```
 -/
 
@@ -103,6 +103,7 @@ def main (args : List String) : IO UInt32 := do
       defaultLogJson := defaultLogJson
       defaultSteps := 1
       description := "vanilla RNN"
+      dataOptions := RealData.TextCorpusFlags.help
       parseData := RealData.TextCorpusFlags.parse
       train := train }
     args

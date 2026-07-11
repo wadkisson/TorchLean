@@ -24,6 +24,39 @@ namespace Cuda
 
 namespace Buffer
 
+/-! ### Runtime Availability -/
+
+/-- What implementation sits behind the CUDA FFI symbols in the current process. -/
+inductive RuntimeStatus where
+  /-- Default non-CUDA builds provide host-memory parity stubs for low-level tests. -/
+  | cpuStub
+  /-- The project was built with CUDA and at least one CUDA device is visible. -/
+  | nativeAvailable
+  /-- The project was built with CUDA, but no usable CUDA device is visible. -/
+  | nativeUnavailable
+  deriving DecidableEq, Repr
+
+@[extern "torchlean_cuda_runtime_status"]
+opaque runtimeStatusRaw (token : UInt32) : UInt32
+
+/-- Query whether the linked CUDA symbols are native or the CPU parity stubs. -/
+def runtimeStatus (token : UInt32 := 0) : RuntimeStatus :=
+  match runtimeStatusRaw token with
+  | 0 => .cpuStub
+  | 1 => .nativeAvailable
+  | _ => .nativeUnavailable
+
+/-- Require real CUDA execution for a user-selected CUDA session. -/
+def requireNativeRuntime : IO Unit :=
+  match runtimeStatus with
+  | .nativeAvailable => pure ()
+  | .cpuStub =>
+      throw <| IO.userError
+        "CUDA was requested, but this executable is linked to TorchLean's CPU parity stubs; rebuild and run with `-K cuda=true`"
+  | .nativeUnavailable =>
+      throw <| IO.userError
+        "CUDA was requested and this is a CUDA build, but no usable CUDA device is visible"
+
 /-!
 ### Deterministic Reductions Mode
 

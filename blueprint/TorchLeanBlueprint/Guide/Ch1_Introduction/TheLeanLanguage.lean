@@ -47,7 +47,7 @@ theorem scoreIsPositive_zero : scoreIsPositive 0 := by
 ```
 
 The first definition is a program. The second definition is a proposition about that program. The
-third declaration proves one instance of the proposition. When the guide talks about a verifier,
+third declaration proves one instance of the proposition. A verifier
 this is the shape to remember: a checker can be executable code, while soundness is a theorem about
 what acceptance by that checker means.
 

@@ -35,9 +35,7 @@ the registry explicitly (for example `NN.Verification.CLI`).
 
 The underlying CROWN/LiRPA soundness development enters here too. Executable examples can parse
 JSON artifacts and recompute bounds inside Lean; theorem-level credit comes from those imported
-soundness modules, where locally valid certificates are connected to Lean graph semantics. The
-convenience aliases in `NN.Verification.ProofBackedCertificates` sit one layer above this entrypoint
-and re-export the main theorem handles under verification names.
+soundness modules, where locally valid certificates are connected to Lean graph semantics.
 -/
 
 @[expose] public section

@@ -284,7 +284,7 @@ def run_ibp() -> Dict[str, Any]:
             }
         },
         "pinn": {
-            "pde": "u''(x) = 0",
+            "pde": "uxx",
             "domain": [0.0, 1.0],
             "h": h,
             "eps": eps,

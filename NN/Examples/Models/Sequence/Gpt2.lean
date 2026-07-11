@@ -4,18 +4,17 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 CUDA text example:
-  lake exe -K cuda=true torchlean gpt2 --cuda --steps 1 --windows 1 --generate 0
-  lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --prompt "First Citizen:" --steps 1 \
+  lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1 --windows 1 --generate 0
+  lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --prompt "First Citizen:" --steps 1 \
     --windows 1 --generate 0 --temperature 0.85 --top-k 12 --sample-seed 7
-  lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 \
+  lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 \
     --save-params data/model_zoo/gpt2_shakespeare.params.json
-  lake exe -K cuda=true torchlean gpt2_saved --cuda --fast-kernels --params data/model_zoo/gpt2_shakespeare.params.json \
+  lake -R -K cuda=true exe torchlean gpt2_saved --device cuda --params data/model_zoo/gpt2_shakespeare.params.json \
     --prompt "First Citizen:" --generate 0
 
 Dataset example:
   python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-  lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
-  lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 --generate 0
+  lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 
 This is a GPT-2-style *causal* language-model command (byte-level tokens).
 
@@ -57,7 +56,7 @@ wiring and save/reload loop.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 -/
 
@@ -318,7 +317,7 @@ def main (args : List String) : IO UInt32 := do
     (banner := ModelZoo.bannerWithDevice exeName "causal LM training")
     (k := fun opts rest => do
       let (input, rest) ← takeInputText rest
-      let defaultSteps : Nat := if opts.useGpu then 1 else 0
+      let defaultSteps : Nat := if opts.usesCuda then 1 else 0
       let (train, rest) ← ModelZoo.orThrow exeName <|
         text.InteractiveCheckpointedWindowedTrainGenerationOptions.parse
           exeName rest defaultLogJson defaultSteps 0.001 1

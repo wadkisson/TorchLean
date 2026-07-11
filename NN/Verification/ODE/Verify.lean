@@ -711,8 +711,8 @@ structure ODECertificate where
 
 /-- Parse an interval object `{ lo: ..., hi: ... }` from JSON. -/
 private def parseIntervalObj (j : Json) : Except String Interval := do
-  let lo ← NN.Verification.Json.expectFieldFloatE "interval" "lo" j
-  let hi ← NN.Verification.Json.expectFieldFloatE "interval" "hi" j
+  let lo ← NN.Verification.Json.expectFieldFiniteFloatE "interval" "lo" j
+  let hi ← NN.Verification.Json.expectFieldFiniteFloatE "interval" "hi" j
   if hi < lo then throw "interval: hi < lo" else
   pure { lo := lo, hi := hi }
 
@@ -725,18 +725,18 @@ private def parsePairObj (j : Json) : Except String (Float × Float) := do
 private def parseSettings (j : Json) : Except String ODEVerifierSettings := do
   match j with
   | .obj o =>
-    let maxDepth :=
+    let maxDepth ←
       match o.get? "maxDepth" with
-      | some (.num n) => (n.toFloat.toUInt64).toNat
-      | _ => 18
-    let minWidth :=
+      | some value => NN.API.Json.expectNatE "settings.maxDepth" value
+      | none => pure 18
+    let minWidth ←
       match o.get? "minWidth" with
-      | some (.num n) => n.toFloat
-      | _ => 1e-3
-    let slack :=
+      | some value => NN.Verification.Json.expectFiniteFloatE "settings.minWidth" value
+      | none => pure 1e-3
+    let slack ←
       match o.get? "slack" with
-      | some (.num n) => n.toFloat
-      | _ => 0.0
+      | some value => NN.Verification.Json.expectFiniteFloatE "settings.slack" value
+      | none => pure 0.0
     let verbose :=
       match o.get? "verbose" with
       | some (.bool b) => b
@@ -758,13 +758,15 @@ private def parseSettings (j : Json) : Except String ODEVerifierSettings := do
 /-- Parse a single segment object from the certificate JSON. -/
 private def parseSegment (j : Json) : Except String ODECertificateSegment := do
   let _ ← NN.API.Json.expectObjE "segment" j
-  let t0 ← NN.Verification.Json.expectFieldFloatE "segment" "t0" j
-  let t1 ← NN.Verification.Json.expectFieldFloatE "segment" "t1" j
+  let t0 ← NN.Verification.Json.expectFieldFiniteFloatE "segment" "t0" j
+  let t1 ← NN.Verification.Json.expectFieldFiniteFloatE "segment" "t1" j
   let initJ ← NN.API.Json.expectFieldE "segment" "init" j
   let init ←
     match initJ with
     | .obj _ => parsePairObj initJ
-    | .num n => pure (n.toFloat, n.toFloat)
+    | .num _ =>
+        let x ← NN.Verification.Json.expectFiniteFloatE "segment.init" initJ
+        pure (x, x)
     | _ => throw "segment.init must be number or {lo,hi}"
   let lw ← NN.Verification.Json.expectFieldStringE "segment" "lowerWeights" j
   let uw ← NN.Verification.Json.expectFieldStringE "segment" "upperWeights" j
@@ -778,6 +780,8 @@ def parseODECertificate (j : Json) : Except String ODECertificate := do
   let segArr ← NN.API.Json.expectArrayE "ode certificate.segments" <|
     ← NN.API.Json.expectFieldE "ode certificate" "segments" j
   let segs ← segArr.toList.mapM parseSegment
+  if segs.isEmpty then
+    throw "ode certificate.segments must contain at least one segment"
   let settings ←
     match Std.TreeMap.Raw.get? o "settings" with
     | some settingsJ => parseSettings settingsJ

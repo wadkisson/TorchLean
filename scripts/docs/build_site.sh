@@ -98,7 +98,7 @@ Site assets and Jekyll output are rebuilt.
 
 Preview with:
   cd home_page
-  bundle _2.3.14_ exec jekyll serve --config _config.yml,_config_dev.yml
+  bundle _2.3.14_ exec jekyll serve --config _config.yml,_config_dev.yml --port 4001
 
 If Bundler warns about its version, install the lockfile version once:
   gem install bundler:2.3.14

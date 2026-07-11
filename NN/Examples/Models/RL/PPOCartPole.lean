@@ -32,7 +32,7 @@ More concretely:
 
 ## CLI flags
 
-- `--cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
+- `--device cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
 - `--seed <n>`: deterministic seed for TorchLean RNG streams (and evaluation seeding).
 - `--updates <n>`: limit the number of PPO rollout/update cycles.
 - `--log <path>`: write the widget log JSON to a custom path.
@@ -41,7 +41,7 @@ Run (from the repo root):
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0'
-lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 Artifacts:

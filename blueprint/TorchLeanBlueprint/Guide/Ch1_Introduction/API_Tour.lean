@@ -63,9 +63,8 @@ def publicMlp : nn.M (nn.Sequential (Shape.vec 8) (Shape.vec 3)) :=
 #check publicMlp
 ```
 
-When the guide later mentions `NN.IR.Graph`, `NN.Spec`, `NN.MLTheory.CROWN`, or
-`NN.Verification`, it is usually because the page has shifted from "how do I build and run this
-model?" to "what does this artifact mean?" The module names are a map of that shift.
+`NN.IR.Graph`, `NN.Spec`, `NN.MLTheory.CROWN`, and `NN.Verification` shift the question from "how do
+I build and run this model?" to "what does this artifact mean?"
 
 # Tensors And Models
 
@@ -135,8 +134,7 @@ def task (seed : Nat) :=
   Trainer.new classifier { task := .classification, seed := seed }
 ```
 
-Later chapters rely on that separation. A training step can be read as an explicit
-state transition:
+That separation makes a training step an explicit state transition:
 
 $$`\mathrm{step} :
   (\theta,\mathrm{optState},\mathrm{rng},\mathrm{mode},x,y)
@@ -267,13 +265,6 @@ Fast kernels are boundaries too. For attention, the mathematical contract is ord
 dot product attention, while fused FlashAttention implementations are optimized kernels that must be
 related back to that contract. The relevant proof statements live near the attention and GPU
 chapters: a fast path should preserve a slow, readable meaning, or else it is a different model.
-
-# Reading The Rest Of The Guide
-
-This tour should make the later chapters easier to navigate. *Building Models* explains the public
-API in detail. *Runtime and Interop* shows training, logs, execution modes, and PyTorch
-round trips. *Semantics and Graphs* fixes the graph denotation. *Verification* explains how checked
-artifacts become claims about the model.
 
 # References
 

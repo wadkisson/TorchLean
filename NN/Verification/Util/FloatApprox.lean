@@ -25,7 +25,8 @@ namespace NN.Verification.Util
 
 /-- Absolute-difference comparison on `Float`. -/
 def approxEq (x y : Float) (tol : Float := 1e-6) : Bool :=
-  let d := (if x > y then x - y else y - x)
-  decide (d ≤ tol)
+  x.isFinite && y.isFinite && tol.isFinite && decide (0.0 ≤ tol) &&
+    let d := (if x > y then x - y else y - x)
+    decide (d ≤ tol)
 
 end NN.Verification.Util

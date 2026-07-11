@@ -311,12 +311,12 @@ def boxSqrt (B : FlatBox α) : FlatBox α :=
     lo := Tensor.sqrtSpec (α := α) B.lo
     hi := Tensor.sqrtSpec (α := α) B.hi }
 
-/-- Componentwise reciprocal bounds using `operators.arithmetic.ibp_reciprocal`. -/
+/-- Componentwise reciprocal bounds, failing when an input coordinate interval crosses zero. -/
 @[expose]
-def boxInv (B : FlatBox α) : FlatBox α :=
-  let yB := NN.MLTheory.CROWN.Operators.Arithmetic.ibpReciprocal (α := α) (n := B.dim) (ofFlatBox
-    B)
-  toFlatBox B.dim yB
+def boxInv? (B : FlatBox α) : Option (FlatBox α) := do
+  let yB ← NN.MLTheory.CROWN.Operators.Arithmetic.ibpReciprocal? (α := α) (n := B.dim)
+    (ofFlatBox B)
+  pure (toFlatBox B.dim yB)
 
 /-- Dynamic tensor value used while reshaping and permuting flattened boxes. -/
 abbrev FlatDVal (α : Type) [Context α] : Type :=

@@ -278,7 +278,7 @@ rounded-arithmetic error bounds have also been supplied.
 
 # Learning Theory Claim Checklist
 
-For a learning theory claim, the guide should make four fields visible:
+A learning-theory claim has four visible fields:
 
 ```
 object       : mechanism, classifier, algorithm, dataset, trajectory, or estimator
@@ -293,18 +293,18 @@ without a numerical bridge.
 
 # A Concrete Comparison To Mainstream Stacks
 
-Here is the practical difference we are aiming for:
+The formal statements differ from common runtime evidence in specific ways:
 
-- If a script says an optimizer is differentially private because it used a DP library, the
-  TorchLean guidepost is to define a mechanism and prove the DP event inequality or import a
+- If a script says an optimizer is differentially private because it used a DP library, the formal
+  claim must define a mechanism and prove the DP event inequality or import a
   checked theorem.
 - If no attack found an adversarial example, that is runtime evidence unless it implies
   `isCertifiedRobust`.
-- If a model seems stable when retrained, the formal guidepost is a replace one stability predicate
+- If a model seems stable when retrained, the formal statement is a replace-one stability predicate
   over `Dataset n Z`.
-- If a dynamical system stayed bounded in simulation, the formal guidepost is a BIBO, ISS,
+- If a dynamical system stayed bounded in simulation, the formal statement is a BIBO, ISS,
   Lyapunov, or related stability predicate.
-- If the theorem is over the reals but the code uses float32, the guidepost is an
+- If the theorem is over the reals but the code uses float32, the missing link is an
   `IEEE32Exec`/FP32 bridge with explicit finite path hypotheses.
 
 This does not make TorchLean automatically prove every learning theory theorem. It makes the boundary
@@ -319,23 +319,18 @@ between theorem, checker, diagnostic, and assumption harder to blur.
   ["Stability and Generalization"](https://jmlr.org/papers/v2/bousquet02a.html),
   JMLR 2002.
 
-# Suggested Path Through The Theory
+# Learning Theory APIs
 
-For readers coming in fresh, we recommend this first pass:
+We keep the mathematical predicate beside the executable evidence that may support it. These are the
+main entry points:
 
-1. Read the [differential privacy core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/DifferentialPrivacy/Core.lean)
-   for the smallest complete example of a reusable measure theoretic definition plus closure
-   lemmas.
-2. Read the [robustness spec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Spec.lean) beside
-   the [robustness runtime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Runtime.lean) to see the
-   spec/runtime split.
-3. Read the [stability core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Core.lean) for datasets,
-   replace one perturbations, learning maps, and loss/error definitions.
-4. Read the [ridge regression real theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/Real.lean)
-   for a complete theorem development with explicit constants.
-5. Read the [ridge regression IEEE32Exec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/IEEE32Exec.lean)
-   when you want the finite precision bridge.
-
-The common voice across this layer is intentional: we built small, named definitions first, then
-attached runtime checks and proof obligations to them. TorchLean can then keep ML engineering and
-formal learning theory in the same codebase without treating them as the same activity.
+- The [differential privacy core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/DifferentialPrivacy/Core.lean)
+  gives a reusable measure-theoretic definition and closure lemmas.
+- The [robustness spec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Spec.lean) and
+  [robustness runtime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Runtime.lean) expose the spec/runtime split.
+- The [stability core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Core.lean) defines datasets,
+  replace-one perturbations, learning maps, and loss/error functions.
+- The [ridge regression real theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/Real.lean)
+  contains a complete theorem with explicit constants.
+- The [ridge regression IEEE32Exec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/IEEE32Exec.lean)
+  supplies the finite-precision bridge.

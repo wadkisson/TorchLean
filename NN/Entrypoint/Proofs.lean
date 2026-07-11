@@ -31,6 +31,7 @@ public import NN.Proofs.Autograd.Tape.Ops.Norm.LayerNorm
 public import NN.Proofs.Autograd.Training.StepAlgebra
 public import NN.Proofs.Gradients.Activation
 public import NN.Proofs.Gradients.Linear
+public import NN.Proofs.IR
 public import NN.Proofs.Models
 public import NN.Proofs.Probability
 public import NN.Proofs.RuntimeApprox
@@ -76,7 +77,10 @@ Proof landmarks:
 - model-level invariants: `NN.Proofs.Models`,
 - probability-kernel facts: `NN.Proofs.Probability`,
 - runtime-approximation bounds: `NN.Proofs.RuntimeApprox.*`,
-- verification envelopes and backend bridges: `NN.Proofs.Verification`.
+- verification envelopes: `NN.Proofs.Verification`.
+
+Backend contract data lives under `NN.Backend`. It is not re-exported here until the proof layer has
+semantic/refinement theorems rather than planner metadata.
 
 References / context:
 - PyTorch autograd background:

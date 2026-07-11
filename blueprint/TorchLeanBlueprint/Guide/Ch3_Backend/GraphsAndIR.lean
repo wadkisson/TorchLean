@@ -450,7 +450,7 @@ User-facing model code and graph artifacts meet at a semantic boundary:
 - the bridge succeeds by producing a graph plus payload/parameter store, or fails with an explicit
   unsupported-operator error.
 
-The IR chapter is therefore not another tour of the training API. It is the contract for the graph
+The IR is not another training API. It is the contract for the graph
 that verification, export, and inspection tools consume.
 
 # Compiling TorchLean Programs To IR

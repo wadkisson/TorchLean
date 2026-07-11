@@ -120,7 +120,6 @@ instance [Numbers α] [Zero α] : Numbers (Complex α) where
   log10 := ofReal Numbers.log10
   log10000 := ofReal Numbers.log10000
   epsilon := ofReal Numbers.epsilon
-  neg_thousand := ofReal Numbers.neg_thousand
 
 /-! ## Transcendentals -/
 

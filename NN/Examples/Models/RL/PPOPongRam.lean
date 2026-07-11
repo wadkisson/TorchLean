@@ -39,7 +39,7 @@ python3 -m pip install --user 'gymnasium>=1.0' ale-py
 
 ## CLI flags
 
-- `--cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
+- `--device cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
 - `--updates <n>`: number of PPO updates to run.
 - `--eval-every <n>`: evaluate the greedy policy every `n` updates.
 - `--eval-episodes <n>`: number of evaluation episodes per checkpoint.
@@ -84,7 +84,7 @@ def exeName : String := "torchlean ppo_pong_ram"
 def usage : String :=
   String.intercalate "\n"
     [ "Usage:"
-    , "  lake exe -K cuda=true torchlean ppo_pong_ram --cuda [PPO flags]"
+    , "  lake -R -K cuda=true exe torchlean ppo_pong_ram --device cuda [PPO flags]"
     , ""
     , "PPO flags:"
     , "  --updates N          number of PPO updates"

@@ -22,7 +22,7 @@ and the same code runs on CPU or CUDA through TorchLean autograd.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 -/
 

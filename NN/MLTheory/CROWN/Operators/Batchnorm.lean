@@ -17,10 +17,15 @@ public import NN.Spec.Core.TensorOps
 This file bounds inference-time BatchNorm. Since inference-time BatchNorm is an affine
 transformation (with frozen statistics), both IBP and affine propagation are exact (componentwise).
 
-At inference time,
-`y = γ * (x - μ) / sqrt(σ² + ε) + β`,
+At inference time, TorchLean uses
+`y = γ * (x - μ) / sqrt(max(σ², 0) + ε) + β`,
 so the layer reduces to `y = scale * x + offset`, where
-`scale = γ / sqrt(σ² + ε)` and `offset = β - γ * μ / sqrt(σ² + ε)`.
+`scale = γ / sqrt(max(σ², 0) + ε)` and
+`offset = β - γ * μ / sqrt(max(σ², 0) + ε)`.
+
+The `max` is the same totalization used by `Spec.batchNormInference` and the IR evaluator. It has no
+effect on valid nonnegative running variances, while keeping every TorchLean layer aligned on
+malformed approximate-runtime inputs.
 
 References:
 - Ioffe and Szegedy, "Batch Normalization: Accelerating Deep Network Training by Reducing
@@ -54,24 +59,24 @@ structure BatchNormParams (α : Type) [Context α] where
   /-- Small constant for numerical stability -/
   eps : α
 
-/-- Compute the equivalent affine scale: γ / √(σ² + ε) -/
+/-- Compute the equivalent affine scale: `γ / sqrt(max(σ², 0) + ε)`. -/
 def computeScale (params : BatchNormParams α) : Tensor α (.dim params.dim .scalar) :=
   match params.running_var, params.gamma with
   | .dim var, .dim gam =>
     Tensor.dim (fun i =>
       match var i, gam i with
       | .scalar v, .scalar g =>
-        let denom := MathFunctions.sqrt (v + params.eps)
+        let denom := MathFunctions.sqrt (max v Numbers.zero + params.eps)
         Tensor.scalar (g / denom))
 
-/-- Compute the equivalent affine offset: β - γ * μ / √(σ² + ε) -/
+/-- Compute the equivalent affine offset: `β - γ * μ / sqrt(max(σ², 0) + ε)`. -/
 def computeOffset (params : BatchNormParams α) : Tensor α (.dim params.dim .scalar) :=
   match params.running_mean, params.running_var, params.gamma, params.beta with
   | .dim mu, .dim var, .dim gam, .dim bet =>
     Tensor.dim (fun i =>
       match mu i, var i, gam i, bet i with
       | .scalar m, .scalar v, .scalar g, .scalar b =>
-        let denom := MathFunctions.sqrt (v + params.eps)
+        let denom := MathFunctions.sqrt (max v Numbers.zero + params.eps)
         Tensor.scalar (b - g * m / denom))
 
 /-- IBP for BatchNorm: since BN is affine, we can compute exact bounds.
@@ -142,46 +147,15 @@ def derivBatchnorm (params : BatchNormParams α)
         Tensor.scalar (if s > Numbers.zero then s * dh else s * dl))
     { lo := outLo, hi := outHi }
 
-/-- Second derivative of BatchNorm is zero (affine function). -/
+/--
+Propagate second-derivative bounds through inference-time BatchNorm.
+
+Although the second derivative of the affine map `x ↦ scale * x + offset` with respect to `x` is
+zero, composition with a curve `x(t)` gives `d²/dt² BN(x(t)) = scale * x''(t)`. Consequently this
+uses the same signed scaling rule as first-derivative propagation.
+-/
 def secondDerivBatchnorm (params : BatchNormParams α)
-    (_d2B : Box α (.dim params.dim .scalar)) : Box α (.dim params.dim .scalar) :=
-  let zero := Spec.fill (α:=α) Numbers.zero (.dim params.dim .scalar)
-  { lo := zero, hi := zero }
-
-namespace Theorems
-
-/-- BatchNorm IBP produces a valid Box structure. -/
-theorem ibp_batchnorm_returns_box (params : BatchNormParams α)
-    (xB : Box α (.dim params.dim .scalar)) :
-    ∃ lo hi : Tensor α (.dim params.dim .scalar), ibpBatchnorm params xB = { lo := lo, hi := hi }
-      := by
-  simp only [ibpBatchnorm, computeScale, computeOffset]
-  match xB.lo, xB.hi, params.running_var, params.gamma, params.running_mean, params.beta with
-  | .dim _, .dim _, .dim _, .dim _, .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-/-- BatchNorm affine transformation preserves structure. -/
-theorem aff_batchnorm_returns_affine {inDim : Nat} (params : BatchNormParams α)
-    (aff : AffineVec α inDim params.dim) :
-    ∃ A' c', (affBatchnorm params aff).A = A' ∧ (affBatchnorm params aff).c = c' := by
-  exact ⟨(affBatchnorm params aff).A, (affBatchnorm params aff).c, rfl, rfl⟩
-
-/-- BatchNorm derivative IBP produces valid Box. -/
-theorem deriv_batchnorm_returns_box (params : BatchNormParams α)
-    (dB : Box α (.dim params.dim .scalar)) :
-    ∃ lo hi : Tensor α (.dim params.dim .scalar), derivBatchnorm params dB = { lo := lo, hi := hi }
-      := by
-  simp only [derivBatchnorm, computeScale]
-  match dB.lo, dB.hi, params.running_var, params.gamma with
-  | .dim _, .dim _, .dim _, .dim _ => exact ⟨_, _, rfl⟩
-
-/-- BatchNorm second derivative is zero (affine function). -/
-theorem second_derivative_batchnorm_is_zero (params : BatchNormParams α)
-    (d2B : Box α (.dim params.dim .scalar)) :
-    let result := secondDerivBatchnorm params d2B
-    result.lo = result.hi := by
-  unfold secondDerivBatchnorm
-  rfl
-
-end Theorems
+    (d2B : Box α (.dim params.dim .scalar)) : Box α (.dim params.dim .scalar) :=
+  derivBatchnorm params d2B
 
 end NN.MLTheory.CROWN.Operators.Batchnorm

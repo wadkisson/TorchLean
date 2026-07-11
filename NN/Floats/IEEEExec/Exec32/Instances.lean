@@ -259,7 +259,6 @@ instance : Numbers IEEE32Exec where
   log10 := ofFloat (Float.log 10)
   log10000 := ofFloat (Float.log 10000)
   epsilon := ofFloat (1e-6)
-  neg_thousand := ofFloat (-1000)
 
 /-- `Context` instance so the spec layer can execute with `IEEE32Exec` scalars. -/
 instance : Context IEEE32Exec := {

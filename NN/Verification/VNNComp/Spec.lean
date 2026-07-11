@@ -64,15 +64,15 @@ def loadSuite (path : String) : IO (Array Instance) := do
   for ex in instArr do
     let exo ← expectObj ex "instance"
     let id ← expectFieldNat exo "id" "instance"
-    let lo ← expectFieldFloatArray exo "input_lo" "instance"
-    let hi ← expectFieldFloatArray exo "input_hi" "instance"
+    let lo ← expectFieldFiniteFloatArray exo "input_lo" "instance"
+    let hi ← expectFieldFiniteFloatArray exo "input_hi" "instance"
     let specArr ← expectFieldArray exo "spec" "instance"
     let mut specOut : Spec := #[]
     for t in specArr do
       let termObj ← expectObj t "spec term"
       let matJ ← expectField termObj "mat" "spec term"
-      let mat ← expectFloatMatrix matJ "spec term.mat"
-      let rhs ← expectFieldFloatArray termObj "rhs" "spec term"
+      let mat ← expectFiniteFloatMatrix matJ "spec term.mat"
+      let rhs ← expectFieldFiniteFloatArray termObj "rhs" "spec term"
       specOut := specOut.push (mat, rhs)
     out := out.push { id := id, inputLo := lo, inputHi := hi, spec := specOut }
   pure out

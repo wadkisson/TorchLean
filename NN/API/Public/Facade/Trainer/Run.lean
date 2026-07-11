@@ -78,15 +78,9 @@ def withBackend (run : RunConfig) (backend : Runtime.Backend) : RunConfig :=
 def withDevice (run : RunConfig) (device : Runtime.Device) : RunConfig :=
   { run with device := device }
 
-/-- Enable or disable runtime-only fast kernels for this run configuration. -/
-def withFastKernels (run : RunConfig) (enabled : Bool := true) : RunConfig :=
-  { run with fastKernels := enabled }
-
-/-- Override CUDA matmul precision for fast kernels. -/
-def withFastGpuMatmulPrecision
-    (run : RunConfig)
-    (precision : _root_.Runtime.Autograd.FastKernels.GpuMatmulPrecision) : RunConfig :=
-  { run with fastGpuMatmulPrecision := precision }
+/-- Enable or disable first-use backend capsule reporting. -/
+def withBackendReport (run : RunConfig) (enabled : Bool := true) : RunConfig :=
+  { run with showBackend := enabled }
 
 /-- Use the eager runtime backend. -/
 def eager (run : RunConfig) : RunConfig :=
@@ -108,9 +102,8 @@ def cuda (run : RunConfig) : RunConfig :=
 def withOptions (run : RunConfig) (opts : Options) : RunConfig :=
   { run with
       backend := opts.backend
-      device := if opts.useGpu then .cuda else .cpu
-      fastKernels := opts.fastKernels
-      fastGpuMatmulPrecision := opts.fastGpuMatmulPrecision }
+      device := opts.device
+      showBackend := opts.showBackend }
 
 /-- Build a run configuration from parsed runtime flags and trainer choices. -/
 def fromOptions (opts : Options) (base : RunConfig := {}) : RunConfig :=
@@ -119,9 +112,8 @@ def fromOptions (opts : Options) (base : RunConfig := {}) : RunConfig :=
 /-- Lower a public run configuration to the runtime `Options` record. -/
 def toOptions (run : RunConfig) : Options :=
   { backend := run.backend
-    fastKernels := run.fastKernels
-    fastGpuMatmulPrecision := run.fastGpuMatmulPrecision
-    useGpu := run.device == .cuda }
+    requestedDevice := run.device
+    showBackend := run.showBackend }
 
 /-- CLI spelling for a Float32 runtime mode. -/
 def float32ModeArg : TorchLean.Floats.Float32Mode → String
@@ -142,15 +134,16 @@ def backendArgs : Runtime.Backend → List String
 
 /-- CLI arguments that reproduce a public device choice. -/
 def deviceArgs : Runtime.Device → List String
-  | .cpu => ["--cpu"]
-  | .cuda => ["--cuda"]
-
-/-- CLI arguments that reproduce the CUDA matmul precision setting. -/
-def precisionArgs
-    (p : _root_.Runtime.Autograd.FastKernels.GpuMatmulPrecision) : List String :=
-  match p with
-  | .fp32 => ["--fast-gpu-matmul-precision", "fp32"]
-  | .fp64 => ["--fast-gpu-matmul-precision", "fp64"]
+  | .auto => ["--device", "auto"]
+  | .cpu => ["--device", "cpu"]
+  | .cuda => ["--device", "cuda"]
+  | .rocm => ["--device", "rocm"]
+  | .metal => ["--device", "metal"]
+  | .wasm => ["--device", "wasm"]
+  | .tpu => ["--device", "tpu"]
+  | .trainium => ["--device", "trainium"]
+  | .custom => ["--device", "custom"]
+  | .external => ["--device", "external"]
 
 /-- Parse CLI runtime flags into persistent trainer run settings. -/
 def parseRuntimeArgs (args : List String) (base : RunConfig := {}) :
@@ -161,9 +154,8 @@ def parseRuntimeArgs (args : List String) (base : RunConfig := {}) :
     ({ base with
         dtype := exec.dtype
         backend := exec.backend
-        device := if exec.useGpu then .cuda else .cpu
-        fastKernels := exec.fastKernels
-        fastGpuMatmulPrecision := exec.fastGpuMatmulPrecision },
+        device := exec.device
+        showBackend := exec.showBackend },
       rest)
 
 /-- Resolve runtime flags into a `Trainer.RunConfig` and reject unused trailing arguments. -/
@@ -182,8 +174,7 @@ def toArgs (run : RunConfig) : List String :=
   dtypeArgs run.dtype ++
   backendArgs run.backend ++
   deviceArgs run.device ++
-  (if run.fastKernels then ["--fast-kernels"] else []) ++
-  precisionArgs run.fastGpuMatmulPrecision
+  (if run.showBackend then ["--show-backend"] else [])
 
 end RunConfig
 
@@ -199,8 +190,7 @@ def fromRunConfig {σ τ : Shape}
     dtype := run.dtype
     backend := run.backend
     device := run.device
-    fastKernels := run.fastKernels
-    fastGpuMatmulPrecision := run.fastGpuMatmulPrecision }
+    showBackend := run.showBackend }
 
 end Config
 

@@ -35,8 +35,8 @@ lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- \
 With CUDA enabled, model examples that support device buffers add a device choice:
 
 ```
-lake exe -K cuda=true torchlean mlp --cuda --steps 100
-lake exe -K cuda=true torchlean mlp --cuda --steps 1000 --cuda-mem-watch 100
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 100
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 1000 --cuda-mem-watch 100
 ```
 
 The flags change how the model is evaluated. They do not change the layer structure or parameter
@@ -53,7 +53,7 @@ The runtime choices separate into four decisions:
   shape and architecture stay fixed.
 - Backend choice: `--backend eager` or `--backend compiled` changes whether the run produces an
   eager tape or a reusable graph artifact.
-- Device choice: `--cpu` or `--cuda` changes whether supported numeric buffers live on the host or
+- Device choice: `--device cpu` or `--device cuda` changes whether supported numeric buffers live on the host or
   on CUDA device memory.
 - CUDA diagnostics: `--cuda-mem-watch N` samples native allocator state every `N` training updates.
   Long CUDA model runs choose a small default cadence so the terminal shows whether device memory is
@@ -189,7 +189,7 @@ def cudaTrainer :=
       device := .cuda }
 ```
 
-In command-line examples, the same choice appears as `--cuda`. If an example says CUDA currently
+In command-line examples, the same choice appears as `--device cuda`. If an example says CUDA currently
 requires `--dtype float`, read that as a runtime support constraint, not as a change to the
 mathematical tensor type in the spec layer.
 
@@ -219,13 +219,13 @@ It helps to keep this small map in mind:
   definition stays fixed.
 - `--backend compiled` changes the runtime artifact to a reusable compiled graph. The public model
   definition stays fixed.
-- `--cpu` versus `--cuda` changes where supported numeric buffers live. The Lean specification and
+- `--device cpu` versus `--device cuda` changes where supported numeric buffers live. The Lean specification and
   declared runtime assumptions stay fixed.
 
 That separation is the reason TorchLean can be used as a tutorial framework, an executable
 experiment harness, and a verification codebase at the same time.
 
-# What To Read Next
+# Runnable Sources
 
 For a small runnable example, open [SimpleMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean).
 For minibatches and epochs, open

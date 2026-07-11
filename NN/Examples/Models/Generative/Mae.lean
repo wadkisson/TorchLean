@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Run:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
+  lake -R -K cuda=true exe torchlean mae --device cuda --steps 1 --n-total 1
 -/
 
 module
@@ -184,7 +184,7 @@ def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
 CLI entrypoint.
 
 Useful flags:
-- `--cuda` runs the public trainer on the CUDA runtime.
+- `--device cuda` runs the public trainer on the CUDA runtime.
 - `--steps <n>` controls optimization steps.
 - `--x <path> --y <path>` selects custom CIFAR-style `.npy` arrays.
 - `--log <path>` writes the standard TorchLean training log JSON.

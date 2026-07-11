@@ -242,7 +242,7 @@ Important name:
 
 This path is used by the runnable
 [GraphSpec tutorial](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/GraphSpec/Tutorial.lean): author once in GraphSpec,
-then plug the lowered model into the same `Trainer` API used elsewhere in the guide.
+then plug the lowered model into the public `Trainer` API.
 
 ## DAG Model To Runtime Example Wrappers
 
@@ -305,21 +305,18 @@ to check first:
 These facts show GraphSpec as a representation for theorem statements and illustrate the "extend op
 by op" development used in the verified runtime and verification layers.
 
-# Best First Path
+# Running The GraphSpec Tutorial
 
-One concrete reading order:
-
-1. Read the [GraphSpec README](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/README.md).
-2. Open the [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/GraphSpec/Tutorial.lean).
-3. Run:
+1. Open the [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/GraphSpec/Tutorial.lean).
+2. Run:
    `lake exe torchlean graphspec --backend compiled`
-4. Read the [residual linear model API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/ResidualLinear.lean).
-5. Read the [ResNet-18 GraphSpec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/Resnet18.lean).
+3. Compare the [residual linear model API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/ResidualLinear.lean)
+   with the [ResNet-18 GraphSpec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/Resnet18.lean).
 
 That path moves from "author a typed MLP and lower it into the training API" to "author a real
 residual DAG with explicit sharing."
 
-# Where It Fits In The System
+# Role In The System
 
 GraphSpec refines TorchLean's semantic model at the architecture boundary. In a Python codebase,
 architecture authoring and execution are often bundled together. GraphSpec separates them enough to

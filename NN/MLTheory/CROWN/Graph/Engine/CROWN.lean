@@ -1245,8 +1245,8 @@ def propagateCROWNNode
       | _, _ => bounds
     | _ => bounds
   | .inv =>
-    -- Reciprocal has an asymptote at 0; we conservatively fall back to a constant affine
-    -- bound derived from IBP (which widens to ±1/ε when the interval crosses 0).
+    -- Reciprocal has an asymptote at zero. IBP leaves this node unresolved when the input
+    -- interval crosses zero, so a constant fallback is available only on a valid domain.
     match ibp[id]! with
     | some Bout => bounds.set! id (some (boundsConst (α:=α) ctx.inputDim Bout.dim Bout.lo Bout.hi))
     | none => bounds

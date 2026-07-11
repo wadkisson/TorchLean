@@ -326,7 +326,7 @@ def applyFloatPlan (opts : Torch.Options) :
     {ss : List Shape} → Torch.ParamList Float ss → Plan ss → IO Unit
   | [], .nil, .nil => pure ()
   | s :: ss, .cons p ps, .cons init rest => do
-      if opts.useGpu then
+      if opts.usesCuda then
         let buf ← cudaBufferOf (Shape.size s) init
         _root_.Runtime.Autograd.Torch.Internal.setParamCudaValue (α := Float) (sh := s) p
           { s := s, buf := buf }

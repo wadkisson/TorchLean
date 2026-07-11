@@ -292,6 +292,7 @@ def write_index(docs: Path) -> None:
     <h1><label for="nav_toggle"></label><span>TorchLean API</span></h1>
     <div class="tl-docsite-links" aria-label="TorchLean site links">
       <a href="../">Home</a>
+      <a href="../installation/">Installation</a>
       <a href="../blueprint/">Guide</a>
       <a href="../examples/">Examples</a>
       <a href="../graphs/">Graphs</a>
@@ -1325,6 +1326,7 @@ def rename_docgen_header(docs: Path) -> None:
             links = (
                 '<div class="tl-docsite-links" aria-label="TorchLean site links">'
                 f'<a href="{docs_root}index.html">Docs Home</a>'
+                f'<a href="{site_root}installation/">Installation</a>'
                 f'<a href="{site_root}blueprint/">Guide</a>'
                 f'<a href="{site_root}examples/">Examples</a>'
                 f'<a href="{site_root}graphs/">Graphs</a>'

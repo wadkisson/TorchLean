@@ -20,6 +20,7 @@ public import NN.Spec.RL.FiniteStochasticMDP
 public import NN.API.Runtime.Core
 public import NN.API.Runtime.Layers
 public import NN.API.Runtime.Autograd
+public import NN.Backend.Report
 
 import Mathlib.Algebra.Order.Algebra
 import NN.Spec.Autograd.AutogradSpec
@@ -76,9 +77,10 @@ export _root_.Runtime.Autograd.TorchLean.Module.ScalarModule
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef
   (instantiate instantiateFloatWithRuntimePlan instantiateFloatWithRuntimeInit)
 
+abbrev Device := _root_.Runtime.Autograd.Torch.Device
+
 /--
-Instantiate a `ScalarModuleDef` under explicit Torch options (`backend`, `fastKernels`, `useGpu`,
-etc.).
+Instantiate a `ScalarModuleDef` under explicit Torch options such as `backend` and `device`.
 
 This is the most direct "runtime" entrypoint (used by the CPU/CUDA example binaries), since it
 threads the same options record all the way down to the eager tape / CUDA tape selection.
@@ -133,25 +135,18 @@ Execution configuration parsed from CLI flags.
 Supported flags (parsed by `ExecConfig.parseAndStrip`):
 - `--dtype ...` / `--float32-mode ...` (see `NN.API.DType`)
 - `--backend eager|compiled`
-- `--cpu` / `--cuda` (eager device selection)
-- `--fast-kernels` (eager-only performance hooks, no effect on compiled backend)
-- `--fast-gpu-matmul-precision fp32|fp64` (fast-kernel CUDA matmul precision)
+- `--device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external`
+- `--show-backend` (print backend capsules when the eager runtime first executes them)
 -/
 structure ExecConfig where
   /-- Scalar dtype selection. -/
   dtype : DType := .float
   /-- Execution backend selection. -/
   backend : Backend := .eager
-  /--
-  Eager execution device selector.
-
-  When `true` and `backend = .eager`, TorchLean uses the CUDA tape backend.
-  -/
-  useGpu : Bool := false
-  /-- Enable runtime-only eager fast kernels (tight-loop implementations for a few hot ops). -/
-  fastKernels : Bool := false
-  /-- GPU precision for fast-kernel matmul over Lean `Float` tensors. -/
-  fastGpuMatmulPrecision : GpuMatmulPrecision := .fp32
+  /-- Eager execution device selector. -/
+  device : Device := .auto
+  /-- Print each backend capsule when the eager runtime first executes it. -/
+  showBackend : Bool := false
   deriving Repr, DecidableEq
 
 namespace ExecConfig
@@ -165,92 +160,92 @@ def parseBackend (v : String) : Except String Backend := do
   else
     throw s!"unknown --backend {v} (supported: eager | compiled)"
 
-/-- Parse a fast-kernel CUDA matmul precision selector. -/
-def parseFastGpuMatmulPrecision (v : String) : Except String GpuMatmulPrecision := do
-  if v == "fp32" || v == "float32" then
-    pure .fp32
-  else if v == "fp64" || v == "float64" || v == "double" then
-    pure .fp64
-  else
-    throw s!"unknown --fast-gpu-matmul-precision {v} (supported: fp32 | fp64)"
+/-- Parse a device selector string into a runtime `Device`. -/
+def parseDevice (v : String) : Except String Device :=
+  _root_.Runtime.Autograd.Torch.Device.parse v
+
+/-- Whether a raw CLI argument list explicitly requests CUDA. -/
+def requestsCuda : List String → Bool
+  | [] => false
+  | "--device=cuda" :: _ => true
+  | "--device=gpu" :: _ => true
+  | "--device" :: "cuda" :: _ => true
+  | "--device" :: "gpu" :: _ => true
+  | _ :: rest => requestsCuda rest
 
 /--
 Parse CLI flags handled by `ExecConfig` and return `(cfg, rest)`.
 
 Consumed flags:
 - `--backend eager|compiled` (at most once),
-- `--cpu` / `--cuda` (boolean flags; last one wins; removed from `rest`),
-- `--fast-kernels` (boolean flag; removed from `rest`).
-- `--fast-gpu-matmul-precision fp32|fp64` (at most once).
+- `--device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external`,
+- `--show-backend` (boolean flag; removed from `rest`).
 
 All dtype/Float32 selection flags are delegated to `DType.parseAndStripWithDefault`.
 
 Default dtype policy:
-- If the user does not specify `--dtype` / `--float32-mode` and `--cuda` is present, default to
+- If the user does not specify `--dtype` / `--float32-mode` and CUDA is selected, default to
   `dtype=float` (CUDA eager supports `Float` upload/download).
 - Otherwise default to `dtype=float32` (executable IEEE-754 float32 semantics).
 
-When `--cuda` is selected, also enable the CUDA fast path (`--fast-kernels`) by default. Users who
-choose CUDA get the best available CUDA runtime path; backend-debugging flags can still disable or
-override behavior at the call site when a particular executable exposes them.
+Named future devices are accepted at parse time so `--show-backend` and planning diagnostics can
+explain them. Runtime session creation still rejects devices that this build cannot execute.
+
+The selected device chooses its normal registered kernels. Users do not need a second performance
+flag after selecting CUDA or another accelerator.
 -/
 def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
     Except String (ExecConfig × List String) := do
   let (dtype, args1) ← DType.parseAndStripWithDefault args defaultDType
   let (backend, args2) ←
     CLI.takeParsedFlagDefault args1 "backend" "eager" parseBackend
-  let (fastGpuMatmulPrecision, args3) ←
-    CLI.takeParsedFlagDefault args2 "fast-gpu-matmul-precision" "fp32" parseFastGpuMatmulPrecision
-  let rec go (useGpu fastKernels : Bool) (acc : List String) :
-      List String → (Bool × Bool × List String)
-    | [] => (useGpu, fastKernels, acc.reverse)
+  let rec go (device : Device) (showBackend : Bool) (acc : List String) :
+      List String → Except String (Device × Bool × List String)
+    | [] => pure (device, showBackend, acc.reverse)
+    | "--device" :: v :: as => do
+        let d ← parseDevice v
+        go d showBackend acc as
+    | "--device" :: [] =>
+        throw "missing value after --device (supported: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
     | a :: as =>
-        if a == "--cuda" then
-          go true fastKernels acc as
-        else if a == "--cpu" then
-          go false fastKernels acc as
-        else if a == "--fast-kernels" then
-          go useGpu true acc as
+        if a.startsWith "--device=" then do
+          let d ← parseDevice ((a.drop "--device=".length).toString)
+          go d showBackend acc as
+        else if a == "--show-backend" then
+          go device true acc as
         else
-          go useGpu fastKernels (a :: acc) as
-  let (useGpu, fastKernels, rest) := go false false [] args3
-  -- Public CLI policy: `--cuda` means "use the CUDA runtime path", and the runtime path should pick
-  -- the fast CUDA kernels when they are available. This keeps ordinary commands short while still
-  -- preserving the explicit `--fast-kernels` flag for CPU/diagnostic runs.
+          go device showBackend (a :: acc) as
+  let (device, showBackend, rest) ← go .auto false [] args2
   pure ({
     dtype := dtype,
     backend := backend,
-    useGpu := useGpu,
-    fastKernels := fastKernels || useGpu,
-    fastGpuMatmulPrecision := fastGpuMatmulPrecision
+    device := device,
+    showBackend := showBackend
   }, rest)
 
 /-- Convert a parsed CLI execution config to runtime `Options`. -/
 def toOptions (cfg : ExecConfig) (seed : Nat := 0) : Options :=
   { backend := cfg.backend
     seed := seed
-    useGpu := cfg.useGpu
-    fastKernels := cfg.fastKernels
-    fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
+    requestedDevice := cfg.device
+    showBackend := cfg.showBackend }
 
 /-- Parse CLI flags with the standard TorchLean default dtype policy. -/
 def parseAndStrip (args : List String) : Except String (ExecConfig × List String) := do
-  let defaultDType : DType := if args.contains "--cuda" then .float else .float32 {}
+  let defaultDType : DType := if requestsCuda args then .float else .float32 {}
   parseAndStripWithDefaultDType args defaultDType
 
 /-- Log the chosen execution config to stdout for reproducible runs. -/
 def log (cfg : ExecConfig) : IO Unit := do
   DType.log cfg.dtype
   IO.println s!"[TorchLean] backend: {reprStr cfg.backend}"
-  IO.println s!"[TorchLean] device: {if cfg.useGpu then "cuda" else "cpu"}"
-  IO.println s!"[TorchLean] fastKernels: {cfg.fastKernels}"
-  IO.println s!"[TorchLean] fastGpuMatmulPrecision: {reprStr cfg.fastGpuMatmulPrecision}"
+  IO.println s!"[TorchLean] device: {(toOptions cfg).deviceName}"
 
 end ExecConfig
 
 /--
-Parse runtime flags (`--dtype`, `--backend`, `--cpu|--cuda`, `--fast-kernels`,
-`--fast-gpu-matmul-precision`) and choose an executable scalar `α`, then call `k` with:
+Parse runtime flags (`--dtype`, `--backend`, `--device`, `--show-backend`) and choose an executable
+scalar `α`, then call `k` with:
 - `cast : Float → α` for building inputs from literals
 - `opts : Options` selecting the backend/kernel mode
 - `rest : List String` containing the remaining CLI arguments
@@ -271,6 +266,7 @@ def withRuntime
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
   let opts : Options := ExecConfig.toOptions cfg
+  opts.validateForExecution
   match (← DType.withRuntime cfg.dtype (fun {α} _ _ _ _ => do
         k (α := α) (API.Runtime.ofFloat (α := α)) opts rest
       )) with
@@ -278,8 +274,8 @@ def withRuntime
   | .error msg => throw <| IO.userError msg
 
 /--
-Instantiate a `ScalarModuleDef` under CLI runtime flags (`--dtype`, `--backend`, `--cpu|--cuda`,
-  `--fast-kernels`, `--fast-gpu-matmul-precision`), then call a continuation.
+Instantiate a `ScalarModuleDef` under CLI runtime flags (`--dtype`, `--backend`, `--device`,
+`--show-backend`), then call a continuation.
 
 This provides the cast function `Float → α` so call sites can build inputs from float literals.
 -/
@@ -298,6 +294,7 @@ def withModule
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
   let opts : Options := ExecConfig.toOptions cfg
+  opts.validateForExecution
   match cfg.dtype with
   | .float =>
       -- Keep the Float branch explicit. If this path is hidden behind the scalar-polymorphic
@@ -308,7 +305,7 @@ def withModule
         (α := Float) (paramShapes := paramShapes) (inputShapes := inputShapes) defn id opts
       k (α := Float) id m rest
   | _ =>
-      if cfg.useGpu then
+      if (cfg.device == .cuda) then
         throw <| IO.userError "torch: eager CUDA module execution currently requires --dtype float"
       match (← DType.withExec cfg.dtype (fun {α} _ _ _ cast => do
             let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateWith
@@ -337,6 +334,7 @@ def withModuleRuntime
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
   let opts : Options := ExecConfig.toOptions cfg
+  opts.validateForExecution
   match cfg.dtype with
   | .float =>
       -- Same reason as `withModule`: CUDA module construction should see `α = Float` directly, so
@@ -346,7 +344,7 @@ def withModuleRuntime
         (α := Float) (paramShapes := paramShapes) (inputShapes := inputShapes) defn id opts
       k (α := Float) m rest
   | _ =>
-      if cfg.useGpu then
+      if (cfg.device == .cuda) then
         throw <| IO.userError "torch: eager CUDA module execution currently requires --dtype float"
       match (← DType.withRuntime cfg.dtype (fun {α} _ _ _ _ => do
             let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateWith
@@ -410,15 +408,32 @@ def runUsage (exeName : String) : String :=
   String.intercalate "\n"
     [ s!"Usage: {exeName} [runtime flags] [command flags]"
     , ""
-    , "Runtime flags:"
-    , "  --cpu | --cuda"
-    , "  --dtype float|ieee754exec"
-    , "  --backend eager|compiled"
-    , "  --seed N"
-    , "  --fast-kernels"
-    , "  --fast-gpu-matmul-precision fp32|tf32"
+    , "Quick examples:"
+    , s!"  {exeName} --device cpu --steps 10"
+    , s!"  {exeName} --device cuda --steps 10"
     , ""
-    , "Use the example documentation or `lake exe torchlean --help` for command-specific flags."
+    , "Runtime flags:"
+    , "  -h, --help"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "      cpu and cuda are implemented by the current eager runtime;"
+    , "      rocm, metal, wasm, tpu, trainium, custom, and external are named targets"
+    , "      that fail until their runtimes are implemented and registered."
+    , "  --dtype float|ieee754exec"
+    , "      float is the native runtime scalar; ieee754exec uses executable Float32 semantics where supported."
+    , "  --backend eager|compiled"
+    , "      eager runs the ordinary runtime path; compiled records/runs the proof-linked graph path where supported."
+    , "  --seed N"
+    , "  --show-backend"
+    , "      print the backend-contract capsules selected by the current device/profile."
+    , ""
+    , "Verification commands:"
+    , "  lake exe verify -- list"
+    , "  lake exe verify -- margin-cert"
+    , "  lake exe verify -- abcrown-leaf"
+    , "  lake exe verify -- torchlean-robustness"
+    , "  lake exe verify -- torchlean-mlp-workflow"
+    , ""
+    , "Use `lake exe torchlean --help` for the full example list."
     ]
 
 /--
@@ -426,8 +441,8 @@ CLI entrypoint helper for executable `main` functions.
 
 This parses:
 - `--seed N` (via `API.CLI.takeSeed`), and
-- runtime execution flags (`--dtype`, `--float32-mode`, `--backend`, `--cpu|--cuda`,
-  `--fast-kernels`, `--fast-gpu-matmul-precision`),
+- runtime execution flags (`--dtype`, `--float32-mode`, `--backend`, `--device`,
+  `--show-backend`),
 then executes the chosen `RunAction`.
 
 It also seeds TorchLean's global RNG stream (`API.rand`) so code that draws init seeds via
@@ -475,6 +490,7 @@ def run
         throw <| IO.userError s!"{exeName}: this program only supports `--dtype float`"
       ExecConfig.log cfg
       let opts : Options := ExecConfig.toOptions cfg seed
+      opts.validateForExecution
       runOpts.printBanner opts
       k opts rest
       printOk

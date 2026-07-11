@@ -9,7 +9,7 @@ module
 public import NN.MLTheory.CROWN.Cert.AlphaCROWN
 public import NN.MLTheory.CROWN.Graph
 public import NN.Spec.Core.Utils
-public import NN.Verification.Cert.Common
+public import NN.Verification.Cert.IBPNodeCert
 public import Lean.Data.Json
 
 /-!
@@ -88,18 +88,19 @@ def checkCROWNNode (g : Graph) (ps : ParamStore Float)
 /--
 Check a per-node α-CROWN certificate against Lean's propagation rules.
 
-Returns `true` iff every node's certificate affine bounds agree (within `tol`) with what Lean
-computes from the certificate parents + `ParamStore`.
+Returns `true` iff every supplied IBP box is locally recomputed by Lean and every node's affine
+bounds agree (within `tol`) with Lean's CROWN step.
 -/
 def checkCROWNNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) (tol : Float := 1e-4) : IO Bool :=
   do
   let cert ← readCROWNNodeCertificate g path
   let mut ok := true
   for id in [0:g.nodes.size] do
-    let okNode ← checkCROWNNode g ps cert.ibp cert.alpha cert.crown cert.ctx id tol
-    ok := ok && okNode
+    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g ps cert.ibp id tol
+    let okCrown ← checkCROWNNode g ps cert.ibp cert.alpha cert.crown cert.ctx id tol
+    ok := ok && okIbp && okCrown
   if ok then
-    IO.println "[CROWNNodeCert] certificate verified: all nodes match Lean α-CROWN step."
+    IO.println "[CROWNNodeCert] artifact replay matched Lean IBP and α-CROWN steps."
   pure ok
 
 end NN.Verification.CROWNNodeCert

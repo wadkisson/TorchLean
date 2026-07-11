@@ -86,6 +86,23 @@ def mask : Tensor Bool (shape![n, n]) :=
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: multi_head_attention ==="
 
+  -- A blocked extreme score must not influence stabilization. The second row checks the explicit
+  -- all-blocked convention used by both composed and fused hard-masked attention.
+  let extremeScores := Runtime.Autograd.Cuda.Buffer.ofFloatArray <|
+    FloatArray.mk #[1000.0, -1000.0, 3.0, 4.0]
+  let extremeMask := Runtime.Autograd.Cuda.Buffer.ofFloatArray <|
+    FloatArray.mk #[0.0, 1.0, 0.0, 0.0]
+  let extremeOut := Runtime.Autograd.Cuda.Buffer.hardMaskedSoftmaxByRow
+    extremeScores extremeMask 2 2
+  let extremeHost := Runtime.Autograd.Cuda.Buffer.toFloatArray extremeOut
+  Utils.assertApprox "hard mask ignores blocked row maximum[0]" (extremeHost.get! 0) 0.0
+  Utils.assertApprox "hard mask preserves allowed probability[1]" (extremeHost.get! 1) 1.0
+  Utils.assertApprox "all-blocked hard mask row[0]" (extremeHost.get! 2) 0.0
+  Utils.assertApprox "all-blocked hard mask row[1]" (extremeHost.get! 3) 0.0
+  let _ := Runtime.Autograd.Cuda.Buffer.release extremeScores
+  let _ := Runtime.Autograd.Cuda.Buffer.release extremeMask
+  let _ := Runtime.Autograd.Cuda.Buffer.release extremeOut
+
   let outShape : Shape := shape![n, dModel]
 
   -- CPU tape
@@ -151,7 +168,8 @@ def run : IO Unit := do
   let (t6s, yIds) ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t5s)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim)
-      (h1 := hN) wqIds wkIds wvIds woIds xIds (mask := some mask) (useFlash := false))
+      (h1 := hN) wqIds wkIds wvIds woIds xIds (mask := some mask)
+      (attentionCapsule := NN.Backend.Attention.torchLeanComposed))
   let yCudaComposed ← Utils.cudaValue (s := outShape) t6s yIds
   let seedComposed : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape)) 1.0 }

@@ -8,7 +8,6 @@ module
 
 public import NN.Runtime.Context
 public import NN.Runtime.Scalar
-public import NN.Runtime.Variable
 
 public import NN.Spec.Autograd.AutogradSpec
 public import NN.Spec.Autograd.Ops

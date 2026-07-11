@@ -35,8 +35,8 @@ Recommended runs:
 - lower `--lr` if the reported forecast error increases.
 
 ```bash
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 1 --windows 1
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 1 --windows 1
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 200 --windows 96
 ```
 
 Dataset citation: Hebrail and Berard, "Individual Household Electric Power Consumption", UCI Machine

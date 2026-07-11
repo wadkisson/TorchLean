@@ -362,7 +362,7 @@ syntax (name := gridworldPathViewCmd) "#gridworld_path_view " term ", " term : c
 Read a saved GridWorld greedy-policy snapshot (`before` vs `after`) from JSON and render it.
 
 This is intended for executable examples or training jobs that write artifacts to disk, for example:
-`lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`.
+`lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`.
 
 The JSON schema matches `Runtime.RL.Artifacts.GridWorld.PolicyDiff`.
 -/
@@ -372,7 +372,7 @@ syntax (name := gridworldPolicyFileViewCmd) "#gridworld_policy_file_view " term 
 Read a saved GridWorld episode path snapshot (`before` vs `after`) from JSON and render it.
 
 This is intended for executable examples or training jobs that write artifacts to disk, for example:
-`lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`.
+`lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`.
 
 The JSON schema matches `Runtime.RL.Artifacts.GridWorld.PathDiff`.
 -/

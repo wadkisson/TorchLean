@@ -349,21 +349,22 @@ $$`\text{reverse pass returns }(D_\theta L(\theta))^\* 1.`
 Optimization theory then decides what an update using that gradient means under step-size,
 smoothness, convexity, or backend-certification hypotheses.
 
-# Autograd Proof Tree
+# Autograd Proof Dependencies
 
-For readers trying to audit an autograd claim, we recommend reading from the bottom up:
+An autograd claim is easiest to audit from the graph theorem down to the local derivative rules and
+then back up to training. The proof stack has five levels:
 
-1. Read the [tape algebra soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
-   and find `Graph.backprop_correct`.
-2. Move to the [Fréchet derivative tape API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Core/FDeriv.lean) and find
+1. The [tape algebra soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
+   contains `Graph.backprop_correct`.
+2. The [Fréchet derivative tape API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Core/FDeriv.lean) contains
    `Graph.backpropVec_eq_adjoint_fderiv`.
-3. Read a local derivative file such as
-   the [softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/Softmax.lean) or
-   the [log-softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/LogSoftmax.lean).
-4. Read a file for a model block, such as
-   the [Transformer post-norm API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Transformer/PostNorm.lean).
-5. Finish with the [training step algebra API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Training/StepAlgebra.lean)
-   if the claim is about training rather than only differentiation.
+3. Local derivative files include the
+   [softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/Softmax.lean) and
+   [log-softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/LogSoftmax.lean).
+4. Model-block proofs include the
+   [Transformer post-norm API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Transformer/PostNorm.lean).
+5. The [training step algebra API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Training/StepAlgebra.lean)
+   connects differentiation to parameter updates.
 
 The pattern should feel familiar if you know PyTorch internals or JAX transformations: local rules,
 graph traversal, cotangent accumulation, and scalar loss seeding. The proof contribution is that

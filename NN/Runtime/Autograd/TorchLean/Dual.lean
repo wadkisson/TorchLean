@@ -138,7 +138,6 @@ instance {α : Type} [Context α] : Numbers (Dual α) where
   log10 := ⟨Numbers.log10, 0⟩
   log10000 := ⟨Numbers.log10000, 0⟩
   epsilon := ⟨Numbers.epsilon, 0⟩
-  neg_thousand := ⟨Numbers.neg_thousand, 0⟩
 
 /-- Forward-mode chain rule implementations for `MathFunctions` over dual numbers. -/
 instance {α : Type} [Context α] : MathFunctions (Dual α) where

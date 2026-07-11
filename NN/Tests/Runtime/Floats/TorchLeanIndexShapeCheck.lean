@@ -13,7 +13,11 @@ public import Std
 /-!
 # TorchLeanIndexShapeCheck
 
- Runtime checks for TorchLean indexing and shape helpers over floats. -/
+Runtime checks for TorchLean indexing and shape helpers over floats.
+
+These checks focus on shape-manipulating ops and indexing helpers that are easy to break when
+refactoring tensor APIs.
+-/
 
 @[expose] public section
 
@@ -199,9 +203,3 @@ def run : IO Unit := do
 end TorchLeanIndexShapeCheck
 end Floats
 end Tests
-/-!
-Indexing/shape regression tests (floats).
-
-These checks focus on shape-manipulating ops and indexing helpers that are easy to break when
-refactoring tensor APIs.
--/

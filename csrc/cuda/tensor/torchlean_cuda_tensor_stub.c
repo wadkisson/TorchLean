@@ -25,6 +25,12 @@ static uint64_t g_torchlean_cuda_peak_bytes = 0u;
 static uint64_t g_torchlean_cuda_alloc_count = 0u;
 static uint64_t g_torchlean_cuda_free_count = 0u;
 
+// 0 = CPU stub, 1 = native CUDA with a visible device, 2 = native CUDA without one.
+LEAN_EXPORT uint32_t torchlean_cuda_runtime_status(uint32_t token) {
+  (void)token;
+  return 0u;
+}
+
 static void torchlean_cuda_note_alloc(size_t n) {
   const uint64_t bytes = torchlean_float_bytes_for(n);
   g_torchlean_cuda_alloc_count++;

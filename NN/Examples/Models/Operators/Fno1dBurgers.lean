@@ -6,8 +6,8 @@ Authors: TorchLean Team
 Native TorchLean 1D FNO on the Burgers operator:
 
   python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
-  lake build -R -K cuda=true
-  lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 700 --lr 0.003 \
+  lake -R -K cuda=true build
+  lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 0.003 \
     --plot-csv data/real/fno/predictions.csv --log data/real/fno/trainlog.json
   python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.csv
 -/
@@ -310,8 +310,9 @@ def run (cfg : BurgersOptions) : IO Unit := do
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) cfg.seed
   let mut adamSt : _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.AdamState := {}
   let mut hist ← recordEval eval.reportTrainSamples eval.reportTestSamples metricHistory 0 ps "before"
-  let cudaMemWatch := cfg.effectiveCudaMemWatch { useGpu := true }
-  let mut memWatch? ← ModelZoo.reportCudaMemWatch { useGpu := true } cudaMemWatch cfg.steps 0 none
+  let cudaOpts : _root_.Runtime.Autograd.Torch.Options := { requestedDevice := .cuda }
+  let cudaMemWatch := cfg.effectiveCudaMemWatch cudaOpts
+  let mut memWatch? ← ModelZoo.reportCudaMemWatch cudaOpts cudaMemWatch cfg.steps 0 none
   let progressEvery : Nat := Nat.max 1 (cfg.steps / 10)
   for step in [0:cfg.steps] do
     let s := eval.trainCycle (cfg.seed + step)
@@ -319,7 +320,7 @@ def run (cfg : BurgersOptions) : IO Unit := do
     let (ps', adamSt') ← trainStep cfg.lr ps adamSt sample
     ps := ps'
     adamSt := adamSt'
-    memWatch? ← ModelZoo.reportCudaMemWatch { useGpu := true } cudaMemWatch cfg.steps (step + 1) memWatch?
+    memWatch? ← ModelZoo.reportCudaMemWatch cudaOpts cudaMemWatch cfg.steps (step + 1) memWatch?
     if ModelZoo.shouldLogStep progressEvery (step + 1) then
       hist ← recordEval eval.reportTrainSamples eval.reportTestSamples hist (step + 1) ps s!"step {step + 1}"
   hist ← recordEval eval.reportTrainSamples eval.reportTestSamples hist cfg.steps ps "after"
@@ -390,8 +391,6 @@ def runPortableDense
 
 def logRunHeader (opts : Options) (cfg : BurgersOptions) : IO Unit := do
   IO.println s!"{exeName}: native real-split FNO1D Burgers"
-  if opts.useGpu && opts.fastKernels then
-    IO.println "  fast-kernels=on"
   let backendName :=
     match opts.backend with
     | .eager => "eager"
@@ -410,13 +409,8 @@ def main (args : List String) : IO UInt32 := do
     (k := fun opts rest => do
       let (cfg, rest) ← ModelZoo.orThrow exeName <| BurgersOptions.parse rest
       CLI.requireNoArgs exeName rest
-      let opts :=
-        if opts.useGpu && !opts.fastKernels then
-          { opts with fastKernels := true }
-        else
-          opts
       logRunHeader opts cfg
-      if opts.useGpu then
+      if opts.usesCuda then
         IO.println "  spectral path=fused cuFFT RFFT autograd op"
         if opts.backend != .eager then
           IO.println "  note: fused CUDA path uses the eager CUDA tape (ignoring --backend compiled)"

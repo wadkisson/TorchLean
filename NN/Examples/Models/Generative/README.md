@@ -47,18 +47,18 @@ python3 scripts/datasets/torchlean_data_convert.py image-folder \
 Quick CUDA checks:
 
 ```bash
-lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean autoencoder --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean mae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean vae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean vqvae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean gan --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 Longer diffusion run with visual artifacts:
 
 ```bash
-lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset cifar10 --n-total 800 --steps 200 --hidden-c 8 --T 100 --beta-end 0.12 \
   --reference-ppm data/model_zoo/diffusion_reference.ppm \
   --noisy-ppm data/model_zoo/diffusion_noisy.ppm \

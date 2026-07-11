@@ -46,8 +46,8 @@ python3 scripts/datasets/torchlean_data_convert.py image-folder \
 Train on ImageNet64 and save visual artifacts:
 
 ```bash
-lake build -R -K cuda=true
-CUDA_VISIBLE_DEVICES=0 lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true build
+CUDA_VISIBLE_DEVICES=0 lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset imagenet64 --n-total 800 --steps 1000 --hidden-c 8 --T 100 --beta-end 0.12 \
   --log data/model_zoo/diffusion_trainlog.json \
   --reference-ppm data/model_zoo/diffusion_reference.ppm \
@@ -60,7 +60,7 @@ CIFAR run:
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 -/
 

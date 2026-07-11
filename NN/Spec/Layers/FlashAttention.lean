@@ -34,8 +34,6 @@ The theorems in this file are compact but important:
   equal to TorchLean's existing standard attention spec.
 - `flashAttentionBackward_eq_scaledDotProductAttentionBackward` proves the fused VJP contract is
   semantically equal to the existing standard attention backward spec.
-- `cudaLoopFlashAttention_eq_onlineSoftmaxTiledAttention` gives a Lean denotational target for the
-  native kernel path and proves that target denotes the same online/tiled contract.
 
 These are definitional-equality theorems because the proof layer contract spells out the same
 mathematical stages as standard attention. The native CUDA implementation is tested against this
@@ -159,54 +157,6 @@ def onlineSoftmaxTiledAttention
     (ctx : AttentionContext α nQ nK dModel h1 h2) :
     Tensor α (.dim nQ (.dim dModel .scalar)) :=
   matMulSpec (onlineSoftmaxWeights (α := α) cfg ctx) ctx.V
-
-/-!
-## CUDA Denotation
-
-The native runtime kernel is intended to compute the same row program in a fused way:
-
-1. for each `(batch, head, query)` row, scan keys to build masked/scaled scores;
-2. compute the stabilized softmax normalization for that row;
-3. accumulate `Σ_j softmax(score_j) * V_j` directly into the output.
-
-`cudaLoopFlashAttention` is a **denotational target**, written with tensor combinators rather than
-CUDA thread/block syntax. The equalities below are definitional checks: they say the named fused
-operator denotes standard SDPA in the spec. They do not verify the CUDA source code, the
-online-softmax recurrence, or the memory-IO schedule. Those remain explicit runtime/FFI contracts
-tested against this target.
--/
-
-/-- Denotational target for the fused CUDA FlashAttention forward kernel. -/
-def cudaLoopFlashAttention
-    (cfg : FlashAttentionConfig)
-    {nQ nK dModel : Nat} {h1 : nQ ≠ 0} {h2 : nK ≠ 0}
-    (ctx : AttentionContext α nQ nK dModel h1 h2) :
-    Tensor α (.dim nQ (.dim dModel .scalar)) :=
-  let rowWeights := onlineSoftmaxWeights (α := α) cfg ctx
-  matMulSpec rowWeights ctx.V
-
-@[simp] theorem cudaLoopFlashAttention_eq_onlineSoftmaxTiledAttention
-    (cfg : FlashAttentionConfig)
-    {nQ nK dModel : Nat} {h1 : nQ ≠ 0} {h2 : nK ≠ 0}
-    (ctx : AttentionContext α nQ nK dModel h1 h2) :
-    cudaLoopFlashAttention (α := α) cfg ctx =
-      onlineSoftmaxTiledAttention (α := α) cfg ctx := by
-  rfl
-
-/--
-The CUDA denotational target has the same spec meaning as standard SDPA.
-
-This theorem is about the denotational target. CUDA machine code and online-softmax tiling enter
-through the runtime boundary documented for the native kernels.
--/
-@[simp] theorem cudaLoopFlashAttention_eq_scaledDotProductAttention
-    (cfg : FlashAttentionConfig)
-    {nQ nK dModel : Nat} {h1 : nQ ≠ 0} {h2 : nK ≠ 0}
-    (ctx : AttentionContext α nQ nK dModel h1 h2) :
-    cudaLoopFlashAttention (α := α) cfg ctx =
-      scaledDotProductAttention (α := α) ctx := by
-  cases cfg
-  rfl
 
 /--
 The proof layer FlashAttention denotation equals standard SDPA.

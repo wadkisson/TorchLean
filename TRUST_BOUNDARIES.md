@@ -28,6 +28,11 @@ When writing a correctness claim, name the layer explicitly:
 This avoids collapsing "the command ran", "the checker accepted this artifact", and "Lean proved a
 mathematical statement" into one sentence.
 
+The backend planner and capsule vocabulary are documented in the
+[Installation guide](https://lean-dojo.github.io/TorchLean/installation/#devices-providers-and-kernel-capsules).
+It describes how TorchLean names native CUDA, LibTorch, ATen, and future platform providers before
+a runtime path uses them.
+
 ## Lean Axioms
 
 - `NN/MLTheory/CROWN/Lyapunov/Oracle.lean`: `crown_oracle` assumes an external CROWN

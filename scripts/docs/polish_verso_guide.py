@@ -655,6 +655,7 @@ TORCHLEAN_JS_BODY = r"""
     const siteRoot = new URL("../", rootUrl);
     const links = [
       ["Main site", "./"],
+      ["Installation", "installation/"],
       ["Examples", "examples/"],
       ["API Reference", "docs/"],
       ["Graphs", "graphs/"],
@@ -684,6 +685,22 @@ TORCHLEAN_JS_BODY = r"""
       const search = header.querySelector("#search-wrapper");
       header.insertBefore(nav, search || null);
     }
+  }
+
+  function polishGuideHomepage() {
+    if (normalizedCurrentPage() !== "index.html") return;
+
+    const wrapper = document.querySelector("main .content-wrapper");
+    const topNext = wrapper && wrapper.querySelector(":scope > .prev-next-buttons");
+    if (topNext) topNext.remove();
+
+    const duplicateContents = wrapper && wrapper.querySelector(":scope > section > section");
+    if (duplicateContents && duplicateContents.querySelector("ol.section-toc")) {
+      duplicateContents.remove();
+    }
+
+    const titlePermalink = document.querySelector("main .titlepage > h1 .permalink-widget");
+    if (titlePermalink) titlePermalink.remove();
   }
 
   function scrollRatio() {
@@ -953,6 +970,7 @@ TORCHLEAN_JS_BODY = r"""
 
   document.addEventListener("DOMContentLoaded", () => {
     mountGuideNav();
+    polishGuideHomepage();
     replaceAsciiArrowsInText();
     autoLinkBareUrls();
     externalLinksOpenInNewTabs();

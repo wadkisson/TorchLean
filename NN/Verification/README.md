@@ -58,8 +58,7 @@ format tolerances. Soundness of the external producer is a separate claim and sh
 by an exporter/provenance argument, a replayable certificate, or a theorem about the producer.
 
 The theorem-level graph IBP/CROWN-family soundness results live under
-`NN.MLTheory.CROWN.Proofs.*`. Public entry points expose those statements through
-`NN.Verification.ProofBackedCertificates` and `NN.Entrypoint.Verification`.
+`NN.MLTheory.CROWN.Proofs.*` and are imported by `NN.Entrypoint.Verification`.
 
 The TorchLean-to-IR proof API is separate. It covers the compiler proof fragment and local
 evaluator lemmas for supported imported operations. Current coverage includes elementwise

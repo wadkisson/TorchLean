@@ -630,8 +630,8 @@ Relevant tools and examples:
 - `margin-cert`
 - `torchlean-ibp`
 
-This section connects TorchLean to the adversarial-robustness literature and to the
-IBP / CROWN / LiRPA papers already cited below.
+These commands implement claims drawn from the adversarial-robustness, IBP, CROWN, and LiRPA
+literature cited below.
 
 ## 2. PINN residual bounds
 
@@ -897,20 +897,6 @@ the [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/V
 - Geometry and spline certificates: `camera-box3d-cert`, `spline-cert`
 - End-to-end TorchLean MLP workflow: `torchlean-mlp-workflow`
 - Benchmark-style exported-artifact suite: `vnncomp-mnistfc`
-
-## Practical reading order
-
-Starting from a runtime example, the suggested order is:
-
-1. `Graphs and IR`
-2. `Floating-Point Semantics`
-3. return here once the terms above are familiar
-
-Starting from a certificate artifact, the suggested order is:
-
-1. `Certificates`
-2. `Two-Stage Workflows`
-3. the [certificate checker API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert.lean)
 
 Many tools accept an explicit JSON path as the first argument; the `-- list` output shows the
 default path.

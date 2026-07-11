@@ -87,8 +87,12 @@ def usage : String :=
     , "  --steps N"
     , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
-    , "  --cpu | --cuda"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --show-backend                    print backend capsules as they execute"
     , "  --log PATH"
+    , ""
+    , "Top-level chooser:"
+    , "  lake exe torchlean --choose quickstart_mlp --steps 20"
     ]
 
 def main (args : List String) : IO Unit := do

@@ -38,15 +38,15 @@ and the agreement evidence between them.
 Use CUDA when you want to train or evaluate larger float32 models from Lean:
 
 ```
-lake build -R -K cuda=true
-lake exe -K cuda=true torchlean mlp --cuda --steps 20
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 700 --lr 0.003
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 20
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 0.003
 ```
 
 Then run the CUDA test suite:
 
 ```
-lake exe -K cuda=true nn_tests_suite
+lake -R -K cuda=true exe nn_tests_suite
 ```
 
 To test the native CUDA boundary, run the same Lean-driven suite under NVIDIA's sanitizer:
@@ -58,7 +58,7 @@ scripts/checks/cuda_sanitize_tests.sh --all-tools
 
 The flag `-K cuda=true` is a *build* flag. It selects the native CUDA objects in the
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) and links CUDA libraries such as cuBLAS and cuFFT. The
-command-line flag `--cuda` is a *runtime* flag. For long training runs, model commands also expose:
+command-line flag `--device cuda` is a *runtime* flag. For long training runs, model commands also expose:
 
 ```
 --cuda-mem-watch N
@@ -305,7 +305,7 @@ the mathematical contract in Lean, and require tests, sanitizers, and parity che
 
 Third, we avoid silent semantic changes. CUDA is a runtime backend, not a new meaning for the
 model. The same model API and IR should describe CPU eager, CUDA eager, and compiled execution.
-So `--cuda` stays narrow: it changes where work runs, not what the operation is supposed to mean.
+So `--device cuda` stays narrow: it changes where work runs, not what the operation is supposed to mean.
 
 Fourth, we started with float32 because it is the smallest concrete target that covers the
 training examples, has an executable `IEEE32Exec` bridge, and keeps the native-bit agreement
@@ -347,7 +347,7 @@ Runtime.Autograd.Cuda.Tape.spectralConv1dRfft
 The public training API usually hides those names. A model example command such as
 
 ```
-lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
 ```
 
 still looks like an ordinary TorchLean run. Under the hood, tensors are stored in CUDA buffers and
@@ -483,13 +483,13 @@ Those names identify the contract:
 The native runtime path is separate. The [CUDA kernel API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Kernels.lean)
 declares the FFI symbols, the
 [native CUDA source](https://github.com/lean-dojo/TorchLean/blob/main/csrc/cuda/kernels/torchlean_cuda_kernels.cu) implements them, and the CPU
-CPU fallback sits next to it in
+fallback sits next to it in
 [the fallback source](https://github.com/lean-dojo/TorchLean/blob/main/csrc/cuda/kernels/torchlean_cuda_kernels_stub.c).
 
 TorchLean's fused attention kernel is correctness-first: it implements the same masked,
-stable scaled dot product attention contract and fused VJP interface. Its role in this chapter is
-the specified fused operator and native boundary, separate from the production IO-tiled Dao-AILab
-implementation. The terminology is:
+stable scaled dot product attention contract and fused VJP interface. It is a specified fused
+operator behind a native boundary, separate from the production IO-tiled Dao-AILab implementation.
+The terminology is:
 
 - *Fused attention contract* means the fused operator is specified as equal to SDPA.
 - *Native fused attention kernel* means the CUDA backend calls external code through the FFI.
@@ -528,7 +528,7 @@ the theorem ends and the engineering validation begins.
 
 # Common Failure Modes This Design Avoids
 
-- *Silent CPU fallback.* Build-time CUDA selection and runtime `--cuda` selection are separate, so a
+- *Silent CPU fallback.* Build-time CUDA selection and runtime `--device cuda` selection are separate, so a
   missing native build should fail loudly.
 - *Unstated nondeterminism.* Atomic reductions are called out explicitly, and deterministic
   reductions are available where reproducibility matters.
@@ -545,10 +545,10 @@ When changing CUDA code, run at least:
 
 ```
 lake build NN.Tests.Runtime.Cuda.Fft
-lake build -K cuda=true NN.Tests.Runtime.Cuda.Fft
+lake -R -K cuda=true build NN.Tests.Runtime.Cuda.Fft
 lake exe nn_tests_suite
-lake exe -K cuda=true nn_tests_suite
-lake build -K cuda=true
+lake -R -K cuda=true exe nn_tests_suite
+lake -R -K cuda=true build
 ```
 
 After touching allocation, indexing, FFT, cuBLAS, convolution, or fused kernels, also run:
@@ -566,7 +566,7 @@ prediction:
 
 ```
 python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 700 --lr 0.003 \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 0.003 \
   --plot-csv data/real/fno/predictions.csv
 python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.csv
 ```

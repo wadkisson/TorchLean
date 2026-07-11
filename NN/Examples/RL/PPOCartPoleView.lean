@@ -13,7 +13,7 @@ public import NN.Runtime.RL.Artifacts.DefaultPaths
 # PPO CartPole Artifacts
 
 This file visualizes the training curve produced by
-`NN/Examples/Models/RL/PPOCartPole.lean` (`lake exe -K cuda=true torchlean ppo_cartpole --cuda ...`).
+`NN/Examples/Models/RL/PPOCartPole.lean` (`lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda ...`).
 
 The executable trainer stays in `Examples/Models`; this file is only the editor-side artifact
 viewer. That split keeps PPO training code in one place and avoids a duplicate "RL examples" model
@@ -24,7 +24,7 @@ Workflow:
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0'
-lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 2. Put the cursor on the command below in an editor. The infoview will render the saved log.

@@ -37,84 +37,149 @@ def usage : String :=
     [ "TorchLean runnable examples"
     , ""
     , "Usage:"
-    , "  lake exe torchlean --help"
     , "  lake exe torchlean <example> [flags...]"
+    , "  lake exe torchlean --choose <example> [flags...]"
+    , "  lake exe torchlean <example> --help"
     , ""
-    , "Examples:"
-    , "  quickstart_tensors | quickstart_autograd | quickstart_mlp | quickstart_minibatch_mlp | quickstart_cnn"
-    , "  mlp | kan | cnn | diffusion | fno1d_burgers"
-    , "  autoencoder | mae | vae | vqvae | gan"
-    , "  rnn | lstm | lstm_regression | transformer | vit | gpt2 | text_gpt2"
-    , "  gpt2_saved"
-    , "  chargpt"
-    , "  gpt_adder"
-    , "  mamba"
-    , "  ppo_cartpole | ppo_gridworld | ppo_pong_ram | dqn_replay"
-    , "  pytorch_roundtrip | pytorch_export_check"
-    , "  data_csv | data_npy | data_cifar10"
-    , "  floats_arb_ieee_compare | float32_modes | graphspec"
-    , "  ir_axis_ops | one_semantic_universe | torch_ir_pytorch"
-    , ""
-    , "Runtime flags:"
-    , "  - You can put runtime flags (e.g. `--cpu`, `--cuda`, `--dtype`, `--backend`) either before or"
-    , "    after the example name; the runner forwards them to the example entrypoint."
-    , "  - A leading `--` separator is accepted and ignored:"
-    , "      lake exe torchlean -- mlp --cpu"
-    , ""
-    , "Examples:"
-    , "  python3 scripts/datasets/download_example_data.py --auto-mpg --cifar10"
-    , "  lake exe torchlean mlp --cpu --steps 10"
-    , "  lake exe torchlean kan --cpu --steps 20"
-    , "  lake exe -K cuda=true torchlean cnn --cuda --steps 10 --n-total 1"
+    , "Start here:"
     , "  lake exe torchlean quickstart_tensors"
     , "  lake exe torchlean quickstart_autograd"
-    , "  lake exe torchlean quickstart_mlp --steps 20 --dtype float32 --backend eager"
-    , "  lake exe torchlean quickstart_minibatch_mlp --steps 30 --batch 5 --dtype float --backend eager"
-    , "  lake exe torchlean quickstart_cnn --steps 5 --batch 2 --dtype float --backend eager"
-    , "  lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0"
-    , "  lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 1 --plot-csv data/real/fno/predictions.csv"
-    , "  lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0"
-    , "  python3 scripts/datasets/download_example_data.py --household-power --household-power-windows 512"
-    , "  lake exe -K cuda=true torchlean lstm_regression --cuda --steps 1 --windows 4"
-    , "  lake exe -K cuda=true torchlean text_gpt2 --cuda --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 1 --generate 0"
-    , "  lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0"
-    , "  lake exe -K cuda=true torchlean ppo_pong_ram --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8"
-    , "  lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1"
-    , "  lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1 --log data/model_zoo/mae_trainlog.json"
-    , "  lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1 --log data/model_zoo/vae_trainlog.json"
-    , "  lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1"
-    , "  lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1 --log data/model_zoo/gan_trainlog.json"
-    , "  python3 scripts/datasets/torchlean_data_convert.py image-folder --input /path/to/imagenet/train --x-output data/real/imagenet64/imagenet64_train_X.npy --y-output data/real/imagenet64/imagenet64_train_y.npy --height 64 --width 64 --labels-from-dirs --limit 2000"
-    , "  lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2 --sample-ppm data/model_zoo/cifar_sample.ppm"
-    , "  lake exe torchlean pytorch_roundtrip --model mlp --action import"
-    , "  lake exe torchlean data_csv --steps 30 --batch 5 --dtype float --backend eager"
-    , "  lake exe torchlean data_npy --steps 20 --batch 5 --dtype float --backend eager"
-    , "  lake exe torchlean data_cifar10 --check-only --epochs 1 --batch 4 --train-size 8 --n-total 20"
-    , "  lake exe torchlean pytorch_export_check"
-    , "  lake exe torchlean float32_modes"
-    , "  lake exe torchlean graphspec --backend eager"
-    , "  lake exe torchlean ir_axis_ops --dtype float --backend eager"
-    , "  lake exe torchlean one_semantic_universe --samples 50"
-    , "  lake exe torchlean torch_ir_pytorch --arch mlp > exported_model.py"
-    , "  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --a 7 --b 8"
+    , "  lake exe torchlean quickstart_mlp --steps 20"
+    , "  lake exe torchlean --choose quickstart_mlp --steps 20"
+    , "  lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0"
+    , ""
+    , "Common examples:"
+    , "  quickstart_tensors | quickstart_autograd | quickstart_mlp | quickstart_minibatch_mlp | quickstart_cnn"
+    , "  mlp | cnn | transformer | gpt2 | text_gpt2 | mamba | fno1d_burgers"
+    , "  autoencoder | vae | gan | diffusion | ppo_cartpole | dqn_replay"
+    , "  pytorch_roundtrip | pytorch_export_check"
+    , "  data_csv | data_npy | data_cifar10"
+    , "  float32_modes | graphspec | ir_axis_ops | one_semantic_universe"
+    , ""
+    , "Runtime flags:"
+    , "  --choose                         ask for runtime choices before running"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --dtype float|ieee754exec"
+    , "  --backend eager|compiled"
+    , "  --seed N"
+    , "  --show-backend"
+    , ""
+    , "Verification commands live under `lake exe verify -- list`."
+    , "Use `lake exe torchlean <example> --help` for command-specific flags."
     ]
+
+/-- Runtime flags that consume the following command-line token. -/
+def prefixFlagTakesValue (a : String) : Bool :=
+  a == "--device" ||
+  a == "--dtype" ||
+  a == "--float32-mode" ||
+  a == "--backend" ||
+  a == "--seed"
 
 /--
 Split CLI arguments into `(prefixFlags, command, commandArgs)`.
 
 We allow "global" runtime flags before the command name so users can write either:
-- `torchlean mlp --cpu`, or
-- `torchlean --cpu mlp`.
+- `torchlean mlp --device cpu`, or
+- `torchlean --device cpu mlp`.
 -/
 def splitCommandArgs? (args : List String) : Option (List String × String × List String) :=
   let rec go (prefixRev : List String) : List String → Option (List String × String × List String)
     | [] => none
+    | a :: b :: rest =>
+        if prefixFlagTakesValue a then
+          go (b :: a :: prefixRev) rest
+        else if a.startsWith "-" then
+          go (a :: prefixRev) (b :: rest)
+        else
+          some (prefixRev.reverse, a, b :: rest)
     | a :: rest =>
         if a.startsWith "-" then
           go (a :: prefixRev) rest
         else
           some (prefixRev.reverse, a, rest)
   go [] args
+
+/-- Detect whether the command line already selects a runtime device. -/
+def hasDeviceFlag : List String → Bool
+  | [] => false
+  | "--device" :: _ :: _ => true
+  | a :: rest =>
+      a.startsWith "--device=" || hasDeviceFlag rest
+
+/-- Detect whether the command line selects CUDA. -/
+def hasCudaDeviceFlag : List String → Bool
+  | [] => false
+  | "--device" :: "cuda" :: _ => true
+  | "--device" :: "gpu" :: _ => true
+  | a :: rest =>
+      a == "--device=cuda" || a == "--device=gpu" || hasCudaDeviceFlag rest
+
+/-- Device selected by runner/runtime arguments. Last device flag wins. -/
+def selectedDeviceFromArgs (args : List String) :
+    Except String _root_.Runtime.Autograd.Torch.Device :=
+  let rec go (current : _root_.Runtime.Autograd.Torch.Device) :
+      List String → Except String _root_.Runtime.Autograd.Torch.Device
+    | [] => pure current
+    | "--device" :: value :: rest => do
+        let d ← _root_.Runtime.Autograd.Torch.Device.parse value
+        go d rest
+    | "--device" :: [] =>
+        throw "missing value after --device (supported: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
+    | a :: rest =>
+        if a.startsWith "--device=" then do
+          let d ← _root_.Runtime.Autograd.Torch.Device.parse
+            ((a.drop "--device=".length).toString)
+          go d rest
+        else
+          go current rest
+  go .auto args
+
+/-- Read one line, treating EOF as the default answer. -/
+def readPromptLine : IO String := do
+  try
+    let line ← (← IO.getStdin).getLine
+    pure line.trimAscii.toString
+  catch _ =>
+    pure ""
+
+/-- Ask for the device in the interactive runtime chooser. -/
+partial def askDevice : IO (List String) := do
+  IO.println "Runtime device:"
+  IO.println "  1) CPU    portable default"
+  IO.println "  2) CUDA   GPU runtime, requires `lake -R -K cuda=true exe ...`"
+  IO.print "Select device [1]: "
+  (← IO.getStdout).flush
+  match (← readPromptLine).toLower with
+  | "" | "1" | "cpu" => pure ["--device", "cpu"]
+  | "2" | "cuda" | "gpu" => pure ["--device", "cuda"]
+  | _ =>
+      IO.println "Please choose 1/cpu or 2/cuda."
+      askDevice
+
+/-- Whether the chosen or already supplied arguments select CUDA. -/
+def selectsCuda (deviceArgs args : List String) : Bool :=
+  deviceArgs == ["--device", "cuda"] || hasCudaDeviceFlag args
+
+/--
+Fill in missing runtime choices interactively.
+
+The chooser is explicit (`--choose`) so scripts, tests, and CI never block waiting for stdin.
+-/
+def chooseRuntimeArgs (args : List String) : IO (List String) := do
+  IO.println "TorchLean runtime chooser"
+  let deviceArgs ←
+    if hasDeviceFlag args then
+      pure []
+    else
+      askDevice
+  pure (deviceArgs ++ args)
+
+/-- Strip top-level runner flags that are not meant for individual examples. -/
+def stripRunnerFlag (flag : String) : List String → List String
+  | [] => []
+  | a :: rest =>
+      if a == flag then stripRunnerFlag flag rest else a :: stripRunnerFlag flag rest
 
 def runCmd (cmd : String) (args : List String) : IO UInt32 := do
   match cmd with
@@ -205,6 +270,13 @@ def main (args : List String) : IO UInt32 := do
       IO.println NN.Examples.Models.Runner.usage
       pure 0
   | _ =>
+      let choose := args.contains "--choose" && !(args.contains "--help") && !(args.contains "-h")
+      let args := NN.Examples.Models.Runner.stripRunnerFlag "--choose" args
+      let args ←
+        if choose then
+          NN.Examples.Models.Runner.chooseRuntimeArgs args
+        else
+          pure args
       match NN.Examples.Models.Runner.splitCommandArgs? args with
       | none =>
           IO.eprintln NN.Examples.Models.Runner.usage

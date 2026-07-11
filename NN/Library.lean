@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Entrypoint.API
+public import NN.Entrypoint.Backend
 public import NN.Entrypoint.Floats
 public import NN.Entrypoint.GraphSpec
 public import NN.Entrypoint.IR

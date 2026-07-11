@@ -24,7 +24,7 @@ model.
 
 Tip:
 - For a short run that writes artifacts:
-  `lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`
+  `lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8`
 
 The executable writes three JSON files by default:
 - `data/rl/ppo_gridworld_trainlog.json` (greedy-policy evaluation return curve)

@@ -8,6 +8,8 @@ module
 
 public import Std
 
+public import NN.Tests.Backend.Profile
+public import NN.Tests.MLTheory.CROWNOperators
 public import NN.Tests.Runtime.Floats.Suite
 public import NN.Tests.Runtime.Rationals.Suite
 public import NN.Tests.Runtime.Cuda.Suite
@@ -43,6 +45,8 @@ def usage : String :=
 
 def run : IO Unit := do
   IO.println "== TorchLean: curated tests =="
+  NN.Tests.Backend.Profile.run
+  NN.Tests.MLTheory.CROWNOperators.run
   Tests.Floats.run
   Tests.Rationals.Suite.run
   Tests.Cuda.run

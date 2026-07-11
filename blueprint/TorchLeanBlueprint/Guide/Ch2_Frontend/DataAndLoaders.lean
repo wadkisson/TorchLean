@@ -254,7 +254,7 @@ a corpus, tokenize or encode it, and create causal samples. The relevant files a
 - [NN/Examples/Models/Sequence/Transformer.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Transformer.lean)
 - [NN/Examples/Models/Sequence/TextGpt2.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/TextGpt2.lean)
 
-The shapes are still the guide. A language model sample is a tensor with a sequence length and a
+The shapes remain explicit. A language model sample is a tensor with a sequence length and a
 target convention, rather than an unstructured list of tokens.
 
 # What the Data Layer Guarantees
@@ -276,6 +276,6 @@ parsed, shapes matched, batches were reproducible, and loss moved during a run. 
 runtime facts. They are not the same as a theorem about generalization, a proof of optimizer
 convergence, or a certified robustness bound.
 
-Later chapters use the same datasets and models as inputs to stronger checks. The point of Chapter 2
-is to make sure the ordinary executable path is visible and typed before those stronger claims enter
-the story.
+Stronger claims about these datasets require separate generalization, convergence, robustness, or
+numerical arguments. A typed executable path supplies their concrete inputs; it does not replace
+those arguments.

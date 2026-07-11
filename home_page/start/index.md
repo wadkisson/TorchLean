@@ -13,7 +13,7 @@ graph representation, and the checker that reasons about the graph.
 
 ```bash
 lake build
-lake exe torchlean quickstart_mlp --cpu --steps 10 --dtype float32 --backend eager
+lake exe torchlean quickstart_mlp --device cpu --steps 10 --dtype float32 --backend eager
 lake exe verify -- torchlean-ibp
 ```
 
@@ -37,26 +37,28 @@ certificates, and two-stage Lyapunov experiments.
 
 ## Where To Go Next
 
-1. [Building Models]({{ '/blueprint/Building-Models/' | relative_url }}) introduces typed tensors,
+1. [Installation]({{ '/installation/' | relative_url }}) covers Linux, macOS, Windows/WSL, CUDA,
+   optional LibTorch integration, and backend capsules.
+2. [Building Models]({{ '/blueprint/Building-Models/' | relative_url }}) introduces typed tensors,
    layers, parameter packs, datasets, losses, optimizers, and the public trainer.
-2. [Runtime and Interop]({{ '/blueprint/Runtime___-Autograd___-and-Interop/' | relative_url }})
+3. [Runtime and Interop]({{ '/blueprint/Runtime___-Autograd___-and-Interop/' | relative_url }})
    explains eager and compiled execution, autograd, runtime artifacts, PyTorch interop boundaries,
    data streams, and backend selection.
-3. [Semantics and Graphs]({{ '/blueprint/Semantics-and-Graphs/' | relative_url }}) explains the
+4. [Semantics and Graphs]({{ '/blueprint/Semantics-and-Graphs/' | relative_url }}) explains the
    graph IR, graph denotation, shape discipline, named operations, and why verifiers reuse the same
    graph rather than inventing a second model language.
-4. [Floating Point and Native Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/' | relative_url }})
+5. [Floating Point and Native Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/' | relative_url }})
    separates real-valued specifications, executable Float32 models, CUDA/native execution, and
    external producer assumptions.
-5. [Verification and Certificates]({{ '/blueprint/Verification-and-Certificates/' | relative_url }})
+6. [Verification and Certificates]({{ '/blueprint/Verification-and-Certificates/' | relative_url }})
    covers IBP/CROWN bounds, imported artifacts, optimizer laws, autograd proof APIs, scientific
    ML certificates, and trust boundaries.
-6. [Examples]({{ '/examples/' | relative_url }}) collects runnable model, scientific ML,
+7. [Examples]({{ '/examples/' | relative_url }}) collects runnable model, scientific ML,
    verification, text, diffusion, geometry, and Bug Zoo workflows.
 
 ## Common Next Steps
 
-- Train a model: `lake exe torchlean mlp --cpu --steps 100 --dtype float32`.
+- Train a model: `lake exe torchlean mlp --device cpu --steps 100 --dtype float32`.
 - Inspect a scientific ML run: [Scientific ML]({{ '/examples/scientific-ml/' | relative_url }}).
 - Check a certificate or bound pass: [Verification Bounds]({{ '/examples/verification/' | relative_url }}).
 - Read the public import path: `import NN; open TorchLean`.

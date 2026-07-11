@@ -18,7 +18,7 @@ Those two lines are enough for ordinary examples. They give access to the names 
 tutorials: `nn` for models, `Data` for datasets, `Trainer` for training and reports, `optim` for
 optimizers, and `autograd` for explicit differentiation tools.
 
-For a first pass through TorchLean, read the API this way:
+The public namespaces divide responsibilities as follows:
 
 - `nn` builds models;
 - `Data` builds datasets and loaders;
@@ -39,7 +39,7 @@ when the runtime itself is the subject.
 
 # What Counts As An API Claim
 
-TorchLean guide text uses four kinds of claims. Keeping them separate saves a lot of confusion.
+TorchLean distinguishes four kinds of claims.
 
 First, a *Lean snippet* is code meant to elaborate as Lean code when pasted into a file with the
 right imports. These examples usually start with `import NN` and `open TorchLean`.
@@ -56,9 +56,8 @@ which semantics, scalar domain, graph fragment, and hypotheses are covered. A th
 graph evaluator is not automatically a theorem about a native CUDA kernel unless the bridge theorem
 or trust boundary says so.
 
-The public API is designed so these claims can line up. A tutorial model can train, lower to a
-graph, produce an artifact, and later appear in a theorem statement. The guide should not blur those
-steps together.
+The public API lets these claims line up without conflating them. A model can train, lower to a
+graph, produce an artifact, and appear in a theorem statement.
 
 # The First Line Of A Tutorial
 
@@ -109,7 +108,7 @@ The user should not need to rewrite the model to move from a small training run 
 or to a verifier fixture. The runtime layer may require extra hypotheses, but it should be about the
 same model.
 
-The import graph is intentionally boring at the tutorial boundary:
+The tutorial import remains short:
 
 ```
 import NN
@@ -298,7 +297,7 @@ That distinction matters because it keeps the choice of semantics explicit. The 
 when the backend changes; only the execution mode changes.
 
 Device note: the same APIs also compose with an optional CUDA backed float32 path when the
-project is built with `-K cuda=true`. Public tutorials often show `--cpu` and `--cuda` on the
+project is built with `-K cuda=true`. Public tutorials often show `--device cpu` and `--device cuda` on the
 `torchlean` runner; the public types do not change. Only the runtime buffer implementation does.
 See *Runtime and Autograd* for the trust boundary and *Example Walkthroughs* for commands.
 

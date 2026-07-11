@@ -59,8 +59,8 @@ lake exe nn_tests_suite
 CUDA builds exercise the same Lean driven tests against the native CUDA FFI layer:
 
 ```bash
-lake build -R -K cuda=true nn_tests_suite
-lake exe -K cuda=true nn_tests_suite
+lake -R -K cuda=true build nn_tests_suite
+lake -R -K cuda=true exe nn_tests_suite
 ```
 
 To test the native CUDA boundary, run the curated suite under NVIDIA's CUDA memory checker:
@@ -93,6 +93,6 @@ under `NN/Proofs`, `NN/MLTheory`, or `NN/Verification` and keep the test as the 
 | --- | --- |
 | Public trainer, prediction, optimizer, or loader behavior | `lake exe nn_tests_suite` plus a focused `lake exe torchlean ...` command |
 | New verifier command or certificate schema | malformed-artifact rejection, accepted fixture check, and `lake exe verify -- all` when feasible |
-| CUDA kernel or VJP rule | `lake exe -K cuda=true nn_tests_suite` plus `scripts/checks/cuda_sanitize_tests.sh` for native memory behavior |
+| CUDA kernel or VJP rule | `lake -R -K cuda=true exe nn_tests_suite` plus `scripts/checks/cuda_sanitize_tests.sh` for native memory behavior |
 | PyTorch/ONNX/ATen/Julia/Gymnasium bridge | round-trip or fixture test that names the imported artifact and remaining producer boundary |
 | Documentation for public commands | `lake exe torchlean --help`, `lake exe verify --help`, and the relevant Jekyll/Verso build |

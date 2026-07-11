@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --cifar10
-  lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+  lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 -/
 
 module
@@ -26,7 +26,7 @@ artifact writing.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 ```
 -/
 

@@ -15,9 +15,9 @@ It shows whether the codebase has the shape we intend. The runtime graph IR is a
 it represents a neural-network computation and has a denotation. Proof dependencies are different
 again: they live at the declaration level after Lean elaborates a file.
 
-Use this page for architecture questions. Does `NN.Spec` stay independent of runtime code? Which
-modules are central hubs? Which layers are growing? Where does a new example or verifier import
-from? For runtime semantics, use the graph-IR chapters of the guide. For theorem statements, read
+The import graph answers architecture questions: whether `NN.Spec` stays independent of runtime
+code, which modules have become central hubs, and where a new example or verifier enters the module
+tree. Runtime semantics belong to the graph-IR chapters of the guide; theorem dependencies belong to
 the proof modules themselves.
 
 <div class="dep-dashboard" id="dep-dashboard">

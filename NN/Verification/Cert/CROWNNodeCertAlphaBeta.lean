@@ -9,7 +9,7 @@ module
 public import NN.MLTheory.CROWN.Cert.AlphaBetaCROWN
 public import NN.MLTheory.CROWN.Graph
 public import NN.Spec.Core.Utils
-public import NN.Verification.Cert.Common
+public import NN.Verification.Cert.IBPNodeCert
 public import Lean.Data.Json
 
 /-!
@@ -155,8 +155,8 @@ def checkAlphaBetaCROWNNode (g : Graph) (ps : ParamStore Float)
 /--
 Check a per-node α/β-CROWN certificate against Lean's propagation rules.
 
-Returns `true` iff every node's certificate affine bounds agree (within `tol`) with what Lean
-computes from the certificate parents + `ParamStore`.
+Returns `true` iff every supplied IBP box is locally recomputed by Lean and every node's affine
+bounds agree (within `tol`) with Lean's α/β-CROWN step.
 -/
 def checkAlphaBetaCROWNNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) (tol : Float := 1e-4) :
     IO Bool :=
@@ -164,10 +164,13 @@ def checkAlphaBetaCROWNNodeCertificate (g : Graph) (ps : ParamStore Float) (path
   let cert ← readAlphaBetaCROWNNodeCertificate g path
   let mut ok := true
   for id in [0:g.nodes.size] do
-    let okNode ← checkAlphaBetaCROWNNode g ps cert.ibp cert.alpha cert.beta cert.crown cert.ctx id tol
-    ok := ok && okNode
+    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g ps cert.ibp id tol
+    let okCrown ←
+      checkAlphaBetaCROWNNode g ps cert.ibp cert.alpha cert.beta cert.crown cert.ctx id tol
+    ok := ok && okIbp && okCrown
   if ok then
-    IO.println "[CROWNNodeCertAlphaBeta] certificate verified: all nodes match Lean α/β-CROWN step."
+    IO.println
+      "[CROWNNodeCertAlphaBeta] artifact replay matched Lean IBP and α/β-CROWN steps."
   pure ok
 
 end NN.Verification.CROWNNodeCertAlphaBeta

@@ -127,15 +127,7 @@ Row-wise hard-masked softmax.
 literal zero numerator. This matches `Spec.hardMaskedSoftmaxSpec`, not a finite additive sentinel.
 -/
 def rowHardMaskedSoftmaxForward (x mask : Buffer) (rows cols : UInt32) : Buffer.WithWorkspace :=
-  let rowMax := Buffer.reduceMaxByRow x rows cols
-  let maxB := Buffer.broadcastVecToCols rowMax rows cols
-  let shifted := Buffer.sub x maxB
-  let ex := Buffer.exp shifted
-  let exMasked := Buffer.mul ex mask
-  let rowSum := Buffer.reduceSumByRow exMasked rows cols
-  let sumB := Buffer.broadcastVecToCols rowSum rows cols
-  let y := Buffer.div exMasked sumB
-  { value := y, workspace := [rowMax, maxB, shifted, ex, exMasked, rowSum, sumB] }
+  { value := Buffer.hardMaskedSoftmaxByRow x mask rows cols, workspace := [] }
 
 /-- Row-wise softmax VJP: `dX = y * (dY - sum(dY*y, axis=1))`. -/
 def rowSoftmaxBwd (y dLdy : Buffer) (rows cols : UInt32) : Buffer :=

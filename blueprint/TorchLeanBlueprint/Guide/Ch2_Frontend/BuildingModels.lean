@@ -218,7 +218,7 @@ Here the shape bookkeeping is part of the model definition:
 - the final linear layer maps each flattened image to two logits.
 
 The CNN example makes the axes explicit. The type records that a batch of images enters, the
-convolution changes the channel and spatial axes, and two logits per image leave. Later chapters use
+convolution changes the channel and spatial axes, and two logits per image leave. Graph lowering and
 the same information when they lower the model to graphs or discuss verification conditions.
 
 The runnable CNN tutorial is

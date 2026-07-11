@@ -7,14 +7,13 @@ open Verso.Genre Manual
 tag := "examples"
 %%%
 
-Read the examples through a short first pass: one tensor file, one training run, one autograd run,
-one graph/checker run, and one BugZoo example.
+The examples cover typed tensors, training, autograd, graph checking, verification, and BugZoo
+contracts. Each group identifies where data enters, which artifact is produced, what is checked, and
+what a successful run establishes.
 
-Each example group has a teaching role: what it exercises, where data enters the system, what gets
-checked, and what a successful run establishes.
-
-For GPT text training, Mamba, diffusion, PPO, or FNO on the Burgers dataset, *Modern Models
-and Training* gives the deeper model walkthrough. The map below helps choose a starting point.
+For a first run, choose one row from the table below and keep the resulting artifact in view. A loss
+trace answers a different question from a graph, and an accepted certificate answers a different
+question from both.
 
 # The Examples At A Glance
 
@@ -23,14 +22,14 @@ The tree is organized around questions:
 | Goal | Run or read |
 |---|---|
 | first tensor example | [TensorBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean) |
-| first training example | `lake exe torchlean mlp --cpu --steps 10` |
+| first training example | `lake exe torchlean mlp --device cpu --steps 10` |
 | first autograd example | [AutogradBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean) |
 | first graph example | `lake exe verify -- torchlean-ibp` |
 | first BugZoo example | `NN.Examples.BugZoo.All` |
-| first CUDA runtime check | `lake exe -K cuda=true torchlean mlp --cuda --steps 20` |
+| first CUDA runtime check | `lake -R -K cuda=true exe torchlean mlp --device cuda --steps 20` |
 | first scientific ML example | `lake exe verify -- ode` or the PINN/FNO examples |
 
-The fastest way to avoid overreading the examples is to ask which artifact the example produces:
+The produced artifact determines the meaning of a successful run:
 
 | Artifact | Example family | How to read the result |
 |---|---|---|
@@ -41,15 +40,6 @@ The fastest way to avoid overreading the examples is to ask which artifact the e
 | certificate or bounds | `lake exe verify -- ...` | checker acceptance, not training quality |
 | image sample | diffusion/autoencoder-style examples | sampling artifact, not a theorem |
 | rollout or policy artifact | PPO examples | environment-boundary and behavior inspection |
-
-- *Can I build and inspect small tensors?* Read [Quickstart](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Quickstart/).
-- *Can I train a model in Lean?* Read [Models](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/) and
-  [Data](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Data/).
-- *Can I cross the PyTorch boundary without losing shapes?* Read
-  [PyTorch interop](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Interop/PyTorch/).
-- *Can I see the graph that a verifier sees?* Read [GraphSpec and IR deep dives](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/DeepDives/).
-- *Can I check a property or certificate?* Read the verification examples and fixtures.
-- *Can I see common ML bugs as checked Lean case studies?* Read [Bug Zoo](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/).
 
 Most model examples run through one executable:
 
@@ -64,7 +54,7 @@ curated examples:
 lake build NN.Examples.Zoo
 ```
 
-# Three Walkthroughs To Read First
+# Three Representative Workflows
 
 ## 1. A compact model trains
 
@@ -80,8 +70,8 @@ These small runs use the same runtime path as the larger examples, so they are g
 the training loop before adding a larger dataset or model family.
 
 ```
-lake exe torchlean mlp --cpu --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake exe torchlean mlp --device cpu --steps 10
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 ```
 
 ## 2. A graph is checked
@@ -93,9 +83,8 @@ payload supplies parameters, and a verifier pass computes a bound or checks a ce
 lake exe verify -- torchlean-ibp
 ```
 
-Read this together with the *Graphs and IR* and *Verification* chapters. The verifier is not
-guessing which Python object was meant; it consumes the same graph with named operations described
-earlier in the book.
+The verifier does not guess which Python object was meant; it consumes an `NN.IR.Graph` with named
+operations and an explicit payload.
 
 ## 3. A real ML failure mode becomes a tiny Lean case study
 
@@ -111,13 +100,11 @@ The style is:
 #check runtimeFloat32_add_rewrites_to_ieee32
 ```
 
-For papers, talks, and documentation, this example family is often the easiest entry point: it shows
-how TorchLean turns a bug pattern into a checked statement.
+BugZoo turns each bug pattern into a named, checked statement.
 
-# A Small Lean Reading Pattern
+# Anatomy Of An Example
 
-Most runnable examples are ordinary Lean modules with a predictable shape. Read for these pieces
-before chasing implementation details:
+Most runnable examples are ordinary Lean modules with four recognizable pieces:
 
 ```
 def model : nn.M ...
@@ -139,7 +126,7 @@ theorem name tells you which semantic object the surrounding prose is allowed to
 
 # Fast Kernels, BugZoo, and Verification
 
-Read the examples as one chain:
+The runtime-to-proof chain has four stages:
 
 1. *Fast kernel*: a runtime path uses an optimized implementation, such as fused CUDA attention.
 2. *BugZoo example*: BugZoo states the semantic hazard, such as mask polarity, cache position mismatch, or
@@ -227,13 +214,9 @@ For one short pass that touches the main layers, use this order:
 6. Autograd example:
    `lake env lean --run NN/Examples/Quickstart/AutogradBasics.lean -- --dtype float`
 7. Model training example:
-   `lake exe torchlean mlp --cpu --steps 10`
+   `lake exe torchlean mlp --device cpu --steps 10`
 8. Small complete verification example:
    `lake exe verify -- torchlean-ibp`
-
-Read the output alongside this book: training-focused material begins with *Training From Scratch*
-and *Runtime and Autograd*; graph and verification artifacts begin with *Graphs and IR*, then
-*Verification*.
 
 # What Success Looks Like
 
@@ -242,8 +225,8 @@ Expected outputs on a healthy run:
 - `quickstart_tensors`: small typed tensors print cleanly.
 - `float32_modes`: the same numeric expression is evaluated under different float32 semantics.
 - `quickstart_autograd`: prints a value and a gradient from the recorded tape.
-- `lake exe torchlean mlp --cpu --steps 10`: prints a short loss trace trending downward.
-- `lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1`: runs the minGPT
+- `lake exe torchlean mlp --device cpu --steps 10`: prints a short loss trace trending downward.
+- `lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1`: runs the minGPT
   addition example on GPU when the CUDA backend has been built.
 - `torchlean-ibp`: prints interval bounds for the output node, not raw graph internals.
 
@@ -324,22 +307,22 @@ Use these as starting points; each module's header documents the full flag set.
 - `floats_arb_ieee_compare`: compares float semantics modes and pairs with *Floating-Point
   Semantics*.
 
-Runnable via `torchlean`: `lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1` trains the
+Runnable via `torchlean`: `lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1` trains the
 small addition example through the same runner as the other model commands. This particular
 example is CUDA-only.
 
 Example invocations:
 
 ```
-lake exe torchlean mlp --cpu --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
-lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
-lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
-lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
-lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1
+lake exe torchlean mlp --device cpu --steps 10
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean rnn --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean transformer --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1
+lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1
 ```
 
 The real data helper prepares the small public corpora and CIFAR shards used by these examples:
@@ -360,9 +343,9 @@ teaching example:
 The larger examples should still be run small first. For example:
 
 ```
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
-lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 Those settings are intentionally small. They are meant to test the path through tokenization,
@@ -521,29 +504,13 @@ For the FNO/Burgers example, a typical workflow is:
 
 ```
 python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 700 --lr 0.003 \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 0.003 \
   --plot-csv data/real/fno/predictions.csv
 python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.csv
 ```
 
-Read this as a runtime/operator-learning workflow. Read `pinn-cert`, `pinn-cli`, `ode`, and the
-Lyapunov workflows as verification workflows.
-
-# A Paper-Oriented Reading Path
-
-To mirror the paper's example ordering, try:
-
-1. `simple_mlp_train`
-2. `pytorch_loop_mlp_train`
-3. `graphspec`
-4. `torchlean-ibp`
-5. `torchlean-crown-ops`
-6. `pinn-cert` or `pinn-cli`
-7. `ode`
-8. `vnncomp-mnistfc`
-
-That sequence starts with familiar training, then introduces typed authoring, then compiled IR,
-then the verifier workflows that are specific to TorchLean's research program.
+This command is a runtime operator-learning workflow. The `pinn-cert`, `pinn-cli`, `ode`, and
+Lyapunov commands produce or check verification artifacts.
 
 # Widgets In Practice
 
@@ -578,7 +545,7 @@ After editing an example, prefer the smallest check that covers the touched path
 lake env lean NN/Examples/Quickstart/TensorBasics.lean
 lake build NN.Examples.BugZoo.All
 lake exe torchlean --help
-lake exe torchlean mlp --cpu --steps 1
+lake exe torchlean mlp --device cpu --steps 1
 ```
 
 Run broader tests when the touched code changes shared APIs or runtime behavior. For guide-only

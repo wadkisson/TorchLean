@@ -75,8 +75,7 @@ structure SemanticBoundary
     ∀ {source : Source} {target : Target},
       implements source target → ∀ input, targetEval target input = sourceEval source input
 
-/-- Once a backend has the semantic-boundary evidence, every accepted implementation agrees. -/
-theorem acceptedBackend_matches_source
+example
     {Source Target Input Output : Type}
     (boundary : SemanticBoundary Source Target Input Output)
     {source : Source} {target : Target}

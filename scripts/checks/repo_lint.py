@@ -327,10 +327,6 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public examples should use `Runtime.runFloat` or `Runtime.withOptions`, not the raw `TorchLean.Module.run` dispatcher.",
     ),
     (
-        re.compile(r"\bRuntime\.withSelected(Scalar)?\b"),
-        "public examples should use `Runtime.withOptions` / `Runtime.withOptionsScalar`, which pass parsed runtime options through the facade.",
-    ),
-    (
         re.compile(r"\bModule\.(withMseModel|withCrossEntropyOneHotModel|withScalarLossModel)\b"),
         "public model/example training should use `Trainer.*` handles, not raw `Module.with*Model` setup.",
     ),
@@ -413,7 +409,7 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public examples should use `Trainer.runConfig opts { optimizer := ... }`, not a type-ascribed RunConfig followed by `.withOptions opts`.",
     ),
     (
-        re.compile(r"\b(backend := opts\.backend|device := if opts\.useGpu|fastKernels := opts\.fastKernels|fastGpuMatmulPrecision := opts\.fastGpuMatmulPrecision)\b"),
+        re.compile(r"\b(backend := opts\.backend|device := if opts\.usesCuda|fastKernels := opts\.fastKernels|fastGpuMatmulPrecision := opts\.fastGpuMatmulPrecision)\b"),
         "public examples should use `Trainer.runConfig opts { ... }` or `Trainer.runtimeSettings opts { ... }` instead of manually copying runtime fields from `opts`.",
     ),
     (
@@ -492,6 +488,18 @@ PUBLIC_TUTORIAL_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 TOP_LEVEL_API_DECL_RE = re.compile(
     r"^\s*(def|structure|inductive|class|abbrev|instance|theorem|lemma)\s+",
     flags=re.MULTILINE,
+)
+
+CONTRACT_SOURCE_FILE_RE = re.compile(
+    r"\.sourceFile\s*\{(?P<body>[^{}]*)\}",
+    flags=re.DOTALL,
+)
+CONTRACT_NATIVE_SYMBOL_RE = re.compile(
+    r"\.nativeSymbol\s*\{(?P<body>[^{}]*)\}",
+    flags=re.DOTALL,
+)
+CONTRACT_GUARD_SOURCE_PATH_RE = re.compile(
+    r"\.runtimeGuard\s+\"[^\"]*\.(?:c|cc|cpp|cu|cuh|h|hpp)\"",
 )
 
 
@@ -754,9 +762,123 @@ def _check_docgen_api_links(path: pathlib.Path, text: str, findings: list[Findin
             )
 
 
+def _lean_string_field(body: str, field: str) -> str | None:
+    m = re.search(rf"\b{re.escape(field)}\s*:=\s*\"([^\"]+)\"", body)
+    return m.group(1) if m else None
+
+
+def _lean_optional_string_field(body: str, field: str) -> str | None:
+    m = re.search(rf"\b{re.escape(field)}\s*:=\s*some\s+\"([^\"]+)\"", body)
+    return m.group(1) if m else None
+
+
+def _lake_declares_target(lake_text: str, target: str) -> bool:
+    return re.search(
+        rf"^\s*(?:target|lean_exe|lean_lib)\s+{re.escape(target)}\b",
+        lake_text,
+        flags=re.MULTILINE,
+    ) is not None
+
+
+def _check_backend_contract_refs(
+    path: pathlib.Path,
+    text: str,
+    lake_text: str,
+    findings: list[Finding],
+) -> None:
+    """Check structured backend contract references to local sources and native symbols."""
+
+    for m in CONTRACT_GUARD_SOURCE_PATH_RE.finditer(text):
+        line, col = _line_col(text, m.start())
+        findings.append(
+            Finding(
+                "ERROR",
+                path,
+                line,
+                col,
+                "native source paths belong in structured `.sourceFile` or `.nativeSymbol` provenance, not a runtime-guard label.",
+            )
+        )
+
+    for m in CONTRACT_SOURCE_FILE_RE.finditer(text):
+        body = m.group("body")
+        raw_path = _lean_string_field(body, "path")
+        if raw_path is None:
+            line, col = _line_col(text, m.start())
+            findings.append(Finding("ERROR", path, line, col, "`.sourceFile` provenance is missing `path := ...`."))
+            continue
+        source = REPO_ROOT / raw_path
+        if not source.exists():
+            line, col = _line_col(text, m.start())
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"`.sourceFile` provenance points to missing source `{raw_path}`.",
+                )
+            )
+
+    for m in CONTRACT_NATIVE_SYMBOL_RE.finditer(text):
+        body = m.group("body")
+        raw_path = _lean_string_field(body, "path")
+        symbol = _lean_string_field(body, "symbol")
+        build_target = _lean_optional_string_field(body, "buildTarget?")
+        line, col = _line_col(text, m.start())
+        if raw_path is None:
+            findings.append(Finding("ERROR", path, line, col, "`.nativeSymbol` provenance is missing `path := ...`."))
+            continue
+        if symbol is None:
+            findings.append(Finding("ERROR", path, line, col, "`.nativeSymbol` provenance is missing `symbol := ...`."))
+            continue
+        source = REPO_ROOT / raw_path
+        if not source.exists():
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"`.nativeSymbol` provenance points to missing source `{raw_path}`.",
+                )
+            )
+            continue
+        try:
+            source_text = source.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            findings.append(Finding("ERROR", source, None, None, f"failed to read file: {e}"))
+            continue
+        if symbol not in source_text:
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"`.nativeSymbol` provenance names `{symbol}`, but it does not occur in `{raw_path}`.",
+                )
+            )
+        if build_target is not None and not _lake_declares_target(lake_text, build_target):
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    line,
+                    col,
+                    f"`.nativeSymbol` provenance names Lake target `{build_target}`, but `lakefile.lean` does not declare it.",
+                )
+            )
+
+
 def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
     """Run TorchLean's repository hygiene checks and return all findings."""
     findings: list[Finding] = []
+    try:
+        lake_text = (REPO_ROOT / "lakefile.lean").read_text(encoding="utf-8")
+    except OSError as e:
+        lake_text = ""
+        findings.append(Finding("ERROR", REPO_ROOT / "lakefile.lean", None, None, f"failed to read file: {e}"))
 
     if not LINT_SCOPE_SENTINEL.exists():
         findings.append(
@@ -974,6 +1096,7 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
         text = raw.decode("utf-8", errors="replace")
         masked = _mask_lean_comments_and_strings(text)
         _check_local_source_refs(path, text, findings)
+        _check_backend_contract_refs(path, text, lake_text, findings)
 
         if not _has_nn_header(path, text):
             findings.append(

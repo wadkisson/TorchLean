@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Proofs.Models.Attention
+public import NN.Proofs.Models.Mlp
 
 /-!
 # Model-Level Proofs
@@ -24,4 +25,3 @@ guess which attention leaf file contains the fact they need.
 -/
 
 @[expose] public section
-

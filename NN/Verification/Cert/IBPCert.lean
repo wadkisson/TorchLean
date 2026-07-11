@@ -80,6 +80,8 @@ def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol
   let n := outB.dim
   let some loVec := parseFloatVec n loJ | throw <| IO.userError "Missing/invalid result.lo"
   let some hiVec := parseFloatVec n hiJ | throw <| IO.userError "Missing/invalid result.hi"
+  unless (List.finRange n).all (fun i => (loVec i).isFinite && (hiVec i).isFinite) do
+    throw <| IO.userError "Invalid result bounds: every value must be finite"
 
   let (leanLo, leanHi) := NN.Verification.Util.Tensor.flatBoxBoundsToArrays outB
   let okLo :=

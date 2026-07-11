@@ -7,7 +7,6 @@ Authors: TorchLean Team
 module
 
 public import NN.Tests.Runtime.Rationals.AutogradEngineTest
-public import NN.Tests.Runtime.Rationals.MlpTest
 public import NN.Tests.Runtime.Rationals.ElementwiseDivTest
 
 /-!
@@ -31,7 +30,6 @@ namespace Suite
 def run : IO Unit := do
   Tests.Rationals.AutogradEngine.run
   Tests.Rationals.ElementwiseDiv.run
-  Tests.Rationals.run
 
 end Suite
 

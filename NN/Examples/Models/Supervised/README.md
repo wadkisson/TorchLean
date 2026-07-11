@@ -21,17 +21,17 @@ GPT-style language modeling, Mamba-style state updates, and synthetic sequence c
 
 ```bash
 python3 scripts/datasets/download_example_data.py --auto-mpg
-lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean kan --cpu --steps 10
+lake exe torchlean mlp --device cpu --steps 10
+lake exe torchlean kan --device cpu --steps 10
 
 python3 scripts/datasets/download_example_data.py --household-power --household-power-windows 512
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 200 --windows 96
 ```
 
 Pass `--log PATH` to preserve the training curve:
 
 ```bash
-lake exe torchlean mlp --cpu --steps 50 --log data/model_zoo/mlp_trainlog.json
+lake exe torchlean mlp --device cpu --steps 50 --log data/model_zoo/mlp_trainlog.json
 ```
 
 The log is the stable artifact for comparing runs. Printed predictions are useful for a quick read,

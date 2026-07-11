@@ -108,7 +108,6 @@ noncomputable local instance : Numbers ℂ where
   log10 := 0
   log10000 := 0
   epsilon := (1 : ℂ) / 1000000
-  neg_thousand := (-1000 : ℂ)
 
 /- Local-only `Context ℂ`: the ordering is not mathematically meaningful for complex numbers.
 It is present solely because the generic TorchLean runtime context class includes order-dependent

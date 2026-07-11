@@ -205,12 +205,10 @@ def loadWeights (path : String) : IO (Array LayerWB) := do
       | none => throw <| IO.userError s!"Missing key: {kB}"
     let some (rows, cols) := Import.PyTorch.inferMatrixDims wJ
       | throw <| IO.userError s!"Bad matrix for {kW}"
-    let some wArr := NN.Verification.Json.parseFloatMatrix wJ
-      | throw <| IO.userError s!"Bad matrix payload for {kW}"
+    let wArr ← NN.Verification.Json.expectFiniteFloatMatrix wJ kW
     let some w := NN.Verification.Util.Tensor.matOfArray rows cols wArr
       | throw <| IO.userError s!"Bad matrix shape for {kW} (expected {rows}x{cols})"
-    let some bArr := NN.Verification.Json.parseFloatArray bJ
-      | throw <| IO.userError s!"Bad bias payload for {kB}"
+    let bArr ← NN.Verification.Json.expectFiniteFloatArray bJ kB
     let some bT := NN.Verification.Util.Tensor.vecOfArray rows bArr
       | throw <| IO.userError s!"Bad bias shape for {kB} (expected length {rows})"
     layers := layers.push { inDim := cols, outDim := rows, w := w, b := bT }
@@ -257,8 +255,8 @@ def loadAlphas (path : String) : IO (Array AlphaEntry) := do
     let alphaObj ← expectFieldObj exo "alpha" "alpha instance"
     let a2J ← expectField alphaObj "2" "alpha"
     let a4J ← expectField alphaObj "4" "alpha"
-    let a2 ← NN.Verification.Json.expectFloatMatrix a2J "alpha.2"
-    let a4 ← NN.Verification.Json.expectFloatMatrix a4J "alpha.4"
+    let a2 ← NN.Verification.Json.expectFiniteFloatMatrix a2J "alpha.2"
+    let a4 ← NN.Verification.Json.expectFiniteFloatMatrix a4J "alpha.4"
     out := out.push { id := id, alpha2 := a2, alpha4 := a4 }
   pure out
 

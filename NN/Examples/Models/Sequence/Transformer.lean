@@ -5,7 +5,7 @@ Authors: TorchLean Team
 
 Real-data CUDA example:
   python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-  lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
+  lake -R -K cuda=true exe torchlean transformer --device cuda --tiny-shakespeare --steps 1
 -/
 
 module
@@ -26,7 +26,7 @@ regularly.
 
 ```bash
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean transformer --device cuda --tiny-shakespeare --steps 1
 ```
 -/
 
@@ -107,6 +107,7 @@ def main (args : List String) : IO UInt32 := do
       defaultLogJson := defaultLogJson
       defaultSteps := 1
       description := "Transformer encoder"
+      dataOptions := RealData.TextCorpusFlags.help
       parseData := RealData.TextCorpusFlags.parse
       train := train }
     args

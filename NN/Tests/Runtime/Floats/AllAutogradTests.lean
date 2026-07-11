@@ -209,7 +209,7 @@ def initParams : Params :=
 
 -- Optimizer config: ids are stable because we create W then b each step.
 def lrScheduler : Train.LRScheduler Float :=
-  .linearWarmup (Optim.createLinearWarmupScheduler (initialLr := 0.2) (warmupSteps := 2)
+  .linearWarmup (Optim.linearWarmupScheduler (initialLr := 0.2) (warmupSteps := 2)
     (startLr := 0.05))
 
 def initOptim : Train.OptimizerState Float :=

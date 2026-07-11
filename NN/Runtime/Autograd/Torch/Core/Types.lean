@@ -8,12 +8,12 @@ module
 
 public import NN.Runtime.Autograd.Compiled.Core
 public import NN.Runtime.Autograd.Compiled.GraphM
-public import NN.Runtime.Autograd.Engine.FastKernels
 public import NN.Runtime.Autograd.Engine.Cuda.Tape
 public import NN.Runtime.Autograd.Engine.Cuda.Kernels
 public import NN.Runtime.Autograd.Engine.Cuda.ConvPool
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
 public import NN.Runtime.Autograd.Engine.Cuda.Shape
+public import NN.Backend.Profile
 import Batteries.Data.Vector.Lemmas
 import Init.Data.Vector.Lemmas
 import Mathlib.Algebra.Order.Algebra
@@ -60,23 +60,92 @@ inductive Backend where
 deriving Repr, DecidableEq
 
 /--
-Execution device selector (PyTorch comparison: `cpu` vs `cuda`).
+Execution device requested by the Torch-style front-end.
 
-Current scope:
-- eager backend only: selects whether the hidden tape is CPU (`Runtime.Autograd.Tape`) or CUDA
-  (`Runtime.Autograd.Cuda.Tape`),
-- compiled backend is unchanged (proof semantics / typed IR are device-agnostic).
+`cpu` and `cuda` are implemented by the current eager runtime. The other constructors are reserved
+platform targets: they are valid names for configuration, backend planning, and diagnostics, but
+runtime execution rejects them until the corresponding engine is implemented.
 -/
 inductive Device where
+  | auto
   | cpu
   | cuda
+  | rocm
+  | metal
+  | wasm
+  | tpu
+  | trainium
+  | custom
+  | external
 deriving Repr, DecidableEq
+
+namespace Device
+
+/-- Stable CLI spelling for a runtime device. -/
+def cliName : Device → String
+  | .auto => "auto"
+  | .cpu => "cpu"
+  | .cuda => "cuda"
+  | .rocm => "rocm"
+  | .metal => "metal"
+  | .wasm => "wasm"
+  | .tpu => "tpu"
+  | .trainium => "trainium"
+  | .custom => "custom"
+  | .external => "external"
+
+/-- Parse the public `--device` value. -/
+def parse? : String → Option Device
+  | "auto" => some .auto
+  | "cpu" => some .cpu
+  | "cuda" => some .cuda
+  | "gpu" => some .cuda
+  | "rocm" => some .rocm
+  | "amd" => some .rocm
+  | "metal" => some .metal
+  | "mps" => some .metal
+  | "wasm" => some .wasm
+  | "webgpu" => some .wasm
+  | "tpu" => some .tpu
+  | "xla" => some .tpu
+  | "trainium" => some .trainium
+  | "neuron" => some .trainium
+  | "custom" => some .custom
+  | "custom-chip" => some .custom
+  | "external" => some .external
+  | _ => none
+
+/-- Parse the public `--device` value or return a CLI error. -/
+def parse (v : String) : Except String Device :=
+  match parse? v with
+  | some d => pure d
+  | none =>
+      throw s!"unknown --device {v} (supported names: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
+
+/-- Whether the current eager runtime has an implementation for this selected device. -/
+def runtimeImplemented : Device → Bool
+  | .auto => true
+  | .cpu => true
+  | .cuda => true
+  | .rocm => false
+  | .metal => false
+  | .wasm => false
+  | .tpu => false
+  | .trainium => false
+  | .custom => false
+  | .external => false
+
+/-- Human-facing explanation for a device that is named but not implemented in this runtime. -/
+def unsupportedRuntimeMessage (d : Device) : String :=
+  s!"device `{d.cliName}` is a named TorchLean target, but this runtime build only implements cpu and cuda execution"
+
+end Device
 
 /--
 Options controlling the behavior of the Torch-style front-end.
 
-PyTorch comparison: these are approximately "session/global" settings (e.g. default `requires_grad`,
-and runtime-only performance toggles).
+PyTorch comparison: these are approximately session/global settings, such as the default
+`requires_grad` value and requested execution device.
 -/
 structure Options where
   /-- Execution backend selection. -/
@@ -96,19 +165,6 @@ structure Options where
   -/
   seed : Nat := 0
   /--
-  Enable runtime-only fast kernels for a few hot ops in the eager backend.
-
-  This is an execution/performance flag; it is not used by the proof-linked compilation path.
-  -/
-  fastKernels : Bool := false
-  /--
-  GPU precision for fast-kernel matmul over Lean `Float` tensors.
-
-  `.fp32` matches the eager CUDA buffer path. `.fp64` selects the double-precision DGEMM path for
-  matmul-only `Float` workloads that request double precision on GPU.
-  -/
-  fastGpuMatmulPrecision : Runtime.Autograd.FastKernels.GpuMatmulPrecision := .fp32
-  /--
   Track gradients for newly recorded leaves.
 
   Inference helpers set this to `false`: forward values are still materialized so they can be read
@@ -118,27 +174,101 @@ structure Options where
   -/
   trackGradients : Bool := true
   /--
-  Eager execution on CUDA.
+  Requested eager execution device.
 
-  When `true` and `backend = .eager`, the eager session uses the CUDA tape
-  (`Runtime.Autograd.Cuda.Tape`) and Torch ops must route to CUDA implementations (no implicit CPU
-  fallback).
-
-  Compiled backend behavior is unchanged.
+  `.auto` currently resolves to CPU. CUDA and future accelerators are selected explicitly with
+  `--device`.
   -/
-  useGpu : Bool := false
+  requestedDevice : Device := .auto
+  /--
+  Optional backend-contract profile selected by higher-level helpers.
+
+  If omitted, `Options.backendProfile` derives a conservative profile from `Options.device`.
+  -/
+  backendProfile? : Option NN.Backend.BackendProfile := none
+  /-- Print each accepted backend capsule the first time an eager session executes it. -/
+  showBackend : Bool := false
 deriving Repr
 
 /- Convenience API for PyTorch-style device selection. -/
 namespace Options
 
-/-- Read the device selector corresponding to `useGpu`. -/
+/-- Read the effective device selector. -/
 def device (opts : Options) : Device :=
-  if opts.useGpu then .cuda else .cpu
+  match opts.requestedDevice with
+  | .auto => .cpu
+  | d => d
 
 /-- Return a copy of the options that selects the requested execution device. -/
 def toDevice (opts : Options) (d : Device) : Options :=
-  { opts with useGpu := d == .cuda }
+  { opts with requestedDevice := d, backendProfile? := none }
+
+/-- Whether the effective runtime device is CUDA. -/
+def usesCuda (opts : Options) : Bool :=
+  opts.device == .cuda
+
+/-- Reject devices that are named for planning but not implemented by the eager runtime yet. -/
+def validateDevice (opts : Options) : Except String Unit :=
+  let d := opts.device
+  if d.runtimeImplemented then
+    pure ()
+  else
+    throw d.unsupportedRuntimeMessage
+
+/-- Validate both the named device and the linked native runtime before executing user code. -/
+def validateForExecution (opts : Options) : IO Unit := do
+  match opts.validateDevice with
+  | .ok () => pure ()
+  | .error msg => throw <| IO.userError msg
+  if opts.usesCuda then
+    Runtime.Autograd.Cuda.Buffer.requireNativeRuntime
+
+/-- CLI/log spelling for the effective runtime device. -/
+def deviceName (opts : Options) : String :=
+  opts.device.cliName
+
+/-- Conservative backend-contract profile implied by the selected runtime device. -/
+def defaultBackendProfile (opts : Options) : NN.Backend.BackendProfile :=
+  match opts.device with
+  | .auto => NN.Backend.BackendProfile.checkedCpu
+  | .cpu => NN.Backend.BackendProfile.checkedCpu
+  | .cuda => NN.Backend.BackendProfile.checkedCuda
+  | .rocm => NN.Backend.BackendProfile.futureRocm
+  | .metal => NN.Backend.BackendProfile.futureMetal
+  | .wasm => NN.Backend.BackendProfile.futureWasm
+  | .tpu => NN.Backend.BackendProfile.futureTpu
+  | .trainium => NN.Backend.BackendProfile.futureTrainium
+  | .custom => NN.Backend.BackendProfile.futureCustomChip
+  | .external => NN.Backend.BackendProfile.futureExternal
+
+/-- Backend-contract profile attached to this runtime options record. -/
+def backendProfile (opts : Options) : NN.Backend.BackendProfile :=
+  let profile := match opts.backendProfile? with
+  | some p => p
+  | none => opts.defaultBackendProfile
+  if opts.trackGradients then
+    profile
+  else
+    { profile with config := { profile.config with vjpMode := .none } }
+
+/-- Select a backend capsule for one operation under this options record. -/
+def planBackendOp (opts : Options) (op : NN.Backend.BackendOp) :
+    Except String NN.Backend.AcceptedKernel :=
+  match opts.backendProfile.planOps [op] with
+  | .ok { kernels := k :: _ } =>
+      match k.accept opts.backendProfile.acceptancePolicy with
+      | .error failures =>
+          .error s!"backend profile {opts.backendProfile.name} rejected `{op.name}`: {repr failures}"
+      | .ok accepted =>
+          if k.capsule.runtimeSupport == .eager then
+            .ok accepted
+          else
+            .error <|
+              s!"backend capsule `{k.capsule.name}` for `{op.name}` is " ++
+                s!"{repr k.capsule.runtimeSupport}, not eager runtime support"
+  | .ok { kernels := [] } =>
+      .error s!"backend profile {opts.backendProfile.name} returned no capsule for {op.name}"
+  | .error msg => .error msg
 
 end Options
 

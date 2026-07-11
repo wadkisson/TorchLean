@@ -15,18 +15,30 @@ starts running. TorchLean gives those objects Lean names, executable paths, grap
 representations, and theorem or checker APIs where the current library has
 support.
 
-## Quickstart
+## Installation
 
 ```bash
 git clone https://github.com/lean-dojo/TorchLean.git
 cd TorchLean
+lake exe cache get
 lake build
-lake exe torchlean quickstart_mlp --cpu --steps 10 --dtype float32 --backend eager
-lake exe torchlean quickstart_mlp --cpu --steps 10 --dtype float --backend eager
+```
+
+For Linux, macOS, Windows/WSL, CUDA, optional LibTorch support, and an explanation of
+TorchLean's backend architecture, see the [Installation guide](https://lean-dojo.github.io/TorchLean/installation/).
+
+TorchLean is pinned by `lean-toolchain` and currently builds with
+`leanprover/lean4:v4.31.0`.
+
+## Quickstart
+
+```bash
+lake exe torchlean quickstart_mlp --device cpu --steps 10 --dtype float32 --backend eager
+lake exe torchlean quickstart_mlp --device cpu --steps 10 --dtype float --backend eager
 
 # Optional CUDA run, if the CUDA toolkit and an NVIDIA GPU are available:
-lake build -K cuda=true
-lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 1000
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 1000
 ```
 
 The first quickstart uses TorchLean's executable IEEE-style Float32 scalar. The
@@ -34,9 +46,6 @@ second uses Lean's builtin `Float` runtime path. The CUDA command uses the
 native GPU runtime path and checks that the CUDA backend is available. Theorem
 statements that mention CUDA cite the native-runtime boundary in
 `TRUST_BOUNDARIES.md` instead of treating a kernel launch as Lean proof evidence.
-
-TorchLean is pinned by `lean-toolchain` and currently builds with
-`leanprover/lean4:v4.31.0`.
 
 The public code shape is:
 
@@ -93,12 +102,6 @@ backend, scalar mode, and seed. It can run one prediction with `trainer.predict`
 reuse the trained parameters. Verification commands use the same idea at the artifact level: the
 CLI names the graph, certificate, dataset, or external producer boundary being checked.
 
-Backend selection is an option on the same model. Eager execution, compiled graph execution, CUDA
-runtime paths, and selected external forward-kernel providers are not separate public meanings of
-the network. When a fast runtime supplies a value, TorchLean still records the graph, tape, payload,
-or checker object that later statements refer to. If a path cannot preserve that relationship for
-training, it belongs behind an explicit runtime boundary or fallback.
-
 The maintained command set currently includes quickstarts, supervised models, CNN/ViT, GPT-style
 text, Mamba, diffusion, FNO Burgers, PPO/DQN, PyTorch round trips, data loaders, floating-point
 deep dives, GraphSpec, BugZoo, and verification workflows such as `torchlean-ibp`,
@@ -110,6 +113,7 @@ and `vnncomp-mnistfc`.
 - Project site: <https://lean-dojo.github.io/TorchLean/>
 - Guide: <https://lean-dojo.github.io/TorchLean/blueprint/>
 - Examples: <https://lean-dojo.github.io/TorchLean/examples/>
+- Installation: <https://lean-dojo.github.io/TorchLean/installation/>
 - Module graph: <https://lean-dojo.github.io/TorchLean/graphs/>
 - Updates and recent validation notes: <https://lean-dojo.github.io/TorchLean/updates/>
 - Paper: [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631)
@@ -160,6 +164,7 @@ require TorchLean from "../TorchLean"
 - `NN/Spec`: mathematical tensor, layer, model, and dynamical-system definitions.
 - `NN/Runtime`: executable autograd, optimizers, training loops, CUDA boundary,
   PyTorch import/export, and RL runtime support.
+- `NN/Backend`: contract-carrying backend capsules, profiles, device targets, reports, and gates.
 - `NN/IR` and `NN/GraphSpec`: graph IR, graph semantics, and typed architecture
   descriptions.
 - `NN/Proofs`: tensor algebra, selected autograd correctness theorems, analytic derivatives,

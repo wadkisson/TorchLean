@@ -93,14 +93,14 @@ A compact CUDA runtime check looks like:
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 For a longer image run, increase `--n-total`, `--steps`, `--hidden-c`, and the diffusion horizon:
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset cifar10 --n-total 128 --steps 50 --hidden-c 8
 ```
 
@@ -113,7 +113,7 @@ python3 scripts/datasets/torchlean_data_convert.py image-folder \
   --y-output data/real/imagenet64/imagenet64_train_y.npy \
   --height 64 --width 64 --labels-from-dirs --limit 2000
 
-lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset imagenet64 --n-total 800 --steps 200 --hidden-c 8 \
   --sample-ppm data/model_zoo/imagenet64_sample.ppm
 ```

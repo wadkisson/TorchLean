@@ -7,9 +7,10 @@ open Verso.Genre Manual
 tag := "factorizations-cholesky-qr"
 %%%
 
-Classical and scientific ML models often depend on matrix factorizations. Gaussian processes,
-kernel ridge regression, PCA, least squares, and many inverse problems all need a way to talk about
-Cholesky or QR without treating the factorization as an opaque numerical routine.
+Matrix factorizations appear throughout scientific machine learning. Cholesky factors are used in
+Gaussian-process and kernel computations; QR factors appear in least squares, orthogonalization,
+and stable linear algebra. A formal development needs both an executable algorithm and a statement
+of the algebraic object it is supposed to return.
 
 TorchLean adds specifications for two finite factorizations: Cholesky, where `A = L·Lᵀ`, and QR by
 classical Gram Schmidt, where `A = Q·R`. These are direct algorithms. There is no iteration count or
@@ -18,7 +19,7 @@ exact identity.
 
 # Specifications
 
-Each factorization is given a proposition level meaning over real matrices, independent of any particular
+Each factorization is given a proposition-level meaning over real matrices, independent of any particular
 algorithm:
 
 - `IsCholesky A L`: `L` is lower triangular and `A = L·Lᵀ`;
@@ -64,7 +65,7 @@ re-expanding that span. Together they give `IsQR A Q R`.
 
 # Scope
 
-Everything in this chapter is an exact finite identity. There is no sweep count, no residual, and
+The proved results are exact finite identities. There is no sweep count, no residual, and
 no asymptotic limit. Three layers are kept distinct:
 
 - *Proved specs* (over `ℝ`): the predicates `IsCholesky` / `IsQR`, together with reconstruction,
@@ -80,13 +81,21 @@ It is not stated as SPD. `Matrix.PosDef A` is the expected sufficient condition 
 be positive, but the theorem assumes the executable pivot condition directly. A separate
 theorem from SPD to positive pivots would discharge that hypothesis. QR likewise assumes positive executable
 `R`-pivots, corresponding to full column rank, rather than a separately proved rank hypothesis.
-Under those pivot hypotheses, the chapter's theorem statements are
+Under those pivot hypotheses, the theorem statements are
 closed. The triangular- and ridge-solve helpers that ride on the Cholesky factor are shipped as
-executable APIs; their correctness theorems belong in a later factorization layer.
+executable APIs; they do not yet have corresponding correctness theorems.
 
-# Executable witnesses
+# Executable Witnesses
 
 `NN.Examples.Factorization.Cholesky` and `…QR` exhibit each factorization on a concrete matrix: a
 positive reconstruction check (`‖A − L·Lᵀ‖`, `‖A − Q·R‖`, `‖Qᵀ·Q − I‖` all at machine zero) paired with a
 negative control, every check a `#eval` over `Float`, with no unproved goals, green on
 `lake build NN.Examples.Factorization`.
+
+# References
+
+- Golub and Van Loan, [*Matrix Computations*, fourth edition](https://press.jhu.edu/books/title/10678/matrix-computations),
+  Johns Hopkins University Press, 2013.
+- Higham, [*Accuracy and Stability of Numerical Algorithms*, second
+  edition](https://doi.org/10.1137/1.9780898718027), SIAM, 2002.
+- Mathlib, [`Analysis.InnerProductSpace.GramSchmidtOrtho`](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/InnerProductSpace/GramSchmidtOrtho.html).

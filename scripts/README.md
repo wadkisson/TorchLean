@@ -12,6 +12,7 @@ Everything is organized by purpose:
 
 - `checks/`: local CI, repository lint, dependency audit, CUDA sanitizer helpers, and Lake's Lean
   lint driver.
+- `setup/`: optional local native-backend setup helpers.
 - `docs/`: public site, DocGen, and Verso post-processing.
 - `datasets/`: dataset download, conversion, and training-log plotting helpers.
 - `verification/`: certificate producers and artifact-regeneration workflows.
@@ -34,6 +35,7 @@ These scripts are used by the build, documentation, and local verification paths
 - `docs/build_site.sh`
 - `docs/polish_docgen.py`
 - `docs/polish_verso_guide.py`
+- `setup/resolve_libtorch.sh`
 - `sandbox/run_comparator.py`
 - `comparator/nn_ci_all.json`
 
@@ -171,6 +173,12 @@ the dependency graph JSON, and the Jekyll site. To refresh only the graph artifa
 The dependency audit is a source-architecture check. Its graph is made from Lean imports, so it is
 the right tool for questions about layer boundaries and module ownership. It is not the graph IR
 used by TorchLean runtimes, and it is not a declaration-level proof-dependency extractor.
+
+## Setup
+
+- `setup/resolve_libtorch.sh`: validates an optional LibTorch checkout used by
+  `lake -R -K cuda=true build -K libtorch=true`. The normal CPU build and the default CUDA build do
+  not require LibTorch.
 
 ## Sandboxed Lean Checking
 

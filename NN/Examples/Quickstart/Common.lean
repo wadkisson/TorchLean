@@ -36,7 +36,7 @@ structure RuntimeTrain where
 /--
 Parse the common quickstart tail:
 
-`--steps`, optional logging flags, and runtime flags such as `--dtype`, `--backend`, or `--cuda`.
+`--steps`, optional logging flags, and runtime flags such as `--dtype`, `--backend`, or `--device`.
 
 Each quickstart still owns its model, dataset, task, and any tutorial-specific flags.
 -/

@@ -339,7 +339,7 @@ The normal-form end-to-end file packages the graph story into two declarations:
 #check NN.Proofs.RuntimeApprox.NF.backprop_approx_graphData
 ```
 
-Read these as graph-level bridge theorems:
+These are graph-level bridge theorems:
 
 - `eval_approx_graphData` says evaluating the executable forward graph is close to evaluating the
   spec forward graph when the local node approximation obligations have been supplied.
@@ -350,24 +350,23 @@ That is the runtime approximation analogue of the autograd proof architecture. L
 lemmas are the leaves; graph theorems compose them; deployment claims then combine the graph theorem
 with any scalar/backend assumptions.
 
-# Practical Reading Order
+# Runtime Approximation APIs
 
-For readers auditing or extending runtime approximation, a gentle path through the declarations is:
+The definitions are organized in the same order as the proof: define closeness, prove local operator
+bounds, compose them over forward and backward graphs, and finally connect the result to autograd.
 
-1. Read the [tolerance API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Core/Tolerance.lean) and
-   [spec approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Core/SpecApprox.lean) for the relation.
-2. Read the [forward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/ForwardApprox.lean) and find
-   `FwdGraph.eval_approx`.
-3. Read the [backward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/BackwardApprox.lean) and
-   find `RevGraph.backprop_approx`.
-4. Read one local op family in the [normal form operator API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Ops.lean), especially
-   a domain sensitive one such as division or safe log.
-5. Read the [convolution forward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvForward.lean) and
-   [convolution backward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvBackward.lean) for a larger operator.
-6. Read the [scale approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Scale/ScaleApprox.lean) when absolute
-   tolerances are too coarse.
-7. Read the [autograd algebra link API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/LinkAutogradAlgebra.lean)
-   when connecting approximation back to the autograd proof layer.
+- The [tolerance API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Core/Tolerance.lean) and
+  [spec approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Core/SpecApprox.lean) define the approximation relation.
+- The [forward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/ForwardApprox.lean) contains
+  `FwdGraph.eval_approx`; the [backward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/BackwardApprox.lean)
+  contains `RevGraph.backprop_approx`.
+- The [normal form operator API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Ops.lean) supplies local obligations, including
+  domain-sensitive operations such as division and safe log.
+- The [convolution forward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvForward.lean) and
+  [convolution backward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvBackward.lean) handle a larger operator family.
+- The [scale approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Scale/ScaleApprox.lean) supports scale-aware error bounds.
+- The [autograd algebra link API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/LinkAutogradAlgebra.lean)
+  connects approximation to the autograd proof layer.
 
 # Runtime Agreement
 

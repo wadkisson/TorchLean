@@ -66,21 +66,4 @@ theorem compileForward_correct
   NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward (α := α)
     (paramShapes := paramShapes) (inShape := inShape) (outShape := outShape) p params x
 
-/-- Same content with a more concise statement name. -/
-theorem forward_correct_eq_evalForward
-    {α : Type} [Context α] [DecidableEq Shape]
-    {paramShapes : List Shape} {inShape outShape : Shape}
-    (p : Proved.Program α paramShapes inShape outShape)
-    (params : Runtime.Autograd.Torch.TList α paramShapes)
-    (x : Tensor α inShape) :
-    NN.Verification.TorchLean.runForwardIR (α := α) (inShape := inShape) (outShape := outShape)
-        (c := compileForward (α := α) (paramShapes := paramShapes)
-          (inShape := inShape) (outShape := outShape) p params)
-        x
-      =
-    NN.Verification.TorchLean.Proved.evalForward (α := α) (paramShapes := paramShapes) (inShape := inShape)
-      (outShape := outShape) p params x :=
-  compileForward_correct (α := α) (paramShapes := paramShapes) (inShape := inShape)
-    (outShape := outShape) p params x
-
 end NN.Verification.TorchLean.Verified

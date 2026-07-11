@@ -39,10 +39,10 @@ usemathjax: true
     <strong>Lower to graph IR</strong>
     <em>Inspect shapes, payloads, graph semantics, and executable traces.</em>
   </a>
-  <a href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}">
+  <a href="{{ '/installation/#devices-providers-and-kernel-capsules' | relative_url }}">
     <span>03</span>
     <strong>Choose a backend</strong>
-    <em>Keep one model while choosing eager, compiled, CUDA, or external kernel providers.</em>
+    <em>Keep one model while choosing CPU, CUDA, LibTorch, or named future accelerator targets.</em>
   </a>
   <a href="{{ '/blueprint/Verification-and-Certificates/' | relative_url }}">
     <span>04</span>

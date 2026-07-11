@@ -53,10 +53,6 @@ never actually needs those emergency branches.
 def clampToCorridor (uL uU : ℝ → ℝ) (t : ℝ) (u : ℝ) : ℝ :=
   max (uL t) (min (uU t) u)
 
-/-- Unfolding lemma for `clampToCorridor`. -/
-lemma clampToCorridor_def (uL uU : ℝ → ℝ) (t u : ℝ) :
-    clampToCorridor uL uU t u = max (uL t) (min (uU t) u) := rfl
-
 /-- If `u` is already within the corridor, clamping is a no-op. -/
 lemma clampToCorridor_eq_self {uL uU : ℝ → ℝ} {t u : ℝ}
     (hL : uL t ≤ u) (hU : u ≤ uU t) :

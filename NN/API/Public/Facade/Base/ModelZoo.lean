@@ -226,7 +226,7 @@ def orThrow {α : Type} (exeName : String) (result : Except String α) : IO α :
 
 /-- Runtime device label used by example banners and notes. -/
 def deviceName (opts : Options) : String :=
-  if opts.useGpu then "cuda" else "cpu"
+  opts.deviceName
 
 /-- `device=...` note string used by example logs. -/
 def deviceNote (opts : Options) : String :=

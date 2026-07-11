@@ -98,7 +98,7 @@ def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
       NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO β := do
   let opts := run.toOptions
-  if opts.useGpu && run.dtype != .float then
+  if opts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.trainSelectedCrossEntropy: CUDA execution currently requires dtype Float"
   match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ => do
@@ -213,9 +213,9 @@ def trainWithRun {σ τ : Shape} (trainer : CrossEntropy σ τ)
 Train with a runtime scalar that has already been selected by the caller.
 
 Call `trainer.train` when the scalar should be chosen from `trainer.runConfig.dtype`.
-This method exists for model-zoo dispatchers that already run inside a callback like
-`Runtime.runSelectedOrFloatSimple`: at that point Lean has a concrete scalar type `α`, not merely a
-`Runtime.DType` tag. Even these deep-dive examples still use the public trainer API, so they do not
+This method exists for model-zoo dispatchers that already run inside a runtime callback. At that
+point Lean has a concrete scalar type `α`, not merely a `Runtime.DType` tag. Even these deep-dive
+examples still use the public trainer API, so they do not
 have to open-code module creation, loss calls, or optimizer steps.
 -/
 def trainSelected {σ τ : Shape} {α : Type}

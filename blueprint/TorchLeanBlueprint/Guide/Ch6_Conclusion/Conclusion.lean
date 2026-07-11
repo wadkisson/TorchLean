@@ -7,10 +7,10 @@ open Verso.Genre Manual
 tag := "conclusion"
 %%%
 
-TorchLean is still a research system, but the direction is clear. Modern ML systems increasingly
-mix generated code, learned models, numerical kernels, exported graphs, and scientific claims. The
-first question is whether these systems run. The deeper question is whether we can say precisely
-what they mean.
+TorchLean is a research system for a practical problem: modern ML work mixes learned parameters,
+generated code, numerical kernels, exported graphs, verifier artifacts, and scientific claims. A
+successful run answers whether those pieces execute together. It does not, by itself, explain what
+was computed or justify the claim made from the result.
 
 One design principle runs through the project:
 
@@ -25,12 +25,10 @@ controllers, 3D perception systems, and RL agents are not isolated classifiers. 
 larger mathematical and engineering arguments. A verified ML system should help those arguments name
 their assumptions, check their artifacts, and preserve meaning across runtimes.
 
-The applications chapter should also make the project feel more concrete. TorchLean is not only a
-language for toy proofs, and it is not only a neural-network runner. The same repository contains
-compact model examples, scientific ML workflows, BugZoo case studies, RL environments, generative
-objectives, widgets, CLI commands, and theorem fragments. The point is not that every one of those
-pieces has the same proof strength. The point is that each piece can say what kind of evidence it
-provides.
+The repository therefore contains more than theorem statements or training examples in isolation.
+Its scientific ML workflows, Bug Zoo cases, RL environments, generative objectives, widgets, and
+command-line tools expose the artifacts on which later claims depend. Each one should state whether
+its support comes from execution, a checker, a theorem, or an external assumption.
 
 # The Working Pattern
 
@@ -116,8 +114,8 @@ Here are better and worse forms of the same result:
 | "The CUDA backend is proved." | "This command used CUDA; proof support depends on the specific kernel, spec, test, or runtime-conformance assumption cited." |
 | "The widget proves the graph." | "The widget renders the graph/checker state; the theorem or checker result carries the proof claim." |
 
-This is not timid language. It is engineering language. It lets a reader reproduce the run, inspect
-the artifact, and see exactly where a stronger theorem would attach.
+This wording lets a reader reproduce the run, inspect the artifact, and see where a stronger theorem
+would attach.
 
 # Application Lessons
 
@@ -185,9 +183,9 @@ The project now has several natural next steps:
 - build more bridges from external ecosystems such as PyTorch, ONNX, Gymnasium, VNN-COMP, and
   scientific-data formats into checked Lean artifacts.
 
-The near-term goal is not a single monolithic theorem that covers all of machine learning. The
-better goal is a library where every serious claim has an object, a semantics, an artifact, and an
-honest account of the remaining assumptions.
+The next stage is a library in which every serious claim names its object, semantics, supporting
+artifact, and remaining assumptions. Different model families will require different local
+theorems; they do not need to be hidden behind one monolithic claim about all of machine learning.
 
 # Closing
 

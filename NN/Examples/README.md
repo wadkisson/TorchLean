@@ -40,7 +40,7 @@ For the larger or newer workflows:
 
 | Workflow | File or artifact | Command | What it exposes |
 | --- | --- | --- | --- |
-| Burgers FNO | `Models/Operators/Fno1dBurgers.lean` | `lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 1` | Scientific-ML data, Fourier layers, prediction artifacts, and the path from PDE trajectories to Lean-checkable outputs. |
+| Burgers FNO | `Models/Operators/Fno1dBurgers.lean` | `lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 1` | Scientific-ML data, Fourier layers, prediction artifacts, and the path from PDE trajectories to Lean-checkable outputs. |
 | alpha-beta-CROWN leaf artifact | `Verification/AbCrown/sample_abcrown_leaf_artifact_v0_1.json` | `lake exe verify -- abcrown-leaf` | Lean checks a leaf artifact schema and local certificate condition without trusting the external branch-and-bound run. |
 | LiRPA fixture artifacts | `Verification/LiRPA/*.json` | `lake exe verify -- lirpa-mlp` and sibling commands | Small exported bound artifacts for MLP, CNN, attention, GRU, and transformer encoder fragments. |
 | PINN residual certificate | `Verification/PINN/pinn_cert.json` | `lake exe verify -- pinn-cert` | A neural PDE residual certificate is parsed into Lean side expressions and checked against the declared grid/bounds. |
@@ -122,10 +122,10 @@ export, and a later certificate check.
 ```bash
 lake exe torchlean quickstart_mlp --steps 10 --dtype float32 --backend compiled
 lake exe torchlean mlp --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --steps 10
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
-lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean cnn --device cuda --steps 10
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare --steps 10 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 lake exe verify -- torchlean-ibp
 lake exe verify -- torchlean-crown-ops
 lake exe verify -- abcrown-leaf

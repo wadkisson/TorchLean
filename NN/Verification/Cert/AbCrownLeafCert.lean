@@ -62,8 +62,8 @@ def checkAbCrownLeafArtifact (path : String) : IO Unit := do
   let inputDim ← expectFieldNat topObj "input_dim" "top-level"
 
   let rootObj ← expectFieldObj topObj "root" "top-level"
-  let rootLo ← expectFieldFloatArray rootObj "lo" "root"
-  let rootHi ← expectFieldFloatArray rootObj "hi" "root"
+  let rootLo ← expectFieldFiniteFloatArray rootObj "lo" "root"
+  let rootHi ← expectFieldFiniteFloatArray rootObj "hi" "root"
   if rootLo.size ≠ inputDim || rootHi.size ≠ inputDim then
     throw <| IO.userError
       s!"root dimension mismatch: input_dim={inputDim}, lo={rootLo.size}, hi={rootHi.size}"
@@ -76,10 +76,10 @@ def checkAbCrownLeafArtifact (path : String) : IO Unit := do
   let mut badCount := 0
   for leaf in leaves do
     let leafObj ← expectObj leaf "leaf"
-    let lo ← expectFieldFloatArray leafObj "lo" "leaf"
-    let hi ← expectFieldFloatArray leafObj "hi" "leaf"
-    let lb ← expectFieldFloatArray leafObj "lb" "leaf"
-    let thr ← expectFieldFloatArray leafObj "threshold" "leaf"
+    let lo ← expectFieldFiniteFloatArray leafObj "lo" "leaf"
+    let hi ← expectFieldFiniteFloatArray leafObj "hi" "leaf"
+    let lb ← expectFieldFiniteFloatArray leafObj "lb" "leaf"
+    let thr ← expectFieldFiniteFloatArray leafObj "threshold" "leaf"
     if lo.size ≠ inputDim || hi.size ≠ inputDim then
       throw <| IO.userError
         s!"leaf dimension mismatch: input_dim={inputDim}, lo={lo.size}, hi={hi.size}"

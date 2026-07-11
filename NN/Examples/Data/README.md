@@ -105,10 +105,10 @@ lake exe torchlean data_cifar10 --check-only --epochs 1 --batch 4 --train-size 8
 Model examples use the same API:
 
 ```bash
-lake exe -K cuda=true torchlean mlp --cuda --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 200 --steps 2
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 10
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 200 --steps 2
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 200 --windows 96
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 ## Training Data Versus Verification Data

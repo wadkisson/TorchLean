@@ -57,10 +57,9 @@ For tensor optimizers with richer state, the
 #check NN.MLTheory.Optimization.AdamW.update_eq_spec
 ```
 
-`StepSpec` is the important interface. It gives a proof-level equation for one optimizer step, and
-then the generic run theorem lifts that equation over a stream of gradients. The point is modest but
-useful: if a trainer says it used AdamW, a theorem can cite the AdamW update equation rather than a
-string in a config file.
+`StepSpec` gives a proof-level equation for one optimizer step, and the generic run theorem lifts
+that equation over a stream of gradients. A claim that training used AdamW can therefore cite the
+AdamW update equation itself rather than relying on a string in a configuration file.
 
 Low rank optimizer facts follow the same pattern. The
 [low rank optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/LowRank.lean) records equations such as

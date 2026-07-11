@@ -159,9 +159,6 @@ PyTorch analogy: constructing training code with a fixed `lr` and no `lr_schedul
 def constantScheduler (lr : α) : ConstantScheduler α :=
   { lr := lr }
 
-@[inherit_doc constantScheduler]
-abbrev createConstantScheduler := @constantScheduler
-
 /-! ## Exponential decay -/
 
 /--
@@ -204,9 +201,6 @@ PyTorch analogy: `torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=decay_
 -/
 def exponentialDecayScheduler (initialLr : α) (decay_rate : α) : ExponentialDecayScheduler α :=
   { initialLr := initialLr, decayRate := decay_rate }
-
-@[inherit_doc exponentialDecayScheduler]
-abbrev createExponentialDecayScheduler := @exponentialDecayScheduler
 
 /-! ## Step decay -/
 
@@ -271,9 +265,6 @@ def stepDecayScheduler (initialLr : α) (decay_factor : α) (stepSize : Nat) : S
   :=
   { initialLr := initialLr, decayFactor := decay_factor, stepSize := stepSize }
 
-@[inherit_doc stepDecayScheduler]
-abbrev createStepDecayScheduler := @stepDecayScheduler
-
 /-! ## Cosine annealing -/
 
 /--
@@ -325,9 +316,6 @@ PyTorch analogy: `torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=ma
 def cosineAnnealingScheduler (initialLr : α) (maxSteps : Nat) (minLr : α := 0) :
     CosineAnnealingScheduler α :=
   { initialLr := initialLr, minLr := minLr, maxSteps := maxSteps }
-
-@[inherit_doc cosineAnnealingScheduler]
-abbrev createCosineAnnealingScheduler := @cosineAnnealingScheduler
 
 /-! ## Linear warmup -/
 
@@ -381,9 +369,6 @@ PyTorch analogy: a warmup wrapper around an optimizer or a base scheduler.
 def linearWarmupScheduler (initialLr : α) (warmupSteps : Nat) (startLr : α := 0) :
     LinearWarmupScheduler α :=
   { initialLr := initialLr, warmupSteps := warmupSteps, startLr := startLr }
-
-@[inherit_doc linearWarmupScheduler]
-abbrev createLinearWarmupScheduler := @linearWarmupScheduler
 
 /-! ## Warmup + cosine -/
 
@@ -446,9 +431,6 @@ PyTorch analogy: composing a warmup schedule with cosine annealing in a training
 def warmupCosineScheduler (initialLr : α) (warmupSteps : Nat) (totalSteps : Nat) :
     WarmupCosineScheduler α :=
   { initialLr := initialLr, warmupSteps := warmupSteps, totalSteps := totalSteps }
-
-@[inherit_doc warmupCosineScheduler]
-abbrev createWarmupCosineScheduler := @warmupCosineScheduler
 
 /-! ## Cyclic LR -/
 
@@ -524,9 +506,6 @@ def cyclicScheduler (baseLr : α) (maxLr : α) (stepSize : Nat)
     (mode : String := "triangular") (gamma : α := 1) : CyclicScheduler α :=
   { baseLr := baseLr, maxLr := maxLr, stepSize := stepSize, mode := mode, gamma := gamma }
 
-@[inherit_doc cyclicScheduler]
-abbrev createCyclicScheduler := @cyclicScheduler
-
 /-! ## Triangular cycle (special case) -/
 
 /--
@@ -582,9 +561,6 @@ PyTorch analogy: `CyclicLR(base_lr=..., max_lr=..., mode=\"triangular\")`.
 def triangularCycleScheduler (baseLr : α) (maxLr : α) (stepSize : Nat) :
     TriangularCycleScheduler α :=
   { baseLr := baseLr, maxLr := maxLr, stepSize := stepSize }
-
-@[inherit_doc triangularCycleScheduler]
-abbrev createTriangularCycleScheduler := @triangularCycleScheduler
 
 /-! ## 1cycle Learning Rate Schedule -/
 
@@ -658,9 +634,6 @@ def oneCycleScheduler (maxLr : α) (totalSteps : Nat) (divFactor : α) (pctStart
   { maxLr := maxLr, totalSteps := totalSteps, initialLr := initialLr, finalLr := finalLr
     divFactor := divFactor, pctStart := pctStart }
 
-@[inherit_doc oneCycleScheduler]
-abbrev createOneCycleScheduler := @oneCycleScheduler
-
 /-! ## LR finder -/
 
 /--
@@ -706,9 +679,6 @@ PyTorch analogy: setting up an LR finder run to sweep learning rates.
 -/
 def lrFinder (initialLr : α) (finalLr : α) (numSteps : Nat) : LRFinder α :=
   { initialLr := initialLr, finalLr := finalLr, numSteps := numSteps }
-
-@[inherit_doc lrFinder]
-abbrev createLrFinder := @lrFinder
 
 /-! ## PyTorch-compatible scheduler variants -/
 
@@ -778,9 +748,6 @@ def StepLR.step (scheduler : StepLR α) : StepLR α :=
 def stepLR (baseLr : α) (stepSize : Nat) (gamma : α) : StepLR α :=
   { baseLr := baseLr, stepSize := stepSize, gamma := gamma }
 
-@[inherit_doc stepLR]
-abbrev createStepLr := @stepLR
-
 /-! ### CosineAnnealingLR -/
 
 /--
@@ -820,9 +787,6 @@ def CosineAnnealingLR.step (scheduler : CosineAnnealingLR α) : CosineAnnealingL
 def cosineAnnealingLR (baseLr : α) (tMax : Nat) (etaMin : α := Numbers.zero) :
     CosineAnnealingLR α :=
   { baseLr := baseLr, tMax := tMax, etaMin := etaMin }
-
-@[inherit_doc cosineAnnealingLR]
-abbrev createCosineAnnealingLr := @cosineAnnealingLR
 
 /-! ### OneCycleLR (LR-only) -/
 
@@ -944,8 +908,5 @@ def oneCycleLR (maxLr : α) (totalSteps : Nat) (pctStart : α) (divFactor : α)
     finalDivFactor := finalDivFactor
     annealStrategy := annealStrategy
     threePhase := threePhase }
-
-@[inherit_doc oneCycleLR]
-abbrev createOneCycleLr := @oneCycleLR
 
 end Optim

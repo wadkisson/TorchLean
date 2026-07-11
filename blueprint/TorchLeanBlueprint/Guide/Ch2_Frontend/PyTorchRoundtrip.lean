@@ -254,16 +254,16 @@ DLPack belongs mostly to the first layer: it is a standard in-memory tensor exch
 array and tensor libraries. It can help avoid extra copies, but it does not by itself tell Lean that
 a Python model has the same architecture, parameter names, or proof semantics.
 
-The TorchLean round trip in this chapter is the second layer. It checks family metadata and named
-parameter tensors. The third layer is stronger and belongs with IR, graph semantics, and proof
-chapters.
+TorchLean's current round trip implements the second layer: it checks family metadata and named
+parameter tensors. Semantic import is stronger and requires an IR denotation and a proof relating the
+foreign program to it.
 
-# Where This Fits In The Guide
+# Choosing The Interop Boundary
 
 Use the round trip when the training workflow belongs in Python but the returned artifact should
-enter the TorchLean world with typed parameters and auditable metadata. Use the runtime chapters
-when the training loop itself should run in Lean. Use the graph and verification chapters when the
-next step is to inspect the model as an IR object or connect it to a theorem.
+enter TorchLean with typed parameters and auditable metadata. Run the training loop in Lean when its
+state transitions must remain explicit. Lower to IR when the model must be inspected as a graph or
+connected to a theorem.
 
 # Guarantees And Limits
 

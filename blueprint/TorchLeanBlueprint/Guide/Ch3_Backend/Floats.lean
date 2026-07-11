@@ -31,7 +31,7 @@ state:
 - which finite/no-overflow side conditions are required;
 - and which theorem, checker, or runtime agreement connects the executed value to the proof value.
 
-Those questions define the numeric discipline of the chapter.
+Those questions define TorchLean's numeric discipline.
 
 # Four Numeric Layers
 
@@ -139,7 +139,7 @@ open TorchLean.Floats.IEEE754
 #check IEEE32Exec.toReal?_add_eq_ite
 ```
 
-The pattern for the rest of the chapter is to keep the layers separate and connect them with a
+The layers remain separate and are connected by a
 named theorem, checker, or runtime agreement.
 
 # Binary32 Is A Format, Not A Whole Execution Story

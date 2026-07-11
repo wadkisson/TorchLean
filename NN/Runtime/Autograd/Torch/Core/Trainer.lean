@@ -481,28 +481,10 @@ def sgdStep {α : Type} [Context α] : {ss : List Shape} → ParamList α ss →
       if p.requiresGrad then
         let v ← p.value.get
         let updated : Tensor α _s :=
-          -- `Tensor.materialize` prevents long training runs from building deep closure chains
-          -- (important for Lean runtime performance).
-          Tensor.materialize <| subSpec v (scaleSpec (α := α) (s := _s) g lr)
-        Internal.setParamHostValue (α := α) (sh := _s) p updated
-      sgdStep (α := α) (ss := ss) ps lr gs
-
-/--
-Like `sgdStep`, but uses a fully materialized update (`subScaleMaterialize`) for speed.
-
-This is a runtime performance knob; mathematically it is equivalent to `sgdStep`.
--/
-def sgdStepFast {α : Type} [Context α] : {ss : List Shape} → ParamList α ss → (lr : α) → TList α ss
-  → IO Unit
-  | [], .nil, _lr, .nil => pure ()
-  | _s :: ss, .cons p ps, lr, .cons g gs => do
-      if p.requiresGrad then
-        let v ← p.value.get
-        let updated : Tensor α _s :=
-          -- Build a materialized tensor in one pass: `v - lr*g`.
+          -- Materialize `v - lr * g` in one pass so long runs do not retain expression closures.
           subScaleMaterialize (α := α) (s := _s) v g lr
         Internal.setParamHostValue (α := α) (sh := _s) p updated
-      sgdStepFast (α := α) (ss := ss) ps lr gs
+      sgdStep (α := α) (ss := ss) ps lr gs
 
 end ParamList
 
@@ -603,6 +585,9 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
     let ps ← ParamList.ofTListWithRequiresGrad (α := α) initParams initRequiresGrad
     match opts.backend with
     | .compiled =>
+        if opts.device != .cpu then
+          throw <| IO.userError
+            s!"torch compiled backend currently supports device `cpu`; requested `{opts.deviceName}`"
         let Γ : List Shape := paramShapes ++ inputShapes
         let build : Runtime.Autograd.Compiled.GraphM.M α Γ (Runtime.Autograd.Compiled.GraphM.Var
           Shape.scalar) := do
@@ -665,10 +650,7 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
           Curried.curry (α := α) (ss := inputShapes) (β := IO Unit) (fun xs => do
             let g ← Curried.uncurry (α := α) (ss := inputShapes) (β := IO (TList α paramShapes))
               backward xs
-            if opts.fastKernels then
-              ParamList.sgdStepFast (α := α) (ss := paramShapes) ps lr g
-            else
-              ParamList.sgdStep (α := α) (ss := paramShapes) ps lr g)
+            ParamList.sgdStep (α := α) (ss := paramShapes) ps lr g)
         pure
           { params := ps
             forward := forward
@@ -703,7 +685,7 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
             Internal.gradsOfRefs (α := α) (ss := paramShapes) grads pRefs)
         let step (lr : α) : Curried.Fn α inputShapes (IO Unit) :=
           Curried.curry (α := α) (ss := inputShapes) (β := IO Unit) (fun xs => do
-            if opts.useGpu then
+            if opts.usesCuda then
               sess.resetTape
               let lossRef ← (do
                 let pRefs ← Internal.useParams (α := α) (ss := paramShapes) ps
@@ -721,12 +703,9 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
             else
               let g ← Curried.uncurry (α := α) (ss := inputShapes) (β := IO (TList α paramShapes))
                 backward xs
-              if opts.fastKernels then
-                ParamList.sgdStepFast (α := α) (ss := paramShapes) ps lr g
-              else
-                ParamList.sgdStep (α := α) (ss := paramShapes) ps lr g)
+              ParamList.sgdStep (α := α) (ss := paramShapes) ps lr g)
         let adamStep? : Option (α → α → α → α → Curried.Fn α inputShapes (IO Unit)) :=
-          if opts.useGpu then
+          if opts.usesCuda then
             some (fun lr beta1 beta2 epsilon =>
               Curried.curry (α := α) (ss := inputShapes) (β := IO Unit) (fun xs => do
                 sess.resetTape
@@ -747,7 +726,7 @@ def scalarTrainer {α : Type} [Context α] [Internal.CudaBridge.TensorConv α] [
           else
             none
         let adamWStep? : Option (α → α → α → α → α → Curried.Fn α inputShapes (IO Unit)) :=
-          if opts.useGpu then
+          if opts.usesCuda then
             some (fun lr weightDecay beta1 beta2 epsilon =>
               Curried.curry (α := α) (ss := inputShapes) (β := IO Unit) (fun xs => do
                 sess.resetTape

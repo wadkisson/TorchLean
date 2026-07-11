@@ -78,7 +78,10 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
     | _ => boxes
   | .inv =>
     match node.parents with
-    | p1 :: _ => boxes.set! id (some (boxInv (α := α) (get! p1)))
+    | p1 :: _ =>
+        match boxInv? (α := α) (get! p1) with
+        | some B => boxes.set! id (some B)
+        | none => boxes
     | _ => boxes
   | .maxElem =>
     match node.parents with

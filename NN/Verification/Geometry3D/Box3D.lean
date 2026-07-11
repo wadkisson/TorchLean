@@ -798,12 +798,12 @@ def formatString : String := "torchlean.camera.box3d.v1"
 /-- Parse a JSON artifact into the Float checker representation. -/
 def parseJsonCert (j : Lean.Json) : IO (BoxCameraCert Float) := do
   expectFormat j formatString
-  let width ← expectFloat (← expectField j "image_width" "top-level") "top-level.image_width"
-  let height ← expectFloat (← expectField j "image_height" "top-level") "top-level.image_height"
-  let tol ← expectFloat (← expectField j "tol" "top-level") "top-level.tol"
-  let cameraFlat ← expectFieldFloatArray j "camera_P" "top-level"
-  let cornersFlat ← expectFieldFloatArray j "corners3d" "top-level"
-  let bboxFlat ← expectFieldFloatArray j "bbox2d" "top-level"
+  let width ← expectFiniteFloat (← expectField j "image_width" "top-level") "top-level.image_width"
+  let height ← expectFiniteFloat (← expectField j "image_height" "top-level") "top-level.image_height"
+  let tol ← expectFiniteFloat (← expectField j "tol" "top-level") "top-level.tol"
+  let cameraFlat ← expectFieldFiniteFloatArray j "camera_P" "top-level"
+  let cornersFlat ← expectFieldFiniteFloatArray j "corners3d" "top-level"
+  let bboxFlat ← expectFieldFiniteFloatArray j "bbox2d" "top-level"
   let camera ← NN.Verification.Util.Tensor.requireMatOfFlatArray
     "top-level.camera_P" 3 4 cameraFlat
   let corners ← NN.Verification.Util.Tensor.requireMatOfFlatArray

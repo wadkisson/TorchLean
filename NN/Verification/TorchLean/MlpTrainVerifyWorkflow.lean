@@ -97,9 +97,9 @@ def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
 def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
     [Runtime.Scalar α] (opts : Options) (rest : List String) : IO Unit := do
   CLI.requireNoArgs "torchlean-mlp-workflow" rest
-  if opts.useGpu then
+  if opts.usesCuda then
     throw <| IO.userError
-      "torchlean-mlp-workflow: CUDA eager training is not used here; this workflow keeps trained parameters as Lean tensors so the verifier can compile and check them. Use the model-training examples for CUDA runtime training, or run this verifier workflow without --cuda."
+      "torchlean-mlp-workflow: CUDA eager training is not used here; this workflow keeps trained parameters as Lean tensors so the verifier can compile and check them. Use the model-training examples for CUDA runtime training, or run this verifier workflow without --device cuda."
   runOnce (α := α) opts
 
 /--

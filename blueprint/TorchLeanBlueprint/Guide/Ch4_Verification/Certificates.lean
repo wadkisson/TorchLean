@@ -173,7 +173,7 @@ Semantics:
   `witness_margin = lb[witness_idx] - threshold[witness_idx]`.
 
 The schema deliberately does not contain a neural-network graph, α slopes, β phases, or per-node
-affine forms. That is why this page calls it a *leaf artifact* rather than a full proof certificate.
+affine forms. It is therefore a *leaf artifact*, not a full proof certificate.
 The artifact records enough to check the terminal-domain bookkeeping exported by the producer; it
 does not replay the producer's bound propagation.
 

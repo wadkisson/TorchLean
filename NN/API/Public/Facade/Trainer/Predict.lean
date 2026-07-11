@@ -49,7 +49,7 @@ def predictCustomWithRunConfig {σ τ : Shape}
         let x' := Tensor.castFloat (Runtime.ofFloat (α := α)) x
         let y ← Module.predict (α := α) opts model m x'
         Tensor.toFloatIO y)
-  if opts.useGpu && run.dtype != .float then
+  if opts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.predict: CUDA execution currently requires dtype Float"
   match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ =>
@@ -254,8 +254,7 @@ def Handle.trainPairStreamFloat {σ₁ τ₁ σ₂ τ₂ : Shape}
 /--
 Train a unified cross-entropy trainer after the scalar type has already been selected.
 
-Scalar-selected cross-entropy training. Use this path from dispatchers such as
-`Runtime.runSelectedOrFloatSimple`, where the callback already has a concrete scalar `α`.
+Use this path from a runtime callback where Lean has already selected a concrete scalar `α`.
 -/
 def Handle.trainSelectedCrossEntropy {σ τ : Shape} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]

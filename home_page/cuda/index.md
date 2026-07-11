@@ -25,13 +25,13 @@ make training and inference realistic without making the CUDA machine code part 
 Build with CUDA support:
 
 ```bash
-lake build -K cuda=true
+lake -R -K cuda=true build
 ```
 
 Run a small CUDA example:
 
 ```bash
-lake exe -K cuda=true torchlean mlp --cuda --fast-kernels --steps 100
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 100
 ```
 
 Run a broader CUDA regression pass:
@@ -50,7 +50,7 @@ scripts/checks/cuda_sanitize_tests.sh --all-tools
 
 The CUDA path is used for supported Float32 tensor operations: elementwise arithmetic, reductions,
 matmul/cuBLAS paths, convolution/pooling kernels, shape/view operations, attention kernels, FFT/FNO
-support where enabled, and model examples that choose `--cuda` or `--fast-kernels`.
+support where enabled, and model examples that choose `--device cuda`.
 
 The public API should still look like one model with a backend choice. A user should not need a
 separate "CUDA forward" function in ordinary code. The backend changes where supported kernels run;
@@ -80,7 +80,7 @@ let _ := Runtime.Autograd.Cuda.Buffer.setDeterministicReductionsChecked true
 or:
 
 ```bash
-TORCHLEAN_CUDA_DETERMINISTIC_REDUCTIONS=1 lake exe -K cuda=true torchlean mlp --cuda
+TORCHLEAN_CUDA_DETERMINISTIC_REDUCTIONS=1 lake -R -K cuda=true exe torchlean mlp --device cuda
 ```
 
 Evidence levels should be stated carefully:

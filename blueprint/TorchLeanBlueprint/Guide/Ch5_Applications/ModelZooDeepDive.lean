@@ -76,9 +76,9 @@ The MLP, KAN, and CNN examples are not just warmups. They are where the public t
 it can handle ordinary user expectations before the architecture becomes exotic:
 
 ```
-lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean kan --cpu --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake exe torchlean mlp --device cpu --steps 10
+lake exe torchlean kan --device cpu --steps 10
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 ```
 
 The MLP checks the minimal tabular training path. The KAN command checks that learned edge-function
@@ -125,14 +125,14 @@ A typical small run is:
 
 ```
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda \
   --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
 ```
 
 For CharGPT:
 
 ```
-lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare \
   --steps 1 --batch 1 --seq-len 1 --generate 0 --prompt "ROMEO:"
 ```
 
@@ -165,7 +165,7 @@ training example style.
 The command writes a training log when requested:
 
 ```
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
   --steps 10 --windows 1 --generate 64 --prompt "ROMEO:" \
   --log data/model_zoo/gpt2_trainlog.json
 ```
@@ -187,7 +187,7 @@ the public Mamba API:
 
 ```
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake exe -K cuda=true torchlean mamba --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean mamba --device cuda \
   --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
 ```
 
@@ -226,15 +226,15 @@ The current runnable recurrent examples are:
 The small text commands are short:
 
 ```
-lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean lstm --cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean rnn --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean lstm --device cuda --tiny-shakespeare --steps 1
 ```
 
 The forecasting run is the better tutorial:
 
 ```
 python3 scripts/datasets/download_example_data.py --household-power --household-power-windows 512
-lake exe -K cuda=true torchlean lstm_regression --cuda --steps 200 --windows 96
+lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 200 --windows 96
 ```
 
 These examples stress recurrent state handling: hidden state shape, application at each time step,
@@ -293,7 +293,7 @@ ViT style CIFAR classifier:
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10
-lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
 ```
 
 The corresponding spec material in [NN.Spec.Models.Vit API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Vit.lean) names
@@ -327,7 +327,7 @@ Burgers dataset:
 ```
 python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
 
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda \
   --steps 700 --lr 0.003 --plot-csv data/real/fno/predictions.csv
 ```
 
@@ -367,12 +367,12 @@ Equations" (ICLR 2021, https://arxiv.org/abs/2010.08895).
 The generative commands are:
 
 ```
-lake exe -K cuda=true torchlean autoencoder --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean mae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean vae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean vqvae --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean gan --cuda --steps 1 --n-total 1
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean autoencoder --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean mae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean vae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean vqvae --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean gan --device cuda --steps 1 --n-total 1
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 These examples stress stochastic and reconstruction oriented training. Diffusion adds timestep
@@ -417,7 +417,7 @@ by an environment boundary rather than read from a static tensor file:
 For CartPole:
 
 ```
-lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 50
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 50
 ```
 
 For the DQN replay mini example:
@@ -448,7 +448,7 @@ environment is Gymnasium, the environment transition itself remains an external 
 For Pong RAM, the command name follows the runner:
 
 ```
-lake exe -K cuda=true torchlean ppo_pong_ram --cuda --updates 1 \
+lake -R -K cuda=true exe torchlean ppo_pong_ram --device cuda --updates 1 \
   --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 

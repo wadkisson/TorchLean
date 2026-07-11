@@ -51,110 +51,54 @@ import TorchLeanBlueprint.Guide.Ch6_Conclusion.Conclusion
 
 open Verso.Genre Manual
 
-#doc (Manual) "TorchLean Guide" =>
+#doc (Manual) "TorchLean" =>
 %%%
 shortTitle := "TorchLean"
 tag := "torchlean"
 %%%
 
-TorchLean is a Lean 4 library for neural-network programs that are meant to survive scrutiny. You
-can still begin in the ordinary ML way: define a model, give it tensors, run a training loop, and
-inspect the result. The difference is what happens next. The same program can be lowered to a graph,
-connected to a specification, executed through a chosen backend, or paired with a certificate while
-remaining recognizably the object you started with.
+TorchLean brings neural-network programming and formal reasoning into the same Lean 4 project. You
+can define a model, train it, inspect its parameters, and run it on the CPU or an accelerated backend.
+Because the model is written in Lean, its tensor shapes, graph structure, specifications, and theorem
+statements can share the same definitions.
 
-Machine-learning work changes form as it moves through a project. An equation becomes a model; the
-model becomes a training script; the script calls kernels; the run produces checkpoints, plots, and
-claims. The fragile step is not any one conversion. It is the accumulation of small conventions:
-which tensor layout was used, which mask was meant, which graph was exported, which scalar semantics
-the verifier saw. TorchLean is built to keep those conventions close to Lean objects, so the code,
-graph, runtime artifact, certificate, and theorem can be compared without pretending they are all the
-same thing.
+A model is more than its forward function. Its behavior also depends on parameter layouts, masks,
+training mode, scalar arithmetic, and the runtime selected to execute each operation. TorchLean makes
+these choices explicit. A model written through the public API can be lowered to `NN.IR.Graph`; the
+graph has a Lean denotation; and runtime or verification code can refer to that graph together with a
+specific parameter payload.
 
-This guide is a tour of that discipline. It starts with small models because every later claim is
-easier to read when there is a concrete network on the page. From there the same object passes
-through training, graph lowering, floating-point execution, CUDA and PyTorch boundaries,
-certificates, and proofs. You do not need to memorize the module tree on a first pass. The useful
-habit is simpler: when a page makes a claim, ask which Lean object carries it.
+The execution backend is a separate choice. TorchLean can evaluate supported operations through its
+Lean runtime, native CUDA kernels, or registered external providers such as LibTorch. Changing the
+backend should not silently change the model. Backend contracts record which operation is being
+implemented, which device and layout it expects, how gradients are supplied, and which parts are
+proved, checked, or trusted.
 
-The question we keep asking is simple:
-
-> Which object is this statement about?
-
-For a classifier, the object might be a typed model with a fixed input shape. For autograd, it might
-be the reverse-mode computation used by a training step. For a verifier, it might be a graph plus an
-input region and a bound certificate. For CUDA, it might be a fast native forward path tied back to a
-TorchLean graph and backward rule. For scientific ML, it might be a residual check over a grid or an
-interval certificate for a trajectory.
-
-Lean does not make any of this automatic, and TorchLean does not try to hide that. A theorem is not
-a smoke test. A CUDA regression is not a proof. A JSON certificate is not trusted merely because a
-tool emitted it. The point of the library is to make those distinctions precise enough that a reader
-can see what was run, what was checked, and what was proved.
-
-Here is the kind of ledger the rest of the guide keeps returning to:
-
-```
--- Graph semantics: what does the lowered graph mean?
-#check NN.IR.Graph.denote
-#check NN.IR.Graph.denoteAll
-
--- Autograd correctness: when does the reverse pass compute the intended derivative?
-#check NN.IR.Graph.backprop_correct
-#check NN.IR.Graph.backpropVec_eq_adjoint_fderiv
-#check NN.IR.Graph.scalarLoss_grad_correct
-
--- Float32 transfer: when does a real-valued statement survive rounded execution?
-#check NN.Proofs.RuntimeApprox.FP32.approxT_linear_fp32
-#check NN.Proofs.RuntimeApprox.FP32.ibpBound_contains_reluTwoLayerMlp_float32
-
--- Imported verifier artifacts: what is checked before an external certificate is used?
-#check NN.MLTheory.CROWN.Graph.AlphaCrownTransferSoundness.alphaCrown_transfer_sound
-#check NN.MLTheory.CROWN.Graph.AlphaCrownTransferSoundness.alphaBetaCrown_transfer_sound
-```
-
-Some of those declarations are theorems. Some are denotational functions used by theorems. Some are
-transfer lemmas saying how one layer supports a claim at another layer. The important habit is to
-name the declaration rather than leaving the word "verified" floating by itself.
+Verification follows the same principle. A robustness bound concerns a graph, parameters, and an
+input region. A scientific ML claim may concern a residual over a domain. An imported certificate is
+accepted only by a checker for a stated artifact format. A successful program run is useful evidence,
+but it is not a theorem; a theorem states its own semantics and hypotheses.
 
 ![TorchLean guide map](Guide/Assets/torchlean-guide-map.png)
 
-Read the chapters in order once, then treat them as a map of the repository. The early chapters show
-how to write models and training loops. The middle chapters explain the graph and specification
-layers. The later chapters show how numerical backends, scientific ML examples, optimizer laws,
-learning theory statements, and verifier certificates attach to those same objects.
+We begin with tensors, models, and training. We then make the graph semantics explicit, examine
+floating-point and backend boundaries, and finally connect executable artifacts to verification
+claims. To run a first model, begin with *Building Models*. For graph or certificate work, begin with
+*Semantics and Graphs* or *Verification and Certificates*.
 
-When an example writes a JSON certificate, the guide shows which checker reads it. When an example
-uses CUDA, the guide separates the native computation from the TorchLean object it is meant to
-implement. When a theorem mentions a graph denotation, the guide explains where that graph came from.
-
-If you are new to Lean, keep the official Lean material nearby:
+No prior theorem-proving experience is required for the executable examples. For Lean language and
+proof background, the standard references are
 [*Functional Programming in Lean*](https://lean-lang.org/functional_programming_in_lean/),
 [*Theorem Proving in Lean 4*](https://lean-lang.org/theorem_proving_in_lean4/), and
-[*The Lean Language Reference*](https://lean-lang.org/doc/reference/latest/). TorchLean uses Lean as
-both a programming language and a proof language, so the examples introduce proof-oriented notation
-when it first becomes necessary.
-
-The guide also points outside the repository when the outside tool or paper matters to the claim.
-PyTorch is the reference point for the everyday training interface and for comparison with
-[torch.autograd](https://docs.pytorch.org/docs/stable/autograd.html). VNN-COMP and
-[VNN-LIB](https://www.vnnlib.org/) explain the verifier ecosystem around ONNX networks and input
-specifications. The α,β-CROWN family, including
-[β-CROWN](https://arxiv.org/abs/2103.06624), is the main external verifier line behind several
-certificate and branch-and-bound examples. Scientific ML pages cite the relevant PDE, PINN, neural
-operator, and residual-checking literature when the example depends on that background rather than
-on TorchLean alone.
+[*The Lean Language Reference*](https://lean-lang.org/doc/reference/latest/). Proof notation is
+introduced alongside the first examples that use it.
 
 # Introduction
 
-The first chapter explains the basic promise of TorchLean: neural-network code should remain
-runnable while becoming more precise about what it means. It starts with the everyday model construction
-interface, then introduces the reason the same classifier will later reappear as a program, a graph,
-a floating point computation, a runtime artifact, and a verification target.
-
-The chapter is deliberately practical. It does not begin with a theorem prover slogan. It begins
-with the question a user actually has: if I write a neural network, where does the mathematical
-meaning live, and how much work is required before Lean can say something about it?
+We begin with an ordinary classifier and ask what happens as its meaning becomes more precise. The
+same classifier can appear as a program, a graph, a floating-point computation, a runtime artifact,
+and a verification target. At each representation, we identify what Lean can establish and what
+remains an execution or trust assumption.
 
 {include 2 TorchLeanBlueprint.Guide.Ch1_Introduction.Overview}
 
@@ -176,7 +120,8 @@ meaning live, and how much work is required before Lean can say something about 
 Before there is anything to verify, there has to be a model worth talking about. This part stays
 close to everyday ML work: tensors with shapes, layer builders, datasets, loaders, losses,
 optimizers, and short training runs. The runnable path should feel ordinary while still carrying
-enough structure for later chapters to inspect the same model rather than reconstruct it.
+enough structure for graph lowering, numerical analysis, and verification to inspect the same model
+rather than reconstruct it.
 
 This is where TorchLean has to earn trust from programmers, not just from proof engineers. The
 examples show the small details that matter in practice: which dimensions are fixed in the type,
@@ -203,11 +148,11 @@ compiled graph execution, reverse-mode autograd, optimizers, checkpoints, and Py
 Faster execution should not secretly change the object being trained or checked. Backends
 are choices about how to compute; they are not new mathematical models.
 
-The runtime chapter therefore treats execution modes as interfaces with contracts. Eager TorchLean
+Execution modes are interfaces with contracts. Eager TorchLean
 execution, compiled graph execution, CUDA kernels, ATen/libtorch calls, PyTorch export, and imported
 checkpoints can all be useful, but they must preserve enough structure for the proof side to know
-what happened. This is also where the guide explains the difference between an executable check
-against a closed form and an autograd correctness theorem.
+what happened. An executable check against a closed form and an autograd correctness theorem are
+different forms of evidence.
 
 {include 2 TorchLeanBlueprint.Guide.Ch2_Frontend.ExecutionModes}
 
@@ -234,10 +179,9 @@ meaning. A GraphSpec model is a structured architecture. An IR graph is an artif
 parent ids, shapes, and payloads. Keeping the roles separate is what lets a later theorem or
 checker say exactly what it used.
 
-A good way to read this part is to keep three questions in mind. What is the mathematical
-denotation? What is the artifact stored in the repository or produced by a run? What is the bridge
-between them? Most mistakes in ML verification come from treating those as the same object too
-early.
+Three questions keep the levels distinct: What is the mathematical denotation? What artifact is
+stored or produced by a run? What bridge relates them? Many ML verification mistakes come from
+treating these as the same object too early.
 
 {include 2 TorchLeanBlueprint.Guide.Ch3_Backend.GraphsAndIR}
 
@@ -258,11 +202,9 @@ is executable binary32 behavior inside Lean. Native execution through Lean `Floa
 cuFFT, Python, Julia, Arb, or external verifiers enters through explicit producer/checker
 boundaries. Practical numerical tools stay in the workflow, with a named role in each claim.
 
-This part also explains why TorchLean does not simply pretend that a real-valued proof is a GPU
-proof. A real proof may be the right starting point, but deployment usually passes through rounded
-arithmetic, library kernels, scheduling choices, and finite buffers. The guide names those steps so
-they can be checked, bounded, or left as explicit trusted boundaries instead of being smuggled into
-the theorem statement.
+A real-valued proof is not automatically a GPU proof. Deployment usually passes through rounded
+arithmetic, library kernels, scheduling choices, and finite buffers. Those steps must be checked,
+bounded, or left as explicit trusted boundaries instead of being smuggled into the theorem statement.
 
 {include 2 TorchLeanBlueprint.Guide.Ch3_Backend.Floats}
 
@@ -293,8 +235,8 @@ real-valued theorem needs a numerical bridge before it becomes a Float32 claim. 
 bridges are present, concrete artifacts can become precise mathematical statements rather than
 screenshots of successful runs.
 
-The verification chapter is intentionally broader than classifier robustness. Robustness is the
-standard benchmark language, but the same idea appears in optimizer laws, autograd rules, scientific
+Verification is broader than classifier robustness. Robustness is the standard benchmark language,
+but the same idea appears in optimizer laws, autograd rules, scientific
 ML residuals, ODE enclosures, dataset checks, and imported verifier leaves. The unifying principle
 is that a certificate should say what finite object was checked, and a theorem should say which
 mathematical statement follows.
@@ -340,9 +282,8 @@ Each example is intentionally small enough to inspect, but it touches a real sou
 A finished command is the start of the story. The better question is what object it produced, what
 TorchLean can inspect about that object, and what kind of claim the object can support.
 
-Read this chapter as a catalog of workflows rather than a gallery of demos. Each example should
-answer three concrete questions: how do I run it, what artifact do I get, and what can Lean say
-about that artifact today?
+Each workflow answers three concrete questions: how to run it, which artifact it produces, and what
+Lean can establish about that artifact today.
 
 {include 2 TorchLeanBlueprint.Guide.Ch5_Applications.ModernModels}
 

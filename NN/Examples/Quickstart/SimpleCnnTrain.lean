@@ -24,7 +24,7 @@ Check this tutorial module directly:
 For the maintained command-line CNN trainer, use `NN/Examples/Models/Vision/Cnn.lean`:
 
 - `python3 scripts/datasets/download_example_data.py --cifar10`
-- `lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1`
+- `lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1`
 
 Optional flags:
 
@@ -70,7 +70,8 @@ def usage : String :=
     , "  --steps N"
     , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
-    , "  --cpu | --cuda"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --show-backend                    print backend capsules as they execute"
     , "  --log PATH"
     ]
 
@@ -84,7 +85,7 @@ def main (args : List String) : IO Unit := do
   let (batch, args) ← CLI.positiveNatFlag "SimpleCNNTrain" args "batch" 2
   let parsed ←
     _root_.NN.Examples.Quickstart.parseRuntimeTrain
-      "SimpleCNNTrain" args defaultLogJson 5 (optim.adam { lr := 0.03 })
+      "SimpleCNNTrain" args defaultLogJson 1 (optim.adam { lr := 0.03 })
   let trainer := Trainer.new (mkModel (batch := batch)) <|
     Trainer.Config.fromRunConfig parsed.run .classification (seed := seed)
 

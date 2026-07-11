@@ -32,8 +32,8 @@ N-D max pooling (channels-first) on a single sample tensor (no batch axis).
 PyTorch comparison: `torch.nn.functional.max_pool1d` / `max_pool2d` / `max_pool3d` depending on
 the spatial rank `d`.
 
-Forward-mode status: implemented. The JVP follows the primal argmax selected by
-`Spec.maxPoolJvpSpec`, including the documented first-winner tie convention.
+Forward-mode status: implemented as the selected-branch linearization from
+`Spec.maxPoolLinearizationSpec`. At ties this follows the documented first-winner convention.
 -/
 def maxPool {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {d C : Nat}
@@ -57,7 +57,7 @@ def maxPool {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
         jvp := fun ctx dctx _d =>
           let xv := getIdx (α := α) (xs := ctx) ix
           let dx := getIdx (α := α) (xs := dctx) ix
-          Spec.maxPoolJvpSpec (α := α) (d := d) (C := C)
+          Spec.maxPoolLinearizationSpec (α := α) (d := d) (C := C)
             (inSpatial := inSpatial) (kernel := kernel) (stride := stride) (padding := padding)
             (layer := layer) xv dx
         vjp := fun ctx _d δ =>
@@ -188,7 +188,7 @@ def maxPool2d {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
         jvp := fun ctx dctx _d =>
           let xv := getIdx (α := α) (xs := ctx) ix
           let dx := getIdx (α := α) (xs := dctx) ix
-          Spec.maxPool2dMultiJvpSpec (layer := layer) (input := xv) (tangent := dx)
+          Spec.maxPool2dMultiLinearizationSpec (layer := layer) (input := xv) (tangent := dx)
         vjp := fun ctx _d δ =>
           let xv := getIdx (α := α) (xs := ctx) ix
           let dx :=
@@ -205,8 +205,8 @@ def maxPool2d {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
 
 PyTorch comparison: `torch.nn.functional.max_pool2d` with padding.
 
-Forward-mode status: implemented. Padding is fixed and the JVP follows the real primal winner,
-ignoring padded cells just like the forward pass.
+Forward-mode status: implemented as a selected-branch linearization. Padding is fixed and the
+chosen tangent follows the real primal winner, ignoring padded cells just like the forward pass.
 -/
 def maxPool2dPad {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
   {Γ : List Shape} {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
@@ -229,7 +229,7 @@ def maxPool2dPad {α : Type} {Δ : Type} [Context α] [DecidableEq Shape]
         jvp := fun ctx dctx _d =>
           let xv := getIdx (α := α) (xs := ctx) ix
           let dx := getIdx (α := α) (xs := dctx) ix
-          Spec.maxPool2dMultiJvpSpecPad (layer := layer) (padding := padding)
+          Spec.maxPool2dMultiLinearizationSpecPad (layer := layer) (padding := padding)
             (input := xv) (tangent := dx)
         vjp := fun ctx _d δ =>
           let xv := getIdx (α := α) (xs := ctx) ix

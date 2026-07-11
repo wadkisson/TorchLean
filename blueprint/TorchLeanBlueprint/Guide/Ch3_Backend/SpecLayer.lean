@@ -23,8 +23,8 @@ prover. For broader language background, see the official Lean texts
 simple: write the mathematical object as an ordinary Lean definition, then make later layers show
 which definition they execute, differentiate, lower, or verify.
 
-The discussion assumes the tensor and model construction material from the earlier chapters and focuses
-on the semantic anchors that later runtime, autograd, graph, and verification statements cite.
+Spec declarations are the semantic anchors cited by runtime, autograd, graph, and verification
+statements.
 
 # Semantic Anchors
 
@@ -226,11 +226,10 @@ $$`\text{certificate accepted}
 \;\Longrightarrow\;
 \text{property of Spec.forward over the stated input set}`
 
-For that reason, the spec layer still matters when the page you are reading is about CUDA, CROWN, or
-export. Those layers are meaningful only after they say which specification function they are
-implementing, differentiating, lowering, or bounding.
+CUDA, CROWN, and export layers are meaningful only after they identify the specification function
+they implement, differentiate, lower, or bound.
 
-# A Practical Reading Habit
+# Inspecting A Specification
 
 When reading a spec file, make three passes:
 
@@ -286,19 +285,14 @@ diffusion objectives, reinforcement learning interfaces, and scientific ML examp
 and runtime wrappers may choose different execution paths, but the spec files are where the
 mathematical forward maps and objectives are named.
 
-When an example claims to implement a larger model, a good reading path is:
+Tracing a larger model requires four links:
 
 1. Open the runnable example to see the user-facing workflow.
 2. Follow the import to the corresponding spec or GraphSpec model.
 3. Identify the forward spec and loss spec.
 4. Then read the runtime, autograd, or verification theorem that cites those names.
 
-# What To Read Next
-
-Read *Runtime and Autograd* for executable traces and derivative paths. Read *Graphs and IR* for the
-canonical DAG with named operations. Read *GraphSpec* for architecture objects that have both pure spec
-semantics and executable TorchLean programs. Read *Verification* for how bounds and certificates
-refer back to the same denotation.
+# API Entry Points
 
 Concrete declarations begin with the [Context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Core/Context.lean), then the
 [layer semantics API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Layers/), the [model spec API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Models/), and the

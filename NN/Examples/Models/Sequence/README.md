@@ -57,20 +57,20 @@ the model architecture.
 Useful commands:
 
 ```bash
-lake exe torchlean rnn --cpu --steps 1
-lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean gpt2 --cuda --fast-kernels --steps 10 --generate 0
-lake exe -K cuda=true torchlean text_gpt2 --cuda --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 1 --generate 0
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake exe torchlean rnn --device cpu --steps 1
+lake -R -K cuda=true exe torchlean transformer --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 10 --generate 0
+lake -R -K cuda=true exe torchlean text_gpt2 --device cuda --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 1 --generate 0
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 For a save/reload check:
 
 ```bash
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
   --steps 1 --windows 1 --generate 0 --save-params /tmp/gpt2.params.json
 
-lake exe -K cuda=true torchlean gpt2_saved --cuda \
+lake -R -K cuda=true exe torchlean gpt2_saved --device cuda \
   --params /tmp/gpt2.params.json --prompt "ROMEO:" --generate 16
 ```
 

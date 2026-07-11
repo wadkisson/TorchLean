@@ -98,136 +98,47 @@ def ibpAbs (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
         Tensor.scalar (ibpAbsScalar l u).2)
     { lo := outLo, hi := outHi }
 
-/-- Affine bounds for absolute value. -/
+/--
+Affine lower and upper bounds for absolute value on an ordered interval `[l, u]`.
+
+On an interval crossing zero, the lower bound is the zero line and the upper bound is the secant
+through `(l, -l)` and `(u, u)`. The degenerate interval `[0, 0]` is represented by the zero line.
+-/
 def affAbs (l u : α) : α × α × α × α :=
   if l > Numbers.zero then
     (Numbers.one, Numbers.zero, Numbers.one, Numbers.zero)
   else if u < Numbers.zero then
     (-Numbers.one, Numbers.zero, -Numbers.one, Numbers.zero)
   else
-    -- Crossing: upper bound is secant, lower is 0
-    let slope := ((-l) + u) / (u - l)  -- This simplifies but keeping for clarity
-    (Numbers.zero, Numbers.zero, slope, -slope * l)
-
-/-! ### Square Root -/
-
-/-- Square-root approximation using two Babylonian refinement steps for a `Context` scalar. -/
-def sqrtApprox (x : α) : α :=
-  if x < Numbers.epsilon then
-    Numbers.zero
-  else
-    -- Babylonian method with initial guess
-    let guess := (x + Numbers.one) * Numbers.pointfive
-    let refined := (guess + x / guess) * Numbers.pointfive
-    (refined + x / refined) * Numbers.pointfive
-
-/-- IBP for square root. Sqrt is monotone increasing on [0,∞). -/
-def ibpSqrtScalar (l u : α) : α × α :=
-  -- Assuming l ≥ 0 (sqrt domain)
-  let l' := if l < Numbers.zero then Numbers.zero else l
-  (sqrtApprox l', sqrtApprox u)
-
-/-- IBP for square root on boxes. -/
-def ibpSqrt (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
-  match B.lo, B.hi with
-  | .dim lo, .dim hi =>
-    let outLo := Tensor.dim (fun i =>
-      match lo i with
-      | .scalar l => Tensor.scalar (ibpSqrtScalar l Numbers.zero).1)
-    let outHi := Tensor.dim (fun i =>
-      match hi i with
-      | .scalar u => Tensor.scalar (ibpSqrtScalar Numbers.zero u).2)
-    { lo := outLo, hi := outHi }
-
-/-- Affine bounds for square root (concave function).
-    Upper: tangent line, Lower: secant line. -/
-def affSqrt (l u : α) : α × α × α × α :=
-  let sl := sqrtApprox l
-  let su := sqrtApprox u
-  -- Secant for lower bound (since sqrt is concave)
-  let slope_sec := if u > l + Numbers.epsilon then (su - sl) / (u - l) else Numbers.one /
-    (Numbers.two * sl)
-  let bias_sec := sl - slope_sec * l
-  -- Tangent at midpoint for upper bound
-  let mid := (l + u) * Numbers.pointfive
-  let smid := sqrtApprox mid
-  let slope_tan := if smid > Numbers.epsilon then Numbers.one / (Numbers.two * smid) else
-    Numbers.one
-  let bias_tan := smid - slope_tan * mid
-  (slope_sec, bias_sec, slope_tan, bias_tan)
-
-/-- Derivative bounds for sqrt: d/dx √x = 1/(2√x). -/
-def derivSqrt (l u : α) : α × α :=
-  let sl := sqrtApprox l
-  let su := sqrtApprox u
-  -- Derivative decreases as x increases
-  let deriv_lo := if su > Numbers.epsilon then Numbers.one / (Numbers.two * su) else Numbers.one
-  let deriv_hi := if sl > Numbers.epsilon then Numbers.one / (Numbers.two * sl) else Numbers.one
-  (deriv_lo, deriv_hi)
+    if u > l then
+      let slope := (u + l) / (u - l)
+      let bias := u - slope * u
+      (Numbers.zero, Numbers.zero, slope, bias)
+    else
+      (Numbers.zero, Numbers.zero, Numbers.zero, Numbers.zero)
 
 /-! ### Reciprocal -/
 
 /-- Reciprocal: f(x) = 1/x. -/
 def reciprocal (x : α) : α := Numbers.one / x
 
-/-- IBP for reciprocal.
-    Warning: 1/x has asymptote at 0, so this is only valid when 0 ∉ [l,u]. -/
-def ibpReciprocalScalar (l u : α) : α × α :=
-  if l > Numbers.zero then
-    -- All positive: 1/x is decreasing
-    (Numbers.one / u, Numbers.one / l)
-  else if u < Numbers.zero then
-    -- All negative: 1/x is decreasing
-    (Numbers.one / u, Numbers.one / l)
-  else
-    -- Contains zero: return very wide bounds
-    let inf := Numbers.one / Numbers.epsilon
-    (-inf, inf)
-
-/-- IBP for reciprocal on boxes. -/
-def ibpReciprocal (n : Nat) (B : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
+/-- IBP for reciprocal on boxes, defined only when every coordinate interval excludes zero. -/
+def ibpReciprocal? (n : Nat) (B : Box α (.dim n .scalar)) :
+    Option (Box α (.dim n .scalar)) :=
   match B.lo, B.hi with
   | .dim lo, .dim hi =>
-    let outLo := Tensor.dim (fun i =>
-      match lo i, hi i with
-      | .scalar l, .scalar u =>
-        Tensor.scalar (ibpReciprocalScalar l u).1)
-    let outHi := Tensor.dim (fun i =>
-      match lo i, hi i with
-      | .scalar l, .scalar u =>
-        Tensor.scalar (ibpReciprocalScalar l u).2)
-    { lo := outLo, hi := outHi }
-
-/-- Affine bounds for reciprocal (convex for x > 0).
-    Lower: secant line, Upper: tangent line. -/
-def affReciprocal (l u : α) : α × α × α × α :=
-  if l > Numbers.zero then
-    let rl := Numbers.one / l
-    let ru := Numbers.one / u
-    -- Secant for lower (since 1/x is convex on x > 0)
-    let slope_sec := (ru - rl) / (u - l)
-    let bias_sec := rl - slope_sec * l
-    -- Tangent at midpoint for upper
-    let mid := (l + u) * Numbers.pointfive
-    let rmid := Numbers.one / mid
-    let slope_tan := -(Numbers.one / (mid * mid))
-    let bias_tan := rmid - slope_tan * mid
-    (slope_sec, bias_sec, slope_tan, bias_tan)
-  else
-    -- Contains zero or negative: very conservative
-    let inf := Numbers.one / Numbers.epsilon
-    (Numbers.zero, -inf, Numbers.zero, inf)
-
-/-- Derivative bounds for reciprocal: d/dx (1/x) = -1/x². -/
-def derivReciprocal (l u : α) : α × α :=
-  if l > Numbers.zero then
-    -- All positive: -1/x² is negative, |deriv| decreases as x increases
-    let deriv_lo := -(Numbers.one / (l * l))
-    let deriv_hi := -(Numbers.one / (u * u))
-    (deriv_hi, deriv_lo)  -- Note: deriv_hi > deriv_lo since both negative
-  else
-    let inf := Numbers.one / Numbers.epsilon
-    (-inf, Numbers.zero)
+    if (List.finRange n).all (fun i =>
+        match lo i, hi i with
+        | .scalar l, .scalar u => l > Numbers.zero || u < Numbers.zero) then
+      let outLo := Tensor.dim (fun i =>
+        match lo i, hi i with
+        | .scalar _l, .scalar u => Tensor.scalar (Numbers.one / u))
+      let outHi := Tensor.dim (fun i =>
+        match lo i, hi i with
+        | .scalar l, .scalar _u => Tensor.scalar (Numbers.one / l))
+      some { lo := outLo, hi := outHi }
+    else
+      none
 
 /-! ### Power -/
 
@@ -315,12 +226,20 @@ def ibpMax (n : Nat) (B1 B2 : Box α (.dim n .scalar)) : Box α (.dim n .scalar)
         Tensor.scalar (if u1 > u2 then u1 else u2))
     { lo := outLo, hi := outHi }
 
-/-- Clamp operation: clamp(x, lo, hi) = max(lo, min(hi, x)). -/
+/--
+Clamp one scalar with the same composition used by `Spec.clampSpec`:
+`min clamp_hi (max clamp_lo x)`.
+
+In particular, when `clamp_lo > clamp_hi`, the result is `clamp_hi`. This agrees with PyTorch's
+documented behavior instead of silently switching the two bounds.
+-/
+def clampScalar (x clamp_lo clamp_hi : α) : α :=
+  let floored := if x > clamp_lo then x else clamp_lo
+  if floored < clamp_hi then floored else clamp_hi
+
+/-- Clamp operation: `clamp(x, lo, hi) = min(hi, max(lo, x))`. -/
 def ibpClampScalar (x_lo x_hi clamp_lo clamp_hi : α) : α × α :=
-  -- Output is in [clamp_lo, clamp_hi] intersected with [x_lo, x_hi]
-  let out_lo := if x_lo > clamp_lo then x_lo else clamp_lo
-  let out_hi := if x_hi < clamp_hi then x_hi else clamp_hi
-  (out_lo, out_hi)
+  (clampScalar x_lo clamp_lo clamp_hi, clampScalar x_hi clamp_lo clamp_hi)
 
 /-- Interval propagation for `clamp`, applied coordinatewise to a vector box. -/
 def ibpClamp (n : Nat) (B : Box α (.dim n .scalar)) (clamp_lo clamp_hi : α) : Box α (.dim n
@@ -330,30 +249,11 @@ def ibpClamp (n : Nat) (B : Box α (.dim n .scalar)) (clamp_lo clamp_hi : α) : 
     let outLo := Tensor.dim (fun i =>
       match lo i with
       | .scalar l =>
-        Tensor.scalar (if l > clamp_lo then l else clamp_lo))
+        Tensor.scalar (clampScalar l clamp_lo clamp_hi))
     let outHi := Tensor.dim (fun i =>
       match hi i with
       | .scalar u =>
-        Tensor.scalar (if u < clamp_hi then u else clamp_hi))
+        Tensor.scalar (clampScalar u clamp_lo clamp_hi))
     { lo := outLo, hi := outHi }
-
-namespace Theorems
-
-/-- Negation IBP is exact. This states the basic structure of negation bounds. -/
-theorem neg_ibp_scalar_structure (l u : α) :
-    ibpNegScalar (α:=α) l u = (-u, -l) := by
-  rfl
-
-/-- Absolute value IBP returns a pair. -/
-theorem abs_ibp_returns_pair (l u : α) :
-    ∃ lo hi : α, ibpAbsScalar (α:=α) l u = (lo, hi) := by
-  exact ⟨(ibpAbsScalar l u).1, (ibpAbsScalar l u).2, rfl⟩
-
-/-- Square IBP returns a pair. -/
-theorem square_ibp_returns_pair (l u : α) :
-    ∃ lo hi : α, ibpSquareScalar (α:=α) l u = (lo, hi) := by
-  exact ⟨(ibpSquareScalar l u).1, (ibpSquareScalar l u).2, rfl⟩
-
-end Theorems
 
 end NN.MLTheory.CROWN.Operators.Arithmetic

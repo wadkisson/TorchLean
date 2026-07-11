@@ -6,7 +6,7 @@ Authors: TorchLean Team
 CUDA FFI: naive Float32 kernels for Conv + pooling (forward/backward).
 
 Build:
-  lake build -K cuda=true
+  lake -R -K cuda=true build
 
 Notes:
 - APIs operate on `Cuda.Buffer` (opaque float32 device buffer).

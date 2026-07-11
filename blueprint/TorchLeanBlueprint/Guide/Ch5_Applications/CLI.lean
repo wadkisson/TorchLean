@@ -36,15 +36,15 @@ and run a verifier tool.
 The runner accepts runtime flags either before or after the subcommand. These are equivalent:
 
 ```
-lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean --cpu mlp --steps 10
+lake exe torchlean mlp --device cpu --steps 10
+lake exe torchlean --device cpu mlp --steps 10
 ```
 
 Use the first form in prose and scripts because it reads like "run this example with these flags."
 Use a leading `--` separator only when another wrapper needs it:
 
 ```
-lake exe torchlean -- mlp --cpu --steps 10
+lake exe torchlean -- mlp --device cpu --steps 10
 ```
 
 # Building with CUDA (optional)
@@ -53,11 +53,11 @@ GPU-backed examples require a CUDA-enabled build of the Lean project so the nati
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) link against the toolkit:
 
 ```
-lake build -R -K cuda=true
-lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1
 ```
 
-If `cuda=true` is not set, the same symbols resolve to CPU stubs and `--cuda` may error or fall back
+If `cuda=true` is not set, the same symbols resolve to CPU stubs and `--device cuda` may error or fall back
 depending on the example. See *GPU and CUDA* for the build/runtime split and each example's module
 header for model specific flags. Verification CLI tools (`lake exe verify`) do not need CUDA.
 
@@ -124,7 +124,7 @@ After cloning, a fast runtime check is:
 lake build
 lake build NN.Examples.Zoo
 lake env lean --run NN/Examples/Quickstart/TensorBasics.lean
-lake exe torchlean mlp --cpu --steps 10
+lake exe torchlean mlp --device cpu --steps 10
 lake exe verify -- torchlean-ibp
 ```
 
@@ -145,7 +145,7 @@ Model examples use the `torchlean` runner:
 
 ```
 lake exe torchlean --help
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 ```
 
 Some tutorial and deep dive examples are ordinary Lean `--run` programs under `NN/Examples/*`. Pick
@@ -176,10 +176,10 @@ python3 scripts/datasets/torchlean_data_convert.py image-folder \
 When a command writes artifacts, prefer explicit paths in documentation:
 
 ```
-lake exe -K cuda=true torchlean gpt2 --cuda --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
   --steps 10 --windows 1 --generate 64 --log data/model_zoo/gpt2_trainlog.json
 
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 \
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 \
   --n-total 1 --steps 1 --hidden-c 1 --T 2 \
   --sample-ppm data/model_zoo/cifar_sample.ppm
 ```
@@ -230,7 +230,7 @@ Most failed application commands are informative if read through the right bound
 
 - *unknown example*: run `lake exe torchlean --help` and use the registered subcommand name;
 - *missing file under `data/real`*: run the documented data helper or pass a smaller synthetic-data flag;
-- *CUDA symbol or device failure*: rebuild with `lake build -R -K cuda=true` and keep `-K cuda=true`
+- *CUDA symbol or device failure*: rebuild with `lake -R -K cuda=true build` and keep `-K cuda=true`
   on the executable command;
 - *Gymnasium import/server failure*: install the Python dependency and check the external environment name;
 - *verifier artifact failure*: distinguish "artifact missing" from "artifact present but rejected";
@@ -238,7 +238,7 @@ Most failed application commands are informative if read through the right bound
 
 These are not merely operational tips. They also mark trust boundaries. A dataset converter, a Python
 environment, a CUDA kernel, and an external certificate producer are different kinds of dependencies,
-so the guide names them separately.
+and must be named separately.
 
 # Website Build
 
@@ -255,10 +255,9 @@ the `blueprint/` package), and installs the homepage bundle.
 For more runnable examples, see *Example Walkthroughs*. For what `verify` subcommands do internally, see
 *Verification*.
 
-# Targeted Checks For Guide Edits
+# Checking Guide Edits
 
-For documentation-only edits in this chapter, do not start with a full `lake build`. A focused pass is
-usually enough:
+Each guide file is a Lean source file. During development, a focused check gives faster feedback:
 
 ```
 lake env lean blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/CLI.lean
@@ -266,5 +265,5 @@ lake env lean blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Examples.lean
 lake env lean blueprint/TorchLeanBlueprint/Guide/Ch6_Conclusion/Conclusion.lean
 ```
 
-If a page imports executable widget or runtime modules, check that page directly. If a command table
-was changed, compare against `lake exe torchlean --help` rather than guessing subcommand names.
+Pages that import executable widget or runtime modules should be checked directly. Command tables
+should be compared with `lake exe torchlean --help` so that the published flags match the runner.

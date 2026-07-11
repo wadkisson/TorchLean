@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.MLTheory.CROWN.Core
+public import NN.MLTheory.CROWN.Operators.Activations
 public import NN.MLTheory.CROWN.Runtime.Ops
 public import NN.Spec.Core.Context
 public import NN.Spec.Core.Tensor
@@ -262,13 +263,9 @@ abbrev sigmoid {n : Nat} (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar
 abbrev tanh {n : Nat} (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   Runtime.Ops.IBP.tanh (α := α) xB
 
-/--
-Interval bounds for leaky-ReLU.
-
-Sound when the negative slope `αₗ` is nonnegative.
--/
+/-- Interval bounds for leaky ReLU, including the zero kink on crossing intervals. -/
 def leakyRelu {n : Nat} (αₗ : α) (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
-  mapMinmax (fun x => Activation.Math.leakyReluSpec x αₗ) xB
+  Operators.Activations.ibpLeakyRelu n αₗ xB
 
 /--
 Interval bounds for ELU.
@@ -420,23 +417,6 @@ properties of mat-vec interval arithmetic.
 namespace Theorems
 
 open NN.MLTheory.CROWN
-
-/--
-`boundAffineCrown` is exactly the input-box evaluation of the affine forms constructed by
-`affineCrownForms`.
-
-This is a small sanity theorem for the wrapper; semantic soundness is proved separately.
--/
-theorem bound_affine_crown_eq_affine_forms_eval {inDim hidDim outDim : Nat}
-  (net : TwoLayerMLP ℝ inDim hidDim outDim)
-  (xB : Box ℝ (.dim inDim .scalar)) :
-  boundAffineCrown (α:=ℝ) net xB =
-    let forms := affineCrownForms (α:=ℝ) net xB
-    let BL := AffineVec.evalOnBox (α:=ℝ) forms.1 xB
-    let BU := AffineVec.evalOnBox (α:=ℝ) forms.2 xB
-    { lo := BL.lo, hi := BU.hi } := by
-  rfl
-
 
 /--
 Scalar ReLU relaxation soundness over `ℝ` (upper bound).

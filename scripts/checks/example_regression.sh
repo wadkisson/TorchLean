@@ -10,8 +10,7 @@ Run a sequential regression check over the public `lake exe torchlean ...` comma
 Default:
   - check that `import NN.Entrypoint.API` exposes the usual `TorchLean.*` names;
   - verify every registered subcommand accepts `--help`;
-  - run a compact CPU/tutorial/interop regression set, plus one GPU-first command through
-    the default CUDA-stub path.
+  - run a compact CPU/tutorial/interop regression set.
 
 Options:
   --cuda             Also run a compact set of real CUDA model checks.
@@ -118,6 +117,11 @@ commands = re.findall(r'^\s*\| "([^"]+)" =>', runner, re.M)
 print(f"help audit: {len(commands)} registered torchlean subcommands")
 
 bad = []
+required_help = {
+    "rnn": ("Data:", "--data-file PATH", "--tiny-shakespeare", "Runtime:"),
+    "lstm": ("Data:", "--data-file PATH", "--tiny-shakespeare", "Runtime:"),
+    "transformer": ("Data:", "--data-file PATH", "--tiny-shakespeare", "Runtime:"),
+}
 for cmd in commands:
     proc = subprocess.run(
         [lake, "exe", "torchlean", cmd, "--help"],
@@ -127,7 +131,12 @@ for cmd in commands:
         timeout=180,
     )
     out = proc.stdout
-    ok = proc.returncode == 0 and ("Usage:" in out or "usage:" in out.lower())
+    required = required_help.get(cmd, ())
+    ok = (
+        proc.returncode == 0
+        and ("Usage:" in out or "usage:" in out.lower())
+        and all(item in out for item in required)
+    )
     if ok:
         print(f"  ok  {cmd}")
     else:
@@ -167,82 +176,81 @@ if [[ "$run_default" == true ]]; then
   run "$LAKE" exe torchlean one_semantic_universe --samples 3
   run "$LAKE" exe torchlean torch_ir_pytorch
   run "$LAKE" exe torchlean dqn_replay
-  # `gpt_adder` is GPU-first. In a non-CUDA build this still exercises the CUDA-stub path.
-  run "$LAKE" exe torchlean gpt_adder \
-    --steps 1 --a 7 --b 8 --log "$tmp_dir/gpt_adder.json"
 fi
 
 if [[ "$run_cuda" == true ]]; then
+  run "$LAKE" exe -K cuda=true torchlean gpt_adder \
+    --device cuda --steps 1 --a 7 --b 8 --log "$tmp_dir/gpt_adder.json"
   run "$LAKE" exe -K cuda=true torchlean cnn \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/cnn_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/cnn_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean vit \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/vit_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/vit_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean gpt2 \
-    --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
+    --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
     --log "$tmp_dir/gpt2_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean mamba \
-    --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
+    --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
     --log "$tmp_dir/mamba_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean fno1d_burgers \
-    --cuda --fast-kernels --steps 1 \
+    --device cuda --steps 1 \
     --plot-csv "$tmp_dir/fno_predictions.csv" --log "$tmp_dir/fno_cuda.json"
 fi
 
 if [[ "$run_extended_cuda" == true ]]; then
   # Supervised and tabular models.
   run "$LAKE" exe -K cuda=true torchlean mlp \
-    --cuda --steps 1 --log "$tmp_dir/mlp_cuda.json"
+    --device cuda --steps 1 --log "$tmp_dir/mlp_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean kan \
-    --cuda --steps 1 --log "$tmp_dir/kan_cuda.json"
+    --device cuda --steps 1 --log "$tmp_dir/kan_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean lstm_regression \
-    --cuda --steps 1 --windows 1 --log "$tmp_dir/lstm_regression_cuda.json"
+    --device cuda --steps 1 --windows 1 --log "$tmp_dir/lstm_regression_cuda.json"
 
   # Vision and generative models.
   run "$LAKE" exe -K cuda=true torchlean autoencoder \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/autoencoder_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/autoencoder_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean mae \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/mae_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/mae_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean vae \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/vae_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/vae_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean vqvae \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/vqvae_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/vqvae_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean gan \
-    --cuda --steps 1 --n-total 1 --log "$tmp_dir/gan_cuda.json"
+    --device cuda --steps 1 --n-total 1 --log "$tmp_dir/gan_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean diffusion \
-    --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2 \
+    --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2 \
     --log "$tmp_dir/diffusion_cuda.json" \
     --reference-ppm "$tmp_dir/diffusion_reference.ppm" \
     --sample-ppm "$tmp_dir/diffusion_sample.ppm"
 
   # Sequence models.
   run "$LAKE" exe -K cuda=true torchlean rnn \
-    --cuda --steps 1 --log "$tmp_dir/rnn_cuda.json"
+    --device cuda --steps 1 --log "$tmp_dir/rnn_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean lstm \
-    --cuda --steps 1 --log "$tmp_dir/lstm_cuda.json"
+    --device cuda --steps 1 --log "$tmp_dir/lstm_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean transformer \
-    --cuda --tiny-shakespeare --steps 1 \
+    --device cuda --tiny-shakespeare --steps 1 \
     --log "$tmp_dir/transformer_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean chargpt \
-    --cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0 \
+    --device cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0 \
     --log "$tmp_dir/chargpt_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean gpt2 \
-    --cuda --fast-kernels --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
+    --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0 \
     --save-params "$tmp_dir/gpt2_saved.params.json" \
     --log "$tmp_dir/gpt2_extended_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean gpt2_saved \
-    --cuda --fast-kernels --params "$tmp_dir/gpt2_saved.params.json" \
+    --device cuda --params "$tmp_dir/gpt2_saved.params.json" \
     --prompt "First Citizen:" --generate 0
   run "$LAKE" exe -K cuda=true torchlean text_gpt2 \
-    --cuda --data-file data/real/text/tinystories_valid.txt \
+    --device cuda --data-file data/real/text/tinystories_valid.txt \
     --allow-small-data --steps 1 --generate 0 \
     --log "$tmp_dir/text_gpt2_cuda.json"
 
   # RL examples with tiny evaluation windows.
   run "$LAKE" exe -K cuda=true torchlean ppo_cartpole \
-    --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
+    --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
     --log "$tmp_dir/ppo_cartpole_cuda.json"
   run "$LAKE" exe -K cuda=true torchlean ppo_gridworld \
-    --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
+    --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
     --log "$tmp_dir/ppo_gridworld_cuda.json" \
     --policy "$tmp_dir/ppo_gridworld_policy.json" \
     --path "$tmp_dir/ppo_gridworld_path.json"
@@ -250,7 +258,7 @@ fi
 
 if [[ "$run_external_rl" == true ]]; then
   run "$LAKE" exe -K cuda=true torchlean ppo_pong_ram \
-    --cuda --check-env-only
+    --device cuda --check-env-only
 fi
 
 printf '\nTorchLean example regression checks passed.\n'

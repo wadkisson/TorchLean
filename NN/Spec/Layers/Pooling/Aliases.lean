@@ -36,12 +36,4 @@ abbrev avgPool := @avgPoolSpec
 /-- Alias for `smooth_max_pool_spec`. -/
 abbrev smoothMaxPool := @smoothMaxPoolSpec
 
-/-- Alias for `max_pool_backward_spec`. -/
-abbrev maxPoolBackward := @maxPoolBackwardSpec
-
-/-- Alias for `avg_pool_backward_spec`. -/
-abbrev avgPoolBackward := @avgPoolBackwardSpec
-
-/-- Alias for `smooth_max_pool_backward_spec`. -/
-abbrev smoothMaxPoolBackward := @smoothMaxPoolBackwardSpec
 end Spec

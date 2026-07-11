@@ -23,7 +23,7 @@ sessions live in `NN/Runtime/RL/`, and proof hooks live in `NN/Proofs/RL/`.
 Lean-native GridWorld:
 
 ```bash
-lake exe -K cuda=true torchlean ppo_gridworld --cuda \
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda \
   --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
@@ -31,7 +31,7 @@ Gymnasium CartPole:
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0'
-lake exe -K cuda=true torchlean ppo_cartpole --cuda \
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda \
   --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
@@ -45,7 +45,7 @@ Optional Pong RAM path:
 
 ```bash
 python3 -m pip install --user 'gymnasium>=1.0' ale-py
-lake exe -K cuda=true torchlean ppo_pong_ram --cuda --updates 1
+lake -R -K cuda=true exe torchlean ppo_pong_ram --device cuda --updates 1
 ```
 
 ## Artifacts

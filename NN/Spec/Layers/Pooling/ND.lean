@@ -197,12 +197,12 @@ def maxPoolValue
   best?.getD 0
 
 /--
-Directional derivative of hard max-pooling for one N-D window.
+Selected-branch tangent for one hard max-pooling window.
 
-The derivative is taken along the same winner selected by `maxPoolValue`. At ties we keep the first
-winner in row-major order, matching the VJP convention below and PyTorch's index convention.
+The tangent follows the same winner selected by `maxPoolValue`. At a tie this is a deterministic
+generalized-derivative convention, not the mathematical directional derivative of `max`.
 -/
-def maxPoolJvpValue
+def maxPoolSelectedTangentValue
     {d : Nat} {inSpatial : Vector Nat d}
     (input tangent : Tensor α (Shape.ofList inSpatial.toList))
     (outIdxs : List Nat)
@@ -305,13 +305,12 @@ def maxPoolSpatialSpec
       (kernel := kernelL) (stride := strideL) (padding := paddingL))
 
 /--
-Forward-mode JVP for N-D hard max-pooling on a spatial tensor.
+Selected-branch linearization for N-D hard max-pooling on a spatial tensor.
 
-The derivative follows the same primal argmax as `maxPoolSpatialSpec`; at ties it keeps the first
-row-major maximizer. This is the correct directional derivative for TorchLean's chosen subgradient
-convention and matches the VJP tie policy.
+Away from ties this is the ordinary JVP. At ties it follows the first row-major primal maximizer,
+matching the VJP convention but not claiming an analytic directional derivative.
 -/
-def maxPoolSpatialJvpSpec
+def maxPoolSpatialLinearizationSpec
     {d : Nat} {inSpatial kernel stride padding : Vector Nat d}
     {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
     {hStride : ∀ i : Fin d, stride.get i ≠ 0}
@@ -325,7 +324,7 @@ def maxPoolSpatialJvpSpec
   let paddingL := padding.toList
 
   Private.tensorOfDims outSpatial.toList (fun outIdxs =>
-    Private.maxPoolJvpValue (d := d) (inSpatial := inSpatial)
+    Private.maxPoolSelectedTangentValue (d := d) (inSpatial := inSpatial)
       (input := input) (tangent := tangent) (outIdxs := outIdxs)
       (kernel := kernelL) (stride := strideL) (padding := paddingL))
 
@@ -467,8 +466,8 @@ def maxPoolSpec
       (stride := stride) (padding := padding)
       layer (getAtSpec input c))
 
-/-- N-D hard max-pool JVP on a channels-first tensor (channel-wise application). -/
-def maxPoolJvpSpec
+/-- N-D hard max-pool selected-branch linearization, applied channel-wise. -/
+def maxPoolLinearizationSpec
     {d C : Nat} {inSpatial kernel stride padding : Vector Nat d}
     {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
     {hStride : ∀ i : Fin d, stride.get i ≠ 0}
@@ -477,7 +476,7 @@ def maxPoolJvpSpec
     Tensor α (Shape.ofList (C :: (poolOutSpatialPad inSpatial kernel stride padding).toList)) :=
 
   Tensor.dim (fun c =>
-    maxPoolSpatialJvpSpec (α := α) (d := d) (inSpatial := inSpatial) (kernel := kernel)
+    maxPoolSpatialLinearizationSpec (α := α) (d := d) (inSpatial := inSpatial) (kernel := kernel)
       (stride := stride) (padding := padding)
       layer (getAtSpec input c) (getAtSpec tangent c))
 

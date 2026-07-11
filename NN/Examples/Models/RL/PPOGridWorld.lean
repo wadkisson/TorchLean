@@ -40,7 +40,7 @@ environment or an external sampler.
 
 ## CLI flags
 
-- `--cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
+- `--device cuda`: run the Torch backend on CUDA (requires building with `-K cuda=true`).
 - `--updates <n>`: number of PPO updates to run.
 - `--eval-every <n>`: evaluate the greedy policy every `n` updates.
 - `--eval-episodes <n>`: number of evaluation episodes per checkpoint.
@@ -50,8 +50,8 @@ environment or an external sampler.
 Run (from the repo root):
 
 ```bash
-lake build -R -K cuda=true
-lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 Artifacts:

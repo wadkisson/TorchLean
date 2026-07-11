@@ -914,25 +914,12 @@ def convTranspose2dBackwardSpec {inC outC kH kW stride padding inH inW : Nat}
       layer' input grad_output'
 
 /-!
-## Friendly aliases
+## Friendly alias
 
-We keep the `_spec` suffixes as the canonical names, but provide a few shorthands so call sites can
-read more like PyTorch-style pseudocode.
+We keep the `_spec` suffix as the canonical name, with a forward shorthand for model expressions.
 -/
 
 /-- Alias for `conv_spec`. -/
 abbrev conv := @convSpec
-
-/-- Alias for `conv_backward_spec`. -/
-abbrev convBackward := @convBackwardSpec
-
-/-- Alias for `conv_kernel_deriv_spec`. -/
-abbrev convKernelDeriv := @convKernelDerivSpec
-
-/-- Alias for `conv_bias_deriv_spec`. -/
-abbrev convBiasDeriv := @convBiasDerivSpec
-
-/-- Alias for `conv_input_deriv_spec`. -/
-abbrev convInputDeriv := @convInputDerivSpec
 
 end Spec

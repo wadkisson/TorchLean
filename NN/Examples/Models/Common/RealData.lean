@@ -219,7 +219,7 @@ Parse the standard CIFAR plus optimizer/training flags.
 
 Vision examples share the same CIFAR data boundary and optimizer controls; architecture files only
 need to provide the model constructor and logging title. Any remaining arguments are preserved so
-the caller can forward runtime flags such as `--cpu`, `--cuda`, or `--backend compiled` to the
+the caller can forward runtime flags such as `--device cpu`, `--device cuda`, or `--backend compiled` to the
 public `Trainer.RunConfig` parser.
 -/
 def parse (exeName : String) (args : List String)
@@ -476,6 +476,12 @@ def cifarVectorDataset {τ : Shape}
 abbrev TextCorpusFlags := text.TextCorpusPathOptions
 
 namespace TextCorpusFlags
+
+/-- Command-line options shared by local text-corpus examples. -/
+def help : List String :=
+  [ "  --data-file PATH      read a local UTF-8 text corpus"
+  , "  --tiny-shakespeare    use data/real/tinyshakespeare/input.txt"
+  ]
 
 /--
 Parse the shared `--data-file` flag used by local text-model examples.

@@ -111,7 +111,7 @@ private def gpt2PromptHtml (prompt : String) (steps : Nat := 5) (generate : Nat 
           {.text "Could not find the TorchLean executable at: "}{monospace torchleanBin.toString}
         </div>
         <div style={json% {"margin-top": "6px", "opacity": "0.9"}}>
-          {.text "Build it with "}{monospace "lake build -R -K cuda=true torchlean:exe"}{.text "."}
+          {.text "Build it with "}{monospace "lake -R -K cuda=true build torchlean:exe"}{.text "."}
         </div>
       </div>
   else
@@ -120,7 +120,7 @@ private def gpt2PromptHtml (prompt : String) (steps : Nat := 5) (generate : Nat 
       -- `withTempFile` after this callback returns.)
       h.flush
       let args : Array String :=
-        #["gpt2", "--cuda", "--fast-kernels", "--tiny-shakespeare",
+        #["gpt2", "--device", "cuda", "--tiny-shakespeare",
           "--steps", toString steps,
           "--windows", "64",
           "--lr", "0.0005",
@@ -191,7 +191,7 @@ macro "#gpt2_train_log_file_view " path:term : command =>
           </div>
           <div style={json% {"margin-top": "6px", "opacity": "0.9"}}>
             {.text "Tip: create this file by running "}
-            {monospace "lake exe -K cuda=true torchlean gpt2 --cuda --log <path> ..."}
+            {monospace "lake -R -K cuda=true exe torchlean gpt2 --device cuda --log <path> ..."}
             {.text "."}
           </div>
           <div style={json% {"margin-top": "6px"}}>{monospace (toString e)}</div>

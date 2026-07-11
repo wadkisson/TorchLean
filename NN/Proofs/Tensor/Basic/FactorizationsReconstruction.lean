@@ -8,6 +8,7 @@ module
 
 public import NN.Spec.Core.Tensor.Factorizations
 public import NN.Proofs.Tensor.Basic.Factorizations
+public import NN.Proofs.Utils.MathFunctions
 public import Mathlib.Data.List.GetD
 public import Mathlib.Algebra.BigOperators.Fin
 
@@ -219,15 +220,12 @@ theorem sumsq_eq (A : Fin n → Fin n → ℝ) (j : Fin n) :
 
 /-! ### Closed-form entries of the executable Cholesky factor -/
 
-/-- Over `ℝ`, the `Context` square root is `Real.sqrt`. -/
-theorem mfsqrt_eq (x : ℝ) : MathFunctions.sqrt x = Real.sqrt x := rfl
-
 /-- The diagonal entry of `L` in closed form: `L[j,j] = √(A[j,j] − Σ_{k<j} L[j,k]²)`. -/
 theorem choleskyFn_diag_eq (A : Fin n → Fin n → ℝ) (j : Fin n) :
     Spec.choleskyFn A j j
       = Real.sqrt (A j j
           - ∑ k, if k.val < j.val then Spec.choleskyFn A j k * Spec.choleskyFn A j k else 0) := by
-  rw [choleskyFn_eq_step, cholStep_diag, sumsq_eq, mfsqrt_eq]
+  rw [choleskyFn_eq_step, cholStep_diag, sumsq_eq, Proofs.mathfunc_sqrt_eq_rsqrt]
 
 /-- The below-diagonal entry of `L` in closed form:
 `L[i,j] = (A[i,j] − Σ_{k<j} L[i,k]·L[j,k]) / L[j,j]` for `i > j`. -/
@@ -235,8 +233,8 @@ theorem choleskyFn_offdiag_eq (A : Fin n → Fin n → ℝ) {i j : Fin n} (hij :
     Spec.choleskyFn A i j
       = (A i j - ∑ k, if k.val < j.val then Spec.choleskyFn A i k * Spec.choleskyFn A j k else 0)
           / Spec.choleskyFn A j j := by
-  rw [choleskyFn_eq_step A i j, cholStep_offdiag _ _ hij, cross_sum_eq, sumsq_eq, mfsqrt_eq,
-    ← choleskyFn_diag_eq]
+  rw [choleskyFn_eq_step A i j, cholStep_offdiag _ _ hij, cross_sum_eq, sumsq_eq,
+    Proofs.mathfunc_sqrt_eq_rsqrt, ← choleskyFn_diag_eq]
 
 /-! ### Reconstruction `A = L · Lᵀ`
 

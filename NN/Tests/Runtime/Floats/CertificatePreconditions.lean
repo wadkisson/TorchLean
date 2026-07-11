@@ -86,6 +86,12 @@ def run : IO Unit := do
   let badAlpha ← parseJson! "[2.0, 0.5]"
   expectRejected "alpha outside [0,1] was accepted" (parseAlphaVec? 2 badAlpha)
 
+  let nonfiniteAlpha ← parseJson! "[1e999, 0.5]"
+  expectRejected "non-finite alpha was accepted" (parseAlphaVec? 2 nonfiniteAlpha)
+
+  let nonfiniteBox ← parseJson! "{\"lo\":[0.0,1e999],\"hi\":[1.0,2.0]}"
+  expectRejected "non-finite interval certificate was accepted" (parseFlatBox? 2 nonfiniteBox)
+
   let b2 := flatBox (fun _ => 0.0) (fun _ => 1.0)
   let mismatchCert : Array (Option (FlatBox Float)) := #[some b2, some flatBox3, some b2]
   expect "binary elementwise dimension mismatch was accepted"

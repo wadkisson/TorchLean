@@ -9,7 +9,7 @@ Build TorchLean with native CUDA externs and profile the curated CUDA/Lean test 
 NVIDIA Nsight tools.
 
 Default:
-  lake build -R -K cuda=true nn_tests_suite
+  lake -R -K cuda=true build nn_tests_suite
   lake env nsys profile -t cuda,nvtx,osrt -f true -o data/profiles/cuda/nn_tests_suite_nsys \
     .lake/build/bin/nn_tests_suite
 

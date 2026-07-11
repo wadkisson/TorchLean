@@ -4,8 +4,8 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 GPU-only corpus-training example:
-  lake build -R -K cuda=true
-  lake exe -K cuda=true torchlean text_gpt2 --cuda \
+  lake -R -K cuda=true build
+  lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
     --data-file data/real/text/tinystories_valid.txt \
     --allow-small-data --steps 1 --generate 0
 
@@ -13,7 +13,7 @@ Prepare that file with:
   python3 scripts/datasets/download_example_data.py --tinystories-valid
 
 GPT-2 BPE tokenizer run:
-  lake exe -K cuda=true torchlean text_gpt2 --cuda \
+  lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
     --data-file data/real/text/tiny_shakespeare.txt \
     --bpe-vocab data/real/gpt2/vocab.json \
     --bpe-merges data/real/gpt2/merges.txt \
@@ -21,7 +21,7 @@ GPT-2 BPE tokenizer run:
     --prompt "First Citizen:" --generate 8
 
 Local file run:
-  lake exe -K cuda=true torchlean text_gpt2 --cuda \
+  lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
     --data-file /tmp/tiny.txt --allow-small-data --steps 1 --generate 0
 -/
 
@@ -467,7 +467,7 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runCudaFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "GPU corpus trainer")
     (k := fun opts rest => do
-      if !opts.useGpu then
+      if !opts.usesCuda then
         throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
       let (trainOpts, rest) ← ModelZoo.orThrow exeName <|
         text.CorpusLoggedPromptInteractiveOptions.parse

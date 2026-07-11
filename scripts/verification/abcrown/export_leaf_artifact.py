@@ -21,6 +21,7 @@ import math
 import os
 import subprocess
 import sys
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -201,10 +202,14 @@ def build_abcrown_leaf_artifact(
         top: Mapping[str, Any] = {}
     else:
         top = _as_object(raw, "top-level")
-        leaves_value = _get_any(top, LEAF_LIST_FIELDS, "top-level")
-        if not isinstance(leaves_value, list):
-            raise ArtifactExportError("top-level leaves/domains field must be a list")
-        leaves_raw = [_as_object(item, f"leaf[{i}]") for i, item in enumerate(leaves_value)]
+        if any(name in top for name in LEAF_LO_FIELDS) and any(name in top for name in LEAF_HI_FIELDS):
+            leaves_raw = [top]
+            top = {}
+        else:
+            leaves_value = _get_any(top, LEAF_LIST_FIELDS, "top-level")
+            if not isinstance(leaves_value, list):
+                raise ArtifactExportError("top-level leaves/domains field must be a list")
+            leaves_raw = [_as_object(item, f"leaf[{i}]") for i, item in enumerate(leaves_value)]
 
     if root_lo is None or root_hi is None:
         root_obj = _get_optional(top, ("root", "input_box"))
@@ -275,10 +280,27 @@ def write_abcrown_leaf_artifact(
 
 
 def _read_json(path: Path) -> Any:
-    """Read JSON from `path`."""
+    """Read JSON or newline-delimited JSON leaves from `path`."""
 
     with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        text = handle.read()
+    try:
+        return json.loads(text)
+    except JSONDecodeError:
+        leaves = []
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                leaves.append(json.loads(stripped))
+            except JSONDecodeError as exc:
+                raise ArtifactExportError(
+                    f"{path}:{lineno}: expected JSON object line in JSONL dump"
+                ) from exc
+        if not leaves:
+            raise ArtifactExportError(f"{path}: empty JSON/JSONL input")
+        return leaves
 
 
 def _write_json(path: Path, obj: Mapping[str, Any]) -> None:

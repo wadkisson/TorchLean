@@ -77,12 +77,10 @@ structure RuntimeSettings where
   dtype : Runtime.DType := .float
   /-- Eager or compiled execution backend. -/
   backend : Runtime.Backend := .eager
-  /-- CPU or CUDA execution device. -/
+  /-- Requested execution device. CPU/CUDA run today; future platform targets fail explicitly. -/
   device : Runtime.Device := .cpu
-  /-- Enable runtime-only fast kernels where available. -/
-  fastKernels : Bool := false
-  /-- CUDA matmul precision for fast kernels. -/
-  fastGpuMatmulPrecision : _root_.Runtime.Autograd.FastKernels.GpuMatmulPrecision := .fp32
+  /-- Print each accepted backend capsule when it is first used. -/
+  showBackend : Bool := false
 
 /--
 Task carried by the unified public trainer.

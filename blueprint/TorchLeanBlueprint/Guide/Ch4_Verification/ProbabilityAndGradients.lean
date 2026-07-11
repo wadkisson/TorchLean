@@ -7,13 +7,10 @@ open Verso.Genre Manual
 tag := "probability-and-gradients"
 %%%
 
-Some proof declarations are compact. They are not a full autograd or runtime
-approximation development; they give reusable local facts: a probability kernel for diffusion, a
-linear layer gradient theorem, and activation derivative theorems. These pages are the little gears
-that larger model proofs reuse.
-
-Large model proofs are rarely proved from scratch. They are assembled from small local facts. This
-page names the local facts that should be reused instead of reproved ad hoc.
+Model proofs are assembled from operator-level facts. TorchLean keeps several of those facts in
+small modules: the Gaussian forward kernel used by diffusion models, linear-layer gradient
+identities, and derivative rules for activations. They can be imported without committing a proof to
+the entire runtime autograd development.
 
 The reusable pieces are:
 
@@ -99,12 +96,21 @@ gradient theorem instead of pulling in the whole graph backprop layer.
 
 # Where These Utilities Fit
 
-Think of these declarations as connective tissue:
+These declarations serve three different proof tasks:
 
 - diffusion probability facts support generative model proofs;
 - local gradient facts support operator and model block reasoning;
 - larger autograd proofs can coexist with smaller direct derivative theorems.
 
-That distinction matters. TorchLean does not need one proof style for every gradient claim. A
-large graph theorem is powerful, but a local theorem can be the kinder and clearer tool when the
-claim is local.
+TorchLean does not need one proof style for every gradient claim. A whole-graph theorem is useful
+when the tape or compiler is part of the statement; an operator theorem is clearer when the claim is
+only about one derivative.
+
+# References
+
+- Ho, Jain, and Abbeel, ["Denoising Diffusion Probabilistic
+  Models"](https://arxiv.org/abs/2006.11239), NeurIPS 2020.
+- Baydin et al., ["Automatic Differentiation in Machine Learning: a
+  Survey"](https://jmlr.org/papers/v18/17-468.html), JMLR 2018.
+- Linnainmaa, ["Taylor Expansion of the Accumulated Rounding
+  Error"](https://doi.org/10.1007/BF01931367), BIT Numerical Mathematics, 1976.

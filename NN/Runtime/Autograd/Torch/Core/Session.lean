@@ -8,6 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Torch.Core.Types
 public import NN.Floats.IEEEExec.Exec32.Compare
+public import NN.Backend.Report
 
 /-!
 # Eager Session and CUDA Bridge
@@ -186,24 +187,73 @@ Notes:
 structure EagerSession (α : Type) where
   /-- Session options controlling backend/device/kernel behavior. -/
   opts : Options
-  /-- CPU eager tape used when `opts.useGpu = false`. -/
+  /-- CPU eager tape used when `Options.device opts = .cpu`. -/
   tape : IO.Ref (Runtime.Autograd.Tape α)
-  /-- CUDA eager tape used when `opts.useGpu = true`. -/
+  /-- CUDA eager tape used when `Options.device opts = .cuda`. -/
   cudaTape : IO.Ref (Runtime.Autograd.Cuda.Tape)
   /-- Map from tape leaf ids to trainable parameter objects. -/
   paramsByLeaf : IO.Ref (Std.HashMap Nat (AnyParam α))
   /-- Non-differentiable integer inputs for dynamic indexing operations. -/
   nats : IO.Ref (Array Nat)
+  /-- Accepted capsules already reported for this session, in first-use order. -/
+  selectedBackends : IO.Ref (List NN.Backend.AcceptedKernel)
 
 namespace EagerSession
 
+/-- Select and validate the capsule that corresponds to this eager session's concrete executor. -/
+def selectedCapsule {α : Type} (s : EagerSession α) (op : NN.Backend.BackendOp) :
+    IO NN.Backend.KernelCapsule := do
+  let planned ←
+    match s.opts.planBackendOp op with
+    | .ok planned => pure planned
+    | .error msg => throw <| IO.userError s!"torch: backend planning failed for `{op.name}`: {msg}"
+  let capsule := planned.capsule
+  if s.opts.usesCuda then
+    unless capsule.provider == NN.Backend.Provider.nativeCuda &&
+        capsule.device == NN.Backend.Device.cuda do
+      throw <| IO.userError <|
+        s!"torch: CUDA op `{op.name}` selected capsule `{capsule.name}`, " ++
+          "but this eager path is wired to native CUDA"
+  else
+    unless capsule.provider == NN.Backend.Provider.reference &&
+        capsule.device == NN.Backend.Device.cpu do
+      throw <| IO.userError <|
+        s!"torch: CPU op `{op.name}` selected capsule `{capsule.name}`, " ++
+          "but this eager path is wired to the portable reference provider"
+  let selected ← s.selectedBackends.get
+  unless selected.any (fun old => old.capsule.sameIdentity capsule) do
+    s.selectedBackends.set (selected ++ [planned])
+    if s.opts.showBackend then
+      let row := NN.Backend.KernelAudit.ofPlannedKernel
+        { op := planned.op, capsule := planned.capsule }
+      for line in row.detailedReportLines do
+        IO.println line
+  pure capsule
+
+/-- Accepted capsules actually selected by this eager session. -/
+def backendSelections {α : Type} (s : EagerSession α) : IO (List NN.Backend.AcceptedKernel) :=
+  s.selectedBackends.get
+
 /-- Allocate a fresh eager session with an empty tape and empty side tables. -/
 def new {α : Type} (opts : Options := {}) : IO (EagerSession α) := do
+  try
+    opts.validateForExecution
+  catch e =>
+    throw <| IO.userError s!"torch eager session: {e.toString}"
   let tape ← IO.mkRef Runtime.Autograd.Tape.empty
   let cudaTape ← IO.mkRef Runtime.Autograd.Cuda.Tape.empty
   let paramsByLeaf ← IO.mkRef (Std.HashMap.emptyWithCapacity)
   let nats ← IO.mkRef #[]
-  pure { opts := opts, tape := tape, cudaTape := cudaTape, paramsByLeaf := paramsByLeaf, nats := nats }
+  let selectedBackends ← IO.mkRef ([] : List NN.Backend.AcceptedKernel)
+  if opts.showBackend then
+    IO.println "[TorchLean] backend capsules used:"
+  pure
+    { opts := opts
+      tape := tape
+      cudaTape := cudaTape
+      paramsByLeaf := paramsByLeaf
+      nats := nats
+      selectedBackends := selectedBackends }
 
 /-- Force-free a CUDA buffer allocation; the external finalizer is safe to call twice. -/
 def releaseCudaBuffer (b : Runtime.Autograd.Cuda.Buffer) : IO Unit := do
@@ -434,11 +484,13 @@ def detach {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) {sh : Sh
 def randUniform {α : Type} [Context α] [CudaBridge.TensorConv α]
     (s : EagerSession α) {sh : Shape} [DecidableEq Shape]
     (seed : Nat) (name : Option String := none) : IO (TensorRef α sh) := do
+  let _ ← s.selectedCapsule .randUniform
   if Options.device s.opts == .cuda then
     let t0 ← s.cudaTape.get
     let counter := t0.size
     let key := Runtime.Autograd.TorchLean.Random.keyOf seed counter
-    let n32 := UInt32.ofNat (Shape.size sh)
+    let n32 ← Runtime.Autograd.okOrThrow <|
+      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Shape.size sh)
     let buf := Runtime.Autograd.Cuda.Buffer.randUniform n32 key
     let any : Runtime.Autograd.Cuda.AnyBuffer := { s := sh, buf := buf }
     let (t1, id) :=
@@ -457,6 +509,7 @@ def bernoulliMask {α : Type} [Context α] [CudaBridge.TensorConv α]
     (s : EagerSession α) {sh : Shape} [DecidableEq Shape]
     (keepProb : TensorRef α Shape.scalar) (seed : Nat) (name : Option String := none) :
     IO (TensorRef α sh) := do
+  let _ ← s.selectedCapsule .bernoulliMask
   let kpT ← getValue (α := α) s (sh := Shape.scalar) keepProb
   let keepProbVal : α :=
     match kpT with
@@ -465,7 +518,8 @@ def bernoulliMask {α : Type} [Context α] [CudaBridge.TensorConv α]
     let t0 ← s.cudaTape.get
     let counter := t0.size
     let key := Runtime.Autograd.TorchLean.Random.keyOf seed counter
-    let n32 := UInt32.ofNat (Shape.size sh)
+    let n32 ← Runtime.Autograd.okOrThrow <|
+      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Shape.size sh)
     let keepF ← CudaBridge.TensorConv.toFloat (α := α) keepProbVal
     let buf := Runtime.Autograd.Cuda.Buffer.bernoulliMask n32 keepF key
     let any : Runtime.Autograd.Cuda.AnyBuffer := { s := sh, buf := buf }

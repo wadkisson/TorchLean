@@ -43,14 +43,14 @@ def containsWithTol (u lo hi tol : Float) : Bool :=
 def getYorT (j : Json) : Except String Float := do
   let o ← NN.API.Json.expectObjE "dataset point" j
   match Std.TreeMap.Raw.get? o "y" with
-  | some _ => NN.Verification.Json.expectFieldFloatE "dataset point" "y" j
-  | none => NN.Verification.Json.expectFieldFloatE "dataset point" "t" j
+  | some _ => NN.Verification.Json.expectFieldFiniteFloatE "dataset point" "y" j
+  | none => NN.Verification.Json.expectFieldFiniteFloatE "dataset point" "t" j
 
 /-- Parse one dataset point as `(x, y-or-t, u)`. -/
 def parsePoint (j : Json) : Except String Point := do
-  let x ← NN.Verification.Json.expectFieldFloatE "dataset point" "x" j
+  let x ← NN.Verification.Json.expectFieldFiniteFloatE "dataset point" "x" j
   let yOrT ← getYorT j
-  let u ← NN.Verification.Json.expectFieldFloatE "dataset point" "u" j
+  let u ← NN.Verification.Json.expectFieldFiniteFloatE "dataset point" "u" j
   pure { x := x, yOrT := yOrT, u := u }
 
 /-- Load one named dataset section into checked PINN sample points. -/
@@ -67,4 +67,3 @@ def loadSection (path : String) (sectionName : String) : IO (Array Point) := do
   pure out
 
 end NN.Verification.PINN.Dataset
-

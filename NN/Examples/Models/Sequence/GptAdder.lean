@@ -4,11 +4,11 @@ Released under MIT license as described in the file LICENSE.
 Authors: TorchLean Team
 
 CUDA-only minGPT-style addition walkthrough:
-  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --optim adam --lr 0.005 --a 7 --b 8
-  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --optim sgd --lr 0.05 --a 7 --b 8
+  lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1 --optim adam --lr 0.005 --a 7 --b 8
+  lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1 --optim sgd --lr 0.05 --a 7 --b 8
 
 Interactive addition REPL:
-  lake exe -K cuda=true torchlean gpt_adder --cuda --steps 1 --interactive
+  lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1 --interactive
 -/
 
 module
@@ -37,7 +37,7 @@ loop:
 * evaluation greedily completes every one-digit addition problem.
 
 Performance note: this uses the eager CUDA runtime, not a persistent CUDA graph.
-The heavy tensor operations run on the GPU, including fused attention when `--fast-kernels` is on,
+The heavy tensor operations run on the GPU, including fused attention,
 but each step still records a fresh autograd tape and synchronizes parameter refs through the
 current scalar training bridge. This is the correctness-facing example; full PyTorch-style
 throughput requires persistent device parameters plus compiled/fused graph execution.
@@ -593,7 +593,7 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runCudaEagerFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "minGPT-style addition training")
     (k := fun opts rest => do
-      if !opts.useGpu then
+      if !opts.usesCuda then
         throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
       let (trainOpts, rest) ← ModelZoo.orThrow exeName <| AdderOptions.parse rest
       CLI.requireNoArgs exeName rest

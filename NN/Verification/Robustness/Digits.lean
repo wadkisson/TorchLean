@@ -16,6 +16,7 @@ public import NN.Runtime.External.Process
 public import NN.Verification.Robustness.TopLabel
 public import NN.Verification.TorchLean.Compile
 public import NN.Verification.Util.Json
+public import NN.Verification.Util.Tensor
 import Lean.Data.Json
 
 /-!
@@ -208,12 +209,12 @@ def loadWeights (path : String) : IO (Spec.LinearSpec Float inDim outDim) := do
         match o.get? "layers.0.bias" with
         | some jb => pure jb
         | none => throw <| IO.userError "Missing weights key: layers.0.bias"
-      let some wFn := Import.PyTorch.parseFloatMatrix outDim inDim wJ
+      let wArr ← NN.Verification.Json.expectFiniteFloatMatrix wJ "layers.0.weight"
+      let bArr ← NN.Verification.Json.expectFiniteFloatArray bJ "layers.0.bias"
+      let some w := NN.Verification.Util.Tensor.matOfArray outDim inDim wArr
         | throw <| IO.userError "layers.0.weight must be a float matrix of shape [10][64]"
-      let some bFn := Import.PyTorch.parseFloatVec outDim bJ
+      let some b := NN.Verification.Util.Tensor.vecOfArray outDim bArr
         | throw <| IO.userError "layers.0.bias must be a float array of length 10"
-      let w : Tensor Float WShape := Spec.matrixTensor wFn
-      let b : Tensor Float bShape := Spec.vectorTensor bFn
       pure { weights := w, bias := b }
   | _ =>
       throw <| IO.userError "Weights JSON must be an object"
@@ -230,9 +231,9 @@ def loadDataset (path : String) : IO (Array (Tensor Float xShape × Nat)) := do
     let eo ← expectObj e "dataset example"
     let xJ ← expectField eo "x" "dataset example"
     let y ← expectFieldNat eo "y" "dataset example"
-    let some vec := Import.PyTorch.parseFloatVec inDim xJ
+    let vec ← NN.Verification.Json.expectFiniteFloatArray xJ "dataset example.x"
+    let some xT := NN.Verification.Util.Tensor.vecOfArray inDim vec
       | throw <| IO.userError "Dataset example 'x' must be a float array of length 64"
-    let xT : Tensor Float xShape := Spec.vectorTensor vec
     out := out.push (xT, y)
   pure out
 

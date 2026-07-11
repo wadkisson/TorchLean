@@ -136,7 +136,7 @@ def checkIBPNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) 
     let okNode ← checkIBPNode g ps cert id tol
     ok := ok && okNode
   if ok then
-    IO.println "[IBPNodeCert] certificate verified: all nodes match Lean propagation."
+    IO.println "[IBPNodeCert] artifact replay matched Lean propagation at every node."
   pure ok
 
 end NN.Verification.IBPNodeCert

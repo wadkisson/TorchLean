@@ -22,6 +22,7 @@ public import NN.API.Text.Bpe
 public import NN.MLTheory.CROWN.Flatbox
 public import NN.MLTheory.CROWN.Graph
 public import NN.Verification.TorchLean.Compile
+public import NN.Backend.Report
 public import NN.API.Public.Facade.Base.Root
 
 /-!
@@ -109,6 +110,10 @@ abbrev Device := _root_.Runtime.Autograd.Torch.Device
 
 namespace Device
 
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.auto]
+abbrev auto : Device :=
+  _root_.Runtime.Autograd.Torch.Device.auto
+
 @[inherit_doc _root_.Runtime.Autograd.Torch.Device.cpu]
 abbrev cpu : Device :=
   _root_.Runtime.Autograd.Torch.Device.cpu
@@ -116,6 +121,34 @@ abbrev cpu : Device :=
 @[inherit_doc _root_.Runtime.Autograd.Torch.Device.cuda]
 abbrev cuda : Device :=
   _root_.Runtime.Autograd.Torch.Device.cuda
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.rocm]
+abbrev rocm : Device :=
+  _root_.Runtime.Autograd.Torch.Device.rocm
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.metal]
+abbrev metal : Device :=
+  _root_.Runtime.Autograd.Torch.Device.metal
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.wasm]
+abbrev wasm : Device :=
+  _root_.Runtime.Autograd.Torch.Device.wasm
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.tpu]
+abbrev tpu : Device :=
+  _root_.Runtime.Autograd.Torch.Device.tpu
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.trainium]
+abbrev trainium : Device :=
+  _root_.Runtime.Autograd.Torch.Device.trainium
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.custom]
+abbrev custom : Device :=
+  _root_.Runtime.Autograd.Torch.Device.custom
+
+@[inherit_doc _root_.Runtime.Autograd.Torch.Device.external]
+abbrev external : Device :=
+  _root_.Runtime.Autograd.Torch.Device.external
 
 end Device
 
@@ -136,27 +169,6 @@ def runFloat
     (printOk : Bool := true) : IO UInt32 :=
   NN.API.Common.runFloat exeName args banner k printOk
 
-@[inherit_doc NN.API.Common.runSelectedOrFloat]
-abbrev runSelectedOrFloat := NN.API.Common.runSelectedOrFloat
-
-@[inherit_doc NN.API.Common.runSelectedOrFloatSimple]
-abbrev runSelectedOrFloatSimple := NN.API.Common.runSelectedOrFloatSimple
-
-@[inherit_doc NN.API.Common.requestsCompiledBackend]
-abbrev requestsCompiledBackend := NN.API.Common.requestsCompiledBackend
-
-@[inherit_doc NN.API.Common.cudaArgs]
-abbrev cudaArgs := NN.API.Common.cudaArgs
-
-@[inherit_doc NN.API.Common.requireEagerBackend]
-abbrev requireEagerBackend := NN.API.Common.requireEagerBackend
-
-@[inherit_doc NN.API.Common.cudaEagerArgs]
-abbrev cudaEagerArgs := NN.API.Common.cudaEagerArgs
-
-@[inherit_doc NN.API.Common.runNormalizedFloat]
-abbrev runNormalizedFloat := NN.API.Common.runNormalizedFloat
-
 @[inherit_doc NN.API.Common.runCudaFloat]
 abbrev runCudaFloat := NN.API.Common.runCudaFloat
 
@@ -167,7 +179,7 @@ abbrev runCudaEagerFloat := NN.API.Common.runCudaEagerFloat
 Parse the standard TorchLean runtime flags and return the resulting `Options`.
 
 Non-polymorphic sibling of `Runtime.withOptions`: examples that always run at `Float` can still
-parse `--cpu`, `--cuda`, `--backend`, and `--dtype` without exposing a polymorphic callback.
+parse `--device`, `--backend`, and `--dtype` without exposing a polymorphic callback.
 -/
 def parseArgs (args : List String) (defaultDType : DType := .float) :
     Except String (Options × List String) := do
@@ -175,46 +187,28 @@ def parseArgs (args : List String) (defaultDType : DType := .float) :
     NN.API.TorchLean.Module.ExecConfig.parseAndStripWithDefaultDType args defaultDType
   pure (NN.API.TorchLean.Module.ExecConfig.toOptions cfg, rest)
 
-/--
-Run a scalar-polymorphic example under the dtype/backend selected by the usual TorchLean CLI flags.
+namespace BackendContracts
 
-The callback receives:
-- `cast`, for turning Float literals into the selected executable scalar type,
-- `rest`, the arguments left after runtime flags are stripped.
+/-- Backend-contract profile corresponding to the selected runtime options. -/
+def profileForOptions (opts : Options) : NN.Backend.BackendProfile :=
+  opts.backendProfile
 
-Prefer `Trainer` for model training. Use this for demos that really need the selected scalar type in
-their own code, for example small autograd/runtime walkthroughs.
--/
-def withSelected
-    (args : List String)
-    (k :
-      ∀ {α : Type}, [SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
-        [Scalar α] → (cast : Float → α) → (rest : List String) → IO Unit) :
-    IO Unit :=
-  NN.API.TorchLean.Module.withRuntime args
-    (fun {α} _ _ _ _ cast _opts rest => k (α := α) cast rest)
+/-- Plan operations under the runtime-selected backend-contract profile. -/
+def planReport (opts : Options) (ops : List NN.Backend.BackendOp) : Except String String :=
+  (profileForOptions opts).planReport ops
 
-/--
-Run a scalar-polymorphic example under the selected runtime when the callback does not need a
-Float-cast function.
+/-- Print the selected backend capsules for operations. -/
+def printPlan (opts : Options) (ops : List NN.Backend.BackendOp) : IO Unit := do
+  match planReport opts ops with
+  | .ok report => IO.println report
+  | .error msg => IO.println s!"backend plan unavailable: {msg}"
 
-Prefer `Runtime.withOptionsScalar` when the callback also needs parsed runtime options. This
-exists for the rare case where only the selected scalar/backend instances and remaining CLI
-arguments matter.
--/
-def withSelectedScalar
-    (args : List String)
-    (k :
-      ∀ {α : Type}, [SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
-        [Scalar α] → (rest : List String) → IO Unit) :
-    IO Unit :=
-  NN.API.TorchLean.Module.withRuntime args
-    (fun {α} _ _ _ _ _cast _opts rest => k (α := α) rest)
+end BackendContracts
 
 /--
 Run an example under the selected runtime and pass through the parsed runtime options.
 
-Use this when an example needs to inspect `--backend`, `--cuda`, or similar flags after TorchLean
+Use this when an example needs to inspect `--backend`, `--device`, or similar flags after TorchLean
 has selected the scalar backend.
 -/
 def withOptions
@@ -241,7 +235,7 @@ def withOptionsScalar
 /--
 Run a verification or demo command under the selected runtime dtype.
 
-Banner-printing sibling of `withSelected`; it matches the convention used by
+Banner-printing runtime dispatcher matching the convention used by
 `lake exe verify -- ...` commands.
 -/
 def runWithDType

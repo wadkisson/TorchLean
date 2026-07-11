@@ -307,7 +307,7 @@ def effectiveCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
     (steps requested : Nat) : Nat :=
   if requested != 0 then
     requested
-  else if opts.useGpu && steps >= 1000 then
+  else if opts.usesCuda && steps >= 1000 then
     Nat.max 1 (steps / 10)
   else
     0
@@ -339,7 +339,7 @@ slope would cross zero before the requested training horizon.
 def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
     (watchEvery totalSteps done : Nat) (state? : Option CudaMemWatchState) :
     IO (Option CudaMemWatchState) := do
-  if !opts.useGpu || watchEvery = 0 || (done != 0 && done % watchEvery != 0) then
+  if !opts.usesCuda || watchEvery = 0 || (done != 0 && done % watchEvery != 0) then
     pure state?
   else
     let stats ← _root_.Runtime.Autograd.Cuda.Buffer.allocatorStatsWithToken (UInt32.ofNat done)
@@ -381,54 +381,10 @@ def adamOptimizer {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
     (lr := cast lr) (beta1 := cast 0.9) (beta2 := cast 0.999) (epsilon := cast 1e-8)
 
 /--
-Run an executable with the standard TorchLean runtime parser, using the polymorphic scalar path by
-default and switching to the `Float` path when requested.
-
-This is the common shape for public examples that support all executable scalar backends, but need
-the `Float` path for CUDA bridges, decoded reports, or JSON artifacts whose metrics are stored as
-`Float`.
--/
-def runSelectedOrFloat
-    (exeName : String) (args : List String)
-    (preferFloat : List String → Bool)
-    (banner : TorchLean.Options → String)
-    (anyK :
-      ∀ {α : Type}, [Semantics.Scalar α] → [DecidableEq Spec.Shape] → [ToString α] →
-        [Runtime.Scalar α] →
-        (cast : Float → α) → (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (floatK : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (printOk : Bool := true) : IO UInt32 := do
-  let runOpts : TorchLean.Module.RunOptions :=
-    { banner? := some banner, printOk := printOk }
-  if preferFloat args then
-    TorchLean.Module.run exeName args (.float floatK) runOpts
-  else
-    TorchLean.Module.run exeName args (.any anyK) runOpts
-
-/--
-Run an executable on either the selected scalar backend or the concrete `Float` path when the
-generic branch does not need an explicit `Float → α` cast helper.
--/
-def runSelectedOrFloatSimple
-    (exeName : String) (args : List String)
-    (preferFloat : List String → Bool)
-    (banner : TorchLean.Options → String)
-    (anyK :
-      ∀ {α : Type}, [Semantics.Scalar α] → [DecidableEq Spec.Shape] → [ToString α] →
-        [Runtime.Scalar α] →
-        (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (floatK : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (printOk : Bool := true) : IO UInt32 :=
-  runSelectedOrFloat exeName args preferFloat banner
-    (fun {α} _ _ _ _ _cast opts rest => anyK (α := α) opts rest)
-    floatK printOk
-
-/--
 Run an executable on the concrete `Float` runtime path.
 
 We use this for runnable training commands that produce Float-valued artifacts: CPU/CUDA eager
-execution, native kernels, and JSON loss curves. Commands that need to expose another scalar backend
-can use `runSelectedOrFloat`.
+execution, native kernels, and JSON loss curves.
 -/
 def runFloat
     (exeName : String) (args : List String)
@@ -438,77 +394,27 @@ def runFloat
   TorchLean.Module.run exeName args (.float k)
     { banner? := some banner, printOk := printOk }
 
-/-! ### Runtime-flag normalization -/
-
-/-- Detect `--backend compiled` in either `--backend=compiled` or split-flag form. -/
-def requestsCompiledBackend : List String → Bool
-  | "--backend=compiled" :: _ => true
-  | "--backend" :: "compiled" :: _ => true
-  | _ :: rest => requestsCompiledBackend rest
-  | [] => false
-
-/--
-Reject `--cpu` and add CUDA/runtime flags expected by GPU-first commands.
-
-This helper only rewrites command-line intent before the standard runtime parser runs. It does not
-change the lower-level runtime semantics.
--/
-def cudaArgs
-    (exeName : String)
-    (args : List String)
-    (extraFlags : List String := ["--fast-kernels"]) :
-    Except String (List String) := do
-  if args.contains "--cpu" then
-    throw s!"{exeName} is GPU-only; remove --cpu"
-  let args := if args.contains "--cuda" then args else "--cuda" :: args
-  pure <| extraFlags.foldl
-    (fun acc flag => if acc.contains flag then acc else flag :: acc)
-    args
-
-/-- Reject the proof-compiled backend for commands that require eager runtime execution. -/
-def requireEagerBackend (exeName : String) (args : List String) :
-    Except String Unit := do
-  if requestsCompiledBackend args then
-    throw s!"{exeName} requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
-
-/-- Reject compiled backend and force the CUDA-first flags expected by eager GPU examples. -/
-def cudaEagerArgs
-    (exeName : String)
-    (args : List String)
-    (extraFlags : List String := ["--fast-kernels"]) :
-    Except String (List String) := do
-  requireEagerBackend exeName args
-  cudaArgs exeName args extraFlags
-
-/--
-Run a Float-only command after normalizing its runtime flags.
-
-GPU-first examples use this to keep the public `Runtime.runFloat` path while inserting required
-CUDA/eager flags before the standard parser runs.
--/
-def runNormalizedFloat
-    (exeName : String)
-    (args : List String)
-    (normalize : List String → Except String (List String))
-    (banner : TorchLean.Options → String)
-    (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (printOk : Bool := true) : IO UInt32 := do
-  match normalize args with
-  | .error e =>
-      IO.eprintln s!"{exeName}: {e}"
-      pure 1
-  | .ok normalized =>
-      runFloat exeName normalized banner k printOk
-
 /-- Run a Float-only command after forcing CUDA runtime flags. -/
 def runCudaFloat
     (exeName : String)
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (extraFlags : List String := ["--fast-kernels"])
-    (printOk : Bool := true) : IO UInt32 :=
-  runNormalizedFloat exeName args (fun args => cudaArgs exeName args extraFlags) banner k printOk
+    (extraFlags : List String := [])
+    (printOk : Bool := true) : IO UInt32 := do
+  let requestsCpu := args.any fun arg => arg == "--device=cpu"
+    || (args.zip (args.drop 1)).any fun pair => pair == ("--device", "cpu")
+  if requestsCpu then
+    IO.eprintln s!"{exeName}: this command is GPU-only; remove --device cpu"
+    return 1
+  let requestsCuda := args.any fun arg => arg == "--device=cuda" || arg == "--device=gpu"
+    || (args.zip (args.drop 1)).any fun pair =>
+      pair == ("--device", "cuda") || pair == ("--device", "gpu")
+  let args := if requestsCuda then args else "--device" :: "cuda" :: args
+  let args := extraFlags.foldl
+    (fun acc flag => if acc.contains flag then acc else flag :: acc)
+    args
+  runFloat exeName args banner k printOk
 
 /-- Run a Float-only command after forcing CUDA eager-runtime flags. -/
 def runCudaEagerFloat
@@ -516,9 +422,14 @@ def runCudaEagerFloat
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (extraFlags : List String := ["--fast-kernels"])
-    (printOk : Bool := true) : IO UInt32 :=
-  runNormalizedFloat exeName args (fun args => cudaEagerArgs exeName args extraFlags) banner k printOk
+    (extraFlags : List String := [])
+    (printOk : Bool := true) : IO UInt32 := do
+  let requestsCompiled := args.any fun arg => arg == "--backend=compiled"
+    || (args.zip (args.drop 1)).any fun pair => pair == ("--backend", "compiled")
+  if requestsCompiled then
+    IO.eprintln s!"{exeName}: this command requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
+    return 1
+  runCudaFloat exeName args banner k extraFlags printOk
 
 /-! ### Common model-run parsers -/
 
@@ -1054,9 +965,6 @@ def runWithRuntimeDType (title : String) (args : List String)
   match (← NN.API.DType.withRuntime dtype (fun {α} _ _ _ _ => k (α := α))) with
   | .ok () => pure ()
   | .error msg => throw <| IO.userError msg
-
-/-- Entry-point alias for runnable binaries that need runtime float-literal injection. -/
-abbrev mainWithRuntimeDType := runWithRuntimeDType
 
 end Common
 

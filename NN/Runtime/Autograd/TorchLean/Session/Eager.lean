@@ -649,7 +649,7 @@ Fully-connected (affine) layer on vectors: `y = w·x + b` (eager backend).
 PyTorch analogue: `torch.nn.functional.linear` (with weight shape `(outDim, inDim)`).
 -/
 def linear {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Mul α] [Zero α] [DecidableEq
-  Shape] [_root_.Runtime.Autograd.FastKernels.FastMatmul α]
+  Shape]
   {inDim outDim : Nat}
   (w : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outDim (.dim inDim .scalar)))
   (b : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outDim .scalar))

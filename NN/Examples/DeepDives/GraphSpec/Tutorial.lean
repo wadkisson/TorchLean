@@ -70,7 +70,8 @@ def usage : String :=
     , "Options:"
     , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
-    , "  --cpu | --cuda"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --show-backend                    print backend capsules as they execute"
     ]
 
 /-! ## Small architecture terms that should typecheck -/

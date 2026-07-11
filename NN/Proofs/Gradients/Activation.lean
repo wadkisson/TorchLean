@@ -312,9 +312,6 @@ theorem logistic_deriv_correct (x : ℝ) :
     (Activation.Math.logisticDerivSpec x) x
   exact hdiv''
 
-
-lemma mathfunc_tanh_eq_rtanh (x : ℝ) : MathFunctions.tanh x = Real.tanh x := rfl
-
 lemma tanh_exp_eq (x : ℝ) :
   Real.tanh x = (Real.exp x - Real.exp (-x)) / (Real.exp x + Real.exp (-x)) := by
   calc

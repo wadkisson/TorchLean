@@ -96,13 +96,13 @@ def maxPool2dMultiSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 : kH ≠ 
         Tensor.scalar (best?.getD 0))))
 
 /--
-Forward-mode JVP for padded hard max-pooling.
+Selected-branch linearization for padded hard max-pooling.
 
 Padding cells are ignored exactly as in `maxPool2dMultiSpecPad`, so the tangent is taken from the
 primal winner among real input locations only. If a window contains no real input cells, the
 forward value and tangent are both `0`.
 -/
-def maxPool2dMultiJvpSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 : kH ≠ 0}
+def maxPool2dMultiLinearizationSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 : kH ≠ 0}
     {h2 : kW ≠ 0} {hStride : stride ≠ 0}
     (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
     (input tangent : MultiChannelImage inC inH inW α) :

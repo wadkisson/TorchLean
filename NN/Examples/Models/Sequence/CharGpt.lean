@@ -30,8 +30,8 @@ scripts, but this command does not precompute a fixed window table.
 Quick run:
 
 ```bash
-lake build -R -K cuda=true torchlean:exe
-lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0
+lake -R -K cuda=true build torchlean:exe
+lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0
 ```
 
 `chargpt` is the character-tokenizer teaching path. It rebuilds deterministic training windows from
@@ -69,10 +69,10 @@ def usage : String :=
     [ "torchlean chargpt: character-level GPT training"
     , ""
     , "Usage:"
-    , "  lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare [flags]"
+    , "  lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare [flags]"
     , ""
     , "Quick check:"
-    , "  lake exe -K cuda=true torchlean chargpt --cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0"
+    , "  lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0"
     , ""
     , "Notes:"
     , "  - CUDA is required; CPU eager mode is too slow for this path."
@@ -133,10 +133,10 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runFloat exeName args
     (banner := fun _ => s!"{exeName}: char-level GPT training")
     (k := fun opts rest => do
-      if !opts.useGpu then
-        throw <| IO.userError s!"{exeName}: use --cuda (CPU char-gpt is extremely slow in eager mode)"
+      if !opts.usesCuda then
+        throw <| IO.userError s!"{exeName}: use --device cuda (CPU char-gpt is extremely slow in eager mode)"
       let (corpus, rest) ← takeInputText rest
-      let defaultSteps : Nat := if opts.useGpu then 1 else 0
+      let defaultSteps : Nat := if opts.usesCuda then 1 else 0
       let (train, rest) ← ModelZoo.orThrow exeName <|
         text.BatchedCheckpointedWindowedTrainGenerationOptions.parse
           exeName rest defaultLogJson defaultSteps 0.0005 1 1 1

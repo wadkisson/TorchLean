@@ -9,7 +9,7 @@ Notes:
 - `Cuda.Buffer` is an opaque contiguous float32 buffer (device memory when built with `-K cuda=true`,
   otherwise a CPU stub buffer).
 - These kernels keep their shape APIs explicit: dimensions are passed as `UInt32`.
-- Build with `lake build -K cuda=true` to use real CUDA kernels at runtime; otherwise the stub
+- Build with `lake -R -K cuda=true build` to use real CUDA kernels at runtime; otherwise the stub
   implementation runs on CPU for portability.
 -/
 
@@ -69,6 +69,15 @@ Output is length `rows` (max across the columns for each row).
 -/
 @[extern "torchlean_cuda_buffer_reduce_max_by_row"]
 opaque reduceMaxByRow (b : Buffer) (rows cols : UInt32) : Buffer
+
+/--
+Stable row-wise hard-masked softmax for flat `(rows, cols)` buffers.
+
+The row maximum and denominator are computed only from entries whose mask value is nonzero. Blocked
+entries are exactly zero in the output. A row with no allowed entries is defined to be all zeros.
+-/
+@[extern "torchlean_cuda_buffer_hard_masked_softmax_by_row"]
+opaque hardMaskedSoftmaxByRow (scores mask : Buffer) (rows cols : UInt32) : Buffer
 
 /-- Concatenate two 1D buffers `a` (length `n`) and `b` (length `m`). -/
 @[extern "torchlean_cuda_buffer_concat1d"]
@@ -230,31 +239,32 @@ Inputs are row-major buffers with shapes:
 - `Q`, `K`, `V`: `(batch, n, d)`, where `batch` is usually the number of heads,
 - `mask`: `(batch, n, n)` encoded as `0.0/1.0` when `hasMask != 0`; otherwise ignored.
 
-Output has shape `(batch, n, d)` and computes the same no-dropout masked attention semantics as:
-`hardMaskedSoftmax((Q Kᵀ) * scale, mask) V`. Blocked mask entries contribute zero softmax
-numerator; no finite sentinel is inserted.
+Output has shape `(batch, n, d)`.
 
-This is a fused native runtime primitive. The proof layer contract is `Spec.flashAttention` in
-`NN/Spec/Layers/FlashAttention.lean`; the native kernel is part of the CUDA runtime boundary.
+Both the native CUDA and optional LibTorch providers use hard-mask semantics: blocked mask entries
+contribute zero softmax numerator. The LibTorch provider has separate extern names because it is an
+external implementation and, for its backward entry point, an external autograd boundary.
 -/
 @[extern "torchlean_cuda_buffer_flash_attention_fwd"]
 opaque flashAttentionFwd
     (Q K V mask : Buffer) (hasMask batch n d : UInt32) (scale : Float) : Buffer
 
-/-- Fused VJP component `∂L/∂Q` for `flashAttentionFwd`. -/
-@[extern "torchlean_cuda_buffer_flash_attention_bwd_q"]
-opaque flashAttentionBwdQ
-    (Q K V mask dOut : Buffer) (hasMask batch n d : UInt32) (scale : Float) : Buffer
+/-- Fused VJP `(dQ, dK, dV)` for `flashAttentionFwd`. -/
+@[extern "torchlean_cuda_buffer_flash_attention_bwd"]
+opaque flashAttentionBwd
+    (Q K V mask dOut : Buffer) (hasMask batch n d : UInt32) (scale : Float) :
+    Buffer × Buffer × Buffer
 
-/-- Fused VJP component `∂L/∂K` for `flashAttentionFwd`. -/
-@[extern "torchlean_cuda_buffer_flash_attention_bwd_k"]
-opaque flashAttentionBwdK
-    (Q K V mask dOut : Buffer) (hasMask batch n d : UInt32) (scale : Float) : Buffer
+/-- Optional LibTorch SDPA forward provider. Built only with `-K cuda=true -K libtorch=true`. -/
+@[extern "torchlean_libtorch_sdpa_fwd"]
+opaque libTorchSDPAFwd
+    (Q K V mask : Buffer) (hasMask batch n d : UInt32) (scale : Float) : IO Buffer
 
-/-- Fused VJP component `∂L/∂V` for `flashAttentionFwd`. -/
-@[extern "torchlean_cuda_buffer_flash_attention_bwd_v"]
-opaque flashAttentionBwdV
-    (Q K V mask dOut : Buffer) (hasMask batch n d : UInt32) (scale : Float) : Buffer
+/-- Optional LibTorch SDPA VJP provider. Built only with `-K cuda=true -K libtorch=true`. -/
+@[extern "torchlean_libtorch_sdpa_bwd"]
+opaque libTorchSDPABwd
+    (Q K V mask dOut : Buffer) (hasMask batch n d : UInt32) (scale : Float) :
+    IO (Buffer × Buffer × Buffer)
 
 /--
 Row-major transpose of a 2D buffer.

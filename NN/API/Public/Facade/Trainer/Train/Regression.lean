@@ -49,7 +49,7 @@ def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
       NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO β := do
   let opts := run.toOptions
-  if opts.useGpu && run.dtype != .float then
+  if opts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
   match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ => do

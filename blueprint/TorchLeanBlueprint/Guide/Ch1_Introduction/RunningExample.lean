@@ -284,8 +284,8 @@ sentence.
 - Bound artifact: "these intervals or affine bounds were produced for this graph and input box."
 - Lean theorem: "under the theorem hypotheses, accepted bounds imply the stated semantic property."
 
-The point of TorchLean is not that every line above is automatically proved. The point is that the
-lines can be kept close enough that a reader can see which object each claim uses.
+Not every line above is automatically proved. Keeping the artifacts together makes it possible to
+see which object supports each claim and where an additional proof obligation remains.
 
 # References
 

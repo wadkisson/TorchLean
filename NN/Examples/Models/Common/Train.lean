@@ -119,6 +119,8 @@ structure Config (δ : Type) where
   defaultSteps : Nat
   /-- Model description used in banners. -/
   description : String
+  /-- Command-specific data flags, rendered by `--help`. -/
+  dataOptions : List String := []
   /-- Parse data flags, then leave device/training flags for the shared parser. -/
   parseData : List String → Except String (δ × List String)
   /-- Run the actual training body after data, device, and training flags have been parsed. -/
@@ -126,19 +128,26 @@ structure Config (δ : Type) where
 
 /-- Usage text for shared `Trainer.Command.run` model examples. -/
 def usage {δ : Type} (cfg : Config δ) : String :=
-  String.intercalate "\n"
+  let dataSection :=
+    if cfg.dataOptions.isEmpty then []
+    else ["", "Data:"] ++ cfg.dataOptions
+  String.intercalate "\n" <|
     [ s!"{cfg.exeName}: {cfg.description}"
     , ""
     , "Usage:"
-    , s!"  lake exe torchlean {cfg.exeName.drop 10} --cpu [data flags] [training flags]"
-    , s!"  lake exe -K cuda=true torchlean {cfg.exeName.drop 10} --cuda [data flags] [training flags]"
-    , ""
-    , "Common training flags:"
+    , s!"  lake exe torchlean {cfg.exeName.drop 10} [options]"
+    ] ++ dataSection ++
+    [ ""
+    , "Training:"
     , s!"  --steps N          optimizer updates (default: {cfg.defaultSteps})"
     , "  --lr X             learning rate"
     , "  --log PATH|false   write a TrainLog JSON, or disable logging"
     , ""
-    , "Use the file comment for model-specific data flags."
+    , "Runtime:"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --backend eager|compiled"
+    , "  --dtype float|float32|ieee32"
+    , "  --show-backend     print backend capsules as they execute"
     ]
 
 /-- Run a public model-training command. -/

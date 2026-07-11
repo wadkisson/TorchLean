@@ -15,7 +15,7 @@ The output is always `.npy`, optionally accompanied by a small JSON manifest.
 That keeps TorchLean examples and training code simple:
 
     python3 scripts/datasets/torchlean_data_convert.py tensor --input data.pt --key x --output X.npy
-    lake exe -K cuda=true torchlean cnn --cuda --x X.npy --y y.npy --n-total 1000
+    lake exe -K cuda=true torchlean cnn --device cuda --x X.npy --y y.npy --n-total 1000
 """
 
 from __future__ import annotations

@@ -1516,7 +1516,7 @@ def exponentialEpochLR (cfg : LoaderTrainConfig) (base : Float) (gamma : Float) 
   withEpochScheduler cfg (.exponential base gamma)
 
 /--
-Instantiate a runner under explicit Torch options (`backend`, `useGpu`, `fastKernels`, ...).
+Instantiate a runner under explicit Torch options such as `backend` and `requestedDevice`.
 
 This is the recommended entrypoint when you want CUDA eager execution from the training helpers
 without dropping down to `TorchLean.Module` directly.

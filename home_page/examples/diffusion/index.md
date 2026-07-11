@@ -18,7 +18,7 @@ represented, what the denoiser predicts, and what gets saved after a run.
 For a short runtime check, use the CUDA path with a tiny model:
 
 ```bash
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 For a more informative local run, use CUDA if available. The command writes a JSON loss log and a PPM
@@ -27,7 +27,7 @@ image artifact for inspecting both numbers and pixels:
 ```bash
 python3 scripts/datasets/download_example_data.py --cifar10
 
-lake exe -K cuda=true torchlean diffusion --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
   --dataset cifar10 --n-total 800 --steps 50 --hidden-c 8 \
   --log data/model_zoo/diffusion_trainlog.json \
   --sample-ppm data/model_zoo/diffusion_sample.ppm

@@ -65,8 +65,8 @@ Architecture:
 `mamba(seqLen, vocab, stateDim) → linear(stateDim → vocab)` applied at every time step.
 
 The recurrent core is a gated diagonal state-space update implemented with autograd-covered
-TorchLean ops.  Passing `--cuda` to a runner that instantiates this model trains the same parameters
-on the CUDA backend.
+TorchLean ops. Passing `--device cuda` to a runner that instantiates this model trains the same
+parameters on the CUDA backend.
 -/
 def mambaTextLm (cfg : MambaTextConfig) (seqLen : Nat) :
     nn.M (nn.Sequential (mambaTokenMat cfg seqLen) (mambaLogitMat cfg seqLen)) :=

@@ -31,6 +31,19 @@ static std::atomic<uint64_t> g_torchlean_cuda_peak_bytes{0u};
 static std::atomic<uint64_t> g_torchlean_cuda_alloc_count{0u};
 static std::atomic<uint64_t> g_torchlean_cuda_free_count{0u};
 
+// 0 = CPU stub, 1 = native CUDA with a visible device, 2 = native CUDA without one.
+extern "C" LEAN_EXPORT uint32_t torchlean_cuda_runtime_status(uint32_t token) {
+  (void)token;
+  int count = 0;
+  cudaError_t err = cudaGetDeviceCount(&count);
+  if (err != cudaSuccess || count <= 0) {
+    // Clear the runtime error so a diagnostic probe does not poison the next CUDA call.
+    (void)cudaGetLastError();
+    return 2u;
+  }
+  return 1u;
+}
+
 extern "C" void torchlean_cuda_kernels_flush_scratch_cache(void);
 extern "C" void torchlean_cuda_conv_pool_flush_scratch_cache(void);
 extern "C" void torchlean_cuda_blas_flush_scratch_cache(void);

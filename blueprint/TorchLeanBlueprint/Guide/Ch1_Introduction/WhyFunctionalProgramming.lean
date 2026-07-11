@@ -19,9 +19,9 @@ parameters to outputs. A training step is a function from old parameters, data, 
 state, and random generator state to new values. Nothing essential is lost; the difference is that
 every value that matters to a theorem has a name.
 
-This is the main theme of the chapter: state does not disappear. It becomes an argument, a return
-value, or a named boundary. Once state is visible, the guide can ask normal mathematical questions
-about it. Did this step use the old momentum or the new momentum? Was this dropout mask sampled in
+State does not disappear. It becomes an argument, a return value, or a named boundary. Once state is
+visible, ordinary mathematical questions apply. Did this step use the old momentum or the new
+momentum? Was this dropout mask sampled in
 training mode or skipped in evaluation mode? Did this certificate check the payload before or after
 an import conversion? A functional style gives those questions handles.
 
@@ -82,8 +82,8 @@ def batchNormSketch
       (y, newState)
 ```
 
-The sketch is intentionally too small to be a production BatchNorm definition. Its point is the
-shape of the interface: the state that changes is returned. A theorem about evaluation mode can
+This is only the state-changing core of BatchNorm, not a production definition. The important part
+is the interface: the state that changes is returned. A theorem about evaluation mode can
 quantify over `state` without pretending a hidden object field stayed fixed.
 
 # Pure Functions are Mathematical Functions
@@ -186,8 +186,8 @@ and FFI boundaries for native or external systems.
 
 That distinction is part of the trust story. A pure Lean definition can be unfolded in a theorem. An
 `IO` action can be run, tested, and wrapped by a checker, but its external behavior is not proved
-merely because the call is written in Lean syntax. The guide will repeatedly separate "this action
-produced an artifact" from "this theorem says accepted artifacts imply a semantic property."
+merely because the call is written in Lean syntax. "This action produced an artifact" is distinct
+from "this theorem says accepted artifacts imply a semantic property."
 
 # Related Design Ideas
 

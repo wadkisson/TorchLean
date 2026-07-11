@@ -183,7 +183,7 @@ def programWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
         (ss := paramShapes model ++ [σ])
         (programWithMode mode (model := model) (α := α)) allRefs) |>.run sess
     let y ← _root_.Runtime.Autograd.Torch.Internal.EagerSession.getValue (α := α) sess outRef
-    if opts.useGpu then
+    if opts.usesCuda then
       _root_.Runtime.Autograd.Torch.Internal.EagerSession.releaseCudaTapeNonParamValues sess
       sess.cudaTape.set _root_.Runtime.Autograd.Cuda.Tape.empty
       sess.paramsByLeaf.set (Std.HashMap.emptyWithCapacity)

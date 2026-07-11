@@ -150,14 +150,14 @@ data/real/fno/burgers_meta.json
 Build TorchLean with CUDA support:
 
 ```bash
-lake build -R -K cuda=true
+lake -R -K cuda=true build
 ```
 
 Run the trainer:
 
 ```bash
-lake exe -K cuda=true torchlean fno1d_burgers \
-  --cuda --fast-kernels \
+lake -R -K cuda=true exe torchlean fno1d_burgers \
+  --device cuda \
   --steps 700 \
   --lr 0.003 \
   --plot-csv data/real/fno/predictions.csv \
@@ -167,8 +167,8 @@ lake exe -K cuda=true torchlean fno1d_burgers \
 For a short run that exercises the same path:
 
 ```bash
-lake exe -K cuda=true torchlean fno1d_burgers \
-  --cuda --fast-kernels --steps 50 --log false
+lake -R -K cuda=true exe torchlean fno1d_burgers \
+  --device cuda --steps 50 --log false
 ```
 
 The command prints the device path, grid/model constants, train/test rows, and loss reports. With

@@ -1,0 +1,115 @@
+/-
+Copyright (c) 2026 TorchLean
+Released under MIT license as described in the file LICENSE.
+Authors: TorchLean Team
+-/
+
+module
+
+public import NN.Backend.Planner
+
+/-!
+# Backend Plan Audits
+
+Inspection data for contract-carrying backend plans.
+
+The planner chooses capsules. The audit layer records what that choice means for trust boundaries:
+which provider was selected, which device it targets, which spec it claims to refine, and whether
+the plan crosses a trusted-external boundary.
+-/
+
+@[expose] public section
+
+namespace NN
+namespace Backend
+
+namespace KernelCapsule
+
+/-- Whether this capsule crosses a trusted external boundary. -/
+def isTrustedExternal (c : KernelCapsule) : Bool :=
+  c.trustLevel == .trustedExternal
+
+end KernelCapsule
+
+/-- Audit row for one selected backend kernel. -/
+structure KernelAudit where
+  op : BackendOp
+  capsuleName : String
+  provider : Provider
+  device : Device
+  specName : String
+  trustLevel : TrustLevel
+  vjpMode : VJPMode
+  runtimeSupport : RuntimeSupport
+  shapeContract : ContractDescriptor
+  layoutContract : ContractDescriptor
+  valueContract : ContractDescriptor
+  vjpContract : ContractDescriptor
+  deriving Repr
+
+namespace KernelAudit
+
+/-- Build an audit row from a selected planner kernel. -/
+def ofPlannedKernel (k : PlannedKernel) : KernelAudit :=
+  { op := k.op
+    capsuleName := k.capsule.name
+    provider := k.capsule.provider
+    device := k.capsule.device
+    specName := k.capsule.specName
+    trustLevel := k.capsule.trustLevel
+    vjpMode := k.capsule.vjpMode
+    runtimeSupport := k.capsule.runtimeSupport
+    shapeContract := k.capsule.shapeContract
+    layoutContract := k.capsule.layoutContract
+    valueContract := k.capsule.valueContract
+    vjpContract := k.capsule.vjpContract }
+
+/-- Whether this selected kernel crosses a trusted external boundary. -/
+def isTrustedExternal (a : KernelAudit) : Bool :=
+  a.trustLevel == .trustedExternal
+
+end KernelAudit
+
+/-- Audit view of an execution plan. -/
+structure ExecutionAudit where
+  kernels : List KernelAudit
+  deriving Repr
+
+namespace ExecutionAudit
+
+/-- Trust levels selected by the plan, in plan order. -/
+def trustLevels (a : ExecutionAudit) : List TrustLevel :=
+  a.kernels.map (·.trustLevel)
+
+/-- Capsule names selected by the plan, in plan order. -/
+def capsuleNames (a : ExecutionAudit) : List String :=
+  a.kernels.map (·.capsuleName)
+
+/-- Operation names whose selected capsule is trusted external. -/
+def trustedExternalOps (a : ExecutionAudit) : List String :=
+  (a.kernels.filter KernelAudit.isTrustedExternal).map (·.op.name)
+
+/-- Whether the plan crosses any trusted external boundary. -/
+def hasTrustedExternal (a : ExecutionAudit) : Bool :=
+  a.kernels.any KernelAudit.isTrustedExternal
+
+end ExecutionAudit
+
+namespace ExecutionPlan
+
+/-- Audit a selected execution plan. -/
+def audit (p : ExecutionPlan) : ExecutionAudit :=
+  { kernels := p.kernels.map KernelAudit.ofPlannedKernel }
+
+/-- Whether a selected execution plan crosses any trusted external boundary. -/
+def hasTrustedExternal (p : ExecutionPlan) : Bool :=
+  p.audit.hasTrustedExternal
+
+/-- Operation names whose selected capsules are trusted external. -/
+def trustedExternalOps (p : ExecutionPlan) : List String :=
+  p.audit.trustedExternalOps
+
+end ExecutionPlan
+
+end Backend
+end NN

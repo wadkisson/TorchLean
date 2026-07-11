@@ -192,7 +192,6 @@ noncomputable instance : Numbers (NF β fexp rnd) where
   log10          := ofReal (β := β) (fexp := fexp) (rnd := rnd) (Real.log 10)
   log10000       := ofReal (β := β) (fexp := fexp) (rnd := rnd) (Real.log 10000)
   epsilon        := ofReal (β := β) (fexp := fexp) (rnd := rnd) (1e-6)
-  neg_thousand   := ofReal (β := β) (fexp := fexp) (rnd := rnd) (-1000)
 
 /--
 `Context` instance used by TorchLean specs.

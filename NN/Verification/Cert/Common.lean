@@ -44,6 +44,14 @@ open _root_.Spec
 open _root_.Spec.Tensor
 open Lean Data Json
 
+/-- Whether every entry of a fixed-size vector is finite. -/
+def finiteVec (n : Nat) (v : Fin n → Float) : Bool :=
+  (List.finRange n).all fun i => (v i).isFinite
+
+/-- Whether every entry of a fixed-size matrix is finite. -/
+def finiteMatrix (rows cols : Nat) (A : Fin rows → Fin cols → Float) : Bool :=
+  (List.finRange rows).all fun i => (List.finRange cols).all fun j => (A i j).isFinite
+
 /--
 Approximate equality for flat scalar tensors (length-`n` vectors), up to an absolute tolerance.
 
@@ -108,6 +116,8 @@ def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox Float)) := do
         | throw <| IO.userError s!"Invalid ibp[i].lo: expected float array length {dim}"
       let some hiVec := parseFloatVec dim hiJ
         | throw <| IO.userError s!"Invalid ibp[i].hi: expected float array length {dim}"
+      unless finiteVec dim loVec && finiteVec dim hiVec do
+        throw <| IO.userError "Invalid ibp[i]: interval bounds must be finite"
       let loT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor loVec
       let hiT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor hiVec
       pure (some { dim := dim, lo := loT, hi := hiT })
@@ -128,7 +138,7 @@ def parseAlphaVec? (dim : Nat) (j : Json) (ctx : String := "alpha[i]") :
         | throw <| IO.userError s!"Invalid {ctx}: expected float array length {dim}"
       for k in List.finRange dim do
         let a := v k
-        if a < 0.0 || a > 1.0 then
+        if !a.isFinite || a < 0.0 || a > 1.0 then
           throw <| IO.userError
             s!"Invalid {ctx}[{k.val}]: α-CROWN requires 0 ≤ alpha ≤ 1, got {a}"
       let t : Tensor Float (.dim dim .scalar) := Spec.vectorTensor v
@@ -152,6 +162,9 @@ def parseAffineBounds? (inDim outDim : Nat) (j : Json) : IO (Option (FlatAffineB
         | throw <| IO.userError s!"Invalid crown[i].loC: expected float array length {outDim}"
       let some hiC := parseFloatVec outDim hiCJ
         | throw <| IO.userError s!"Invalid crown[i].hiC: expected float array length {outDim}"
+      unless finiteMatrix outDim inDim loA && finiteMatrix outDim inDim hiA &&
+          finiteVec outDim loC && finiteVec outDim hiC do
+        throw <| IO.userError "Invalid crown[i]: affine bounds must be finite"
       let loAff : AffineVec Float inDim outDim :=
         { A := Spec.matrixTensor loA, c := Spec.vectorTensor loC }
       let hiAff : AffineVec Float inDim outDim :=
@@ -279,6 +292,16 @@ def flatBoxStrictlyAbove (B : FlatBox Float) (eps : Float) : Bool :=
         match flo i, fhi i with
         | .scalar l, .scalar u => l > eps && u > eps)
 
+/-- Check that every coordinate interval lies strictly on one side of zero. -/
+def flatBoxExcludesZero (B : FlatBox Float) : Bool :=
+  match B with
+  | ⟨n, lo, hi⟩ =>
+      let flo := getDimScalarFn (α := Float) lo
+      let fhi := getDimScalarFn (α := Float) hi
+      (List.finRange n).all (fun i =>
+        match flo i, fhi i with
+        | .scalar l, .scalar u => l > 0.0 || u < 0.0)
+
 /--
 Domain and shape preconditions that must hold before a node-wise certificate checker replays a
 bound step. These executable checks mirror the side conditions that the mathematical rules need.
@@ -296,6 +319,13 @@ def ibpNodePreconditionsOk
           | p1 :: _ =>
               match getFlatBox? cert p1 with
               | some B => flatBoxStrictlyAbove B Numbers.epsilon
+              | none => false
+          | _ => false
+      | .inv =>
+          match node.parents with
+          | p1 :: _ =>
+              match getFlatBox? cert p1 with
+              | some B => flatBoxExcludesZero B
               | none => false
           | _ => false
       | _ => true

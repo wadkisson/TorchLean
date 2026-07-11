@@ -224,7 +224,8 @@ structure ParamGroup (α : Type) [Context α] where
   /-- Adam beta1 parameter (exponential decay for the first moment). -/
   beta1 : α := Numbers.one - Numbers.pointone
   /-- Adam beta2 parameter (exponential decay for the second moment). -/
-  beta2 : α := Numbers.one - (Numbers.one / (-Numbers.neg_thousand))
+  beta2 : α :=
+    Numbers.one - (Numbers.one / (Numbers.ten * Numbers.ten * Numbers.ten))
   /-- Numerical stability term used by adaptive optimizers. -/
   epsilon : α := Numbers.epsilon
   /-- "Rho" decay parameter for RMSProp/AdaDelta style optimizers. -/

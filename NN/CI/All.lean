@@ -35,7 +35,6 @@ public import NN.Verification.PINN.DatasetCheck
 public import NN.Verification.PINN.PdeAst
 public import NN.Verification.PINN.PdeParse
 public import NN.Verification.PINN.ResidualAffine
-public import NN.Verification.ProofBackedCertificates
 public import NN.Verification.Robustness.Digits
 public import NN.Floats.Arb
 public import NN.Floats.Arb.Oracle
@@ -109,8 +108,6 @@ public import NN.MLTheory.CROWN.Operators.Arithmetic
 public import NN.MLTheory.CROWN.Operators.Batchnorm
 public import NN.MLTheory.CROWN.Operators.Conv
 public import NN.MLTheory.CROWN.Operators.Gelu
-public import NN.MLTheory.CROWN.Operators.Pooling
-public import NN.MLTheory.CROWN.Operators.Reduce
 public import NN.MLTheory.CROWN.Operators.Slice
 public import NN.MLTheory.CROWN.Operators.Trigonometric
 public import NN.MLTheory.CROWN.Proofs.AlphaBetaReLUScalarSoundness
@@ -221,7 +218,6 @@ public import NN.Runtime.Optim
 public import NN.Runtime.PyTorch
 public import NN.Runtime.Scalar
 public import NN.Runtime.Training.Log
-public import NN.Runtime.Variable
 public import NN.Spec.Autograd.AutogradSpec
 public import NN.Spec.Autograd.Ops
 public import NN.Spec.Core.Context
@@ -312,10 +308,7 @@ public import NN.Spec.Module.SpecModule
 public import NN.Spec.Module.Svm
 public import NN.Entrypoint.Tensor
 public import NN.Tests.Runtime.Floats.AllAutogradTests
-public import NN.Tests.Runtime.Floats.KnnCheck
-public import NN.Tests.Runtime.Floats.ModelsCheck
 public import NN.Tests.Runtime.Floats.PINNDerivResidual
-public import NN.Tests.Runtime.Floats.RnnGruLstmBpttCheck
 public import NN.Tests.Runtime.Floats.Suite
 public import NN.Tests.Runtime.Floats.TorchLeanIRExecEquivCheck
 public import NN.Tests.Runtime.Floats.TorchLeanIndexShapeCheck
@@ -323,7 +316,6 @@ public import NN.Tests.Runtime.Floats.TorchLeanOpsCheck
 public import NN.Tests.Runtime.Floats.TorchLeanSpecMlpEquivCheck
 public import NN.Tests.Runtime.Floats.Utils
 public import NN.Tests.Runtime.Rationals.AutogradEngineTest
-public import NN.Tests.Runtime.Rationals.MlpTest
 public import NN.Tests.Runtime.Rationals.Suite
 public import NN.Verification.Cert.CROWNNodeCert
 public import NN.Verification.Cert.CROWNNodeCertAlphaBeta

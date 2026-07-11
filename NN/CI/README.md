@@ -51,8 +51,8 @@ lake build NN.Examples.Zoo NN.Examples.BugZoo.All
 For CUDA changes:
 
 ```bash
-lake build -R -K cuda=true NN.CI.All
-lake exe -K cuda=true nn_tests_suite
+lake -R -K cuda=true build NN.CI.All
+lake -R -K cuda=true exe nn_tests_suite
 scripts/checks/cuda_sanitize_tests.sh --all-tools
 ```
 

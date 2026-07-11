@@ -58,7 +58,8 @@ def usage : String :=
     , "Options:"
     , "  --dtype float|float32|ieee32"
     , "  --backend eager|compiled"
-    , "  --cpu | --cuda"
+    , "  --device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external"
+    , "  --show-backend                    print backend capsules as they execute"
     ]
 
 /-!
@@ -209,6 +210,6 @@ def main (args : List String) : IO Unit := do
   if CLI.hasHelp args then
     IO.println usage
     return
-  Runtime.withSelectedScalar args (@runSelected)
+  Runtime.withOptionsScalar args (fun {α} _ _ _ _ _opts rest => runSelected (α := α) rest)
 
 end NN.Examples.DeepDives.IRAxisOps

@@ -67,14 +67,14 @@ The runner is there so users can learn one command shape instead of remembering 
 The best first run is still a small one:
 
 ```
-lake exe torchlean mlp --cpu --steps 10
+lake exe torchlean mlp --device cpu --steps 10
 ```
 
 Once CUDA has been built, the same command shape works on GPU:
 
 ```
-lake build -R -K cuda=true
-lake exe -K cuda=true torchlean mlp --cuda --steps 20
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 20
 ```
 
 That one command runs through the public API, the eager tape, the optimizer, and the selected
@@ -85,10 +85,10 @@ runtime backend. The rest of the model examples grow from that same shape.
 The classical supervised examples have easy-to-recognize behavior.
 
 ```
-lake exe torchlean mlp --cpu --steps 10
-lake exe torchlean kan --cpu --steps 10
-lake exe -K cuda=true torchlean cnn --cuda --n-total 1 --steps 1
-lake exe -K cuda=true torchlean vit --cuda --n-total 1 --steps 1
+lake exe torchlean mlp --device cpu --steps 10
+lake exe torchlean kan --device cpu --steps 10
+lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
+lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
 ```
 
 These examples show:
@@ -141,9 +141,9 @@ runtime graph computes that sum, rather than producing some tensor with a compat
 The sequence examples give a gentle path from recurrent state to attention:
 
 ```
-lake exe -K cuda=true torchlean rnn --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean lstm --cuda --tiny-shakespeare --steps 1
-lake exe -K cuda=true torchlean transformer --cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean rnn --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean lstm --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean transformer --device cuda --tiny-shakespeare --steps 1
 ```
 
 A one-step run does not learn language. It does exercise the full data path: text is loaded, token
@@ -177,8 +177,8 @@ TorchLean has two GPT examples:
 Typical commands:
 
 ```
-lake exe -K cuda=true torchlean gpt2 --cuda --steps 1
-lake exe -K cuda=true torchlean text_gpt2 --cuda \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1
+lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
   --data-file data/real/text/tinystories_valid.txt --allow-small-data --steps 100
 ```
 
@@ -240,7 +240,7 @@ parameter files, and the specific runtime command that produced the log.
 The Mamba example exercises selective scan computation:
 
 ```
-lake exe -K cuda=true torchlean mamba --cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
 ```
 
 Under the CUDA backend, TorchLean includes native selective-scan kernels for the float32 path.  The
@@ -265,7 +265,7 @@ prefixes, state layout, and broadcasted parameters rather than softmax weights.
 The diffusion example is a compact denoising training loop:
 
 ```
-lake exe -K cuda=true torchlean diffusion --cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
 ```
 
 Diffusion is included because it stresses a different kind of ML program: a stochastic noise
@@ -307,7 +307,7 @@ python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 
 Train on CUDA:
 
 ```
-lake exe -K cuda=true torchlean fno1d_burgers --cuda --fast-kernels --steps 700 --lr 0.003 \
+lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 0.003 \
   --plot-csv data/real/fno/predictions.csv
 ```
 
@@ -336,8 +336,8 @@ the same typed tensor and runtime layer.
 The PPO examples show that TorchLean is not limited to supervised losses:
 
 ```
-lake exe -K cuda=true torchlean ppo_gridworld --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
-lake exe -K cuda=true torchlean ppo_cartpole --cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
 ```
 
 The GridWorld example is written in Lean and has proof hooks.  The Gymnasium examples cross a Python

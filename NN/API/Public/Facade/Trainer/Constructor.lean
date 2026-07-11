@@ -56,8 +56,7 @@ def new {model : Type u} {σ τ : Shape} [ToModel model σ τ] (m : model)
         dtype := cfg.dtype
         backend := cfg.backend
         device := cfg.device
-        fastKernels := cfg.fastKernels
-        fastGpuMatmulPrecision := cfg.fastGpuMatmulPrecision }
+        showBackend := cfg.showBackend }
     seed := cfg.seed }
 
 end Trainer

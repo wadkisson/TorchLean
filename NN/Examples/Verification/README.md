@@ -74,9 +74,8 @@ reproducible without pulling in large benchmark dumps.
   under `scripts/verification/` used as untrusted producers for weights or candidate certificates.
 
 - Proof map: theorem-level graph IBP/CROWN-family soundness is developed under
-  `NN.MLTheory.CROWN.Proofs.*`. Public theorem handles are exposed through
-  `NN.Verification.ProofBackedCertificates` and `NN.Entrypoint.Verification`, not in this artifact
-  directory.
+  `NN.MLTheory.CROWN.Proofs.*` and imported by `NN.Entrypoint.Verification`, not defined in this
+  artifact directory.
 
 Reusable Lean code for ODE/PINN and certificate checking belongs under `NN/Verification`.
 The `ODE/`, `PINN/`, `AbCrown/`, and `LiRPA/` folders here should contain small artifacts, notes,

@@ -83,9 +83,11 @@ Practical checklist:
    - If it should be part of ordinary model code, also expose a clean root spelling through
      `NN.lean` or the public model API.
 
-7. Add a short runtime check (recommended)
-   - Put a small compile only / small eval test in `NN/Tests/Runtime/Floats/ModelsCheck.lean`.
-   - Keep it deterministic and small (a few steps of training, or a single forward).
+7. Add evidence in the right layer
+   - If the claim is mathematical, add a theorem under `NN/Proofs/Models`.
+   - If the model crosses a runtime or artifact boundary, add a focused runtime check near that
+     boundary.
+   - If the code is only a usage demonstration, put it under `NN/Examples`.
 
 8. Build the files you touched
    - `lake build NN.Spec.Models.<your_model>`

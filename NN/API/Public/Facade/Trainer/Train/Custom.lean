@@ -92,7 +92,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
               predictBatch := predictBatch }
           let extra ← afterTrain (α := α) model m
           pure (result, extra))
-  if runtimeOpts.useGpu && run.dtype != .float then
+  if runtimeOpts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
   match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ =>

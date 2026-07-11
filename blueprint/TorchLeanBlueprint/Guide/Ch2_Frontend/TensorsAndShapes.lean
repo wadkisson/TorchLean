@@ -120,7 +120,7 @@ $$`f_\alpha :
 The subscript changes when we choose `Float`, `IEEE32Exec`, `ℝ`, intervals, or another scalar
 domain. The architecture and shapes remain the same.
 
-The guide uses these scalar choices in different contexts:
+TorchLean uses these scalar choices in different contexts:
 
 ```
 -- Executable tutorial value.
@@ -451,7 +451,7 @@ Representative theorems and definitions:
   on special cases.
 - `Spec.dot` packages the familiar “elementwise multiply, then sum” pattern.
 
-Those facts matter because they let later chapters talk about models, losses, and verification using
+Those facts let model, loss, and verification statements use
 ordinary algebra instead of ad hoc shape bookkeeping. The same tensor library can be used for:
 
 - exact reasoning in `ℚ` or `ℝ`,

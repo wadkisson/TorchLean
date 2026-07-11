@@ -50,16 +50,29 @@ When `Options.device = .cuda`, any op whose CUDA implementation returns `none` w
 TorchLean's CUDA eager mode has no per-op CPU fallback: either the op is supported by CUDA, or it
 errors immediately.
 -/
-def dispatchCudaOpt {α β : Type} (s : EagerSession α) (opName : String)
+def dispatchCudaOpt {α β : Type} (s : EagerSession α) (op : NN.Backend.BackendOp)
     (cpu : IO β) (cuda : IO (Option β)) : IO β := do
+  let _ ← s.selectedCapsule op
   if Options.device s.opts == .cuda then
     let r? ← cuda
     match r? with
     | some r => pure r
     | none =>
-        throw <| IO.userError s!"torch: cuda: `{opName}` is unsupported by the eager CUDA backend"
+        throw <| IO.userError s!"torch: cuda: `{op.name}` is unsupported by the eager CUDA backend"
   else
     cpu
+
+/--
+Require that the selected backend contract is the native CUDA capsule used by this eager op.
+
+This guard is intentionally runtime-side. The planner may know about LibTorch, Metal, ROCm, or
+reference capsules, but these eager branches below call TorchLean's native CUDA tape directly. If a
+profile selects another provider, failing here is better than silently running a different backend.
+-/
+def requireNativeCudaCapsule {α : Type} (s : EagerSession α) (op : NN.Backend.BackendOp) : IO Unit := do
+  let _ ← s.selectedCapsule op
+  unless s.opts.usesCuda do
+    throw <| IO.userError s!"torch: native CUDA capsule requested for CPU op `{op.name}`"
 
 /--
 Validate one float-encoded token id and return the corresponding `Nat`.
@@ -93,12 +106,13 @@ def add {α : Type} (s : EagerSession α) [Add α] [DecidableEq Shape] {sh : Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .add
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.add (t := t0) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "add" cpu cuda
+  dispatchCudaOpt (α := α) s .add cpu cuda
 
 /-- Record elementwise subtraction `a - b`. PyTorch: `torch.sub`. -/
 def sub {α : Type} (s : EagerSession α) [Sub α] [Zero α] [DecidableEq Shape] {sh : Shape}
@@ -109,12 +123,13 @@ def sub {α : Type} (s : EagerSession α) [Sub α] [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .sub
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sub (t := t0) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "sub" cpu cuda
+  dispatchCudaOpt (α := α) s .sub cpu cuda
 
 /-- Record elementwise multiplication `a * b`. PyTorch: `torch.mul`. -/
 def mul {α : Type} (s : EagerSession α) [Mul α] [DecidableEq Shape] {sh : Shape}
@@ -125,12 +140,13 @@ def mul {α : Type} (s : EagerSession α) [Mul α] [DecidableEq Shape] {sh : Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .mul
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.mul (t := t0) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "mul" cpu cuda
+  dispatchCudaOpt (α := α) s .mul cpu cuda
 
 /-- Record scaling by a scalar constant. PyTorch: `x * c`. -/
 def scale {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Mul α] [DecidableEq Shape]
@@ -142,13 +158,14 @@ def scale {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Mul α] 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .scale
     let cF ← CudaBridge.TensorConv.toFloat (α := α) c
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.scale (t := t0) (s := sh) x.id cF
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "scale" cpu cuda
+  dispatchCudaOpt (α := α) s .scale cpu cuda
 
 /-- Record elementwise absolute value. PyTorch: `torch.abs`. -/
 def abs {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -160,12 +177,13 @@ def abs {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .abs
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.abs (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "abs" cpu cuda
+  dispatchCudaOpt (α := α) s .abs cpu cuda
 
 /-- Record elementwise square root. PyTorch: `torch.sqrt`. -/
 def sqrt {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -177,12 +195,13 @@ def sqrt {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .sqrt
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sqrt (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "sqrt" cpu cuda
+  dispatchCudaOpt (α := α) s .sqrt cpu cuda
 
 /-- Record elementwise clamp to `[minVal,maxVal]`. PyTorch: `torch.clamp`. -/
 def clamp {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Context α]
@@ -194,6 +213,7 @@ def clamp {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Context 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .clamp
     let lo ← CudaBridge.TensorConv.toFloat (α := α) minVal
     let hi ← CudaBridge.TensorConv.toFloat (α := α) maxVal
     let t0 ← s.cudaTape.get
@@ -201,7 +221,7 @@ def clamp {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Context 
       Runtime.Autograd.Cuda.Tape.clamp (t := t0) (s := sh) x.id lo hi
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "clamp" cpu cuda
+  dispatchCudaOpt (α := α) s .clamp cpu cuda
 
 /-- Record elementwise maximum. PyTorch: `torch.maximum`. -/
 def max {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -213,12 +233,13 @@ def max {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .max
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.max (t := t0) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "max" cpu cuda
+  dispatchCudaOpt (α := α) s .max cpu cuda
 
 /-- Record elementwise minimum. PyTorch: `torch.minimum`. -/
 def min {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -230,12 +251,13 @@ def min {α : Type} (s : EagerSession α) [Context α] [DecidableRel ((· > ·) 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .min
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.min (t := t0) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "min" cpu cuda
+  dispatchCudaOpt (α := α) s .min cpu cuda
 
 /-- Record elementwise ReLU. PyTorch: `torch.relu` / `torch.nn.functional.relu`. -/
 def relu {α : Type} (s : EagerSession α)
@@ -248,12 +270,13 @@ def relu {α : Type} (s : EagerSession α)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .relu
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.relu (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "relu" cpu cuda
+  dispatchCudaOpt (α := α) s .relu cpu cuda
 
 /-- Record elementwise sigmoid. PyTorch: `torch.sigmoid`. -/
 def sigmoid {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -264,11 +287,12 @@ def sigmoid {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .sigmoid
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.sigmoid (t := t0) (s := sh) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "sigmoid" cpu cuda
+  dispatchCudaOpt (α := α) s .sigmoid cpu cuda
 
 /-- Record elementwise tanh. PyTorch: `torch.tanh`. -/
 def tanh {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -279,11 +303,12 @@ def tanh {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .tanh
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.tanh (t := t0) (s := sh) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "tanh" cpu cuda
+  dispatchCudaOpt (α := α) s .tanh cpu cuda
 
 /--
 Record softmax (shape-preserving).
@@ -299,11 +324,12 @@ def softmax {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .softmax
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.softmax (t := t0) (s := sh) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "softmax" cpu cuda
+  dispatchCudaOpt (α := α) s .softmax cpu cuda
 
 /--
 Record stable log-softmax (shape-preserving, last-axis convention).
@@ -318,11 +344,12 @@ def logSoftmax {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .logSoftmax
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.logSoftmax (t := t0) (s := sh) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "log_softmax" cpu cuda
+  dispatchCudaOpt (α := α) s .logSoftmax cpu cuda
 
 /-- Record elementwise softplus. PyTorch: `torch.nn.functional.softplus`. -/
 def softplus {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -333,11 +360,12 @@ def softplus {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .softplus
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.softplus (t := t0) (s := sh) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "softplus" cpu cuda
+  dispatchCudaOpt (α := α) s .softplus cpu cuda
 
 /-- Record elementwise exponential. PyTorch: `torch.exp`. -/
 def exp {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -348,12 +376,13 @@ def exp {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .exp
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.exp (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "exp" cpu cuda
+  dispatchCudaOpt (α := α) s .exp cpu cuda
 
 /-- Record elementwise log. PyTorch: `torch.log`. -/
 def log {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -364,12 +393,13 @@ def log {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .log
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.log (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "log" cpu cuda
+  dispatchCudaOpt (α := α) s .log cpu cuda
 
 /-- Record elementwise inverse `1/x`. PyTorch: `torch.reciprocal`. -/
 def inv {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -380,12 +410,13 @@ def inv {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .inv
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.inv (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "inv" cpu cuda
+  dispatchCudaOpt (α := α) s .inv cpu cuda
 
 /--
 Record elementwise log with epsilon guard.
@@ -400,13 +431,14 @@ def safeLog {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [Contex
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .safeLog
     let epsF ← CudaBridge.TensorConv.toFloat (α := α) ε
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.safeLog (t := t0) (s := sh) x.id epsF
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "safe_log" cpu cuda
+  dispatchCudaOpt (α := α) s .safeLog cpu cuda
 
 /-- Sum-reduce all elements to a scalar. PyTorch: `x.sum()`. -/
 def sum {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
@@ -417,12 +449,13 @@ def sum {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .sum
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sum (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "sum" cpu cuda
+  dispatchCudaOpt (α := α) s .sum cpu cuda
 
 /-- Flatten a tensor to a 1D vector. PyTorch: `torch.flatten`. -/
 def flatten {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape] {sh : Shape}
@@ -433,12 +466,13 @@ def flatten {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .flatten
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.flatten (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "flatten" cpu cuda
+  dispatchCudaOpt (α := α) s .flatten cpu cuda
 
 /--
 Reshape a tensor while preserving total number of elements.
@@ -453,12 +487,13 @@ def reshape {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .reshape
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.reshape (t := t0) (s₁ := sh1) (s₂ := sh2) x.id h
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "reshape" cpu cuda
+  dispatchCudaOpt (α := α) s .reshape cpu cuda
 
 /-- Transpose a 2D matrix. PyTorch: `x.t()` / `x.transpose(0,1)`. -/
 def transpose2d {α : Type} (s : EagerSession α) [DecidableEq Shape] {m n : Nat}
@@ -469,12 +504,13 @@ def transpose2d {α : Type} (s : EagerSession α) [DecidableEq Shape] {m n : Nat
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .transpose2d
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose2d (t := t0) (m := m) (n := n) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "transpose2d" cpu cuda
+  dispatchCudaOpt (α := α) s .transpose2d cpu cuda
 
 /-- Swap two adjacent axes at a given depth. PyTorch analogue: `x.transpose(dim, dim+1)`. -/
 def swapAdjacentAtDepth {α : Type} (s : EagerSession α) [DecidableEq Shape] {sh : Shape}
@@ -486,12 +522,13 @@ def swapAdjacentAtDepth {α : Type} (s : EagerSession α) [DecidableEq Shape] {s
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .swapAdjacentAtDepth
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.swapAdjacentAtDepth (t := t0) (s := sh) depth x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "swapAdjacentAtDepth" cpu cuda
+  dispatchCudaOpt (α := α) s .swapAdjacentAtDepth cpu cuda
 
 /-- Permute a 3D tensor `(a,b,c) → (b,c,a)`. PyTorch: `x.permute(1,2,0)`. -/
 def transpose3dFirstToLast {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -504,12 +541,13 @@ def transpose3dFirstToLast {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .transpose3dFirstToLast
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dFirstToLast (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "transpose3d_first_to_last" cpu cuda
+  dispatchCudaOpt (α := α) s .transpose3dFirstToLast cpu cuda
 
 /-- Permute a 3D tensor `(a,b,c) → (c,a,b)`. PyTorch: `x.permute(2,0,1)`. -/
 def transpose3dLastToFirst {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -522,12 +560,13 @@ def transpose3dLastToFirst {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .transpose3dLastToFirst
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dLastToFirst (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "transpose3d_last_to_first" cpu cuda
+  dispatchCudaOpt (α := α) s .transpose3dLastToFirst cpu cuda
 
 /-- Swap the last two axes of a 3D tensor `(a,b,c) → (a,c,b)`. PyTorch: `x.transpose(1,2)`. -/
 def transpose3dLastTwo {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -540,12 +579,13 @@ def transpose3dLastTwo {α : Type} (s : EagerSession α) [DecidableEq Shape] {a 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .transpose3dLastTwo
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dLastTwo (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "transpose3d_last_two" cpu cuda
+  dispatchCudaOpt (α := α) s .transpose3dLastTwo cpu cuda
 
 /-- Broadcast a tensor to a larger shape. PyTorch: implicit broadcasting / `expand`. -/
 def broadcastTo {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Zero α] [DecidableEq Shape]
@@ -558,12 +598,13 @@ def broadcastTo {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Zero 
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .broadcastTo
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.broadcastTo (t := t0) (s₁ := sh1) (s₂ := sh2) cb x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "broadcastTo" cpu cuda
+  dispatchCudaOpt (α := α) s .broadcastTo cpu cuda
 
 /-- Sum-reduce along `axis`. PyTorch: `torch.sum(x, dim=axis)`. -/
 def reduceSum {α : Type} (s : EagerSession α) [Add α] [Zero α] [Inhabited α] [DecidableEq Shape]
@@ -575,12 +616,13 @@ def reduceSum {α : Type} (s : EagerSession α) [Add α] [Zero α] [Inhabited α
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .reduceSum
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.reduceSum (s := sh) axis (t := t0) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "reduce_sum" cpu cuda
+  dispatchCudaOpt (α := α) s .reduceSum cpu cuda
 
 /-- Mean-reduce along `axis`. PyTorch: `torch.mean(x, dim=axis)`. -/
 def reduceMean {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -592,12 +634,13 @@ def reduceMean {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .reduceMean
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.reduceMean (s := sh) axis (t := t0) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "reduce_mean" cpu cuda
+  dispatchCudaOpt (α := α) s .reduceMean cpu cuda
 
 /-- Gather a scalar from a 1D vector with a `Fin n` index. PyTorch: `x[i]`. -/
 def gatherScalar {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -608,12 +651,13 @@ def gatherScalar {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .gatherScalar
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherScalar (t := t0) (n := n) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "gather_scalar" cpu cuda
+  dispatchCudaOpt (α := α) s .gatherScalar cpu cuda
 
 /-- Gather a row from a 2D tensor with a `Fin rows` index. PyTorch: `x[i]` for 2D tensors. -/
 def gatherRow {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -626,12 +670,13 @@ def gatherRow {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .gatherRow
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherRow (t := t0) (rows := rows) (cols := cols) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "gather_row" cpu cuda
+  dispatchCudaOpt (α := α) s .gatherRow cpu cuda
 
 /-- Gather a scalar from a 1D vector with a raw `Nat` index (totalized by the tape op). -/
 def gatherScalarNat {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -642,12 +687,13 @@ def gatherScalarNat {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .gatherScalarNat
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherScalarNat (t := t0) (n := n) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "gather_scalar_nat" cpu cuda
+  dispatchCudaOpt (α := α) s .gatherScalarNat cpu cuda
 
 /-- Dynamic gather scalar using an index stored in `NatRef`. -/
 def gatherScalarRef {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -678,12 +724,13 @@ def gatherVecNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .gatherVecNat
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherVecNat (t := t0) (n := n) (k := k) x.id idx
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "gather_vec_nat" cpu cuda
+  dispatchCudaOpt (α := α) s .gatherVecNat cpu cuda
 
 /-- Gather `k` rows using an explicit index tensor. PyTorch: `index_select(dim=0, index=...)`. -/
 def gatherRowsNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
@@ -697,12 +744,13 @@ def gatherRowsNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .gatherRowsNat
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherRowsNat (t := t0) (rows := rows) (cols := cols) (k := k) x.id idx
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "gather_rows_nat" cpu cuda
+  dispatchCudaOpt (α := α) s .gatherRowsNat cpu cuda
 
 /--
 Read a float input vector and return the corresponding `Tensor Nat` index vector.
@@ -748,12 +796,13 @@ def scatterAddVec {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .scatterAddVec
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.scatterAddVec (t := t0) (n := n) x.id v.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "scatter_add_vec" cpu cuda
+  dispatchCudaOpt (α := α) s .scatterAddVec cpu cuda
 
 /-- Scatter-add into a matrix row: return a copy of `x` with `x[i,:] += v`. -/
 def scatterAddRow {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
@@ -768,70 +817,53 @@ def scatterAddRow {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .scatterAddRow
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.scatterAddRow (t := t0) (rows := rows) (cols := cols) x.id v.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "scatter_add_row" cpu cuda
+  dispatchCudaOpt (α := α) s .scatterAddRow cpu cuda
 
-/--
-Fully-connected linear layer `y = w x + b` (matvec).
-
-If `opts.fastKernels` is enabled, uses a runtime-only fast kernel implementation.
-PyTorch comparison: `torch.nn.functional.linear(x, weight=w, bias=b)`.
--/
+/-- Fully-connected linear layer `y = w x + b`. PyTorch: `torch.nn.functional.linear`. -/
 def linear {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Mul α] [Zero α] [DecidableEq
-  Shape] [Runtime.Autograd.FastKernels.FastMatmul α]
+  Shape]
   {inDim outDim : Nat}
   (w : TensorRef α (.dim outDim (.dim inDim .scalar)))
   (b : TensorRef α (.dim outDim .scalar))
   (x : TensorRef α (.dim inDim .scalar)) : IO (TensorRef α (.dim outDim .scalar)) := do
   let cpu := do
     let t0 ← s.tape.get
-    let (t1, id) ←
-      if s.opts.fastKernels then
-        okOrThrow (Runtime.Autograd.Tape.linearFast (useGpu := s.opts.useGpu) (t := t0)
-          (gpuPrecision := s.opts.fastGpuMatmulPrecision)
-          (inDim := inDim) (outDim := outDim) w.id b.id x.id)
-      else
-        okOrThrow (Runtime.Autograd.Tape.linear (t := t0) (inDim := inDim) (outDim := outDim) w.id
-          b.id x.id)
+    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.linear (t := t0)
+      (inDim := inDim) (outDim := outDim) w.id b.id x.id)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .linear
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.linear (t := t0) (outDim := outDim) (inDim := inDim) w.id b.id x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "linear" cpu cuda
+  dispatchCudaOpt (α := α) s .linear cpu cuda
 
-/--
-Mean-squared-error loss returning a scalar.
-
-If `opts.fastKernels` is enabled, uses a runtime-only fast kernel implementation.
-PyTorch comparison: `torch.nn.functional.mse_loss(..., reduction=\"mean\")`.
--/
+/-- Mean-squared-error loss returning a scalar. PyTorch: `torch.nn.functional.mse_loss`. -/
 def mseLoss {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
   [Inhabited α] [Add α] [Sub α] [Mul α] [Div α] [Zero α] [One α] [Coe Nat α] [DecidableEq Shape]
   {sh : Shape} (yhat target : TensorRef α sh) : IO (TensorRef α Shape.scalar) := do
   let cpu := do
     let t0 ← s.tape.get
-    let (t1, id) ←
-      if s.opts.fastKernels then
-        okOrThrow (Runtime.Autograd.Tape.mseLossFast (t := t0) (s := sh) yhat.id target.id)
-      else
-        okOrThrow (Runtime.Autograd.Tape.mseLoss (t := t0) (s := sh) yhat.id target.id)
+    let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.mseLoss (t := t0) (s := sh) yhat.id target.id)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .mseLoss
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.mseLoss (t := t0) (s := sh) yhat.id target.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "mse_loss" cpu cuda
+  dispatchCudaOpt (α := α) s .mseLoss cpu cuda
 
 /-- Layer normalization over embedding dimension. PyTorch: `nn.LayerNorm` / `functional.layer_norm`.
   -/
@@ -850,13 +882,14 @@ def layerNorm {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .layerNorm
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.layerNorm (t := t0)
       (seqLen := seqLen) (embedDim := embedDim) (h_seq_pos := h_seq_pos) (h_embed_pos := h_embed_pos)
       x.id gamma.id beta.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "layer_norm" cpu cuda
+  dispatchCudaOpt (α := α) s .layerNorm cpu cuda
 
 /-- BatchNorm for channel-first images `(C,H,W)` (no batch axis). PyTorch: `nn.BatchNorm2d`
   (conceptually). -/
@@ -876,6 +909,7 @@ def batchnormChannelFirst {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .batchNormChannelFirst
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.batchnormChannelFirst (t := t0)
       (channels := channels) (height := height) (width := width) (h_c := h_c) (h_h := h_h)
@@ -883,7 +917,7 @@ def batchnormChannelFirst {α : Type} (s : EagerSession α) [Context α]
       x.id gamma.id beta.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "batchnorm_channel_first" cpu cuda
+  dispatchCudaOpt (α := α) s .batchNormChannelFirst cpu cuda
 
 /-- Multi-head self-attention (typed, proof-friendly). PyTorch: `nn.MultiheadAttention`
   (conceptually). -/
@@ -906,12 +940,13 @@ def multiHeadAttention {α : Type} (s : EagerSession α) [Context α]
     pure { id := id }
   let cuda := do
     let t0 ← s.cudaTape.get
+    let attentionCapsule ← s.selectedCapsule NN.Backend.Attention.scaledDotProductOp
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t0)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim) (h1 := h1)
-      wq.id wk.id wv.id wo.id x.id (mask := mask) (useFlash := s.opts.fastKernels))
+      wq.id wk.id wv.id wo.id x.id (mask := mask) (attentionCapsule := attentionCapsule))
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "multi_head_attention" cpu cuda
+  dispatchCudaOpt (α := α) s .scaledDotProductAttention cpu cuda
 
 /--
 N-D convolution for channels-first tensors `(inC, spatial...)` (no batch axis).
@@ -939,6 +974,7 @@ def conv {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .conv
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.conv (t := t0)
       (d := d) (inC := inC) (outC := outC)
@@ -947,7 +983,7 @@ def conv {α : Type} (s : EagerSession α) [Context α]
       (hInC := hInC) (hKernel := hKernel))
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "conv" cpu cuda
+  dispatchCudaOpt (α := α) s .conv cpu cuda
 
 /-- 2D convolution for channel-first images `(C,H,W)` (no batch axis). PyTorch:
   `torch.nn.functional.conv2d`. -/
@@ -969,6 +1005,7 @@ def conv2d {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .conv2d
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.conv2d (t := t0)
@@ -978,7 +1015,7 @@ def conv2d {α : Type} (s : EagerSession α) [Context α]
         kernel.id bias.id input.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "conv2d" cpu cuda
+  dispatchCudaOpt (α := α) s .conv2d cpu cuda
 
 /--
 N-D transpose convolution for channels-first tensors `(inC, spatial...)` (no batch axis).
@@ -1007,6 +1044,7 @@ def convTranspose {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .convTranspose
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.convTranspose (t := t0)
       (d := d) (inC := inC) (outC := outC)
@@ -1015,7 +1053,7 @@ def convTranspose {α : Type} (s : EagerSession α) [Context α]
       (hInC := hInC) (hKernel := hKernel))
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "conv_transpose" cpu cuda
+  dispatchCudaOpt (α := α) s .convTranspose cpu cuda
 
 /-- 2D transpose convolution for channel-first images `(C,H,W)` (no batch axis). PyTorch:
   `torch.nn.functional.conv_transpose2d`. -/
@@ -1037,6 +1075,7 @@ def convTranspose2d {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .convTranspose2d
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.convTranspose2d (t := t0)
@@ -1046,7 +1085,7 @@ def convTranspose2d {α : Type} (s : EagerSession α) [Context α]
         kernel.id bias.id input.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "conv_transpose2d" cpu cuda
+  dispatchCudaOpt (α := α) s .convTranspose2d cpu cuda
 
 /-- 2D matrix multiplication. PyTorch: `torch.matmul` for 2D tensors. -/
 def matmul {α : Type} (s : EagerSession α) [Context α]
@@ -1058,21 +1097,17 @@ def matmul {α : Type} (s : EagerSession α) [Context α]
   let cpu := do
     let t0 ← s.tape.get
     let (t1, id) ←
-      if s.opts.fastKernels then
-        okOrThrow (Runtime.Autograd.Tape.matmulFast (useGpu := s.opts.useGpu)
-          (gpuPrecision := s.opts.fastGpuMatmulPrecision)
-          (t := t0) (m := m) (n := n) (p := p) a.id b.id)
-      else
-        okOrThrow (Runtime.Autograd.Tape.matmul (t := t0) (m := m) (n := n) (p := p) a.id b.id)
+      okOrThrow (Runtime.Autograd.Tape.matmul (t := t0) (m := m) (n := n) (p := p) a.id b.id)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .matmul
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.matmul (t := t0) (m := m) (n := n) (p := p) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "matmul" cpu cuda
+  dispatchCudaOpt (α := α) s .matmul cpu cuda
 
 /-- Batched matrix multiplication. PyTorch: `torch.bmm`. -/
 def bmm {α : Type} (s : EagerSession α) [Add α] [Mul α] [Zero α] [DecidableEq Shape]
@@ -1087,12 +1122,13 @@ def bmm {α : Type} (s : EagerSession α) [Add α] [Mul α] [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .bmm
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.bmm (t := t0) (batch := batch) (m := m) (n := n) (p := p) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "bmm" cpu cuda
+  dispatchCudaOpt (α := α) s .bmm cpu cuda
 
 /-- Concatenate two vectors along dim 0. PyTorch: `torch.cat([a,b], dim=0)`. -/
 def concatVectors {α : Type} (s : EagerSession α) [Context α]
@@ -1108,12 +1144,13 @@ def concatVectors {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .concatVectors
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.concatVectors (t := t0) (n := n) (m := m) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "concat_vectors" cpu cuda
+  dispatchCudaOpt (α := α) s .concatVectors cpu cuda
 
 /-- Concatenate along dim 0 for tensors with leading dimension. PyTorch: `torch.cat(..., dim=0)`. -/
 def concatLeadingAxis {α : Type} (s : EagerSession α) [DecidableEq Shape]
@@ -1128,12 +1165,13 @@ def concatLeadingAxis {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .concatLeadingAxis
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.concatLeadingAxis (t := t0) (n := n) (m := m) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "concat_leading_axis" cpu cuda
+  dispatchCudaOpt (α := α) s .concatLeadingAxis cpu cuda
 
 /-- Slice along dim 0: `x[start:start+len]`. PyTorch: standard slicing. -/
 def sliceLeadingAxisRange {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -1147,12 +1185,13 @@ def sliceLeadingAxisRange {α : Type} (s : EagerSession α) [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .sliceLeadingAxisRange
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sliceLeadingAxisRange (t := t0) (n := n) (s := sh) x.id start len h
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "slice_leading_axis_range" cpu cuda
+  dispatchCudaOpt (α := α) s .sliceLeadingAxisRange cpu cuda
 
 /--
 N-D max pooling for channels-first tensors `(C, spatial...)` (no batch axis).
@@ -1175,6 +1214,7 @@ def maxPool {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .maxPool
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.maxPool (t := t0)
       (d := d) (C := C)
@@ -1182,7 +1222,7 @@ def maxPool {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
       (hKernel := hKernel) x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "max_pool" cpu cuda
+  dispatchCudaOpt (α := α) s .maxPool cpu cuda
 
 /--
 N-D average pooling for channels-first tensors `(C, spatial...)` (no batch axis).
@@ -1205,6 +1245,7 @@ def avgPool {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .avgPool
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.avgPool (t := t0)
       (d := d) (C := C)
@@ -1212,7 +1253,7 @@ def avgPool {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
       hKernel x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "avg_pool" cpu cuda
+  dispatchCudaOpt (α := α) s .avgPool cpu cuda
 
 /--
 N-D smooth max pooling (log-sum-exp surrogate) for channels-first tensors `(C, spatial...)`.
@@ -1236,6 +1277,7 @@ def smoothMaxPool {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .smoothMaxPool
     let betaF ← CudaBridge.TensorConv.toFloat (α := α) beta
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.smoothMaxPool (t := t0)
@@ -1244,7 +1286,7 @@ def smoothMaxPool {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α) [
       (hKernel := hKernel) x.id betaF)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "smooth_max_pool" cpu cuda
+  dispatchCudaOpt (α := α) s .smoothMaxPool cpu cuda
 
 /-- 2D max-pooling (no batch axis). PyTorch: `torch.nn.functional.max_pool2d`. -/
 def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -1252,6 +1294,8 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
   (x : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
     .scalar)))) := do
+  if stride == 0 then
+    throw <| IO.userError "torch: max_pool2d requires stride > 0"
   let cpu := do
     let t0 ← s.tape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.maxPool2d (t := t0)
@@ -1260,12 +1304,13 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let inCU32 : UInt32 := UInt32.ofNat inC
-    let inHU32 : UInt32 := UInt32.ofNat inH
-    let inWU32 : UInt32 := UInt32.ofNat inW
-    let kHU32 : UInt32 := UInt32.ofNat kH
-    let kWU32 : UInt32 := UInt32.ofNat kW
-    let strideU32 : UInt32 := UInt32.ofNat stride
+    let _ ← requireNativeCudaCapsule s .maxPool2d
+    let inCU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inC
+    let inHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inH
+    let inWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inW
+    let kHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked kH
+    let kWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked kW
+    let strideU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked stride
     let paddingU32 : UInt32 := 0
     let outSh : Shape :=
       .dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar))
@@ -1279,7 +1324,7 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
           Runtime.Autograd.Cuda.torchleanMaxPool2dBwdCuda xBuf dLdy inCU32 inHU32 inWU32 kHU32 kWU32 strideU32 paddingU32)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "max_pool2d" cpu cuda
+  dispatchCudaOpt (α := α) s .maxPool2d cpu cuda
 
 /-- 2D max-pooling with padding (no batch axis). PyTorch: `max_pool2d(..., padding=...)`. -/
 def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -1287,6 +1332,8 @@ def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
   (x : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (TensorRef α (.dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
     (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))) := do
+  if stride == 0 then
+    throw <| IO.userError "torch: max_pool2d with padding requires stride > 0"
   let cpu := do
     let t0 ← s.tape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Tape.maxPool2dPad (t := t0)
@@ -1296,13 +1343,14 @@ def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let inCU32 : UInt32 := UInt32.ofNat inC
-    let inHU32 : UInt32 := UInt32.ofNat inH
-    let inWU32 : UInt32 := UInt32.ofNat inW
-    let kHU32 : UInt32 := UInt32.ofNat kH
-    let kWU32 : UInt32 := UInt32.ofNat kW
-    let strideU32 : UInt32 := UInt32.ofNat stride
-    let paddingU32 : UInt32 := UInt32.ofNat padding
+    let _ ← requireNativeCudaCapsule s .maxPool2dPad
+    let inCU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inC
+    let inHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inH
+    let inWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inW
+    let kHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked kH
+    let kWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked kW
+    let strideU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked stride
+    let paddingU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked padding
     let outSh : Shape :=
       .dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
         (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))
@@ -1316,7 +1364,7 @@ def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
           Runtime.Autograd.Cuda.torchleanMaxPool2dBwdCuda xBuf dLdy inCU32 inHU32 inWU32 kHU32 kWU32 strideU32 paddingU32)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "max_pool2d_pad" cpu cuda
+  dispatchCudaOpt (α := α) s .maxPool2dPad cpu cuda
 
 /-- Alias for `max_pool2d_pad` (PyTorch-style shorthand). -/
 abbrev maxPoolPad {α : Type} := maxPool2dPad (α := α)
@@ -1337,6 +1385,7 @@ def smoothMaxPool2d {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .smoothMaxPool2d
     let betaF ← CudaBridge.TensorConv.toFloat (α := α) beta
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
@@ -1345,7 +1394,7 @@ def smoothMaxPool2d {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
         (h1 := h1) (h2 := h2) x.id betaF
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "smooth_max_pool2d" cpu cuda
+  dispatchCudaOpt (α := α) s .smoothMaxPool2d cpu cuda
 
 /-- 2D average-pooling (no batch axis). PyTorch: `torch.nn.functional.avg_pool2d`. -/
 def avgPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -1361,13 +1410,14 @@ def avgPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .avgPool2d
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.avgPool2d (t := t0)
       (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
       h1 h2 x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "avg_pool2d" cpu cuda
+  dispatchCudaOpt (α := α) s .avgPool2d cpu cuda
 
 /-- 2D average-pooling with padding (no batch axis). PyTorch: `avg_pool2d(..., padding=...)`. -/
 def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -1384,6 +1434,7 @@ def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
+    let _ ← requireNativeCudaCapsule s .avgPool2dPad
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.avgPool2dPad (t := t0)
       (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride) (padding :=
@@ -1391,7 +1442,7 @@ def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
       h1 h2 x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s "avg_pool2d_pad" cpu cuda
+  dispatchCudaOpt (α := α) s .avgPool2dPad cpu cuda
 
 /-- Alias for `avg_pool2d_pad` (PyTorch-style shorthand). -/
 abbrev avgPoolPad {α : Type} := avgPool2dPad (α := α)
