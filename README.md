@@ -108,21 +108,6 @@ deep dives, GraphSpec, BugZoo, and verification workflows such as `torchlean-ibp
 `torchlean-crown-ops`, `abcrown-leaf`, `pinn-cert`, `pinn-dataset-check`, `digits-train-certify`,
 and `vnncomp-mnistfc`.
 
-## Documentation
-
-- Project site: <https://lean-dojo.github.io/TorchLean/>
-- Guide: <https://lean-dojo.github.io/TorchLean/blueprint/>
-- Examples: <https://lean-dojo.github.io/TorchLean/examples/>
-- Installation: <https://lean-dojo.github.io/TorchLean/installation/>
-- Module graph: <https://lean-dojo.github.io/TorchLean/graphs/>
-- Updates and recent validation notes: <https://lean-dojo.github.io/TorchLean/updates/>
-- Paper: [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631)
-  (arXiv:2602.22631)
-
-For a first pass, read the guide and examples together: the guide explains the objects, and the
-examples show the commands that produce them. Use the source tree for exact declarations and the
-graph page for module ownership.
-
 ## Use TorchLean From Another Lean Project
 
 TorchLean is a normal Lake package. You can depend on the Git repository directly:
@@ -230,10 +215,23 @@ Lean proofs, executable checkers, Lake builds, tests, and explicit
 trust-boundary documentation are the source of truth for what is proved,
 checked, or assumed.
 
-## Paper
+## Citation
 
-TorchLean is described in the arXiv preprint
-[TorchLean: Formalizing Neural Networks in Lean](https://arxiv.org/abs/2602.22631).
+If TorchLean is useful in your work, please cite
+[*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631):
+
+```bibtex
+@misc{george2026torchlean,
+  title         = {TorchLean: Formalizing Neural Networks in Lean},
+  author        = {George, Robert Joseph and Cruden, Jennifer and Adkisson, Will and
+                   Zhong, Xiangru and Zhang, Huan and Anandkumar, Anima},
+  year          = {2026},
+  eprint        = {2602.22631},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.MS},
+  url           = {https://arxiv.org/abs/2602.22631}
+}
+```
 
 ## License
 
