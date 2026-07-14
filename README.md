@@ -8,13 +8,6 @@ neural-network programs. It provides typed tensors and model APIs, a shared grap
 IR, runtime/autograd support, finite-precision semantics, certificate checkers,
 CUDA/runtime boundaries, and examples across modern ML and scientific ML.
 
-The project is organized around one discipline: keep the object of the claim
-visible. A classifier, FNO, PINN residual, optimizer step, imported checkpoint,
-or verifier certificate should not become a loose collection of scripts once it
-starts running. TorchLean gives those objects Lean names, executable paths, graph
-representations, and theorem or checker APIs where the current library has
-support.
-
 ## Installation
 
 ```bash
@@ -95,18 +88,6 @@ For the maintained examples:
 ```bash
 lake build NN.Examples.Zoo
 ```
-
-The public API is centered around `Trainer.new`. A trainer owns the model, task, optimizer, runtime
-backend, scalar mode, and seed. It can run one prediction with `trainer.predict`, run training with
-`trainer.train`, and return a trained handle whose `predict`, `predictBatch`, and `verify` methods
-reuse the trained parameters. Verification commands use the same idea at the artifact level: the
-CLI names the graph, certificate, dataset, or external producer boundary being checked.
-
-The maintained command set currently includes quickstarts, supervised models, CNN/ViT, GPT-style
-text, Mamba, diffusion, FNO Burgers, PPO/DQN, PyTorch round trips, data loaders, floating-point
-deep dives, GraphSpec, BugZoo, and verification workflows such as `torchlean-ibp`,
-`torchlean-crown-ops`, `abcrown-leaf`, `pinn-cert`, `pinn-dataset-check`, `digits-train-certify`,
-and `vnncomp-mnistfc`.
 
 ## Use TorchLean From Another Lean Project
 
