@@ -100,11 +100,11 @@ def evalFGraphVals
     {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
     (g : FGraph α paramShapes inShape ss out)
     (params : Runtime.Autograd.Torch.TList α paramShapes)
-    (vals : Array (DVal α)) : Except String (Array (DVal α)) := do
+    (vals : Array (DVal α)) : Except String (Array (DVal α)) :=
   match g with
-      | .ret _y =>
+  | .ret _y =>
       pure vals
-      | .let1 (ss := ss) (mid := mid) (out := out) node gNext =>
+  | .let1 (ss := ss) (mid := mid) (out := out) node gNext => do
       let vOut ←
         evalNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := mid)
           node params vals

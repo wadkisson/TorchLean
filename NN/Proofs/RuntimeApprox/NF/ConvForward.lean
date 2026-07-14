@@ -277,18 +277,9 @@ private lemma conv_input_val_eq_padded
           getAtOrZero layer.bias [out_ch.val] := by
     classical
     unfold Spec.conv2dSpec
-    -- `getAtOrZero` reduces via in-bounds checks. With `outH/outW = (...) / stride + 1`, simp will
-    -- rewrite `i < outH` into `i ≤ outH - 1`, so we provide those `≤` proofs explicitly.
-    have hi : i.val ≤ (inH + 2 * padding - kH) / stride := by
-      have hi' : i.val < (inH + 2 * padding - kH) / stride + 1 := by
-        simpa [conv2dOutH] using i.isLt
-      exact Nat.le_of_lt_succ hi'
-    have hj : j.val ≤ (inW + 2 * padding - kW) / stride := by
-      have hj' : j.val < (inW + 2 * padding - kW) / stride + 1 := by
-        simpa [conv2dOutW] using j.isLt
-      exact Nat.le_of_lt_succ hj'
+    -- The output indices are in bounds for the shared totalized window shape by construction.
     simp [conv2dOutH, conv2dOutW, Spec.get_at_or_zero_dim_cons, Spec.get_at_or_zero_scalar_nil,
-      out_ch.isLt, hi, hj]
+      out_ch.isLt]
     rfl
 
 -- ---------------------------------------------------------------------------

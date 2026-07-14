@@ -7,7 +7,6 @@ Authors: TorchLean Team
 module
 
 public import Mathlib.Analysis.SpecialFunctions.Log.Basic
-public import NN.Floats.NeuralFloat.Metadata
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 /-!
@@ -21,14 +20,12 @@ TorchLean frequently reasons about floating-point behavior using a classical "ro
 - describe the *format* via an exponent-selection function `fexp : ℤ → ℤ` and a rounding operator.
 
 This decomposition is the same one used by the Coq library **Flocq**. It makes many theorems
-reusable across formats (fixed-point, unbounded floats, bounded IEEE-like floats) and aligns well
+reusable across formats (fixed-point, unbounded floats, and lower-exponent-bounded floats) and aligns well
 with ULP-style error bounds from numerical analysis.
 
-TorchLean also cares about *mixed precision* training/inference (FP16/bfloat16/TF32/FP32/FP64).
-In this folder, "precision" is not a promise about bit-level encoding; it's a parameter that
-selects mantissa/exponent sizes and is used by the format and error-bound layers.
-
 For executable, bit-level IEEE-754 semantics (NaN/Inf/signed zero), see `NN/Floats/IEEEExec/`.
+Training annotations and named precision policies are deliberately kept out of this mathematical
+core; see `NN/Floats/NeuralFloat/Metadata.lean`.
 
 ## References
 
@@ -87,33 +84,12 @@ lemma gt_one : 1 < r.toReal := by
 
 end NeuralRadix
 
-/--
-An abstract floating-point value (mantissa/exponent) plus analysis metadata.
-
-The core mathematical payload is `mantissa` and `exponent`. The other fields are there to support
-mixed precision and simple error-tracking experiments used in some TorchLean examples:
-
-- `precision`: a named format (FP16/FP32/…); see `NeuralPrecision`.
-- `error_bound`: a conservative absolute error bound attached by a conversion/rounding pass.
-- `phase`: forward/backward/update/inference (see `TrainingPhase.requires_high_precision`).
-- `layer_id`/`batch_id`: metadata tags used by “track where an error came from”
-  utilities.
--/
+/-- A radix-`β` floating-point representation with integer mantissa and exponent. -/
 structure NeuralFloat (β : NeuralRadix) where
   /-- Integer mantissa `m`. -/
   mantissa : ℤ
   /-- Integer exponent `e`. -/
   exponent : ℤ
-  /-- Named precision metadata (e.g. FP16/FP32); does not affect `to_real`. -/
-  precision : NeuralPrecision
-  /-- Conservative absolute error bound metadata attached by conversions/rounding passes. -/
-  error_bound : ℝ
-  /-- Training phase metadata (forward/backward/update/inference). -/
-  phase : TrainingPhase
-  /-- Optional layer id tag (used in examples/experiments). -/
-  layer_id : ℕ
-  /-- Optional batch id tag (used in examples/experiments). -/
-  batch_id : ℕ
 
 namespace NeuralFloat
 
@@ -154,6 +130,11 @@ lemma add_exp (e1 e2 : ℤ) : neuralBpow β (e1 + e2) = neuralBpow β e1 * neura
 /-- Negating the exponent inverts the base power: `β^(-e) = (β^e)⁻¹`. -/
 lemma neg_exp (e : ℤ) : neuralBpow β (-e) = (neuralBpow β e)⁻¹ := by
   simp [neuralBpow, zpow_neg]
+
+/-- Exponent subtraction corresponds to division of radix powers. -/
+lemma sub_exp (e₁ e₂ : ℤ) :
+    neuralBpow β (e₁ - e₂) = neuralBpow β e₁ / neuralBpow β e₂ := by
+  simp [neuralBpow, zpow_sub₀ (NeuralRadix.ne_zero β)]
 
 end neuralBpow
 
@@ -196,17 +177,53 @@ noncomputable def neuralMagnitude (β : NeuralRadix) (x : ℝ) : ℤ :=
 /--
 Validity predicate for exponent-selection functions.
 
-In Flocq, many results are stated for an abstract `fexp : ℤ → ℤ` satisfying `Valid_exp`.
-We keep essentially the same interface (see `flocq_valid`) so theorems can be stated using direct
-analogues of Flocq results, and we add a couple of convenience properties that are often needed for
-bounding arguments (`bounded_growth`, `monotone`).
+This is the exponent-validity condition used by Flocq. Properties that are not consequences of
+validity, such as monotonicity, are separate classes so generic results do not acquire unnecessary
+hypotheses.
 -/
 class NeuralValidExp (fexp : ℤ → ℤ) : Prop where
   flocq_valid : ∀ k : ℤ,
     (fexp k < k → fexp (k + 1) ≤ k) ∧
     (k ≤ fexp k → fexp (fexp k + 1) ≤ fexp k ∧ ∀ l, l ≤ fexp k → fexp l = fexp k)
-  bounded_growth : ∀ k : ℤ, |fexp (k + 1) - fexp k| ≤ 1
+
+/-- Exponent-selection functions that preserve order. -/
+class NeuralMonotoneExp (fexp : ℤ → ℤ) : Prop where
   monotone : ∀ k1 k2 : ℤ, k1 ≤ k2 → fexp k1 ≤ fexp k2
+
+/-- Optional local growth bound used by selected numerical estimates. -/
+class NeuralBoundedExpGrowth (fexp : ℤ → ℤ) : Prop where
+  boundedGrowth : ∀ k : ℤ, |fexp (k + 1) - fexp k| ≤ 1
+
+/-- A witness that the format has a lower exponent region, in Flocq's sense. -/
+def IsNeuralNegligibleExp (fexp : ℤ → ℤ) (n : ℤ) : Prop :=
+  n ≤ fexp n
+
+/--
+Select a witness `n ≤ fexp n` when the format has one. Unbounded formats such as FLX return
+`none`; lower-bounded formats such as FLT return `some n`.
+-/
+noncomputable def neuralNegligibleExp (fexp : ℤ → ℤ) : Option ℤ := by
+  classical
+  exact if h : ∃ n, IsNeuralNegligibleExp fexp n then some (Classical.choose h) else none
+
+/-- A selected negligible exponent satisfies `n ≤ fexp n`. -/
+theorem neuralNegligibleExp_spec {fexp : ℤ → ℤ} {n : ℤ}
+    (h : neuralNegligibleExp fexp = some n) : IsNeuralNegligibleExp fexp n := by
+  classical
+  unfold neuralNegligibleExp at h
+  split at h
+  next hex =>
+    have hn : Classical.choose hex = n := Option.some.inj h
+    rw [← hn]
+    exact Classical.choose_spec hex
+  next _ => simp at h
+
+/-- A format has no selected negligible exponent exactly when no negligible exponent exists. -/
+theorem neuralNegligibleExp_eq_none_iff (fexp : ℤ → ℤ) :
+    neuralNegligibleExp fexp = none ↔ ¬∃ n, IsNeuralNegligibleExp fexp n := by
+  classical
+  unfold neuralNegligibleExp
+  split <;> simp_all
 
 /--
 Canonical exponent (`cexp` in Flocq terminology).
@@ -216,6 +233,11 @@ exponent used for scaling/rounding.
 -/
 noncomputable def neuralCexp (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp fexp] (x : ℝ) : ℤ :=
   fexp (neuralMagnitude β x)
+
+/-- A float representation is canonical when its stored exponent is the exponent selected for its value. -/
+def NeuralCanonical (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp fexp]
+    (f : NeuralFloat β) : Prop :=
+  f.exponent = neuralCexp β fexp (neuralToReal f)
 
 /--
 Scaled mantissa (`x * β^{-cexp(x)}`).
@@ -237,31 +259,22 @@ def neuralGenericFormat (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp 
     neuralToReal (β := β)
       { mantissa := ⌊neuralScaledMantissa β fexp x⌋
       , exponent := neuralCexp β fexp x
-      , precision := NeuralPrecision.ieee_single
-      , error_bound := 0
-      , phase := TrainingPhase.forward
-      , layer_id := 0
-      , batch_id := 0
       }
 
 /--
-Unit in the last place (`ulp`) associated with `x`.
+Unit in the last place (`ulp`) associated with `x` and the format selected by `fexp`.
 
 This is the scale of the “one ulp” step at the exponent selected by `cexp`. For round-to-nearest,
 many standard bounds have the shape `|round(x) - x| ≤ ulp(x)/2`.
 
-TorchLean adds a small, *optional* twist: during numerically sensitive phases (see
-`TrainingPhase.requires_high_precision`) we treat the bound as if it were one extra bit tighter.
-This is a modeling hook for mixed-precision heuristics; it is not a replacement for a concrete
-bit-level IEEE-754 semantics.
+An ULP is a property of the format and does not depend on runtime provenance annotations.
 -/
-noncomputable def neuralUlp (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp fexp] (x : ℝ) (phase :
-  TrainingPhase := TrainingPhase.forward) : ℝ :=
-  if x = 0 then neuralBpow β (fexp 0)
-  else
-    let base_ulp := neuralBpow β (neuralCexp β fexp x)
-    if phase.requiresHighPrecision then base_ulp / 2
-    else base_ulp
+noncomputable def neuralUlp (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp fexp] (x : ℝ) : ℝ :=
+  if x = 0 then
+    match neuralNegligibleExp fexp with
+    | some n => neuralBpow β (fexp n)
+    | none => 0
+  else neuralBpow β (neuralCexp β fexp x)
 
 namespace neuralUlp
 
@@ -272,88 +285,34 @@ variable (β : NeuralRadix) (fexp : ℤ → ℤ) [NeuralValidExp fexp]
 
 Informally: an ulp is a step size on a real grid, so it cannot be negative.
 -/
-lemma nonneg (x : ℝ) (phase : TrainingPhase) : 0 ≤ neuralUlp β fexp x phase := by
-  simp [neuralUlp]
-  split_ifs
-  · exact neuralBpow.nonneg β (fexp 0)
-  · exact div_nonneg (neuralBpow.nonneg β _) (by norm_num)
-  · exact neuralBpow.nonneg β _
+lemma nonneg (x : ℝ) : 0 ≤ neuralUlp β fexp x := by
+  by_cases hx : x = 0
+  · simp [neuralUlp, hx]
+    split <;> simp [neuralBpow.nonneg]
+  · simp [neuralUlp, hx, neuralBpow.nonneg]
 
 /--
 `neural_ulp` is strictly positive away from zero.
 
-Informally: if `x ≠ 0` then the exponent selection `cexp(x)` picks some power of `β`, and the ulp
-at that exponent is `β^{cexp(x)}` (or half of it in high-precision phases), hence positive.
+If `x ≠ 0`, the exponent selection `cexp(x)` picks a power of `β`, which is strictly positive.
 -/
-lemma pos_of_ne_zero (x : ℝ) (hx : x ≠ 0) (phase : TrainingPhase) : 0 < neuralUlp β fexp x phase :=
-  by
-  simp [neuralUlp, hx]
-  -- Since x ≠ 0, we're in the else branch
-  split_ifs with h_phase
-  · -- High precision phase: base_ulp / 2
-    apply div_pos
-    · exact neuralBpow.pos β (neuralCexp β fexp x)
-    · norm_num
-  · -- Normal precision phase: base_ulp
-    exact neuralBpow.pos β (neuralCexp β fexp x)
+lemma pos_of_ne_zero (x : ℝ) (hx : x ≠ 0) : 0 < neuralUlp β fexp x := by
+  simp [neuralUlp, hx, neuralBpow.pos]
 
-/-- `neural_ulp` at zero does not depend on the training phase. -/
-@[simp] lemma zero (phase : TrainingPhase) :
-    neuralUlp β fexp (0 : ℝ) phase = neuralBpow β (fexp 0) := by
+/-- The ULP at zero is determined by the format's negligible exponent, when one exists. -/
+@[simp] lemma zero :
+    neuralUlp β fexp (0 : ℝ) =
+      match neuralNegligibleExp fexp with
+      | some n => neuralBpow β (fexp n)
+      | none => 0 := by
   simp [neuralUlp]
 
 /--
-When `x ≠ 0` and the phase does **not** request high precision, `neural_ulp` is just the base grid
-step `β^{cexp(x)}`.
+Away from zero, `neuralUlp` is the base grid step `β^{cexp(x)}`.
 -/
-lemma eq_base_of_ne_zero_of_not_high_precision (x : ℝ) (hx : x ≠ 0)
-    (phase : TrainingPhase) (hphase : phase.requiresHighPrecision = false) :
-    neuralUlp β fexp x phase = neuralBpow β (neuralCexp β fexp x) := by
-  simp [neuralUlp, hx, hphase]
-
-/--
-When `x ≠ 0` and the phase requests high precision, we use the same exponent scale but treat the
-ULP as “one extra bit tighter” by dividing by 2.
--/
-lemma eq_base_div_two_of_ne_zero_of_high_precision (x : ℝ) (hx : x ≠ 0)
-    (phase : TrainingPhase) (hphase : phase.requiresHighPrecision = true) :
-    neuralUlp β fexp x phase = neuralBpow β (neuralCexp β fexp x) / 2 := by
-  simp [neuralUlp, hx, hphase]
-
-/--
-Forward-mode ULP simplification for `x ≠ 0`.
-
-This matches the common “one ulp at exponent `cexp(x)`” intuition used in numerical analysis and
-in everyday PyTorch/IEEE-754 error reasoning.
--/
-@[simp] lemma forward_of_ne_zero (x : ℝ) (hx : x ≠ 0) :
-    neuralUlp β fexp x TrainingPhase.forward = neuralBpow β (neuralCexp β fexp x) := by
-  simpa [TrainingPhase.requiresHighPrecision] using
-    (eq_base_of_ne_zero_of_not_high_precision (β := β) (fexp := fexp) x hx TrainingPhase.forward
-      rfl)
-
-/-- Inference-phase ULP simplification for `x ≠ 0` (same scale as forward). -/
-@[simp] lemma inference_of_ne_zero (x : ℝ) (hx : x ≠ 0) :
-    neuralUlp β fexp x TrainingPhase.inference = neuralBpow β (neuralCexp β fexp x) := by
-  simpa [TrainingPhase.requiresHighPrecision] using
-    (eq_base_of_ne_zero_of_not_high_precision (β := β) (fexp := fexp) x hx TrainingPhase.inference
-      rfl)
-
-/-- Backward-phase ULP simplification for `x ≠ 0` (uses the “tighter by 2” convention). -/
-@[simp] lemma backward_of_ne_zero (x : ℝ) (hx : x ≠ 0) :
-    neuralUlp β fexp x TrainingPhase.backward =
-      neuralBpow β (neuralCexp β fexp x) / 2 := by
-  simpa [TrainingPhase.requiresHighPrecision] using
-    (eq_base_div_two_of_ne_zero_of_high_precision (β := β) (fexp := fexp) x hx
-      TrainingPhase.backward rfl)
-
-/-- Update-phase ULP simplification for `x ≠ 0` (uses the “tighter by 2” convention). -/
-@[simp] lemma update_of_ne_zero (x : ℝ) (hx : x ≠ 0) :
-    neuralUlp β fexp x TrainingPhase.update =
-      neuralBpow β (neuralCexp β fexp x) / 2 := by
-  simpa [TrainingPhase.requiresHighPrecision] using
-    (eq_base_div_two_of_ne_zero_of_high_precision (β := β) (fexp := fexp) x hx TrainingPhase.update
-      rfl)
+@[simp] lemma of_ne_zero (x : ℝ) (hx : x ≠ 0) :
+    neuralUlp β fexp x = neuralBpow β (neuralCexp β fexp x) := by
+  simp [neuralUlp, hx]
 
 end neuralUlp
 

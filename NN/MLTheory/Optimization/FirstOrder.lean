@@ -9,14 +9,9 @@ module
 public import NN.MLTheory.Optimization.OptimizerLaws
 
 /-!
-# Runtime Optimizer Equations
+# First-Order Optimizer Relations
 
-Small executable theorems about TorchLean's optimizer equations.
-
-These are kept modest. They prove properties of the update rules that TorchLean actually executes,
-rather than broad convergence claims that would require assumptions about convexity, smoothness,
-stochastic gradients, and floating-point error. Larger optimization theory can build on these
-equations through `Optimization.OptimizerLaws`.
+Relations between distinct first-order optimizer updates.
 
 This is the tensor-facing layer: the statements are phrased over `Spec.Tensor` and the executable
 operator dictionary `Spec.Context`. When we want ordinary algebraic simplification, such as proving
@@ -33,47 +28,7 @@ open Tensor
 
 variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
 
-namespace SGD
-
-/-- SGD is definitionally `p - lr * g`. -/
-theorem update_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    update state params grads = subSpec params (scaleSpec grads state.lr) := by
-  rfl
-
-end SGD
-
-namespace MomentumSGD
-
-/-- Momentum SGD updates its buffer to `momentum * old_buffer + gradient`. -/
-theorem update_buffer_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    (update state params grads).1.buf =
-      addSpec (scaleSpec state.buf state.momentum) grads := by
-  rfl
-
-/-- Momentum SGD updates parameters using the freshly updated buffer. -/
-theorem update_params_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    (update state params grads).2 =
-      subSpec params
-        (scaleSpec (addSpec (scaleSpec state.buf state.momentum) grads) state.lr) := by
-  rfl
-
-end MomentumSGD
-
-namespace Adam
-
-/-- Adam increments its bias-correction counter by exactly one every step. -/
-theorem update_time_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    (update state params grads).1.t = state.t + 1 := by
-  rfl
-
-end Adam
-
 namespace AdamW
-
-/-- AdamW increments its bias-correction counter by exactly one every step. -/
-theorem update_time_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    (update state params grads).1.t = state.t + 1 := by
-  rfl
 
 /-!
 `Context α` gives us executable operators, but not algebraic laws like `x * 0 = 0`.
@@ -124,16 +79,5 @@ theorem update_weight_decay_zero_params_eq_adam_real {s : Shape}
       simp [AdamW.update, Adam.update, hwd', scaleSpec_zero, subSpec_fill_zero]
 
 end AdamW
-
-namespace Adadelta
-
-/-- Adadelta's gradient accumulator follows the documented EMA equation. -/
-theorem update_v_eq {s : Shape} (state : State α s) (params grads : Tensor α s) :
-    (update state params grads).1.v =
-      addSpec (scaleSpec state.v state.rho)
-        (scaleSpec (squareSpec grads) (1 - state.rho)) := by
-  rfl
-
-end Adadelta
 
 end Optim

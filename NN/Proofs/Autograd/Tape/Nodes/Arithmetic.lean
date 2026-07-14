@@ -40,8 +40,8 @@ fixed affine map can instantiate the same theorem by supplying the appropriate c
 map `A` and bias vector `b`.
 -/
 def affine {Γ : List Shape} {sIn sOut : Shape}
-    (idx : Idx Γ sIn) (A : Vec (Shape.size sIn) →L[ℝ] Vec (Shape.size sOut))
-    (b : Vec (Shape.size sOut)) : Node Γ sOut :=
+    (idx : Idx Γ sIn) (A : Vec (Spec.Shape.size sIn) →L[ℝ] Vec (Spec.Shape.size sOut))
+    (b : Vec (Spec.Shape.size sOut)) : Node Γ sOut :=
   Node.ofVec (Γ := Γ) (τ := sOut)
     (f := fun x => A (CtxVec.get (Γ := Γ) (s := sIn) idx x) + b)
     (jvp := fun _x dx => A (CtxVec.get (Γ := Γ) (s := sIn) idx dx))
@@ -55,8 +55,8 @@ def affine {Γ : List Shape} {sIn sOut : Shape}
 
 /-- `NodeFDerivCorrect` for a fixed affine map over arbitrary tensor shapes. -/
 def affineFderiv {Γ : List Shape} {sIn sOut : Shape}
-    (idx : Idx Γ sIn) (A : Vec (Shape.size sIn) →L[ℝ] Vec (Shape.size sOut))
-    (b : Vec (Shape.size sOut)) :
+    (idx : Idx Γ sIn) (A : Vec (Spec.Shape.size sIn) →L[ℝ] Vec (Spec.Shape.size sOut))
+    (b : Vec (Spec.Shape.size sOut)) :
     NodeFDerivCorrect (affine (Γ := Γ) (sIn := sIn) (sOut := sOut) idx A b) :=
   { deriv := fun _x => A.comp (CtxVec.getCLM (Γ := Γ) (s := sIn) idx)
     hasFDerivAt := by
@@ -189,15 +189,15 @@ This is the differentiable core of deterministic training-mode dropout: once a s
 mask, the forward pass is just `x ↦ coeff ⊙ x` (with `coeff = mask / keepProb` for inverted
 dropout). The randomness itself is not differentiated; it is represented by the fixed `coeff`.
 -/
-def fixedMaskScale {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (coeff : Vec (Shape.size s)) :
+def fixedMaskScale {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (coeff : Vec (Spec.Shape.size s)) :
     Node Γ s :=
   Node.ofVec (Γ := Γ) (τ := s)
-    (f := fun x => vecOfFun (n := Shape.size s) fun i =>
+    (f := fun x => vecOfFun (n := Spec.Shape.size s) fun i =>
       coeff i * CtxVec.get (Γ := Γ) (s := s) idx x i)
-    (jvp := fun _x dx => vecOfFun (n := Shape.size s) fun i =>
+    (jvp := fun _x dx => vecOfFun (n := Spec.Shape.size s) fun i =>
       coeff i * CtxVec.get (Γ := Γ) (s := s) idx dx i)
     (vjp := fun _x δ => CtxVec.single (Γ := Γ) (s := s) idx
-      (vecOfFun (n := Shape.size s) fun i => coeff i * δ i))
+      (vecOfFun (n := Spec.Shape.size s) fun i => coeff i * δ i))
     (correct_inner := by
       intro _x dx δ
       classical
@@ -212,13 +212,13 @@ seeded dropout after the mask has been generated: fixed seed and fixed keep prob
 `coeff`; gradients flow only through the input activation.
 -/
 def fixedMaskScaleFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
-    (coeff : Vec (Shape.size s)) :
+    (coeff : Vec (Spec.Shape.size s)) :
     NodeFDerivCorrect (fixedMaskScale (Γ := Γ) (s := s) idx coeff) :=
-  let D : CtxVec Γ →L[ℝ] Vec (Shape.size s) := by
+  let D : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s) := by
     classical
-    let L : Vec (Shape.size s) →L[ℝ] Vec (Shape.size s) := by
-      let fLin : Vec (Shape.size s) →ₗ[ℝ] Vec (Shape.size s) :=
-        { toFun := fun v => vecOfFun (n := Shape.size s) fun i => coeff i * v i
+    let L : Vec (Spec.Shape.size s) →L[ℝ] Vec (Spec.Shape.size s) := by
+      let fLin : Vec (Spec.Shape.size s) →ₗ[ℝ] Vec (Spec.Shape.size s) :=
+        { toFun := fun v => vecOfFun (n := Spec.Shape.size s) fun i => coeff i * v i
           map_add' := by
             intro x y
             ext i
@@ -253,9 +253,9 @@ def fixedMaskScaleFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
         ContinuousLinearMap.comp_apply] }
 
 /-- Coefficients for inverted dropout from a fixed Boolean keep mask and scalar keep probability. -/
-def invertedDropoutCoeff {s : Shape} (mask : Fin (Shape.size s) → Bool) (keepProb : ℝ) :
-    Vec (Shape.size s) :=
-  vecOfFun (n := Shape.size s) fun i => if mask i then keepProb⁻¹ else 0
+def invertedDropoutCoeff {s : Shape} (mask : Fin (Spec.Shape.size s) → Bool) (keepProb : ℝ) :
+    Vec (Spec.Shape.size s) :=
+  vecOfFun (n := Spec.Shape.size s) fun i => if mask i then keepProb⁻¹ else 0
 
 /--
 Fixed-mask inverted dropout node.
@@ -265,12 +265,12 @@ derivative theorem treats `mask` and `keepProb` as constants, so the node is sim
 linear map on the activation.
 -/
 def fixedInvertedDropout {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
-    (mask : Fin (Shape.size s) → Bool) (keepProb : ℝ) : Node Γ s :=
+    (mask : Fin (Spec.Shape.size s) → Bool) (keepProb : ℝ) : Node Γ s :=
   fixedMaskScale (Γ := Γ) (s := s) idx (invertedDropoutCoeff (s := s) mask keepProb)
 
 /-- `NodeFDerivCorrect` for fixed-mask inverted dropout. -/
 def fixedInvertedDropoutFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
-    (mask : Fin (Shape.size s) → Bool) (keepProb : ℝ) :
+    (mask : Fin (Spec.Shape.size s) → Bool) (keepProb : ℝ) :
     NodeFDerivCorrect
       (fixedInvertedDropout (Γ := Γ) (s := s) idx mask keepProb) :=
   fixedMaskScaleFderiv (Γ := Γ) (s := s) idx
@@ -278,7 +278,7 @@ def fixedInvertedDropoutFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
 
 /-- Pointwise multiplication of two same-shaped context entries. -/
 def mul {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   let hadamard : Vec n → Vec n → Vec n := fun u v => vecOfFun (n := n) fun i => u i * v i
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun x => hadamard (CtxVec.get (Γ := Γ) (s := s) a x) (CtxVec.get (Γ := Γ) (s := s) b x))
@@ -342,7 +342,7 @@ def mul {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
 def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
     NodeFDerivCorrect (mul (Γ := Γ) (s := s) a b) :=
 { deriv := fun xV =>
-    let n : Nat := Shape.size s
+    let n : Nat := Spec.Shape.size s
     (euclideanEquiv n).symm.toContinuousLinearMap.comp <|
       ContinuousLinearMap.pi (fun i : Fin n =>
         let a_i : CtxVec Γ →L[ℝ] ℝ :=
@@ -353,7 +353,7 @@ def mulFderiv {Γ : List Shape} {s : Shape} (a b : Idx Γ s) :
   hasFDerivAt := by
     intro xV
     classical
-    let n : Nat := Shape.size s
+    let n : Nat := Spec.Shape.size s
     let aFun : CtxVec Γ → Vec n := fun x => CtxVec.get (Γ := Γ) (s := s) a x
     let bFun : CtxVec Γ → Vec n := fun x => CtxVec.get (Γ := Γ) (s := s) b x
     -- prove coordinatewise and assemble with `hasFDerivAt_pi`

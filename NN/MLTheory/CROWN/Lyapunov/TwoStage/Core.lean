@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Spec
+public import NN.Spec
 public import NN.Runtime.Autograd.TorchLean.Functional
 public import NN.Tensor.API
 

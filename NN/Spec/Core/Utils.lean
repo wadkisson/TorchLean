@@ -23,7 +23,7 @@ Main definitions include:
 - simple pretty-printing (`Spec.pretty`) for executable scalar backends,
 - list ↔ tensor helpers (`from_list_1d`, `from_list_2d`).
 
-User-facing constructors in the tensor API (for example `tensorND!`, `tensorF!`) live in
+User-facing constructors in the tensor API (for example `tensorOfList!`, `tensorF!`) live in
 `NN/Tensor/API.lean` and are built on top of these utilities.
 -/
 

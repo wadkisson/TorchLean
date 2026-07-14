@@ -73,29 +73,29 @@ By default, checks the bundled JSON cert on disk. With `--regen`, calls Julia an
 stdout JSON payload instead.
 -/
 def main (args : List String) : IO Unit := do
-  let args := NN.API.CLI.dropDashDash args
+  let args := TorchLean.CLI.dropDashDash args
 
-  if NN.API.CLI.hasHelp args then
+  if TorchLean.CLI.hasHelp args then
     IO.println usage
     return
 
   let (regen, args) ←
-    match NN.API.CLI.takeBoolFlagOnce args "regen" with
+    match TorchLean.CLI.takeBoolFlagOnce args "regen" with
     | .ok result => pure result
     | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   let (ieee32, args) ←
-    match NN.API.CLI.takeBoolFlagOnce args "ieee32" with
+    match TorchLean.CLI.takeBoolFlagOnce args "ieee32" with
     | .ok result => pure result
     | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   let (scriptPath, args) ←
-    match NN.API.CLI.takeFlagValueDefault args "script" defaultJuliaScript with
+    match TorchLean.CLI.takeFlagValueDefault args "script" defaultJuliaScript with
     | .ok result => pure result
     | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   let (certPath, args) ←
-    match NN.API.CLI.takePositionalDefault args defaultCertPath with
+    match TorchLean.CLI.takePositionalDefault args defaultCertPath with
     | .ok result => pure result
     | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
-  match NN.API.CLI.requireNoArgs args with
+  match TorchLean.CLI.checkNoArgs args with
   | .ok () => pure ()
   | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   let check :=

@@ -106,11 +106,9 @@ def conv2d {α : Type} (s : SessionIR α) [Context α]
   (kernel : TensorRef α (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))))
   (bias : TensorRef α (.dim outC .scalar))
   (input : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
-  IO (TensorRef α (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1) (.dim ((inW + 2 * padding
-    - kW) / stride + 1) .scalar)))) :=
+  IO (TensorRef α (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) :=
   commitGraphM (α := α) s
-    (β := TensorRef α (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1) (.dim ((inW + 2 *
-      padding - kW) / stride + 1) .scalar))))
+    (β := TensorRef α (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))))
     (fun {Γ} {ss} xv nat g => do
       let (v, st') ← runGraphM (α := α) (Γ := Γ)
         (Runtime.Autograd.Compiled.GraphM.conv2d (α := α) (Γ := Γ)
@@ -135,11 +133,11 @@ def convTranspose2d {α : Type} (s : SessionIR α) [Context α]
   (kernel : TensorRef α (.dim inC (.dim outC (.dim kH (.dim kW .scalar)))))
   (bias : TensorRef α (.dim outC .scalar))
   (input : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
-  IO (TensorRef α (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-    (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)))) :=
+  IO (TensorRef α (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+    (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar)))) :=
   commitGraphM (α := α) s
-    (β := TensorRef α (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-      (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar))))
+    (β := TensorRef α (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+      (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar))))
     (fun {Γ} {ss} xv nat g => do
       let (v, st') ← runGraphM (α := α) (Γ := Γ)
         (Runtime.Autograd.Compiled.GraphM.convTranspose2d (α := α) (Γ := Γ)
@@ -191,4 +189,3 @@ end Internal
 end Torch
 end Autograd
 end Runtime
-

@@ -44,7 +44,7 @@ For proof-heavy or public API changes:
 
 ```bash
 lake build NN.CI.All
-lake build NN.Entrypoint.API NN.Entrypoint.Verification NN.Entrypoint.Proofs
+lake build NN.API NN.Verification NN.Proofs
 lake build NN.Examples.Zoo NN.Examples.BugZoo.All
 ```
 

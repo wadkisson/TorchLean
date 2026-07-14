@@ -12,8 +12,8 @@ and Lyapunov/controller experiments.
    including ReLU relaxations, IBP bounds, and affine propagation.
 3. `Graph.lean` and `Graph/`: graph-based LiRPA over TorchLean's op-tagged IR graphs. The graph
    engine stores per-node interval boxes, affine forms, parameter stores, and transfer state.
-4. `Operators.lean` and `Operators/`: transfer rules for activations, arithmetic, convolution,
-   pooling, batch normalization, reductions, slicing, GELU, and trigonometric operations.
+4. `Operators.lean` and `Operators/`: transfer rules for ReLU-family activations, arithmetic,
+   convolution, pooling, batch normalization, reductions, slicing, and trigonometric operations.
 5. `Cert/`: alpha-CROWN and alpha-beta-CROWN certificate data structures.
 6. `Proofs/`: theorem-backed pieces of the CROWN development, including graph-IBP theorems,
    graph-certificate soundness, alpha/beta ReLU scalar soundness, and transfer-rule soundness

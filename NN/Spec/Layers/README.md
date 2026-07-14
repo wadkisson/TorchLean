@@ -16,14 +16,15 @@ Files:
 - `Activation.lean`: scalar activation formulas under `Activation.Math`, tensor activation wrappers,
   real last-axis softmax/log-softmax, and VJP specs.
 - `Linear.lean`: fully connected layer spec (`y = W x + b`) and gradients.
-- `Attention.lean`: scaled dot product attention and multihead attention with hard mask
+- `Attention.lean`: scaled dot product attention and multihead attention with hard-mask semantics;
+  blocked weights are exactly zero, and a fully blocked row evaluates to the zero vector
   semantics and VJPs.
 - `FlashAttention.lean`: FlashAttention style tiling metadata/specs tied back to the same attention
   semantics.
 - `Conv.lean`: 1D/2D convolution and transposed convolution specs plus explicit backward rules.
 - `Pooling.lean`: max/avg pooling, padded pooling, adaptive pooling, and smooth max pooling
   surrogates, including backward/JVP rules.
-- `Pooling/`: two-dimensional, padded, N-dimensional, and alias helpers used by the main pooling
+- `Pooling/`: two-dimensional, padded, and N-dimensional helpers used by the main pooling
   umbrella.
 - `GlobalPooling.lean`: global avg/max pooling and backward rules.
 - `Normalization.lean`: LayerNorm and BatchNorm style utilities with explicit backward specs.
@@ -34,7 +35,7 @@ Files:
 - `Gnn.lean`: a compact GCN-style graph layer and backward rules.
 - `Rnn.lean`, `Lstm.lean`, `Gru.lean`: recurrent layers and BPTT-style backwards.
 - `SelectiveScan.lean`: affine scan primitives used by S4/Mamba style state space models.
-- `Utils.lean`: shared image/tensor utilities used by convolution and pooling layers.
+- `Utils.lean`: shared indexing and sliding-window geometry used by convolution and pooling layers.
 
 The underlying tensor primitives (maps, matmul, reshape, broadcasting) live under `NN/Spec/Core/*`.
 

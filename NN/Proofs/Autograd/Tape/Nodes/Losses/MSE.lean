@@ -37,7 +37,7 @@ Tape node and Fréchet derivative proof for scalar mean-squared error.
 Mean-squared-error loss node: `c * ‖yhat - target‖^2`, with
 `c = 1 / Spec.meanDenom s`.
 
-For nonempty shapes this is the usual `1 / Shape.size s`. For the empty shape case, the scalar loss
+For nonempty shapes this is the usual `1 / Spec.Shape.size s`. For the empty shape case, the scalar loss
 API is totalized with denominator `1`, matching `Spec.mseSpec` and the IR evaluator.
 -/
 def mseLoss {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) : Node Γ Shape.scalar :=
@@ -45,37 +45,37 @@ def mseLoss {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) : Node Γ Sha
   let c : ℝ := (1 : ℝ) / (n : ℝ)
   Node.ofVec (Γ := Γ) (τ := Shape.scalar)
     (f := fun xV =>
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         c * ‖(CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)‖ ^ 2)
     (jvp := fun xV dxV =>
       let diff := (CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)
       let ddiff := (CtxVec.get (Γ := Γ) (s := s) yhat dxV) - (CtxVec.get (Γ := Γ) (s := s) target
         dxV)
-      vecOfFun (n := Shape.size Shape.scalar) fun _ => c * (2 * inner ℝ diff ddiff))
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ => c * (2 * inner ℝ diff ddiff))
     (vjp := fun xV δV =>
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let diff := (CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)
       let scale : ℝ := δ0 * (2 * c)
-      let dYhat : Vec (Shape.size s) := scale • diff
-      let dTarget : Vec (Shape.size s) := -dYhat
+      let dYhat : Vec (Spec.Shape.size s) := scale • diff
+      let dTarget : Vec (Spec.Shape.size s) := -dYhat
       CtxVec.single (Γ := Γ) (s := s) yhat dYhat + CtxVec.single (Γ := Γ) (s := s) target dTarget)
     (correct_inner := by
       intro xV dxV δV
       classical
       let n : Nat := Spec.meanDenom s
       let c : ℝ := (1 : ℝ) / (n : ℝ)
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let diff := (CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)
       let dy := (CtxVec.get (Γ := Γ) (s := s) yhat dxV)
       let dt := (CtxVec.get (Γ := Γ) (s := s) target dxV)
       let ddiff := dy - dt
       let scale : ℝ := δ0 * (2 * c)
-      let dYhat : Vec (Shape.size s) := scale • diff
-      let dTarget : Vec (Shape.size s) := -dYhat
+      let dYhat : Vec (Spec.Shape.size s) := scale • diff
+      let dTarget : Vec (Spec.Shape.size s) := -dYhat
       have hL :
-          inner ℝ (vecOfFun (n := Shape.size Shape.scalar) (fun _ => c * (2 * inner ℝ diff ddiff)))
+          inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ => c * (2 * inner ℝ diff ddiff)))
             δV
             =
           (c * (2 * inner ℝ diff ddiff)) * δ0 := by
@@ -110,7 +110,7 @@ def mseLoss {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) : Node Γ Sha
         simp [scale, mul_assoc, mul_left_comm, mul_comm, real_inner_comm]
       -- Finish.
       calc
-        inner ℝ (vecOfFun (n := Shape.size Shape.scalar) (fun _ => c * (2 * inner ℝ diff ddiff))) δV
+        inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ => c * (2 * inner ℝ diff ddiff))) δV
             = (c * (2 * inner ℝ diff ddiff)) * δ0 := hL
         _ = scale * inner ℝ ddiff diff := hfinal
         _ = inner ℝ dxV
@@ -124,11 +124,11 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
   classical
   let n : Nat := Spec.meanDenom s
   let c : ℝ := (1 : ℝ) / (n : ℝ)
-  let diffDeriv : CtxVec Γ →L[ℝ] Vec (Shape.size s) :=
+  let diffDeriv : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s) :=
     (CtxVec.getCLM (Γ := Γ) (s := s) yhat) - (CtxVec.getCLM (Γ := Γ) (s := s) target)
   refine
     { deriv := fun xV =>
-        let diffV : Vec (Shape.size s) :=
+        let diffV : Vec (Spec.Shape.size s) :=
           (CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)
         vecScalarCLM.comp (c • (2 • (innerSL ℝ diffV)).comp diffDeriv)
       hasFDerivAt := ?_
@@ -197,21 +197,21 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
       fin_cases i
       calc
         ((Node.forwardVec (Γ := Γ) (τ := Shape.scalar)
-              (mseLoss (Γ := Γ) (s := s) yhat target)) x).ofLp ⟨0, by simp [Shape.size]⟩
+              (mseLoss (Γ := Γ) (s := s) yhat target)) x).ofLp ⟨0, by simp [Spec.Shape.size]⟩
             =
           (↑(Spec.meanDenom s))⁻¹ *
             ‖CtxVec.get (Γ := Γ) (s := s) yhat x -
               CtxVec.get (Γ := Γ) (s := s) target x‖ ^ 2 := by
-            simp [mseLoss, Node.forwardVec_ofVec, Shape.size, div_eq_mul_inv]
-        _ = (vecScalarCLM (g x)).ofLp ⟨0, by simp [Shape.size]⟩ := by
+            simp [mseLoss, Node.forwardVec_ofVec, Spec.Shape.size, div_eq_mul_inv]
+        _ = (vecScalarCLM (g x)).ofLp ⟨0, by simp [Spec.Shape.size]⟩ := by
             simp [g, c, n, smul_eq_mul, div_eq_mul_inv]
     exact hwrap.congr_of_eventuallyEq hEq.eventuallyEq
   · intro xV dxV
-    let diffV : Vec (Shape.size s) :=
+    let diffV : Vec (Spec.Shape.size s) :=
       (CtxVec.get (Γ := Γ) (s := s) yhat xV) - (CtxVec.get (Γ := Γ) (s := s) target xV)
     let D0 : CtxVec Γ →L[ℝ] ℝ :=
       (c • (2 • (innerSL ℝ diffV)).comp diffDeriv)
-    let ddiffV : Vec (Shape.size s) :=
+    let ddiffV : Vec (Spec.Shape.size s) :=
       (CtxVec.get (Γ := Γ) (s := s) yhat dxV) - (CtxVec.get (Γ := Γ) (s := s) target dxV)
     have hdiffDeriv : diffDeriv dxV = ddiffV := by
       simp [diffDeriv, ddiffV, CtxVec.getCLM_apply]
@@ -228,7 +228,7 @@ def mseLossFderiv {Γ : List Shape} {s : Shape} (yhat target : Idx Γ s) :
         (Node.jvpVec (Γ := Γ) (τ := Shape.scalar) (mseLoss (Γ := Γ) (s := s) yhat target) xV
           dxV).ofLp i =
           c * (2 * inner ℝ diffV ddiffV) := by
-      simp [mseLoss, Node.jvpVec_ofVec, diffV, ddiffV, Shape.size, c, n, div_eq_mul_inv]
+      simp [mseLoss, Node.jvpVec_ofVec, diffV, ddiffV, Spec.Shape.size, c, n, div_eq_mul_inv]
     have hR : ((vecScalarCLM.comp D0) dxV).ofLp i = D0 dxV := by
       simp [ContinuousLinearMap.comp_apply]
     calc

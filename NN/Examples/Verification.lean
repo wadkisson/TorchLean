@@ -6,18 +6,27 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Examples.Verification.LiRPA
 public import NN.Examples.Verification.Robustness
 public import NN.Examples.Verification.Splines
 public import NN.Examples.Verification.TorchLean
 public import NN.Examples.Verification.VNNComp
+public import NN.Verification.Cert.AbCrownLeafCert
+public import NN.Verification.ODE.Verify
+public import NN.Verification.PINN.CLI
+public import NN.Verification.PINN.Certificate
+public import NN.Verification.PINN.Core
+public import NN.Verification.PINN.DatasetCheck
+public import NN.Verification.PINN.PdeAst
+public import NN.Verification.PINN.PdeParse
+public import NN.Verification.PINN.ResidualAffine
+public import NN.Verification.Robustness.Digits
 
 /-!
 # Verification Examples
 
-Runnable and theorem-backed examples for TorchLean's verification library. Reusable checker
-implementations live under `NN.Verification`; this namespace gathers the small example entrypoints
-and bundled artifacts that make the workflows easy to run.
+Runnable and theorem-backed examples for TorchLean's verification library. The imports include the
+checkers used by the bundled LiRPA, robustness, spline, VNN-COMP, ODE, PINN, and alpha-beta-CROWN
+artifacts, together with workflows whose models originate in TorchLean.
 -/
 
 @[expose] public section

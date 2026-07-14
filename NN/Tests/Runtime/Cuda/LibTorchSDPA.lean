@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.Engine.Cuda.Kernels
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -38,7 +38,7 @@ abbrev s : Shape := shape![batch, n, d]
 abbrev maskShape : Shape := shape![batch, n, n]
 
 def q : Tensor Float s :=
-  tensorND! [batch, n, d] [
+  tensorOfList! [batch, n, d] [
     0.10, -0.20,
     0.30,  0.05,
    -0.15,  0.25,
@@ -46,7 +46,7 @@ def q : Tensor Float s :=
   ]
 
 def k : Tensor Float s :=
-  tensorND! [batch, n, d] [
+  tensorOfList! [batch, n, d] [
     0.05,  0.20,
    -0.10,  0.30,
     0.15, -0.25,
@@ -54,7 +54,7 @@ def k : Tensor Float s :=
   ]
 
 def v : Tensor Float s :=
-  tensorND! [batch, n, d] [
+  tensorOfList! [batch, n, d] [
     0.20, -0.05,
     0.10,  0.30,
    -0.20,  0.15,
@@ -62,7 +62,7 @@ def v : Tensor Float s :=
   ]
 
 def dOut : Tensor Float s :=
-  tensorND! [batch, n, d] [
+  tensorOfList! [batch, n, d] [
     1.00, 0.50,
    -0.25, 0.75,
     0.30, 1.20,
@@ -71,7 +71,7 @@ def dOut : Tensor Float s :=
 
 /-- `1` marks an allowed key. The last query row is fully blocked. -/
 def hardMask : Tensor Float maskShape :=
-  tensorND! [batch, n, n] [
+  tensorOfList! [batch, n, n] [
     1.0, 0.0,
     1.0, 1.0,
     1.0, 0.0,

@@ -40,7 +40,7 @@ Adadelta. Optimizer-adjacent extension points use explicit runtime names:
   explicit, and the optimizer applied after projection is still named.
 
 The exact public names live under `NN/API/Public/Facade/Runtime/Optim.lean`,
-`NN/API/TorchLean/Optimizers.lean`, and `NN/API/TorchLean/Schedulers.lean`. Runtime implementation
+`TorchLean.optim` and `NN/API/TorchLean/Schedulers.lean`. Runtime implementation
 files should stay focused on the update equations and state transitions.
 
 ## Proof Boundary

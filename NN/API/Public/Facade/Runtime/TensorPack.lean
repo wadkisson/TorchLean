@@ -20,9 +20,6 @@ namespace TorchLean
 
 namespace tensorpack
 
-@[inherit_doc TorchLean.TensorPack]
-abbrev TensorPack := TorchLean.TensorPack
-
 export NN.API.tensorpack
   (singleton pair triple quad map zipWith append split
    unpackSingleton unpackPair unpackTriple unpackQuad

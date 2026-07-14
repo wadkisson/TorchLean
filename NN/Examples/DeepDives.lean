@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Examples.DeepDives.Floats.ArbIEEEExecCompare
+public import NN.Examples.DeepDives.Floats.EffectiveRounding
 public import NN.Examples.DeepDives.Floats.Float32Modes
 public import NN.Examples.DeepDives.GraphSpec.Tutorial
 public import NN.Examples.DeepDives.IRAxisOps

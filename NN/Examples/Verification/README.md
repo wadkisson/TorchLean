@@ -74,7 +74,7 @@ reproducible without pulling in large benchmark dumps.
   under `scripts/verification/` used as untrusted producers for weights or candidate certificates.
 
 - Proof map: theorem-level graph IBP/CROWN-family soundness is developed under
-  `NN.MLTheory.CROWN.Proofs.*` and imported by `NN.Entrypoint.Verification`, not defined in this
+  `NN.MLTheory.CROWN.Proofs.*` and imported by `NN.Verification`, not defined in this
   artifact directory.
 
 Reusable Lean code for ODE/PINN and certificate checking belongs under `NN/Verification`.
@@ -90,7 +90,7 @@ recomputes the relevant predicate or bound.
 Some JSON checkers compare decimal serialized floating point values with an explicit
 tolerance. That checks the serialized artifact against the declared tolerance; soundness of the
 producer is a separate claim. For the theorem path, use the proof modules re-exported by
-`NN.Entrypoint.Verification`, which state checker-style soundness over the Lean graph semantics once
+`NN.Verification`, which state checker-style soundness over the Lean graph semantics once
 the local certificate hypotheses are discharged.
 
 ## Small Constants Versus Real Data

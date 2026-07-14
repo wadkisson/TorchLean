@@ -53,7 +53,7 @@ The proof follows the unmasked graph with one extra affine identity node between
 softmax.  Because the bias is fixed, its derivative is the identity on the scaled logits.
 -/
 def maskedScaledDotProductDGraph {m d : Nat}
-    (c : ℝ) (bias : Vec (Shape.size (.dim m (.dim m .scalar))) := 0) :
+    (c : ℝ) (bias : Vec (Spec.Shape.size (.dim m (.dim m .scalar))) := 0) :
     DGraph (ΓQKV m d) (ssMaskedScaledDotProduct m d) := by
   classical
 
@@ -115,16 +115,16 @@ def maskedScaledDotProductDGraph {m d : Nat}
       (Γ := ΓQKV m d ++
         [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
       (sIn := .dim m (.dim m .scalar)) (sOut := .dim m (.dim m .scalar))
-      idxScaled (1 : Vec (Shape.size (.dim m (.dim m .scalar))) →L[ℝ]
-        Vec (Shape.size (.dim m (.dim m .scalar)))) bias
+      idxScaled (1 : Vec (Spec.Shape.size (.dim m (.dim m .scalar))) →L[ℝ]
+        Vec (Spec.Shape.size (.dim m (.dim m .scalar)))) bias
   let dg4 :=
     DGraph.snoc (dg := dg3) (node := nodeMasked)
       (hn := TapeNodes.affineFderiv
         (Γ := ΓQKV m d ++
           [.dim d (.dim m .scalar), .dim m (.dim m .scalar), .dim m (.dim m .scalar)])
         (sIn := .dim m (.dim m .scalar)) (sOut := .dim m (.dim m .scalar))
-        idxScaled (1 : Vec (Shape.size (.dim m (.dim m .scalar))) →L[ℝ]
-          Vec (Shape.size (.dim m (.dim m .scalar)))) bias)
+        idxScaled (1 : Vec (Spec.Shape.size (.dim m (.dim m .scalar))) →L[ℝ]
+          Vec (Spec.Shape.size (.dim m (.dim m .scalar)))) bias)
 
   let idxMasked :
       Idx
@@ -200,7 +200,7 @@ def maskedScaledDotProductDGraph {m d : Nat}
 Reverse-mode theorem for finite additive-mask scaled-dot-product attention.
 -/
 theorem backprop_eq_adjoint_fderiv_maskedScaledDotProduct
-    {m d : Nat} (c : ℝ) (bias : Vec (Shape.size (.dim m (.dim m .scalar))) := 0) :
+    {m d : Nat} (c : ℝ) (bias : Vec (Spec.Shape.size (.dim m (.dim m .scalar))) := 0) :
     ∀ (xV : CtxVec (ΓQKV m d))
       (seedV : CtxVec (ΓQKV m d ++ ssMaskedScaledDotProduct m d)),
       Graph.backpropVec (Γ := ΓQKV m d) (ss := ssMaskedScaledDotProduct m d)

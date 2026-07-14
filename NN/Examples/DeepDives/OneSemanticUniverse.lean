@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.IR.Semantics
 public import NN.MLTheory.CROWN.Graph
 
@@ -44,7 +44,7 @@ Run:
 namespace NN.Examples.DeepDives.OneSemanticUniverse
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 open _root_.TorchLean
 
@@ -70,14 +70,14 @@ def inDim : Nat := 4
 def hidDim : Nat := 5
 def outDim : Nat := 3
 
-def xShape : Shape := Shape.vec inDim
-def hShape : Shape := Shape.vec hidDim
-def yShape : Shape := Shape.vec outDim
+def xShape : Spec.Shape := .dim inDim .scalar
+def hShape : Spec.Shape := .dim hidDim .scalar
+def yShape : Spec.Shape := .dim outDim .scalar
 
-def hiddenWeightShape : Shape := Shape.mat hidDim inDim
-def hiddenBiasShape : Shape := Shape.vec hidDim
-def outputWeightShape : Shape := Shape.mat outDim hidDim
-def outputBiasShape : Shape := Shape.vec outDim
+def hiddenWeightShape : Spec.Shape := .dim hidDim (.dim inDim .scalar)
+def hiddenBiasShape : Spec.Shape := .dim hidDim .scalar
+def outputWeightShape : Spec.Shape := .dim outDim (.dim hidDim .scalar)
+def outputBiasShape : Spec.Shape := .dim outDim .scalar
 
 structure Params (α : Type) where
   /-- Weight matrix for layer 1. -/
@@ -96,18 +96,18 @@ def Params.map {α β : Type} (f : α → β) (p : Params α) : Params β :=
     outputBias := Spec.mapTensor f p.outputBias }
 
 def paramsFloat : Params Float :=
-  { hiddenWeight := tensorND! (ty := Float) [hidDim, inDim]
+  { hiddenWeight := tensorOfList! (ty := Float) [hidDim, inDim]
       [ 0.15, -0.12, 0.08, 0.05
       , 0.02, 0.11, -0.09, 0.07
       , -0.04, 0.06, 0.10, -0.03
       , 0.09, 0.01, 0.04, 0.13
       , -0.07, 0.03, 0.12, -0.02 ]
-    hiddenBias := tensorND! (ty := Float) [hidDim] [0.01, -0.02, 0.03, 0.0, 0.02]
-    outputWeight := tensorND! (ty := Float) [outDim, hidDim]
+    hiddenBias := tensorOfList! (ty := Float) [hidDim] [0.01, -0.02, 0.03, 0.0, 0.02]
+    outputWeight := tensorOfList! (ty := Float) [outDim, hidDim]
       [ 0.05, 0.08, -0.06, 0.03, 0.07
       , -0.04, 0.02, 0.09, -0.01, 0.06
       , 0.10, -0.03, 0.04, 0.05, -0.08 ]
-    outputBias := tensorND! (ty := Float) [outDim] [0.02, -0.01, 0.00] }
+    outputBias := tensorOfList! (ty := Float) [outDim] [0.02, -0.01, 0.00] }
 
 def g : NN.IR.Graph :=
   let n0 : NN.IR.Node := { id := 0, parents := [], kind := .input, outShape := xShape }
@@ -137,7 +137,7 @@ def mkParamStore {α : Type} [Context α] (p : Params α) (xB : FlatBox α) : Pa
         |>.insert 3 { m := outDim, n := hidDim, w := p.outputWeight, b := p.outputBias } }
 
 def evalOut
-    {α : Type} [Context α] [DecidableEq Shape]
+    {α : Type} [Context α] [DecidableEq Spec.Shape]
     (p : Params α) (x : Spec.Tensor α xShape) :
     Except String (Spec.Tensor α _root_.TorchLean.Shape.scalar) :=
       do
@@ -179,10 +179,11 @@ noncomputable example : True := by
 end ProofOnly
 
 def referenceInputFloat : Spec.Tensor Float xShape :=
-  tensorND! (ty := Float) [inDim] [0.3, -0.2, 0.1, 0.4]
+  tensorOfList! (ty := Float) [inDim] [0.3, -0.2, 0.1, 0.4]
 
 def xBoxOf (α : Type) [Runtime.SemanticScalar α] [Runtime.Scalar α] (eps : Float) : Box α xShape :=
-  let x0 : Spec.Tensor α xShape := Tensor.castFloat Runtime.ofFloat referenceInputFloat
+  let x0 : Spec.Tensor α xShape :=
+    _root_.TorchLean.Tensor.castFloat Runtime.ofFloat referenceInputFloat
   let r : α := Runtime.ofFloat eps
   let rad : Spec.Tensor α xShape := Spec.fill (α := α) r xShape
   { lo := Spec.Tensor.subSpec (α := α) x0 rad
@@ -195,9 +196,9 @@ def scalarBoxOfFlat (B : FlatBox IEEE32Exec) :
     Except String (Box IEEE32Exec _root_.TorchLean.Shape.scalar) :=
   do
   if h : B.dim = 1 then
-    let loT : Spec.Tensor IEEE32Exec (Shape.vec 1) :=
+    let loT : Spec.Tensor IEEE32Exec (.dim 1 .scalar) :=
       Spec.Tensor.castVecDim (α := IEEE32Exec) (n := B.dim) (m := 1) h B.lo
-    let hiT : Spec.Tensor IEEE32Exec (Shape.vec 1) :=
+    let hiT : Spec.Tensor IEEE32Exec (.dim 1 .scalar) :=
       Spec.Tensor.castVecDim (α := IEEE32Exec) (n := B.dim) (m := 1) h B.hi
     let l : IEEE32Exec := Spec.Tensor.vecGet (α := IEEE32Exec) loT fin0!
     let u : IEEE32Exec := Spec.Tensor.vecGet (α := IEEE32Exec) hiT fin0!
@@ -224,7 +225,8 @@ def showIEEECheck (samples : Nat) : IO Unit := do
   let xBIEEE : FlatBox IEEE32Exec := toFlatXBox (α := IEEE32Exec) BIEEE
 
   -- Evaluate at the center point.
-  let referenceInputIEEE : Spec.Tensor IEEE32Exec xShape := Tensor.castFloat Runtime.ofFloat referenceInputFloat
+  let referenceInputIEEE : Spec.Tensor IEEE32Exec xShape :=
+    _root_.TorchLean.Tensor.castFloat Runtime.ofFloat referenceInputFloat
   match evalOut (α := IEEE32Exec) pIEEE referenceInputIEEE with
   | .error msg => throw <| IO.userError msg
   | .ok y0 =>

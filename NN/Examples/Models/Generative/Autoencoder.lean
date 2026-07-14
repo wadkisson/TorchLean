@@ -10,7 +10,7 @@ Run:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -52,7 +52,7 @@ The architecture is defined in the public model API. The command chooses the dat
 runtime options, and logging path.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.VectorAutoencoder cfg
+  nn.models.vectorAutoencoder cfg
 
 /-- Public singleton dataset for compact CIFAR reconstruction. -/
 def data (flags : RealData.CifarModelTrainFlags) : Trainer.Dataset σ τ :=
@@ -85,7 +85,7 @@ The command loads one real CIFAR minibatch, builds the supervised reconstruction
 trains the autoencoder for `--steps`, and writes the standard TorchLean training summary/log.
 -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionNpy exeName args
+  TrainCommand.regressionNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 10 1e-3)
     (ModelZoo.bannerWithDevice exeName "CIFAR vector reconstruction")
     train

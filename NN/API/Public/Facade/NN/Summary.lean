@@ -21,7 +21,7 @@ namespace TorchLean
 namespace nn
 
 def paramCount (shapes : List Shape) : Nat :=
-  shapes.foldl (fun acc s => acc + Shape.size s) 0
+  shapes.foldl (fun acc s => acc + Spec.Shape.size s) 0
 
 /-- Dimensions of a tensor shape, outermost first. Scalars have no dimensions. -/
 def shapeDims : Shape → List Nat

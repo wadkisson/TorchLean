@@ -570,8 +570,8 @@ private def backwardNode (dir : BackwardDir)
           if _hs : cfg.stride = 0 then
             st.fail
           else
-            let outH := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-            let outW := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+            let outH := Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+            let outW := Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
             let outDim := cfg.outC * outH * outW
             let convAff := affOfConv2d (α:=α) cfg
             match backwardLinear (α:=α) (m:=outDim) (n:=cfg.inC * cfg.inH * cfg.inW) aY convAff.A
@@ -606,14 +606,14 @@ private def backwardNode (dir : BackwardDir)
             | .sigmoid   => some (propagateSigmoidBounds (α:=α) preB idB rfl)
             | .tanh      => some (propagateTanhBounds (α:=α) preB idB rfl)
             | .softmax axis =>
-              if axis = Shape.rank node.outShape - 1 then
+              if axis = Spec.Shape.rank node.outShape - 1 then
                 some (propagateSoftmaxBoundsLastAxis (α:=α) node.outShape preB idB rfl)
               else
                 some (boundsConst (α:=α) n n
                   (Spec.fill (α:=α) Numbers.zero (.dim n .scalar))
                   (Spec.fill (α:=α) Numbers.one (.dim n .scalar)))
             | .layernorm axis =>
-              if axis = Shape.rank node.outShape - 1 then
+              if axis = Spec.Shape.rank node.outShape - 1 then
                 some (propagateLayernormBoundsLastAxis (α:=α) node.outShape preB idB rfl)
               else
                 some (boundsConst (α:=α) n n preB.lo preB.hi)
@@ -680,7 +680,7 @@ private def backwardNode (dir : BackwardDir)
             addCoeff (α:=α) st p1 aY
           else
             haveI : NeZero outDim := ⟨h0⟩
-            let restSize := Shape.size rest
+            let restSize := Spec.Shape.size rest
             let block := m * restSize
             let perm : Fin outDim → Fin outDim := fun idx =>
               let t := idx.val
@@ -823,14 +823,14 @@ private def backwardNodeWithReluAlpha (dir : BackwardDir)
             | .sigmoid   => some (propagateSigmoidBounds (α:=α) preB idB rfl)
             | .tanh      => some (propagateTanhBounds (α:=α) preB idB rfl)
             | .softmax axis =>
-              if axis = Shape.rank node.outShape - 1 then
+              if axis = Spec.Shape.rank node.outShape - 1 then
                 some (propagateSoftmaxBoundsLastAxis (α:=α) node.outShape preB idB rfl)
               else
                 some (boundsConst (α:=α) n n
                   (Spec.fill (α:=α) Numbers.zero (.dim n .scalar))
                   (Spec.fill (α:=α) Numbers.one (.dim n .scalar)))
             | .layernorm axis =>
-              if axis = Shape.rank node.outShape - 1 then
+              if axis = Spec.Shape.rank node.outShape - 1 then
                 some (propagateLayernormBoundsLastAxis (α:=α) node.outShape preB idB rfl)
               else
                 some (boundsConst (α:=α) n n preB.lo preB.hi)

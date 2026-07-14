@@ -16,7 +16,7 @@ public meta import ProofWidgets.Demos.Macro
 
 Small helpers for surfacing docstrings in the InfoView.
 
-This is available through the widget entrypoint (`import NN.Entrypoint.Widgets`) or
+This is available through the widget entrypoint (`import NN.Widgets`) or
 directly as `import NN.Widgets.Core.Docs`, since it depends on ProofWidgets.
 
 Commands:

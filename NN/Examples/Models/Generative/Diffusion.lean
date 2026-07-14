@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -90,15 +90,25 @@ local instance : NeZero cifarTinyW := ⟨by decide⟩
 
 /-- Clean image batch shape `x₀`: NCHW with the fixed command batch size. -/
 abbrev cleanImageShape (c h w : Nat) : Shape :=
-  Shape.nchw batch c h w
+  .dim batch (.dim c (.dim h (.dim w .scalar)))
 
 /-- Epsilon-model input shape: image channels plus one broadcast timestep channel. -/
 abbrev noisyInputShape (c h w : Nat) : Shape :=
-  Shape.nchw batch (c + 1) h w
+  .dim batch (.dim (c + 1) (.dim h (.dim w .scalar)))
 
 /-- Shape-level configuration for the epsilon predictor. -/
-def cfgFor (c h w hiddenC : Nat) : nn.models.EpsConvNetConfig :=
-  { batch := batch, dataC := c, h := h, w := w, hiddenC := hiddenC }
+def cfgFor (c h w hiddenC : Nat) [NeZero h] [NeZero w] : nn.models.EpsConvNetConfig 2 :=
+  { batch := batch
+    dataChannels := c
+    spatial := #v[h, w]
+    spatialNonzero := by
+      intro i
+      fin_cases i
+      · change h ≠ 0
+        exact NeZero.ne h
+      · change w ≠ 0
+        exact NeZero.ne w
+    hiddenChannels := hiddenC }
 
 /--
 Build the default epsilon predictor for a specific typed image shape.
@@ -110,12 +120,10 @@ CUDA quick check.
 def mkModel (c h w hiddenC : Nat)
     [NeZero c] [NeZero h] [NeZero w] (h_hiddenC : hiddenC ≠ 0) :
     nn.M (nn.Sequential (noisyInputShape c h w) (cleanImageShape c h w)) :=
-  nn.models.EpsConvNet (cfgFor c h w hiddenC)
+  nn.models.epsConvNet (cfgFor c h w hiddenC)
     (h_batch := by simp [cfgFor, batch])
-    (h_dataC := by exact NeZero.ne c)
+    (h_dataC := NeZero.ne c)
     (h_inC := by exact Nat.succ_ne_zero c)
-    (h_h := by exact NeZero.ne h)
-    (h_w := by exact NeZero.ne w)
     (h_hiddenC := h_hiddenC)
 
 /--
@@ -130,7 +138,7 @@ def cifarCleanImageBatch
   let cropped := RealData.cropCifarBatch batch cifarTinyH cifarTinyW
     (by decide) (by decide) batchSample
   let unitImage : Tensor.T Float (cleanImageShape RealData.cifarChannels cifarTinyH cifarTinyW) := by
-    simpa [cleanImageShape, Shape.nchw, Shape.images] using (Sample.x cropped)
+    simpa [cleanImageShape] using (Sample.x cropped)
   exact diffusion.toMinusOneOne unitImage
 
 /--
@@ -144,7 +152,7 @@ def imageNet64CleanImageBatch
       RealData.imagenet64Width) := by
   let unitImage : Tensor.T Float (cleanImageShape RealData.imagenet64Channels RealData.imagenet64Height
       RealData.imagenet64Width) := by
-    simpa [cleanImageShape, Shape.nchw, RealData.ImageNet64Image, Shape.image] using
+    simpa [cleanImageShape, RealData.ImageNet64Image] using
       (Sample.x batchSample)
   exact diffusion.toMinusOneOne unitImage
 
@@ -188,7 +196,8 @@ def reverseDdim {c h w : Nat}
       let ab : Float := alphaBars.getD tIdx 1.0
       let abPrev : Float := if tIdx = 0 then 1.0 else alphaBars.getD (tIdx - 1) 1.0
       let tNorm : Float := Float.ofNat tIdx / Float.ofNat (T - 1)
-      let epsHat ← predict (diffusion.appendTimeChannel x_t tNorm)
+      let epsHat ← predict <|
+        diffusion.appendTimeChannel (.dim batch .scalar) #v[h, w] x_t tNorm
       x_t := diffusion.ddimPrev abPrev ab x_t epsHat
   pure x_t
 
@@ -209,7 +218,8 @@ def reverseDdimFrom {c h w : Nat}
     let ab : Float := alphaBars.getD tIdx 1.0
     let abPrev : Float := if tIdx = 0 then 1.0 else alphaBars.getD (tIdx - 1) 1.0
     let tNorm : Float := if T <= 1 then 0.0 else Float.ofNat tIdx / Float.ofNat (T - 1)
-    let epsHat ← predict (diffusion.appendTimeChannel x_t tNorm)
+    let epsHat ← predict <|
+      diffusion.appendTimeChannel (.dim batch .scalar) #v[h, w] x_t tNorm
     x_t := diffusion.ddimPrev abPrev ab x_t epsHat
   pure x_t
 
@@ -249,7 +259,8 @@ def trainCurveFloat {c h w : Nat} [NeZero c] [NeZero h] [NeZero w]
   let evalX0 := batchAt 0
   let alphaBars := diffusion.alphaBarsLinear cfg.T cfg.betaStart cfg.betaEnd
   let evalStep := if cfg.T = 0 then 0 else cfg.T / 2
-  let evalSample := diffusion.noisedSample alphaBars cfg.T evalX0 (seed := opts.seed)
+  let evalSample := diffusion.noisedSample (.dim batch .scalar) #v[h, w]
+    alphaBars cfg.T evalX0 (seed := opts.seed)
     (step := evalStep)
   let trainer :=
     Trainer.new (mkModel c h w cfg.hiddenC h_hiddenC) <|
@@ -262,7 +273,8 @@ def trainCurveFloat {c h w : Nat} [NeZero c] [NeZero h] [NeZero w]
   let trained ← trainer.trainStreamFloat opts
     (fun step =>
       let x0 := batchAt step
-      diffusion.noisedSample alphaBars cfg.T x0 (seed := opts.seed) (step := step + 1))
+      diffusion.noisedSample (.dim batch .scalar) #v[h, w]
+        alphaBars cfg.T x0 (seed := opts.seed) (step := step + 1))
     evalSample
     { steps := cfg.steps, log := .disabled }
     (curveEvery := curveEvery)
@@ -271,14 +283,14 @@ def trainCurveFloat {c h w : Nat} [NeZero c] [NeZero h] [NeZero w]
   trained.printSummary
     match cfg.referencePpm? with
     | none => pure ()
-    | some path => diffusion.writeFirstRgbNchwPpm path evalX0
+    | some path => diffusion.writeFirstRgbPpm path evalX0
     match cfg.samplePpm? with
     | none => pure ()
     | some path => do
-        let x_T := diffusion.randomEps (batch := batch) (c := c) (h := h) (w := w)
+        let x_T := diffusion.randomEps (s := cleanImageShape c h w)
           (seed := opts.seed) (step := 999)
         let x_t ← reverseDdim trained.predict alphaBars cfg.T x_T
-        diffusion.writeFirstRgbNchwPpm path x_t
+        diffusion.writeFirstRgbPpm path x_t
     match cfg.reconstructPpm? with
     | none => pure ()
     | some path => do
@@ -286,7 +298,7 @@ def trainCurveFloat {c h w : Nat} [NeZero c] [NeZero h] [NeZero w]
         let ab : Float := alphaBars.getD tIdx 1.0
         let sqrtAb : Float := MathFunctions.sqrt (Max.max ab 0.0)
         let sqrtOneMinusAb : Float := MathFunctions.sqrt (Max.max (1.0 - ab) 0.0)
-        let eps := diffusion.randomEps (batch := batch) (c := c) (h := h) (w := w)
+        let eps := diffusion.randomEps (s := cleanImageShape c h w)
           (seed := opts.seed) (step := 1001)
         let noisyImage : Tensor.T Float (cleanImageShape c h w) :=
           Spec.Tensor.addSpec
@@ -294,9 +306,9 @@ def trainCurveFloat {c h w : Nat} [NeZero c] [NeZero h] [NeZero w]
             (Spec.Tensor.scaleSpec eps sqrtOneMinusAb)
         match cfg.noisyPpm? with
         | none => pure ()
-        | some noisyPath => diffusion.writeFirstRgbNchwPpm noisyPath noisyImage
+        | some noisyPath => diffusion.writeFirstRgbPpm noisyPath noisyImage
         let x_t ← reverseDdimFrom trained.predict alphaBars cfg.T tIdx noisyImage
-        diffusion.writeFirstRgbNchwPpm path x_t
+        diffusion.writeFirstRgbPpm path x_t
   pure curve
 
 namespace DiffusionOptions

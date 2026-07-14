@@ -63,11 +63,11 @@ def CausalOneHotConfig.dModel (cfg : CausalOneHotConfig) : Nat :=
   cfg.numHeads * cfg.headDim
 
 /-- Input/output tensor shape `(batch × seqLen × vocab)` for a one-hot causal LM. -/
-abbrev causalOneHotShape (cfg : CausalOneHotConfig) : Shape :=
+abbrev causalOneHotShape (cfg : CausalOneHotConfig) : Spec.Shape :=
   shape![cfg.batch, cfg.seqLen, cfg.vocab]
 
 /-- Embedded-token tensor shape `(batch × seqLen × dModel)`. -/
-abbrev causalEmbeddingShape (cfg : CausalOneHotConfig) : Shape :=
+abbrev causalEmbeddingShape (cfg : CausalOneHotConfig) : Spec.Shape :=
   shape![cfg.batch, cfg.seqLen, cfg.dModel]
 
 /--
@@ -95,7 +95,7 @@ def causalTransformerFromEmbeddings (cfg : CausalOneHotConfig)
     nn.transformerEncoderStack (batch := cfg.batch) (n := cfg.seqLen) (dModel := dModel) encCfg
       (mask := some (text.causalMask cfg.seqLen)),
     nn.layerNorm (batch := cfg.batch) (seqLen := cfg.seqLen) (embedDim := dModel),
-    Linear dModel cfg.vocab (pfx := NN.Tensor.Shape.Mat cfg.batch cfg.seqLen)
+    linear dModel cfg.vocab (pfx := .dim cfg.batch (.dim cfg.seqLen .scalar))
   ]
 
 /--
@@ -111,7 +111,7 @@ def causalTransformerOneHot (cfg : CausalOneHotConfig)
   letI : NeZero cfg.seqLen := ⟨h_seqLen⟩
   letI : NeZero cfg.dModel := ⟨h_dModel⟩
   let dModel := cfg.dModel
-  nn.embedding cfg.vocab dModel (pfx := NN.Tensor.Shape.Mat cfg.batch cfg.seqLen) >>= fun embed =>
+  nn.embedding cfg.vocab dModel (pfx := .dim cfg.batch (.dim cfg.seqLen .scalar)) >>= fun embed =>
   causalTransformerFromEmbeddings cfg (h_seqLen := h_seqLen) (h_dModel := h_dModel) >>= fun body =>
   pure (embed >>> body)
 
@@ -145,7 +145,7 @@ def causalTransformerTokenScalarModuleDefWithMode
         _root_.Runtime.Autograd.Torch.CurriedRef.curry
           (Ref := _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α))
           (ss := ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body) ++
-            ([] : List Shape))
+            ([] : List Spec.Shape))
           (β := m (_root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α)
             Spec.Shape.scalar))
           (fun args => do
@@ -153,7 +153,7 @@ def causalTransformerTokenScalarModuleDefWithMode
               _root_.Runtime.Autograd.Torch.RefList.split
                 (Ref := _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α))
                 (ss₁ := (.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
-                (ss₂ := ([] : List Shape)) args
+                (ss₂ := ([] : List Spec.Shape)) args
             let .nil := empty
             let .cons tokenEmbedding bodyParams := ps
             let x ← _root_.Runtime.Autograd.TorchLean.F.embeddingBatchSeqNat (m := m) (α := α)
@@ -187,7 +187,7 @@ The sequence batch is represented as one vector of length `batch * seqLen`. The 
 ids encoded as floats by the data loader, then checked and converted back to `Nat` inside the eager
 runtime. Keeping this as a flat vector matches the existing scalar-module input convention.
 -/
-abbrev causalTokenIdLmInputShape (cfg : CausalOneHotConfig) : Shape :=
+abbrev causalTokenIdLmInputShape (cfg : CausalOneHotConfig) : Spec.Shape :=
   .dim (cfg.batch * cfg.seqLen) .scalar
 
 /--

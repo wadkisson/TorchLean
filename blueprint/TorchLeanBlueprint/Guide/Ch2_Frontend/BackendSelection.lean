@@ -216,10 +216,10 @@ let eagerTrainer := trainerFor .eager
 let compiledTrainer := trainerFor .compiled
 ```
 
-Device and provider selection live in runtime configuration and command-line options. The model
-does not acquire separate functions named `forwardCuda`, `forwardCompiled`, or
-`forwardLibTorch`. This is similar to the separation between calling a PyTorch model and wrapping it
-with `torch.compile`: compilation changes execution, not the mathematical intention of the model.
+Device and provider selection live in runtime configuration and command-line options. Backend
+selection does not change the model's public forward function. This is similar to the separation
+between calling a PyTorch model and wrapping it with `torch.compile`: compilation changes
+execution, not the mathematical intention of the model.
 
 # Choosing A Path
 

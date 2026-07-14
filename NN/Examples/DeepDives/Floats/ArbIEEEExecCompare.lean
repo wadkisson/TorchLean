@@ -28,7 +28,7 @@ interval:
 NumPy / PyTorch analogue:
 
 ```python
-import numpy as np
+public import numpy as np
 
 lo, hi = np.float32(-0.5), np.float32(0.5)
 endpoint_box = (np.tanh(lo), np.tanh(hi))   # common fast check, not a rigorous enclosure
@@ -351,11 +351,11 @@ def usage : String :=
 
 /-- Entrypoint: run the Arb-vs-`IEEE32Exec` interval tutorial. -/
 def main (args : List String) : IO UInt32 := do
-  let args := _root_.NN.API.CLI.dropDashDash args
-  if _root_.NN.API.CLI.hasHelp args then
+  let args := _root_.TorchLean.CLI.dropDashDash args
+  if _root_.TorchLean.CLI.hasHelp args then
     IO.println usage
     return 0
-  match _root_.NN.API.CLI.requireNoArgs args with
+  match _root_.TorchLean.CLI.checkNoArgs args with
   | .ok () => pure ()
   | .error e => throw <| IO.userError s!"floats_arb_ieee_compare: {e}"
   TorchLean.Floats.Interval.ComparisonTutorial.run

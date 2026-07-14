@@ -152,11 +152,11 @@ structure RunArgs where
 
 /-- Parse shared margin-certificate CLI flags. -/
 def parseRunArgs (defaultPath : String) (args : List String) : Except String RunArgs := do
-  let args := CLI.dropDashDash args
-  let (timing, args) ← CLI.takeBoolFlagOnce args "timing"
-  let (timingEvery, args) ← CLI.takeNatFlagDefault args "timing-every" 0
-  let (path, args) ← CLI.takePositionalDefault args defaultPath
-  CLI.requireNoArgs args
+  let args := TorchLean.CLI.dropDashDash args
+  let (timing, args) ← TorchLean.CLI.takeBoolFlagOnce args "timing"
+  let (timingEvery, args) ← TorchLean.CLI.takeNatFlagDefault args "timing-every" 0
+  let (path, args) ← TorchLean.CLI.takePositionalDefault args defaultPath
+  TorchLean.CLI.checkNoArgs args
   pure { path := path, timing := timing, timingEvery := timingEvery }
 
 /-- Run the checker with a caller-provided default certificate path. -/

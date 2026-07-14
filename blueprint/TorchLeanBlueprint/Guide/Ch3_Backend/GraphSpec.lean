@@ -168,7 +168,7 @@ The declarations worth recognizing in the infoview are:
 The smallest GraphSpec check sequence is the one from the README:
 
 ```
-import NN.Entrypoint.GraphSpec
+import NN.GraphSpec
 
 open NN
 open NN.GraphSpec
@@ -207,9 +207,8 @@ The value `x` is used twice. In a purely sequential chain, that sharing is awkwa
 would have to be carried forward as an explicit side value. In a DAG model, the intermediate names
 are part of the authoring language.
 
-Examples such as `Models.residualLinear` and `Models.ResNet18.model` use the DAG API because their
-architectures contain skip connections. Shared values should be represented directly, not smuggled
-through an artificial sequential chain.
+`Models.residualLinear` uses the DAG API because its architecture contains a skip connection.
+Shared values should be represented directly, not carried through an artificial sequential chain.
 
 # Lowering Paths
 
@@ -244,17 +243,6 @@ This path is used by the runnable
 [GraphSpec tutorial](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/GraphSpec/Tutorial.lean): author once in GraphSpec,
 then plug the lowered model into the public `Trainer` API.
 
-## DAG Model To Runtime Example Wrappers
-
-The runtime examples to open are [GraphSpec ResNet18](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/TorchLean/Resnet18.lean)
-and [runtime FNO1D](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Fno1d.lean).
-
-These wrappers show how GraphSpec feeds the runtime examples:
-
-- GraphSpec-backed `resnet18Model`, `resnet18Program`, `resnet18InitParams`
-- `fno1d` runtime wrappers for operator learning, which sit beside the GraphSpec-backed
-  models in the broader example set
-
 # Model Example Landmarks
 
 For model definitions used in examples, `NN.GraphSpec.Models` is the most convenient
@@ -264,15 +252,13 @@ The current example set includes both sequential and DAG-native models:
 
 - `Models.mlp` for the smallest sequential path,
 - `Models.twoConvCnn` and `twoConvCnnDAGModelZeroInit` for "same model, different representation" comparisons,
-- `Models.residualLinear` for a small residual/shared example,
-- `Models.ResNet18.model` for a substantial DAG-authored architecture.
+- `Models.residualLinear` for a small residual/shared example.
 
 The GraphSpec README suggests this order:
 
 1. `Models.mlp`
 2. `Models.twoConvCnn`
 3. `Models.residualLinear`
-4. `Models.ResNet18.model`
 
 # Reading Rule
 
@@ -293,7 +279,7 @@ GraphSpec also has proof declarations. The declarations below are compact alignm
 connect GraphSpec syntax to reference specs, deterministic parameter initialization, and the
 embedding of sequential primitives into DAG primitives.
 
-The entrypoint `NN.Entrypoint.GraphSpec` re-exports the theorem names readers are most likely
+The module `NN.GraphSpec` re-exports the theorem names readers are most likely
 to check first:
 
 ```
@@ -310,8 +296,8 @@ by op" development used in the verified runtime and verification layers.
 1. Open the [GraphSpec tutorial API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/GraphSpec/Tutorial.lean).
 2. Run:
    `lake exe torchlean graphspec --backend compiled`
-3. Compare the [residual linear model API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/ResidualLinear.lean)
-   with the [ResNet-18 GraphSpec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/Resnet18.lean).
+3. Read the [residual linear model API](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec/Models/ResidualLinear.lean)
+   and identify the shared input used by both branches.
 
 That path moves from "author a typed MLP and lower it into the training API" to "author a real
 residual DAG with explicit sharing."

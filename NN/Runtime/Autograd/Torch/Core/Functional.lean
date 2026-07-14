@@ -38,6 +38,10 @@ small `Ops` interface) and then choose:
 - `backend := .compiled` (compile once, run many)
 -/
 
+end Torch
+end Autograd
+end Runtime
+
 namespace Proofs.Autograd.Algebra.TList
 
 /--
@@ -45,7 +49,8 @@ Append two `TList`s.
 
 This is a small utility for bridging between curried APIs and list-of-shapes APIs.
 -/
-def append {α : Type} : {ss₁ ss₂ : List Shape} → TList α ss₁ → TList α ss₂ → TList α (ss₁ ++ ss₂)
+def append {α : Type} : {ss₁ ss₂ : List Spec.Shape} →
+    TList α ss₁ → TList α ss₂ → TList α (ss₁ ++ ss₂)
   | [], _ss₂, .nil, ys => ys
   | _s :: ss₁, ss₂, .cons x xs, ys => .cons x (append (ss₁ := ss₁) (ss₂ := ss₂) xs ys)
 
@@ -54,7 +59,8 @@ Split a `TList α (ss₁ ++ ss₂)` into its left and right parts.
 
 This is the inverse of `TList.append`.
 -/
-def splitAppend {α : Type} : {ss₁ ss₂ : List Shape} → TList α (ss₁ ++ ss₂) → TList α ss₁ × TList α
+def splitAppend {α : Type} : {ss₁ ss₂ : List Spec.Shape} →
+    TList α (ss₁ ++ ss₂) → TList α ss₁ × TList α
   ss₂
   | [], _ss₂, xs => (.nil, xs)
   | _s :: ss₁, ss₂, .cons x xs =>
@@ -62,6 +68,14 @@ def splitAppend {α : Type} : {ss₁ ss₂ : List Shape} → TList α (ss₁ ++ 
       (.cons x xs₁, xs₂)
 
 end Proofs.Autograd.Algebra.TList
+
+namespace Runtime
+namespace Autograd
+namespace Torch
+
+open Spec
+open Tensor
+open Proofs.Autograd.Algebra
 
 namespace Curried
 
@@ -184,7 +198,7 @@ class Ops (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape] where
   max : {s : Shape} → Ref s → Ref s → m (Ref s)
   min : {s : Shape} → Ref s → Ref s → m (Ref s)
   broadcastTo : {s₁ s₂ : Shape} → Shape.CanBroadcastTo s₁ s₂ → Ref s₁ → m (Ref s₂)
-  reshape : {s₁ s₂ : Shape} → Ref s₁ → (h : Shape.size s₁ = Shape.size s₂) → m (Ref s₂)
+  reshape : {s₁ s₂ : Shape} → Ref s₁ → (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) → m (Ref s₂)
   transpose2d {mDim nDim : Nat} : Ref (.dim mDim (.dim nDim .scalar)) → m (Ref (.dim nDim (.dim mDim
     .scalar)))
   transpose3dFirstToLast {a b c : Nat} :
@@ -257,22 +271,22 @@ class Ops (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape] where
     m (Ref (Shape.ofList (C :: (Spec.poolOutSpatialPad inSpatial kernel stride padding).toList)))
   maxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0} :
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar))))
+    m (Ref (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar))))
   maxPool2dPad {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0} :
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
-      (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))))
+    m (Ref (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+      (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))))
   smoothMaxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0} :
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
     α →
-    m (Ref (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar))))
+    m (Ref (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar))))
   avgPool2d {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0) :
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar))))
+    m (Ref (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar))))
   avgPool2dPad {kH kW inH inW inC stride padding : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0) :
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
-      (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))))
+    m (Ref (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+      (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))))
   relu : {s : Shape} → Ref s → m (Ref s)
   sigmoid : {s : Shape} → Ref s → m (Ref s)
   tanh : {s : Shape} → Ref s → m (Ref s)
@@ -285,7 +299,7 @@ class Ops (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape] where
   detach : {s : Shape} → Ref s → m (Ref s)
   safeLog : {s : Shape} → Ref s → α → m (Ref s)
   sum : {s : Shape} → Ref s → m (Ref Shape.scalar)
-  flatten : {s : Shape} → Ref s → m (Ref (.dim (Shape.size s) .scalar))
+  flatten : {s : Shape} → Ref s → m (Ref (.dim (Spec.Shape.size s) .scalar))
   linear {inDim outDim : Nat} :
     Ref (.dim outDim (.dim inDim .scalar)) →
     Ref (.dim outDim .scalar) →
@@ -333,16 +347,16 @@ class Ops (m : Type → Type) (α : Type) [Context α] [DecidableEq Shape] where
     Ref (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))) →
     Ref (.dim outC .scalar) →
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1)
-      (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))))
+    m (Ref (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+      (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))))
 
   convTranspose2d {inC outC kH kW stride padding inH inW : Nat}
     {h1 : inC ≠ 0} {h2 : kH ≠ 0} {h3 : kW ≠ 0} :
     Ref (.dim inC (.dim outC (.dim kH (.dim kW .scalar)))) →
     Ref (.dim outC .scalar) →
     Ref (.dim inC (.dim inH (.dim inW .scalar))) →
-    m (Ref (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-      (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar))))
+    m (Ref (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+      (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar))))
 
   /-
   Seeded RNG primitives (first-class in TorchLean graphs).
@@ -405,7 +419,7 @@ def broadcastTo {s₁ s₂ : Shape} (cb : Shape.CanBroadcastTo s₁ s₂)
   (x : Ref (m := m) (α := α) s₁) : m (Ref (m := m) (α := α) s₂) :=
   Ops.broadcastTo (m := m) (α := α) (s₁ := s₁) (s₂ := s₂) cb x
 /-- Re-export of `Ops.reshape`. PyTorch: `reshape` / `view`. -/
-def reshape {s₁ s₂ : Shape} (x : Ref (m := m) (α := α) s₁) (h : Shape.size s₁ = Shape.size s₂) :
+def reshape {s₁ s₂ : Shape} (x : Ref (m := m) (α := α) s₁) (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) :
   m (Ref (m := m) (α := α) s₂) :=
   Ops.reshape (m := m) (α := α) (s₁ := s₁) (s₂ := s₂) x h
 /-- Re-export of `Ops.transpose2d`. PyTorch: `x.t()` / `transpose`. -/
@@ -567,25 +581,22 @@ def smoothMaxPool {d C : Nat}
 /-- Re-export of `Ops.max_pool2d`. PyTorch: `torch.nn.functional.max_pool2d`. -/
 def maxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  m (Ref (m := m) (α := α) (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   Ops.maxPool2d (m := m) (α := α) (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC)
     (stride := stride) (h1 := h1) (h2 := h2) x
 /-- Re-export of `Ops.max_pool2d_pad`. PyTorch: `max_pool2d(..., padding=...)`. -/
 def maxPool2dPad {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
-    (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))) :=
+  m (Ref (m := m) (α := α) (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+    (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) :=
   Ops.maxPool2dPad (m := m) (α := α) (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC)
     (stride := stride) (padding := padding) (h1 := h1) (h2 := h2) x
-
-/-- Alias for `max_pool2d_pad` (PyTorch-style shorthand). -/
-abbrev maxPoolPad := @maxPool2dPad
 
 /-- Re-export of `Ops.smooth_max_pool2d` (softmax pooling). -/
 def smoothMaxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) (beta : α) :
-  m (Ref (m := m) (α := α) (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  m (Ref (m := m) (α := α) (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   Ops.smoothMaxPool2d (m := m) (α := α) (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC :=
     inC)
@@ -593,20 +604,18 @@ def smoothMaxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW �
 /-- Re-export of `Ops.avg_pool2d`. PyTorch: `torch.nn.functional.avg_pool2d`. -/
 def avgPool2d {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  m (Ref (m := m) (α := α) (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   Ops.avgPool2d (m := m) (α := α) (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC)
     (stride := stride) h1 h2 x
 /-- Re-export of `Ops.avg_pool2d_pad`. PyTorch: `avg_pool2d(..., padding=...)`. -/
 def avgPool2dPad {kH kW inH inW inC stride padding : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim inC (.dim ((inH + 2 * padding - kH) / stride + 1)
-    (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))) :=
+  m (Ref (m := m) (α := α) (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+    (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) :=
   Ops.avgPool2dPad (m := m) (α := α) (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC)
     (stride := stride) (padding := padding) h1 h2 x
 
-/-- Alias for `avg_pool2d_pad` (PyTorch-style shorthand). -/
-abbrev avgPoolPad := @avgPool2dPad
 /-- Re-export of `Ops.relu`. -/
 def relu {s : Shape} (x : Ref (m := m) (α := α) s) : m (Ref (m := m) (α := α) s) := Ops.relu (m :=
   m) (α := α) x
@@ -686,76 +695,12 @@ def gelu {s : Shape} (x : Ref (m := m) (α := α) s) : m (Ref (m := m) (α := α
   let mid ← mul (m := m) (α := α) (s := s) x onePlus
   scale (m := m) (α := α) (s := s) mid (Numbers.pointfive : α)
 
-/--
-Global average pooling over the last two axes of a `C×H×W` tensor (channel-first).
-
-Returns a vector `C`, averaging each channel over `H×W`.
--/
-def globalAvgPool2dChw {c h w : Nat}
-    (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : Ref (m := m) (α := α) (.dim c (.dim h (.dim w .scalar)))) :
-    m (Ref (m := m) (α := α) (.dim c .scalar)) := do
-  let sCHW : Shape := .dim c (.dim h (.dim w .scalar))
-  let _ : Shape.WellFormed sCHW := ⟨⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩
-  let axisW : Nat := Shape.rank sCHW - 1
-  have hrank : Shape.rank sCHW > 0 := by simp [sCHW, Shape.rank]
-  let _ : Shape.valid_axis_inst axisW sCHW := Shape.validAxisLastAuto hrank
-  let yCH ← reduceMean (m := m) (α := α) (s := sCHW) axisW x
-  let sCH : Shape := shapeAfterSum sCHW axisW
-  have hsCH : sCH = .dim c (.dim h .scalar) := by
-    simp [sCH, sCHW, axisW, Shape.rank, shapeAfterSum]
-  let _ : Shape.WellFormed sCH := by
-    simpa [hsCH] using (show Shape.WellFormed (.dim c (.dim h .scalar)) from ⟨⟨h_c_pos, ⟨h_h_pos,
-      trivial⟩⟩⟩)
-  let axisH : Nat := Shape.rank sCH - 1
-  have hrank2 : Shape.rank sCH > 0 := by simp [hsCH, Shape.rank]
-  let _ : Shape.valid_axis_inst axisH sCH := Shape.validAxisLastAuto hrank2
-  let yCH' : Ref (m := m) (α := α) sCH := by
-    change Ref (m := m) (α := α) (shapeAfterSum sCHW axisW)
-    exact yCH
-  let yC ← reduceMean (m := m) (α := α) (s := sCH) axisH yCH'
-  have hsC : shapeAfterSum sCH axisH = .dim c .scalar := by
-    simp [hsCH, axisH, Shape.rank]
-  return (by simpa [hsC] using yC)
-
-/--
-Global average pooling over the last two axes of an `N×C×H×W` tensor (PyTorch default layout).
-
-Returns `N×C`, averaging each channel over `H×W` for each batch element.
--/
-def globalAvgPool2dNchw {n c h w : Nat}
-    (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : Ref (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar))))) :
-    m (Ref (m := m) (α := α) (.dim n (.dim c .scalar))) := do
-  let sNCHW : Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
-  let _ : Shape.WellFormed sNCHW := ⟨⟨h_n_pos, ⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩⟩
-  let axisW : Nat := Shape.rank sNCHW - 1
-  have hrank : Shape.rank sNCHW > 0 := by simp [sNCHW, Shape.rank]
-  let _ : Shape.valid_axis_inst axisW sNCHW := Shape.validAxisLastAuto hrank
-  let yNCH ← reduceMean (m := m) (α := α) (s := sNCHW) axisW x
-  let sNCH : Shape := shapeAfterSum sNCHW axisW
-  have hsNCH : sNCH = .dim n (.dim c (.dim h .scalar)) := by
-    simp [sNCH, sNCHW, axisW, Shape.rank]
-  let _ : Shape.WellFormed sNCH := by
-    simpa [hsNCH] using
-      (show Shape.WellFormed (.dim n (.dim c (.dim h .scalar))) from ⟨⟨h_n_pos, ⟨h_c_pos, ⟨h_h_pos,
-        trivial⟩⟩⟩⟩)
-  let axisH : Nat := Shape.rank sNCH - 1
-  have hrank2 : Shape.rank sNCH > 0 := by simp [hsNCH, Shape.rank]
-  let _ : Shape.valid_axis_inst axisH sNCH := Shape.validAxisLastAuto hrank2
-  let yNCH' : Ref (m := m) (α := α) sNCH := by
-    change Ref (m := m) (α := α) (shapeAfterSum sNCHW axisW)
-    exact yNCH
-  let yNC ← reduceMean (m := m) (α := α) (s := sNCH) axisH yNCH'
-  have hsNC : shapeAfterSum sNCH axisH = .dim n (.dim c .scalar) := by
-    simp [hsNCH, axisH, Shape.rank, shapeAfterSum]
-  return (by simpa [hsNC] using yNC)
 /-- Re-export of `Ops.sum`. PyTorch: `x.sum()`. -/
 def sum {s : Shape} (x : Ref (m := m) (α := α) s) : m (Ref (m := m) (α := α) Shape.scalar) :=
   Ops.sum (m := m) (α := α) (s := s) x
 /-- Re-export of `Ops.flatten`. PyTorch: `torch.flatten`. -/
 def flatten {s : Shape} (x : Ref (m := m) (α := α) s) :
-    m (Ref (m := m) (α := α) (.dim (Shape.size s) .scalar)) :=
+    m (Ref (m := m) (α := α) (.dim (Spec.Shape.size s) .scalar)) :=
   Ops.flatten (m := m) (α := α) (s := s) x
 
 /-- Re-export of `Ops.linear`. PyTorch: `torch.nn.functional.linear`. -/
@@ -851,8 +796,8 @@ def conv2d {inC outC kH kW stride padding inH inW : Nat}
   (kernel : Ref (m := m) (α := α) (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))))
   (bias : Ref (m := m) (α := α) (.dim outC .scalar))
   (input : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1)
-    (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))) :=
+  m (Ref (m := m) (α := α) (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+    (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) :=
   Ops.conv2d (m := m) (α := α) (inC := inC) (outC := outC) (kH := kH) (kW := kW)
     (stride := stride) (padding := padding) (inH := inH) (inW := inW) (h1 := h1) (h2 := h2) (h3 :=
       h3)
@@ -864,8 +809,8 @@ def convTranspose2d {inC outC kH kW stride padding inH inW : Nat}
   (kernel : Ref (m := m) (α := α) (.dim inC (.dim outC (.dim kH (.dim kW .scalar)))))
   (bias : Ref (m := m) (α := α) (.dim outC .scalar))
   (input : Ref (m := m) (α := α) (.dim inC (.dim inH (.dim inW .scalar)))) :
-  m (Ref (m := m) (α := α) (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-    (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)))) :=
+  m (Ref (m := m) (α := α) (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+    (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar)))) :=
   Ops.convTranspose2d (m := m) (α := α)
     (inC := inC) (outC := outC) (kH := kH) (kW := kW)
     (stride := stride) (padding := padding) (inH := inH) (inW := inW)

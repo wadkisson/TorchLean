@@ -22,7 +22,7 @@ This file provides `NNModuleSpec` wrappers so linear layers can be:
 These wrappers are thin on purpose: the meaning is still the underlying `linear_spec`; the extra
 fields are just metadata.
 
-Most readers can map these directly to PyTorch: `LinearModuleSpec` is `nn.Linear`, and the sequence
+Most readers can map these directly to PyTorch: `LinearModuleSpec` is `nn.linear`, and the sequence
 helpers are the common pattern "apply a linear layer to each timestep, then maybe select the last
 step for classification".
 -/

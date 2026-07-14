@@ -10,7 +10,7 @@ public import Lean.Data.Json
 public import NN.Runtime.External.Process
 public import NN.Runtime.PyTorch.Export.TorchExport
 public import NN.Runtime.PyTorch.Import.TorchExport
-public import NN
+public import NN.API
 
 /-!
 # PyTorch `nn.Module` → TorchLean IR Check

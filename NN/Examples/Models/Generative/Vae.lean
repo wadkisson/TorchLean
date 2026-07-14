@@ -10,7 +10,7 @@ Run:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 public import NN.Spec.Models.Vae
 public import NN.MLTheory.Generative.Latent.VAE
@@ -58,7 +58,7 @@ The executable target is still an MSE-style supervised sample; the imported spec
 the VAE objective separately.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.VectorVAE cfg
+  nn.models.vectorVae cfg
 
 /-- Public singleton dataset for compact CIFAR reconstruction plus latent-stat targets. -/
 def data (flags : RealData.CifarModelTrainFlags) : Trainer.Dataset σ τ :=
@@ -91,7 +91,7 @@ The command loads CIFAR vectors, constructs the reconstruction/latent-proxy targ
 Adam, and writes the standard TorchLean training summary/log.
 -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionNpy exeName args
+  TrainCommand.regressionNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 10 1e-3)
     (ModelZoo.bannerWithDevice exeName "CIFAR beta-VAE-style training")
     train

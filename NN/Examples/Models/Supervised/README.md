@@ -55,7 +55,7 @@ the verification page should name the exported artifact and the Lean statement t
 
 Supervised examples should keep the public path direct:
 
-- start from `import NN` and `open TorchLean`;
+- start from `import NN.API` and `open TorchLean`;
 - construct a model with `TorchLean.nn`;
 - load data through `TorchLean.Data`;
 - run through `Trainer.new`, `trainer.predict`, `trainer.train`, and the trained handle;

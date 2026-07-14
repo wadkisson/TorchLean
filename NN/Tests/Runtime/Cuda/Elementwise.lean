@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -33,8 +33,8 @@ def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: elementwise ==="
 
   let s : Shape := shape![5]
-  let a : Tensor Float s := tensorND! [5] [0.10, -0.20, 0.30, -0.15, 0.05]
-  let b : Tensor Float s := tensorND! [5] [0.20,  0.10, -0.25, 0.40, -0.05]
+  let a : Tensor Float s := tensorOfList! [5] [0.10, -0.20, 0.30, -0.15, 0.05]
+  let b : Tensor Float s := tensorOfList! [5] [0.20,  0.10, -0.25, 0.40, -0.05]
 
   let scaleC : Float := 0.3
   let clampLo : Float := 1e-3

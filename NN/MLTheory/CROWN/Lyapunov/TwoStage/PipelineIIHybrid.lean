@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Spec
+public import NN.Spec
 public import NN.API.CLI
 public import NN.API.Macros
 public import NN.API.Public.TensorPack
@@ -151,7 +151,7 @@ Load stage-1 parameters exported by PyTorch as *float32 bit patterns*.
 We do this (instead of parsing JSON floats) so stage-2 runs under *bit-exact* float32 semantics
 (`IEEE32Exec`) without decimal conversion error.
 -/
-def loadFirstStageParams (width : Nat) (path : String) : IO (NN.API.TensorPack α (paramShapes
+def loadFirstStageParams (width : Nat) (path : String) : IO (NN.API.TorchLean.TensorPack α (paramShapes
   width)) := do
   let jsonStr ← IO.FS.readFile path
   let j ← match Json.parse jsonStr with
@@ -191,15 +191,15 @@ then clamp to the training box `[-rad, rad]^2`.
 def pgdStepCompiled
     (width : Nat)
     (cLoss : _root_.Runtime.Autograd.Torch.CompiledScalar α (lossΓ width))
-    (params : NN.API.TensorPack α (paramShapes width))
+    (params : NN.API.TorchLean.TensorPack α (paramShapes width))
     (x : Tensor α xShape) : Tensor α xShape :=
-  let args : NN.API.TensorPack α (lossΓ width) :=
-    _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
+  let args : NN.API.TorchLean.TensorPack α (lossΓ width) :=
+    _root_.Proofs.Autograd.Algebra.TList.append (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) params (.cons x .nil)
-  let gAll : NN.API.TensorPack α (lossΓ width) :=
+  let gAll : NN.API.TorchLean.TensorPack α (lossΓ width) :=
     _root_.Runtime.Autograd.Torch.CompiledScalar.backward (α := α) (Γ := lossΓ width) cLoss args
-  let gx : NN.API.TensorPack α [xShape] :=
-    (_root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
+  let gx : NN.API.TorchLean.TensorPack α [xShape] :=
+    (_root_.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
       (ss₁ := paramShapes width) (ss₂ := [xShape]) gAll).2
   let .cons g .nil := gx
   let x' := Tensor.addSpec x (Tensor.scaleSpec g pgdStepSize)
@@ -212,7 +212,7 @@ over a small box around the origin.
 This check proves that the training objective is small on that box; it is not
 claimed to match α/β-CROWN tightness.
 -/
-def checkBox (width : Nat) (params : NN.API.TensorPack α (paramShapes width)) (eps : α :=
+def checkBox (width : Nat) (params : NN.API.TorchLean.TensorPack α (paramShapes width)) (eps : α :=
   epsCheck) : IO Unit := do
   IO.println "Stage 2 check: IBP + CROWN on the scalar loss over a small box"
   let compiled ←
@@ -253,17 +253,17 @@ deriving Repr
 /-- Parse all CLI flags once, so the runner and stage-1 bootstrap cannot disagree. -/
 def parseHybridCliOptions (width : Nat) (args : List String) : IO HybridCliOptions := do
   let defaultPath : String := s!"_external/van_stage1_w{width}_bits.json"
-  let args := NN.API.CLI.dropDashDash args
-  let (weightsFlag?, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFlagValueOnce args "weights"
-  let (positionalWeights, args) ← NN.API.CLI.orThrow <|
-    NN.API.CLI.takePositionalDefault args defaultPath
-  let (forceStage1, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "stage1"
-  let (stage1Steps, args) ← NN.API.CLI.orThrow <|
-    NN.API.CLI.takeNatFlagDefault args "stage1-steps" 10
-  let (longRun, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "long"
-  let (paperRun, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolFlagOnce args "paper"
-  let (candidates, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeNatFlagDefault args "candidates" 1
-  NN.API.CLI.orThrow <| NN.API.CLI.requireNoArgs args
+  let args := TorchLean.CLI.dropDashDash args
+  let (weightsFlag?, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeFlagValueOnce args "weights"
+  let (positionalWeights, args) ← TorchLean.CLI.orThrowIO <|
+    TorchLean.CLI.takePositionalDefault args defaultPath
+  let (forceStage1, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeBoolFlagOnce args "stage1"
+  let (stage1Steps, args) ← TorchLean.CLI.orThrowIO <|
+    TorchLean.CLI.takeNatFlagDefault args "stage1-steps" 10
+  let (longRun, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeBoolFlagOnce args "long"
+  let (paperRun, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeBoolFlagOnce args "paper"
+  let (candidates, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeNatFlagDefault args "candidates" 1
+  TorchLean.CLI.orThrowIO <| TorchLean.CLI.checkNoArgs args
   pure
     { weightsPath := weightsFlag?.getD positionalWeights
       forceStage1 := forceStage1
@@ -341,7 +341,7 @@ def run (width : Nat) (args : List String) : IO Unit := do
       let mut x := x0
       for _k in [0:pgdSteps] do
         x := pgdStepCompiled width cLoss params x
-      let xs : NN.API.TensorPack α [xShape] := tensorpack! x
+      let xs : NN.API.TorchLean.TensorPack α [xShape] := tensorpack! x
       let lossFound := _root_.Runtime.Autograd.Torch.scalarOf (←
         _root_.Runtime.Autograd.Torch.ScalarTrainer.forwardT tr xs)
       if (0 : α) < lossFound then

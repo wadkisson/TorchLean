@@ -242,6 +242,12 @@ def optionalFieldNat? (j : Json) (k : String) (ctx : String) : IO (Option Nat) :
   | none => pure none
   | some v => some <$> expectNat v s!"{ctx}.{k}"
 
+/-- Extract an optional finite floating-point-valued field. -/
+def optionalFieldFiniteFloat? (j : Json) (k : String) (ctx : String) : IO (Option Float) := do
+  match ← optionalField? j k ctx with
+  | none => pure none
+  | some v => some <$> expectFiniteFloat v s!"{ctx}.{k}"
+
 /-- Extract an optional boolean-valued field. -/
 def optionalFieldBool? (j : Json) (k : String) (ctx : String) : IO (Option Bool) := do
   match ← optionalField? j k ctx with

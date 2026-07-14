@@ -8,7 +8,7 @@ module
 
 public import Lean.Data.Json
 public import NN.API.Json
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Examples.Interop.PyTorch.CNN.Import
 public import NN.Examples.Interop.PyTorch.MLP.Import
 public import NN.Examples.Interop.PyTorch.Transformer.Import

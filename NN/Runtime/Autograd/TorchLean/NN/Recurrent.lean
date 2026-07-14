@@ -36,9 +36,9 @@ Parameters:
 PyTorch analogy: `torch.nn.Linear(inDim, outDim)`.
 -/
 def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
-  let WShape : Shape := NN.Tensor.Shape.Mat outDim inDim
-  let bShape : Shape := NN.Tensor.Shape.Vec outDim
+    LayerDef (.dim inDim .scalar) (.dim outDim .scalar) :=
+  let WShape : Shape := .dim outDim (.dim inDim .scalar)
+  let bShape : Shape := .dim outDim .scalar
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := outDim) (inDim := inDim) (seed :=
     seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
@@ -61,8 +61,8 @@ PyTorch analogy: `torch.nn.Linear(inDim, outDim)` applied to a 2D tensor.
 -/
 def linear2d (batch inDim outDim : Nat) (seedW seedB : Nat := 0) :
     LayerDef (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar)) :=
-  let WShape : Shape := NN.Tensor.Shape.Mat outDim inDim
-  let bShape : Shape := NN.Tensor.Shape.Vec outDim
+  let WShape : Shape := .dim outDim (.dim inDim .scalar)
+  let bShape : Shape := .dim outDim .scalar
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := outDim) (inDim := inDim) (seed :=
     seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
@@ -93,8 +93,8 @@ Docs: https://docs.pytorch.org/docs/stable/generated/torch.nn.RNN.html
 -/
 def rnn (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     LayerDef (.dim seqLen (.dim inputSize .scalar)) (.dim seqLen (.dim hiddenSize .scalar)) :=
-  let WShape : Shape := NN.Tensor.Shape.Mat hiddenSize (inputSize + hiddenSize)
-  let bShape : Shape := NN.Tensor.Shape.Vec hiddenSize
+  let WShape : Shape := .dim hiddenSize (.dim (inputSize + hiddenSize) .scalar)
+  let bShape : Shape := .dim hiddenSize .scalar
   let w0 : Tensor Float WShape := Torch.Init.xavierW (outDim := hiddenSize) (inDim := inputSize +
     hiddenSize) (seed := seedW)
   let b0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
@@ -139,8 +139,8 @@ Docs: https://docs.pytorch.org/docs/stable/generated/torch.nn.GRU.html
 -/
 def gru (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     LayerDef (.dim seqLen (.dim inputSize .scalar)) (.dim seqLen (.dim hiddenSize .scalar)) :=
-  let WShape : Shape := NN.Tensor.Shape.Mat hiddenSize (inputSize + hiddenSize)
-  let bShape : Shape := NN.Tensor.Shape.Vec hiddenSize
+  let WShape : Shape := .dim hiddenSize (.dim (inputSize + hiddenSize) .scalar)
+  let bShape : Shape := .dim hiddenSize .scalar
   let wReset0 : Tensor Float WShape := Torch.Init.xavierW (outDim := hiddenSize) (inDim := inputSize +
     hiddenSize) (seed := seedW + 0)
   let bReset0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed :=
@@ -222,9 +222,9 @@ all projections and gates train correctly.
 -/
 def mamba (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     LayerDef (.dim seqLen (.dim inputSize .scalar)) (.dim seqLen (.dim hiddenSize .scalar)) :=
-  let WInShape : Shape := NN.Tensor.Shape.Mat hiddenSize inputSize
-  let WDeltaShape : Shape := NN.Tensor.Shape.Mat hiddenSize (inputSize + hiddenSize)
-  let bShape : Shape := NN.Tensor.Shape.Vec hiddenSize
+  let WInShape : Shape := .dim hiddenSize (.dim inputSize .scalar)
+  let WDeltaShape : Shape := .dim hiddenSize (.dim (inputSize + hiddenSize) .scalar)
+  let bShape : Shape := .dim hiddenSize .scalar
   let wIn0 : Tensor Float WInShape := Torch.Init.xavierW
     (outDim := hiddenSize) (inDim := inputSize) (seed := seedW + 0)
   let bIn0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros)
@@ -300,8 +300,8 @@ Docs: https://docs.pytorch.org/docs/stable/generated/torch.nn.LSTM.html
 -/
 def lstm (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     LayerDef (.dim seqLen (.dim inputSize .scalar)) (.dim seqLen (.dim hiddenSize .scalar)) :=
-  let WShape : Shape := NN.Tensor.Shape.Mat hiddenSize (inputSize + hiddenSize)
-  let bShape : Shape := NN.Tensor.Shape.Vec hiddenSize
+  let WShape : Shape := .dim hiddenSize (.dim (inputSize + hiddenSize) .scalar)
+  let bShape : Shape := .dim hiddenSize .scalar
   let wF0 : Tensor Float WShape := Torch.Init.xavierW (outDim := hiddenSize) (inDim := inputSize +
     hiddenSize) (seed := seedW + 0)
   let bF0 : Tensor Float bShape := Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB + 0)

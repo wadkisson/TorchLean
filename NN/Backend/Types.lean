@@ -50,6 +50,27 @@ def cliName : Device → String
   | .custom => "custom"
   | .external => "external"
 
+/-- Parse an explicit backend device name. CLI layers may resolve policy names such as `auto`
+before calling this function. -/
+def parse? : String → Option Device
+  | "cpu" => some .cpu
+  | "cuda" | "gpu" => some .cuda
+  | "rocm" | "amd" => some .rocm
+  | "metal" | "mps" => some .metal
+  | "wasm" | "webgpu" => some .wasm
+  | "tpu" | "xla" => some .tpu
+  | "trainium" | "neuron" => some .trainium
+  | "custom" | "custom-chip" => some .custom
+  | "external" => some .external
+  | _ => none
+
+/-- Parse an explicit backend device name or return a diagnostic suitable for command-line use. -/
+def parse (value : String) : Except String Device :=
+  match parse? value with
+  | some device => pure device
+  | none =>
+      throw s!"unknown --device {value} (supported names: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
+
 end Device
 
 /-- Concrete provider family used to execute a kernel capsule. -/

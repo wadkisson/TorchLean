@@ -78,7 +78,7 @@ Proof-carrying masked multi-head attention core.
 The fixed `bias` is added after scaling the score tensor and before the row-wise softmax.
 -/
 def maskedCoreDGraph {n numHeads headDim : Nat}
-    (c : ℝ) (bias : Vec (Shape.size (ScoresShape n numHeads)) := 0) :
+    (c : ℝ) (bias : Vec (Spec.Shape.size (ScoresShape n numHeads)) := 0) :
     DGraph (ΓMaskedCore n numHeads headDim) (ssMaskedCore n numHeads headDim) := by
   classical
   let dg0 : DGraph (ΓMaskedCore n numHeads headDim) [] := DGraph.nil
@@ -126,8 +126,8 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
       (Γ := ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads, ScoresShape n numHeads])
       (sIn := ScoresShape n numHeads) (sOut := ScoresShape n numHeads)
       idxScaled
-      (1 : Vec (Shape.size (ScoresShape n numHeads)) →L[ℝ]
-        Vec (Shape.size (ScoresShape n numHeads)))
+      (1 : Vec (Spec.Shape.size (ScoresShape n numHeads)) →L[ℝ]
+        Vec (Spec.Shape.size (ScoresShape n numHeads)))
       bias
   let dg3 :=
     DGraph.snoc (dg := dg2) (node := nodeMasked)
@@ -135,8 +135,8 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
         (Γ := ΓMaskedCore n numHeads headDim ++ [ScoresShape n numHeads, ScoresShape n numHeads])
         (sIn := ScoresShape n numHeads) (sOut := ScoresShape n numHeads)
         idxScaled
-        (1 : Vec (Shape.size (ScoresShape n numHeads)) →L[ℝ]
-          Vec (Shape.size (ScoresShape n numHeads)))
+        (1 : Vec (Spec.Shape.size (ScoresShape n numHeads)) →L[ℝ]
+          Vec (Spec.Shape.size (ScoresShape n numHeads)))
         bias)
 
   let idxMasked :
@@ -200,7 +200,7 @@ def maskedCoreDGraph {n numHeads headDim : Nat}
 /-- Reverse-mode theorem for the fixed-bias multi-head attention core. -/
 theorem maskedCore_backpropVec_eq_adjoint_fderiv
     {n numHeads headDim : Nat}
-    (c : ℝ) (bias : Vec (Shape.size (ScoresShape n numHeads)) := 0)
+    (c : ℝ) (bias : Vec (Spec.Shape.size (ScoresShape n numHeads)) := 0)
     (xV : CtxVec (ΓMaskedCore n numHeads headDim))
     (seedV : CtxVec (ΓMaskedCore n numHeads headDim ++ ssMaskedCore n numHeads headDim)) :
     Graph.backpropVec
@@ -227,7 +227,7 @@ proved additive-bias attention core.
 theorem maskedCoreAfterProjection_hasFDerivAt
     {E : Type u} [NormedAddCommGroup E] [NormedSpace ℝ E]
     {n numHeads headDim : Nat}
-    (c : ℝ) (bias : Vec (Shape.size (ScoresShape n numHeads)) := 0)
+    (c : ℝ) (bias : Vec (Spec.Shape.size (ScoresShape n numHeads)) := 0)
     (projectPack : E → CtxVec (ΓMaskedCore n numHeads headDim))
     (DprojectPack : E →L[ℝ] CtxVec (ΓMaskedCore n numHeads headDim))
     (x : E)
@@ -292,7 +292,7 @@ theorem projectedMaskedAttention_hasFDerivAt
     {E : Type u} [NormedAddCommGroup E] [NormedSpace ℝ E]
     {F : Type v} [NormedAddCommGroup F] [NormedSpace ℝ F]
     {n numHeads headDim : Nat}
-    (c : ℝ) (bias : Vec (Shape.size (ScoresShape n numHeads)) := 0)
+    (c : ℝ) (bias : Vec (Spec.Shape.size (ScoresShape n numHeads)) := 0)
     (projectPack : E → CtxVec (ΓMaskedCore n numHeads headDim))
     (DprojectPack : E →L[ℝ] CtxVec (ΓMaskedCore n numHeads headDim))
     (mergePack : CtxVec (ΓMaskedCore n numHeads headDim ++ ssMaskedCore n numHeads headDim) → F)

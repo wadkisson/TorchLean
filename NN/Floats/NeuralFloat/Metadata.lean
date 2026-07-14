@@ -6,20 +6,20 @@ Authors: TorchLean Team
 
 module
 
-public import Mathlib.Data.Real.Basic
+public import NN.Floats.NeuralFloat.Core
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 /-!
-# NeuralFloat metadata (training phase, named precisions)
+# NeuralFloat Metadata
 
-The Flocq-style core model is "rounded arithmetic on `ℝ`". In TorchLean we sometimes want a little
-extra structure *around* that core:
+The Flocq-style core model is rounded arithmetic on `ℝ`. TorchLean attaches two pieces of
+non-semantic information when converting values for runtime-refinement arguments:
 
-- a coarse notion of which part of training we're in (forward vs backward vs parameter update),
-- named precision levels commonly used in ML (FP16/bfloat16/TF32/FP32/FP64).
+- the phase in which a value was produced;
+- a named hardware format and a conservative absolute error bound.
 
-We keep these notions in a separate file so that `Core.lean` can stay focused on the Flocq-style
-mantissa/exponent machinery while still letting higher-level layers talk about mixed precision.
+These notions are deliberately separate from `NeuralFloat`, which remains the pure
+mantissa/exponent representation used by the generic format theory.
 -/
 
 @[expose] public section
@@ -30,34 +30,13 @@ namespace TorchLean.Floats
 /--
 Training phases for neural networks.
 
-This is a coarse classifier used by a few mixed-precision policies and specifications; it is not a
-model of the full optimizer state.
+This is a coarse provenance tag, not a model of optimizer state or numerical execution.
 -/
 inductive TrainingPhase
   | forward
   | backward
   | update
   | inference
-
-namespace TrainingPhase
-
-/-- Phases where we typically want to be more conservative about rounding/error. -/
-def requiresHighPrecision : TrainingPhase → Bool
-  | backward => true
-  | update => true
-  | forward => false
-  | inference => false
-
-/-- `forward` does not request extra precision. -/
-@[simp] lemma requires_high_precision_forward : requiresHighPrecision forward = false := rfl
-/-- `backward` requests extra precision (more conservative bounds). -/
-@[simp] lemma requires_high_precision_backward : requiresHighPrecision backward = true := rfl
-/-- `update` requests extra precision (more conservative bounds). -/
-@[simp] lemma requires_high_precision_update : requiresHighPrecision update = true := rfl
-/-- `inference` does not request extra precision. -/
-@[simp] lemma requires_high_precision_inference : requiresHighPrecision inference = false := rfl
-
-end TrainingPhase
 
 /--
 Named precision levels commonly used in ML.
@@ -67,29 +46,29 @@ These carry the intended mantissa/exponent widths. Bit-level IEEE-754 behavior l
 `NN/Floats/FP32`.
 -/
 inductive NeuralPrecision
-  | brain_float16
-  | ieee_half
-  | ieee_single
-  | ieee_double
-  | tensor_float32
+  | brainFloat16
+  | ieeeHalf
+  | ieeeSingle
+  | ieeeDouble
+  | tensorFloat32
 
 namespace NeuralPrecision
 
 /-- Exponent bit width (informational). -/
 def expBits : NeuralPrecision → ℕ
-  | brain_float16 => 8
-  | ieee_half => 5
-  | ieee_single => 8
-  | ieee_double => 11
-  | tensor_float32 => 8
+  | brainFloat16 => 8
+  | ieeeHalf => 5
+  | ieeeSingle => 8
+  | ieeeDouble => 11
+  | tensorFloat32 => 8
 
 /-- Stored mantissa (fraction) bit width (informational). -/
 def mantissaBits : NeuralPrecision → ℕ
-  | brain_float16 => 7
-  | ieee_half => 10
-  | ieee_single => 23
-  | ieee_double => 52
-  | tensor_float32 => 10
+  | brainFloat16 => 7
+  | ieeeHalf => 10
+  | ieeeSingle => 23
+  | ieeeDouble => 52
+  | tensorFloat32 => 10
 
 /-- Total bit width (sign + exponent + mantissa bits). -/
 def totalBits (p : NeuralPrecision) : ℕ :=
@@ -101,36 +80,30 @@ noncomputable def machineEpsilon (p : NeuralPrecision) : ℝ :=
 
 end NeuralPrecision
 
-/--
-Mixed-precision configuration: which named precision to use in each stage.
+/-- Non-semantic annotations attached to a rounded value by conversion and analysis utilities. -/
+structure NeuralFloatMetadata where
+  /-- Named precision used to produce the value. -/
+  precision : NeuralPrecision
+  /-- Nonnegative absolute error budget attached by the producing conversion. -/
+  errorBound : ℝ
+  /-- The attached error budget is nonnegative. -/
+  errorBound_nonneg : 0 ≤ errorBound
+  /-- Training phase in which the value was produced. -/
+  phase : TrainingPhase
 
-This is a convenience record used by a few examples/spec layers; it is not part of the Flocq format
-definitions (`FIX`/`FLX`/`FLT`), but it gives a simple way to state “forward in FP16, gradients in
-FP32”, etc.
--/
-structure NeuralMixedFormat where
-  /-- Precision used for the forward pass. -/
-  forward_format : NeuralPrecision
-  /-- Precision used for the backward pass (gradients/VJPs). -/
-  backward_format : NeuralPrecision
-  /-- Precision used for stored parameters (weights/biases). -/
-  param_format : NeuralPrecision
-  /-- Precision used for accumulated gradients. -/
-  grad_format : NeuralPrecision
-  /-- Precision used for the scalar loss / reductions. -/
-  loss_format : NeuralPrecision
+/-- A pure `NeuralFloat` together with ML-specific analysis metadata. -/
+structure AnnotatedNeuralFloat (β : NeuralRadix) where
+  /-- Mathematical mantissa/exponent value. -/
+  value : NeuralFloat β
+  /-- Metadata that does not affect the real denotation of `value`. -/
+  metadata : NeuralFloatMetadata
 
-/--
-A conservative default used by TorchLean examples:
+namespace AnnotatedNeuralFloat
 
-- FP16 forward (for speed),
-- FP32 for gradients/params/loss (for stability).
--/
-def NeuralMixedFormat.default : NeuralMixedFormat where
-  forward_format := NeuralPrecision.ieee_half
-  backward_format := NeuralPrecision.ieee_single
-  param_format := NeuralPrecision.ieee_single
-  grad_format := NeuralPrecision.ieee_single
-  loss_format := NeuralPrecision.ieee_single
+/-- Real denotation of an annotated value; metadata has no semantic effect. -/
+noncomputable def toReal {β : NeuralRadix} (x : AnnotatedNeuralFloat β) : ℝ :=
+  neuralToReal x.value
+
+end AnnotatedNeuralFloat
 
 end TorchLean.Floats

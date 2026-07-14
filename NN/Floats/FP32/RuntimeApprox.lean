@@ -75,8 +75,7 @@ private lemma eps32_nonneg (x : ℝ) : 0 ≤ eps₃₂ x := by
   -- Unfold to the underlying `neural_ulp` so we can reuse its nonnegativity lemma.
   unfold eps₃₂ eps32 ulp32
   exact div_nonneg
-    (neuralUlp.nonneg (β := binaryRadix) (fexp := fexp32) (x := x)
-      (phase := TrainingPhase.forward))
+    (neuralUlp.nonneg (β := binaryRadix) (fexp := fexp32) (x := x))
     (by norm_num)
 
 /-! ## Arithmetic (one real op + one rounding step) -/

@@ -44,7 +44,7 @@ namespace Probe
 
 /-- Two-coordinate vector probe for small tabular regression examples. -/
 def point (name : String) (x y : Float) (expected : Option String := none) :
-    Probe (Shape.vec 2) :=
+    Probe (.dim 2 .scalar) :=
   { name := name
     inputText := s!"x=({x},{y})"
     input := fun {α} _ _ => NN.API.Samples.pointVector (α := α) NN.API.Runtime.ofFloat x y
@@ -112,7 +112,7 @@ def fromOptions (opts : Options) (base : RunConfig := {}) : RunConfig :=
 /-- Lower a public run configuration to the runtime `Options` record. -/
 def toOptions (run : RunConfig) : Options :=
   { backend := run.backend
-    requestedDevice := run.device
+    device := run.device
     showBackend := run.showBackend }
 
 /-- CLI spelling for a Float32 runtime mode. -/
@@ -134,7 +134,6 @@ def backendArgs : Runtime.Backend → List String
 
 /-- CLI arguments that reproduce a public device choice. -/
 def deviceArgs : Runtime.Device → List String
-  | .auto => ["--device", "auto"]
   | .cpu => ["--device", "cpu"]
   | .cuda => ["--device", "cuda"]
   | .rocm => ["--device", "rocm"]

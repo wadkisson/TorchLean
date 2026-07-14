@@ -157,7 +157,7 @@ def parseBackendVal (s : String) : Option Backend :=
 
 /-- Parse a decimal Float literal used by CLI flags. -/
 def parseFloat : String → Option Float :=
-  NN.API.CLI.parseFloatLit
+  TorchLean.CLI.parseFloatLit
 
 /-- Parse a non-scientific decimal string into a generic numeric α using Numbers and Context.
   Supports optional leading '-' and a single '.'. -/
@@ -353,16 +353,16 @@ structure Opts where
 
 /-- Parse recognized flags and return the remaining positional arguments. -/
 def parseFlags (args : List String) : Except String (Opts × List String) := do
-  let args := NN.API.CLI.dropDashDash args
-  let (weights?, args) ← NN.API.CLI.takeFlagValueOnce args "weights"
-  let (splitDepth, args) ← NN.API.CLI.takeNatFlagDefault args "split-depth" 0
+  let args := TorchLean.CLI.dropDashDash args
+  let (weights?, args) ← TorchLean.CLI.takeFlagValueOnce args "weights"
+  let (splitDepth, args) ← TorchLean.CLI.takeNatFlagDefault args "split-depth" 0
   let (method, args) ←
-    NN.API.CLI.takeParsedFlagDefault args "method" "ibp" fun s =>
+    TorchLean.CLI.takeParsedFlagDefault args "method" "ibp" fun s =>
       match parseMethodVal s with
       | some method => pure method
       | none => throw s!"--method: expected ibp, crown, crown-fwd, or crown-bwd; got `{s}`"
   let (backend, args) ←
-    NN.API.CLI.takeParsedFlagDefault args "backend" "float" fun s =>
+    TorchLean.CLI.takeParsedFlagDefault args "backend" "float" fun s =>
       match parseBackendVal s with
       | some backend => pure backend
       | none => throw s!"--backend: expected float or neuralfloat; got `{s}`"

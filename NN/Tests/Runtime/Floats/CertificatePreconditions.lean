@@ -104,6 +104,14 @@ def run : IO Unit := do
   expect "positive log input was rejected"
     (ibpNodePreconditionsOk logGraph #[some positive, some positive] 1)
 
+  let emptyStore : ParamStore Float := {}
+  let nonPositiveRun := runIBP logGraph (emptyStore.seedInputBox 0 nonPositive)
+  let positiveRun := runIBP logGraph (emptyStore.seedInputBox 0 positive)
+  expect "IBP evaluated raw log across its nonpositive domain boundary"
+    (nonPositiveRun[1]!.isNone)
+  expect "IBP failed to evaluate raw log on a positive interval"
+    (positiveRun[1]!.isSome)
+
   IO.println "certificate_preconditions: ok"
 
 end CertificatePreconditions

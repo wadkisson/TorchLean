@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -30,20 +30,20 @@ open Runtime.Autograd
 abbrev seqLen : Nat := 2
 abbrev embedDim : Nat := 4
 
-def hSeq : seqLen > 0 := by decide
-def hEmb : embedDim > 0 := by decide
+theorem hSeq : seqLen > 0 := by decide
+theorem hEmb : embedDim > 0 := by decide
 
 def x : Tensor Float (shape![seqLen, embedDim]) :=
-  tensorND! [seqLen, embedDim] [
+  tensorOfList! [seqLen, embedDim] [
     0.10, 0.20, 0.00, -0.10,
     -0.30, 0.50, 0.20, 0.10
   ]
 
 def gamma : Tensor Float (shape![embedDim]) :=
-  tensorND! [embedDim] [1.0, 0.9, 1.1, 1.0]
+  tensorOfList! [embedDim] [1.0, 0.9, 1.1, 1.0]
 
 def beta : Tensor Float (shape![embedDim]) :=
-  tensorND! [embedDim] [0.0, 0.1, -0.1, 0.0]
+  tensorOfList! [embedDim] [0.0, 0.1, -0.1, 0.0]
 
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: layer_norm ==="
@@ -78,7 +78,7 @@ def run : IO Unit := do
       (h_seq_pos := hSeq) (h_embed_pos := hEmb) xIdc gIdc bIdc)
   let yCuda ← Utils.cudaValue (s := outShape) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape)) 1.0 }
+    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := outShape) gradsCuda xIdc

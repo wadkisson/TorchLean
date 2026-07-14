@@ -380,7 +380,7 @@ def permuteDVal? {α : Type} [Context α] (v : FlatDVal α) (perm : List Nat) :
   match Spec.Shape.permute? sIn perm with
   | none => none
   | some _ =>
-      match swapDepthsForPerm? perm (Shape.rank sIn) with
+      match swapDepthsForPerm? perm (Spec.Shape.rank sIn) with
       | none => none
       | some swaps => some <| swaps.foldl (fun acc d => applySwapDepth (α := α) acc d) v
 
@@ -481,13 +481,13 @@ def mkValidAxis? (axis : Nat) : (s : Shape) → Option (PLift (Shape.valid_axis 
 /-- Runtime witness that one shape can broadcast to another. -/
 def mkCanBroadcastTo? : (s₁ s₂ : Shape) → Option (Shape.CanBroadcastTo s₁ s₂)
   | s₁, s₂ =>
-    if Shape.rank s₁ < Shape.rank s₂ then
+    if Spec.Shape.rank s₁ < Spec.Shape.rank s₂ then
       match s₂ with
       | .scalar => none
       | .dim n₂ t₂ =>
         (mkCanBroadcastTo? s₁ t₂).map (fun tail =>
           Shape.CanBroadcastTo.expand_dims (n := n₂) (s₁ := s₁) (s₂ := t₂) tail)
-    else if Shape.rank s₂ < Shape.rank s₁ then
+    else if Spec.Shape.rank s₂ < Spec.Shape.rank s₁ then
       none
     else
       match s₁, s₂ with
@@ -505,15 +505,15 @@ def mkCanBroadcastTo? : (s₁ s₂ : Shape) → Option (Shape.CanBroadcastTo s�
 
 /-- Reinterpret a flattened tensor as shape `s` when the element counts agree. -/
 def ibpUnflatten {s : Shape} (dim : Nat) (t : Tensor α (.dim dim .scalar)) (h : dim =
-  Shape.size s) :
+  Spec.Shape.size s) :
     Tensor α s :=
-  let t' : Tensor α (.dim (Shape.size s) .scalar) := by
+  let t' : Tensor α (.dim (Spec.Shape.size s) .scalar) := by
     simpa [h] using t
   Tensor.unflattenSpec (α := α) s t'
 
 /-- IBP rule for broadcasting a flattened input box to a target shape. -/
 def ibpBroadcastTo (s₁ s₂ : Shape) (Xin : FlatBox α) : Option (FlatBox α) :=
-  if h : Xin.dim = Shape.size s₁ then
+  if h : Xin.dim = Spec.Shape.size s₁ then
     match mkCanBroadcastTo? s₁ s₂ with
     | none => none
     | some cb =>
@@ -523,13 +523,13 @@ def ibpBroadcastTo (s₁ s₂ : Shape) (Xin : FlatBox α) : Option (FlatBox α) 
         let yHi : Tensor α s₂ := Tensor.broadcastTo (α := α) (s₁ := s₁) (s₂ := s₂) cb xHi
         let flatLo := Tensor.flattenSpec (α := α) yLo
         let flatHi := Tensor.flattenSpec (α := α) yHi
-        some { dim := Shape.size s₂, lo := flatLo, hi := flatHi }
+        some { dim := Spec.Shape.size s₂, lo := flatLo, hi := flatHi }
   else
     none
 
 /-- IBP rule for reducing a shaped box by summing along one axis. -/
 def ibpReduceSumAxis (axis : Nat) (Xin : FlatBox α) (s : Shape) : Option (FlatBox α) :=
-  if h : Xin.dim = Shape.size s then
+  if h : Xin.dim = Spec.Shape.size s then
     match mkValidAxis? (axis := axis) s with
     | none => none
     | some hAxis =>
@@ -541,13 +541,13 @@ def ibpReduceSumAxis (axis : Nat) (Xin : FlatBox α) (s : Shape) : Option (FlatB
         let outS := Tensor.shapeAfterSum s axis
         let flatLo := Tensor.flattenSpec (α := α) yLo
         let flatHi := Tensor.flattenSpec (α := α) yHi
-        some { dim := Shape.size outS, lo := flatLo, hi := flatHi }
+        some { dim := Spec.Shape.size outS, lo := flatLo, hi := flatHi }
   else
     none
 
 /-- IBP rule for reducing a shaped box by averaging along one axis. -/
 def ibpReduceMeanAxis (axis : Nat) (Xin : FlatBox α) (s : Shape) : Option (FlatBox α) :=
-  if h : Xin.dim = Shape.size s then
+  if h : Xin.dim = Spec.Shape.size s then
     match mkValidAxis? (axis := axis) s with
     | none => none
     | some hAxis =>
@@ -559,7 +559,7 @@ def ibpReduceMeanAxis (axis : Nat) (Xin : FlatBox α) (s : Shape) : Option (Flat
         let outS := Tensor.shapeAfterSum s axis
         let flatLo := Tensor.flattenSpec (α := α) yLo
         let flatHi := Tensor.flattenSpec (α := α) yHi
-        some { dim := Shape.size outS, lo := flatLo, hi := flatHi }
+        some { dim := Spec.Shape.size outS, lo := flatLo, hi := flatHi }
   else
     none
 
@@ -859,14 +859,14 @@ def ibpConv2dNode (id : Nat) (ps : ParamStore α) (Xin : FlatBox α) : Option (F
       let sFlat := Shape.dim Xin.dim Shape.scalar
       let sIn := Shape.dim cfg.inC (Shape.dim cfg.inH (Shape.dim cfg.inW Shape.scalar))
       have hsize : sFlat.size = sIn.size := by
-        simp [Shape.size, sFlat, sIn, hdim, expected, Nat.mul_assoc]
+        simp [Spec.Shape.size, sFlat, sIn, hdim, expected, Nat.mul_assoc]
       let xLo := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
       let xHi := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
       let xBox : Box α sIn := { lo := xLo, hi := xHi }
       let yBox := NN.MLTheory.CROWN.ibpConv2d (α:=α)
         (layer:=cfg.spec) (xB:=xBox)
-      let outH := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-      let outW := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+      let outH := Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+      let outW := Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
       let outShape := Shape.dim cfg.outC (Shape.dim outH (Shape.dim outW Shape.scalar))
       let flatLo := Tensor.flattenSpec (α:=α) yBox.lo
       let flatHi := Tensor.flattenSpec (α:=α) yBox.hi

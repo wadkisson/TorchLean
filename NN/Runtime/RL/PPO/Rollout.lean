@@ -139,7 +139,7 @@ def toActorCriticSample {obsShape : Shape} {nActions horizon : Nat}
     Tensor.ofArrayDim (n := horizon) (s := obsShape) statesArr hStates
 
   let actionsOneHotArr : Array (Tensor α (.dim nActions .scalar)) :=
-    steps.map (fun st => Core.oneHotAction (α := α) (nActions := nActions) st.action)
+    steps.map (fun st => NN.Tensor.oneHot (α := α) nActions st.action)
   let hActHot : horizon = actionsOneHotArr.size := by
     have : actionsOneHotArr.size = horizon := by
       simpa [actionsOneHotArr, Array.size_map] using r.steps_size_eq_horizon

@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Spec
+public import NN.Spec
 public import NN.Floats.IEEEExec
 public import NN.MLTheory.CROWN.Lyapunov.TwoStage.Core
 

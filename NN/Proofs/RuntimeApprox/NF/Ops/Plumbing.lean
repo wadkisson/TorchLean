@@ -12,7 +12,7 @@ public import Mathlib.Analysis.Complex.Trigonometric
 public import Mathlib.Analysis.SpecialFunctions.Log.Deriv
 public import Mathlib.Data.List.FinRange
 public import Mathlib.Analysis.Real.Sqrt
-public import NN.Floats.NeuralFloat.NF
+public import NN.Floats.NeuralFloat.Scalar.NF
 public import NN.Proofs.Gradients.Activation
 public import NN.Proofs.RuntimeApprox.Graph.ForwardApprox
 public import NN.Proofs.RuntimeApprox.Rounding.RoundingApprox

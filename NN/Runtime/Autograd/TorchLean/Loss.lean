@@ -212,7 +212,7 @@ def nllRowsNat {α : Type} [Context α] [DecidableEq Shape]
     (s₁ := .dim rows (.dim classes .scalar))
     (s₂ := .dim (rows * classes) .scalar)
     logProbs (by
-      simp [Shape.size])
+      simp [Spec.Shape.size])
   let picked ← gatherVecNat (m := m) (α := α)
     (n := rows * classes) (k := rows) flat (rowTargetFlatIndices rows classes target)
   let neg ← scale (m := m) (α := α) (s := .dim rows .scalar) picked (-1)

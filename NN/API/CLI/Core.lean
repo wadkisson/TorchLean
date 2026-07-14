@@ -9,9 +9,10 @@ module
 public import Lean.Data.Json.Parser
 
 /-!
-# API CLI Helpers
+# TorchLean CLI Parsers
 
-Small command-line parsers shared by examples, verification tools, and public facade helpers.
+Pure command-line parsers shared by examples, verification tools, and public facade helpers. The
+definitions live directly under `TorchLean.CLI`; `NN.API.CLI` is the lightweight import path.
 
 This module stays independent of tensors and runtime modules so lightweight artifact checkers can
 reuse the CLI surface without importing the full public API.
@@ -19,13 +20,11 @@ reuse the CLI surface without importing the full public API.
 
 @[expose] public section
 
-namespace NN
-namespace API
-
+namespace TorchLean
 namespace CLI
 
 /-- Lift a shared CLI parser result into `IO.userError`. -/
-def orThrow {α : Type} (x : Except String α) : IO α :=
+def orThrowIO {α : Type} (x : Except String α) : IO α :=
   match x with
   | .ok value => pure value
   | .error e => throw <| IO.userError e
@@ -176,7 +175,7 @@ def hasHelp (args : List String) : Bool :=
   args.contains "--help" || args.contains "-h"
 
 /-- Fail if there are any unconsumed CLI arguments. -/
-def requireNoArgs (args : List String) : Except String Unit :=
+def checkNoArgs (args : List String) : Except String Unit :=
   if args.isEmpty then
     .ok ()
   else
@@ -564,6 +563,4 @@ def takeSeed (args : List String) (default : Nat := 0) :
   pure (seed?.getD default, rest)
 
 end CLI
-
-end API
-end NN
+end TorchLean

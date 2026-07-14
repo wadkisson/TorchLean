@@ -182,8 +182,8 @@ def conv2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
   (bias : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outC .scalar))
   (input : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1)
-      (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))) := do
+    (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+      (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) := do
   match s.impl with
   | .eager sess =>
       EagerSession.conv2d (α := α) sess
@@ -209,8 +209,8 @@ def convTranspose2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape
   (bias : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outC .scalar))
   (input : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-      (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)))) := do
+    (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+      (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar)))) := do
   match s.impl with
   | .eager sess =>
       EagerSession.convTranspose2d (α := α) sess

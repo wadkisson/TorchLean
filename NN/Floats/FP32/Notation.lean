@@ -41,30 +41,26 @@ a function `ℝ → ℝ` (useful for bridge theorems and error bounds).
 noncomputable abbrev round32 (x : ℝ) : ℝ :=
   neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 x
 
-/--
-One ULP at `x` for the canonical binary32 exponent configuration.
+/-- One ULP at `x` for the canonical binary32 exponent configuration. -/
+noncomputable abbrev ulp32 (x : ℝ) : ℝ :=
+  neuralUlp binaryRadix fexp32 x
 
-The optional `phase` parameter matches TorchLean's mixed-precision hook:
-`TrainingPhase.requires_high_precision` tightens the bound by one extra bit.
--/
-noncomputable abbrev ulp32 (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) : ℝ :=
-  neuralUlp binaryRadix fexp32 x phase
+/-- Convenience abbreviation: half an ULP at `x`. -/
+noncomputable abbrev eps32 (x : ℝ) : ℝ := ulp32 x / 2
 
-/-- Convenience abbreviation: half-ULP at `x` (with the same optional `phase` hook as `ulp32`). -/
-noncomputable abbrev eps32 (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) : ℝ :=
-  ulp32 x phase / 2
+/-- Binary32 has a smallest grid step, so its ULP at zero is `2⁻¹⁴⁹`. -/
+@[simp] theorem ulp32_zero : ulp32 0 = neuralBpow binaryRadix (-149) := by
+  exact neuralUlp_zero_FLT (-149) 24 (by norm_num)
 
 /-- Unicode alias for `round32` (useful in error-bound statements). -/
 noncomputable abbrev round₃₂ (x : ℝ) : ℝ :=
   round32 x
 
 /-- Unicode alias for `ulp32` (useful in error-bound statements). -/
-noncomputable abbrev ulp₃₂ (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) : ℝ :=
-  ulp32 x phase
+noncomputable abbrev ulp₃₂ (x : ℝ) : ℝ := ulp32 x
 
 /-- Unicode alias for `eps32` (half-ULP). -/
-noncomputable abbrev eps₃₂ (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) : ℝ :=
-  eps32 x phase
+noncomputable abbrev eps₃₂ (x : ℝ) : ℝ := eps32 x
 
 /-
 `round₃₂`/`ulp₃₂`/`eps₃₂` are purely ergonomic unicode aliases.
@@ -76,12 +72,10 @@ We keep the simp lemmas one-way (unicode → ASCII) to avoid accidental simp loo
 @[simp] lemma round₃₂_eq_round32 (x : ℝ) : round₃₂ x = round32 x := rfl
 
 /-- `ulp₃₂` is definitionally equal to `ulp32` (unicode → ASCII simp). -/
-@[simp] lemma ulp₃₂_eq_ulp32 (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) :
-    ulp₃₂ x phase = ulp32 x phase := rfl
+@[simp] lemma ulp₃₂_eq_ulp32 (x : ℝ) : ulp₃₂ x = ulp32 x := rfl
 
 /-- `eps₃₂` is definitionally equal to `eps32` (unicode → ASCII simp). -/
-@[simp] lemma eps₃₂_eq_eps32 (x : ℝ) (phase : TrainingPhase := TrainingPhase.forward) :
-    eps₃₂ x phase = eps32 x phase := rfl
+@[simp] lemma eps₃₂_eq_eps32 (x : ℝ) : eps₃₂ x = eps32 x := rfl
 
 end
 

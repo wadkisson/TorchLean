@@ -178,14 +178,13 @@ def conv2d {α : Type} {Δ : Type} [Context α]
   (kernel : Var (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))))
   (bias : Var (.dim outC .scalar))
   (input : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
-  MWith α Δ Γ (Var (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1) (.dim ((inW + 2 *
-    padding - kW) / stride + 1) .scalar)))) := do
+  MWith α Δ Γ (Var (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) := do
   let ⟨ss, g⟩ ← get
   let ik ← liftM (mkIdx (_α := α) (Γ := Γ) ss kernel)
   let ib ← liftM (mkIdx (_α := α) (Γ := Γ) ss bias)
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss input)
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
   let outS : Shape := .dim outC (.dim outH (.dim outW .scalar))
   let node : NodeData α Δ (Γ ++ ss) outS :=
     { forward := fun ctx _d =>
@@ -248,15 +247,15 @@ def convTranspose2d {α : Type} {Δ : Type} [Context α]
   (kernel : Var (.dim inC (.dim outC (.dim kH (.dim kW .scalar)))))
   (bias : Var (.dim outC .scalar))
   (input : Var (.dim inC (.dim inH (.dim inW .scalar)))) :
-  MWith α Δ Γ (Var (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-    (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)))) := do
+  MWith α Δ Γ (Var (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+    (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar)))) := do
   have h1' : inC > 0 := Nat.pos_of_ne_zero h1
   let ⟨ss, g⟩ ← get
   let ik ← liftM (mkIdx (_α := α) (Γ := Γ) ss kernel)
   let ib ← liftM (mkIdx (_α := α) (Γ := Γ) ss bias)
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss input)
-  let outH : Nat := (inH - 1) * stride - 2 * padding + kH
-  let outW : Nat := (inW - 1) * stride - 2 * padding + kW
+  let outH : Nat := Spec.convTransposeOutDim inH kH stride padding
+  let outW : Nat := Spec.convTransposeOutDim inW kW stride padding
   let outS : Shape := .dim outC (.dim outH (.dim outW .scalar))
   let node : NodeData α Δ (Γ ++ ss) outS :=
     { forward := fun ctx _d =>

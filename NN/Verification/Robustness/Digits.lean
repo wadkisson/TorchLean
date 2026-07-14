@@ -136,33 +136,33 @@ def usage : String :=
 
 /-- Parse CLI args into `DigitsOpts` (returns `usage` as the error message on `--help`). -/
 def parseArgs (args : List String) : Except String DigitsOpts := do
-  let args := NN.API.CLI.dropDashDash args
-  if NN.API.CLI.hasHelp args then
+  let args := TorchLean.CLI.dropDashDash args
+  if TorchLean.CLI.hasHelp args then
     throw usage
-  let (weights, args) ← NN.API.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
-  let (dataset, args) ← NN.API.CLI.takeFlagValueDefault args "dataset" defaultDatasetPath
-  let (eps, args) ← NN.API.CLI.takeFloatFlagDefault args "eps" 0.02
-  let (max, args) ← NN.API.CLI.takeNatFlagDefault args "max" 100
-  NN.API.CLI.requireNoArgs args
+  let (weights, args) ← TorchLean.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
+  let (dataset, args) ← TorchLean.CLI.takeFlagValueDefault args "dataset" defaultDatasetPath
+  let (eps, args) ← TorchLean.CLI.takeFloatFlagDefault args "eps" 0.02
+  let (max, args) ← TorchLean.CLI.takeNatFlagDefault args "max" 100
+  TorchLean.CLI.checkNoArgs args
   pure { weights := weights, dataset := dataset, eps := eps, max := max }
 
 /-- Parse the combined trainer/certifier CLI for `digits-train-certify`. -/
 def parseTrainCertifyArgs (args : List String) : Except String TrainCertifyOpts := do
-  let args := NN.API.CLI.dropDashDash args
-  if NN.API.CLI.hasHelp args then
+  let args := TorchLean.CLI.dropDashDash args
+  if TorchLean.CLI.hasHelp args then
     throw usage
-  let (script, args) ← NN.API.CLI.takeFlagValueDefault args "script" defaultTrainScript
-  let (weights, args) ← NN.API.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
-  let (dataset, args) ← NN.API.CLI.takeFlagValueDefault args "dataset" defaultDatasetPath
-  let (eps, args) ← NN.API.CLI.takeFloatFlagDefault args "eps" 0.02
-  let (max, args) ← NN.API.CLI.takeNatFlagDefault args "max" 100
-  let (seed, args) ← NN.API.CLI.takeNatFlagDefault args "seed" 0
-  let (epochs, args) ← NN.API.CLI.takeNatFlagDefault args "epochs" 200
-  let (batch, args) ← NN.API.CLI.takeNatFlagDefault args "batch" 128
-  let (lr, args) ← NN.API.CLI.takeFloatFlagDefault args "lr" 1e-2
-  let (testSize, args) ← NN.API.CLI.takeFloatFlagDefault args "test-size" 0.2
-  let (maxTest, args) ← NN.API.CLI.takeNatFlagDefault args "max-test" 360
-  NN.API.CLI.requireNoArgs args
+  let (script, args) ← TorchLean.CLI.takeFlagValueDefault args "script" defaultTrainScript
+  let (weights, args) ← TorchLean.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
+  let (dataset, args) ← TorchLean.CLI.takeFlagValueDefault args "dataset" defaultDatasetPath
+  let (eps, args) ← TorchLean.CLI.takeFloatFlagDefault args "eps" 0.02
+  let (max, args) ← TorchLean.CLI.takeNatFlagDefault args "max" 100
+  let (seed, args) ← TorchLean.CLI.takeNatFlagDefault args "seed" 0
+  let (epochs, args) ← TorchLean.CLI.takeNatFlagDefault args "epochs" 200
+  let (batch, args) ← TorchLean.CLI.takeNatFlagDefault args "batch" 128
+  let (lr, args) ← TorchLean.CLI.takeFloatFlagDefault args "lr" 1e-2
+  let (testSize, args) ← TorchLean.CLI.takeFloatFlagDefault args "test-size" 0.2
+  let (maxTest, args) ← TorchLean.CLI.takeNatFlagDefault args "max-test" 360
+  TorchLean.CLI.checkNoArgs args
   pure {
     certify := { weights := weights, dataset := dataset, eps := eps, max := max }
     script := script
@@ -262,7 +262,7 @@ def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToString α]
   let examples0 ← loadDataset opts.dataset
   let examples := examples0.take opts.max
 
-  let params : TensorPack α paramShapes :=
+  let params : NN.API.TorchLean.TensorPack α paramShapes :=
     tensorpack!
       (NN.API.Common.castTensor cast linF.weights),
       (NN.API.Common.castTensor cast linF.bias)

@@ -33,12 +33,12 @@ namespace TapeNodes
 /-- `CtxVec.get` specialized to vector shapes. -/
 def getVec {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) (x : CtxVec Γ) : Vec n :=
   castVec (by
-    simp [Shape.size] : Shape.size (.dim n .scalar) = n) (CtxVec.get (Γ := Γ) (s := .dim n .scalar)
+    simp [Spec.Shape.size] : Spec.Shape.size (.dim n .scalar) = n) (CtxVec.get (Γ := Γ) (s := .dim n .scalar)
       idx x)
 
 /-- `CtxVec.getCLM` specialized to vector shapes `.dim n .scalar`. -/
 def getVecCLM {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) : CtxVec Γ →L[ℝ] Vec n :=
-  (Graph.castCLM (h := (by simp [Shape.size] : Shape.size (.dim n .scalar) = n))).comp
+  (Graph.castCLM (h := (by simp [Spec.Shape.size] : Spec.Shape.size (.dim n .scalar) = n))).comp
     (CtxVec.getCLM (Γ := Γ) (s := .dim n .scalar) idx)
 
 @[simp] lemma getVecCLM_apply {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) (x : CtxVec
@@ -47,7 +47,7 @@ def getVecCLM {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) : CtxV
   simp [getVecCLM, getVec, CtxVec.getCLM_apply, Graph.castCLM]
 
 @[simp] lemma getCLM_apply_ofLp {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (x : CtxVec Γ)
-    (i : Fin (Shape.size s)) :
+    (i : Fin (Spec.Shape.size s)) :
     ((CtxVec.getCLM (Γ := Γ) (s := s) idx) x).ofLp i = (CtxVec.get (Γ := Γ) (s := s) idx x).ofLp i
       := by
   simp
@@ -55,13 +55,13 @@ def getVecCLM {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) : CtxV
 /-- Inject a `Vec n` into a vectorized context at `idx` (fills other blocks with zeros). -/
 def singleVec {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) (v : Vec n) : CtxVec Γ :=
   CtxVec.single (Γ := Γ) (s := .dim n .scalar) idx
-    (castVec (by simp [Shape.size] : Shape.size (.dim n .scalar) = n).symm v)
+    (castVec (by simp [Spec.Shape.size] : Spec.Shape.size (.dim n .scalar) = n).symm v)
 
 @[simp] lemma inner_getVec_singleVec {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar))
     (x : CtxVec Γ) (v : Vec n) :
     inner ℝ x (singleVec (Γ := Γ) (n := n) idx v) = inner ℝ (getVec (Γ := Γ) (n := n) idx x) v := by
   classical
-  let hsz : Shape.size (.dim n .scalar) = n := by simp [Shape.size]
+  let hsz : Spec.Shape.size (.dim n .scalar) = n := by simp [Spec.Shape.size]
   -- reduce to `CtxVec.inner_get_single` plus cast isometries
   have h :=
     (CtxVec.inner_get_single (Γ := Γ) (s := .dim n .scalar) idx x (castVec hsz.symm v))
@@ -91,7 +91,7 @@ def singleVec {Γ : List Shape} {n : Nat} (idx : Idx Γ (.dim n .scalar)) (v : V
 
 /-- Elementwise node: apply a scalar function pointwise on a context entry. -/
 def elemwise {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (f f' : ℝ → ℝ) : Node Γ s :=
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun xV =>
       vecOfFun (n := n) (fun i : Fin n => f (CtxVec.get (Γ := Γ) (s := s) idx xV i)))
@@ -115,7 +115,7 @@ def elemwiseFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (f f' : ℝ �
     NodeFDerivCorrect (elemwise (Γ := Γ) (s := s) idx f f') :=
 by
   classical
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   refine
     { deriv := fun xV =>
         (elemwiseDerivCLM (n := n) f' (CtxVec.get (Γ := Γ) (s := s) idx xV)).comp
@@ -160,13 +160,13 @@ by
 /-- Pointwise analytic correctness for `elemwise` nodes from a coordinatewise `HasDerivAt`
   hypothesis. -/
 def elemwiseFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (f f' : ℝ → ℝ) (xV : CtxVec Γ)
-    (hf : ∀ i : Fin (Shape.size s),
+    (hf : ∀ i : Fin (Spec.Shape.size s),
       HasDerivAt f (f' (CtxVec.get (Γ := Γ) (s := s) idx xV i)) (CtxVec.get (Γ := Γ) (s := s) idx xV
         i)) :
     NodeFDerivCorrectAt (elemwise (Γ := Γ) (s := s) idx f f') xV :=
 by
   classical
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   refine
     { deriv :=
         (elemwiseDerivCLM (n := n) f' (CtxVec.get (Γ := Γ) (s := s) idx xV)).comp
@@ -213,7 +213,7 @@ def relu {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 
 /-- Pointwise `NodeFDerivCorrectAt` for `relu` under the assumption that inputs are nonzero. -/
 def reluFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
     NodeFDerivCorrectAt (relu (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx
     Activation.Math.reluSpec Activation.Math.reluDerivSpec xV
@@ -225,7 +225,7 @@ def abs {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 
 /-- Pointwise `NodeFDerivCorrectAt` for `abs` under the assumption that inputs are nonzero. -/
 def absFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
     NodeFDerivCorrectAt (abs (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx (fun x : ℝ => |x|) (fun x => (SignType.sign x : ℝ)) xV
     (fun i => by simpa using (hasDerivAt_abs (hx i)))
@@ -236,7 +236,7 @@ def log {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 
 /-- Pointwise `NodeFDerivCorrectAt` for `log` under the assumption that inputs are nonzero. -/
 def logFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
     NodeFDerivCorrectAt (log (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx Real.log (fun x => x⁻¹) xV
     (fun i => Real.hasDerivAt_log (hx i))
@@ -247,7 +247,7 @@ def inv {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 
 /-- Pointwise `NodeFDerivCorrectAt` for `inv` under the assumption that inputs are nonzero. -/
 def invFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
     NodeFDerivCorrectAt (inv (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx (fun x => x⁻¹) (fun x => -((x ^ 2)⁻¹)) xV
     (fun i => by simpa using (hasDerivAt_inv (hx i)))
@@ -276,7 +276,7 @@ def sqrtClamp {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 /-- Pointwise `NodeFDerivCorrectAt` for `sqrt_clamp` under the assumption that inputs are strictly
   positive. -/
 def sqrtClampFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), 0 < CtxVec.get (Γ := Γ) (s := s) idx xV i) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), 0 < CtxVec.get (Γ := Γ) (s := s) idx xV i) :
     NodeFDerivCorrectAt (sqrtClamp (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx
     (fun x => Real.sqrt (max x 0)) (fun x => 1 / (2 * Real.sqrt x)) xV
@@ -288,7 +288,7 @@ def sqrt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : Node Γ s :=
 
 /-- Pointwise `NodeFDerivCorrectAt` for `sqrt` under the assumption that inputs are nonzero. -/
 def sqrtFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (xV : CtxVec Γ)
-    (hx : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
+    (hx : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) idx xV i ≠ 0) :
     NodeFDerivCorrectAt (sqrt (Γ := Γ) (s := s) idx) xV :=
   elemwiseFderivAt (Γ := Γ) (s := s) idx Real.sqrt (fun x => 1 / (2 * Real.sqrt x)) xV
     (fun i => by simpa using (Real.hasDerivAt_sqrt (hx i)))
@@ -448,7 +448,7 @@ def eluFderivAt {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (alpha : ℝ) (xV
 def unaryOp {Γ : List Shape} {inDim outDim : Nat}
     (idx : Idx Γ (.dim inDim .scalar))
     (C : OpSpecFDerivCorrect inDim outDim) : Node Γ (.dim outDim .scalar) :=
-  let hOut : Shape.size (.dim outDim .scalar) = outDim := by simp [Shape.size]
+  let hOut : Spec.Shape.size (.dim outDim .scalar) = outDim := by simp [Spec.Shape.size]
   Node.ofVec (Γ := Γ) (τ := .dim outDim .scalar)
     (f := fun ctxV => castVec hOut.symm (C.forwardVec ((getVecCLM (Γ := Γ) (n := inDim) idx) ctxV)))
     (jvp := fun ctxV dctxV =>
@@ -533,13 +533,13 @@ def unaryOpFderiv {Γ : List Shape} {inDim outDim : Nat}
     (C : OpSpecFDerivCorrect inDim outDim) :
     NodeFDerivCorrect (unaryOp (Γ := Γ) (inDim := inDim) (outDim := outDim) idx C) :=
 { deriv := fun xV =>
-    let hOut : Shape.size (.dim outDim .scalar) = outDim := by simp [Shape.size]
+    let hOut : Spec.Shape.size (.dim outDim .scalar) = outDim := by simp [Spec.Shape.size]
     (Graph.castCLM (h := hOut.symm)).comp
       ((C.deriv ((getVecCLM (Γ := Γ) (n := inDim) idx) xV)).comp (getVecCLM (Γ := Γ) (n := inDim)
         idx))
   hasFDerivAt := by
     intro xV
-    let hOut : Shape.size (.dim outDim .scalar) = outDim := by simp [Shape.size]
+    let hOut : Spec.Shape.size (.dim outDim .scalar) = outDim := by simp [Spec.Shape.size]
     -- projection is linear
     have hproj :
         HasFDerivAt (fun xV : CtxVec Γ => (getVecCLM (Γ := Γ) (n := inDim) idx) xV)
@@ -574,7 +574,7 @@ def unaryOpFderiv {Γ : List Shape} {inDim outDim : Nat}
     simpa [Function.comp_def] using hfinal
   jvp_eq := by
     intro xV dxV
-    let hOut : Shape.size (.dim outDim .scalar) = outDim := by simp [Shape.size]
+    let hOut : Spec.Shape.size (.dim outDim .scalar) = outDim := by simp [Spec.Shape.size]
     have hjvp :=
       C.jvp_eq
         (xV := (getVecCLM (Γ := Γ) (n := inDim) idx) xV)

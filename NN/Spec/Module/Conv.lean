@@ -34,8 +34,9 @@ def Conv2DModuleSpec {α : Type} [Context α] {inC outC kH kW stride padding inH
   (m : Conv2DSpec inC outC kH kW stride padding α h1 h2 h3) :
   NNModuleSpec α
     (.dim inC (.dim inH (.dim inW .scalar)))
-    (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1) (.dim ((inW + 2 * padding - kW) /
-      stride + 1) .scalar))) :=
+    (.dim outC
+      (.dim (Shape.slidingWindowOutDim inH kH stride padding)
+        (.dim (Shape.slidingWindowOutDim inW kW stride padding) .scalar))) :=
 { forward := fun x => conv2dSpec m x, kind := "Conv2D", export_func := {
   toPyTorch :=
     s!"nn.Conv2d({inC}, {outC}, kernel_size=({kH}, {kW}), stride={stride}, padding={padding})",
@@ -54,8 +55,8 @@ def ConvTranspose2DModuleSpec {α : Type} [Context α]
   NNModuleSpec α
     (.dim inC (.dim inH (.dim inW .scalar)))
     (.dim outC
-      (.dim ((inH - 1) * stride - 2 * padding + kH)
-        (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar))) :=
+      (.dim (convTransposeOutDim inH kH stride padding)
+        (.dim (convTransposeOutDim inW kW stride padding) .scalar))) :=
 { forward := fun x => convTranspose2dSpec (inC := inC) (outC := outC)
     (kH := kH) (kW := kW) (stride := stride) (padding := padding)
     (inH := inH) (inW := inW) m x

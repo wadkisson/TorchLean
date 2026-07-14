@@ -49,16 +49,25 @@ def twoConvCnn
     {h_inC : inC ≠ 0} {h_c1 : c1 ≠ 0} {_h_c2 : c2 ≠ 0}
     {h_kH : kH ≠ 0} {h_kW : kW ≠ 0}
     {h_poolKH : poolKH ≠ 0} {h_poolKW : poolKW ≠ 0} :
-    _root_.Runtime.Autograd.TorchLean.NN.Seq (Shape.CHW inC inH inW) (Shape.Vec outDim) :=
-  let firstConvOutHeight : Nat := (inH + 2 * padding1 - kH) / stride1 + 1
-  let firstConvOutWidth : Nat := (inW + 2 * padding1 - kW) / stride1 + 1
-  let firstPoolOutHeight : Nat := (firstConvOutHeight - poolKH) / poolStride1 + 1
-  let firstPoolOutWidth : Nat := (firstConvOutWidth - poolKW) / poolStride1 + 1
-  let secondConvOutHeight : Nat := (firstPoolOutHeight + 2 * padding2 - kH) / stride2 + 1
-  let secondConvOutWidth : Nat := (firstPoolOutWidth + 2 * padding2 - kW) / stride2 + 1
-  let secondPoolOutHeight : Nat := (secondConvOutHeight - poolKH) / poolStride2 + 1
-  let secondPoolOutWidth : Nat := (secondConvOutWidth - poolKW) / poolStride2 + 1
-  let featSize : Nat := (Shape.CHW c2 secondPoolOutHeight secondPoolOutWidth).size
+    _root_.Runtime.Autograd.TorchLean.NN.Seq (.dim inC (.dim inH (.dim inW .scalar))) (.dim outDim .scalar) :=
+  let firstConvOutHeight : Nat :=
+    Spec.Shape.slidingWindowOutDim inH kH stride1 padding1
+  let firstConvOutWidth : Nat :=
+    Spec.Shape.slidingWindowOutDim inW kW stride1 padding1
+  let firstPoolOutHeight : Nat :=
+    Spec.Shape.slidingWindowOutDim firstConvOutHeight poolKH poolStride1 0
+  let firstPoolOutWidth : Nat :=
+    Spec.Shape.slidingWindowOutDim firstConvOutWidth poolKW poolStride1 0
+  let secondConvOutHeight : Nat :=
+    Spec.Shape.slidingWindowOutDim firstPoolOutHeight kH stride2 padding2
+  let secondConvOutWidth : Nat :=
+    Spec.Shape.slidingWindowOutDim firstPoolOutWidth kW stride2 padding2
+  let secondPoolOutHeight : Nat :=
+    Spec.Shape.slidingWindowOutDim secondConvOutHeight poolKH poolStride2 0
+  let secondPoolOutWidth : Nat :=
+    Spec.Shape.slidingWindowOutDim secondConvOutWidth poolKW poolStride2 0
+  let featSize : Nat :=
+    Spec.Shape.size (.dim c2 (.dim secondPoolOutHeight (.dim secondPoolOutWidth .scalar)))
   _root_.Runtime.Autograd.TorchLean.NN.singleLayer
       (_root_.Runtime.Autograd.TorchLean.NN.conv2d
         (inC := inC) (outC := c1) (kH := kH) (kW := kW) (stride := stride1) (padding := padding1)
@@ -88,7 +97,7 @@ def twoConvCnn
         (h1 := h_poolKH) (h2 := h_poolKW))
     >>>
     _root_.Runtime.Autograd.TorchLean.NN.singleLayer
-      (_root_.Runtime.Autograd.TorchLean.NN.flatten (s := Shape.CHW c2 secondPoolOutHeight secondPoolOutWidth))
+      (_root_.Runtime.Autograd.TorchLean.NN.flatten (s := .dim c2 (.dim secondPoolOutHeight (.dim secondPoolOutWidth .scalar))))
     >>>
     _root_.Runtime.Autograd.TorchLean.NN.singleLayer
       (_root_.Runtime.Autograd.TorchLean.NN.linear featSize outDim (seedW := 4) (seedB := 5))

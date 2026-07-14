@@ -146,7 +146,7 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
               hConst.trans hGet'
             have hStoreConst :
                 cOut.ps.constVals.get? id =
-                  some ({ n := Shape.size mid₀, v := t.flattenSpec } :
+                  some ({ n := Spec.Shape.size mid₀, v := t.flattenSpec } :
                     NN.MLTheory.CROWN.Graph.FlatVec α) := by
               simpa [flat, flatOfTensor] using hGet
             have hUF : unflattenSpec mid₀ t.flattenSpec = t := by
@@ -194,7 +194,7 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
               hConst.trans hGet'
             have hStoreConst :
                 cOut.ps.constVals.get? id =
-                  some ({ n := Shape.size mid₀, v := tp.flattenSpec } :
+                  some ({ n := Spec.Shape.size mid₀, v := tp.flattenSpec } :
                     NN.MLTheory.CROWN.Graph.FlatVec α) := by
               simpa [flat, flatOfTensor] using hGet
             have hUF : unflattenSpec mid₀ tp.flattenSpec = tp := by
@@ -816,12 +816,12 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
               simp [hnOut]
             simpa [evalNode, hGetValX, DVal.mk, tx, hnOut, Except.bind, Except.pure, bind, pure] using hEvalAt
         | softmaxLast hRank xIdx =>
-            have hAxis : (Shape.rank mid₀ - 1) + 1 = Shape.rank mid₀ := by
+            have hAxis : (Spec.Shape.rank mid₀ - 1) + 1 = Spec.Shape.rank mid₀ := by
               exact Nat.sub_add_cancel (Nat.succ_le_of_lt hRank)
-            have hAxisValid : OpContracts.checkAxisValid (Shape.rank mid₀ - 1) mid₀ = .ok () := by
+            have hAxisValid : OpContracts.checkAxisValid (Spec.Shape.rank mid₀ - 1) mid₀ = .ok () := by
               unfold OpContracts.checkAxisValid
-              have hLt : Shape.rank mid₀ - 1 < Shape.rank mid₀ := by
-                cases hR : Shape.rank mid₀ with
+              have hLt : Spec.Shape.rank mid₀ - 1 < Spec.Shape.rank mid₀ := by
+                cases hR : Spec.Shape.rank mid₀ with
                 | zero =>
                     simp [hR] at hRank
                 | succ r =>
@@ -834,7 +834,7 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
                   (s := mid₀)
             have hxF : (vals[xIdx.id]!).fst = mid₀ := by
               simpa using hx
-            have hnKind : n.kind = .softmax (Shape.rank mid₀ - 1) := by
+            have hnKind : n.kind = .softmax (Spec.Shape.rank mid₀ - 1) := by
               simp [compileNode, res, n]
             have hnParents : n.parents = [xIdx.id] := by
               simp [compileNode, res, n]
@@ -860,9 +860,9 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
                   (DVal.mk (α := α) mid₀
                     (Activation.softmaxSpec (α := α) tx)) := by
               have hAxisValid' :
-                  OpContracts.checkAxisValid (Shape.rank mid₀ - 1) n.outShape = Except.ok () := by
+                  OpContracts.checkAxisValid (Spec.Shape.rank mid₀ - 1) n.outShape = Except.ok () := by
                 simpa [hnOut] using hAxisValid
-              have hAxis' : (Shape.rank mid₀ - 1) + 1 = Shape.rank n.outShape := by
+              have hAxis' : (Spec.Shape.rank mid₀ - 1) + 1 = Spec.Shape.rank n.outShape := by
                 simpa [hnOut] using hAxis
               unfold NN.IR.Graph.evalAt
               simp [hGetNode, hnKind, hnParents, DVal.shape, DVal.tensor, DVal.mk,
@@ -945,8 +945,8 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
               simp [NN.IR.Graph.layernormPure, hSeq, hEmb]
               rfl
             have hNumel :
-                Shape.size (.dim seqLen (.dim embedDim .scalar)) =
-                  Shape.size (.dim seqLen (.dim embedDim .scalar)) := rfl
+                Spec.Shape.size (.dim seqLen (.dim embedDim .scalar)) =
+                  Spec.Shape.size (.dim seqLen (.dim embedDim .scalar)) := rfl
             have hEvalAt :
                 NN.IR.Graph.evalAt (α := α)
                     (g := cOut.graph)
@@ -1058,8 +1058,8 @@ theorem denoteAllFrom_compileFGraph_eq_evalFGraphVals
               getParam (α := α) (paramShapes := paramShapes) params bias
             let outShape : Shape :=
               .dim outC
-                (.dim ((inH + 2 * padding - kH) / stride + 1)
-                  (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))
+                (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+                  (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))
             have hx : (vals[xIdx.id]!).1 = .dim inC (.dim inH (.dim inW .scalar)) := by
               simpa [DVal.shape] using
                 shape_of_vals_of_hShapes (α := α) (vals := vals) (hShapes := hShapes)

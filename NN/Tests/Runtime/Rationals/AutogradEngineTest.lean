@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Utils
 public import NN.Spec.Models.Mlp
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 
 /-!
 # AutogradEngineTest
@@ -58,22 +58,22 @@ structure ParamIds where
 We use a small deterministic 2-layer MLP so the gradients are stable.
 -/
 def hiddenWeight : Tensor ℚ (.dim hidDim (.dim inDim .scalar)) :=
-  tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+  tensorOfList! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
 def hiddenBias : Tensor ℚ (.dim hidDim .scalar) :=
-  tensorND! [hidDim] [0.1, 0.2, 0.3]
+  tensorOfList! [hidDim] [0.1, 0.2, 0.3]
 
 def outputWeight : Tensor ℚ (.dim outDim (.dim hidDim .scalar)) :=
-  tensorND! [outDim, hidDim] [0.7, 0.8, 0.9]
+  tensorOfList! [outDim, hidDim] [0.7, 0.8, 0.9]
 
 def outputBias : Tensor ℚ (.dim outDim .scalar) :=
-  tensorND! [outDim] [0.4]
+  tensorOfList! [outDim] [0.4]
 
 def x : Tensor ℚ (.dim inDim .scalar) :=
-  tensorND! [inDim] [0.5, 0.8]
+  tensorOfList! [inDim] [0.5, 0.8]
 
 def dLdy : Tensor ℚ (.dim outDim .scalar) :=
-  tensorND! [outDim] [1.0]
+  tensorOfList! [outDim] [1.0]
 
 def hiddenLayer : Spec.LinearSpec ℚ inDim hidDim := { weights := hiddenWeight, bias := hiddenBias }
 def outputLayer : Spec.LinearSpec ℚ hidDim outDim := { weights := outputWeight, bias := outputBias }

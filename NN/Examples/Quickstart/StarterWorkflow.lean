@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 
 /-!
 # Quickstart: Starter Workflow
@@ -14,20 +14,20 @@ public import NN
 The smallest useful TorchLean training setup is ordinary model code:
 
 ```lean
-import NN
+public import NN.API
 open TorchLean
 
 def model :=
   nn.Sequential![
-    nn.Linear 2 8,
-    nn.ReLU,
-    nn.Linear 8 1
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
   ]
 ```
 
-No `NN.*` subsystem imports are needed here. The example exercises the first workflow directly:
-model construction, data construction, training, evaluation, and verification all come from
-`import NN`.
+No subsystem-specific imports are needed here. Model construction, data, training, prediction, and
+the public robustness-checking entry point all come from `import NN.API`. Lower-level certificate
+formats and proof developments use the focused `NN.Verification` and `NN.Proofs` imports.
 -/
 
 @[expose] public section
@@ -38,13 +38,13 @@ open TorchLean
 
 def model :=
   nn.Sequential![
-    nn.Linear 2 8,
-    nn.ReLU,
-    nn.Linear 8 1
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
   ]
 
-/-- Checks that KAN constructors are available from the public `import NN` surface. -/
-def kanModel : nn.M (nn.Sequential (Shape.mat 4 2) (Shape.mat 4 1)) :=
+/-- Checks that KAN constructors are available from `NN.API`. -/
+def kanModel : nn.M (nn.Sequential (.dim 4 (.dim 2 .scalar)) (.dim 4 (.dim 1 .scalar))) :=
   nn.models.KAN
     { batch := 4
       inDim := 2
@@ -62,23 +62,23 @@ The important bit is the last line: `Data.tensorDataset xs ys` turns ordinary `F
 runtime-polymorphic dataset, so the trainer can still choose `Float`, executable IEEE32, CPU, CUDA,
 eager, or compiled execution later.
 -/
-def data : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+def data : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   let xs : Tensor.T Float (shape![4, 2]) :=
-    tensorND! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+    tensorOfList! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
   let ys : Tensor.T Float (shape![4, 1]) :=
-    tensorND! [4, 1] [target 0.0 0.0, target 0.0 1.0, target 1.0 0.0, target 1.0 1.0]
+    tensorOfList! [4, 1] [target 0.0 0.0, target 0.0 1.0, target 1.0 0.0, target 1.0 1.0]
   Data.tensorDataset xs ys
 
-def probes : List (Trainer.Probe (Shape.vec 2)) :=
+def probes : List (Trainer.Probe (.dim 2 .scalar)) :=
   [ Trainer.Probe.point "origin" 0.0 0.0 (some (toString (target 0.0 0.0)))
   , Trainer.Probe.point "heldout" 0.5 (-0.25) (some (toString (target 0.5 (-0.25)))) ]
 
-/-- Tiny optimizer-choice example using only `import NN`. -/
+/-- Select an optimizer through the public API. -/
 def optimizerChoiceExample : Except String (String × optim.Optimizer) := do
   let kind ← optim.Kind.parse "adamw"
   pure (kind.name, kind.toOptimizer 0.01)
 
-/-- Tiny adapter type example using only `import NN`. -/
+/-- A LoRA parameter type exposed by the public adapter API. -/
 def loraParamsExample : Type :=
   Adapters.LoRA.Params Float 2 1 1
 
@@ -104,7 +104,7 @@ def run (_args : List String := []) : IO Unit := do
         optimizer := optim.adam { lr := 0.03 }
         backend := .compiled
         dtype := .float32 }
-  let heldout : Tensor.T Float (Shape.vec 2) := tensorND! [2] [0.5, -0.25]
+  let heldout : Tensor.T Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, -0.25]
   let initial ← trainer.predict heldout
   IO.println s!"initial(heldout) = {Tensor.pretty initial}"
   let trained ← trainer.train data { steps := 25, batchSize := 4, logEvery := 10 } probes

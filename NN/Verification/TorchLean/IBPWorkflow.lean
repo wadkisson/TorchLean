@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.Facade
+public import NN.API
 public import NN.Verification.TorchLean.Compile
 
 /-!
@@ -42,37 +42,37 @@ def hidDim : Nat := 3
 def outDim : Nat := 1
 
 /-- Input shape for the workflow model. -/
-def xShape : Shape := Shape.vec inDim
+def xShape : Spec.Shape := .dim inDim .scalar
 /-- Output shape for the workflow model. -/
-def yShape : Shape := Shape.vec outDim
+def yShape : Spec.Shape := .dim outDim .scalar
 
 /-- TorchLean model used in the workflow (a 2-layer ReLU MLP). -/
 def mkModel : nn.M (nn.Sequential xShape yShape) :=
   nn.Sequential![
-    nn.Linear inDim hidDim,
-    nn.ReLU,
-    nn.Linear hidDim outDim
+    nn.linear inDim hidDim,
+    nn.relu,
+    nn.linear hidDim outDim
   ]
 
 def model : nn.Sequential xShape yShape :=
   nn.run 0 mkModel
 
 /-- Parameter shapes for `model`. -/
-def paramShapes : List Shape := nn.paramShapes model
+def paramShapes : List Spec.Shape := nn.paramShapes model
 
 /-- Runtime-selected typed runner used by the CLI entrypoint. -/
-def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   let params : nn.ParamTensors α paramShapes :=
     nn.ParamTensors.quad
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
+      (NN.Tensor.ofListOfLength (α := α) [3, 2]
         [cast 0.1, cast 0.2, cast 0.3, cast 0.4, cast 0.5, cast 0.6] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3]
+      (NN.Tensor.ofListOfLength (α := α) [3]
         [cast 0.1, cast 0.2, cast 0.3] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [1, 3]
+      (NN.Tensor.ofListOfLength (α := α) [1, 3]
         [cast 0.7, cast 0.8, cast 0.9] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [1]
+      (NN.Tensor.ofListOfLength (α := α) [1]
         [cast 0.4] (by rfl))
 
   let compiled ←
@@ -83,7 +83,7 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α xShape :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
+    NN.Tensor.ofListOfLength (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
   let eps : α := Runtime.ofFloat 0.1
   let xB : FlatBox α := Verification.lInfBall (α := α) x0 eps
   let ps : ParamStore α := compiled.seedInputBox xB

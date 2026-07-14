@@ -51,7 +51,7 @@ def flattenFloatAux : {s : Shape} → Tensor Float s → FloatArray → FloatArr
 
 /-- Flatten a `Spec.Tensor Float s` into a row-major `FloatArray` (CUDA-compatible). -/
 def flattenFloat {s : Shape} (t : Tensor Float s) : FloatArray :=
-  flattenFloatAux (s := s) t (FloatArray.emptyWithCapacity (Shape.size s))
+  flattenFloatAux (s := s) t (FloatArray.emptyWithCapacity (Spec.Shape.size s))
 
 /-- Worker for `flattenBoolMask`; true is encoded as `1.0`, false as `0.0`. -/
 def flattenBoolMaskAux : {s : Shape} → Tensor Bool s → FloatArray → FloatArray
@@ -61,7 +61,7 @@ def flattenBoolMaskAux : {s : Shape} → Tensor Bool s → FloatArray → FloatA
 
 /-- Flatten a `Spec.Tensor Bool s` mask to `FloatArray` as `0.0/1.0` values in row-major order. -/
 def flattenBoolMask {s : Shape} (mask : Tensor Bool s) : FloatArray :=
-  flattenBoolMaskAux (s := s) mask (FloatArray.emptyWithCapacity (Shape.size s))
+  flattenBoolMaskAux (s := s) mask (FloatArray.emptyWithCapacity (Spec.Shape.size s))
 
 /-!
 ### Unflatten (`FloatArray → Spec.Tensor`)
@@ -74,14 +74,14 @@ These functions assume row-major order. The `?` variants check the expected leng
 Worker for `unflattenFloatUnsafe`.
 
 `offset` is the row-major starting position for the current tensor subtree. The caller is
-responsible for ensuring the array contains at least `offset + Shape.size s` elements.
+responsible for ensuring the array contains at least `offset + Spec.Shape.size s` elements.
 -/
 def unflattenFloatAux : {s : Shape} → FloatArray → (offset : Nat) → Tensor Float s
   | .scalar, a, offset =>
       Tensor.scalar (a.get! offset)
   | .dim n s, a, offset =>
       Tensor.dim (fun i : Fin n =>
-        unflattenFloatAux (s := s) a (offset + i.val * Shape.size s))
+        unflattenFloatAux (s := s) a (offset + i.val * Spec.Shape.size s))
 
 /-- Unflatten a row-major `FloatArray` into a `Spec.Tensor Float s` (unsafe: assumes correct size). -/
 def unflattenFloatUnsafe {s : Shape} (a : FloatArray) : Tensor Float s :=
@@ -89,7 +89,7 @@ def unflattenFloatUnsafe {s : Shape} (a : FloatArray) : Tensor Float s :=
 
 /-- Unflatten a row-major `FloatArray` into a `Spec.Tensor Float s` when `a.size` matches. -/
 def unflattenFloat? {s : Shape} (a : FloatArray) : Option (Tensor Float s) :=
-  if a.size = Shape.size s then
+  if a.size = Spec.Shape.size s then
     some (unflattenFloatUnsafe (s := s) a)
   else
     none
@@ -104,7 +104,7 @@ def unflattenBoolMaskAux : {s : Shape} → FloatArray → (offset : Nat) → Ten
       Tensor.scalar (a.get! offset != 0.0)
   | .dim n s, a, offset =>
       Tensor.dim (fun i : Fin n =>
-        unflattenBoolMaskAux (s := s) a (offset + i.val * Shape.size s))
+        unflattenBoolMaskAux (s := s) a (offset + i.val * Spec.Shape.size s))
 
 /-- Unflatten a `FloatArray` into a `Spec.Tensor Bool s` mask (unsafe: nonzero = true). -/
 def unflattenBoolMaskUnsafe {s : Shape} (a : FloatArray) : Tensor Bool s :=
@@ -112,7 +112,7 @@ def unflattenBoolMaskUnsafe {s : Shape} (a : FloatArray) : Tensor Bool s :=
 
 /-- Unflatten a `FloatArray` into a `Spec.Tensor Bool s` mask when `a.size` matches. -/
 def unflattenBoolMask? {s : Shape} (a : FloatArray) : Option (Tensor Bool s) :=
-  if a.size = Shape.size s then
+  if a.size = Spec.Shape.size s then
     some (unflattenBoolMaskUnsafe (s := s) a)
   else
     none

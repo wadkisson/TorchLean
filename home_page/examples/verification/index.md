@@ -48,7 +48,7 @@ The seed box is built explicitly. For the small MLP example, `inputCenter` is th
 
 ```lean
 let inputCenter : Tensor α xShape :=
-  NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
+  NN.Tensor.ofListOfLength (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
 let eps : α := Runtime.ofFloat 0.1
 let rad : Tensor α xShape := Spec.fill eps xShape
 
@@ -166,7 +166,7 @@ single objective backward through the graph:
 
 ```lean
 let objV : Tensor α (.dim softmaxOutDim .scalar) :=
-  NN.Tensor.tensorNDOfLenEq
+  NN.Tensor.ofListOfLength
     (α := α) [3] [cast 1.0, cast (-1.0), cast 0.0] (by rfl)
 
 let obj : FlatVec α := { n := softmaxOutDim, v := objV }

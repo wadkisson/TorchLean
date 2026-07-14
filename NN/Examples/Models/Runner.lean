@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models
 public import NN.Examples.DeepDives
 public import NN.Examples.Quickstart
@@ -117,23 +117,23 @@ def hasCudaDeviceFlag : List String → Bool
 
 /-- Device selected by runner/runtime arguments. Last device flag wins. -/
 def selectedDeviceFromArgs (args : List String) :
-    Except String _root_.Runtime.Autograd.Torch.Device :=
-  let rec go (current : _root_.Runtime.Autograd.Torch.Device) :
-      List String → Except String _root_.Runtime.Autograd.Torch.Device
+    Except String NN.Backend.Device :=
+  let rec go (current : NN.Backend.Device) :
+      List String → Except String NN.Backend.Device
     | [] => pure current
     | "--device" :: value :: rest => do
-        let d ← _root_.Runtime.Autograd.Torch.Device.parse value
+        let d ← TorchLean.Runtime.Device.parse value
         go d rest
     | "--device" :: [] =>
         throw "missing value after --device (supported: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
     | a :: rest =>
         if a.startsWith "--device=" then do
-          let d ← _root_.Runtime.Autograd.Torch.Device.parse
+          let d ← TorchLean.Runtime.Device.parse
             ((a.drop "--device=".length).toString)
           go d rest
         else
           go current rest
-  go .auto args
+  go .cpu args
 
 /-- Read one line, treating EOF as the default answer. -/
 def readPromptLine : IO String := do

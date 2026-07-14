@@ -8,6 +8,7 @@ module
 
 public import NN.API.CLI
 public import NN.Verification.Util.Array
+public import NN.Verification.Util.FloatApprox
 public import NN.Verification.Util.Json
 
 /-!
@@ -67,10 +68,12 @@ def checkAbCrownLeafArtifact (path : String) : IO Unit := do
   if rootLo.size ≠ inputDim || rootHi.size ≠ inputDim then
     throw <| IO.userError
       s!"root dimension mismatch: input_dim={inputDim}, lo={rootLo.size}, hi={rootHi.size}"
+  unless allPairwise rootLo rootHi NN.Verification.Util.Array.floatLe do
+    throw <| IO.userError "invalid root box: every lower bound must be <= its upper bound"
 
   let leaves ← expectFieldArray topObj "leaves" "top-level"
   if leaves.isEmpty then
-    IO.println "[artifact] Warning: leaves list is empty (nothing to check)"
+    throw <| IO.userError "invalid leaf artifact: leaves must be nonempty"
 
   let mut okCount := 0
   let mut badCount := 0
@@ -88,13 +91,24 @@ def checkAbCrownLeafArtifact (path : String) : IO Unit := do
         s!"leaf lower-bound/threshold length mismatch: lb={lb.size}, threshold={thr.size}"
 
     let within := NN.Verification.Util.Array.boxWithin rootLo rootHi lo hi
+    let witnessIdx? ← optionalFieldNat? leafObj "witness_idx" "leaf"
+    let witnessMargin? ← optionalFieldFiniteFloat? leafObj "witness_margin" "leaf"
     let verified :=
-      match ← optionalFieldNat? leafObj "witness_idx" "leaf" with
-      | some wi =>
-          NN.Verification.Util.Array.refutesThresholdAt lb thr wi ||
-            NN.Verification.Util.Array.refutesThreshold lb thr
+      match witnessIdx? with
+      | some wi => NN.Verification.Util.Array.refutesThresholdAt lb thr wi
       | none => NN.Verification.Util.Array.refutesThreshold lb thr
-    if within && verified then
+    let marginMatches :=
+      match witnessIdx?, witnessMargin? with
+      | some wi, some claimedMargin =>
+          if hLb : wi < lb.size then
+            if hThr : wi < thr.size then
+              let actualMargin := lb[wi]'hLb - thr[wi]'hThr
+              NN.Verification.Util.approxEq actualMargin claimedMargin (tol := 1e-6)
+            else false
+          else false
+      | none, some _ => false
+      | _, none => true
+    if within && verified && marginMatches then
       okCount := okCount + 1
     else
       badCount := badCount + 1
@@ -119,16 +133,16 @@ def run (args : List String) : IO Unit := do
       s!"  {defaultArtifactPath}"
     ]
 
-  if NN.API.CLI.hasHelp args then
+  if TorchLean.CLI.hasHelp args then
     IO.println usage
     return
 
-  let args := NN.API.CLI.dropDashDash args
+  let args := TorchLean.CLI.dropDashDash args
   let (path, rest) ←
-    match NN.API.CLI.takePositionalDefault args defaultArtifactPath with
+    match TorchLean.CLI.takePositionalDefault args defaultArtifactPath with
     | .ok result => pure result
     | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
-  match NN.API.CLI.requireNoArgs rest with
+  match TorchLean.CLI.checkNoArgs rest with
   | .ok () => pure ()
   | .error e => throw <| IO.userError s!"{e}\n\n{usage}"
   checkAbCrownLeafArtifact path

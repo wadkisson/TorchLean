@@ -139,7 +139,7 @@ inductive OpKind where
   | reshape (inShape outShape : Shape)
       -- Pure reshape (no data movement).
   | flatten (s : Shape)
-      -- Flatten to a vector of length `Shape.size s`.
+      -- Flatten to a vector of length `Spec.Shape.size s`.
   | concat (axis : Nat)
       -- Concatenate along an axis (verifier/export may allow an arbitrary number of parents ≥ 2).
   | swap_first_two

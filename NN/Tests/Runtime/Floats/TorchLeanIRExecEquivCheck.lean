@@ -38,8 +38,8 @@ def run : IO Unit := do
   let inDim : Nat := 2
   let hidDim : Nat := 3
   let outDim : Nat := 1
-  let xShape : Shape := NN.Tensor.Shape.Vec inDim
-  let yShape : Shape := NN.Tensor.Shape.Vec outDim
+  let xShape : Shape := .dim inDim .scalar
+  let yShape : Shape := .dim outDim .scalar
 
   -- A small deterministic TorchLean MLP (weights initialized by explicit seeds).
   let model :=

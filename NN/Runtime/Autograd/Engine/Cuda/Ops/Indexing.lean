@@ -93,7 +93,7 @@ def sliceVectorBuffer {n start len : Nat} (t : Tape) (xId : Nat) : Result (Tape 
 
 /-- Concatenate along dim 0 for tensors with leading dimension (CPU tape name). -/
 def concatLeadingAxis {n m : Nat} {s : Shape} (t : Tape) (aId bId : Nat) : Result (Tape × Nat) := do
-  let inner : Nat := Shape.size s
+  let inner : Nat := Spec.Shape.size s
   let nLen : Nat := n * inner
   let mLen : Nat := m * inner
   let nLen32 ← u32 nLen
@@ -109,7 +109,7 @@ def concatLeadingAxis {n m : Nat} {s : Shape} (t : Tape) (aId bId : Nat) : Resul
 /-- Slice along dim 0: `x[start:start+len]` (CPU tape name). -/
 def sliceLeadingAxisRange {n : Nat} {s : Shape} (t : Tape) (xId : Nat) (start len : Nat)
     (_h : len + start ≤ n) : Result (Tape × Nat) := do
-  let inner : Nat := Shape.size s
+  let inner : Nat := Spec.Shape.size s
   let nTot : Nat := n * inner
   let startOff : Nat := start * inner
   let lenTot : Nat := len * inner

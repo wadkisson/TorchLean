@@ -205,13 +205,13 @@ def idxEncoderFfnResidual {seqLen dModel numHeads headDim dFF : Nat} :
 /-- Graph through the FFN residual part after the first LayerNorm. -/
 def encoderFfnResidualGraph {seqLen dModel numHeads headDim dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (c ε₁ : ℝ) :
     Graph (ΓEncoderBlock seqLen dModel numHeads headDim)
       (ssMHAResidual seqLen dModel numHeads headDim ++ [LayerNorm.MatShape seqLen dModel] ++
@@ -276,13 +276,13 @@ def encoderNorm2Inputs {seqLen dModel numHeads headDim dFF : Nat} :
 /-- Concrete SSA graph for one full post-norm Transformer encoder block. -/
 def encoderBlockGraph {seqLen dModel numHeads headDim dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (c ε₁ ε₂ : ℝ) :
     Graph (ΓEncoderBlock seqLen dModel numHeads headDim)
       (ssEncoderBlock seqLen dModel numHeads headDim dFF) :=
@@ -302,13 +302,13 @@ def encoderBlockGraph {seqLen dModel numHeads headDim dFF : Nat}
 /-- Pointwise analytic correctness for the graph through the FFN residual. -/
 def encoderFfnResidualGraphFDerivCorrectAt {seqLen dModel numHeads headDim dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (c ε₁ : ℝ)
     (xV : CtxVec (ΓEncoderBlock seqLen dModel numHeads headDim))
     (hNorm1 :
@@ -387,13 +387,13 @@ def encoderFfnResidualGraphFDerivCorrectAt {seqLen dModel numHeads headDim dFF :
 /-- Pointwise analytic correctness for the complete concrete encoder-block graph. -/
 def encoderBlockGraphFDerivCorrectAt {seqLen dModel numHeads headDim dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (c ε₁ ε₂ : ℝ)
     (xV : CtxVec (ΓEncoderBlock seqLen dModel numHeads headDim))
     (hNorm1 :
@@ -444,13 +444,13 @@ def encoderBlockGraphFDerivCorrectAt {seqLen dModel numHeads headDim dFF : Nat}
 theorem encoderBlock_backpropVec_eq_adjoint_fderiv_at
     {seqLen dModel numHeads headDim dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (c ε₁ ε₂ : ℝ)
     (xV : CtxVec (ΓEncoderBlock seqLen dModel numHeads headDim))
     (seedV : CtxVec (ΓEncoderBlock seqLen dModel numHeads headDim ++
@@ -535,7 +535,7 @@ theorem postNormEncoderBlock_hasFDerivAt
     (x : E)
     (hAttnPack : HasFDerivAt attnPack DattnPack x)
     (hNorm1VarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -545,7 +545,7 @@ theorem postNormEncoderBlock_hasFDerivAt
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε₁) (attnPack x)) i)
     (hNorm1StdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -561,7 +561,7 @@ theorem postNormEncoderBlock_hasFDerivAt
           (ss := ssPostNorm seqLen dModel)
           (postNormGraph (seqLen := seqLen) (dModel := dModel) ε₁) (attnPack x)))
     (hNorm2VarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -576,7 +576,7 @@ theorem postNormEncoderBlock_hasFDerivAt
                 (ss := ssPostNorm seqLen dModel)
                 (postNormGraph (seqLen := seqLen) (dModel := dModel) ε₁) (attnPack x)))) i)
     (hNorm2StdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)

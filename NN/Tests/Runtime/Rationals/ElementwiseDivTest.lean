@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.Utils
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 
 /-!
 # ElementwiseDivTest
@@ -44,18 +44,18 @@ abbrev tag : String := "elementwise_div_test (Rat)"
 abbrev s2 : Shape := .dim 2 .scalar
 
 /-- Numerator `a`. -/
-def a : Tensor ℚ s2 := tensorND! [2] [6.0, 8.0]
+def a : Tensor ℚ s2 := tensorOfList! [2] [6.0, 8.0]
 /-- Denominator `b`. -/
-def b : Tensor ℚ s2 := tensorND! [2] [2.0, 4.0]
+def b : Tensor ℚ s2 := tensorOfList! [2] [2.0, 4.0]
 /-- Upstream gradient `∂L/∂y`. -/
-def dLdy : Tensor ℚ s2 := tensorND! [2] [1.0, 1.0]
+def dLdy : Tensor ℚ s2 := tensorOfList! [2] [1.0, 1.0]
 
 /-- Expected forward `a / b = [3, 2]`. -/
-def yExp : Tensor ℚ s2 := tensorND! [2] [3.0, 2.0]
+def yExp : Tensor ℚ s2 := tensorOfList! [2] [3.0, 2.0]
 /-- Expected `∂L/∂a = dLdy / b = [1/2, 1/4]`. -/
-def daExp : Tensor ℚ s2 := tensorND! [2] [0.5, 0.25]
+def daExp : Tensor ℚ s2 := tensorOfList! [2] [0.5, 0.25]
 /-- Expected `∂L/∂b = −dLdy·a/b² = [−3/2, −1/2]` (built by negating `[3/2, 1/2]`). -/
-def dbExp : Tensor ℚ s2 := - tensorND! [2] [1.5, 0.5]
+def dbExp : Tensor ℚ s2 := - tensorOfList! [2] [1.5, 0.5]
 
 /-- Build a tape `y = a / b`, run the backward pass, and check the forward value and both
 input gradients against the exact rational references. -/

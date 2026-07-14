@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.Engine.Cuda.Ops.Indexing
+public import NN.Spec.Layers.Conv
 
 /-!
 # CUDA Tape Operations: Convolution and Pooling
@@ -46,8 +47,8 @@ def conv2d
   let kernel ← requireValue (t := t) kernelId (.dim outC (.dim inC (.dim kH (.dim kW .scalar))))
   let bias ← requireValue (t := t) biasId (.dim outC .scalar)
   let input ← requireValue (t := t) inputId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
   let y := torchleanConv2dFwdCuda input kernel bias inC32 inH32 inW32 outC32 kH32 kW32 stride32
     pad32
   let outShape : Shape := .dim outC (.dim outH (.dim outW .scalar))
@@ -91,8 +92,8 @@ def convTranspose2d
   let kernel ← requireValue (t := t) kernelId (.dim inC (.dim outC (.dim kH (.dim kW .scalar))))
   let bias ← requireValue (t := t) biasId (.dim outC .scalar)
   let input ← requireValue (t := t) inputId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH - 1) * stride - 2 * padding + kH
-  let outW : Nat := (inW - 1) * stride - 2 * padding + kW
+  let outH : Nat := Spec.convTransposeOutDim inH kH stride padding
+  let outW : Nat := Spec.convTransposeOutDim inW kW stride padding
   let y :=
     torchleanConvTranspose2dFwdCuda input kernel bias inC32 inH32 inW32 outC32 kH32 kW32 stride32
       pad32
@@ -155,7 +156,7 @@ def conv
     Shape.ofList (inC :: inSpatial.toList)
   let outSpatial : Vector Nat d :=
     Vector.ofFn (fun a =>
-      (inSpatial.get a + 2 * padding.get a - kernel.get a) / stride.get a + 1)
+      Spec.Shape.slidingWindowOutDim (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
   let outShape : Shape :=
     Shape.ofList (outC :: outSpatial.toList)
 
@@ -262,8 +263,8 @@ def maxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   let stride32 ← u32 stride
   let pad32 : UInt32 := 0
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH - kH) / stride + 1
-  let outW : Nat := (inW - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride 0
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride 0
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanMaxPool2dFwdCuda x inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -290,8 +291,8 @@ def maxPool2dPad {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} {h2 : 
   let stride32 ← u32 stride
   let pad32 ← u32 padding
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanMaxPool2dFwdCuda x inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -328,7 +329,7 @@ def maxPool
     Shape.ofList (C :: inSpatial.toList)
   let outSpatial : Vector Nat d :=
     Vector.ofFn (fun a =>
-      (inSpatial.get a + 2 * padding.get a - kernel.get a) / stride.get a + 1)
+      Spec.Shape.slidingWindowOutDim (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
   let outShape : Shape :=
     Shape.ofList (C :: outSpatial.toList)
 
@@ -364,8 +365,8 @@ def smoothMaxPool2d {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW �
   let stride32 ← u32 stride
   let pad32 : UInt32 := 0
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH - kH) / stride + 1
-  let outW : Nat := (inW - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride 0
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride 0
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanSmoothMaxPool2dFwdCuda x beta inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -395,8 +396,8 @@ def smoothMaxPool2dPad {kH kW inH inW inC stride padding : Nat} {h1 : kH ≠ 0} 
   let stride32 ← u32 stride
   let pad32 ← u32 padding
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanSmoothMaxPool2dFwdCuda x beta inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -436,7 +437,7 @@ def smoothMaxPool
     Shape.ofList (C :: inSpatial.toList)
   let outSpatial : Vector Nat d :=
     Vector.ofFn (fun a =>
-      (inSpatial.get a + 2 * padding.get a - kernel.get a) / stride.get a + 1)
+      Spec.Shape.slidingWindowOutDim (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
   let outShape : Shape :=
     Shape.ofList (C :: outSpatial.toList)
 
@@ -473,8 +474,8 @@ def avgPool2d {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   let stride32 ← u32 stride
   let pad32 : UInt32 := 0
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH - kH) / stride + 1
-  let outW : Nat := (inW - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride 0
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride 0
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanAvgPool2dFwdCuda x inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -501,8 +502,8 @@ def avgPool2dPad {kH kW inH inW inC stride padding : Nat} (h1 : kH ≠ 0) (h2 : 
   let stride32 ← u32 stride
   let pad32 ← u32 padding
   let x ← requireValue (t := t) xId (.dim inC (.dim inH (.dim inW .scalar)))
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
   let outShape : Shape := .dim inC (.dim outH (.dim outW .scalar))
   let y := torchleanAvgPool2dFwdCuda x inC32 inH32 inW32 kH32 kW32 stride32 pad32
   let node : Node :=
@@ -539,7 +540,7 @@ def avgPool
     Shape.ofList (C :: inSpatial.toList)
   let outSpatial : Vector Nat d :=
     Vector.ofFn (fun a =>
-      (inSpatial.get a + 2 * padding.get a - kernel.get a) / stride.get a + 1)
+      Spec.Shape.slidingWindowOutDim (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
   let outShape : Shape :=
     Shape.ofList (C :: outSpatial.toList)
 
@@ -567,4 +568,3 @@ end Tape
 end Cuda
 end Autograd
 end Runtime
-

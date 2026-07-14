@@ -227,8 +227,8 @@ different default dtype depending on context (e.g. CUDA eager requires `Float`).
 -/
 def parseAndStripWithDefault (args : List String) (default : DType) :
     Except String (DType × List String) := do
-  let (dtypeV?, args1) ← CLI.takeFlagValueOnce args "dtype"
-  let (modeV?, args2) ← CLI.takeFlagValueOnce args1 "float32-mode"
+  let (dtypeV?, args1) ← TorchLean.CLI.takeFlagValueOnce args "dtype"
+  let (modeV?, args2) ← TorchLean.CLI.takeFlagValueOnce args1 "float32-mode"
   match dtypeV?, modeV? with
   | some _, some _ =>
       throw "--dtype and --float32-mode are mutually exclusive (pick one)"
@@ -301,12 +301,10 @@ namespace Tensor
 export _root_.Spec.Tensor (scalar dim)
 
 export _root_.NN.Tensor
-  (shapeOfDims numelDims tensor1d oneHot oneHotNat tensor2d tensorND tensorDynND
-   fillND zerosND onesND
-   tensorF321d tensorF322d
+  (shapeOfDims numelDims vector oneHot oneHotNat matrix? matrix matrixPadTo matrixPadRight
+   ofListOfLength ofList dynamicOfList fillOfDims zerosOfDims onesOfDims
+   float32Vector float32Matrix
    print)
-
-export _root_.NN.Tensor.Shape (Vec Mat CHW OIHW NCHW)
 
 end Tensor
 

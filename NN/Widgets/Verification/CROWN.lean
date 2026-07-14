@@ -144,7 +144,7 @@ private def nodeStateHtml {α : Type} [Context α] [ToString α]
         | some st =>
             <div>
               <div style={json% {"display": "flex", "gap": "8px", "flex-wrap": "wrap"}}>
-                {pill s!"shape={Shape.pretty st.shape}"} {pill s!"flatDim={Shape.size st.shape}"}
+                {pill s!"shape={Shape.pretty st.shape}"} {pill s!"flatDim={Spec.Shape.size st.shape}"}
               </div>
               {match st.ibp? with
                 | none => ProofWidgets.Html.text ""

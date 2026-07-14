@@ -572,7 +572,7 @@ def mseLoss {α : Type}
         let diff := subSpec yhatv targetv
         let squared := mulSpec diff diff
         let total := sumSpec (α := α) (s := s) squared
-        let denom : Nat := if Shape.size s = 0 then 1 else Shape.size s
+        let denom : Nat := if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
         Tensor.scalar (total / (denom : α))
       jvp := fun ctx dctx _d =>
         let yhatv := getIdx (α := α) (xs := ctx) iyhat
@@ -581,7 +581,7 @@ def mseLoss {α : Type}
         let dtarget := getIdx (α := α) (xs := dctx) itarget
         let diff := subSpec yhatv targetv
         let two : α := (1 : α) + 1
-        let denom : Nat := if Shape.size s = 0 then 1 else Shape.size s
+        let denom : Nat := if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
         let baseGrad : Tensor α s := scaleSpec (α := α) (s := s) diff (two / (denom : α))
         let ddiff := subSpec dyhat dtarget
         Tensor.scalar (sumSpec (α := α) (s := s) (mulSpec baseGrad ddiff))
@@ -590,7 +590,7 @@ def mseLoss {α : Type}
         let targetv := getIdx (α := α) (xs := ctx) itarget
         let diff := subSpec yhatv targetv
         let two : α := (1 : α) + 1
-        let denom : Nat := if Shape.size s = 0 then 1 else Shape.size s
+        let denom : Nat := if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
         let baseGrad : Tensor α s := scaleSpec (α := α) (s := s) diff (two / (denom : α))
         let gscalar : α := Tensor.toScalar dLdy
         let dYhat : Tensor α s := scaleSpec (α := α) (s := s) baseGrad gscalar
@@ -603,7 +603,7 @@ def mseLoss {α : Type}
 /--
   Affine layer `y = W x + b` in the compiled graph.
 
-  PyTorch comparison: `torch.nn.functional.linear` / `torch.nn.Linear`.
+  PyTorch comparison: `torch.nn.functional.linear` / `torch.nn.linear`.
 
   The JVP is the usual product rule:
   `d(Wx+b) = dW*x + W*dx + db`.

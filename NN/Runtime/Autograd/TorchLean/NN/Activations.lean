@@ -27,7 +27,7 @@ namespace NN
 /--
 ReLU activation layer (no parameters).
 
-PyTorch analogy: `torch.nn.ReLU` / `torch.nn.functional.relu`.
+PyTorch analogy: `torch.nn.relu` / `torch.nn.functional.relu`.
 -/
 def relu {s : Shape} : LayerDef s s :=
   { kind := "ReLU"
@@ -41,7 +41,7 @@ def relu {s : Shape} : LayerDef s s :=
 /--
 SiLU (a.k.a. swish) activation layer (no parameters).
 
-PyTorch analogy: `torch.nn.SiLU` / `torch.nn.functional.silu`.
+PyTorch analogy: `torch.nn.silu` / `torch.nn.functional.silu`.
 -/
 def silu {s : Shape} : LayerDef s s :=
   { kind := "SiLU"
@@ -55,7 +55,7 @@ def silu {s : Shape} : LayerDef s s :=
 /--
 GELU activation layer (no parameters).
 
-PyTorch analogy: `torch.nn.GELU` / `torch.nn.functional.gelu`.
+PyTorch analogy: `torch.nn.gelu` / `torch.nn.functional.gelu`.
 -/
 def gelu {s : Shape} : LayerDef s s :=
   { kind := "GELU"
@@ -137,11 +137,11 @@ def sum {s : Shape} : LayerDef s Shape.scalar :=
   }
 
 /--
-Flatten any tensor to a 1D vector of length `Shape.size s` (no parameters).
+Flatten any tensor to a 1D vector of length `Spec.Shape.size s` (no parameters).
 
 PyTorch analogy: `torch.flatten(x)` or `x.reshape(-1)`.
 -/
-def flatten {s : Shape} : LayerDef s (.dim (Shape.size s) .scalar) :=
+def flatten {s : Shape} : LayerDef s (.dim (Spec.Shape.size s) .scalar) :=
   { kind := "Flatten"
     paramShapes := []
     initParams := .nil
@@ -158,7 +158,7 @@ Input shape: `N × s`. Output shape: `N × (size s)`.
 PyTorch analogy: `torch.flatten(x, start_dim=1)` for an `N×…` tensor.
 -/
 def flattenKeep0 {batch : Nat} {s : Shape} :
-    LayerDef (.dim batch s) (.dim batch (.dim (Shape.size s) .scalar)) :=
+    LayerDef (.dim batch s) (.dim batch (.dim (Spec.Shape.size s) .scalar)) :=
   { kind := "FlattenBatch"
     paramShapes := []
     initParams := .nil

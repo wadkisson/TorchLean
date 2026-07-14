@@ -93,7 +93,7 @@ the proof modules themselves.
     const parts = mod.split(".");
     if (parts[0] !== "NN" || parts.length < 2) return parts[0] || "unknown";
     const named = new Set([
-      "API", "CI", "Entrypoint", "Examples", "Floats", "GraphSpec", "IR", "MLTheory",
+      "API", "CI", "Examples", "Floats", "GraphSpec", "IR", "MLTheory",
       "Proofs", "Runtime", "Spec", "Tensor", "Tests", "Verification"
     ]);
     return named.has(parts[1]) ? `NN.${parts[1]}` : parts[1];

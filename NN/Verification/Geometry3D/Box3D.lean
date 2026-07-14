@@ -243,13 +243,13 @@ theorem list_all_true_of_mem {α : Type} {p : α → Bool} {xs : List α}
       · exact ht x hx
 
 /-- A 3D point as a tensor of shape `[3]`. -/
-abbrev Point3 (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Vec 3)
+abbrev Point3 (α : Type) := Spec.Tensor α (.dim 3 .scalar)
 
 /-- A 2D point as a tensor of shape `[2]`. -/
-abbrev Point2 (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Vec 2)
+abbrev Point2 (α : Type) := Spec.Tensor α (.dim 2 .scalar)
 
 /-- Eight cuboid corners, stored as a tensor of shape `[8, 3]`. -/
-abbrev BoxCorners (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Mat 8 3)
+abbrev BoxCorners (α : Type) := Spec.Tensor α (.dim 8 (.dim 3 .scalar))
 
 /--
 A 3×4 camera projection matrix.
@@ -260,22 +260,22 @@ For a homogeneous point `[X,Y,Z,1]`, the raw camera coordinates are:
 
 The projected pixel is `(u_num / z, v_num / z)`, checked only when `z > 0`.
 -/
-abbrev CameraP (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Mat 3 4)
+abbrev CameraP (α : Type) := Spec.Tensor α (.dim 3 (.dim 4 .scalar))
 
 /-- Projected eight-corner tensor of shape `[8, 2]`. -/
-abbrev ProjectedCorners (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Mat 8 2)
+abbrev ProjectedCorners (α : Type) := Spec.Tensor α (.dim 8 (.dim 2 .scalar))
 
 /-- A 2D box `[xmin, ymin, xmax, ymax]`. -/
-abbrev Box2D (α : Type) := Spec.Tensor α (NN.Tensor.Shape.Vec 4)
+abbrev Box2D (α : Type) := Spec.Tensor α (.dim 4 .scalar)
 
 /-- Matrix scalar accessor for tensor-shaped matrices. -/
 def matGet {α : Type} {rows cols : Nat}
-    (x : Spec.Tensor α (NN.Tensor.Shape.Mat rows cols)) (i : Fin rows) (j : Fin cols) : α :=
+    (x : Spec.Tensor α (.dim rows (.dim cols .scalar))) (i : Fin rows) (j : Fin cols) : α :=
   Spec.Tensor.toScalar (Spec.get (Spec.get x i) j)
 
 /-- Vector scalar accessor for tensor-shaped vectors. -/
 def vecGet {α : Type} {n : Nat}
-    (x : Spec.Tensor α (NN.Tensor.Shape.Vec n)) (i : Fin n) : α :=
+    (x : Spec.Tensor α (.dim n .scalar)) (i : Fin n) : α :=
   Spec.Tensor.toScalar (Spec.get x i)
 
 /-- Extract the `i`-th cuboid corner as a `[3]` tensor. -/

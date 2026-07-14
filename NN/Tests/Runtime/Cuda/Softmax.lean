@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -33,7 +33,7 @@ def run : IO Unit := do
 
   let s : Shape := shape![2, 3]
   let x : Tensor Float s :=
-    tensorND! [2, 3] [
+    tensorOfList! [2, 3] [
       0.10, -0.20, 0.30,
       0.05,  0.25, -0.15
     ]
@@ -54,7 +54,7 @@ def run : IO Unit := do
   let (t2c, yIdc) ← Utils.okOrThrow (Runtime.Autograd.Cuda.Tape.softmax (t := t1c) (s := s) xIdc)
   let yCuda ← Utils.cudaValue (s := s) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := s, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size s)) 1.0 }
+    { s := s, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size s)) 1.0 }
   let gradsCuda ← Utils.okOrThrow (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := s) gradsCuda xIdc
 
@@ -79,7 +79,7 @@ def run : IO Unit := do
     (s := s) xIdcLog)
   let yLogCuda ← Utils.cudaValue (s := s) t2cLog yIdcLog
   let seedLogCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := s, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size s)) 1.0 }
+    { s := s, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size s)) 1.0 }
   let gradsLogCuda ← Utils.okOrThrow (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2cLog)
     yIdcLog seedLogCuda)
   let dxLogCuda ← Utils.cudaGrad (s := s) gradsLogCuda xIdcLog

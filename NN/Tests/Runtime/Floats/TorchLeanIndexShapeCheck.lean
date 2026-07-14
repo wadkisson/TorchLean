@@ -35,7 +35,7 @@ instance : Fact (3 > 0) where
 
 def gradGatherVec (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scalar)) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
-  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Float) [1.0, 2.0, 3.0]
+  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.vector (α := Float) [1.0, 2.0, 3.0]
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let y ← TorchLean.Session.gatherScalar sess (n := 3) x ⟨1, by decide⟩
   let grads ← TorchLean.Session.backwardScalarDenseAll sess y
@@ -43,7 +43,7 @@ def gradGatherVec (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scal
 
 def gradGatherScalarNat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scalar)) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
-  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Float) [1.0, 2.0, 3.0]
+  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.vector (α := Float) [1.0, 2.0, 3.0]
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let y ← TorchLean.Session.gatherScalarNat sess (n := 3) x 1
   let grads ← TorchLean.Session.backwardScalarDenseAll sess y
@@ -51,8 +51,8 @@ def gradGatherScalarNat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3
 
 def gradGatherVecNat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scalar)) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
-  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Float) [1.0, 2.0, 3.0]
-  let idx : Tensor Nat (.dim 4 .scalar) := NN.Tensor.tensor1d (α := Nat) [2, 0, 2, 10]
+  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.vector (α := Float) [1.0, 2.0, 3.0]
+  let idx : Tensor Nat (.dim 4 .scalar) := NN.Tensor.vector (α := Nat) [2, 0, 2, 10]
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let y ← TorchLean.Session.gatherVecNat sess (n := 3) (k := 4) x idx
   let total ← TorchLean.Session.sum sess (sh := .dim 4 .scalar) y
@@ -64,7 +64,7 @@ def gradGatherRowsNat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 (
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
   let xVal : Tensor Float (.dim 3 (.dim 2 .scalar)) :=
     Tensor.dim (fun r => Tensor.dim (fun c => Tensor.scalar (Float.ofNat (r.val * 10 + c.val + 1))))
-  let idx : Tensor Nat (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Nat) [2, 10, 2]
+  let idx : Tensor Nat (.dim 3 .scalar) := NN.Tensor.vector (α := Nat) [2, 10, 2]
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let y ← TorchLean.Session.gatherRowsNat sess (rows := 3) (cols := 2) (k := 3) x idx
   let total ← TorchLean.Session.sum sess (sh := .dim 3 (.dim 2 .scalar)) y
@@ -88,7 +88,7 @@ def gradReshapeMat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 2 (.di
   let xVal : Tensor Float (.dim 2 (.dim 3 .scalar)) :=
     Tensor.dim (fun i => Tensor.dim (fun j => Tensor.scalar (Float.ofNat (i.val * 10 + j.val))))
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
-  let h : Shape.size (.dim 2 (.dim 3 .scalar)) = Shape.size (.dim 6 .scalar) := by decide
+  let h : Spec.Shape.size (.dim 2 (.dim 3 .scalar)) = Spec.Shape.size (.dim 6 .scalar) := by decide
   let y ← TorchLean.Session.reshape sess (sh1 := .dim 2 (.dim 3 .scalar)) (sh2 := .dim 6 .scalar) x
     h
   let total ← TorchLean.Session.sum sess (sh := .dim 6 .scalar) y
@@ -108,7 +108,7 @@ def gradTransposeMat (backend : TorchLean.Backend) : IO (Tensor Float (.dim 2 (.
 
 def gradReduceMeanVec (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scalar)) := do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
-  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Float) [1.0, 2.0, 3.0]
+  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.vector (α := Float) [1.0, 2.0, 3.0]
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let m ← TorchLean.Session.reduceMean sess (sh := .dim 3 .scalar) 0 x
   let grads ← TorchLean.Session.backwardScalarDenseAll sess m
@@ -117,7 +117,7 @@ def gradReduceMeanVec (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .
 def gradScatterAddVec (backend : TorchLean.Backend) : IO (Tensor Float (.dim 3 .scalar) × Float) :=
   do
   let sess ← TorchLean.Session.new (α := Float) (opts := { backend := backend })
-  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.tensor1d (α := Float) [1.0, 2.0, 3.0]
+  let xVal : Tensor Float (.dim 3 .scalar) := NN.Tensor.vector (α := Float) [1.0, 2.0, 3.0]
   let vVal : Tensor Float Shape.scalar := Tensor.scalar 5.0
   let x ← TorchLean.Session.input sess xVal (name := some "x") (requiresGrad := true)
   let v ← TorchLean.Session.input sess vVal (name := some "v") (requiresGrad := true)

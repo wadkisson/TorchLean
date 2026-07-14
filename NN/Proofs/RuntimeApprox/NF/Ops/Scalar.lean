@@ -209,8 +209,7 @@ lemma approx_sqrt_clamp_nf_of_lb {x : ℝ} {xR : R} {eps η : ℝ}
         (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt (max xR 0)) -
           Real.sqrt (max x 0)) ≤
       eps / Real.sqrt η +
-        neuralUlp β fexp (Real.sqrt (max (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) 0))
-            TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (Real.sqrt (max (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) 0)) / 2 := by
   set xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   have hxhat : abs (xhat - x) ≤ eps := by
     simpa [xhat, abs_sub_comm] using hx
@@ -222,7 +221,7 @@ lemma approx_sqrt_clamp_nf_of_lb {x : ℝ} {xR : R} {eps η : ℝ}
       abs
           (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt (max xR 0)) -
             Real.sqrt (max xhat 0)) ≤
-        neuralUlp β fexp (Real.sqrt (max xhat 0)) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (Real.sqrt (max xhat 0)) / 2 := by
     -- `sqrt` on NF is a single rounding of the real `sqrt`.
     have :
         toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt (max xR 0)) =
@@ -292,11 +291,11 @@ lemma approx_sqrt_clamp_nf_of_lb {x : ℝ} {xR : R} {eps η : ℝ}
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt (max xR 0)))
                     (Real.sqrt (max xhat 0))
                     (Real.sqrt (max x 0))
-      _ ≤ neuralUlp β fexp (Real.sqrt (max xhat 0)) TrainingPhase.forward / 2 + eps / Real.sqrt η
+      _ ≤ neuralUlp β fexp (Real.sqrt (max xhat 0)) / 2 + eps / Real.sqrt η
         := by
             exact add_le_add hround hdiff
       _ = eps / Real.sqrt η +
-            neuralUlp β fexp (Real.sqrt (max xhat 0)) TrainingPhase.forward / 2 := by
+            neuralUlp β fexp (Real.sqrt (max xhat 0)) / 2 := by
             ring
   simpa [xhat, add_comm, add_left_comm, add_assoc] using this
 
@@ -341,8 +340,7 @@ lemma approx_add_nf {x y : ℝ} {xR yR : R} {epsx epsy : ℝ}
       epsx + epsy +
         neuralUlp β fexp
             (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR +
-              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-            TrainingPhase.forward / 2 := by
+              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2 := by
   have hx' :
       Proofs.RuntimeRoundingApprox.scalarApprox x
         (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) epsx := by
@@ -368,15 +366,14 @@ lemma approx_sub_nf {x y : ℝ} {xR yR : R} {epsx epsy : ℝ}
       epsx + epsy +
         neuralUlp β fexp
             (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR -
-              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-            TrainingPhase.forward / 2 := by
+              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2 := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   let yhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) yR
   have hround :
       abs
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (xhat - yhat) -
             (xhat - yhat)) ≤
-        neuralUlp β fexp (xhat - yhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (xhat - yhat) / 2 := by
     simpa [Proofs.RuntimeRoundingApprox.roundR] using
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (xhat -
         yhat))
@@ -407,9 +404,9 @@ lemma approx_sub_nf {x y : ℝ} {xR yR : R} {epsx epsy : ℝ}
                   (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (xhat -
                     yhat))
                   (xhat - yhat) (x - y)
-      _ ≤ neuralUlp β fexp (xhat - yhat) TrainingPhase.forward / 2 + (epsx + epsy) := by
+      _ ≤ neuralUlp β fexp (xhat - yhat) / 2 + (epsx + epsy) := by
             exact add_le_add hround hdiff
-      _ = epsx + epsy + neuralUlp β fexp (xhat - yhat) TrainingPhase.forward / 2 := by ring
+      _ = epsx + epsy + neuralUlp β fexp (xhat - yhat) / 2 := by ring
   simpa [xhat, yhat, sub_eq_add_neg, add_assoc, add_left_comm, add_comm] using this
 
 /-- Forward approximation bound for negation in `NF` (rounding error on `-toSpec xR`). -/
@@ -418,12 +415,11 @@ lemma approx_neg_nf {x : ℝ} {xR : R} {eps : ℝ}
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (-xR) - (-x)) ≤
       eps +
         neuralUlp β fexp
-            (-toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
-            TrainingPhase.forward / 2 := by
+            (-toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) / 2 := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   have hround :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (-xR) - (-xhat)) ≤
-        neuralUlp β fexp (-xhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (-xhat) / 2 := by
     -- `toSpec (-xR)` is a single rounding of `-xhat`.
     simpa [xhat, toSpec_neg (β := β) (fexp := fexp) (rnd := rnd) xR,
       Proofs.RuntimeRoundingApprox.roundR] using
@@ -450,9 +446,9 @@ lemma approx_neg_nf {x : ℝ} {xR : R} {eps : ℝ}
                   abs_sub_le
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) (-xR))
                     (-xhat) (-x)
-      _ ≤ neuralUlp β fexp (-xhat) TrainingPhase.forward / 2 + eps := by
+      _ ≤ neuralUlp β fexp (-xhat) / 2 + eps := by
             exact add_le_add hround hdiff
-      _ = eps + neuralUlp β fexp (-xhat) TrainingPhase.forward / 2 := by ring
+      _ = eps + neuralUlp β fexp (-xhat) / 2 := by ring
   simpa [xhat, add_assoc, add_left_comm, add_comm] using this
 
 /-- Forward approximation bound for absolute value in `NF` (`abs` is pure + a final rounding). -/
@@ -461,12 +457,11 @@ lemma approx_abs_nf {x : ℝ} {xR : R} {eps : ℝ}
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.abs xR) - abs x) ≤
       eps +
         neuralUlp β fexp
-            (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-            TrainingPhase.forward / 2 := by
+            (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   have hround :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.abs xR) - abs xhat) ≤
-        neuralUlp β fexp (abs xhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (abs xhat) / 2 := by
     -- `toSpec (abs xR)` is a single rounding of `|xhat|`.
     simpa [xhat, toSpec, MathFunctions.abs, TorchLean.Floats.NF.instMathFunctions,
       TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
@@ -486,11 +481,11 @@ lemma approx_abs_nf {x : ℝ} {xR : R} {eps : ℝ}
                   abs_sub_le
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.abs xR))
                     (abs xhat) (abs x)
-      _ ≤ neuralUlp β fexp (abs xhat) TrainingPhase.forward / 2 + abs (xhat - x) := by
+      _ ≤ neuralUlp β fexp (abs xhat) / 2 + abs (xhat - x) := by
             exact add_le_add hround habs
-      _ ≤ neuralUlp β fexp (abs xhat) TrainingPhase.forward / 2 + eps := by
+      _ ≤ neuralUlp β fexp (abs xhat) / 2 + eps := by
             linarith [hxhat]
-      _ = eps + neuralUlp β fexp (abs xhat) TrainingPhase.forward / 2 := by ring
+      _ = eps + neuralUlp β fexp (abs xhat) / 2 := by ring
   simpa [xhat, add_assoc, add_left_comm, add_comm] using this
 
 /--
@@ -505,8 +500,7 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
       Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
         Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
         neuralUlp β fexp
-            (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-            TrainingPhase.forward / 2 := by
+            (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
 
   have hround :
@@ -514,7 +508,7 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (Real.exp xhat)
             -
             Real.exp xhat) ≤
-        neuralUlp β fexp (Real.exp xhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (Real.exp xhat) / 2 := by
     simpa [Proofs.RuntimeRoundingApprox.roundR] using
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (Real.exp
         xhat))
@@ -540,8 +534,7 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (Real.exp xhat)
             -
             Real.exp x) ≤
-        Real.exp xhat + Real.exp (xhat + eps) + neuralUlp β fexp (Real.exp xhat)
-          TrainingPhase.forward / 2 := by
+        Real.exp xhat + Real.exp (xhat + eps) + neuralUlp β fexp (Real.exp xhat) / 2 := by
     have :=
       calc
         abs
@@ -558,11 +551,11 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
                       (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd)
                         (Real.exp xhat))
                       (Real.exp xhat) (Real.exp x)
-        _ ≤ neuralUlp β fexp (Real.exp xhat) TrainingPhase.forward / 2 +
+        _ ≤ neuralUlp β fexp (Real.exp xhat) / 2 +
               (Real.exp xhat + Real.exp (xhat + eps)) := by
               exact add_le_add hround hdiff
         _ = Real.exp xhat + Real.exp (xhat + eps) +
-              neuralUlp β fexp (Real.exp xhat) TrainingPhase.forward / 2 := by ring
+              neuralUlp β fexp (Real.exp xhat) / 2 := by ring
     exact this
 
   simpa [xhat, toSpec_exp (β := β) (fexp := fexp) (rnd := rnd) xR, add_assoc, add_left_comm,
@@ -580,8 +573,7 @@ lemma approx_tanh_nf {x : ℝ} {xR : R} {eps : ℝ}
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.tanh xR) - Real.tanh x) ≤
       2 +
         neuralUlp β fexp
-            (Real.tanh (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-            TrainingPhase.forward / 2 := by
+            (Real.tanh (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
 
   have hround :
@@ -589,7 +581,7 @@ lemma approx_tanh_nf {x : ℝ} {xR : R} {eps : ℝ}
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (Real.tanh xhat)
             -
             Real.tanh xhat) ≤
-        neuralUlp β fexp (Real.tanh xhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (Real.tanh xhat) / 2 := by
     simpa [Proofs.RuntimeRoundingApprox.roundR] using
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (Real.tanh
         xhat))
@@ -609,7 +601,7 @@ lemma approx_tanh_nf {x : ℝ} {xR : R} {eps : ℝ}
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (Real.tanh xhat)
             -
             Real.tanh x) ≤
-        2 + neuralUlp β fexp (Real.tanh xhat) TrainingPhase.forward / 2 := by
+        2 + neuralUlp β fexp (Real.tanh xhat) / 2 := by
     have :=
       calc
         abs
@@ -626,9 +618,9 @@ lemma approx_tanh_nf {x : ℝ} {xR : R} {eps : ℝ}
                       (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd)
                         (Real.tanh xhat))
                       (Real.tanh xhat) (Real.tanh x)
-        _ ≤ neuralUlp β fexp (Real.tanh xhat) TrainingPhase.forward / 2 + 2 := by
+        _ ≤ neuralUlp β fexp (Real.tanh xhat) / 2 + 2 := by
               exact add_le_add hround hdiff
-        _ = 2 + neuralUlp β fexp (Real.tanh xhat) TrainingPhase.forward / 2 := by ring
+        _ = 2 + neuralUlp β fexp (Real.tanh xhat) / 2 := by ring
     exact this
 
   -- `hx` is not needed for the range-based bound; the statement mirrors the other unary lemmas.
@@ -701,8 +693,7 @@ lemma approx_safeLog_nf {x : ℝ} {xR : R} {eps ε : ℝ}
       ε xR) -
           safeLog (ε := ε) x) ≤
       (1 / ε) * eps +
-        neuralUlp β fexp (safeLog (ε := ε) (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-          TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (safeLog (ε := ε) (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
   set xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   set yhat : ℝ := max xhat ε
   set y : ℝ := max x ε
@@ -733,7 +724,7 @@ lemma approx_safeLog_nf {x : ℝ} {xR : R} {eps ε : ℝ}
           (toSpec (β := β) (fexp := fexp) (rnd := rnd)
               (safeLogR (β := β) (fexp := fexp) (rnd := rnd) ε xR) -
             Real.log yhat) ≤
-        neuralUlp β fexp (Real.log yhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (Real.log yhat) / 2 := by
     -- `safeLogR` rounds the real `log (max x̂ ε)`.
     have :
         toSpec (β := β) (fexp := fexp) (rnd := rnd)
@@ -763,12 +754,12 @@ lemma approx_safeLog_nf {x : ℝ} {xR : R} {eps ε : ℝ}
                       (safeLogR (β := β) (fexp := fexp) (rnd := rnd) ε xR))
                     (Real.log yhat)
                     (safeLog (ε := ε) x)
-      _ ≤ neuralUlp β fexp (Real.log yhat) TrainingPhase.forward / 2 + (1 / ε) * eps := by
+      _ ≤ neuralUlp β fexp (Real.log yhat) / 2 + (1 / ε) * eps := by
             -- second term is the `log` perturbation
             have : abs (Real.log yhat - safeLog (ε := ε) x) = abs (Real.log yhat - Real.log y) := by
               simp [safeLog, y]
             simpa [this, add_comm, add_left_comm, add_assoc] using add_le_add hround hdiff
-      _ = (1 / ε) * eps + neuralUlp β fexp (safeLog (ε := ε) xhat) TrainingPhase.forward / 2 := by
+      _ = (1 / ε) * eps + neuralUlp β fexp (safeLog (ε := ε) xhat) / 2 := by
             simp [safeLog, xhat, yhat, add_comm]
   simpa [xhat] using this
 
@@ -788,8 +779,7 @@ lemma approx_mul_nf {x y : ℝ} {xR yR : R} {epsx epsy : ℝ}
         (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) + epsy) * epsx +
         neuralUlp β fexp
             (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR *
-              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-            TrainingPhase.forward / 2) := by
+              toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2) := by
   have hx' :
       Proofs.RuntimeRoundingApprox.scalarApprox x
         (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) epsx := by
@@ -814,8 +804,7 @@ lemma approx_div_nf_of_one_le {x y : ℝ} {xR yR : R} {epsx : ℝ}
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) - (x / y)) ≤
       neuralUlp β fexp
           (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR /
-            toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-          TrainingPhase.forward / 2
+            toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2
         + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) *
             abs (1 / toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
         + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
@@ -880,7 +869,7 @@ lemma approx_div_nf_of_one_le {x y : ℝ} {xR yR : R} {epsx : ℝ}
   -- Rounding error of the final division.
   have hround :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) - qhat) ≤
-        neuralUlp β fexp qhat TrainingPhase.forward / 2 := by
+        neuralUlp β fexp qhat / 2 := by
     have : toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) =
         Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) qhat := by
       simpa [qhat, xhat, yhat] using (toSpec_div (β := β) (fexp := fexp) (rnd := rnd) xR yR)
@@ -895,10 +884,10 @@ lemma approx_div_nf_of_one_le {x y : ℝ} {xR yR : R} {epsx : ℝ}
               abs (qhat - x / y) := by
                 simpa [sub_eq_add_neg, add_assoc] using
                   abs_sub_le (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR)) qhat (x / y)
-      _ ≤ neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+      _ ≤ neuralUlp β fexp qhat / 2 +
             (abs xhat * abs (1 / yhat) + abs xhat + epsx) := by
             exact add_le_add hround hquot
-      _ = neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+      _ = neuralUlp β fexp qhat / 2 +
             abs xhat * abs (1 / yhat) + abs xhat + epsx := by simp [add_assoc]
   simpa [qhat, xhat, yhat, add_assoc, add_left_comm, add_comm] using this
 
@@ -915,8 +904,7 @@ lemma approx_div_nf_of_lb {x y : ℝ} {xR yR : R} {epsx η : ℝ}
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) - (x / y)) ≤
       neuralUlp β fexp
           (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR /
-            toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-          TrainingPhase.forward / 2
+            toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2
         + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) *
             abs (1 / toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
         + (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) + epsx) * (1 / η) := by
@@ -975,7 +963,7 @@ lemma approx_div_nf_of_lb {x y : ℝ} {xR yR : R} {epsx η : ℝ}
   -- Rounding error of the final division.
   have hround :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) - qhat) ≤
-        neuralUlp β fexp qhat TrainingPhase.forward / 2 := by
+        neuralUlp β fexp qhat / 2 := by
     have : toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) =
         Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) qhat := by
       simpa [qhat, xhat, yhat] using (toSpec_div (β := β) (fexp := fexp) (rnd := rnd) xR yR)
@@ -989,10 +977,10 @@ lemma approx_div_nf_of_lb {x y : ℝ} {xR yR : R} {epsx η : ℝ}
               abs (qhat - x / y) := by
                 simpa [sub_eq_add_neg, add_assoc] using
                   abs_sub_le (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR)) qhat (x / y)
-      _ ≤ neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+      _ ≤ neuralUlp β fexp qhat / 2 +
             (abs xhat * abs (1 / yhat) + (abs xhat + epsx) * (1 / η)) := by
             exact add_le_add hround hquot
-      _ = neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+      _ = neuralUlp β fexp qhat / 2 +
             abs xhat * abs (1 / yhat) + (abs xhat + epsx) * (1 / η) := by simp [add_assoc]
   simpa [qhat, xhat, yhat, add_assoc, add_left_comm, add_comm, mul_assoc] using this
 
@@ -1004,8 +992,7 @@ lemma approx_scale_nf {x : ℝ} {xR : R} {eps : ℝ} (c : R)
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) c) * eps +
         neuralUlp β fexp
             (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR *
-              toSpec (β := β) (fexp := fexp) (rnd := rnd) c)
-            TrainingPhase.forward / 2 := by
+              toSpec (β := β) (fexp := fexp) (rnd := rnd) c) / 2 := by
   have hc : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) c -
         toSpec (β := β) (fexp := fexp) (rnd := rnd) c) ≤ (0 : ℝ) := by
     simp

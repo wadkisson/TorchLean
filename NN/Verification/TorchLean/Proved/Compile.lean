@@ -28,7 +28,7 @@ open NN.IR
 def flatOfTensor {α : Type} [Context α] {s : Shape}
     (_wf : Shape.WellFormed s)
     (t : Tensor α s) : NN.MLTheory.CROWN.Graph.FlatVec α :=
-  { n := Shape.size s, v := Tensor.flattenSpec (α := α) (s := s) t }
+  { n := Spec.Shape.size s, v := Tensor.flattenSpec (α := α) (s := s) t }
 
 /--
 Compile a single forward-fragment node into the verifier IR.
@@ -88,7 +88,7 @@ def compileNode
   | .transpose3dLastTwo _a _b _c x =>
       ({ id := id, parents := [x.id], kind := .transpose3dLastTwo, outShape := out }, ps)
   | .softmaxLast (s := s) _hRank x =>
-      let axis := (Shape.rank s) - 1
+      let axis := (Spec.Shape.rank s) - 1
       ({ id := id, parents := [x.id], kind := .softmax axis, outShape := s }, ps)
   | .layernorm2d seqLen embedDim _hSeq _hEmb x =>
       ({ id := id
@@ -109,8 +109,8 @@ def compileNode
       let bT := getParam (α := α) (paramShapes := paramShapes) params bias
       let outShape : Shape :=
         .dim outC
-          (.dim ((inH + 2 * padding - kH) / stride + 1)
-            (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))
+          (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+            (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))
       let n : NN.IR.Node :=
         { id := id
           parents := [x.id]

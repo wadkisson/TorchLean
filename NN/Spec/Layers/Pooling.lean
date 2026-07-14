@@ -9,7 +9,6 @@ module
 public import NN.Spec.Layers.Pooling.TwoD
 public import NN.Spec.Layers.Pooling.PaddedTwoD
 public import NN.Spec.Layers.Pooling.ND
-public import NN.Spec.Layers.Pooling.Aliases
 
 /-!
 # Pooling Layers

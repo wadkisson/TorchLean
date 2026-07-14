@@ -15,7 +15,7 @@ This example trains a tiny byte-level LSTM on real text:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -24,7 +24,7 @@ public import NN.Examples.Models.Common.RealData
 Runnable `torchlean lstm` example. It reads a local text corpus, takes a short byte window from the
 front, and trains an LSTM plus a time-distributed linear head.
 
-The model constructor is exposed as `TorchLean.nn.models.LSTMWithLinearHead`. The local code names the
+The model constructor is exposed as `TorchLean.nn.models.lstmWithLinearHead`. The local code names the
 architecture, builds the text dataset, and trains through the public `Trainer` surface.
 
 ## Scope
@@ -75,7 +75,7 @@ abbrev τ :=
 
 /-- LSTM followed by a time-distributed linear output head. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.LSTMWithLinearHead cfg
+  nn.models.lstmWithLinearHead cfg
 
 /-- Build one next-token training sample from the loaded corpus prefix. -/
 def sample (corpus : String) : SupervisedSample Float σ τ :=
@@ -101,7 +101,7 @@ def train (opts : Options) (corpusFlags : RealData.TextCorpusFlags)
 
 /-- CLI entrypoint for the LSTM text command. -/
 def main (args : List String) : IO UInt32 := do
-  Trainer.Command.run
+  TrainCommand.run
     { exeName := exeName
       defaultLogJson := defaultLogJson
       defaultSteps := 1

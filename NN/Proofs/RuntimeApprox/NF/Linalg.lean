@@ -219,14 +219,12 @@ def dotStep {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) :
           (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) bkR) + epsb) * epsa +
           neuralUlp β fexp
               (toSpec (β := β) (fexp := fexp) (rnd := rnd) akR *
-                toSpec (β := β) (fexp := fexp) (rnd := rnd) bkR)
-              TrainingPhase.forward / 2
+                toSpec (β := β) (fexp := fexp) (rnd := rnd) bkR) / 2
       let epsAcc' : ℝ :=
         epsAcc + epsProd +
           neuralUlp β fexp
               (toSpec (β := β) (fexp := fexp) (rnd := rnd) accR +
-                toSpec (β := β) (fexp := fexp) (rnd := rnd) prodR)
-              TrainingPhase.forward / 2
+                toSpec (β := β) (fexp := fexp) (rnd := rnd) prodR) / 2
       (accR + prodR, epsAcc')
 
 /--
@@ -236,7 +234,7 @@ Closed-form bound for a runtime dot-product over `List.finRange n`.
 starting from 0.
 -/
 def dotBound {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
-  let initEps : ℝ := neuralUlp β fexp 0 TrainingPhase.forward / 2
+  let initEps : ℝ := neuralUlp β fexp 0 / 2
   ((List.finRange n).foldl (dotStep (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR)
       ((0 : R), initEps)).2
 
@@ -247,7 +245,7 @@ Exported tensor-bound constructors use this name instead of the local helper tha
 non-exportable in this file.
 -/
 def dotBoundExport {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
-  let initEps : ℝ := neuralUlp β fexp 0 TrainingPhase.forward / 2
+  let initEps : ℝ := neuralUlp β fexp 0 / 2
   ((List.finRange n).foldl (dotStep (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR)
       ((0 : R), initEps)).2
 
@@ -329,8 +327,7 @@ private theorem approx_dot_list {n : Nat} (l : List (Fin n))
               (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) + epsb) * epsa +
               neuralUlp β fexp
                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k) *
-                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k))
-                  TrainingPhase.forward / 2) := by
+                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) / 2) := by
         exact approx_mul_nf (β := β) (fexp := fexp) (rnd := rnd) (x := aS k) (y := bS k)
           (xR := aR k) (yR := bR k) (epsx := epsa) (epsy := epsb) (ha k) (hb k)
 
@@ -343,12 +340,10 @@ private theorem approx_dot_list {n : Nat} (l : List (Fin n))
                 (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) + epsb) * epsa +
                 neuralUlp β fexp
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k) *
-                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k))
-                    TrainingPhase.forward / 2) +
+                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) / 2) +
               neuralUlp β fexp
                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) accR +
-                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k * bR k))
-                  TrainingPhase.forward / 2 := by
+                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k * bR k)) / 2 := by
         -- apply the scalar add bound with `acc` and `prod`
         have := approx_add_nf (β := β) (fexp := fexp) (rnd := rnd)
           (x := accS) (y := aS k * bS k) (xR := accR) (yR := aR k * bR k)
@@ -358,8 +353,7 @@ private theorem approx_dot_list {n : Nat} (l : List (Fin n))
               (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) + epsb) * epsa +
               neuralUlp β fexp
                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k) *
-                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k))
-                  TrainingPhase.forward / 2))
+                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) / 2))
           hAcc hProd
         -- the lemma already has the correct RHS shape
         simpa [add_assoc, add_left_comm, add_comm] using this
@@ -373,12 +367,10 @@ private theorem approx_dot_list {n : Nat} (l : List (Fin n))
                 (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) + epsb) * epsa +
                 neuralUlp β fexp
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k) *
-                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k))
-                    TrainingPhase.forward / 2) +
+                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (bR k)) / 2) +
               neuralUlp β fexp
                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) accR +
-                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k * bR k))
-                  TrainingPhase.forward / 2)
+                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (aR k * bR k)) / 2)
           hStep
 
       -- rewrite folds for `cons`
@@ -401,7 +393,7 @@ private theorem approx_dot_finRange {n : Nat}
     -- base approximation for the initial accumulator `0`
   have h0 :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) - (0 : SpecScalar)) ≤
-        neuralUlp β fexp 0 TrainingPhase.forward / 2 := by
+        neuralUlp β fexp 0 / 2 := by
     -- `toSpec 0 = roundR 0`, then apply the rounding abs-error bound.
     convert
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ))
@@ -412,7 +404,7 @@ private theorem approx_dot_finRange {n : Nat}
     (approx_dot_list (β := β) (fexp := fexp) (rnd := rnd) (n := n) (l := List.finRange n)
       (aS := aS) (bS := bS) (aR := aR) (bR := bR)
       (accS := (0 : SpecScalar)) (accR := (0 : R))
-      (epsAcc := neuralUlp β fexp 0 TrainingPhase.forward / 2)
+      (epsAcc := neuralUlp β fexp 0 / 2)
       (epsa := epsa) (epsb := epsb) h0 ha hb)
 
 -- ---------------------------------------------------------------------------

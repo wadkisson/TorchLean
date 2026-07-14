@@ -35,33 +35,33 @@ structure PPOActorCriticConfig where
 deriving Repr
 
 /-- Actor input shape: observation vectors with a caller-chosen prefix shape. -/
-abbrev ppoActorInShape (cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
+abbrev ppoActorInShape (cfg : PPOActorCriticConfig) (pfx : Spec.Shape) : Spec.Shape :=
   pfx.appendDim cfg.obsDim
 
 /-- Actor output shape: action logits with the same prefix shape. -/
-abbrev ppoActorOutShape (cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
+abbrev ppoActorOutShape (cfg : PPOActorCriticConfig) (pfx : Spec.Shape) : Spec.Shape :=
   pfx.appendDim cfg.nActions
 
 /-- Critic output shape: one scalar value per prefixed observation. -/
-abbrev ppoCriticOutShape (_cfg : PPOActorCriticConfig) (pfx : Shape) : Shape :=
+abbrev ppoCriticOutShape (_cfg : PPOActorCriticConfig) (pfx : Spec.Shape) : Spec.Shape :=
   pfx.appendDim 1
 
 /-- Actor MLP mapping observations to action logits. -/
-def ppoActor (cfg : PPOActorCriticConfig) (pfx : Shape) :
+def ppoActor (cfg : PPOActorCriticConfig) (pfx : Spec.Shape) :
     nn.M (nn.Sequential (ppoActorInShape cfg pfx) (ppoActorOutShape cfg pfx)) :=
   nn.Sequential![
-    Linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
+    linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
     nn.tanh,
-    Linear cfg.hiddenDim cfg.nActions (pfx := pfx)
+    linear cfg.hiddenDim cfg.nActions (pfx := pfx)
   ]
 
 /-- Critic MLP mapping observations to a scalar value estimate. -/
-def ppoCritic (cfg : PPOActorCriticConfig) (pfx : Shape) :
+def ppoCritic (cfg : PPOActorCriticConfig) (pfx : Spec.Shape) :
     nn.M (nn.Sequential (ppoActorInShape cfg pfx) (ppoCriticOutShape cfg pfx)) :=
   nn.Sequential![
-    Linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
+    linear cfg.obsDim cfg.hiddenDim (pfx := pfx),
     nn.tanh,
-    Linear cfg.hiddenDim 1 (pfx := pfx)
+    linear cfg.hiddenDim 1 (pfx := pfx)
   ]
 
 end models

@@ -49,141 +49,80 @@ For the documented user API with named-field configs and blocks, see
 -/
 
 /-- Lift a single layer into a sequential model. -/
-def of {σ τ : Spec.Shape} (layer : API.TorchLean.NN.LayerDef σ τ) :
-    API.TorchLean.NN.Seq σ τ :=
-  API.TorchLean.NN.singleLayer layer
+def of {σ τ : Spec.Shape} (layer : API.TorchLean.LayerCore.LayerDef σ τ) :
+    API.TorchLean.LayerCore.Seq σ τ :=
+  API.TorchLean.LayerCore.singleLayer layer
+
+namespace Internal
+
+/-- Checked reshape layer used by generic runtime adapters. -/
+def reshapeLayer (source target : Spec.Shape)
+    (sameSize : Spec.Shape.size source = Spec.Shape.size target) :
+    API.TorchLean.LayerCore.LayerDef source target :=
+  { kind := "Reshape"
+    paramShapes := []
+    initParams := .nil
+    paramRequiresGrad := []
+    forward := fun _ {α} _ _ => fun {m} _ _ => fun x =>
+      API.TorchLean.reshape (m := m) (α := α) (s₁ := source) (s₂ := target) x sameSize }
+
+/-- Checked reshape as a one-layer sequential model. -/
+def reshapeSeq (source target : Spec.Shape)
+    (sameSize : Spec.Shape.size source = Spec.Shape.size target) :
+    API.TorchLean.LayerCore.Seq source target :=
+  of (reshapeLayer source target sameSize)
+
+end Internal
 
 /-- Linear layer over vectors (returns a 1-layer `Seq`). -/
 def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
-  of <| API.TorchLean.NN.linear inDim outDim seedW seedB
+    API.TorchLean.LayerCore.Seq (.dim inDim .scalar) (.dim outDim .scalar) :=
+  of <| API.TorchLean.LayerCore.linear inDim outDim seedW seedB
 
 /-- Pointwise ReLU activation, preserving the input shape. -/
-def relu {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.relu (s := s)
+def relu {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.relu (s := s)
 
 /-- Elementwise SiLU/Swish. -/
-def silu {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.silu (s := s)
+def silu {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.silu (s := s)
 
 /-- Pointwise GELU activation, preserving the input shape. -/
-def gelu {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.gelu (s := s)
+def gelu {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.gelu (s := s)
 
 /-- Pointwise logistic sigmoid activation, preserving the input shape. -/
-def sigmoid {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.sigmoid (s := s)
+def sigmoid {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.sigmoid (s := s)
 
 /-- Pointwise hyperbolic tangent activation, preserving the input shape. -/
-def tanh {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.tanh (s := s)
+def tanh {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.tanh (s := s)
 
 /-- Softmax over the flattened tensor entries for the current runtime layer convention. -/
-def softmax {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.softmax (s := s)
+def softmax {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.softmax (s := s)
 
 /-- Pointwise square map, preserving the input shape. -/
-def square {s : Spec.Shape} : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.square (s := s)
+def square {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.square (s := s)
 
 /-- Reduce-sum to a scalar. -/
-def sum {s : Spec.Shape} : API.TorchLean.NN.Seq s Spec.Shape.scalar :=
-  of <| API.TorchLean.NN.sum (s := s)
+def sum {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s Spec.Shape.scalar :=
+  of <| API.TorchLean.LayerCore.sum (s := s)
 
 /-- Flatten any input shape into a 1D vector of length `Spec.Shape.size s`. -/
-def flatten {s : Spec.Shape} : API.TorchLean.NN.Seq s (.dim (Spec.Shape.size s) .scalar) :=
-  of <| API.TorchLean.NN.flatten (s := s)
+def flatten {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s (.dim (Spec.Shape.size s) .scalar) :=
+  of <| API.TorchLean.LayerCore.flatten (s := s)
 
 /-- Dropout layer that is active in training mode and identity in eval mode. -/
-def dropout {s : Spec.Shape} (p : Float) (seed : Nat := 0) : API.TorchLean.NN.Seq s s :=
-  of <| API.TorchLean.NN.dropout (s := s) p seed
+def dropout {s : Spec.Shape} (p : Float) (seed : Nat := 0) : API.TorchLean.LayerCore.Seq s s :=
+  of <| API.TorchLean.LayerCore.dropout (s := s) p seed
 
 /-- `Flatten -> Linear` head, with the input dimension computed from the input shape. -/
 def flattenLinear {s : Spec.Shape} (outDim : Nat) (seedW seedB : Nat := 0) :
-    API.TorchLean.NN.Seq s (NN.Tensor.Shape.Vec outDim) :=
+    API.TorchLean.LayerCore.Seq s (.dim outDim .scalar) :=
   (flatten (s := s)) >>> (linear (Spec.Shape.size s) outDim seedW seedB)
-
-/-- Sequential 2D convolution layer for CHW inputs. -/
-def conv2d (inC outC kH kW stride padding inH inW : Nat)
-    {hInC : inC ≠ 0} {hKH : kH ≠ 0} {hKW : kW ≠ 0}
-    (seedK seedB : Nat := 0)
-    (kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1) :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW inC inH inW)
-      (NN.Tensor.Shape.CHW outC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
-        stride + 1)) :=
-  of <| API.TorchLean.NN.conv2d
-    (inC := inC) (outC := outC) (kH := kH) (kW := kW) (stride := stride) (padding := padding)
-    (inH := inH) (inW := inW) (h1 := hInC) (h2 := hKH) (h3 := hKW)
-    (seedK := seedK) (seedB := seedB) (kInit := kInit)
-
-/-- Sequential max-pooling layer for CHW inputs. -/
-def maxPool2d (kH kW inH inW inC stride : Nat)
-    {hKH : kH ≠ 0} {hKW : kW ≠ 0} :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW inC inH inW)
-      (NN.Tensor.Shape.CHW inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1)) :=
-  of <| API.TorchLean.NN.maxPool2d
-    (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
-    (h1 := hKH) (h2 := hKW)
-
-/-- Sequential padded max-pooling layer for CHW inputs. -/
-def maxPool2dPad (kH kW inH inW inC stride padding : Nat)
-    {hKH : kH ≠ 0} {hKW : kW ≠ 0} :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW inC inH inW)
-      (NN.Tensor.Shape.CHW inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
-        stride + 1)) :=
-  of <| API.TorchLean.NN.maxPool2dPad
-    (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride) (padding :=
-      padding)
-    (h1 := hKH) (h2 := hKW)
-
-/-- Sequential average-pooling layer for CHW inputs. -/
-def avgPool2d (kH kW inH inW inC stride : Nat)
-    {hKH : kH ≠ 0} {hKW : kW ≠ 0} :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW inC inH inW)
-      (NN.Tensor.Shape.CHW inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1)) :=
-  of <| API.TorchLean.NN.avgPool2d
-    (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
-    hKH hKW
-
-/-- Sequential padded average-pooling layer for CHW inputs. -/
-def avgPool2dPad (kH kW inH inW inC stride padding : Nat)
-    {hKH : kH ≠ 0} {hKW : kW ≠ 0} :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW inC inH inW)
-      (NN.Tensor.Shape.CHW inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
-        stride + 1)) :=
-  of <| API.TorchLean.NN.avgPool2dPad
-    (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride) (padding :=
-      padding)
-    hKH hKW
-
-/--
-Global average-pooling over `C×H×W` inputs.
-
-PyTorch analogy: `torch.nn.functional.adaptive_avg_pool2d(x, output_size=1)` followed by
-flattening the spatial axes.
--/
-def globalAvgPoolCHW (c h w : Nat)
-    {hC : c > 0} {hH : h > 0} {hW : w > 0} :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.CHW c h w) (NN.Tensor.Shape.Vec c) :=
-  of <| API.TorchLean.NN.globalAvgPool2dChw (c := c) (h := h) (w := w)
-    (h_c_pos := hC) (h_h_pos := hH) (h_w_pos := hW)
-
-/--
-Global average-pooling over `N×C×H×W` inputs.
-
-PyTorch analogy: `torch.nn.functional.adaptive_avg_pool2d(x, output_size=1)` and then reshaping
-to `(N, C)`.
--/
-def globalAvgPoolNCHW (n c h w : Nat)
-    {hN : n > 0} {hC : c > 0} {hH : h > 0} {hW : w > 0} :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.NCHW n c h w) (.dim n (.dim c .scalar)) :=
-  of <| API.TorchLean.NN.globalAvgPool2dNchw (n := n) (c := c) (h := h) (w := w)
-    (h_n_pos := hN) (h_c_pos := hC) (h_h_pos := hH) (h_w_pos := hW)
 
 /--
 Sequence-wise layer normalization.
@@ -193,9 +132,9 @@ PyTorch analogy: `torch.nn.LayerNorm(embedDim)` applied to each position in a se
 def layerNorm (batch seqLen embedDim : Nat)
     {hSeq : seqLen > 0} {hEmbed : embedDim > 0}
     (seedGamma seedBeta : Nat := 0) :
-    API.TorchLean.NN.Seq (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+    API.TorchLean.LayerCore.Seq (.dim batch (.dim seqLen (.dim embedDim .scalar)))
       (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
-  of <| API.TorchLean.NN.layerNorm (batch := batch)
+  of <| API.TorchLean.LayerCore.layerNorm (batch := batch)
     (seqLen := seqLen) (embedDim := embedDim)
     (h_seq_pos := hSeq) (h_embed_pos := hEmbed)
     (seedGamma := seedGamma) (seedBeta := seedBeta)
@@ -208,92 +147,72 @@ PyTorch analogy: an `RMSNorm`-style layer over `(seqLen × embedDim)` tensors.
 def rmsNorm (batch seqLen embedDim : Nat)
     {hSeq : seqLen > 0} {hEmbed : embedDim > 0}
     (seedGamma : Nat := 0) :
-    API.TorchLean.NN.Seq (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+    API.TorchLean.LayerCore.Seq (.dim batch (.dim seqLen (.dim embedDim .scalar)))
       (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
-  of <| API.TorchLean.NN.rmsNorm (batch := batch)
+  of <| API.TorchLean.LayerCore.rmsNorm (batch := batch)
     (seqLen := seqLen) (embedDim := embedDim)
     (h_seq_pos := hSeq) (h_embed_pos := hEmbed)
     (seedGamma := seedGamma)
 
-/--
-Mode-aware batch norm on a single `C×H×W` image tensor.
-
-PyTorch analogy: `torch.nn.BatchNorm2d(channels)` on a single sample, with the layer's mode
-controlling whether running statistics are updated or reused.
--/
-def batchNormCHW (channels height width : Nat)
-    {hC : channels > 0} {hH : height > 0} {hW : width > 0}
-    (seedGamma seedBeta seedMean seedVar : Nat := 0) :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW channels height width)
-      (NN.Tensor.Shape.CHW channels height width) :=
-  of <| API.TorchLean.NN.batchnormChannelFirstMode
-    (channels := channels) (height := height) (width := width)
-    (h_c := hC) (h_h := hH) (h_w := hW)
-    (seedGamma := seedGamma) (seedBeta := seedBeta)
-    (seedMean := seedMean) (seedVar := seedVar)
-
-/--
-Eval-mode batch norm on a single `C×H×W` image tensor with explicit running statistics.
-
-PyTorch analogy: `torch.nn.BatchNorm2d(...).eval()` with `running_mean` and `running_var`.
--/
-def batchNormEvalCHW (channels height width : Nat)
-    {hC : channels > 0} {hH : height > 0} {hW : width > 0}
-    (seedGamma seedBeta seedMean seedVar : Nat := 0) :
-    API.TorchLean.NN.Seq
-      (NN.Tensor.Shape.CHW channels height width)
-      (NN.Tensor.Shape.CHW channels height width) :=
-  of <| API.TorchLean.NN.batchnormChannelFirstEval
-    (channels := channels) (height := height) (width := width)
-    (h_c := hC) (h_h := hH) (h_w := hW)
-    (seedGamma := seedGamma) (seedBeta := seedBeta)
-    (seedMean := seedMean) (seedVar := seedVar)
-
-/--
-Instance normalization over `N×C×H×W` tensors.
-
-PyTorch analogy: `torch.nn.InstanceNorm2d(c, affine=True)` with `NCHW` layout.
--/
-def instanceNorm2dNCHW (n c h w : Nat)
-    {hN : n > 0} {hC : c > 0} {hH : h > 0} {hW : w > 0}
+/-- Instance normalization over a flattened `(leading, channels, spatial)` representation. -/
+def instanceNormChannelFirst (leadingSize channels spatialSize : Nat)
+    {hLeading : leadingSize > 0} {hChannels : channels > 0} {hSpatial : spatialSize > 0}
     (seedGamma seedBeta : Nat := 0) :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  of <| API.TorchLean.NN.instanceNorm2dNchw
-    (n := n) (c := c) (h := h) (w := w)
-    (h_n_pos := hN) (h_c_pos := hC) (h_h_pos := hH) (h_w_pos := hW)
-    (seedGamma := seedGamma) (seedBeta := seedBeta)
+    API.TorchLean.LayerCore.Seq
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar)))
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar))) :=
+  let source : Spec.Shape := .dim leadingSize (.dim channels (.dim spatialSize .scalar))
+  let kernelShape : Spec.Shape :=
+    .dim leadingSize (.dim channels (.dim spatialSize (.dim 1 .scalar)))
+  API.TorchLean.LayerCore.Seq.comp
+    (Internal.reshapeSeq source kernelShape (by simp [source, kernelShape, Spec.Shape.size]))
+    (API.TorchLean.LayerCore.Seq.comp
+      (of (API.TorchLean.LayerCore.instanceNorm2dNchw
+        (n := leadingSize) (c := channels) (h := spatialSize) (w := 1)
+        (h_n_pos := hLeading) (h_c_pos := hChannels) (h_h_pos := hSpatial)
+        (h_w_pos := by decide) (seedGamma := seedGamma) (seedBeta := seedBeta)))
+      (Internal.reshapeSeq kernelShape source (by simp [source, kernelShape, Spec.Shape.size])))
 
-/--
-Group normalization over `N×C×H×W` tensors.
-
-PyTorch analogy: `torch.nn.GroupNorm(groups, c)` with `NCHW` layout.
--/
-def groupNorm2dNCHW (n c h w groups : Nat)
-    {hN : n > 0} {hC : c > 0} {hH : h > 0} {hW : w > 0} {hG : groups > 0}
-    (hGE : c ≥ groups) (hDiv : c % groups = 0)
+/-- Group normalization over a flattened `(leading, channels, spatial)` representation. -/
+def groupNormChannelFirst (leadingSize channels spatialSize groups : Nat)
+    {hLeading : leadingSize > 0} {hChannels : channels > 0} {hSpatial : spatialSize > 0}
+    {hGroups : groups > 0} (hGroupsLe : channels ≥ groups) (hDiv : channels % groups = 0)
     (seedGamma seedBeta : Nat := 0) :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  of <| API.TorchLean.NN.groupNorm2dNchw
-    (n := n) (c := c) (h := h) (w := w) (groups := groups)
-    (h_n_pos := hN) (h_c_pos := hC) (h_h_pos := hH) (h_w_pos := hW) (h_g_pos := hG)
-    hGE hDiv
-    (seedGamma := seedGamma) (seedBeta := seedBeta)
+    API.TorchLean.LayerCore.Seq
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar)))
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar))) :=
+  let source : Spec.Shape := .dim leadingSize (.dim channels (.dim spatialSize .scalar))
+  let kernelShape : Spec.Shape :=
+    .dim leadingSize (.dim channels (.dim spatialSize (.dim 1 .scalar)))
+  API.TorchLean.LayerCore.Seq.comp
+    (Internal.reshapeSeq source kernelShape (by simp [source, kernelShape, Spec.Shape.size]))
+    (API.TorchLean.LayerCore.Seq.comp
+      (of (API.TorchLean.LayerCore.groupNorm2dNchw
+        (n := leadingSize) (c := channels) (h := spatialSize) (w := 1) (groups := groups)
+        (h_n_pos := hLeading) (h_c_pos := hChannels) (h_h_pos := hSpatial)
+        (h_w_pos := by decide) (h_g_pos := hGroups) hGroupsLe hDiv
+        (seedGamma := seedGamma) (seedBeta := seedBeta)))
+      (Internal.reshapeSeq kernelShape source (by simp [source, kernelShape, Spec.Shape.size])))
 
-/--
-Batch norm over `N×C×H×W` tensors in training mode.
-
-PyTorch analogy: `torch.nn.BatchNorm2d(c)` during training, where batch statistics are used.
--/
-def batchNorm2dNCHW (n c h w : Nat)
-    {hN : n > 0} {hC : c > 0} {hH : h > 0} {hW : w > 0}
+/-- Batch normalization over a flattened `(leading, channels, spatial)` representation. -/
+def batchNormChannelFirst (leadingSize channels spatialSize : Nat)
+    {hLeading : leadingSize > 0} {hChannels : channels > 0} {hSpatial : spatialSize > 0}
     (seedGamma seedBeta seedMean seedVar : Nat := 0) :
-    API.TorchLean.NN.Seq (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  of <| API.TorchLean.NN.batchNorm2dNchwMode
-    (n := n) (c := c) (h := h) (w := w)
-    (h_n_pos := hN) (h_c_pos := hC) (h_h_pos := hH) (h_w_pos := hW)
-    (seedGamma := seedGamma) (seedBeta := seedBeta)
-    (seedMean := seedMean) (seedVar := seedVar)
+    API.TorchLean.LayerCore.Seq
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar)))
+      (.dim leadingSize (.dim channels (.dim spatialSize .scalar))) :=
+  let source : Spec.Shape := .dim leadingSize (.dim channels (.dim spatialSize .scalar))
+  let kernelShape : Spec.Shape :=
+    .dim leadingSize (.dim channels (.dim spatialSize (.dim 1 .scalar)))
+  API.TorchLean.LayerCore.Seq.comp
+    (Internal.reshapeSeq source kernelShape (by simp [source, kernelShape, Spec.Shape.size]))
+    (API.TorchLean.LayerCore.Seq.comp
+      (of (API.TorchLean.LayerCore.batchNorm2dNchwMode
+        (n := leadingSize) (c := channels) (h := spatialSize) (w := 1)
+        (h_n_pos := hLeading) (h_c_pos := hChannels) (h_h_pos := hSpatial)
+        (h_w_pos := by decide) (seedGamma := seedGamma) (seedBeta := seedBeta)
+        (seedMean := seedMean) (seedVar := seedVar)))
+      (Internal.reshapeSeq kernelShape source (by simp [source, kernelShape, Spec.Shape.size])))
 
 /--
 Multi-head self-attention over sequence embeddings.
@@ -305,9 +224,9 @@ def attention (batch n dModel numHeads headDim : Nat)
     {hN : n ≠ 0}
     (seedW : Nat := 0)
     (mask : Option (_root_.Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    API.TorchLean.NN.Seq (.dim batch (.dim n (.dim dModel .scalar)))
+    API.TorchLean.LayerCore.Seq (.dim batch (.dim n (.dim dModel .scalar)))
       (.dim batch (.dim n (.dim dModel .scalar))) :=
-  of <| API.TorchLean.NN.multiHeadAttention (batch := batch)
+  of <| API.TorchLean.LayerCore.multiHeadAttention (batch := batch)
     (n := n) (dModel := dModel) (numHeads := numHeads) (headDim := headDim)
     (h1 := hN) (seedW := seedW) (mask := mask)
 

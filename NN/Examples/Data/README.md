@@ -131,7 +131,7 @@ Keep those roles separate:
 Ordinary loader code should use the public API:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
 
@@ -168,12 +168,16 @@ let loader := Data.batchLoader ds 8 (shuffle := true) (seed := 0) (dropLast := t
 let (_loader', batches) ← CLI.orThrow "trainer" <| Data.BatchLoader.epoch "trainer" loader
 ```
 
-The batch axis is reflected in the type, so image minibatches have shapes such as:
+The batch axis is reflected in the type. For example, a batch of channel-first images and its
+class labels can have the following shapes:
 
 ```text
-X : Tensor α (Shape.dim batch (Shape.image C H W))
-Y : Tensor α (Shape.dim batch (Shape.vec classes))
+X : Tensor α (.dim batch (.dim channels (.dim height (.dim width .scalar))))
+Y : Tensor α (.dim batch (.dim classes .scalar))
 ```
+
+These are ordinary tensors built from `Shape.dim`; channel-first is an axis convention rather than
+a separate image tensor type.
 
 ## Provenance
 

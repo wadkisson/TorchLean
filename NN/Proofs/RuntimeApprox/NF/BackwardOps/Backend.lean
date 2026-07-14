@@ -40,7 +40,7 @@ local notation "R" => TorchLean.Floats.NF β fexp rnd
 
 private lemma toSpec_one_bound :
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (1 : R) - (1 : ℝ)) ≤
-      neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2 := by
+      neuralUlp β fexp (1 : ℝ) / 2 := by
   -- `1 : R` is `NF.ofReal 1`, so this is the standard single-step rounding error bound.
   convert
     (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ))
@@ -102,13 +102,13 @@ lemma approxT_fill_const {cS : ℝ} {cR : R} {eps : ℝ} (h : abs (toSpec (β :=
 
 lemma approxT_fill_one :
     ∀ {s : Shape}, approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-      (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s) (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward /
+      (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s) (neuralUlp β fexp (1 : ℝ) /
         2) := by
   intro s
   exact
     approxT_fill_const (β := β) (fexp := fexp) (rnd := rnd)
       (cS := (1 : ℝ)) (cR := (1 : R))
-      (eps := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+      (eps := neuralUlp β fexp (1 : ℝ) / 2)
       (toSpec_one_bound (β := β) (fexp := fexp) (rnd := rnd)) (s := s)
 
 lemma approxT_fill_zero :

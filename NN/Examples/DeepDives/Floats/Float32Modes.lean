@@ -7,8 +7,9 @@ Authors: TorchLean Team
 module
 
 public import Batteries.Lean.Float
-public import NN
-import NN.Entrypoint.Widgets
+public import NN.API
+public import NN.Floats
+public import NN.Widgets
 
 /-!
 # Float32 modes tutorial
@@ -24,8 +25,8 @@ We run a single forward pass and a single reverse-mode VJP (seeded with `1.0`) a
 PyTorch analogue:
 
 ```python
-import torch
-import torch.nn as nn
+public import torch
+public import torch.nn as nn
 
 model64 = nn.Sequential(nn.Linear(2, 3), nn.ReLU(), nn.Linear(3, 1)).to(torch.float64)
 model32 = nn.Sequential(nn.Linear(2, 3), nn.ReLU(), nn.Linear(3, 1)).to(torch.float32)
@@ -89,7 +90,7 @@ def quietNaN32 : IEEE32Exec := IEEE32Exec.canonicalNaN
 #float32_view quietNaN32
 #float32_compare_view one32, quietNaN32
 
-def model : nn.Sequential (Shape.vec 2) (Shape.vec 1) :=
+def model : nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar) :=
   -- A compact 2-layer MLP with ReLU:
   --   Linear(2 -> 3) -> ReLU -> Linear(3 -> 1)
   --
@@ -102,14 +103,14 @@ def model : nn.Sequential (Shape.vec 2) (Shape.vec 1) :=
 -- This tutorial returns a single typed bundle so we can:
 -- - print everything in one place, and
 -- - compare Float vs IEEE32Exec numerically at the end.
-def OutShapes : List Shape :=
-  [Shape.vec 1, Shape.mat 3 2, Shape.vec 3,
-   Shape.mat 1 3, Shape.vec 1, Shape.vec 2]
+def OutShapes : List Spec.Shape :=
+  [.dim 1 .scalar, .dim 3 (.dim 2 .scalar), .dim 3 .scalar,
+   .dim 1 (.dim 3 .scalar), .dim 1 .scalar, .dim 2 .scalar]
 abbrev OutPack (α : Type) :=
-  tensorpack.TensorPack α OutShapes
+  TensorPack α OutShapes
 
 def runOnce {α : Type}
-    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
+    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
     (tag : String) : IO (OutPack α) := do
   -- TorchLean examples typically treat `Float` as the "host literal" type, then inject those
   -- literals into
@@ -134,18 +135,18 @@ def runOnce {α : Type}
   -/
   let params : autograd.model.Params model α :=
     tensorpack!
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
+      (NN.Tensor.ofListOfLength (α := α) [3, 2]
         [cast 0.1, cast 0.2, cast 0.3, cast 0.4, cast 0.5, cast 0.6]
         (by rfl)),
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3]
+      (NN.Tensor.ofListOfLength (α := α) [3]
         [cast 0.1, cast 0.2, cast 0.3] (by rfl)),
-      (NN.Tensor.tensorNDOfLenEq (α := α) [1, 3]
+      (NN.Tensor.ofListOfLength (α := α) [1, 3]
         [cast 0.7, cast 0.8, cast 0.9] (by rfl)),
-      (NN.Tensor.tensorNDOfLenEq (α := α) [1] [cast 0.4] (by rfl))
+      (NN.Tensor.ofListOfLength (α := α) [1] [cast 0.4] (by rfl))
 
   -- One input vector x in R^2.
-  let x : Spec.Tensor α (Shape.vec 2) :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
+  let x : Spec.Tensor α (.dim 2 .scalar) :=
+    NN.Tensor.ofListOfLength (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
 
   /-
   ### 2. Forward pass
@@ -177,8 +178,8 @@ def runOnce {α : Type}
   A VJP needs an output cotangent seed. Since the output shape is `Vec 1`, seeding with `[1]`
   computes the same gradient as differentiating `sum(y)`.
   -/
-  let seedOut : Spec.Tensor α (Shape.vec 1) :=
-    Spec.fill (α := α) (cast 1.0) (Shape.vec 1)
+  let seedOut : Spec.Tensor α (.dim 1 .scalar) :=
+    Spec.fill (α := α) (cast 1.0) (.dim 1 .scalar)
 
   -- Gradients w.r.t. *parameters* (same `TensorPack` structure/order as `params`).
   let dparams ← autograd.model.vjpParams (α := α) model params x seedOut
@@ -204,18 +205,18 @@ def runOnce {α : Type}
 
   pure (tensorpack! y, hiddenWeightGrad, hiddenBiasGrad, outputWeightGrad, outputBiasGrad, inputGrad)
 
-def maxAbsDiffTensor {s : Shape} (a b : Spec.Tensor Float s) : Float :=
+def maxAbsDiffTensor {s : Spec.Shape} (a b : Spec.Tensor Float s) : Float :=
   let diffs :=
     (Spec.toList a).zip (Spec.toList b) |>.map (fun (x, y) => Float.abs (x - y))
   diffs.foldl max 0.0
 
 def unpackOutPack {α : Type} (p : OutPack α) :
-    Spec.Tensor α (Shape.vec 1) ×
-      Spec.Tensor α (Shape.mat 3 2) ×
-      Spec.Tensor α (Shape.vec 3) ×
-      Spec.Tensor α (Shape.mat 1 3) ×
-      Spec.Tensor α (Shape.vec 1) ×
-      Spec.Tensor α (Shape.vec 2) :=
+    Spec.Tensor α (.dim 1 .scalar) ×
+      Spec.Tensor α (.dim 3 (.dim 2 .scalar)) ×
+      Spec.Tensor α (.dim 3 .scalar) ×
+      Spec.Tensor α (.dim 1 (.dim 3 .scalar)) ×
+      Spec.Tensor α (.dim 1 .scalar) ×
+      Spec.Tensor α (.dim 2 .scalar) :=
   match p with
   | .cons y
       (.cons hiddenWeightGrad

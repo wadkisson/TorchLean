@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Data.RealPaths
 public import NN.Examples.Models.Common.RealData
 
@@ -94,11 +94,11 @@ abbrev τ : Shape :=
 
 /-- Raw input shape stored by the prepared household-power `.npy` files. -/
 abbrev rawσ : Shape :=
-  Shape.mat rawSeqLen inputSize
+  .dim rawSeqLen (.dim inputSize .scalar)
 
 /-- Raw target shape stored by the prepared household-power `.npy` files. -/
 abbrev rawτ : Shape :=
-  Shape.mat rawSeqLen inputSize
+  .dim rawSeqLen (.dim inputSize .scalar)
 
 /--
 The actual forecaster.
@@ -106,13 +106,13 @@ The actual forecaster.
 `nn.models.lstmWithLinearHead cfg` expands to:
 
 `nn.LSTM seqLen inputSize hiddenSize`
-followed by a time-distributed `nn.Linear hiddenSize inputSize`.
+followed by a time-distributed `nn.linear hiddenSize inputSize`.
 
 So every timestep emits a scalar forecast. We are not using only the final hidden state here; the loss
 checks the whole output sequence.
 -/
 def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.LSTMWithLinearHead cfg
+  nn.models.lstmWithLinearHead cfg
 
 /-- Data source tags for terminal logs and JSON metadata. -/
 def dataTags (xPath yPath : System.FilePath) : Array String :=
@@ -214,7 +214,7 @@ def trainForecast (opts : Options) (train : RealData.HouseholdPowerModelTrainFla
 
 /-- Executable entrypoint for CPU/CUDA Float training. -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.forecastWindow exeName args
+  TrainCommand.forecastWindow exeName args
     (fun rest =>
       RealData.HouseholdPowerModelTrainFlags.parse exeName rest defaultLogJson 100 0.01 512 96)
     (ModelZoo.bannerWithDevice exeName "LSTM time-series regression")

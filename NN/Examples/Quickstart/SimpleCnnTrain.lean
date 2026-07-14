@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Quickstart.Common
 
 /-!
@@ -45,16 +45,24 @@ open TorchLean
 def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "quickstart_simple_cnn"
 
 def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (Shape.images batch 1 4 4) (Shape.mat batch 2)) :=
-  let outC : Nat := 3
-  let outH : Nat := (4 - 2) / 1 + 1
-  let outW : Nat := (4 - 2) / 1 + 1
-  nn.Sequential![
-    nn.Conv2d (n := batch) (inC := 1) (inH := 4) (inW := 4)
-      { outC := outC, kH := 2, kW := 2, stride := 1, padding := 0 },
-    nn.ReLU,
-    nn.ClassifierBatch (n := batch) (s := Shape.image outC outH outW) 2
-  ]
+    nn.M (nn.Sequential (.dim batch (.dim 1 (.dim 4 (.dim 4 .scalar)))) (.dim batch (.dim 2 .scalar))) :=
+  let cfg : nn.models.CnnConfig 2 :=
+    { batch := batch
+      inChannels := 1
+      spatial := #v[4, 4]
+      outDim := 2
+      conv :=
+        { outChannels := 3
+          kernel := #v[2, 2]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide }
+      pool :=
+        { kernel := #v[1, 1]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide } }
+  by
+    simpa [cfg, nn.models.cnnInShape, nn.models.cnnOutShape, Spec.Shape.ofList] using
+      nn.models.cnn cfg (hInChannels := by simp [cfg])
 
 /-- Command-line help for the simple CNN quickstart. -/
 def usage : String :=

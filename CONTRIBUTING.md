@@ -31,13 +31,13 @@ lake test
 Common targets:
 
 ```bash
-lake build NN.Library
+lake build NN
 DISABLE_EQUATIONS=1 lake build NN:docs
 lake exe verify -- list
 ```
 
-`import NN` is the everyday user facade. `import NN.Library` is the broad library umbrella for
-specs, runtime, verification, and proofs, while still excluding executables and tests.
+`import NN.API` is the focused application API. `import NN` is the complete library umbrella for
+models, specs, runtime, verification, and proofs, while still excluding executables and tests.
 
 ## Tests, Examples, and Verification
 

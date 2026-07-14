@@ -7,26 +7,14 @@ Authors: TorchLean Team
 module
 
 public import NN.Examples.Quickstart
-public import NN.Examples.Quickstart.SimpleCnnTrain
-public import NN.Examples.Quickstart.MinibatchMlpTrain
-public import NN.Examples.Data.Loaders.Csv
-public import NN.Examples.Data.Loaders.Npy
+public import NN.Examples.Data.Loaders
 public import NN.Examples.Models
 public import NN.Examples.Interop.PyTorch
 public import NN.Examples.DeepDives
+public import NN.Examples.Factorization
+public import NN.Examples.Functional.Transcendentals
 public import NN.Examples.Optimization
 public import NN.Examples.Verification
-public import NN.Examples.Data.Loaders.Cifar10Images
-public import NN.Verification.Cert.AbCrownLeafCert
-public import NN.Verification.PINN.CLI
-public import NN.Verification.PINN.Certificate
-public import NN.Verification.PINN.Core
-public import NN.Verification.PINN.DatasetCheck
-public import NN.Verification.PINN.PdeAst
-public import NN.Verification.PINN.PdeParse
-public import NN.Verification.PINN.ResidualAffine
-public import NN.Verification.Robustness.Digits
-public import NN.Verification.ODE.Verify
 public import NN.Examples.RL
 public import NN.Examples.BugZoo.All
 
@@ -35,9 +23,8 @@ public import NN.Examples.BugZoo.All
 
 Single umbrella for TorchLean examples.
 
-The examples directory has one root Lean entrypoint. Import this module when you want to compile
-every maintained example module, including introductory examples, model examples,
-interop examples, widgets, deep-dive tutorials, and verification examples.
+Import this module to compile every library-style example: introductory examples, models, data
+loaders, interop, widgets, mathematical deep dives, and verification workflows.
 
 Typical usage:
 
@@ -47,9 +34,9 @@ Typical usage:
 * Run CUDA-only model examples with both build-time and runtime CUDA selection:
   `lake -R -K cuda=true exe torchlean gpt_adder --device cuda --steps 1`
 
-The heavier examples remain in their subdirectories so users can still build or run one example at a
-time. This umbrella avoids importing standalone executable roots that would collide on the global
-Lean name `main`.
+The heavier examples remain in their subdirectories, so each can still be built independently. The
+standalone CLI root `NN.Examples.Models.Runner` is intentionally excluded because importing an
+executable root would introduce a global `main`; Lake builds that target separately.
 -/
 
 @[expose] public section

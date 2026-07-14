@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -35,12 +35,12 @@ abbrev numHeads : Nat := 2
 abbrev dModel : Nat := 4
 abbrev headDim : Nat := 2
 
-def hN : n ≠ 0 := by decide
+theorem hN : n ≠ 0 := by decide
 
 abbrev projDim : Nat := numHeads * headDim
 
 def wq : Tensor Float (shape![dModel, projDim]) :=
-  tensorND! [dModel, projDim] [
+  tensorOfList! [dModel, projDim] [
     0.01, 0.02, 0.03, 0.04,
     0.05, 0.06, 0.07, 0.08,
     0.09, 0.10, 0.11, 0.12,
@@ -48,7 +48,7 @@ def wq : Tensor Float (shape![dModel, projDim]) :=
   ]
 
 def wk : Tensor Float (shape![dModel, projDim]) :=
-  tensorND! [dModel, projDim] [
+  tensorOfList! [dModel, projDim] [
     0.02, 0.01, 0.04, 0.03,
     0.06, 0.05, 0.08, 0.07,
     0.10, 0.09, 0.12, 0.11,
@@ -56,7 +56,7 @@ def wk : Tensor Float (shape![dModel, projDim]) :=
   ]
 
 def wv : Tensor Float (shape![dModel, projDim]) :=
-  tensorND! [dModel, projDim] [
+  tensorOfList! [dModel, projDim] [
     0.03, 0.00, 0.01, 0.02,
     0.00, 0.03, 0.02, 0.01,
     0.01, 0.02, 0.03, 0.00,
@@ -64,7 +64,7 @@ def wv : Tensor Float (shape![dModel, projDim]) :=
   ]
 
 def wo : Tensor Float (shape![projDim, dModel]) :=
-  tensorND! [projDim, dModel] [
+  tensorOfList! [projDim, dModel] [
     0.05, 0.00, 0.01, 0.02,
     0.00, 0.05, 0.02, 0.01,
     0.01, 0.02, 0.05, 0.00,
@@ -72,19 +72,27 @@ def wo : Tensor Float (shape![projDim, dModel]) :=
   ]
 
 def x : Tensor Float (shape![n, dModel]) :=
-  tensorND! [n, dModel] [
+  tensorOfList! [n, dModel] [
     0.10, -0.20, 0.05, 0.30,
     -0.05, 0.25, -0.10, 0.15
   ]
 
 def mask : Tensor Bool (shape![n, n]) :=
-  tensorND! [n, n] [
+  tensorOfList! [n, n] [
     true,  true,
     false, true
   ]
 
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: multi_head_attention ==="
+
+  let specScores : Tensor Float (shape![2, 2]) :=
+    tensorOfList! [2, 2] [1000.0, -1000.0, 3.0, 4.0]
+  let specMask : Tensor Bool (shape![2, 2]) :=
+    tensorOfList! [2, 2] [false, true, false, false]
+  let specOut := Spec.hardMaskedSoftmaxSpec specScores specMask
+  Utils.assertTensorApprox "hard-masked softmax spec"
+    specOut (tensorOfList! [2, 2] [0.0, 1.0, 0.0, 0.0])
 
   -- A blocked extreme score must not influence stabilization. The second row checks the explicit
   -- all-blocked convention used by both composed and fused hard-masked attention.
@@ -143,7 +151,7 @@ def run : IO Unit := do
       (h1 := hN) wqIdc wkIdc wvIdc woIdc xIdc (mask := some mask))
   let yCuda ← Utils.cudaValue (s := outShape) t6c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape)) 1.0 }
+    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t6c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := outShape) gradsCuda xIdc
@@ -172,7 +180,7 @@ def run : IO Unit := do
       (attentionCapsule := NN.Backend.Attention.torchLeanComposed))
   let yCudaComposed ← Utils.cudaValue (s := outShape) t6s yIds
   let seedComposed : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape)) 1.0 }
+    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }
   let gradsComposed ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t6s) yIds seedComposed)
   let dxCudaComposed ← Utils.cudaGrad (s := outShape) gradsComposed xIds

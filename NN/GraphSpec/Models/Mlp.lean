@@ -16,7 +16,8 @@ This file contains the smallest GraphSpec architecture example:
 `Linear(in,hid) → ReLU → Linear(hid,out)`.
 
 This does not duplicate TorchLean's executable MLP helper. That constructor lives under
-`NN.GraphSpec.Models.TorchLean.Mlp` and is re-exported through `NN.Entrypoint.TorchLeanModels`.
+`NN.GraphSpec.Models.TorchLean.Mlp`; application code reaches the corresponding public constructor
+through `TorchLean.nn.models`.
 The point here is narrower and proof-oriented:
 
 - show the sequential `Graph` DSL in its simplest useful form;
@@ -51,11 +52,11 @@ So the overall parameter list is exactly:
 -/
 def mlp (inDim hidDim outDim : Nat) :
     Graph
-      [ Shape.Mat hidDim inDim, Shape.Vec hidDim
-      , Shape.Mat outDim hidDim, Shape.Vec outDim ]
-      (Shape.Vec inDim) (Shape.Vec outDim) :=
+      [ .dim hidDim (.dim inDim .scalar), .dim hidDim .scalar
+      , .dim outDim (.dim hidDim .scalar), .dim outDim .scalar ]
+      (.dim inDim .scalar) (.dim outDim .scalar) :=
   Graph.linear inDim hidDim >>>
-  Graph.relu (Shape.Vec hidDim) >>>
+  Graph.relu (.dim hidDim .scalar) >>>
   Graph.linear hidDim outDim
 
 /--
@@ -69,10 +70,10 @@ Initialization: all-zero parameters (see `LowerToDAG.Graph.toDAGModelZeroInit`).
 -/
 def mlpDAGModelZeroInit (inDim hidDim outDim : Nat) :
     DAG.Model
-      [ Shape.Mat hidDim inDim, Shape.Vec hidDim
-      , Shape.Mat outDim hidDim, Shape.Vec outDim ]
-      [Shape.Vec inDim]
-      (Shape.Vec outDim) :=
+      [ .dim hidDim (.dim inDim .scalar), .dim hidDim .scalar
+      , .dim outDim (.dim hidDim .scalar), .dim outDim .scalar ]
+      [.dim inDim .scalar]
+      (.dim outDim .scalar) :=
   LowerToDAG.Graph.toDAGModelZeroInit (mlp (inDim := inDim) (hidDim := hidDim) (outDim := outDim))
 
 /-!
@@ -83,15 +84,15 @@ You can build a simple classifier head by appending a softmax:
 ```lean
 def g (inDim hidDim outDim : Nat) :
     Graph
-      [ Shape.Mat hidDim inDim, Shape.Vec hidDim
-      , Shape.Mat outDim hidDim, Shape.Vec outDim ]
-      (Shape.Vec inDim) (Shape.Vec outDim) :=
-  Models.mlp inDim hidDim outDim >>> Graph.softmax (Shape.Vec outDim)
+      [ .dim hidDim (.dim inDim .scalar), .dim hidDim .scalar
+      , .dim outDim (.dim hidDim .scalar), .dim outDim .scalar ]
+      (.dim inDim .scalar) (.dim outDim .scalar) :=
+  Models.mlp inDim hidDim outDim >>> Graph.softmax (.dim outDim .scalar)
 ```
 
 Then:
 
-- `Interp.spec (g …)` is a pure function `Params → Tensor → Tensor`;
+- `Interp.spec (g …)` is a pure function `Params → Spec.Tensor → Spec.Tensor`;
 - `Compile.torchProgram (g …)` is an executable TorchLean `Program` with arguments
   `params ++ [input]`.
 -/

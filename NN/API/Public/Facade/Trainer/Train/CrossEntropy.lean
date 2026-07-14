@@ -29,7 +29,7 @@ namespace Internal
 
 /-- Cast a Float checkpoint payload to the runtime scalar selected for the current run. -/
 def castParamBits {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] :
-    {ss : List Shape} → ParamTensors Float ss → ParamTensors α ss
+    {ss : List Shape} → nn.ParamTensors Float ss → nn.ParamTensors α ss
   | [], .nil => .nil
   | _s :: ss, .cons x xs =>
       .cons (Tensor.castFloat (Runtime.ofFloat (α := α)) x) (castParamBits (α := α) (ss := ss) xs)
@@ -37,7 +37,7 @@ def castParamBits {α : Type} [Runtime.TensorScalar α] [Runtime.Scalar α] :
 /-- Convert a runtime parameter payload back to the public Float checkpoint format. -/
 def paramsToFloatIO {α : Type} [Runtime.TensorScalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α] :
-    {ss : List Shape} → ParamTensors α ss → IO (ParamTensors Float ss)
+    {ss : List Shape} → nn.ParamTensors α ss → IO (nn.ParamTensors Float ss)
   | [], .nil => pure .nil
   | _s :: ss, .cons x xs => do
       let xF ← Tensor.toFloatIO x
@@ -61,7 +61,7 @@ def loadCheckpointIfSome {σ τ : Shape} {α : Type}
   | some path =>
       let psF ←
         NN.API.TorchLean.ParamIO.loadParamBits (paramShapes := nn.paramShapes trainer.model) path
-      let psTask : ParamTensors α (NN.API.TorchLean.Supervised.paramShapes trainer.task) :=
+      let psTask : nn.ParamTensors α (NN.API.TorchLean.Supervised.paramShapes trainer.task) :=
         Eq.mpr (by rw [CrossEntropy.taskParamShapes_eq (trainer := trainer)])
           (castParamBits (α := α) psF)
       Module.setParams runner.module psTask
@@ -78,7 +78,7 @@ def saveCheckpointIfSome {σ τ : Shape} {α : Type}
   | some path =>
       let ps ← Manual.params (task := trainer.task) runner
       let psFTask ← paramsToFloatIO (α := α) ps
-      let psFModel : ParamTensors Float (nn.paramShapes trainer.model) :=
+      let psFModel : nn.ParamTensors Float (nn.paramShapes trainer.model) :=
         Eq.mp (by rw [CrossEntropy.taskParamShapes_eq (trainer := trainer)]) psFTask
       NN.API.TorchLean.ParamIO.saveParamBits (paramShapes := nn.paramShapes trainer.model)
         path psFModel

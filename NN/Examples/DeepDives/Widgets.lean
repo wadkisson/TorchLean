@@ -12,7 +12,7 @@ import NN.IR.Semantics
 import NN.MLTheory.CROWN.Graph
 import NN.Runtime.Autograd.Engine.Core
 import NN.Spec.RL.Envs.GridWorld
-import NN.Entrypoint.Widgets
+import NN.Widgets
 meta import NN.Spec.Core.TensorBridge
 
 /-!
@@ -24,7 +24,7 @@ The gallery is best explored in an editor:
 
 These widgets are inspection tools for teaching, debugging, and reviewing artifacts
 without leaving Lean. They are available through the dedicated widget entrypoint
-(`import NN.Entrypoint.Widgets`) so ordinary runtime and proof imports stay focused.
+(`import NN.Widgets`) so ordinary runtime and proof imports stay focused.
 -/
 
 open Spec

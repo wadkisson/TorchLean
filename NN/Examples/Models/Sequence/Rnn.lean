@@ -15,7 +15,7 @@ This example trains a tiny byte-level RNN on real text:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -24,7 +24,7 @@ public import NN.Examples.Models.Common.RealData
 Runnable `torchlean rnn` example. It reads a local text corpus, takes a short byte window from the
 front, and trains a vanilla RNN plus a time-distributed linear head.
 
-The model constructor is exposed as `TorchLean.nn.models.RNNWithLinearHead`. The local code names the
+The model constructor is exposed as `TorchLean.nn.models.rnnWithLinearHead`. The local code names the
 architecture, builds the text dataset, and trains through the public `Trainer` surface.
 
 ## Scope
@@ -72,7 +72,7 @@ abbrev τ :=
 
 /-- Vanilla RNN followed by a time-distributed linear output head. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.RNNWithLinearHead cfg
+  nn.models.rnnWithLinearHead cfg
 
 /-- Build one next-token training sample from the loaded corpus prefix. -/
 def sample (corpus : String) : SupervisedSample Float σ τ :=
@@ -98,7 +98,7 @@ def train (opts : Options) (corpusFlags : RealData.TextCorpusFlags)
 
 /-- CLI entrypoint for the vanilla RNN text command. -/
 def main (args : List String) : IO UInt32 := do
-  Trainer.Command.run
+  TrainCommand.run
     { exeName := exeName
       defaultLogJson := defaultLogJson
       defaultSteps := 1

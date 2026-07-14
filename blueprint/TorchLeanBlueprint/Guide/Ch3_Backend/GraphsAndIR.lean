@@ -160,8 +160,7 @@ The IR account is built from three closely related groups of declarations:
   - `Graph` stores the node array and exposes the basic checks that the graph is well formed.
 
 - [NN.IR.Infer API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Infer.lean) / [NN.IR.Check API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean)
-  - `checkInferredShapes` recomputes every declared output shape from parent shapes and operation names.
-  - `checkShapes` is the public alias for the same inferred-shape contract.
+  - `checkShapes` recomputes every declared output shape from parent shapes and operation names.
   - Compiler and backend tests use these checks to keep generated graphs honest.
 
 - [NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean)
@@ -181,7 +180,7 @@ The *Widgets* chapter gives concrete examples of both views.
 # A Few Invariants That Matter
 
 - Do not confuse a runtime tape with the canonical IR. They are related, but they do different jobs.
-- Do not skip `checkWellFormed` and `checkInferredShapes` when developing compiler passes.
+- Do not skip `checkWellFormed` and `checkShapes` when developing compiler passes.
 - Do not hide parameters inside the graph structure if the API expects an external payload.
 - Do not assume every runtime feature is automatically verifier-ready; reification has a scope.
 
@@ -198,14 +197,14 @@ The core invariants are:
   - parents only refer to earlier nodes (topological order),
   - node ids match the index discipline expected by builders.
 
-- `Graph.checkShapes` / `Graph.checkInferredShapes` (declared shapes agree with inference)
+- `Graph.checkShapes` (declared shapes agree with inference)
   - each opcode's arity is checked by the inference rule,
   - parent shapes are checked against what the opcode expects,
   - and the inferred output shape must match the node's declared `outShape`.
 
 When writing a compiler pass or a rewrite, we treat these as the default consistency checks:
 
-- run `checkWellFormed` and `checkInferredShapes` on every output graph while developing,
+- run `checkWellFormed` and `checkShapes` on every output graph while developing,
 - and record "preserves well formed graphs" as a proof obligation once the pass stabilizes.
 
 # SSA Discipline
@@ -295,7 +294,7 @@ there is an explicit lowering and semantic bridge for it.
 When a pass emits a graph, the minimum reader checklist is:
 
 1. Does `checkWellFormed` pass?
-2. Does `checkInferredShapes` pass?
+2. Does `checkShapes` pass?
 3. Does every parameterized node have the expected payload entry?
 4. Does the intended output id point to the value we want to verify or export?
 
@@ -351,7 +350,7 @@ Here is a minimal "input + const + add" graph, including:
 
 ```
 import NN
-import NN.Entrypoint.IR
+import NN.IR
 
 open NN
 open Spec
@@ -382,7 +381,7 @@ def input : DVal Float :=
 -- Typical debugging checks:
 -- #eval g.checkWellFormed
 -- #eval g.checkShapes
--- #eval g.checkInferredShapes
+-- #eval g.checkShapes
 
 -- Evaluate the whole graph (values[2] is the output):
 -- #eval g.denoteAll payload input

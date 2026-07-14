@@ -6,22 +6,6 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.NN
-public import NN.API.Public.TensorPack
-public import NN.API.Public.Seeded
-public import NN.API.Public.Autograd
-public import NN.API.Data
-public import NN.API.Data.Transforms
-public import NN.API.Runtime
-public import NN.API.Models
-public import NN.API.Public.NN.Transformer
-public import NN.API.RL
-public import NN.API.Rand
-public import NN.API.Samples.Bands
-public import NN.API.Text.Bpe
-public import NN.MLTheory.CROWN.Flatbox
-public import NN.MLTheory.CROWN.Graph
-public import NN.Verification.TorchLean.Compile
 public import NN.API.Public.Facade.Base.Root
 
 /-!
@@ -36,22 +20,22 @@ namespace TorchLean
 
 namespace Verification
 
-/-- TorchLean-to-verifier compiled IR bundle. -/
+@[inherit_doc NN.Verification.TorchLean.CompiledIR]
 abbrev CompiledIR := NN.Verification.TorchLean.CompiledIR
 
-/-- Verifier-side parameter store used by IBP/CROWN workflows. -/
-abbrev ParamStore := NN.MLTheory.CROWN.Graph.ParamStore
-
-/-- Flat input box used to seed verifier input bounds. -/
+@[inherit_doc NN.MLTheory.CROWN.FlatBox]
 abbrev FlatBox := NN.MLTheory.CROWN.FlatBox
 
-/-- Input-node metadata required by affine/CROWN verifier passes. -/
+@[inherit_doc NN.MLTheory.CROWN.Graph.ParamStore]
+abbrev ParamStore := NN.MLTheory.CROWN.Graph.ParamStore
+
+@[inherit_doc NN.MLTheory.CROWN.Graph.AffineCtx]
 abbrev AffineCtx := NN.MLTheory.CROWN.Graph.AffineCtx
 
-/-- Output of the forward affine pass for one verifier node. -/
+@[inherit_doc NN.MLTheory.CROWN.Graph.FlatAffine]
 abbrev FlatAffine := NN.MLTheory.CROWN.Graph.FlatAffine
 
-/-- Output of the CROWN forward pass for one verifier node. -/
+@[inherit_doc NN.MLTheory.CROWN.Graph.FlatAffineBounds]
 abbrev FlatAffineBounds := NN.MLTheory.CROWN.Graph.FlatAffineBounds
 
 /--
@@ -61,24 +45,24 @@ Usual "train a model, then run IBP/CROWN on its forward pass" path.
 -/
 def compileForward {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
     {σ τ : Shape}
-    (model : SequentialModel σ τ)
-    (params : ParamTensors α (modelParamShapes model)) :
+    (model : NN.API.nn.Sequential σ τ)
+    (params : TensorPack α (NN.API.nn.paramShapes model)) :
     Except String (CompiledIR α) :=
   NN.Verification.TorchLean.compileForward
-    (α := α) (paramShapes := modelParamShapes model)
+    (α := α) (paramShapes := NN.API.nn.paramShapes model)
     (inShape := σ) (outShape := τ)
     (NN.API.nn.forwardProgram (model := model) (α := α)) params
 
 /--
 Compile a custom TorchLean forward program into verifier IR with one distinguished input.
 
-Use this when the target is not a plain `nn.Sequential`, for example a hand-written loss program or
+Use this when the target is not a plain `TorchLean.nn.Sequential`, for example a hand-written loss program or
 an attention fragment built directly from `TorchLean.Ops`.
 -/
 def compileProgram {α : Type} [NN.API.Semantics.Scalar α] [DecidableEq Shape]
     {paramShapes : List Shape} {σ τ : Shape}
     (forwardProgram : _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [σ]) τ)
-    (params : ParamTensors α paramShapes) :
+    (params : TensorPack α paramShapes) :
     Except String (CompiledIR α) :=
   NN.Verification.TorchLean.compileForward
     (α := α) (paramShapes := paramShapes)
@@ -127,14 +111,10 @@ def inputShape? {α : Type} [Context α] (compiled : CompiledIR α) : Except Str
 def inputDim? {α : Type} [Context α] (compiled : CompiledIR α) : Except String Nat :=
   compiled.inputDim?
 
-/-- Checked affine context for the distinguished verifier input. -/
+/-- Affine context for the distinguished verifier input. -/
 def affineCtx? {α : Type} [Context α] (compiled : CompiledIR α) :
     Except String AffineCtx :=
   compiled.affineCtx?
-
-/-- Compatibility affine context for the distinguished verifier input. -/
-def affineCtx {α : Type} [Context α] (compiled : CompiledIR α) : AffineCtx :=
-  compiled.affineCtx
 
 /-- Run IBP on a compiled verifier graph. -/
 def runIBP {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
@@ -151,14 +131,8 @@ def outputBoxOrThrow {α : Type} [Context α] (compiled : CompiledIR α)
     (boxes : Array (Option (FlatBox α))) : IO (FlatBox α) :=
   compiled.outputBoxOrThrow boxes
 
-/-- Run the forward affine pass on a compiled verifier graph. -/
+/-- Run the forward affine pass after validating the compiled verifier input. -/
 def runAffine {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
-    (compiled : CompiledIR α) (ps : ParamStore α) (ibp : Array (Option (FlatBox α))) :
-    Array (Option (FlatAffine α)) :=
-  NN.MLTheory.CROWN.Graph.runAffine (α := α) compiled.graph ps (affineCtx compiled) ibp
-
-/-- Checked variant of `runAffine` that validates the compiled input node first. -/
-def runAffine? {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
     (compiled : CompiledIR α) (ps : ParamStore α) (ibp : Array (Option (FlatBox α))) :
     Except String (Array (Option (FlatAffine α))) := do
   let ctx ← affineCtx? compiled
@@ -169,14 +143,8 @@ def outputAffine? {α : Type} [Context α] (compiled : CompiledIR α)
     (affs : Array (Option (FlatAffine α))) : Except String (FlatAffine α) := do
   compiled.outputAffine? affs
 
-/-- Run CROWN on a compiled verifier graph. -/
+/-- Run CROWN after validating the compiled verifier input. -/
 def runCROWN {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
-    (compiled : CompiledIR α) (ps : ParamStore α) (ibp : Array (Option (FlatBox α))) :
-    Array (Option (FlatAffineBounds α)) :=
-  NN.MLTheory.CROWN.Graph.runCROWN (α := α) compiled.graph ps (affineCtx compiled) ibp
-
-/-- Checked variant of `runCROWN` that validates the compiled input node first. -/
-def runCROWN? {α : Type} [Context α] [NN.MLTheory.CROWN.BoundOps α]
     (compiled : CompiledIR α) (ps : ParamStore α) (ibp : Array (Option (FlatBox α))) :
     Except String (Array (Option (FlatAffineBounds α))) := do
   let ctx ← affineCtx? compiled

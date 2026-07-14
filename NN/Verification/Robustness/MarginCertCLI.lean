@@ -46,7 +46,7 @@ def run (args : List String) : IO Unit := do
       "  python3 scripts/verification/robustness/export_margin_cert.py"
     ]
 
-  if NN.API.CLI.hasHelp args then
+  if TorchLean.CLI.hasHelp args then
     IO.println usage
     return
 

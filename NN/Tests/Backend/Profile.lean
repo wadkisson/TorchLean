@@ -151,11 +151,11 @@ def expectNativeCudaGuardRejects (tag : String)
     pure true
   expect tag rejected
 
-def expectRuntimeDeviceRejected (tag : String) (device : Runtime.Autograd.Torch.Device) :
+def expectRuntimeDeviceRejected (tag : String) (device : NN.Backend.Device) :
     IO Unit := do
   try
     let _ ← Runtime.Autograd.Torch.Internal.EagerSession.new (α := Float)
-      { requestedDevice := device }
+      { device := device }
     throw <| IO.userError s!"{tag}: expected runtime device rejection"
   catch e =>
     let msg := toString e
@@ -163,7 +163,7 @@ def expectRuntimeDeviceRejected (tag : String) (device : Runtime.Autograd.Torch.
 
 /-- User-facing CUDA sessions must agree with the implementation linked behind the CUDA symbols. -/
 def expectCudaSessionMatchesRuntime : IO Unit := do
-  let opts : Runtime.Autograd.Torch.Options := { requestedDevice := .cuda }
+  let opts : Runtime.Autograd.Torch.Options := { device := .cuda }
   match Runtime.Autograd.Cuda.Buffer.runtimeStatus with
   | .nativeAvailable =>
       let _ ← Runtime.Autograd.Torch.Internal.EagerSession.new (α := Float) opts
@@ -457,24 +457,24 @@ def run : IO Unit := do
     BackendProfile.futureExternal [.matmul]
 
   for (tag, device) in
-      [ ("runtime rejects named-but-unimplemented metal", Runtime.Autograd.Torch.Device.metal)
-      , ("runtime rejects named-but-unimplemented rocm", Runtime.Autograd.Torch.Device.rocm)
-      , ("runtime rejects named-but-unimplemented wasm", Runtime.Autograd.Torch.Device.wasm)
-      , ("runtime rejects named-but-unimplemented tpu", Runtime.Autograd.Torch.Device.tpu)
-      , ("runtime rejects named-but-unimplemented trainium", Runtime.Autograd.Torch.Device.trainium)
-      , ("runtime rejects named-but-unimplemented custom chip", Runtime.Autograd.Torch.Device.custom)
-      , ("runtime rejects named-but-unimplemented external", Runtime.Autograd.Torch.Device.external)
+      [ ("runtime rejects named-but-unimplemented metal", NN.Backend.Device.metal)
+      , ("runtime rejects named-but-unimplemented rocm", NN.Backend.Device.rocm)
+      , ("runtime rejects named-but-unimplemented wasm", NN.Backend.Device.wasm)
+      , ("runtime rejects named-but-unimplemented tpu", NN.Backend.Device.tpu)
+      , ("runtime rejects named-but-unimplemented trainium", NN.Backend.Device.trainium)
+      , ("runtime rejects named-but-unimplemented custom chip", NN.Backend.Device.custom)
+      , ("runtime rejects named-but-unimplemented external", NN.Backend.Device.external)
       ] do
     expectRuntimeDeviceRejected tag device
 
   expectCudaSessionMatchesRuntime
 
   let checkedCudaOpts : Runtime.Autograd.Torch.Options :=
-    { requestedDevice := .cuda
+    { device := .cuda
       backendProfile? := some BackendProfile.checkedCuda }
 
   let mismatchedCudaOpts : Runtime.Autograd.Torch.Options :=
-    { requestedDevice := .cuda
+    { device := .cuda
       backendProfile? := some BackendProfile.checkedCpu }
   for op in
       [ BackendOp.matmul

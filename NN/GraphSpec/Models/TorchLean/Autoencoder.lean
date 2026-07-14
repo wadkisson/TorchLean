@@ -36,7 +36,7 @@ open NN.Tensor
 def autoencoder
     (inDim hidDim : Nat)
     (seedW1 seedB1 seedW2 seedB2 : Nat := 0) :
-    _root_.Runtime.Autograd.TorchLean.NN.Seq (Shape.Vec inDim) (Shape.Vec inDim) :=
+    _root_.Runtime.Autograd.TorchLean.NN.Seq (.dim inDim .scalar) (.dim inDim .scalar) :=
   tlseq[
     _root_.Runtime.Autograd.TorchLean.NN.linear inDim hidDim
       (seedW := seedW1) (seedB := seedB1),

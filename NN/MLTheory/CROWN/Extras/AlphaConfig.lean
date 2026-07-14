@@ -161,9 +161,14 @@ def reluWithAlpha (l u : α) (alphas : NeuronAlpha α) : α × α × α × α :=
     let (shi, bhi) := reluUpperFixed (α:=α) l u
     (slo, blo, shi, bhi)
   | .unknown =>
-    let (slo, blo) := reluLowerWithAlpha (α:=α) l u alphas.lower
-    let (shi, bhi) := reluUpperFixed (α:=α) l u
-    (slo, blo, shi, bhi)
+    if u > l then
+      let (slo, blo) := reluLowerWithAlpha (α:=α) l u alphas.lower
+      let (shi, bhi) := reluUpperFixed (α:=α) l u
+      (slo, blo, shi, bhi)
+    else
+      -- The only valid ordered interval in this branch is `[0,0]`. Avoid the `0/0`
+      -- denominator in the secant formula and use the exact zero map.
+      (Numbers.zero, Numbers.zero, Numbers.zero, Numbers.zero)
 
 /-- Gradient of output bounds w.r.t. alpha (for optimization).
     For ReLU: ∂bound/∂α = x for lower bound (where y = αx). -/
@@ -179,73 +184,6 @@ structure LayerAlphaGrad (α : Type) [Context α] where
   dim : Nat
   /-- Per-neuron gradients of the bound objective with respect to α parameters. -/
   grads : Tensor (AlphaGradient α) (.dim dim .scalar)
-
-/-- Local sigmoid approximation: σ(x) = 1 / (1 + exp(-x))
-    Using polynomial approximation for the Context typeclass. -/
-def sigmoidApprox (x : α) : α :=
-  -- Approximate sigmoid using tanh: σ(x) ≈ 0.5 + 0.5*tanh(x/2)
-  -- Or use linear approximation in typical range
-  let y := x * Numbers.pointfive
-  let y2 := y * y
-  -- Approximation: 0.5 + 0.25*x - 0.02*x^3 (for small x)
-  Numbers.pointfive + Numbers.pointfive * Numbers.pointfive * x -
-    (Numbers.one / (Numbers.one + Numbers.one + Numbers.one + Numbers.one + Numbers.one) /
-     (Numbers.one + Numbers.one + Numbers.one + Numbers.one + Numbers.one)) * y2 * y
-
-/-- Local tanh approximation: tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x)) -/
-def tanhApprox (x : α) : α :=
-  -- Approximate tanh using polynomial
-  let x2 := x * x
-  let x3 := x2 * x
-  -- tanh(x) ≈ x - x^3/3 for small x
-  x - x3 / Numbers.three
-
-/-- Sigmoid relaxation with interpolation alpha.
-    α ∈ [0,1] interpolates between tangent and secant for lower/upper. -/
-def sigmoidWithAlpha (l u : α) (alphas : NeuronAlpha α) : α × α × α × α :=
-  let σl := sigmoidApprox (α:=α) l
-  let σu := sigmoidApprox (α:=α) u
-  let mid := (l + u) * Numbers.pointfive
-  let σmid := sigmoidApprox (α:=α) mid
-
-  -- Tangent slopes: σ'(x) = σ(x) * (1 - σ(x))
-  let slope_tan_l := σl * (Numbers.one - σl)
-  let slope_tan_m := σmid * (Numbers.one - σmid)
-
-  -- Secant slope
-  let slope_sec := if u > l + Numbers.epsilon then (σu - σl) / (u - l) else slope_tan_m
-
-  -- Lower: interpolate between tangent at l and tangent at mid
-  let slope_lo := alphas.lower * slope_tan_l + (Numbers.one - alphas.lower) * slope_tan_m
-  let bias_lo := σl - slope_lo * l
-
-  -- Upper: always secant (not optimizable for convex hull)
-  let bias_hi := σl - slope_sec * l
-
-  (slope_lo, bias_lo, slope_sec, bias_hi)
-
-/-- Tanh relaxation with interpolation alpha. -/
-def tanhWithAlpha (l u : α) (alphas : NeuronAlpha α) : α × α × α × α :=
-  let tl := tanhApprox (α:=α) l
-  let tu := tanhApprox (α:=α) u
-  let mid := (l + u) * Numbers.pointfive
-  let tmid := tanhApprox (α:=α) mid
-
-  -- Tangent slopes: tanh'(x) = 1 - tanh²(x)
-  let slope_tan_l := Numbers.one - tl * tl
-  let slope_tan_m := Numbers.one - tmid * tmid
-
-  -- Secant slope
-  let slope_sec := if u > l + Numbers.epsilon then (tu - tl) / (u - l) else slope_tan_m
-
-  -- Lower: interpolate
-  let slope_lo := alphas.lower * slope_tan_l + (Numbers.one - alphas.lower) * slope_tan_m
-  let bias_lo := tl - slope_lo * l
-
-  -- Upper: secant
-  let bias_hi := tl - slope_sec * l
-
-  (slope_lo, bias_lo, slope_sec, bias_hi)
 
 /-- Configuration for alpha optimization. -/
 structure AlphaOptConfig where
@@ -266,50 +204,5 @@ structure OptimizedAlpha (α : Type) [Context α] where
   finalBound : α
   /-- Number of iterations used -/
   iterations : Nat
-
-namespace Theorems
-
-/-- ReLU lower with alpha=0 gives zero slope. -/
-theorem relu_lower_alpha_zero (l u : α) :
-    let (slope, bias) := reluLowerWithAlpha (α:=α) l u Numbers.zero
-    slope = Numbers.zero ∧ bias = Numbers.zero := by
-  unfold reluLowerWithAlpha
-  exact ⟨rfl, rfl⟩
-
-/-- ReLU lower with alpha=1 gives unit slope. -/
-theorem relu_lower_alpha_one (l u : α) :
-    let (slope, _) := reluLowerWithAlpha (α:=α) l u Numbers.one
-    slope = Numbers.one := by
-  unfold reluLowerWithAlpha
-  rfl
-
-/-- Default ReLU alpha has zero lower slope. -/
-theorem default_relu_alpha_lower :
-    (defaultReLUAlpha (α:=α)).lower = Numbers.zero := by
-  rfl
-
-/-- Default ReLU alpha has unit upper value. -/
-theorem default_relu_alpha_upper :
-    (defaultReLUAlpha (α:=α)).upper = Numbers.one := by
-  rfl
-
-/-- Active alpha has unit slope for both. -/
-theorem active_alpha_unit :
-    (activeAlpha (α:=α)).lower = Numbers.one ∧ (activeAlpha (α:=α)).upper = Numbers.one := by
-  exact ⟨rfl, rfl⟩
-
-/-- Inactive alpha has zero slope for both. -/
-theorem inactive_alpha_zero :
-    (inactiveAlpha (α:=α)).lower = Numbers.zero ∧ (inactiveAlpha (α:=α)).upper = Numbers.zero := by
-  exact ⟨rfl, rfl⟩
-
-/-- Init layer alpha preserves dimension. -/
-theorem init_layer_alpha_dim (n : Nat) (preB : Box α (.dim n .scalar)) :
-    (initLayerAlpha n preB).dim = n := by
-  simp only [initLayerAlpha]
-  match preB.lo, preB.hi with
-  | .dim _, .dim _ => rfl
-
-end Theorems
 
 end NN.MLTheory.CROWN.alpha

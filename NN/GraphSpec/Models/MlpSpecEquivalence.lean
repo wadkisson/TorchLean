@@ -49,15 +49,15 @@ namespace GraphSpec
 namespace Models
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 open Runtime.Autograd.Torch (TList)
 
 /-- Parameter ABI for the 2-layer MLP `inDim → hidDim → outDim`: `(W₁,b₁,W₂,b₂)`. -/
 abbrev MLPParams (inDim hidDim outDim : Nat) : List Shape :=
-  [ Shape.Mat hidDim inDim, Shape.Vec hidDim
-  , Shape.Mat outDim hidDim, Shape.Vec outDim ]
+  [ .dim hidDim (.dim inDim .scalar), .dim hidDim .scalar
+  , .dim outDim (.dim hidDim .scalar), .dim outDim .scalar ]
 
 /--
 **Theorem (GraphSpec MLP agrees with Spec reference).**
@@ -84,7 +84,7 @@ theorem mlp_interp_eq_spec_mlp_forward
     {α : Type} [Context α]
     {inDim hidDim outDim : Nat}
     (params : TList α (MLPParams inDim hidDim outDim))
-    (x : Tensor α (NN.Tensor.Shape.Vec inDim)) :
+    (x : Spec.Tensor α (.dim inDim .scalar)) :
     Interp.spec (mlp (inDim := inDim) (hidDim := hidDim) (outDim := outDim)) params x
     =
     let (w1, b1, w2, b2) :=
@@ -107,21 +107,21 @@ theorem mlp_interp_eq_spec_mlp_forward
             let l2 : Spec.LinearSpec α hidDim outDim := { weights := w2, bias := b2 }
             have hsplit1 :
                 (Interp.splitParams
-                    (ps₁ := [Shape.Mat hidDim inDim, Shape.Vec hidDim])
-                    (ps₂ := [Shape.Mat outDim hidDim, Shape.Vec outDim])
+                    (ps₁ := [.dim hidDim (.dim inDim .scalar), .dim hidDim .scalar])
+                    (ps₂ := [.dim outDim (.dim hidDim .scalar), .dim outDim .scalar])
                     (.cons w1 (.cons b1 (.cons w2 (.cons b2 .nil))))).1
                   =
                 (.cons w1 (.cons b1 .nil) :
-                  TList α [Shape.Mat hidDim inDim, Shape.Vec hidDim]) := by
+                  TList α [.dim hidDim (.dim inDim .scalar), .dim hidDim .scalar]) := by
               rfl
             have hsplit2 :
                 (Interp.splitParams
-                    (ps₁ := [Shape.Mat hidDim inDim, Shape.Vec hidDim])
-                    (ps₂ := [Shape.Mat outDim hidDim, Shape.Vec outDim])
+                    (ps₁ := [.dim hidDim (.dim inDim .scalar), .dim hidDim .scalar])
+                    (ps₂ := [.dim outDim (.dim hidDim .scalar), .dim outDim .scalar])
                     (.cons w1 (.cons b1 (.cons w2 (.cons b2 .nil))))).2
                   =
                 (.cons w2 (.cons b2 .nil) :
-                  TList α [Shape.Mat outDim hidDim, Shape.Vec outDim]) := by
+                  TList α [.dim outDim (.dim hidDim .scalar), .dim outDim .scalar]) := by
               rfl
             have hspec :
                 Interp.spec (mlp (inDim := inDim) (hidDim := hidDim) (outDim := outDim))

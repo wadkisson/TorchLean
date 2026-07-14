@@ -59,7 +59,7 @@ namespace GraphSpec
 namespace DAG
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 namespace PrimOp
@@ -79,19 +79,19 @@ The output is `Vec outDim`. This is the DAG embedding of `Primitive.linear`, so 
 sequential authoring surfaces share the same Spec semantics and TorchLean compiler path.
 -/
 def linear (inDim outDim : Nat) :
-    PrimOp [Shape.Mat outDim inDim, Shape.Vec outDim, Shape.Vec inDim] (Shape.Vec outDim) :=
+    PrimOp [.dim outDim (.dim inDim .scalar), .dim outDim .scalar, .dim inDim .scalar] (.dim outDim .scalar) :=
   (LowerToDAG.Primitive.toDAGPrimOp (Primitive.linear inDim outDim) : PrimOp _ _)
 
 /--
 Flatten a tensor to a one-dimensional vector in DAG form.
 
-Input: `[x : Tensor s]`.
-Output: `Vec (Shape.size s)`.
+Input: `[x : Spec.Tensor s]`.
+Output: `Vec (Spec.Shape.size s)`.
 
 This is the DAG embedding of `Primitive.flatten`, so it has exactly the same row-major view
 semantics as the sequential primitive.
 -/
-def flatten (s : Shape) : PrimOp [s] (.dim (Shape.size s) .scalar) :=
+def flatten (s : Shape) : PrimOp [s] (.dim (Spec.Shape.size s) .scalar) :=
   (LowerToDAG.Primitive.toDAGPrimOp (Primitive.flatten s) : PrimOp _ _)
 
 /-! ## Vision / residual DAG primitives -/
@@ -137,7 +137,7 @@ Inputs are ordered as `[kernel, bias, x]`:
 
 The output shape uses the standard convolution formula:
 
-`outH = (inH + 2 * padding - kH) / stride + 1`
+`outH = Spec.Shape.slidingWindowOutDim inH kH stride padding`
 
 and similarly for `outW`. This is derived from the sequential `Primitive.conv2d`.
 -/
@@ -145,9 +145,8 @@ def conv2d
     (inC outC kH kW stride padding inH inW : Nat)
     {h_inC : inC ≠ 0} {h_kH : kH ≠ 0} {h_kW : kW ≠ 0} {hStride : stride ≠ 0} :
     PrimOp
-      [ Shape.OIHW outC inC kH kW, Shape.Vec outC, Shape.CHW inC inH inW ]
-      (Shape.CHW outC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) / stride +
-        1)) :=
+      [ .dim outC (.dim inC (.dim kH (.dim kW .scalar))), .dim outC .scalar, .dim inC (.dim inH (.dim inW .scalar)) ]
+      (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))) :=
   (LowerToDAG.Primitive.toDAGPrimOp
       (Primitive.conv2d (inC := inC) (outC := outC) (kH := kH) (kW := kW)
         (stride := stride) (padding := padding) (inH := inH) (inW := inW)
@@ -159,15 +158,14 @@ Max pooling in DAG form for channel-first `CHW` tensors.
 Input: `[x : CHW inC inH inW]`.
 Output shape uses the standard pooling formula:
 
-`outH = (inH - kH) / stride + 1`
+`outH = Spec.Shape.slidingWindowOutDim inH kH stride 0`
 
 and similarly for `outW`. This is derived from the sequential `Primitive.maxPool2d`.
 -/
 def maxPool2d
     (kH kW inH inW inC stride : Nat)
     {h_kH : kH ≠ 0} {h_kW : kW ≠ 0} {hStride : stride ≠ 0} :
-    PrimOp [Shape.CHW inC inH inW] (Shape.CHW inC ((inH - kH) / stride + 1) ((inW - kW) / stride +
-      1)) :=
+    PrimOp [.dim inC (.dim inH (.dim inW .scalar))] (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar))) :=
   (LowerToDAG.Primitive.toDAGPrimOp
       (Primitive.maxPool2d (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride :=
         stride)
@@ -188,28 +186,11 @@ def batchnormChw
     (channels height width : Nat)
     (h_c : channels > 0) (h_h : height > 0) (h_w : width > 0) :
     PrimOp
-      [Shape.Vec channels, Shape.Vec channels, Shape.CHW channels height width]
-      (Shape.CHW channels height width) :=
+      [.dim channels .scalar, .dim channels .scalar, .dim channels (.dim height (.dim width .scalar))]
+      (.dim channels (.dim height (.dim width .scalar))) :=
   (LowerToDAG.Primitive.toDAGPrimOp
       (Primitive.batchnormChw (channels := channels) (height := height) (width := width)
         (h_c := h_c) (h_h := h_h) (h_w := h_w)) : PrimOp _ _)
-
-/--
-Global average pooling over spatial dimensions for `CHW` tensors.
-
-Input: `[x : CHW c h w]`.
-Output: `Vec c`, where each channel is averaged over the `h x w` grid.
-
-Reference: Lin, Chen, and Yan (2013), "Network In Network".
--/
-def globalAvgPool2dChw
-    (c h w : Nat)
-    (h_c : c > 0) (h_h : h ≠ 0) (h_w : w ≠ 0) :
-    PrimOp [Shape.CHW c h w] (Shape.Vec c) :=
-  (LowerToDAG.Primitive.toDAGPrimOp
-      (Primitive.globalAvgPool2dChw (c := c) (h := h) (w := w) (h_c := h_c) (h_h := h_h) (h_w :=
-        h_w)) :
-    PrimOp _ _)
 
 end PrimOp
 

@@ -9,144 +9,117 @@ module
 public import NN.API.Public
 
 /-!
-# ViT-Style Model Helpers (API)
+# Vision Transformer
 
-This module provides a compact, reusable ViT-style model constructor used by runnable examples.
-
-This constructor keeps the architecture compact:
-- patch embedding is a strided convolution,
-- tokenization is a reshape + axis swap (`N×C×H×W -> N×(H*W)×C`),
-- the “transformer” is a single encoder block,
-- the head is a simple flatten + linear classifier.
-
-The point is to keep examples readable while still exercising:
-Conv2d + tokenization + attention + FFN on both CPU and CUDA eager backends.
+Patch embedding is an arbitrary-dimensional convolution. The spatial output is flattened into a
+token axis before the Transformer block, so the construction applies equally to one-dimensional
+signals, images, volumes, and higher-dimensional grids.
 -/
 
 @[expose] public section
 
 namespace NN
 namespace API
-
-open Spec Tensor
-
 namespace nn
 namespace models
 
-/--
-Configuration for a small ViT-style classifier.
-
-Shapes:
-- input: `N×C×H×W`
-- output: `N×outDim`
--/
-structure VitConfig where
+/-- Configuration for a Transformer over patches from a `d`-dimensional spatial domain. -/
+structure VitConfig (d : Nat) where
+  /-- Number of independent samples processed together. -/
   batch : Nat
-  inC : Nat
-  inH : Nat
-  inW : Nat
-  patchH : Nat
-  patchW : Nat
-  stride : Nat
-  padding : Nat := 0
-  dModel : Nat
+  /-- Number of channels in each input sample. -/
+  inChannels : Nat
+  /-- Extent of each spatial axis. -/
+  spatial : Vector Nat d
+  /-- Convolution that extracts and embeds patches. -/
+  patch : Conv d
+  /-- Number of classifier outputs per sample. -/
   outDim : Nat
+  /-- Number of attention heads. -/
   numHeads : Nat
+  /-- Width of each attention head. -/
   headDim : Nat
+  /-- Width of the feed-forward sublayer. -/
   ffnHidden : Nat
-deriving Repr
 
-/-- Patch-grid height after strided patch embedding. -/
-def VitConfig.outH (cfg : VitConfig) : Nat :=
-  (cfg.inH + 2 * cfg.padding - cfg.patchH) / cfg.stride + 1
+/-- Spatial extent of the patch embedding. -/
+def VitConfig.patchSpatial {d : Nat} (cfg : VitConfig d) : Vector Nat d :=
+  Spec.convOutSpatial cfg.spatial cfg.patch.kernel cfg.patch.stride cfg.patch.padding
 
-/-- Patch-grid width after strided patch embedding. -/
-def VitConfig.outW (cfg : VitConfig) : Nat :=
-  (cfg.inW + 2 * cfg.padding - cfg.patchW) / cfg.stride + 1
+/-- Number of patch tokens. -/
+def VitConfig.seqLen {d : Nat} (cfg : VitConfig d) : Nat :=
+  Spec.Shape.size (Spec.Shape.ofList cfg.patchSpatial.toList)
 
-/-- Number of patch tokens produced by the patch embedding. -/
-def VitConfig.seqLen (cfg : VitConfig) : Nat :=
-  cfg.outH * cfg.outW
+/-- Number of flattened features passed to the classifier. -/
+def VitConfig.flatDim {d : Nat} (cfg : VitConfig d) : Nat :=
+  Spec.Shape.size (.dim cfg.seqLen (.dim cfg.patch.outChannels .scalar))
 
-/-- Flattened token representation size used before the classifier head. -/
-def VitConfig.flatDim (cfg : VitConfig) : Nat :=
-  -- Keep this in the same “shape-size” form used by `FlattenBatch`, so the API-level
-  -- constructor typechecks without requiring `simp` reductions on concrete numerals.
-  Spec.Shape.size (NN.Tensor.Shape.Mat cfg.seqLen cfg.dModel)
+/-- Input shape `(batch, inChannels, spatial...)`. -/
+def vitInShape {d : Nat} (cfg : VitConfig d) : Spec.Shape :=
+  .dim cfg.batch (Spec.Shape.ofList (cfg.inChannels :: cfg.spatial.toList))
 
-/-- Batched image input shape for the ViT helper. -/
-abbrev vitInShape (cfg : VitConfig) : Shape :=
-  NN.Tensor.Shape.NCHW cfg.batch cfg.inC cfg.inH cfg.inW
+/-- Shape produced by patch embedding. -/
+def vitConvOutShape {d : Nat} (cfg : VitConfig d) : Spec.Shape :=
+  .dim cfg.batch (Spec.Shape.ofList (cfg.patch.outChannels :: cfg.patchSpatial.toList))
 
-/-- Batched classifier-logit output shape for the ViT helper. -/
-abbrev vitOutShape (cfg : VitConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.outDim
+/-- Token shape `(batch, sequence, embedding)`. -/
+def vitTokensShape {d : Nat} (cfg : VitConfig d) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.seqLen (.dim cfg.patch.outChannels .scalar))
 
-/-- Convolutional patch-embedding output before tokenization. -/
-abbrev vitConvOutShape (cfg : VitConfig) : Shape :=
-  NN.Tensor.Shape.NCHW cfg.batch cfg.dModel cfg.outH cfg.outW
+/-- Classifier output shape `(batch, outDim)`. -/
+def vitOutShape {d : Nat} (cfg : VitConfig d) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.outDim .scalar)
 
-/-- Token sequence shape consumed by the Transformer block. -/
-abbrev vitTokensShape (cfg : VitConfig) : Shape :=
-  shape![cfg.batch, cfg.seqLen, cfg.dModel]
-
-/--
-Patch-tokenization adapter: `N×C×H×W -> N×(H*W)×C`.
-
-This is the “low-hanging fruit” to move out of examples: the reshape needs a small size proof.
--/
-def nchwToTokens (cfg : VitConfig) : nn.LayerDef (vitConvOutShape cfg) (vitTokensShape cfg) :=
-  { kind := "NCHWToTokens"
+/-- flatten the patch grid into a sequence and move channels to the final axis. -/
+def spatialToTokens {d : Nat} (cfg : VitConfig d) :
+    LayerDef (vitConvOutShape cfg) (vitTokensShape cfg) :=
+  { kind := "SpatialToTokens"
     paramShapes := []
     initParams := .nil
     paramRequiresGrad := []
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
-        fun x =>
-          (show m (Runtime.Autograd.TorchLean.RefTy (m := m) (α := α) (vitTokensShape cfg)) from do
-            let sMid : Shape := shape![cfg.batch, cfg.dModel, cfg.seqLen]
-            have hReshape : Shape.size (vitConvOutShape cfg) = Shape.size sMid := by
-              simp [vitConvOutShape, NN.Tensor.Shape.NCHW, sMid, _root_.Spec.Shape.size,
-                VitConfig.seqLen, VitConfig.outH, VitConfig.outW]
-            let xMid ←
-              _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
-                (s₁ := vitConvOutShape cfg) (s₂ := sMid) x hReshape
-            _root_.Runtime.Autograd.Torch.swapAdjacentAtDepth (m := m) (α := α) (s := sMid) 1 xMid)
-  }
+        fun x => (show m (_root_.Runtime.Autograd.TorchLean.RefTy
+            (m := m) (α := α) (vitTokensShape cfg)) from do
+          let middle : Spec.Shape :=
+            .dim cfg.batch (.dim cfg.patch.outChannels (.dim cfg.seqLen .scalar))
+          let flattened ←
+            _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
+              (s₁ := vitConvOutShape cfg) (s₂ := middle) x (by
+                have hInner :
+                    Spec.Shape.size
+                        (Spec.Shape.ofList (cfg.patch.outChannels :: cfg.patchSpatial.toList)) =
+                      cfg.patch.outChannels * cfg.seqLen := by
+                  simp [VitConfig.seqLen, Spec.Shape.ofList, Spec.Shape.size]
+                simp [vitConvOutShape, middle, Spec.Shape.size, hInner])
+          _root_.Runtime.Autograd.Torch.swapAdjacentAtDepth
+            (m := m) (α := α) (s := middle) 1 flattened) }
 
-/--
-One-block ViT-style classifier.
-
-This is the constructor used by `torchlean vit`. Keeping it here makes the example a one-liner:
-`def mkModel := nn.models.vit cfg`.
--/
-def vit (cfg : VitConfig)
-    (h_inC : cfg.inC ≠ 0 := by decide)
-    (h_patchH : cfg.patchH ≠ 0 := by decide)
-    (h_patchW : cfg.patchW ≠ 0 := by decide)
-    (h_seqLen : cfg.seqLen ≠ 0 := by decide)
-    (h_dModel : cfg.dModel ≠ 0 := by decide) :
-    nn.M (nn.Sequential (vitInShape cfg) (vitOutShape cfg)) :=
-  letI : NeZero cfg.inC := ⟨h_inC⟩
-  letI : NeZero cfg.patchH := ⟨h_patchH⟩
-  letI : NeZero cfg.patchW := ⟨h_patchW⟩
-  letI : NeZero cfg.seqLen := ⟨h_seqLen⟩
-  letI : NeZero cfg.dModel := ⟨h_dModel⟩
+/-- Build patch embedding, one Transformer encoder block, and a linear classifier. -/
+def vit {d : Nat} (cfg : VitConfig d)
+    (hInChannels : cfg.inChannels ≠ 0 := by decide)
+    (hSeqLen : cfg.seqLen ≠ 0 := by decide)
+    (hModel : cfg.patch.outChannels ≠ 0 := by decide) :
+    M (Sequential (vitInShape cfg) (vitOutShape cfg)) :=
+  letI : NeZero cfg.inChannels := ⟨hInChannels⟩
+  letI : NeZero cfg.seqLen := ⟨hSeqLen⟩
+  letI : NeZero cfg.patch.outChannels := ⟨hModel⟩
+  let patchEmbedding :=
+    conv (leading := .dim cfg.batch .scalar) cfg.spatial cfg.patch
   nn.Sequential![
-    nn.conv { outC := cfg.dModel, kH := cfg.patchH, kW := cfg.patchW, stride := cfg.stride, padding := cfg.padding },
-    nn.lift (nn.of (nchwToTokens cfg)),
-    nn.transformerEncoderBlock
+    patchEmbedding,
+    lift (of (spatialToTokens cfg)),
+    transformerEncoderBlock
       { numHeads := cfg.numHeads
         headDim := cfg.headDim
         ffnHidden := cfg.ffnHidden
         activation := .gelu
         dropout? := none },
-    FlattenBatch,
-    Linear cfg.flatDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    flattenBatch,
+    linear cfg.flatDim cfg.outDim (pfx := .dim cfg.batch .scalar)
   ]
 
 end models
 end nn
-
 end API
 end NN

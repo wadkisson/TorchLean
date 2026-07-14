@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.API.Public
+public import NN.Spec.Core.TensorReductionShape.ConcatSlice
 
 /-!
 # Diffusion Model Helpers (API)
@@ -29,22 +30,38 @@ namespace nn
 namespace models
 
 /-- Configuration for a minimal epsilon-predictor conv net. -/
-structure EpsConvNetConfig where
+structure EpsConvNetConfig (d : Nat) where
   batch : Nat
-  /-- Data channels (e.g. `3` for RGB). The model input has one extra channel for time. -/
-  dataC : Nat
-  h : Nat
-  w : Nat
+  dataChannels : Nat
+  spatial : Vector Nat d
+  spatialNonzero : ∀ i : Fin d, spatial.get i ≠ 0
   /-- Hidden channel width. -/
-  hiddenC : Nat := 32
+  hiddenChannels : Nat := 32
 
 /-- Epsilon-predictor input shape, with one extra channel carrying the diffusion time. -/
-abbrev epsConvNetInShape (cfg : EpsConvNetConfig) : Shape :=
-  NN.Tensor.Shape.NCHW cfg.batch (cfg.dataC + 1) cfg.h cfg.w
+def epsConvNetInShape {d : Nat} (cfg : EpsConvNetConfig d) : Spec.Shape :=
+  .dim cfg.batch (Spec.Shape.ofList ((cfg.dataChannels + 1) :: cfg.spatial.toList))
 
 /-- Epsilon-predictor output shape matching the denoised data channels. -/
-abbrev epsConvNetOutShape (cfg : EpsConvNetConfig) : Shape :=
-  NN.Tensor.Shape.NCHW cfg.batch cfg.dataC cfg.h cfg.w
+def epsConvNetOutShape {d : Nat} (cfg : EpsConvNetConfig d) : Spec.Shape :=
+  .dim cfg.batch (Spec.Shape.ofList (cfg.dataChannels :: cfg.spatial.toList))
+
+/-- Seeded shape-preserving convolution over an arbitrary spatial rank. -/
+def EpsConvNetConfig.sameConv {d : Nat} (cfg : EpsConvNetConfig d)
+    (inChannels outChannels : Nat) [NeZero inChannels] :
+    nn.M (nn.Sequential
+      (.dim cfg.batch (Spec.Shape.ofList (inChannels :: cfg.spatial.toList)))
+      (.dim cfg.batch (Spec.Shape.ofList (outChannels :: cfg.spatial.toList)))) :=
+  let layer := nn.conv (leading := .dim cfg.batch .scalar)
+      (inChannels := inChannels) cfg.spatial
+      { outChannels := outChannels
+        kernel := Vector.replicate d 1
+        stride := Vector.replicate d 1
+        padding := Vector.replicate d 0
+        kernelNonzero := by intro i; simp [Vector.get]
+        strideNonzero := by intro i; simp [Vector.get] }
+  by
+    simpa [Spec.Shape.concat, Spec.convOutSpatial_unit cfg.spatial cfg.spatialNonzero] using layer
 
 /--
 Build a minimal epsilon-predictor conv net:
@@ -53,44 +70,24 @@ Build a minimal epsilon-predictor conv net:
 This stays compact enough for the eager CUDA example while giving the CIFAR trainer more denoising
 capacity than a bare two-layer network.
 -/
-def epsConvNet (cfg : EpsConvNetConfig)
+def epsConvNet {d : Nat} (cfg : EpsConvNetConfig d)
     (h_batch : cfg.batch ≠ 0 := by decide)
-    (h_dataC : cfg.dataC ≠ 0 := by decide)
-    (h_inC : (cfg.dataC + 1) ≠ 0 := by decide)
-    (h_h : cfg.h ≠ 0 := by decide)
-    (h_w : cfg.w ≠ 0 := by decide)
-    (h_hiddenC : cfg.hiddenC ≠ 0 := by decide) :
+    (h_dataC : cfg.dataChannels ≠ 0 := by decide)
+    (h_inC : (cfg.dataChannels + 1) ≠ 0 := by decide)
+    (h_hiddenC : cfg.hiddenChannels ≠ 0 := by decide) :
     nn.M (nn.Sequential (epsConvNetInShape cfg) (epsConvNetOutShape cfg)) :=
   letI : NeZero cfg.batch := ⟨h_batch⟩
-  letI : NeZero cfg.dataC := ⟨h_dataC⟩
-  letI : NeZero (cfg.dataC + 1) := ⟨h_inC⟩
-  letI : NeZero cfg.h := ⟨h_h⟩
-  letI : NeZero cfg.w := ⟨h_w⟩
-  letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
+  letI : NeZero cfg.dataChannels := ⟨h_dataC⟩
+  letI : NeZero (cfg.dataChannels + 1) := ⟨h_inC⟩
+  letI : NeZero cfg.hiddenChannels := ⟨h_hiddenC⟩
   nn.Sequential![
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1)),
-    ReLU,
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1)),
-    ReLU,
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1)),
-    ReLU,
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1))
+    cfg.sameConv (cfg.dataChannels + 1) cfg.hiddenChannels,
+    relu,
+    cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels,
+    relu,
+    cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels,
+    relu,
+    cfg.sameConv cfg.hiddenChannels cfg.dataChannels
   ]
 
 /--
@@ -106,66 +103,38 @@ and multi-scale skip concatenation. It is still a useful compact architecture be
 residual paths make the denoising problem much easier than a plain conv chain while staying within
 the eager CUDA memory envelope used by examples.
 -/
-def epsResidualConvNet (cfg : EpsConvNetConfig)
+def epsResidualConvNet {d : Nat} (cfg : EpsConvNetConfig d)
     (h_batch : cfg.batch ≠ 0 := by decide)
-    (h_dataC : cfg.dataC ≠ 0 := by decide)
-    (h_inC : (cfg.dataC + 1) ≠ 0 := by decide)
-    (h_h : cfg.h ≠ 0 := by decide)
-    (h_w : cfg.w ≠ 0 := by decide)
-    (h_hiddenC : cfg.hiddenC ≠ 0 := by decide) :
+    (h_dataC : cfg.dataChannels ≠ 0 := by decide)
+    (h_inC : (cfg.dataChannels + 1) ≠ 0 := by decide)
+    (h_hiddenC : cfg.hiddenChannels ≠ 0 := by decide) :
     nn.M (nn.Sequential (epsConvNetInShape cfg) (epsConvNetOutShape cfg)) :=
   letI : NeZero cfg.batch := ⟨h_batch⟩
-  letI : NeZero cfg.dataC := ⟨h_dataC⟩
-  letI : NeZero (cfg.dataC + 1) := ⟨h_inC⟩
-  letI : NeZero cfg.h := ⟨h_h⟩
-  letI : NeZero cfg.w := ⟨h_w⟩
-  letI : NeZero cfg.hiddenC := ⟨h_hiddenC⟩
+  letI : NeZero cfg.dataChannels := ⟨h_dataC⟩
+  letI : NeZero (cfg.dataChannels + 1) := ⟨h_inC⟩
+  letI : NeZero cfg.hiddenChannels := ⟨h_hiddenC⟩
   nn.Sequential![
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.dataC + 1) (outC := cfg.hiddenC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1)),
-    ReLU,
+    cfg.sameConv (cfg.dataChannels + 1) cfg.hiddenChannels,
+    relu,
     (do
       let block ←
         nn.Sequential![
-          withSeedPair (fun seedK seedB =>
-            _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-              (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
-              (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
-              (kInit := .uniform (-0.1) 0.1)),
-          ReLU,
-          withSeedPair (fun seedK seedB =>
-            _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-              (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
-              (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
-              (kInit := .uniform (-0.1) 0.1))
+          cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels,
+          relu,
+          cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels
         ]
-      pure (nn.pure.blocks.residual block)),
-    ReLU,
+      pure (nn.blocks.residual block)),
+    relu,
     (do
       let block ←
         nn.Sequential![
-          withSeedPair (fun seedK seedB =>
-            _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-              (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
-              (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
-              (kInit := .uniform (-0.1) 0.1)),
-          ReLU,
-          withSeedPair (fun seedK seedB =>
-            _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-              (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.hiddenC)
-              (h := cfg.h) (w := cfg.w) (seedK := seedK) (seedB := seedB)
-              (kInit := .uniform (-0.1) 0.1))
+          cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels,
+          relu,
+          cfg.sameConv cfg.hiddenChannels cfg.hiddenChannels
         ]
-      pure (nn.pure.blocks.residual block)),
-    ReLU,
-    withSeedPair (fun seedK seedB =>
-      _root_.NN.API.nn.pure.blocks.conv3x3SameImages
-        (n := cfg.batch) (inC := cfg.hiddenC) (outC := cfg.dataC) (h := cfg.h) (w := cfg.w)
-        (seedK := seedK) (seedB := seedB)
-        (kInit := .uniform (-0.1) 0.1))
+      pure (nn.blocks.residual block)),
+    relu,
+    cfg.sameConv cfg.hiddenChannels cfg.dataChannels
   ]
 
 end models
@@ -173,25 +142,21 @@ end nn
 
 namespace diffusion
 
-/-- Map image tensors from `[0,1]` into the standard diffusion training range `[-1,1]`. -/
-def toMinusOneOne {batch c h w : Nat}
-    (x01 : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) :
-    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+/-- Map a tensor from `[0,1]` into the standard diffusion training range `[-1,1]`. -/
+def toMinusOneOne {s : Spec.Shape} (x01 : Spec.Tensor Float s) : Spec.Tensor Float s :=
   Spec.Tensor.mapSpec (fun x => 2.0 * x - 1.0) x01
 
 /--
-Deterministic Gaussian epsilon tensor for an NCHW diffusion shape.
+Deterministic Gaussian epsilon tensor for an arbitrary diffusion shape.
 
 The `(seed, step)` pair is turned into the runtime RNG key, so examples and artifact generation can
 reproduce the same noising path without ambient randomness.
 -/
-def randomEps {batch c h w : Nat} (seed step : Nat) :
-    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+def randomEps {s : Spec.Shape} (seed step : Nat) : Spec.Tensor Float s :=
   let key : UInt64 := _root_.Runtime.Autograd.TorchLean.Random.keyOf (seed := seed) (counter := step)
-  _root_.Runtime.Autograd.TorchLean.Random.normal
-    (α := Float) key (s := NN.Tensor.Shape.NCHW batch c h w)
+  _root_.Runtime.Autograd.TorchLean.Random.normal (α := Float) key (s := s)
 
-/-- Linear beta schedule value at timestep `t`. -/
+/-- linear beta schedule value at timestep `t`. -/
 def linearBeta (T : Nat) (betaStart betaEnd : Float) (t : Nat) : Float :=
   if T <= 1 then
     betaEnd
@@ -217,21 +182,24 @@ def alphaBarsLinear (T : Nat) (betaStart betaEnd : Float) : Array Float :=
     return out
 
 /--
-Append a constant time channel to an NCHW image batch.
+Append a constant time channel after arbitrary leading axes.
 
-The epsilon predictor consumes `(data channels + 1)` channels: noisy image channels plus a scalar
-timestep broadcast over spatial positions.
+The input layout is `(leading..., channels, spatial...)`.  The result preserves every leading and
+spatial axis and changes only the channel count from `c` to `c + 1`.
 -/
-def appendTimeChannel {batch c h w : Nat}
-    (x : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (tNorm : Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch (c + 1) h w) :=
-  Tensor.dim (fun bi =>
-    Tensor.dim (fun ci =>
-      if hci : ci.1 < c then
-        let ci' : Fin c := ⟨ci.1, hci⟩
-        x[bi][ci']
-      else
-        Spec.fill tNorm (Spec.Shape.dim h (Spec.Shape.dim w Spec.Shape.scalar))))
+def appendTimeChannel (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
+    (x : Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (tNorm : Float) :
+    Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList))) :=
+  match leading with
+  | .scalar =>
+      Spec.Tensor.concatLeadingAxisSpec x <|
+        Tensor.dim fun _ => Spec.fill tNorm (Spec.Shape.ofList spatial.toList)
+  | .dim _ rest =>
+      match x with
+      | .dim values =>
+          Tensor.dim fun i => appendTimeChannel rest spatial (values i) tNorm
 
 /--
 Build an epsilon-prediction training sample from explicit noise.
@@ -241,22 +209,24 @@ makes the transformation reusable:
 
 `x_t = sqrt(ᾱ_t) * x₀ + sqrt(1 - ᾱ_t) * eps`, target `eps`.
 -/
-def noisedSampleFromEps {batch c h w : Nat}
+def noisedSampleFromEps (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
     (alphaBars : Array Float) (T : Nat)
-    (x0 eps : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (step : Nat) :
-    SupervisedSample Float
-      (NN.Tensor.Shape.NCHW batch (c + 1) h w)
-      (NN.Tensor.Shape.NCHW batch c h w) :=
+    (x0 eps : Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (step : Nat) :
+    TorchLean.Sample.Supervised Float
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList))) :=
   let tIdx : Nat := if T = 0 then 0 else step % T
   let ab : Float := alphaBars.getD tIdx 1.0
   let sqrtAb : Float := MathFunctions.sqrt (Max.max ab 0.0)
   let sqrtOneMinusAb : Float := MathFunctions.sqrt (Max.max (1.0 - ab) 0.0)
-  let x_t : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+  let x_t : Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList))) :=
     Spec.Tensor.addSpec
       (Spec.Tensor.scaleSpec x0 sqrtAb)
       (Spec.Tensor.scaleSpec eps sqrtOneMinusAb)
   let tNorm : Float := if T <= 1 then 0.0 else Float.ofNat tIdx / Float.ofNat (T - 1)
-  Sample.mk (appendTimeChannel x_t tNorm) eps
+  TorchLean.Sample.mk (appendTimeChannel leading spatial x_t tNorm) eps
 
 /--
 Build a deterministic epsilon-prediction training sample.
@@ -264,14 +234,16 @@ Build a deterministic epsilon-prediction training sample.
 This is the common DDPM training step used by examples: draw reproducible Gaussian noise from
 `(seed, step)`, corrupt `x₀`, and use that same noise as the target.
 -/
-def noisedSample {batch c h w : Nat}
+def noisedSample (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
     (alphaBars : Array Float) (T : Nat)
-    (x0 : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (seed step : Nat) :
-    SupervisedSample Float
-      (NN.Tensor.Shape.NCHW batch (c + 1) h w)
-      (NN.Tensor.Shape.NCHW batch c h w) :=
-  noisedSampleFromEps alphaBars T x0
-    (randomEps (batch := batch) (c := c) (h := h) (w := w) seed step) (seed + step)
+    (x0 : Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (seed step : Nat) :
+    TorchLean.Sample.Supervised Float
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList))) :=
+  noisedSampleFromEps leading spatial alphaBars T x0
+    (randomEps (s := leading.concat (Spec.Shape.ofList (c :: spatial.toList))) seed step)
+    (seed + step)
 
 /--
 One deterministic DDIM reverse update (`η = 0`).
@@ -284,19 +256,18 @@ We clamp the intermediate `x₀` estimate to the training image range `[-1,1]`. 
 drive one color channel far outside the data range and the final PPM exporter merely clips the
 damage into saturated color blobs.
 -/
-def ddimPrev {batch c h w : Nat}
+def ddimPrev {s : Spec.Shape}
     (abPrev ab : Float)
-    (x_t epsHat : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) :
-    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+    (x_t epsHat : Spec.Tensor Float s) : Spec.Tensor Float s :=
   let sqrtAb : Float := MathFunctions.sqrt (Max.max ab 0.0)
   let sqrtAbPrev : Float := MathFunctions.sqrt (Max.max abPrev 0.0)
   let sqrtOneMinusAb : Float := MathFunctions.sqrt (Max.max (1.0 - ab) 0.0)
   let sqrtOneMinusAbPrev : Float := MathFunctions.sqrt (Max.max (1.0 - abPrev) 0.0)
-  let x0Hat : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+  let x0Hat : Spec.Tensor Float s :=
     Spec.Tensor.scaleSpec
       (Spec.Tensor.subSpec x_t (Spec.Tensor.scaleSpec epsHat sqrtOneMinusAb))
       (1.0 / (if sqrtAb > 1e-12 then sqrtAb else 1e-12))
-  let x0Clipped : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+  let x0Clipped : Spec.Tensor Float s :=
     Spec.Tensor.clampSpec x0Hat (-1.0) 1.0
   Spec.Tensor.addSpec
     (Spec.Tensor.scaleSpec x0Clipped sqrtAbPrev)
@@ -307,8 +278,8 @@ Write the first image in an RGB NCHW batch as an ASCII PPM.
 
 This dependency-free writer emits portable image artifacts for examples and rendered diagnostics.
 -/
-def writeFirstRgbNchwPpm {batch c h w : Nat}
-    (path : System.FilePath) (x : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) : IO Unit := do
+def writeFirstRgbPpm {batch c h w : Nat}
+    (path : System.FilePath) (x : Spec.Tensor Float (.dim batch (.dim c (.dim h (.dim w .scalar))))) : IO Unit := do
   if c < 3 then
     throw <| IO.userError "diffusion PPM export requires at least 3 channels"
   if let some parent := path.parent then
@@ -321,7 +292,7 @@ def writeFirstRgbNchwPpm {batch c h w : Nat}
   let hOut ← IO.FS.Handle.mk path IO.FS.Mode.write
   hOut.putStr s!"P3\n{w} {h}\n255\n"
   let getPx (ci hi wi : Nat) : Float :=
-    (Spec.getSpec (α := Float) (s := NN.Tensor.Shape.NCHW batch c h w) x [0, ci, hi, wi]).getD 0.0
+    (Spec.getSpec (α := Float) (s := .dim batch (.dim c (.dim h (.dim w .scalar)))) x [0, ci, hi, wi]).getD 0.0
   for hi in [0:h] do
     for wi in [0:w] do
       hOut.putStr s!"{toByte (getPx 0 hi wi)} {toByte (getPx 1 hi wi)} {toByte (getPx 2 hi wi)}\n"

@@ -42,14 +42,14 @@ Flatten each sample in a batch and keep the first `takeDim` entries.
 The output is a typed matrix `batch × takeDim`.
 -/
 def flattenBatchPrefix {α : Type} [Inhabited α]
-    (batch takeDim : Nat) {source : Shape}
-    (hTake : takeDim ≤ Shape.size source)
+    (batch takeDim : Nat) {source : Spec.Shape}
+    (hTake : takeDim ≤ Spec.Shape.size source)
     (x : Spec.Tensor α (.dim batch source)) :
-    Spec.Tensor α (NN.Tensor.Shape.Mat batch takeDim) :=
+    Spec.Tensor α (.dim batch (.dim takeDim .scalar)) :=
   Spec.Tensor.dim (fun bi =>
     let flat := Spec.Tensor.flattenSpec (Spec.getAtSpec x bi)
     Spec.Tensor.dim (fun j =>
-      let h : j.val < Shape.size source := Nat.lt_of_lt_of_le j.isLt hTake
+      let h : j.val < Spec.Shape.size source := Nat.lt_of_lt_of_le j.isLt hTake
       Spec.Tensor.scalar (Spec.Tensor.toScalar (Spec.get flat ⟨j.val, h⟩))))
 
 end tensor

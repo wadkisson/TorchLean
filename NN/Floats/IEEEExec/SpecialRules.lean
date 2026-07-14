@@ -429,24 +429,6 @@ theorem chooseNaN3_of_isSNaN_z (x y z : IEEE32Exec)
     chooseNaN3 x y z = some (quietNaN z) := by
   simp [chooseNaN3, hx, hy, hz]
 
--- Alternative names for the `chooseNaN3` signaling-NaN rules (left/mid/right wording).
-/-- Alias for `chooseNaN3_of_isSNaN_x` (left operand is a signaling NaN). -/
-theorem chooseNaN3_of_isSNaN_left (x y z : IEEE32Exec) (hx : isSNaN x = true) :
-    chooseNaN3 x y z = some (quietNaN x) :=
-  chooseNaN3_of_isSNaN_x x y z hx
-
-/-- Alias for `chooseNaN3_of_isSNaN_y` (middle operand is a signaling NaN). -/
-theorem chooseNaN3_of_isSNaN_mid (x y z : IEEE32Exec)
-    (hx : isSNaN x = false) (hy : isSNaN y = true) :
-    chooseNaN3 x y z = some (quietNaN y) :=
-  chooseNaN3_of_isSNaN_y x y z hx hy
-
-/-- Alias for `chooseNaN3_of_isSNaN_z` (right operand is a signaling NaN). -/
-theorem chooseNaN3_of_isSNaN_right (x y z : IEEE32Exec)
-    (hx : isSNaN x = false) (hy : isSNaN y = false) (hz : isSNaN z = true) :
-    chooseNaN3 x y z = some (quietNaN z) :=
-  chooseNaN3_of_isSNaN_z x y z hx hy hz
-
 /-!
 ## NaN propagation for ops (short-circuit lemmas)
 

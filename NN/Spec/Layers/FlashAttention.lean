@@ -124,7 +124,7 @@ def scaledAttentionScores
     {nQ nK dModel : Nat} {h1 : nQ ≠ 0} {h2 : nK ≠ 0}
     (ctx : AttentionContext α nQ nK dModel h1 h2) :
     Tensor α (.dim nQ (.dim nK .scalar)) :=
-  let scale := MathFunctions.sqrt (dModel : α)
+  let scale := attentionScaleDenom (α := α) dModel
   scaleSpec (attentionScores (α := α) ctx) (1 / scale)
 
 /-- The row-wise softmax weights produced by the online softmax summary.

@@ -27,8 +27,8 @@ This file is a compact implementation that sits on top of:
 - TorchLean’s typed tensor layer (`Spec.Tensor`).
 
 What is implemented:
-- Per-neuron ReLU linear relaxations derived from pre-activation bounds (`ReLU.relax_scalar*`).
-- A basic IBP forward pass for common activations (ReLU/sigmoid/tanh/etc.).
+- Per-neuron ReLU linear relaxations derived from pre-activation bounds (`ReLU.relaxScalar*`).
+- IBP forward rules for ReLU, sigmoid, tanh, and Leaky ReLU.
 - A two-layer ReLU MLP wrapper `TwoLayerMLP` with a simple end-to-end bounding API.
 
 Scope boundaries in this MLP-focused module:
@@ -48,8 +48,8 @@ References:
   NeurIPS 2020, arXiv:2002.12920.
 
 PyTorch analogues:
-- `torch.nn.Linear`: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
-- `torch.nn.ReLU`: https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html
+- `torch.nn.linear`: https://pytorch.org/docs/stable/generated/torch.nn.linear.html
+- `torch.nn.relu`: https://pytorch.org/docs/stable/generated/torch.nn.relu.html
 -/
 
 @[expose] public section
@@ -215,8 +215,8 @@ namespace IBP
 /-!
 Interval Bound Propagation (IBP) utilities for vector-shaped activations.
 
-These are correctness-first helpers: they are intended to be sound for any `Context α` backend that
-implements the scalar operations used by `Activation.Math.*_spec`.
+These are executable transfer functions. Their soundness theorems instantiate the scalar type with
+`ℝ` and use the corresponding monotonicity or activation-specific proof.
 
 The linear-layer bound helper `IBP.linear` lives in `NN.MLTheory.CROWN.Core`.
 -/
@@ -266,14 +266,6 @@ abbrev tanh {n : Nat} (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :
 /-- Interval bounds for leaky ReLU, including the zero kink on crossing intervals. -/
 def leakyRelu {n : Nat} (αₗ : α) (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
   Operators.Activations.ibpLeakyRelu n αₗ xB
-
-/--
-Interval bounds for ELU.
-
-Sound for `alpha > 0`.
--/
-def elu {n : Nat} (alpha : α) (xB : Box α (.dim n .scalar)) : Box α (.dim n .scalar) :=
-  mapMinmax (fun x => Activation.Math.eluSpec x alpha) xB
 
 end IBP
 
@@ -398,8 +390,8 @@ def boundAffineCrown {inDim hidDim outDim : Nat}
 /--
 End-to-end bound API exposed by this file.
 
-This API returns the IBP bound (sound for all backends); `bound_affine_crown` is kept as a
-reference implementation for the 2-layer ReLU case.
+This API returns the IBP bound (sound for all backends); `boundAffineCrown` is the direct
+two-layer ReLU affine implementation.
 -/
 def boundAffine {inDim hidDim outDim : Nat}
   (net : TwoLayerMLP α inDim hidDim outDim)

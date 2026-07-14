@@ -23,7 +23,6 @@ public import NN.Spec.Models.Mlp
 public import NN.Spec.Models.NaiveBayes
 public import NN.Spec.Models.Pca
 public import NN.Spec.Models.RandomForest
-public import NN.Spec.Models.Resnet
 public import NN.Spec.Models.S4
 public import NN.Spec.Models.Seq2seq
 public import NN.Spec.Models.Svm
@@ -44,4 +43,3 @@ these semantics rather than replacing them.
 -/
 
 @[expose] public section
-

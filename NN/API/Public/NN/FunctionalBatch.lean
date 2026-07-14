@@ -14,7 +14,7 @@ public import NN.API.Public.NN.Core
 namespace NN
 namespace API
 namespace nn
-namespace pure
+namespace Internal
 
 /-!
 `nn.functional` mirrors `torch.nn.functional`: pure, stateless building blocks.
@@ -31,7 +31,7 @@ PyTorch references:
 
 export TorchLean.F
   (square checkpoint
-   detach stopGrad
+   detach
    addB mulB
    embedding embeddingRowsNat embeddingBatchSeqNat mean
    dropoutSeeded)
@@ -45,14 +45,58 @@ export _root_.Runtime.Autograd.TorchLean.F
 end functional
 
 /-!
-## Batch Lifting
+## Leading-Dimension Mapping
 
-`batchPointwise n model` wraps a *single-example* model `σ → τ` into a batched model
-`(dim n σ) → (dim n τ)` by running the underlying model once per batch element.
+`mapLeading leading model` applies a model independently across every index in an arbitrary leading
+shape. A conventional batch is the special case `leading = .dim batch .scalar`; multiple leading
+axes work without introducing another tensor or model type.
 
 Correctness-first batch lift for exposing PyTorch-like `N×...` APIs even when a primitive only
 exists for the unbatched shape.
 -/
+
+namespace Implementation
+
+/--
+Expose a runtime layer whose outer axis is a flat batch as a layer over an arbitrary leading
+shape. The adapter changes only the view of the input and output; parameters, buffer updates, and
+the underlying forward program are preserved.
+-/
+def adaptFlatBatch (leading : Spec.Shape) {σ τ : Spec.Shape}
+    (l : LayerDef (.dim (Spec.Shape.size leading) σ) (.dim (Spec.Shape.size leading) τ)) :
+    LayerDef (leading.concat σ) (leading.concat τ) :=
+  { kind := l.kind
+    paramShapes := l.paramShapes
+    initParams := l.initParams
+    paramRequiresGrad := l.paramRequiresGrad
+    updateBuffers := none
+    forward := fun mode {α} _ _ =>
+      fun {m} _ _ =>
+        _root_.Runtime.Autograd.Torch.CurriedRef.curry
+          (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
+          (ss := l.paramShapes ++ [leading.concat σ])
+          (β := m (TorchLean.RefTy (m := m) (α := α) (leading.concat τ)))
+          (fun args => do
+            let (ps, x) :=
+              _root_.Runtime.Autograd.Torch.RefList.splitLast
+                (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
+                (ss := l.paramShapes) (τ := leading.concat σ) args
+            let xBatch ←
+              TorchLean.reshape (m := m) (α := α)
+                (s₁ := leading.concat σ) (s₂ := .dim (Spec.Shape.size leading) σ)
+                x (by simp [Spec.Shape.size_concat, Spec.Shape.size])
+            let yBatch ←
+              _root_.Runtime.Autograd.Torch.CurriedRef.uncurry
+                (Ref := fun sh => TorchLean.RefTy (m := m) (α := α) sh)
+                (ss := l.paramShapes ++ [.dim (Spec.Shape.size leading) σ])
+                (β := m (TorchLean.RefTy (m := m) (α := α)
+                  (.dim (Spec.Shape.size leading) τ)))
+                (l.forward mode (α := α) (m := m))
+                (_root_.Runtime.Autograd.Torch.RefList.append ps (.cons xBatch .nil))
+            TorchLean.reshape (m := m) (α := α)
+              (s₁ := .dim (Spec.Shape.size leading) τ) (s₂ := leading.concat τ)
+              yBatch (by simp [Spec.Shape.size_concat, Spec.Shape.size]))
+  }
 
 /--
 Lift a single-example `LayerDef σ τ` to operate on a leading batch axis.
@@ -60,7 +104,7 @@ Lift a single-example `LayerDef σ τ` to operate on a leading batch axis.
 This is a correctness-first batch lift: it runs the underlying layer independently on each batch
 element. Prefer a primitive batched layer when one exists.
 -/
-def batchLayerPointwise (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
+def mapLayerOverAxis (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
     LayerDef (.dim n σ) (.dim n τ) :=
   let inSize : Nat := Spec.Shape.size σ
   let outSize : Nat := Spec.Shape.size τ
@@ -113,9 +157,20 @@ def batchLayerPointwise (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
   }
 
 /-- Lift a sequential model to act pointwise on a leading batch axis. -/
-def batchPointwise (n : Nat) {σ τ : Spec.Shape} : Sequential σ τ → Sequential (.dim n σ) (.dim n τ)
+def mapModelOverAxis (n : Nat) {σ τ : Spec.Shape} :
+    Sequential σ τ → Sequential (.dim n σ) (.dim n τ)
   | .id s => .id (.dim n s)
-  | .cons l rest => .cons (batchLayerPointwise n l) (batchPointwise n rest)
+  | .cons l rest => .cons (mapLayerOverAxis n l) (mapModelOverAxis n rest)
+
+end Implementation
+
+/-- Apply a model pointwise over an arbitrary collection of leading dimensions. -/
+def mapLeading (leading : Spec.Shape) {σ τ : Spec.Shape} :
+    Sequential σ τ → Sequential (leading.concat σ) (leading.concat τ)
+  | model =>
+      match leading with
+      | .scalar => model
+      | .dim n rest => Implementation.mapModelOverAxis n (mapLeading rest model)
 
 /-!
 Note: some low-level TorchLean layers (notably conv/pool/norm) have Nat-side well-formedness

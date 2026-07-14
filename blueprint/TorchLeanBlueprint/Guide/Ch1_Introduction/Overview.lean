@@ -30,12 +30,14 @@ problem: preserving meaning when a model moves from source code to a graph, from
 runtime, and from a runtime artifact to a mathematical claim. Producing an export is easy; showing
 that it contains the intended model, parameters, scalar convention, and property is the harder part.
 
-Most files begin with [`import NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean).
-Files that deliberately work inside one subsystem can use narrower entry points such as
-[NN.Entrypoint.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/API.lean),
-[NN.Entrypoint.GraphSpec](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/GraphSpec.lean),
-[NN.Entrypoint.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/IR.lean), and
-[NN.Entrypoint.Verification](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/Verification.lean).
+Model and training code begins with
+[NN.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API.lean). Files that combine
+specifications, proofs, verification, and runtime internals can use the complete
+[`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean) umbrella. Subsystem development can
+start from narrower entry points such as
+[NN.GraphSpec](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec.lean),
+[NN.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR.lean), and
+[NN.Verification](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean).
 
 # What TorchLean Covers
 
@@ -127,7 +129,7 @@ fragment.
 # Three Views Of One Model
 
 At the top level, TorchLean presents a familiar ML API over a shared internal model.
-User code starts from `import NN` and `open TorchLean`, then works with familiar concepts:
+Application code starts from `import NN.API` and `open TorchLean`, then works with familiar concepts:
 layers, datasets, optimizers, losses, and training loops.
 
 Under the hood, the same model appears in three representations:

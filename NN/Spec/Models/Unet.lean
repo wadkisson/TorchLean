@@ -105,6 +105,7 @@ structure UNet2Config.WF (cfg : UNet2Config) : Prop where
   poolStride_ne0 : cfg.poolStride ≠ 0
   convK_ne0 : cfg.convKernel ≠ 0
   upK_ne0 : cfg.upKernel ≠ 0
+  upStride_ne0 : cfg.upStride ≠ 0
   headK_ne0 : cfg.headKernel ≠ 0
   baseC_pos : cfg.baseC > 0
 
@@ -118,24 +119,25 @@ theorem unet2DefaultConfig_wf : unet2DefaultConfig.WF := by
       poolStride_ne0 := by decide
       convK_ne0 := by decide
       upK_ne0 := by decide
+      upStride_ne0 := by decide
       headK_ne0 := by decide
       baseC_pos := by decide }
 
 /-- Output height after `MaxPool2d(kernel=2, stride=2)` (no padding). -/
 abbrev UNetDownH (cfg : UNet2Config) (inH : Nat) : Nat :=
-  (inH - cfg.poolKernel) / cfg.poolStride + 1
+  Shape.slidingWindowOutDim inH cfg.poolKernel cfg.poolStride 0
 
 /-- Output width after `MaxPool2d(kernel=2, stride=2)` (no padding). -/
 abbrev UNetDownW (cfg : UNet2Config) (inW : Nat) : Nat :=
-  (inW - cfg.poolKernel) / cfg.poolStride + 1
+  Shape.slidingWindowOutDim inW cfg.poolKernel cfg.poolStride 0
 
 /-- Output height after `MaxPool2d(2,2)` then `ConvTranspose2d(2,2)` (with `padding=0`). -/
 abbrev UNetUpH (cfg : UNet2Config) (inH : Nat) : Nat :=
-  ((UNetDownH cfg inH - 1) * cfg.upStride - 2 * cfg.upPadding + cfg.upKernel)
+  convTransposeOutDim (UNetDownH cfg inH) cfg.upKernel cfg.upStride cfg.upPadding
 
 /-- Output width after `MaxPool2d(2,2)` then `ConvTranspose2d(2,2)` (with `padding=0`). -/
 abbrev UNetUpW (cfg : UNet2Config) (inW : Nat) : Nat :=
-  ((UNetDownW cfg inW - 1) * cfg.upStride - 2 * cfg.upPadding + cfg.upKernel)
+  convTransposeOutDim (UNetDownW cfg inW) cfg.upKernel cfg.upStride cfg.upPadding
 
 /--
 2-level U-Net parameter record (spec).
@@ -280,17 +282,17 @@ def UNet2Spec.forward
   (m : UNet2Spec (α := α) cfg inC outC inH inW h_inC hCfg)
   (x : MultiChannelImage inC inH inW α)
   (h_convH :
-    ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = inH)
+    (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding) = inH)
   (h_convW :
-    ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = inW)
+    (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) = inW)
   (h_convH_down :
-    ((UNetDownH cfg inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = UNetDownH cfg inH)
+    (Shape.slidingWindowOutDim (UNetDownH cfg inH) cfg.convKernel cfg.convStride cfg.convPadding) = UNetDownH cfg inH)
   (h_convW_down :
-    ((UNetDownW cfg inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = UNetDownW cfg inW)
+    (Shape.slidingWindowOutDim (UNetDownW cfg inW) cfg.convKernel cfg.convStride cfg.convPadding) = UNetDownW cfg inW)
   (h_upH : UNetUpH cfg inH = inH)
   (h_upW : UNetUpW cfg inW = inW)
-  (h_outH : ((inH + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1) = inH)
-  (h_outW : ((inW + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1) = inW) :
+  (h_outH : (Shape.slidingWindowOutDim inH cfg.headKernel cfg.headStride cfg.headPadding) = inH)
+  (h_outW : (Shape.slidingWindowOutDim inW cfg.headKernel cfg.headStride cfg.headPadding) = inW) :
   MultiChannelImage outC inH inW α :=
 
   -- The `h_*` equalities are there for one reason: many of the layer specs compute output shapes
@@ -381,17 +383,17 @@ def UNet2Spec.backward
   (x : MultiChannelImage inC inH inW α)
   (grad_output : MultiChannelImage outC inH inW α)
   (h_convH :
-    ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = inH)
+    (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding) = inH)
   (h_convW :
-    ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = inW)
+    (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) = inW)
   (h_convH_down :
-    ((UNetDownH cfg inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = UNetDownH cfg inH)
+    (Shape.slidingWindowOutDim (UNetDownH cfg inH) cfg.convKernel cfg.convStride cfg.convPadding) = UNetDownH cfg inH)
   (h_convW_down :
-    ((UNetDownW cfg inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) = UNetDownW cfg inW)
+    (Shape.slidingWindowOutDim (UNetDownW cfg inW) cfg.convKernel cfg.convStride cfg.convPadding) = UNetDownW cfg inW)
   (h_upH : UNetUpH cfg inH = inH)
   (h_upW : UNetUpW cfg inW = inW)
-  (h_outH : ((inH + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1) = inH)
-  (h_outW : ((inW + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1) = inW) :
+  (h_outH : (Shape.slidingWindowOutDim inH cfg.headKernel cfg.headStride cfg.headPadding) = inH)
+  (h_outW : (Shape.slidingWindowOutDim inW cfg.headKernel cfg.headStride cfg.headPadding) = inW) :
   (UNet2Grads cfg inC outC inH inW α × MultiChannelImage inC inH inW α) :=
 
   -- Forward reconstruction (mirrors `UNet2Spec.forward`).
@@ -455,8 +457,8 @@ def UNet2Spec.backward
   -- `dZ = dY ⊙ ReLU'(Z)` where `Z` is the pre-activation tensor.
   let grad_out_raw :
       MultiChannelImage outC
-        ((inH + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1)
-        ((inW + 2 * cfg.headPadding - cfg.headKernel) / cfg.headStride + 1) α :=
+        (Shape.slidingWindowOutDim inH cfg.headKernel cfg.headStride cfg.headPadding)
+        (Shape.slidingWindowOutDim inW cfg.headKernel cfg.headStride cfg.headPadding) α :=
     rwMultiChannelImage (α := α) grad_output (by rfl) h_outH.symm h_outW.symm
 
   let (d_out1x1_kernel, d_out1x1_bias, d_u2) :=
@@ -469,8 +471,8 @@ def UNet2Spec.backward
 
   let d_u2_raw :
       MultiChannelImage cfg.baseC
-        ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-        ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+        (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding)
+        (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_u2 (by rfl) h_convH.symm h_convW.symm
 
   let d_conv_up1_2 := mulSpec d_u2_raw (reluDerivSpec conv_up1_2)
@@ -485,8 +487,8 @@ def UNet2Spec.backward
 
   let d_u1_raw :
       MultiChannelImage cfg.baseC
-        ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-        ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+        (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding)
+        (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_u1 (by rfl) h_convH.symm h_convW.symm
 
   let d_conv_up1_1 := mulSpec d_u1_raw (reluDerivSpec conv_up1_1)
@@ -523,8 +525,8 @@ def UNet2Spec.backward
       m.upT bottleneck d_upRaw
 
   let d_bottleneck_raw : MultiChannelImage (2 * cfg.baseC)
-      ((UNetDownH cfg inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-      ((UNetDownW cfg inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+      (Shape.slidingWindowOutDim (UNetDownH cfg inH) cfg.convKernel cfg.convStride cfg.convPadding)
+      (Shape.slidingWindowOutDim (UNetDownW cfg inW) cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_bottleneck (by rfl) h_convH_down.symm h_convW_down.symm
 
   let d_conv_down2_2 := mulSpec d_bottleneck_raw (reluDerivSpec conv_down2_2)
@@ -539,8 +541,8 @@ def UNet2Spec.backward
       m.down2_2 b1 d_conv_down2_2
 
   let d_b1_raw : MultiChannelImage (2 * cfg.baseC)
-      ((UNetDownH cfg inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-      ((UNetDownW cfg inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+      (Shape.slidingWindowOutDim (UNetDownH cfg inH) cfg.convKernel cfg.convStride cfg.convPadding)
+      (Shape.slidingWindowOutDim (UNetDownW cfg inW) cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_b1 (by rfl) h_convH_down.symm h_convW_down.symm
 
   let d_conv_down2_1 := mulSpec d_b1_raw (reluDerivSpec conv_down2_1)
@@ -561,8 +563,8 @@ def UNet2Spec.backward
 
   let d_skip1_total := addSpec d_skip1_from_pool d_skip1_from_merge
   let d_skip1_raw : MultiChannelImage cfg.baseC
-      ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-      ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+      (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding)
+      (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_skip1_total (by rfl) h_convH.symm h_convW.symm
 
   let d_conv_down1_2 := mulSpec d_skip1_raw (reluDerivSpec conv_down1_2)
@@ -576,8 +578,8 @@ def UNet2Spec.backward
       m.down1_2 s1 d_conv_down1_2
 
   let d_s1_raw : MultiChannelImage cfg.baseC
-      ((inH + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1)
-      ((inW + 2 * cfg.convPadding - cfg.convKernel) / cfg.convStride + 1) α :=
+      (Shape.slidingWindowOutDim inH cfg.convKernel cfg.convStride cfg.convPadding)
+      (Shape.slidingWindowOutDim inW cfg.convKernel cfg.convStride cfg.convPadding) α :=
     rwMultiChannelImage (α := α) d_s1 (by rfl) h_convH.symm h_convW.symm
 
   let d_conv_down1_1 := mulSpec d_s1_raw (reluDerivSpec conv_down1_1)

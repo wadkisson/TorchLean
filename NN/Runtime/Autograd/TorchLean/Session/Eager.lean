@@ -358,13 +358,10 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) :=
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.maxPool2d (α := α) s.inner
     (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
     (h1 := h1) (h2 := h2) x
-
-/-- Alias for `max_pool2d` (PyTorch-style shorthand). -/
-abbrev maxPool {α : Type} := maxPool2d (α := α)
 
 /--
 Smooth max pooling (softmax-like pooling) on a CHW tensor (eager backend).
@@ -377,13 +374,10 @@ def smoothMaxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq 
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) (beta :
     α) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) :=
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.smoothMaxPool2d (α := α) s.inner
     (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
     (h1 := h1) (h2 := h2) x beta
-
-/-- Alias for `smooth_max_pool2d` (PyTorch-style shorthand). -/
-abbrev smoothMaxPool {α : Type} := smoothMaxPool2d (α := α)
 
 /--
 2D average pooling on a CHW tensor (eager backend).
@@ -394,13 +388,10 @@ def avgPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) :=
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.avgPool2d (α := α) s.inner
     (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
     h1 h2 x
-
-/-- Alias for `avg_pool2d` (PyTorch-style shorthand). -/
-abbrev avgPool {α : Type} := avgPool2d (α := α)
 
 /-- Elementwise ReLU activation (eager backend). -/
 def relu {α : Type} (s : EagerSession α)
@@ -469,7 +460,7 @@ def sum {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
 /-- Flatten a tensor into a 1D vector (eager backend). -/
 def flatten {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape] {sh : Shape}
   (x : _root_.Runtime.Autograd.Torch.TensorRef α sh) :
-  IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim (Shape.size sh) .scalar)) :=
+  IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim (Spec.Shape.size sh) .scalar)) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.flatten (α := α) (sh := sh) s.inner x
 
 /--
@@ -478,7 +469,7 @@ Reshape a tensor, given a proof that the total number of elements is preserved (
 PyTorch analogy: `x.reshape(...)` when the element count matches.
 -/
 def reshape {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape] {sh1 sh2 : Shape}
-  (x : _root_.Runtime.Autograd.Torch.TensorRef α sh1) (h : Shape.size sh1 = Shape.size sh2) :
+  (x : _root_.Runtime.Autograd.Torch.TensorRef α sh1) (h : Spec.Shape.size sh1 = Spec.Shape.size sh2) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α sh2) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.reshape (α := α) (sh1 := sh1) (sh2 := sh2)
     s.inner x h
@@ -768,8 +759,7 @@ def conv2d {α : Type} (s : EagerSession α) [Context α]
   (bias : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outC .scalar))
   (input : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim outC (.dim ((inH + 2 * padding - kH) / stride + 1) (.dim ((inW + 2 * padding - kW) /
-      stride + 1) .scalar)))) :=
+    (.dim outC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.conv2d (α := α)
     (inC := inC) (outC := outC) (kH := kH) (kW := kW) (stride := stride) (padding := padding)
     (inH := inH) (inW := inW) (h1 := h1) (h2 := h2) (h3 := h3)
@@ -789,8 +779,8 @@ def convTranspose2d {α : Type} (s : EagerSession α) [Context α]
   (bias : _root_.Runtime.Autograd.Torch.TensorRef α (.dim outC .scalar))
   (input : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim outC (.dim ((inH - 1) * stride - 2 * padding + kH)
-      (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)))) :=
+    (.dim outC (.dim (Spec.convTransposeOutDim inH kH stride padding)
+      (.dim (Spec.convTransposeOutDim inW kW stride padding) .scalar)))) :=
   _root_.Runtime.Autograd.Torch.Internal.EagerSession.convTranspose2d (α := α)
     (inC := inC) (outC := outC) (kH := kH) (kW := kW) (stride := stride) (padding := padding)
     (inH := inH) (inW := inW) (h1 := h1) (h2 := h2) (h3 := h3)

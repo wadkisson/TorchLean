@@ -357,13 +357,13 @@ The hypotheses `hVarEpsPos` and `hStdNe0` are explicit domain assumptions ensuri
 def layerNormGraphFderivCorrectAt
     {m n : Nat} (ε : ℝ) (xV : CtxVec (ΓLN m n))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         0 < CtxVec.get (Γ := ΓLN m n ++ ssPrefix6 m n) (s := VecShape m) (idxVarEps (m := m) (n :=
           n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix6 m n) (layerNormPrefix6 (m := m) (n := n) ε)
             xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         CtxVec.get (Γ := ΓLN m n ++ ssPrefix7 m n) (s := VecShape m) (idxStd (m := m) (n := n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix7 m n) (layerNormPrefix7 (m := m) (n := n) ε)
             xV) i ≠ 0) :
@@ -541,13 +541,13 @@ theorem backprop_eq_adjoint_fderiv_layerNorm_at
     (xV : CtxVec (ΓLN m n))
     (seedV : CtxVec (ΓLN m n ++ ssLayerNorm m n))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         0 < CtxVec.get (Γ := ΓLN m n ++ ssPrefix6 m n) (s := VecShape m) (idxVarEps (m := m) (n :=
           n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix6 m n) (layerNormPrefix6 (m := m) (n := n) ε)
             xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         CtxVec.get (Γ := ΓLN m n ++ ssPrefix7 m n) (s := VecShape m) (idxStd (m := m) (n := n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix7 m n) (layerNormPrefix7 (m := m) (n := n) ε)
             xV) i ≠ 0) :
@@ -607,29 +607,29 @@ Linear map that packs arbitrary-context LayerNorm inputs into the canonical cont
 -/
 def packInputsCLM {Γ : List Shape} {m n : Nat} (inputs : Inputs Γ m n) :
     CtxVec Γ →L[ℝ] CtxVec (ΓLN m n) := by
-  let xCLM : CtxVec Γ →L[ℝ] Vec (Shape.size (MatShape m n)) :=
+  let xCLM : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size (MatShape m n)) :=
     CtxVec.getCLM (Γ := Γ) (s := MatShape m n) inputs.x
-  let gammaCLM : CtxVec Γ →L[ℝ] Vec (Shape.size (VecShape n)) :=
+  let gammaCLM : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size (VecShape n)) :=
     CtxVec.getCLM (Γ := Γ) (s := VecShape n) inputs.gamma
-  let betaCLM : CtxVec Γ →L[ℝ] Vec (Shape.size (VecShape n)) :=
+  let betaCLM : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size (VecShape n)) :=
     CtxVec.getCLM (Γ := Γ) (s := VecShape n) inputs.beta
   let gbCLM :=
-    (Graph.appendCLM (Shape.size (VecShape n)) (Shape.size (VecShape n))).comp
+    (Graph.appendCLM (Spec.Shape.size (VecShape n)) (Spec.Shape.size (VecShape n))).comp
       (gammaCLM.prod betaCLM)
   let allCLM :=
-    (Graph.appendCLM (Shape.size (MatShape m n))
-      (Shape.size (VecShape n) + Shape.size (VecShape n))).comp
+    (Graph.appendCLM (Spec.Shape.size (MatShape m n))
+      (Spec.Shape.size (VecShape n) + Spec.Shape.size (VecShape n))).comp
       (xCLM.prod gbCLM)
   let h :
-      Shape.size (MatShape m n) + (Shape.size (VecShape n) + Shape.size (VecShape n))
+      Spec.Shape.size (MatShape m n) + (Spec.Shape.size (VecShape n) + Spec.Shape.size (VecShape n))
         =
       ctxSize (ΓLN m n) := by
-    simp [ctxSize, Shape.size]
+    simp [ctxSize, Spec.Shape.size]
   exact (Graph.castCLM (h := h)).comp allCLM
 
 /-- Project the final LayerNorm output from the full canonical graph context. -/
 def outputCLM {m n : Nat} :
-    CtxVec (ΓLN m n ++ ssLayerNorm m n) →L[ℝ] Vec (Shape.size (MatShape m n)) :=
+    CtxVec (ΓLN m n ++ ssLayerNorm m n) →L[ℝ] Vec (Spec.Shape.size (MatShape m n)) :=
   CtxVec.getCLM (Γ := ΓLN m n ++ ssLayerNorm m n) (s := MatShape m n) (idxY (m := m) (n := n))
 
 /--
@@ -644,7 +644,7 @@ single pointwise node with explicit domain assumptions.
 def wholeNode {Γ : List Shape} {m n : Nat} (inputs : Inputs Γ m n) (ε : ℝ) :
     Node Γ (MatShape m n) :=
   let pack := packInputsCLM (Γ := Γ) (m := m) (n := n) inputs
-  let f : CtxVec Γ → Vec (Shape.size (MatShape m n)) :=
+  let f : CtxVec Γ → Vec (Spec.Shape.size (MatShape m n)) :=
     fun xV =>
       outputCLM (m := m) (n := n)
         (Graph.evalVec (Γ := ΓLN m n) (ss := ssLayerNorm m n)
@@ -667,14 +667,14 @@ after packing the arbitrary context into `[X, gamma, beta]`.
 def wholeNodeFDerivCorrectAt {Γ : List Shape} {m n : Nat}
     (inputs : Inputs Γ m n) (ε : ℝ) (xV : CtxVec Γ)
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         0 < CtxVec.get (Γ := ΓLN m n ++ ssPrefix6 m n) (s := VecShape m)
           (idxVarEps (m := m) (n := n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix6 m n)
             (layerNormPrefix6 (m := m) (n := n) ε)
             ((packInputsCLM (Γ := Γ) (m := m) (n := n) inputs) xV)) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (VecShape m)),
+      ∀ i : Fin (Spec.Shape.size (VecShape m)),
         CtxVec.get (Γ := ΓLN m n ++ ssPrefix7 m n) (s := VecShape m)
           (idxStd (m := m) (n := n))
           (Graph.evalVec (Γ := ΓLN m n) (ss := ssPrefix7 m n)
@@ -685,7 +685,7 @@ def wholeNodeFDerivCorrectAt {Γ : List Shape} {m n : Nat}
   let pack := packInputsCLM (Γ := Γ) (m := m) (n := n) inputs
   let g := layerNormGraph (m := m) (n := n) ε
   let out := outputCLM (m := m) (n := n)
-  let f : CtxVec Γ → Vec (Shape.size (MatShape m n)) :=
+  let f : CtxVec Γ → Vec (Spec.Shape.size (MatShape m n)) :=
     fun z =>
       out (Graph.evalVec (Γ := ΓLN m n) (ss := ssLayerNorm m n) g (pack z))
   have hgAt :

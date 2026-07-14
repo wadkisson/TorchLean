@@ -30,14 +30,14 @@ of the Lean type.
 The smallest model pattern is a multilayer perceptron:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def inDim : Nat := 2
 def hidden : Nat := 8
 def outDim : Nat := 1
 
-def mkModel : nn.M (nn.Sequential (Shape.vec inDim) (Shape.vec outDim)) :=
+def mkModel : nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar)) :=
   nn.Sequential![
     nn.Linear inDim hidden,
     nn.ReLU,
@@ -53,7 +53,7 @@ There are three things to notice.
 First, the model type says exactly what the model accepts and returns:
 
 ```
-nn.Sequential (Shape.vec 2) (Shape.vec 1)
+nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)
 ```
 
 Second, `nn.Linear inDim hidden` is more than a runtime operation. It also describes the parameter
@@ -100,21 +100,21 @@ For one vector:
 
 ```
 nn.Linear 2 8
--- Shape.vec 2 -> Shape.vec 8
+-- .dim 2 .scalar -> .dim 8 .scalar
 ```
 
 For a minibatch:
 
 ```
 nn.Linear 2 8
--- Shape.mat batch 2 -> Shape.mat batch 8
+-- .dim batch (.dim 2 .scalar) -> .dim batch (.dim 8 .scalar)
 ```
 
 That prefix is why the minibatch MLP can be written with the same layer vocabulary:
 
 ```
 def mkBatched {batch : Nat} :
-    nn.M (nn.Sequential (Shape.mat batch 2) (Shape.mat batch 1)) :=
+    nn.M (nn.Sequential (.dim batch (.dim 2 .scalar)) (.dim batch (.dim 1 .scalar))) :=
   nn.Sequential![
     nn.Linear 2 8,
     nn.ReLU,
@@ -130,7 +130,7 @@ Prefix shapes also keep sequence and image conventions honest:
 ```
 -- One token embedding.
 nn.Linear dModel hidden
--- Shape.vec dModel -> Shape.vec hidden
+-- .dim dModel .scalar -> .dim hidden .scalar
 
 -- A batch of token embeddings.
 nn.Linear dModel hidden
@@ -184,42 +184,43 @@ standard reference.
 The runnable example is
 [NN.Examples.Models.Supervised.Kan](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Supervised/Kan.lean).
 
-# Images and CNNs
+# Convolutional Models
 
-Image models use the same `nn.Sequential!` style, but the input shape is now an image batch:
+Convolution uses ordinary tensors. A two-dimensional dataset conventionally supplies a tensor of
+shape:
 
 ```
-Shape.images batch channels height width
+.dim batch (.dim channels (.dim height (.dim width .scalar)))
 ```
 
-A small CNN looks like this:
+A compact two-dimensional classifier is one instance of the rank-generic CNN builder:
 
 ```
 def mkCnn {batch : Nat} :
-    nn.M (nn.Sequential (Shape.images batch 1 4 4) (shape![batch, 2])) :=
-  let outC : Nat := 3
-  let outH : Nat := (4 - 2) / 1 + 1
-  let outW : Nat := (4 - 2) / 1 + 1
-  let featInner : Shape := Shape.image outC outH outW
-  let featSize : Nat := Shape.size featInner
-  nn.Sequential![
-    nn.Conv2d (n := batch) (inC := 1) (inH := 4) (inW := 4)
-      { outC := outC, kH := 2, kW := 2, stride := 1, padding := 0 },
-    nn.ReLU,
-    nn.FlattenBatch,
-    nn.Linear featSize 2
-  ]
+    nn.M (nn.Sequential (.dim batch (.dim 1 (.dim 4 (.dim 4 .scalar)))) (shape![batch, 2])) :=
+  let cfg : nn.models.CnnConfig 2 :=
+    { batch := batch
+      inChannels := 1
+      spatial := #v[4, 4]
+      outDim := 2
+      conv :=
+        { outChannels := 3
+          kernel := #v[2, 2]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide }
+      pool :=
+        { kernel := #v[1, 1]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide } }
+  by
+    simpa [cfg, nn.models.cnnInShape, nn.models.cnnOutShape, Spec.Shape.ofList] using
+      nn.models.cnn cfg (hInChannels := by simp [cfg])
 ```
 
-Here the shape bookkeeping is part of the model definition:
-
-- the convolution maps `N x 1 x 4 x 4` to `N x 3 x 3 x 3`;
-- `nn.FlattenBatch` keeps the batch axis and flattens the feature axes;
-- the final linear layer maps each flattened image to two logits.
-
-The CNN example makes the axes explicit. The type records that a batch of images enters, the
-convolution changes the channel and spatial axes, and two logits per image leave. Graph lowering and
-the same information when they lower the model to graphs or discuss verification conditions.
+Here `CnnConfig 2` means there are two spatial axes. The convolution maps `N x 1 x 4 x 4` to
+`N x 3 x 3 x 3`; the pool preserves that shape because its window is `1 x 1`; flattening then
+feeds 27 features to the two-logit classifier. Changing the vector length gives a signal, volume,
+or higher-rank spatial model without introducing separate tensor types.
 
 The runnable CNN tutorial is
 [NN.Examples.Quickstart.SimpleCnnTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean).
@@ -232,19 +233,27 @@ Residual models force the API to express a shape preserving path:
 input -> block(input) + skip(input)
 ```
 
-The public builder for a residual block is `nn.ResNetBasicBlock`. A typical shape is:
+The public ResNet builder uses the same rank-generic convolution and pooling records as the CNN.
+For a two-dimensional input, a compact configuration is:
 
 ```
-nn.ResNetBasicBlock (n := batch) (inC := 8) (h := 4) (w := 4)
-  { outC := 8, stride := 1 }
+let cfg : nn.models.ResNetConfig 2 :=
+  { batch := batch
+    inChannels := 3
+    spatial := #v[32, 32]
+    spatialNonzero := by intro i; fin_cases i <;> decide
+    hiddenChannels := 32
+    numClasses := 10 }
+
+nn.models.resnet cfg
 ```
 
-Read the type as a contract: if the block is used in the no downsample case, the residual path and
-the main path have compatible output shapes. If a downsample is requested, the block records the
-shape change explicitly.
+The residual branches are built only after both paths have the same typed shape. The same
+constructor also works for one-dimensional signals and higher-dimensional spatial data by changing
+the length of `spatial`; it does not introduce separate image or volume tensor types.
 
-The block itself lives in the public `TorchLean.nn` API, and the ResNet model constructors live
-under [NN/API/Models/Resnet.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Resnet.lean).
+The implementation lives in
+[NN/API/Models/ResNet.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/ResNet.lean).
 
 # Transformer Shaped Blocks
 

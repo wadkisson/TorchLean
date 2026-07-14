@@ -17,7 +17,7 @@ This is a real-data ViT-style CIFAR-10 minibatch run:
 module
 
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -27,7 +27,7 @@ Runnable `torchlean vit` example. It trains a compact ViT-style image classifier
 prepared CIFAR-10 minibatch: patch embedding by convolution, token reshape, transformer block, and
 linear head.
 
-The reusable model wiring lives behind the public `TorchLean.nn.models.ViT` constructor. The command
+The reusable model wiring lives behind the public `TorchLean.nn.models.vit` constructor. The command
 adds CIFAR loader construction and the step-limited training loop.
 
 ```bash
@@ -106,26 +106,25 @@ def headDim : Nat := 1
 def ffnHidden : Nat := 2
 
 /-- Shared ViT configuration used by shapes and the reusable public model constructor. -/
-def cfg : nn.models.VitConfig :=
+def cfg : nn.models.VitConfig 2 :=
   { batch := batch
-    inC := inC
-    inH := inH
-    inW := inW
-    patchH := patchH
-    patchW := patchW
-    stride := stride
-    padding := padding
-    dModel := dModel
+    inChannels := inC
+    spatial := #v[inH, inW]
+    patch :=
+      { outChannels := dModel
+        kernel := #v[patchH, patchW]
+        stride := #v[stride, stride]
+        padding := #v[padding, padding]
+        kernelNonzero := by intro i; fin_cases i <;> decide
+        strideNonzero := by intro i; fin_cases i <;> simp [stride, Vector.get] }
     outDim := outDim
     numHeads := numHeads
     headDim := headDim
     ffnHidden := ffnHidden }
 
-abbrev σ :=
-  Shape.images batch inC inH inW
+abbrev σ : Shape := nn.models.vitInShape cfg
 
-abbrev τ :=
-  Shape.mat batch outDim
+abbrev τ : Shape := nn.models.vitOutShape cfg
 
 /--
 Compact ViT-style classifier from the public model API.
@@ -133,7 +132,14 @@ Compact ViT-style classifier from the public model API.
 The constructor builds patch embedding, token reshape, one encoder block, and the classifier head.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.ViT cfg
+  nn.models.vit cfg
+    (hInChannels := by decide)
+    (hSeqLen := by
+      norm_num [nn.models.VitConfig.seqLen, nn.models.VitConfig.patchSpatial, cfg,
+        inH, inW, patchH, patchW, stride, padding,
+        Spec.convOutSpatial, Spec.Shape.slidingWindowOutDim, Spec.Shape.ofList, Spec.Shape.size,
+        Vector.get, Vector.toList, Vector.ofFn])
+    (hModel := by decide)
 
 /-- Train the CIFAR ViT with the public `Trainer` surface. -/
 def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
@@ -156,7 +162,7 @@ def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
 
 /-- CLI entrypoint for CIFAR ViT training; CUDA is the maintained validation path. -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.classificationNpy exeName args
+  TrainCommand.classificationNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 1 1e-3)
     (ModelZoo.bannerWithDevice exeName "ViT CIFAR training")
     train

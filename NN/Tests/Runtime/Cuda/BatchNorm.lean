@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -31,12 +31,12 @@ abbrev channels : Nat := 2
 abbrev height : Nat := 2
 abbrev width : Nat := 2
 
-def hC : channels > 0 := by decide
-def hH : height > 0 := by decide
-def hW : width > 0 := by decide
+theorem hC : channels > 0 := by decide
+theorem hH : height > 0 := by decide
+theorem hW : width > 0 := by decide
 
 def x : Tensor Float (shape![channels, height, width]) :=
-  tensorND! [channels, height, width] [
+  tensorOfList! [channels, height, width] [
     -- channel 0
     1.0, 2.0,
     3.0, 4.0,
@@ -46,10 +46,10 @@ def x : Tensor Float (shape![channels, height, width]) :=
   ]
 
 def gamma : Tensor Float (shape![channels]) :=
-  tensorND! [channels] [1.0, 0.5]
+  tensorOfList! [channels] [1.0, 0.5]
 
 def beta : Tensor Float (shape![channels]) :=
-  tensorND! [channels] [0.0, 0.1]
+  tensorOfList! [channels] [0.0, 0.1]
 
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: batchnorm_channel_first ==="
@@ -84,7 +84,7 @@ def run : IO Unit := do
       (height := height) (width := width) (h_c := hC) (h_h := hH) (h_w := hW) xIdc gIdc bIdc)
   let yCuda ← Utils.cudaValue (s := outShape) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape)) 1.0 }
+    { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := outShape) gradsCuda xIdc

@@ -2,72 +2,72 @@
 
 This report measures the Lean import graph: which source modules import which other modules. It is an architecture and maintenance artifact. It is not the runtime graph IR used to represent neural-network computations, and it is not a declaration-level proof dependency graph.
 
-The audit is still useful for TorchLean because the library has intentional layer boundaries: specifications should not depend on runtime backends, reusable runtime code should not depend on examples, and broad imports should mostly stay at public entrypoints or tutorial surfaces.
+The audit is still useful for TorchLean because the library has intentional layer boundaries: specifications should not depend on runtime backends, reusable runtime code should not depend on examples, and broad imports should stay at deliberate umbrella or test-aggregation entrypoints.
 
 Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (arXiv:2604.24797).
 
 ## Summary
 
-- Modules: `1178`
-- Import edges: `3950`
-- Internal import edges: `3415`
-- Public imports: `3631`
-- Private imports: `319`
-- Critical-path length over internal imports: `121`
+- Modules: `1257`
+- Import edges: `4039`
+- Internal import edges: `3498`
+- Public imports: `3688`
+- Private imports: `351`
+- Critical-path length over internal imports: `130`
 - Findings: `0` (`0` errors, `0` warnings)
-- Lean files: `1178`
-- Lean source lines: `311591`
-- Declaration headers: `13146`
-- Theorem/lemma headers: `2437`
+- Lean files: `1257`
+- Lean source lines: `310828`
+- Declaration headers: `12879`
+- Theorem/lemma headers: `2443`
 
 ## Top Fan-In Modules
 
-- `NN`: `80` incoming imports
-- `NN.Spec.Core.Tensor`: `34` incoming imports
-- `NN.MLTheory.CROWN.Graph`: `34` incoming imports
+- `NN.API`: `79` incoming imports
+- `NN.Spec.Core.Tensor`: `33` incoming imports
 - `NN.Spec.Core.TensorOps`: `32` incoming imports
-- `NN.Spec.Layers.Activation`: `31` incoming imports
 - `NN.Spec.Core.TensorReductionShape`: `30` incoming imports
-- `NN.Spec.Core.Context`: `29` incoming imports
+- `NN.Spec.Layers.Activation`: `30` incoming imports
+- `NN.MLTheory.CROWN.Graph`: `29` incoming imports
+- `NN.Spec.Core.Context`: `28` incoming imports
 - `NN.Floats.IEEEExec.Exec32`: `27` incoming imports
-- `NN.Spec.Module.SpecModule`: `24` incoming imports
-- `NN.Verification.TorchLean.Compile`: `22` incoming imports
+- `NN.Spec.Module.SpecModule`: `22` incoming imports
+- `NN.Tensor`: `22` incoming imports
 
 ## Top Fan-Out Modules
 
-- `NN.CI.All`: `327` imports
-- `NN.Entrypoint.Proofs`: `43` imports
-- `NN.Spec.Module`: `28` imports
-- `NN.Spec.Models`: `26` imports
-- `NN.MLTheory.API`: `25` imports
-- `NN.Examples.Zoo`: `23` imports
-- `NN.Verification.CLI`: `20` imports
-- `NN.API.Public.Facade.Base.Runtime`: `18` imports
-- `NN.Backend`: `18` imports
-- `NN.Proofs.Autograd.Coverage`: `18` imports
+- `NN.CI.Theory`: `105` imports
+- `NN.CI.Foundation`: `99` imports
+- `NN.CI.Floats`: `55` imports
+- `NN.Proofs`: `43` imports
+- `NN.CI.Runtime`: `27` imports
+- `NN.Spec.Module`: `26` imports
+- `NN.CI.Verification`: `25` imports
+- `NN.Spec.Models`: `25` imports
+- `NN.MLTheory.API`: `24` imports
+- `blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats`: `23` imports
 
 ## Layer Edges
 
-- `NN.API` -> `NN.API`: `364`
-- `NN.Runtime` -> `NN.Runtime`: `346`
-- `NN.Spec` -> `NN.Spec`: `315`
-- `NN.Proofs` -> `NN.Proofs`: `285`
-- `NN.MLTheory` -> `NN.MLTheory`: `222`
-- `NN.Floats` -> `NN.Floats`: `168`
-- `NN.Verification` -> `NN.Verification`: `163`
-- `NN.Examples` -> `NN.Examples`: `145`
-- `NN.CI` -> `NN.Spec`: `88`
+- `NN.Runtime` -> `NN.Runtime`: `385`
+- `NN.Proofs` -> `NN.Proofs`: `328`
+- `NN.API` -> `NN.API`: `323`
+- `NN.Spec` -> `NN.Spec`: `309`
+- `NN.Floats` -> `NN.Floats`: `271`
+- `NN.MLTheory` -> `NN.MLTheory`: `229`
+- `NN.Verification` -> `NN.Verification`: `176`
+- `NN.Examples` -> `NN.Examples`: `154`
+- `NN.CI` -> `NN.Spec`: `85`
 - `NN.MLTheory` -> `NN.Spec`: `71`
-- `NN.CI` -> `NN.MLTheory`: `69`
+- `NN.CI` -> `NN.MLTheory`: `68`
 - `NN.Proofs` -> `NN.Spec`: `62`
-- `NN.Tests` -> `NN.Tests`: `58`
+- `NN.Tests` -> `NN.Tests`: `59`
+- `NN.CI` -> `NN.Floats`: `55`
+- `NN.Examples` -> `NN.API`: `54`
 - `NN.Tests` -> `NN.Runtime`: `54`
-- `NN.Examples` -> `NN`: `50`
-- `NN.CI` -> `NN.Floats`: `49`
-- `NN.Entrypoint` -> `NN.Proofs`: `43`
 - `Backend` -> `Backend`: `42`
+- `NN.API` -> `NN.Spec`: `42`
 - `NN.API` -> `NN.Runtime`: `39`
-- `NN.API` -> `NN.Spec`: `36`
+- `NN.CI` -> `NN.Proofs`: `37`
 
 ## Findings
 

@@ -51,7 +51,6 @@ EXTERNAL_TREE_NAMES = {
 # implementation files because they hide which layer a module actually depends on.
 BROAD_IMPORTS = {
     "NN",
-    "NN.Library",
     "NN.CI.All",
     "Mathlib",
     "Mathlib.Tactic",
@@ -61,7 +60,6 @@ BROAD_IMPORTS = {
 # dominate the number and make the graph look deeper than the implementation really is.
 CRITICAL_PATH_EXCLUDE = {
     "NN",
-    "NN.Library",
     "NN.CI.All",
     "NN.Examples.Zoo",
     "NN.Tests.Suite",
@@ -213,7 +211,6 @@ def layer_of(module: str) -> str:
     if parts[1] in {
         "API",
         "CI",
-        "Entrypoint",
         "Examples",
         "Floats",
         "GraphSpec",
@@ -238,9 +235,9 @@ def parse_file(root: pathlib.Path, path: pathlib.Path) -> tuple[list[ImportEdge]
     namespaces: list[str] = []
     findings: list[Finding] = []
     suppress_broad_import_warning = (
-        # Tutorial and integration surfaces deliberately import broad facades.
-        rel.startswith("NN/Examples/")
-        or rel.startswith("NN/Tests/")
+        # Test aggregators deliberately exercise the complete public surface. Examples use
+        # `NN.API` or a focused subsystem so their dependencies remain visible to readers.
+        rel.startswith("NN/Tests/")
         or rel.startswith("blueprint/")
         or rel in {"NN.lean", "NN/CI/ComparatorAll.lean"}
     )
@@ -468,8 +465,8 @@ def render_markdown(report: dict, *, max_findings: int) -> str:
     lines.append(
         "The audit is still useful for TorchLean because the library has intentional layer "
         "boundaries: specifications should not depend on runtime backends, reusable runtime code "
-        "should not depend on examples, and broad imports should mostly stay at public entrypoints "
-        "or tutorial surfaces."
+        "should not depend on examples, and broad imports should stay at deliberate umbrella or "
+        "test-aggregation entrypoints."
     )
     lines.append("")
     lines.append(

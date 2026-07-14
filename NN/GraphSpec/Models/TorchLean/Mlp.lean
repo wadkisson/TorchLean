@@ -26,7 +26,7 @@ different architecture families (CNN, FNO, ResNet, Transformer) into their own m
 
 TorchLean exposes two related layers:
 
-1. `NN.Spec.Models.*`: proof-friendly specifications, evaluated as functions on `Tensor α s`.
+1. `NN.Spec.Models.*`: proof-friendly specifications, evaluated as functions on `Spec.Tensor α s`.
 
 2. `NN.GraphSpec.Models.TorchLean.*`: executable architecture constructors used by runtime
    training/evaluation utilities (with `.eager` / `.compiled` backends).
@@ -49,7 +49,7 @@ namespace Models
 namespace TorchLean
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 /-!
@@ -66,7 +66,7 @@ def mlp
     (inDim hidDim outDim : Nat)
     (seedW1 seedB1 seedW2 seedB2 : Nat := 0) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq
-      (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
+      (.dim inDim .scalar) (.dim outDim .scalar) :=
   _root_.Runtime.Autograd.TorchLean.NN.singleLayer
       (_root_.Runtime.Autograd.TorchLean.NN.linear inDim hidDim
         (seedW := seedW1) (seedB := seedB1)) >>>
@@ -87,7 +87,7 @@ def mlpClassifier
     (inDim hidDim numClasses : Nat)
     (seedW1 seedB1 seedW2 seedB2 : Nat := 0) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq
-      (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec numClasses) :=
+      (.dim inDim .scalar) (.dim numClasses .scalar) :=
   mlp inDim hidDim numClasses
     (seedW1 := seedW1) (seedB1 := seedB1) (seedW2 := seedW2) (seedB2 := seedB2)
 
@@ -96,7 +96,7 @@ def softmaxRegression
     (inDim numClasses : Nat)
     (seedW seedB : Nat := 0) :
     _root_.Runtime.Autograd.TorchLean.NN.Seq
-      (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec numClasses) :=
+      (.dim inDim .scalar) (.dim numClasses .scalar) :=
   _root_.Runtime.Autograd.TorchLean.NN.singleLayer
     (_root_.Runtime.Autograd.TorchLean.NN.linear inDim numClasses (seedW := seedW) (seedB := seedB))
 

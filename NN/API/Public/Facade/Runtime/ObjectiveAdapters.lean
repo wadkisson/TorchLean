@@ -22,7 +22,7 @@ namespace ssl
 
 export NN.API.ssl
   (vectorMaeHiddenMask vectorMaeMask vectorMaeSample
-   imagePatchHidden imagePatchMask imagePatchMaeSample)
+   blockIndex blockHidden blockMask blockMaskBatch blockMaeSample)
 
 end ssl
 
@@ -30,7 +30,7 @@ namespace diffusion
 
 export NN.API.diffusion
   (toMinusOneOne randomEps linearBeta alphaBarsLinear appendTimeChannel noisedSampleFromEps
-   noisedSample ddimPrev writeFirstRgbNchwPpm)
+   noisedSample ddimPrev writeFirstRgbPpm)
 
 end diffusion
 

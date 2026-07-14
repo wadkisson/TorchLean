@@ -41,7 +41,9 @@ def MaxPool2DModuleSpec {kH kW stride inH inW inC: Nat} {h1 : kH ≠ 0} {h2 : kW
   (m : MaxPool2DSpec kH kW stride h1 h2 hStride) :
   NNModuleSpec α
     (.dim inC (.dim inH (.dim inW .scalar)))
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar))) :=
+    (.dim inC
+      (.dim (Shape.slidingWindowOutDim inH kH stride 0)
+        (.dim (Shape.slidingWindowOutDim inW kW stride 0) .scalar))) :=
 { forward := fun x =>
     -- Apply pooling to each channel independently.
     Tensor.dim (fun c => maxPool2dSpec m (getAtSpec x c)),
@@ -58,10 +60,11 @@ def AvgPool2DModuleSpec {kH kW stride inH inW : Nat} {h1 : kH ≠ 0} {h2 : kW �
   (m : AvgPool2DSpec kH kW stride h1 h2 hStride) :
   NNModuleSpec α
     (.dim inH (.dim inW .scalar))
-    (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)) :=
+    (.dim (Shape.slidingWindowOutDim inH kH stride 0)
+      (.dim (Shape.slidingWindowOutDim inW kW stride 0) .scalar)) :=
 { forward := fun x => avgPool2dSpec (layer := m) x, kind := "AvgPool2D", export_func := {
   toPyTorch := s!"nn.AvgPool2d(kernel_size=({kH}, {kW}), stride={stride})",
-  dimensions := (inH, (inH - kH) / stride + 1)  -- Height dimensions
+  dimensions := (inH, Shape.slidingWindowOutDim inH kH stride 0)
 } }
 
 end Spec

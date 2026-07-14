@@ -214,13 +214,13 @@ as long as they expose the same affine map.
 -/
 def seqFfnResidualDGraph {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel))) :
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel))) :
     DGraph (ΓSeqFFN seqLen dModel) (ssSeqFFNResidual seqLen dModel dFF) := by
   let dg0 : DGraph (ΓSeqFFN seqLen dModel) [] := DGraph.nil
   let dg1 : DGraph (ΓSeqFFN seqLen dModel) [SeqFFNHiddenShape seqLen dFF] :=
@@ -285,13 +285,13 @@ def seqFfnResidualDGraph {seqLen dModel dFF : Nat}
 theorem seqFfnResidual_backpropVec_eq_adjoint_fderiv
     {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (xV : CtxVec (ΓSeqFFN seqLen dModel))
     (seedV : CtxVec (ΓSeqFFN seqLen dModel ++ ssSeqFFNResidual seqLen dModel dFF)) :
     Graph.backpropVec

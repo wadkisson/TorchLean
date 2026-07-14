@@ -35,16 +35,6 @@ open Spec Tensor
 namespace nn
 namespace models
 
-namespace KANShape
-
-/-- Unbatched vector shape used by KAN edge bases. -/
-abbrev vec := NN.Tensor.Shape.Vec
-
-/-- Matrix shape used by batched KAN models and basis tables. -/
-abbrev mat := NN.Tensor.Shape.Mat
-
-end KANShape
-
 /--
 Backend-compatible KAN edge family.
 
@@ -59,14 +49,14 @@ structure KANEdgeFamily where
   /-- Number of basis features produced per scalar input coordinate. -/
   basisDim : Nat
   /-- Basis expansion for an unbatched vector of length `inDim`. -/
-  basis : (inDim : Nat) → nn.Sequential (KANShape.vec inDim)
-    (KANShape.vec (inDim * basisDim))
+  basis : (inDim : Nat) → nn.Sequential (.dim inDim .scalar)
+    (.dim (inDim * basisDim) .scalar)
 
 namespace KANEdgeFamily
 
-/-- Shape of the edge-basis expansion for `inDim` scalar inputs. -/
-abbrev basisShape (edge : KANEdgeFamily) (inDim : Nat) : Shape :=
-  KANShape.vec (inDim * edge.basisDim)
+/-- Spec.Shape of the edge-basis expansion for `inDim` scalar inputs. -/
+abbrev basisShape (edge : KANEdgeFamily) (inDim : Nat) : Spec.Shape :=
+  .dim (inDim * edge.basisDim) .scalar
 
 end KANEdgeFamily
 
@@ -96,7 +86,7 @@ Each basis value is `relu(1 - |inputScale * x_i - k|)`, expressed directly in th
 TorchLean op language rather than through an opaque spline evaluator.
 -/
 def basisLayer (cfg : KANPiecewiseLinear) (inDim : Nat) :
-    nn.Sequential (KANShape.vec inDim) (KANShape.vec (inDim * cfg.gridSize)) :=
+    nn.Sequential (.dim inDim .scalar) (.dim (inDim * cfg.gridSize) .scalar) :=
   nn.of
     { kind := s!"KANPiecewiseLinear(grid={cfg.gridSize},scale={cfg.inputScale})"
       paramShapes := []
@@ -106,16 +96,16 @@ def basisLayer (cfg : KANPiecewiseLinear) (inDim : Nat) :
         fun {m} _ _ =>
           fun x =>
             ((do
-              let zeros : Spec.Tensor α (KANShape.mat cfg.gridSize inDim) :=
+              let zeros : Spec.Tensor α (.dim cfg.gridSize (.dim inDim .scalar)) :=
                 Spec.Tensor.dim (fun _ =>
                   Spec.Tensor.dim (fun _ =>
                     Spec.Tensor.scalar (0 : α)))
               let xBasis ← TorchLean.scale (m := m) (α := α) x ((cfg.inputScale : Nat) : α)
               let out0 ← TorchLean.const (m := m) (α := α) zeros
               let out ← (List.finRange cfg.gridSize).foldlM (init := out0) (fun acc k => do
-                let centerT : Spec.Tensor α (KANShape.vec inDim) :=
+                let centerT : Spec.Tensor α (.dim inDim .scalar) :=
                   Spec.Tensor.dim (fun _ => Spec.Tensor.scalar ((k.val : Nat) : α))
-                let oneT : Spec.Tensor α (KANShape.vec inDim) :=
+                let oneT : Spec.Tensor α (.dim inDim .scalar) :=
                   Spec.Tensor.dim (fun _ => Spec.Tensor.scalar (1 : α))
                 let c ← TorchLean.const (m := m) (α := α) centerT
                 let ones ← TorchLean.const (m := m) (α := α) oneT
@@ -126,17 +116,17 @@ def basisLayer (cfg : KANPiecewiseLinear) (inDim : Nat) :
                 TorchLean.scatterAddRow (m := m) (α := α)
                   (rows := cfg.gridSize) (cols := inDim) acc basis k)
               let flat ← TorchLean.reshape (m := m) (α := α)
-                (s₁ := KANShape.mat cfg.gridSize inDim)
-                (s₂ := KANShape.vec (cfg.gridSize * inDim))
+                (s₁ := .dim cfg.gridSize (.dim inDim .scalar))
+                (s₂ := .dim (cfg.gridSize * inDim) .scalar)
                 out (by
                   simp [Spec.Shape.size, Nat.mul_comm])
               TorchLean.reshape (m := m) (α := α)
-                (s₁ := KANShape.vec (cfg.gridSize * inDim))
-                (s₂ := KANShape.vec (inDim * cfg.gridSize))
+                (s₁ := .dim (cfg.gridSize * inDim) .scalar)
+                (s₂ := .dim (inDim * cfg.gridSize) .scalar)
                 flat (by
                   simp [Spec.Shape.size, Nat.mul_comm])
             ) : m (TorchLean.RefTy (m := m) (α := α)
-              (KANShape.vec (inDim * cfg.gridSize))))
+              (.dim (inDim * cfg.gridSize) .scalar)))
     }
 
 /-- Turn piecewise-linear triangular bases into a general KAN edge family. -/
@@ -159,16 +149,14 @@ structure KANConfig where
   outDim : Nat
   /-- Edge basis family. The default is a compact triangular piecewise-linear basis. -/
   edge : KANEdgeFamily := KANPiecewiseLinear.edgeFamily { gridSize := 8 }
-  /-- Base seed used for learned edge coefficients and biases. -/
-  seedBase : Nat := 0
 
 /-- Input shape `(batch × inDim)` for a KAN config. -/
-abbrev kanInShape (cfg : KANConfig) : Shape :=
-  KANShape.mat cfg.batch cfg.inDim
+abbrev kanInShape (cfg : KANConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.inDim .scalar)
 
 /-- Output shape `(batch × outDim)` for a KAN config. -/
-abbrev kanOutShape (cfg : KANConfig) : Shape :=
-  KANShape.mat cfg.batch cfg.outDim
+abbrev kanOutShape (cfg : KANConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.outDim .scalar)
 
 /--
 One unbatched KAN layer.
@@ -176,22 +164,20 @@ One unbatched KAN layer.
 The layer first applies the selected edge basis to every input coordinate, then learns coefficients
 with an ordinary linear map from the expanded features to `outDim`.
 -/
-def kanLayer (inDim outDim : Nat) (edge : KANEdgeFamily) (seedW seedB : Nat := 0) :
-    nn.Sequential (KANShape.vec inDim) (KANShape.vec outDim) :=
-  seq! edge.basis inDim, nn.pure.linear (inDim * edge.basisDim) outDim seedW seedB
+def kanLayer (inDim outDim : Nat) (edge : KANEdgeFamily) :
+    nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar)) :=
+  nn.Sequential![
+    nn.lift (edge.basis inDim),
+    nn.linear (inDim * edge.basisDim) outDim
+  ]
 
 /-- Recursive unbatched KAN stack. Hidden layers use `tanh`; the final layer is linear in bases. -/
 def kanGo (edge : KANEdgeFamily) :
-    (inDim : Nat) → (hidden : List Nat) → (outDim : Nat) → (seed : Nat) →
-      nn.Sequential (KANShape.vec inDim) (KANShape.vec outDim)
-  | inDim, [], outDim, seed =>
-      kanLayer inDim outDim edge seed (seed + 1)
-  | inDim, h :: hs, outDim, seed =>
-      let layer := kanLayer inDim h edge seed (seed + 1)
-      let act : nn.Sequential (KANShape.vec h) (KANShape.vec h) :=
-        nn.pure.tanh
-      let rest := kanGo edge h hs outDim (seed + 2)
-      seq! layer, act, rest
+    (inDim : Nat) → (hidden : List Nat) → (outDim : Nat) →
+      nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar))
+  | inDim, [], outDim => kanLayer inDim outDim edge
+  | inDim, h :: hs, outDim =>
+      nn.Sequential![kanLayer inDim h edge, nn.tanh, kanGo edge h hs outDim]
 
 /--
 Build a batched KAN model.
@@ -202,7 +188,9 @@ constructor.
 -/
 def KAN (cfg : KANConfig) :
     nn.M (nn.Sequential (kanInShape cfg) (kanOutShape cfg)) :=
-  pure <| nn.pure.batchPointwise cfg.batch (kanGo cfg.edge cfg.inDim cfg.hidden cfg.outDim cfg.seedBase)
+  do
+    let sample ← kanGo cfg.edge cfg.inDim cfg.hidden cfg.outDim
+    nn.mapLeading (.dim cfg.batch .scalar) sample
 
 end models
 end nn

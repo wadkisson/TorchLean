@@ -25,7 +25,7 @@ store those bits as JSON natural numbers.
 This is:
 - exact (round-trips every NaN payload and subnormal),
 - stable across locales, and
-- easy to validate (length = `Shape.size`).
+- easy to validate (length = `Spec.Shape.size`).
 
 The file layout is:
 
@@ -76,7 +76,7 @@ def tensorOfFlatListExact {α : Type} [Zero α] (tag : String) :
   | .scalar, xs =>
       throw s!"{tag}: expected 1 scalar, got {xs.length}"
   | .dim n rest, xs => do
-      let chunk := Shape.size rest
+      let chunk := Spec.Shape.size rest
       let expected := n * chunk
       if xs.length != expected then
         throw s!"{tag}: expected {expected} scalars for shape {Shape.toList (.dim n rest)}, got {xs.length}"

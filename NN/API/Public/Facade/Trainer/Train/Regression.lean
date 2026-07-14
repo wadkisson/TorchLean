@@ -91,7 +91,7 @@ def trainedHandle {σ τ : Shape} {α : Type}
   let verify :=
     fun (request : Regression.LInfIBPRequest σ) => do
       Manual.evalMode (task := trainer.task) runner
-      let params : ParamTensors α
+      let params : nn.ParamTensors α
           (NN.API.TorchLean.Supervised.paramShapes trainer.task) ←
         Manual.params (task := trainer.task) runner
       let params' : nn.ParamTensors α (nn.paramShapes trainer.model) :=

@@ -176,9 +176,9 @@ lean_lib NN where
     `NN.Examples.Models.Runner,
     `NN.Verification.CLI
   ]
+
   globs := #[
     .one `NN,
-    .one `NN.Library,
     .submodules `NN.Examples,
     .submodules `NN.Verification
   ]
@@ -279,7 +279,7 @@ lean_exe transcendentals_check where
 
 -- API documentation (HTML) via `lake build NN:docs`.
 require «doc-gen4» from git
-  "https://github.com/leanprover/doc-gen4" @ "v4.31.0"
+  "https://github.com/leanprover/doc-gen4" @ "v4.32.0"
 
 -- Comparator: a sandboxed judge for untrusted Lean proof submissions.
 -- We pin versions compatible with TorchLean's Lean toolchain.
@@ -291,4 +291,4 @@ require Comparator from git
 
 -- Keep `mathlib` last so Mathlib’s dependency versions win, which is required for cache tooling.
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "v4.31.0"
+  "https://github.com/leanprover-community/mathlib4" @ "v4.32.0"

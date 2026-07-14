@@ -565,7 +565,7 @@ end LogSoftmaxLastAxis
 def softmaxLast {Γ : List Shape} {m n : Nat}
     (idx : Idx Γ (.dim m (.dim n .scalar))) : Node Γ (.dim m (.dim n .scalar)) :=
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun xV =>
       castVec hsz.symm
@@ -707,7 +707,7 @@ def softmaxLast {Γ : List Shape} {m n : Nat}
 def logSoftmaxLast {Γ : List Shape} {m n : Nat}
     (idx : Idx Γ (.dim m (.dim n .scalar))) : Node Γ (.dim m (.dim n .scalar)) :=
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun xV =>
       castVec hsz.symm
@@ -787,12 +787,12 @@ def softmaxLastFderiv {Γ : List Shape} {m n : Nat}
     NodeFDerivCorrect (softmaxLast (Γ := Γ) (m := m) (n := n) idx) := by
   classical
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let getMN : CtxVec Γ → Vec (m * n) :=
     fun xV => castVec hsz (CtxVec.get (Γ := Γ) (s := s) idx xV)
   let getMNCLM : CtxVec Γ →L[ℝ] Vec (m * n) :=
     (Graph.castCLM (h := hsz)).comp (CtxVec.getCLM (Γ := Γ) (s := s) idx)
-  let outCast : Vec (m * n) →L[ℝ] Vec (Shape.size s) := Graph.castCLM (h := hsz.symm)
+  let outCast : Vec (m * n) →L[ℝ] Vec (Spec.Shape.size s) := Graph.castCLM (h := hsz.symm)
   refine
     { deriv := fun xV =>
         outCast.comp ((SoftmaxLastAxis.derivMN (m := m) (n := n) (getMN xV)).comp getMNCLM)
@@ -872,12 +872,12 @@ def logSoftmaxLastFderiv {Γ : List Shape} {m n : Nat}
     NodeFDerivCorrect (logSoftmaxLast (Γ := Γ) (m := m) (n := n) idx) := by
   classical
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let getMN : CtxVec Γ → Vec (m * n) :=
     fun xV => castVec hsz (CtxVec.get (Γ := Γ) (s := s) idx xV)
   let getMNCLM : CtxVec Γ →L[ℝ] Vec (m * n) :=
     (Graph.castCLM (h := hsz)).comp (CtxVec.getCLM (Γ := Γ) (s := s) idx)
-  let outCast : Vec (m * n) →L[ℝ] Vec (Shape.size s) := Graph.castCLM (h := hsz.symm)
+  let outCast : Vec (m * n) →L[ℝ] Vec (Spec.Shape.size s) := Graph.castCLM (h := hsz.symm)
   refine
     { deriv := fun xV =>
         outCast.comp ((LogSoftmaxLastAxis.derivMN (m := m) (n := n) (getMN xV)).comp getMNCLM)

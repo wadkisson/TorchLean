@@ -34,14 +34,14 @@ This matches the tensor definition in `NN/Spec/Core/Tensor/Core.lean`.
 
 ## Common utilities
 
-- `Shape.size : Shape → Nat` is the total number of scalar elements (“numel”).
+- `Spec.Shape.size : Shape → Nat` is the total number of scalar elements (“numel”).
 - `Shape.toList : Shape → List Nat` is a convenient runtime view used by front-ends and bridges.
 
 PyTorch analogy:
 
 - `Shape.toList s` corresponds to `tensor.shape` (a tuple of dimensions).
-- `Shape.rank s` corresponds to `tensor.ndim`.
-- `Shape.size s` corresponds to `tensor.numel()`.
+- `Spec.Shape.rank s` corresponds to `tensor.ndim`.
+- `Spec.Shape.size s` corresponds to `tensor.numel()`.
 
 ## Broadcasting and axes
 
@@ -83,6 +83,20 @@ inductive Shape where
 deriving DecidableEq, Repr
 
 namespace Shape
+
+/--
+Output length of a floor-mode sliding window with symmetric padding.
+
+For positive `kernel` and `stride` with `kernel ≤ input + 2 * padding`, this is
+`(input + 2 * padding - kernel) / stride + 1`. Invalid geometry has length zero, so saturated
+natural-number subtraction and division by zero cannot create a phantom output element.
+-/
+def slidingWindowOutDim (input kernel stride padding : Nat) : Nat :=
+  let padded := input + 2 * padding
+  if kernel = 0 || stride = 0 || padded < kernel then
+    0
+  else
+    (padded - kernel) / stride + 1
 
 /-- Build a shape from a list of dimensions (outermost first). -/
 def ofList : List Nat → Shape
@@ -133,10 +147,24 @@ def appendDim (s : Shape) (n : Nat) : Shape :=
   | .scalar => .dim n .scalar
   | .dim m rest => .dim m (appendDim rest n)
 
+/-- Concatenate two shapes, preserving the dimensions of the first shape as leading axes. -/
+def concat : Shape → Shape → Shape
+  | .scalar, suffix => suffix
+  | .dim n rest, suffix => .dim n (concat rest suffix)
+
 /-- Total number of scalar elements (a.k.a. “numel”). -/
 def size : Shape → Nat
   | .scalar => 1
   | .dim n rest => n * size rest
+
+/-- A shape consisting only of singleton axes contains one scalar. -/
+@[simp] theorem size_ofList_replicate_one (n : Nat) :
+    size (ofList (List.replicate n 1)) = 1 := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      rw [List.replicate_succ]
+      simp [ofList, size, ih]
 
 /-- `size` for a 2D shape factors as `a * b * size s`. -/
 theorem size_dim_mul (a b : Nat) (s : Shape) :
@@ -157,6 +185,13 @@ theorem size_appendDim (s : Shape) (n : Nat) : size (appendDim s n) = size s * n
   | dim m rest ih =>
       -- `appendDim` recurses to the innermost dimension; `size` is multiplicative.
       simp [appendDim, size, ih, Nat.mul_assoc]
+
+/-- The number of elements in a concatenated shape is the product of the two shape sizes. -/
+theorem size_concat (leading suffix : Shape) :
+    size (concat leading suffix) = size leading * size suffix := by
+  induction leading with
+  | scalar => simp [concat, size]
+  | dim n rest ih => simp [concat, size, ih, Nat.mul_assoc]
 
 /--
 Shape-size identity used in Transformer attention reshapes.
@@ -302,7 +337,7 @@ instance broadcastToExpandDims {n : Nat} {s₁ s₂ : Shape} [bc : BroadcastTo s
 
 /-- `true` iff two shapes have the same number of elements. -/
 def isValidReshape (s₁ s₂ : Shape) : Bool :=
-  Shape.size s₁ == Shape.size s₂
+  Spec.Shape.size s₁ == Spec.Shape.size s₂
 
 /-- Rank = number of dimensions (scalar has rank 0). -/
 def rank : Shape → Nat
@@ -321,10 +356,10 @@ For docs and examples, these aliases read more like PyTorch.
 /-- PyTorch-style name for `Shape.toList`. -/
 abbrev dims (s : Shape) : List Nat := toList s
 
-/-- PyTorch-style name for `Shape.rank`. -/
+/-- PyTorch-style name for `Spec.Shape.rank`. -/
 abbrev ndim (s : Shape) : Nat := rank s
 
-/-- PyTorch-style name for `Shape.size` ("numel"). -/
+/-- PyTorch-style name for `Spec.Shape.size` ("numel"). -/
 abbrev numel (s : Shape) : Nat := size s
 
 /-- Permute axes of a shape using a runtime permutation list (0-based). Returns `none` if invalid.
@@ -359,7 +394,7 @@ So we provide:
 PyTorch differences:
 
 - PyTorch allows negative axes (e.g. `dim=-1`); here we use `Nat` axes only (0-based).
-  A typical translation is: "last axis" = `Shape.rank s - 1` (when `rank s > 0`).
+  A typical translation is: "last axis" = `Spec.Shape.rank s - 1` (when `rank s > 0`).
 -/
 
 /--
@@ -407,12 +442,12 @@ Instance: axis `0` is valid for a nonzero outer dimension `n`.
 
 The proof converts `n ≠ 0` to the successor form used by the primitive `valid_axis` constructor.
 -/
-@[reducible] def validAxisInstZeroAlt {n s} (h : n ≠ 0) : valid_axis_inst 0 (.dim n s) :=
+abbrev validAxisInstZeroAlt {n s} (h : n ≠ 0) : valid_axis_inst 0 (.dim n s) :=
   let ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero h
   { proof := by rw [hm]; exact valid_axis.valid_zero }
 
 /-- Instance: axis `1` is valid for a 2D shape when both outer dims are nonzero. -/
-@[reducible] def validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
+abbrev validAxisInstOne {n1 n2 s} (h₁ : n1 ≠ 0) (h₂ : n2 ≠ 0) :
     valid_axis_inst 1 (.dim n1 (.dim n2 s)) :=
   let ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero h₁
   { proof := by
@@ -426,7 +461,7 @@ instance validAxisInstSucc {n s k} [inst : valid_axis_inst k s] : valid_axis_ins
 
 -- If a caller already has `n > 0`, this instance packages it as `n ≠ 0`.
 /-- Instance: axis `0` is valid if you have a positivity proof `n > 0` (converted to `n ≠ 0`). -/
-@[reducible] def validAxisInstZeroAlt2 {n s} (h : n > 0) : valid_axis_inst 0 (.dim n s) :=
+abbrev validAxisInstZeroAlt2 {n s} (h : n > 0) : valid_axis_inst 0 (.dim n s) :=
   validAxisInstZeroAlt (n := n) (s := s) (Nat.ne_of_gt h)
 
 -- Small lemma used at many call sites: positivity implies nonzero.
@@ -469,13 +504,13 @@ This is a small but useful bridge lemma: many reductions are only defined for no
 and `WellFormed` is our standard way of expressing that assumption.
 -/
 
-/-- If `s.well_formed`, then `Shape.size s > 0`. -/
-theorem size_pos_of_well_formed : ∀ {s : Shape}, s.wellFormed → 0 < Shape.size s
+/-- If `s.well_formed`, then `Spec.Shape.size s > 0`. -/
+theorem size_pos_of_well_formed : ∀ {s : Shape}, s.wellFormed → 0 < Spec.Shape.size s
   | .scalar, _ => by
-      simp [Shape.size]
+      simp [Spec.Shape.size]
   | .dim n s, hw => by
       rcases hw with ⟨hn, hs⟩
-      simpa [Shape.size] using Nat.mul_pos hn (size_pos_of_well_formed (s := s) hs)
+      simpa [Spec.Shape.size] using Nat.mul_pos hn (size_pos_of_well_formed (s := s) hs)
 
 -- Instance for the last axis (rank - 1) being valid for well-formed shapes
 /--
@@ -483,13 +518,13 @@ If `rank s > 0` and `s` is well-formed, then the last axis `rank s - 1` is valid
 
 This powers many "reduce over last dimension" specs where the axis is computed as `rank s - 1`.
 -/
-@[reducible] def validAxisLastInst {s : Shape} (h : Shape.rank s > 0) (hw : s.wellFormed) :
-  valid_axis_inst (Shape.rank s - 1) s := {
+abbrev validAxisLastInst {s : Shape} (h : Spec.Shape.rank s > 0) (hw : s.wellFormed) :
+  valid_axis_inst (Spec.Shape.rank s - 1) s := {
   proof := by
     -- We'll prove this using strong induction on the rank
-    suffices ∀ r : Nat, ∀ s' : Shape, Shape.rank s' = r → r > 0 → s'.wellFormed → valid_axis (r -
+    suffices ∀ r : Nat, ∀ s' : Shape, Spec.Shape.rank s' = r → r > 0 → s'.wellFormed → valid_axis (r -
       1) s' by
-      exact this (Shape.rank s) s rfl h hw
+      exact this (Spec.Shape.rank s) s rfl h hw
 
     intro r
     induction r using Nat.strong_induction_on with
@@ -497,39 +532,39 @@ This powers many "reduce over last dimension" specs where the axis is computed a
       intro s' hs' hr' hw'
       cases s' with
       | scalar =>
-        simp [Shape.rank] at hs'
+        simp [Spec.Shape.rank] at hs'
         rw [hs'] at hr'
         grind
       | dim n s'' =>
-        simp [Shape.rank] at hs' ⊢
+        simp [Spec.Shape.rank] at hs' ⊢
         -- Extract well-formedness properties
         have ⟨h_n_pos, hw''⟩ := hw'
         -- We know n > 0 from well-formedness
         obtain ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero (Nat.ne_of_gt h_n_pos)
         rw [hm]
-        -- We have Shape.rank s'' + 1 = r, so Shape.rank s'' = r - 1
-        have hs'' : Shape.rank s'' = r - 1 := by grind
+        -- We have Spec.Shape.rank s'' + 1 = r, so Spec.Shape.rank s'' = r - 1
+        have hs'' : Spec.Shape.rank s'' = r - 1 := by grind
         -- We need to prove valid_axis (r - 1) (.dim (m+1) s'')
-        -- Since r > 0, we have r - 1 = Shape.rank s''
+        -- Since r > 0, we have r - 1 = Spec.Shape.rank s''
         rw [← hs'']
 
-        cases Nat.eq_zero_or_pos (Shape.rank s'') with
+        cases Nat.eq_zero_or_pos (Spec.Shape.rank s'') with
         | inl h_zero =>
-          -- If Shape.rank s'' = 0, we need valid_axis 0 (.dim (m+1) s'')
+          -- If Spec.Shape.rank s'' = 0, we need valid_axis 0 (.dim (m+1) s'')
           rw [h_zero]
           exact valid_axis.valid_zero
         | inr h_pos_inner =>
-          -- If Shape.rank s'' > 0, use inductive hypothesis
-          have rank_eq : Shape.rank s'' = (Shape.rank s'' - 1) + 1 :=
+          -- If Spec.Shape.rank s'' > 0, use inductive hypothesis
+          have rank_eq : Spec.Shape.rank s'' = (Spec.Shape.rank s'' - 1) + 1 :=
             Eq.symm (Nat.sub_add_cancel (Nat.succ_le_of_lt h_pos_inner))
           rw [rank_eq]
           apply valid_axis.valid_succ
 
-          -- Apply IH: we need Shape.rank s'' < r, Shape.rank s'' > 0, and s''.well_formed
-          have h_lt : Shape.rank s'' < r := by
+          -- Apply IH: we need Spec.Shape.rank s'' < r, Spec.Shape.rank s'' > 0, and s''.well_formed
+          have h_lt : Spec.Shape.rank s'' < r := by
             rw [hs'']
             grind
-          exact ih (Shape.rank s'') h_lt s'' rfl h_pos_inner hw''
+          exact ih (Spec.Shape.rank s'') h_lt s'' rfl h_pos_inner hw''
 }
 
 /--
@@ -549,7 +584,7 @@ instance : WellFormed .scalar where
 
 -- If the inner shape is well-formed and the new dimension is positive, the result is well-formed.
 /-- If `s` is well-formed and `n > 0`, then `.dim n s` is well-formed. -/
-@[reducible] def wellFormedDimOfPos {n s} [WellFormed s] (h : n > 0) : WellFormed (.dim n s) where
+abbrev wellFormedDimOfPos {n s} [WellFormed s] (h : n > 0) : WellFormed (.dim n s) where
   proof := ⟨h, WellFormed.proof⟩
 
 -- Helper to create well-formedness for positive literals
@@ -583,8 +618,8 @@ In PyTorch this is `dim=-1` (after normalization). Here we stay in `Nat`, so the
 -/
 /-- Convenience instance: infer `valid_axis_inst (rank s - 1) s` from `WellFormed s` and `rank s >
   0`. -/
-@[reducible] def validAxisLastAuto {s : Shape} [h_wf : WellFormed s] (h : Shape.rank s > 0) :
-  Shape.valid_axis_inst (Shape.rank s - 1) s :=
+abbrev validAxisLastAuto {s : Shape} [h_wf : WellFormed s] (h : Spec.Shape.rank s > 0) :
+  Shape.valid_axis_inst (Spec.Shape.rank s - 1) s :=
   validAxisLastInst h h_wf.proof
 
 /-!
@@ -598,7 +633,7 @@ Why both exist:
 This function is the adapter between the two views.
 -/
 /-- Convert a `valid_axis` proof into a structurally convenient `reducibleAlong` proof. -/
-def proveReducibleAlong (axis : Nat) (s : Shape) (h : valid_axis axis s) : reducibleAlong axis s
+theorem proveReducibleAlong (axis : Nat) (s : Shape) (h : valid_axis axis s) : reducibleAlong axis s
   :=
   match h with
   | valid_axis.valid_zero => reducibleAlong.head

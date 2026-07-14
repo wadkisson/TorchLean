@@ -4,11 +4,18 @@ This directory contains TorchLean's floating point backends and the theory that 
 
 - `FP32/`: a proof oriented, finite float32 model based on rounding over `ℝ`.
 - `NeuralFloat/`: generic rounding over `ℝ` (`NeuralRadix`, `NF`, rounding, ULPs, and error bounds).
+- `Calc/`: constructive mantissa/exponent calculations, including brackets, rounding decisions,
+  truncation, and exact arithmetic on float representations.
 - `IEEEExec/`: an executable IEEE-754 binary32 kernel (`IEEE32Exec`) plus bridge theorems to `FP32`.
 - `Interval/`: interval and enclosure utilities, including quantized intervals over `ℝ` and executable endpoint intervals.
 - `Arb/`: an external Arb/FLINT oracle backend (python-flint) for ball and interval enclosures.
 
-If you want the whole float chapter, import `NN.Entrypoint.Floats`. If you only want a single
+The generic theory is a native Lean development informed by Flocq's organization and results. It is
+not a claim that every Coq module has been translated. TorchLean keeps the parts used by its tensor,
+error-analysis, verification, and runtime-refinement developments, and proves executable binary32
+behavior separately under `IEEEExec/`.
+
+If you want the whole float chapter, import `NN.Floats`. If you only want a single
 float32 name to depend on, import `NN.Floats.Float32`.
 
 Executable examples that exercise this infrastructure live under `NN/Examples/`.
@@ -20,6 +27,7 @@ Executable examples that exercise this infrastructure live under `NN/Examples/`.
 | executable binary32 values inside Lean | `IEEEExec` |
 | finite float32-as-rounded-real error bounds | `FP32` |
 | precision-parametric rounding and ULP facts | `NeuralFloat` / `NF` |
+| the mantissa and exponent produced by a rounding operation | `Calc`, specialized through `FP32` when appropriate |
 | interval enclosures with directed endpoints | `Interval` |
 | high-precision external enclosure evidence | `Arb`, with the oracle boundary named |
 | CUDA, ATen/libtorch, or Lean runtime `Float` | a runtime bridge or `TRUST_BOUNDARIES.md` assumption |
@@ -82,12 +90,22 @@ Why we keep it:
 - it lets us reuse the same reasoning patterns for float32 and other formats.
 
 Where to look:
-- `NN/Floats/NeuralFloat/Core.lean`, `NN/Floats/NeuralFloat/Formats.lean`, `NN/Floats/NeuralFloat/Rounding.lean`,
-- `NN/Floats/NeuralFloat/NF.lean` and `NN/Floats/NeuralFloat/ErrorBounds.lean`.
+- `NN/Floats/NeuralFloat/Format.lean` for representable grids,
+- `NN/Floats/NeuralFloat/Rounding.lean` for rounding semantics,
+- `NN/Floats/NeuralFloat/Scalar.lean` for `NF`,
+- `NN/Floats/NeuralFloat/Analysis.lean` and `NN/Floats/NeuralFloat/Error.lean` for numerical bounds.
 
 ## How The Bridge Layers Fit Together
 
-`IEEE32Exec` is executable; `FP32` and `NF` are aimed at proofs. The bridge files connect them:
+`IEEE32Exec` is executable; `FP32` and `NF` are aimed at proofs. `Calc` supplies representation-level
+arithmetic between them. Given a bracket for an exact value, it records the value's position between
+adjacent representable numbers, makes the rounding-mode decision, and returns a `NeuralFloat`
+mantissa and exponent. Theorems in `FP32/Core.lean` identify the real value of that representation
+with `fp32Round`. Thus `Calc` is not another floating-point semantics: it exposes the integer
+calculation underlying the rounding operation used by the proof model. Calculations starting from an
+arbitrary Lean real remain noncomputable; executable runs use `IEEE32Exec` or a named runtime backend.
+
+The bridge files then connect the executable bit model to that result:
 
 - `NN/Floats/IEEEExec/BridgeFP32.lean`: core refinement theorems on the **finite/no-overflow** path:
   `toReal (op_exec …) = fp32Round (op_real …)`.
@@ -97,6 +115,10 @@ Where to look:
 - `NN/Floats/IEEEExec/BridgeERealTotal.lean`: an `EReal`-valued semantics that distinguishes `+∞` and `-∞`.
 - `NN/Floats/IEEEExec/BridgeInitFloat32.lean`: an assumption based bridge from Lean's runtime
   `Init.Float32` to `IEEE32Exec`, at the bit level.
+
+`NN/Examples/DeepDives/Floats/EffectiveRounding.lean` follows one shaped tensor addition through the
+rounded-real and executable IEEE paths. Its theorems expose the computed mantissa/exponent result on
+both sides of the finite bridge.
 
 For native CUDA and ATen/libtorch paths, the bridge is not in this folder by default. Those backends
 are runtime providers. A proof layer float claim should say which Lean model it uses and where the

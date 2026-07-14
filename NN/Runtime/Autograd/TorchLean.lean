@@ -9,7 +9,7 @@ module
 public import NN.Runtime.Autograd.TorchLean.Autodiff
 public import NN.Runtime.Autograd.TorchLean.Backend
 public import NN.Runtime.Autograd.TorchLean.Fft
-public import NN.Runtime.Autograd.TorchLean.Fno1d
+public import NN.Runtime.Autograd.TorchLean.Fno
 public import NN.Runtime.Autograd.TorchLean.Functional
 public import NN.Runtime.Autograd.TorchLean.Loss
 public import NN.Runtime.Autograd.TorchLean.Metrics

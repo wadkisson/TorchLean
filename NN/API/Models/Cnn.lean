@@ -9,85 +9,70 @@ module
 public import NN.API.Public
 
 /-!
-# CNN Model Helpers (API)
+# Convolutional Classifier
 
-Small config-style CNN constructors for runnable examples.
+The classifier is polymorphic in the number of spatial axes. Its input has shape
+`(batch, channels, spatial...)`; convolution and pooling use the same vector-valued configuration
+for signals, images, volumes, and higher-dimensional data.
 -/
 
 @[expose] public section
 
 namespace NN
 namespace API
-
-open Spec Tensor
-
 namespace nn
 namespace models
 
-/-- Configuration for a compact convolutional image classifier. -/
-structure CnnConfig where
+/-- Configuration for a compact convolutional classifier. -/
+structure CnnConfig (d : Nat) where
+  /-- Number of independent samples processed together. -/
   batch : Nat
-  inC : Nat
-  inH : Nat
-  inW : Nat
+  /-- Number of channels in each input sample. -/
+  inChannels : Nat
+  /-- Extent of each spatial axis. -/
+  spatial : Vector Nat d
+  /-- Number of classifier outputs per sample. -/
   outDim : Nat
-  conv : nn.Conv := { outC := 16, kH := 3, kW := 3, stride := 2, padding := 1 }
-  pool : nn.MaxPool := { kH := 2, kW := 2, stride := 2 }
+  /-- Convolution stage. -/
+  conv : Conv d
+  /-- Max-pooling stage. -/
+  pool : Pool d
 
-/-- Height after the convolution stage. -/
-def CnnConfig.firstConvOutHeight (cfg : CnnConfig) : Nat :=
-  (cfg.inH + 2 * cfg.conv.padding - cfg.conv.kH) / cfg.conv.stride + 1
+/-- Spatial extent after convolution. -/
+def CnnConfig.afterConv {d : Nat} (cfg : CnnConfig d) : Vector Nat d :=
+  Spec.convOutSpatial cfg.spatial cfg.conv.kernel cfg.conv.stride cfg.conv.padding
 
-/-- Width after the convolution stage. -/
-def CnnConfig.firstConvOutWidth (cfg : CnnConfig) : Nat :=
-  (cfg.inW + 2 * cfg.conv.padding - cfg.conv.kW) / cfg.conv.stride + 1
+/-- Spatial extent after pooling. -/
+def CnnConfig.afterPool {d : Nat} (cfg : CnnConfig d) : Vector Nat d :=
+  Spec.poolOutSpatialPad cfg.afterConv cfg.pool.kernel cfg.pool.stride cfg.pool.padding
 
-/-- Height after the pooling stage. -/
-def CnnConfig.pooledOutHeight (cfg : CnnConfig) : Nat :=
-  (cfg.firstConvOutHeight - cfg.pool.kH) / cfg.pool.stride + 1
+/-- Number of features presented to the classifier head. -/
+def CnnConfig.featureCount {d : Nat} (cfg : CnnConfig d) : Nat :=
+  Spec.Shape.size (Spec.Shape.ofList (cfg.conv.outChannels :: cfg.afterPool.toList))
 
-/-- Width after the pooling stage. -/
-def CnnConfig.pooledOutWidth (cfg : CnnConfig) : Nat :=
-  (cfg.firstConvOutWidth - cfg.pool.kW) / cfg.pool.stride + 1
+/-- Input tensor shape `(batch, inChannels, spatial...)`. -/
+def cnnInShape {d : Nat} (cfg : CnnConfig d) : Spec.Shape :=
+  .dim cfg.batch (Spec.Shape.ofList (cfg.inChannels :: cfg.spatial.toList))
 
-/-- Flattened feature size entering the classifier head. -/
-def CnnConfig.featSize (cfg : CnnConfig) : Nat :=
-  Spec.Shape.size (NN.Tensor.Shape.CHW cfg.conv.outC cfg.pooledOutHeight cfg.pooledOutWidth)
+/-- Classifier output shape `(batch, outDim)`. -/
+def cnnOutShape {d : Nat} (cfg : CnnConfig d) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.outDim .scalar)
 
-/-- Batched image input shape for `cnn`. -/
-abbrev cnnInShape (cfg : CnnConfig) : Shape :=
-  NN.Tensor.Shape.NCHW cfg.batch cfg.inC cfg.inH cfg.inW
-
-/-- Batched logits output shape for `cnn`. -/
-abbrev cnnOutShape (cfg : CnnConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.outDim
-
-/--
-Build a compact CNN classifier:
-`conv -> relu -> maxPool -> flatten -> linear`.
--/
-def cnn (cfg : CnnConfig)
-    (h_inC : cfg.inC ≠ 0 := by decide)
-    (h_kH : cfg.conv.kH ≠ 0 := by decide)
-    (h_kW : cfg.conv.kW ≠ 0 := by decide)
-    (h_poolKH : cfg.pool.kH ≠ 0 := by decide)
-    (h_poolKW : cfg.pool.kW ≠ 0 := by decide) :
-    nn.M (nn.Sequential (cnnInShape cfg) (cnnOutShape cfg)) :=
-  letI : NeZero cfg.inC := ⟨h_inC⟩
-  letI : NeZero cfg.conv.kH := ⟨h_kH⟩
-  letI : NeZero cfg.conv.kW := ⟨h_kW⟩
-  letI : NeZero cfg.pool.kH := ⟨h_poolKH⟩
-  letI : NeZero cfg.pool.kW := ⟨h_poolKW⟩
+/-- Build `convolution -> activation -> max pool -> flatten -> linear`. -/
+def cnn {d : Nat} (cfg : CnnConfig d) (hInChannels : cfg.inChannels ≠ 0 := by decide) :
+    M (Sequential (cnnInShape cfg) (cnnOutShape cfg)) :=
+  letI : NeZero cfg.inChannels := ⟨hInChannels⟩
+  let convolution := conv (leading := .dim cfg.batch .scalar) cfg.spatial cfg.conv
+  let pooling := maxPool (leading := .dim cfg.batch .scalar) cfg.afterConv cfg.pool
   nn.Sequential![
-    nn.conv cfg.conv,
-    ReLU,
-    maxPool cfg.pool,
-    FlattenBatch,
-    Linear cfg.featSize cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    convolution,
+    relu,
+    pooling,
+    flattenBatch,
+    linear cfg.featureCount cfg.outDim (pfx := .dim cfg.batch .scalar)
   ]
 
 end models
 end nn
-
 end API
 end NN

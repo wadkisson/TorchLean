@@ -136,9 +136,9 @@ running statistics.
 -/
 
 lemma hsz_chw_mat {channels height width : Nat} :
-    Shape.size (CHWShape channels height width) = Shape.size (MatShape channels (hw height width))
+    Spec.Shape.size (CHWShape channels height width) = Spec.Shape.size (MatShape channels (hw height width))
       := by
-  simp [hw, Shape.size]
+  simp [hw, Spec.Shape.size]
 
 /-- Reshape `x : C×H×W` into a matrix `xMat : C×(H*W)` (flatten spatial dimensions). -/
 def nodeXMat {channels height width : Nat} :
@@ -729,7 +729,7 @@ of `sqrt` (after clamp) and `inv` at the actual execution point.
 def batchNormGraphFderivCorrectAt
     {channels height width : Nat} (ε : ℝ) (xV : CtxVec (ΓBN channels height width))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (VecShape channels)),
+      ∀ i : Fin (Spec.Shape.size (VecShape channels)),
         0 < CtxVec.get (Γ := ΓBN channels height width ++ ssPrefixVarEps channels height width)
               (s := VecShape channels)
               (idxVarEps (channels := channels) (height := height) (width := width))
@@ -738,7 +738,7 @@ def batchNormGraphFderivCorrectAt
                 (batchNormPrefixVarEps (channels := channels) (height := height) (width := width) ε)
                   xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (VecShape channels)),
+      ∀ i : Fin (Spec.Shape.size (VecShape channels)),
         CtxVec.get (Γ := ΓBN channels height width ++ ssPrefixStd channels height width)
               (s := VecShape channels)
               (idxStd (channels := channels) (height := height) (width := width))
@@ -1063,7 +1063,7 @@ theorem backprop_eq_adjoint_fderiv_batchNorm_channel_first_at
     (xV : CtxVec (ΓBN channels height width))
     (seedV : CtxVec (ΓBN channels height width ++ ssBatchNorm channels height width))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (VecShape channels)),
+      ∀ i : Fin (Spec.Shape.size (VecShape channels)),
         0 < CtxVec.get (Γ := ΓBN channels height width ++ ssPrefixVarEps channels height width)
               (s := VecShape channels)
               (idxVarEps (channels := channels) (height := height) (width := width))
@@ -1072,7 +1072,7 @@ theorem backprop_eq_adjoint_fderiv_batchNorm_channel_first_at
                 (batchNormPrefixVarEps (channels := channels) (height := height) (width := width) ε)
                   xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (VecShape channels)),
+      ∀ i : Fin (Spec.Shape.size (VecShape channels)),
         CtxVec.get (Γ := ΓBN channels height width ++ ssPrefixStd channels height width)
               (s := VecShape channels)
               (idxStd (channels := channels) (height := height) (width := width))

@@ -160,7 +160,7 @@ unbatched `C×H×W` input).
 -/
 def chwBatchStats {α : Type} [Context α]
     {channels height width : Nat}
-    (x : Tensor α (NN.Tensor.Shape.CHW channels height width)) :
+    (x : Tensor α (.dim channels (.dim height (.dim width .scalar)))) :
     Tensor α (.dim channels .scalar) × Tensor α (.dim channels .scalar) :=
   let means : Tensor α (.dim channels .scalar) :=
     Tensor.dim (fun c =>
@@ -204,7 +204,7 @@ PyTorch analogy: the batch statistics computed by `torch.nn.BatchNorm2d` in trai
 -/
 def nchwBatchStats {α : Type} [Context α]
     {n c h w : Nat}
-    (x : Tensor α (NN.Tensor.Shape.NCHW n c h w)) :
+    (x : Tensor α (.dim n (.dim c (.dim h (.dim w .scalar))))) :
     Tensor α (.dim c .scalar) × Tensor α (.dim c .scalar) :=
   let means : Tensor α (.dim c .scalar) :=
     Tensor.dim (fun ch =>
@@ -292,7 +292,7 @@ def forwardTensor {σ τ : Shape} (l : LayerDef σ τ) (mode : Mode)
     (paramShapes := l.paramShapes) (inputShapes := [σ]) (τ := τ)
     (l.forward mode)
   let args : Torch.TList α (l.paramShapes ++ [σ]) :=
-    Torch.Proofs.Autograd.Algebra.TList.append (α := α) (ss₁ := l.paramShapes) (ss₂ := [σ]) ps
+    _root_.Proofs.Autograd.Algebra.TList.append (α := α) (ss₁ := l.paramShapes) (ss₂ := [σ]) ps
       (.cons x .nil)
   pure <| _root_.Runtime.Autograd.Torch.CompiledGraph.forward compiled args
 

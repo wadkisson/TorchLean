@@ -27,13 +27,13 @@ open Tensor
 namespace Tape
 
 /--
-Flatten a tensor `s` into a 1D vector of length `Shape.size s`.
+Flatten a tensor `s` into a 1D vector of length `Spec.Shape.size s`.
 
 PyTorch comparison: `torch.flatten(x)` with `start_dim=0`.
 -/
 def flatten {α : Type} [Inhabited α] [DecidableEq Shape] {s : Shape}
   (t : Tape α) (xId : Nat) : Result (Tape α × Nat) :=
-  unary (α := α) (t := t) (σ := s) (τ := .dim (Shape.size s) .scalar)
+  unary (α := α) (t := t) (σ := s) (τ := .dim (Spec.Shape.size s) .scalar)
     "flatten" xId
     (forward := fun x => flattenSpec (α := α) x)
     (backward := fun _x dLdz => unflattenSpec (α := α) s dLdz)
@@ -41,11 +41,11 @@ def flatten {α : Type} [Inhabited α] [DecidableEq Shape] {s : Shape}
 /--
 Reshape a tensor while preserving number of elements.
 
-The proof argument `h` enforces `Shape.size s₁ = Shape.size s₂`.
+The proof argument `h` enforces `Spec.Shape.size s₁ = Spec.Shape.size s₂`.
 PyTorch comparison: `x.reshape(new_shape)` / `x.view(new_shape)` (when valid).
 -/
 def reshape {α : Type} [Inhabited α] [DecidableEq Shape] {s₁ s₂ : Shape}
-  (t : Tape α) (xId : Nat) (h : Shape.size s₁ = Shape.size s₂) : Result (Tape α × Nat) :=
+  (t : Tape α) (xId : Nat) (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) : Result (Tape α × Nat) :=
   unary (α := α) (t := t) (σ := s₁) (τ := s₂)
     "reshape" xId
     (forward := fun x => reshapeSpec (α := α) (s₁ := s₁) (s₂ := s₂) x h)

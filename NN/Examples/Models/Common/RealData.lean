@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Data.RealPaths
 public import NN.Examples.Models.Common.Train
 
@@ -70,17 +70,17 @@ instance : NeZero imagenet64Classes := ⟨by decide⟩
 
 /-- Shape of one CIFAR-10 image after conversion to CHW layout. -/
 abbrev CifarImage : Shape :=
-  Shape.image cifarChannels cifarHeight cifarWidth
+  .dim cifarChannels (.dim cifarHeight (.dim cifarWidth .scalar))
 
 /-- One-hot CIFAR-10 target shape. -/
 abbrev CifarTarget : Shape :=
-  Shape.vec cifarClasses
+  .dim cifarClasses .scalar
 
 /-- Take the top-left `h × w` view of a CIFAR image batch. -/
 def cropCifarImages (batch h w : Nat)
     (hH : h ≤ cifarHeight) (hW : w ≤ cifarWidth)
-    (x : Tensor.T Float (Shape.images batch cifarChannels cifarHeight cifarWidth)) :
-    Tensor.T Float (Shape.images batch cifarChannels h w) :=
+    (x : Tensor.T Float (.dim batch (.dim cifarChannels (.dim cifarHeight (.dim cifarWidth .scalar))))) :
+    Tensor.T Float (.dim batch (.dim cifarChannels (.dim h (.dim w .scalar)))) :=
   Spec.Tensor.dim (fun bi =>
     let img := Spec.getAtSpec x bi
     Spec.Tensor.dim (fun ch =>
@@ -96,12 +96,12 @@ def cropCifarImages (batch h w : Nat)
 def cropCifarBatch (batch h w : Nat)
     (hH : h ≤ cifarHeight) (hW : w ≤ cifarWidth)
     (sample : Sample.Batch Float batch CifarImage CifarTarget) :
-    SupervisedSample Float (Shape.images batch cifarChannels h w) (Shape.mat batch cifarClasses) :=
+    SupervisedSample Float (.dim batch (.dim cifarChannels (.dim h (.dim w .scalar)))) (.dim batch (.dim cifarClasses .scalar)) :=
   Sample.mk (cropCifarImages batch h w hH hW (Sample.x sample)) (Sample.y sample)
 
 /-- ImageNet-style converted image shape used by the higher-resolution diffusion example. -/
 abbrev ImageNet64Image : Shape :=
-  Shape.image imagenet64Channels imagenet64Height imagenet64Width
+  .dim imagenet64Channels (.dim imagenet64Height (.dim imagenet64Width .scalar))
 
 /--
 One-hot target shape for ImageNet-style folders.
@@ -110,7 +110,7 @@ The diffusion example ignores labels, but reusing `Data.LabeledSource` keeps the
 to the supervised examples and lets class-directory conversion catch malformed labels early.
 -/
 abbrev ImageNet64Target : Shape :=
-  Shape.vec imagenet64Classes
+  .dim imagenet64Classes .scalar
 
 /-- Error message shown when a CIFAR-backed example cannot find the prepared arrays. -/
 def missingCifarHint : String :=
@@ -365,7 +365,7 @@ def cifarCurve
     (extraNotes : Options → CifarLoggedTrainFlags → Array String := fun _ _ => #[])
     (train : Options → CifarLoggedTrainFlags → IO Training.Curve) :
     IO UInt32 :=
-  Trainer.Command.runParsedWith exeName args
+  TrainCommand.runParsedWith exeName args
     (fun rest => do
       let flags ← CifarLoggedTrainFlags.parse exeName rest defaultLogPath defaultSteps
       pure (flags, []))
@@ -446,7 +446,7 @@ The file paths and download hints remain in `NN.Examples`, while the flattening 
 public generative-model API so users can reuse it with their own image tensors.
 -/
 def loadCifarVectorBatch (cfg : nn.models.VectorGenerativeConfig)
-    (hData : cfg.dataDim ≤ Shape.size CifarImage)
+    (hData : cfg.dataDim ≤ Spec.Shape.size CifarImage)
     (exeName : String) (xPath yPath : System.FilePath) (nRows seed : Nat) :
     IO (Tensor.T Float (nn.models.vectorDataShape cfg)) := do
   let batchSample ← loadCifarBatch exeName cfg.batch nRows seed xPath yPath
@@ -462,7 +462,7 @@ command still works across the ordinary public runtime backends.
 -/
 def cifarVectorDataset {τ : Shape}
     (cfg : nn.models.VectorGenerativeConfig)
-    (hData : cfg.dataDim ≤ Shape.size CifarImage)
+    (hData : cfg.dataDim ≤ Spec.Shape.size CifarImage)
     (exeName : String)
     (mkSample : Tensor.T Float (nn.models.vectorDataShape cfg) →
       SupervisedSample Float (nn.models.vectorDataShape cfg) τ)

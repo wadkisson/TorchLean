@@ -68,8 +68,7 @@ lemma approx_safeDiv_nf {x y : ℝ} {xR yR : R} {epsx epsy ε : ℝ}
         neuralUlp β fexp
             (safeDiv (ε := ε)
               (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
-              (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR))
-            TrainingPhase.forward / 2 := by
+              (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)) / 2 := by
   set xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   set yhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) yR
   set uhat : ℝ := max yhat ε
@@ -104,7 +103,7 @@ lemma approx_safeDiv_nf {x y : ℝ} {xR yR : R} {epsx epsy ε : ℝ}
           (toSpec (β := β) (fexp := fexp) (rnd := rnd)
               (safeDivR (β := β) (fexp := fexp) (rnd := rnd) ε xR yR) -
             safeDiv (ε := ε) xhat yhat) ≤
-        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) / 2 := by
     simpa [safeDivR, safeDiv, xhat, yhat, toSpec, TorchLean.Floats.NF.toReal,
       TorchLean.Floats.NF.ofReal,
       TorchLean.Floats.NF.roundR, Proofs.RuntimeRoundingApprox.roundR] using
@@ -223,11 +222,11 @@ lemma approx_safeDiv_nf {x y : ℝ} {xR yR : R} {epsx epsy ε : ℝ}
                 (safeDiv (ε := ε) xhat yhat)
                 (safeDiv (ε := ε) x y)
       _ ≤
-        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) TrainingPhase.forward / 2 +
+        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) / 2 +
           ((1 / ε) * epsx + (abs xhat + epsx) * (epsy / (ε * ε))) := by
             exact add_le_add hround hdiff
       _ = (1 / ε) * epsx + (abs xhat + epsx) * (epsy / (ε * ε)) +
-        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) TrainingPhase.forward / 2 := by
+        neuralUlp β fexp (safeDiv (ε := ε) xhat yhat) / 2 := by
             ring
 
   simpa [xhat, yhat] using this
@@ -242,7 +241,7 @@ def safeDivBoundTensor {s : Shape} (ε epsx epsy : ℝ) (xR yR : Tensor R s) : S
     (fun a b =>
       (1 / ε) * epsx +
         (abs a + epsx) * (epsy / (ε * ε)) +
-        neuralUlp β fexp (safeDiv (ε := ε) a b) TrainingPhase.forward / 2)
+        neuralUlp β fexp (safeDiv (ε := ε) a b) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
 
@@ -271,7 +270,7 @@ theorem approxT_safeDiv_spec {s : Shape} (ε : ℝ) (hε : 0 < ε) :
       (bnd := fun a b epsx epsy =>
         (1 / ε) * epsx +
           (abs a + epsx) * (epsy / (ε * ε)) +
-          neuralUlp β fexp (safeDiv (ε := ε) a b) TrainingPhase.forward / 2)
+          neuralUlp β fexp (safeDiv (ε := ε) a b) / 2)
       (xS := xS) (yS := yS) (xR := xR) (yR := yR) (epsx := epsx) (epsy := epsy) hx hy (by
         intro x y xR yR hx hy
         simpa using
@@ -294,7 +293,7 @@ def sigmoidBoundScalar (xR : R) : ℝ :=
   let oneHat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) oneR
   let denomHat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) denomR
   let qhat : ℝ := oneHat / denomHat
-  neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+  neuralUlp β fexp qhat / 2 +
     abs oneHat * abs (1 / denomHat) + abs oneHat + oneEps (β := β) (fexp := fexp)
 
 /-- Per-entry bound tensor for `sigmoid`. -/

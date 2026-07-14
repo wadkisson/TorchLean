@@ -78,7 +78,7 @@ Practical checklist:
 
 6. Hook it into the public spec entrypoint
    - Add an import in the relevant focused umbrella, such as `NN/Spec/Models.lean`.
-   - If it should be part of the whole spec doorway, make sure `NN/Entrypoint/Spec.lean` reaches that
+   - If it should be part of the complete spec import, make sure `NN/Spec.lean` reaches that
      umbrella.
    - If it should be part of ordinary model code, also expose a clean root spelling through
      `NN.lean` or the public model API.
@@ -91,7 +91,7 @@ Practical checklist:
 
 8. Build the files you touched
    - `lake build NN.Spec.Models.<your_model>`
-   - If you updated the spec entrypoint: `lake build NN.Entrypoint.Spec`
+   - If you updated the spec entrypoint: `lake build NN.Spec`
 
 ## Common Pitfalls
 

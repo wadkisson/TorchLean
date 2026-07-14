@@ -186,7 +186,7 @@ private def buildDerivativeGraph1D {α : Type} [Context α]
   let mkConstFill : Shape → α → DerivBuildM α Nat := fun outShape x => do
     let id ← pushNode [] (.const outShape) outShape
     modify fun st =>
-      { st with ps := addConstVal (α := α) st.ps id (constVecFill (α := α) (Shape.size outShape) x) }
+      { st with ps := addConstVal (α := α) st.ps id (constVecFill (α := α) (Spec.Shape.size outShape) x) }
     pure id
 
   let setDerivativeId : Nat → Nat → DerivBuildM α Unit := fun i did => do
@@ -975,36 +975,36 @@ Parse CLI arguments and either:
 - verify a single segment specified inline via `--rhs`, `--t0`, `--t1`, etc.
 -/
 def runArgs (args : List String) : IO Unit := do
-  let args := NN.API.CLI.dropDashDash args
+  let args := TorchLean.CLI.dropDashDash args
   let backendParsed :=
-    NN.API.CLI.takeParsedFlagDefault args "model" "direct" parseModelBackendNameE
-  let (backend, args) ← NN.API.CLI.orThrow backendParsed
+    TorchLean.CLI.takeParsedFlagDefault args "model" "direct" parseModelBackendNameE
+  let (backend, args) ← TorchLean.CLI.orThrowIO backendParsed
   let scalarParsed :=
-    NN.API.CLI.takeParsedFlagDefault args "scalar" "float" parseScalarNameE
-  let (scalarBackend, args) ← NN.API.CLI.orThrow scalarParsed
-  let (cert?, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFlagValueOnce args "cert"
+    TorchLean.CLI.takeParsedFlagDefault args "scalar" "float" parseScalarNameE
+  let (scalarBackend, args) ← TorchLean.CLI.orThrowIO scalarParsed
+  let (cert?, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeFlagValueOnce args "cert"
   match cert? with
   | some p => do
-      NN.API.CLI.orThrow (NN.API.CLI.requireNoArgs args)
+      TorchLean.CLI.orThrowIO (TorchLean.CLI.checkNoArgs args)
       runCertificate p (some backend) (some scalarBackend)
   | none =>
-    let (rhsS, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFlagValue args "rhs" (some "missing --rhs=<expr>")
-    let (t0, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFloatFlag args "t0" (some "missing --t0=<float>")
-    let (t1, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFloatFlag args "t1" (some "missing --t1=<float>")
-    let (initF, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFloatFlag args "init" (some "missing --init=<float>")
-    let (lw, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFlagValue args "lower" (some "missing --lower=<weights.json>")
-    let (uw, args) ← NN.API.CLI.orThrow <|
-      NN.API.CLI.takeRequiredFlagValue args "upper" (some "missing --upper=<weights.json>")
-    let (maxDepth, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeNatFlagDefault args "maxDepth" 18
-    let (minWidth, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFloatFlagDefault args "minWidth" 1e-3
-    let (slack, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeFloatFlagDefault args "slack" 0.0
-    let (verbose, args) ← NN.API.CLI.orThrow <| NN.API.CLI.takeBoolValueFlagDefault args "verbose" false
-    NN.API.CLI.orThrow (NN.API.CLI.requireNoArgs args)
+    let (rhsS, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFlagValue args "rhs" (some "missing --rhs=<expr>")
+    let (t0, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFloatFlag args "t0" (some "missing --t0=<float>")
+    let (t1, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFloatFlag args "t1" (some "missing --t1=<float>")
+    let (initF, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFloatFlag args "init" (some "missing --init=<float>")
+    let (lw, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFlagValue args "lower" (some "missing --lower=<weights.json>")
+    let (uw, args) ← TorchLean.CLI.orThrowIO <|
+      TorchLean.CLI.takeRequiredFlagValue args "upper" (some "missing --upper=<weights.json>")
+    let (maxDepth, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeNatFlagDefault args "maxDepth" 18
+    let (minWidth, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeFloatFlagDefault args "minWidth" 1e-3
+    let (slack, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeFloatFlagDefault args "slack" 0.0
+    let (verbose, args) ← TorchLean.CLI.orThrowIO <| TorchLean.CLI.takeBoolValueFlagDefault args "verbose" false
+    TorchLean.CLI.orThrowIO (TorchLean.CLI.checkNoArgs args)
     let init := (initF, initF)
     let rhsAst ←
       match Parse.parseExpr rhsS with

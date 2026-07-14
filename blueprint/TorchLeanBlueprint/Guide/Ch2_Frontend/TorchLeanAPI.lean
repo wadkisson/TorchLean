@@ -7,42 +7,37 @@ open Verso.Genre Manual
 tag := "torchlean-api"
 %%%
 
-The public API starts with two lines:
+An application file normally starts with two lines:
 
 ```
-import NN
+import NN.API
 open TorchLean
 ```
 
-Those two lines are enough for ordinary examples. They give access to the names used throughout the
-tutorials: `nn` for models, `Data` for datasets, `Trainer` for training and reports, `optim` for
-optimizers, and `autograd` for explicit differentiation tools.
+This imports the model, data, training, and differentiation API without importing every proof and
+verification module. The larger `import NN` umbrella includes the same public API together with the
+rest of TorchLean; guide files use it when an example crosses those subsystem boundaries.
 
 The public namespaces divide responsibilities as follows:
 
 - `nn` builds models;
+- `classical` provides KNN, tree, regression, mixture, and related model definitions;
 - `Data` builds datasets and loaders;
 - `Trainer` runs training, prediction, callbacks, and reports;
 - `optim` configures updates;
 - `autograd` exposes explicit gradient tools when the trainer is not enough.
 
-The first thing to keep in mind is the layering:
-
-- `NN` is the canonical import; `TorchLean` remains the public namespace.
-- `NN.API.Public` backs the `TorchLean.*` namespaces exported by `NN`.
-- `NN.API.Runtime` exposes the executable runtime layer.
-- `NN.API.TorchLean` is the namespace that the runtime layer re-exports for ordinary code.
-- `NN.Entrypoint.*` modules provide focused imports for specialized proof or runtime paths.
-
-Rule of thumb: use `import NN` and `open TorchLean` first. Drop to the runtime layer only
-when the runtime itself is the subject.
+`NN.API` is the centralized public import. The definitions behind it are divided into focused
+modules so that TorchLean itself can be developed without import cycles, but application code does
+not need to know that internal layout. Direct imports such as `NN.Spec`, `NN.Runtime`, and
+`NN.Proofs` are available for files devoted to one subsystem.
 
 # What Counts As An API Claim
 
 TorchLean distinguishes four kinds of claims.
 
 First, a *Lean snippet* is code meant to elaborate as Lean code when pasted into a file with the
-right imports. These examples usually start with `import NN` and `open TorchLean`.
+right imports. Application examples usually start with `import NN.API` and `open TorchLean`.
 
 Second, a *runtime check* is an executable run: a training script, a data loader, a parity check, or
 a CUDA smoke test. It is evidence about the implementation on the inputs that were run.
@@ -64,7 +59,7 @@ graph, produce an artifact, and appear in a theorem statement.
 The shortest setup is:
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
@@ -80,10 +75,11 @@ internal imports before they have built their first model.
 
 # The Public API
 
-`TorchLean` is the canonical import for ordinary user code. Its top-level names are deliberately
-close to the ones PyTorch readers already know:
+`NN.API` is the application import, and `TorchLean` is the public namespace. Its top-level names
+are deliberately close to the ones PyTorch readers already know:
 
 - `nn` for layer builders and model constructors,
+- `classical` for classical and statistical models,
 - `Data` for datasets, loaders, and small preprocessing APIs,
 - `Trainer` for train/predict loops and training utilities,
 - `optim` for optimizer configuration,
@@ -96,13 +92,15 @@ the runtime a stable and legible public interface.
 The namespace map is:
 
 - `nn`: layers, blocks, and model builders.
+- `classical`: KNN, forests, Naive Bayes, SVMs, PCA, GMMs, regressions, boosted trees, HMMs, and
+  Hopfield networks.
 - `Data`: datasets, sources, loaders, and transforms.
 - `Trainer`: training, prediction, callbacks, reports, and manual steps.
 - `optim`: SGD, Adam, AdamW, and scheduler configuration.
 - `autograd`: gradients, VJPs, Jacobians, and explicit differentiation.
-- `NN.Entrypoint.IR`: graph examples and compiled artifacts.
-- `NN.Entrypoint.Verification`: verifier and certificate examples.
-- `NN.Entrypoint.Floats`: Float32 and numeric-semantics examples.
+- `NN.IR`: graph examples and compiled artifacts.
+- `NN.Verification`: verifier and certificate examples.
+- `NN.Floats`: Float32 and numeric-semantics examples.
 
 The user should not need to rewrite the model to move from a small training run to graph inspection
 or to a verifier fixture. The runtime layer may require extra hypotheses, but it should be about the
@@ -111,10 +109,10 @@ same model.
 The tutorial import remains short:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
-def mkModel : nn.M (nn.Sequential (Shape.vec 2) (Shape.vec 1)) :=
+def mkModel : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
   nn.Sequential![
     nn.Linear 2 8,
     nn.ReLU,
@@ -174,13 +172,13 @@ def xs : Tensor.T Float (shape![4, 2]) :=
 def ys : Tensor.T Float (shape![4, 1]) :=
   tensor! [[0.0], [1.0], [1.0], [0.0]]
 
-def xorData : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+def xorData : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   Data.tensorDataset xs ys
 ```
 
 The leading dimension of `xs` and `ys` is the number of examples. The dataset shape records the
-per-sample contract, not the whole training table: one input has shape `Shape.vec 2`, and one target
-has shape `Shape.vec 1`.
+per-sample contract, not the whole training table: one input has shape `.dim 2 .scalar`, and one target
+has shape `.dim 1 .scalar`.
 
 See the data contract documentation:
 
@@ -224,14 +222,14 @@ Those facts matter when a result later becomes a plot, a regression test, or a v
 For example, a public trainer configuration is just data:
 
 ```
-def eagerCfg : Trainer.Config (Shape.vec 2) (Shape.vec 1) :=
+def eagerCfg : Trainer.Config (.dim 2 .scalar) (.dim 1 .scalar) :=
   { dtype := .float
     backend := .eager
     optimizer := optim.sgd { lr := 0.05 }
     task := .regression
     seed := 7 }
 
-def compiledCfg : Trainer.Config (Shape.vec 2) (Shape.vec 1) :=
+def compiledCfg : Trainer.Config (.dim 2 .scalar) (.dim 1 .scalar) :=
   { eagerCfg with backend := .compiled }
 ```
 
@@ -241,7 +239,7 @@ to prove about the model, and it does not change the parameter names or shapes.
 Typical names in that layer include:
 
 - `add`, `matmul`, `reshape`, `transpose2d`, `broadcastTo`,
-- `linear`, `conv2d`, `layer_norm`, `multi_head_attention`,
+- `linear`, rank-generic `conv` and pooling, `layerNorm`, `multiheadAttention`,
 - `trainCycleSGD`, `trainCycleOptim`, `meanLoss`,
 - `Backend`, `Options`, plus the executable program/compiled graph types used by
   manual runtime code.
@@ -320,36 +318,32 @@ the model.
 
 # When To Use A Lower Layer
 
-Use `import NN` by default. Drop to a runtime layer only when the runtime layer is exactly what the
-example is explaining:
-
-1. `TorchLean` for ordinary examples.
-2. `NN.API.Runtime` or `NN.API.TorchLean` only when the runtime API is the topic.
-3. `NN.Entrypoint.*` for a narrow import tied to a specific topic (specs, runtime, floats, or
-   verification).
-
-This ordering keeps the manual coherent: the public API appears first, then the runtime assembly.
-It also marks where TorchLean differs from a direct PyTorch clone. We do
-not hide scalar-polymorphic code, shape-indexed parameter packs, graph denotations, or certificate
-boundaries when those objects are the story. The rule is only that beginner examples should not need
-to see them accidentally.
+Use `NN.API` for model construction, datasets, training, and the public classical models. Use `NN`
+when one file also needs the specification, proof, verification, graph, or backend layers. A file
+that belongs entirely to one of those layers can import its subsystem directly.
 
 Concrete import choices:
 
 ```
 -- Beginner model/training example
+import NN.API
+open TorchLean
+```
+
+```
+-- Model code together with proofs or verification
 import NN
 open TorchLean
 ```
 
 ```
 -- Focused verifier example
-import NN.Entrypoint.Verification
+import NN.Verification
 ```
 
 ```
 -- Focused Float32 example
-import NN.Entrypoint.Floats
+import NN.Floats
 ```
 
 # Model Families Beyond The Smallest Tutorials
@@ -360,53 +354,66 @@ more model families:
 - residual CNN support via `nn.blocks.resnetBasicBlock`,
 - transformer style blocks via `nn.multiheadAttention`, `nn.layerNorm`, and
   `nn.blocks.transformerEncoderBlock`,
-- GraphSpec runtime programs such as `resnet18Program`,
+- rank-polymorphic residual networks via `nn.models.resnet`,
 - operator learning work such as the `fno1d` runtime model.
 
 Not all of these families are beginner examples, but they are part of the model building API used by
 larger tutorials and experiments.
 
-# GraphSpec And Tooling
+# Classical And Statistical Models
 
-Three adjacent namespaces are easy to overlook from the broad `NN` umbrella alone.
+TorchLean also includes models that are not assembled from differentiable neural-network layers.
+They remain useful library features: a PCA transform or a fitted random forest may be the model
+under study, a preprocessing stage, or a reference computation beside a neural model. They are
+available from the same import:
 
-## `NN.Entrypoint.*`
+```
+import NN.API
+open TorchLean
 
-These are one-import entrypoints for focused subsystems:
+#check classical.knn.Model
+#check classical.knn.classify
+#check classical.randomForest.regression.Model
+#check classical.randomForest.classification.fitGini
+#check classical.naiveBayes.fit
+#check classical.svm.fit
+#check classical.gmm.trainEM
+#check classical.pca.fit
+#check classical.linearRegression.trainStep
+#check classical.logisticRegression.fit
+#check classical.gradientBoostedTrees.trainStepAndFit
+#check classical.hmm.baumWelchEpoch
+#check classical.hopfield.energy
+```
 
-- `NN.Entrypoint.Spec`
-- `NN.Entrypoint.Runtime`
-- `NN.Entrypoint.Floats`
-- `NN.Entrypoint.Verification`
-- `NN.Entrypoint.GraphSpec`
+The public names are aliases, not wrappers with separate semantics. For example,
+`classical.pca.Model` is `Spec.PCASpec`, and `classical.pca.forward` is
+`Spec.pcaForwardSpec`. Proof files can name the `Spec` declaration directly while application code
+uses the shorter family-oriented path.
 
-Use them in focused guide files or examples where the imports should say what the file is about.
+# Focused Subsystem Imports
+
+The main focused imports are:
+
+- `NN.Spec`
+- `NN.Runtime`
+- `NN.Floats`
+- `NN.Verification`
+- `NN.GraphSpec`
+
+These imports are useful in implementation, proof, and verification files that do not need the
+complete umbrella.
 
 ## `NN.GraphSpec`
 
-GraphSpec is the typed architecture DSL described in its own guide. It is not the default public
-API, but it is already connected to the runtime model examples and to public examples such as
-`lake exe torchlean graphspec`.
-
-## Navigation Tools
-
-The pattern is to start from the broad public namespace and move inward only when the example needs
-to name a specific layer. Ordinary model code should feel like ML code first. The narrower
-entrypoints are there for guide chapters, examples, and proof files that want their imports to say
-exactly which part of TorchLean they are using.
+GraphSpec is TorchLean's typed architecture DSL. It connects architecture descriptions to runtime
+model examples and can be inspected with `lake exe torchlean graphspec`.
 
 # How The Pieces Fit Together
 
-The split between public and runtime namespaces gives the project three practical benefits:
-
-- tutorials stay concise,
-- implementation details stay inspectable rather than hidden behind opaque objects,
-- verification chapters can refer to the same names as the examples.
-
-The API rule is simple: start broad, then narrow only when the topic demands it. Use
-`import NN` for ordinary model code. Use `NN.Entrypoint.*` when a file is specifically about
-graphs, floats, verification, widgets, or runtime internals. That keeps examples readable while
-preserving precise entry points for the runtime and proof layers.
+The public constructors, runtime objects, specifications, and proofs are separate declarations, but
+they refer to the same model structures and operator names. This lets application code remain short
+while proof and backend files state exactly which semantics they use.
 
 Read *Training From Scratch* for the first full training file, *Example Walkthroughs* for curated
 commands, and *PyTorch Round Trip* then *TorchLean vs PyTorch* for interop.

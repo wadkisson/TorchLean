@@ -68,14 +68,14 @@ inductive Layer where
   2D convolution with the fields this text-level assistant can reliably infer from common snippets.
 
   We do not generate executable TorchLean code directly from this constructor because a correct
-  `nn.conv` term also needs the input contract: batch size, input height, and input width.
+  `nn.conv2d` term also needs the input contract: batch size, input height, and input width.
   -/
   | conv2d (inC outC kernel stride padding : Nat)
   /-- 2D max-pooling metadata; executable lowering likewise needs the surrounding image shape. -/
   | maxPool2d (kernel stride : Nat)
   /-- Adaptive average pooling is detected as a named boundary item. -/
   | adaptiveAvgPool2d (out : Nat)
-  /-- Flatten layer; translated to `nn.Flatten` in vector-style sequential skeletons. -/
+  /-- Flatten layer; translated to `nn.flatten` in vector-style sequential skeletons. -/
   | flatten
   /-- Elementwise ReLU. -/
   | relu
@@ -199,12 +199,12 @@ not silently guessed, because that would create exactly the kind of misleading "
 experience TorchLean should avoid.
 -/
 private def layerTorchLeanTerm? : Layer → Option String
-  | .linear i o => some s!"nn.Linear {i} {o}"
-  | .flatten => some "nn.Flatten"
-  | .relu => some "nn.ReLU"
-  | .gelu => some "nn.GELU"
-  | .sigmoid => some "nn.Sigmoid"
-  | .tanh => some "nn.Tanh"
+  | .linear i o => some s!"nn.linear {i} {o}"
+  | .flatten => some "nn.flatten"
+  | .relu => some "nn.relu"
+  | .gelu => some "nn.gelu"
+  | .sigmoid => some "nn.sigmoid"
+  | .tanh => some "nn.tanh"
   | _ => none
 
 /--
@@ -247,7 +247,7 @@ private def analyzeLine (raw : String) : Option Layer :=
   let s := lineClean raw
   if s.isEmpty || s.startsWith "#" then
     none
-  else if hasSubstr s "nn.Linear" || hasSubstr s "Linear(" then
+  else if hasSubstr s "nn.linear" || hasSubstr s "Linear(" then
     let ns := numbersInString s
     match nth? ns 0, nth? ns 1 with
     | some i, some o => some (.linear i o)
@@ -271,15 +271,15 @@ private def analyzeLine (raw : String) : Option Layer :=
     match nth? (numbersInString s) 0 with
     | some o => some (.adaptiveAvgPool2d o)
     | none => some (.unsupported s "AdaptiveAvgPool2d needs a numeric output size")
-  else if hasSubstr s "nn.Flatten" || hasSubstr s "torch.flatten" || hasSubstr s ".flatten(" then
+  else if hasSubstr s "nn.flatten" || hasSubstr s "torch.flatten" || hasSubstr s ".flatten(" then
     some .flatten
-  else if hasSubstr s "nn.ReLU" || hasSubstr s "F.relu" || hasSubstr s ".relu(" then
+  else if hasSubstr s "nn.relu" || hasSubstr s "F.relu" || hasSubstr s ".relu(" then
     some .relu
-  else if hasSubstr s "nn.GELU" || hasSubstr s "F.gelu" then
+  else if hasSubstr s "nn.gelu" || hasSubstr s "F.gelu" then
     some .gelu
-  else if hasSubstr s "nn.Sigmoid" || hasSubstr s "torch.sigmoid" then
+  else if hasSubstr s "nn.sigmoid" || hasSubstr s "torch.sigmoid" then
     some .sigmoid
-  else if hasSubstr s "nn.Tanh" || hasSubstr s "torch.tanh" then
+  else if hasSubstr s "nn.tanh" || hasSubstr s "torch.tanh" then
     some .tanh
   else if hasSubstr s "nn.Dropout" || hasSubstr s "Dropout(" then
     some .dropout

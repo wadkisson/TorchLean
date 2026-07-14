@@ -189,7 +189,7 @@ def permuteDVal {α : Type} [Context α] (v : DVal α) (perm : List Nat) : Excep
   match Spec.Shape.permute? sIn perm with
   | none => throw s!"permute: invalid permutation {repr perm} for shape {repr sIn}"
   | some _ =>
-      let swaps ← swapDepthsForPerm perm (Shape.rank sIn)
+      let swaps ← swapDepthsForPerm perm (Spec.Shape.rank sIn)
       pure <| swaps.foldl (fun acc d => applySwapDepth (α := α) acc d) v
 
 /-!
@@ -216,7 +216,7 @@ For nonempty shapes this is the real element count. For empty shapes, the mathem
 undefined; the IR is total, so it uses denominator `1` and the empty sum contributes `0`.
 -/
 def meanDenom (s : Shape) : Nat :=
-  if Shape.size s = 0 then 1 else Shape.size s
+  if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
 
 /-- Evaluate MSE loss on two dynamic values, checking that their runtime shapes agree. -/
 def mseLossDVal {α : Type} [Context α] [DecidableEq Shape]
@@ -255,18 +255,18 @@ def castDimScalar {α : Type} [Context α] {n n' : Nat}
 Evaluate a `const` node from the external payload.
 
 Constants are stored “flat” (1D) for convenience, so we check the flattened length matches
-`Shape.size s` and then `unflatten` to the requested shape.
+`Spec.Shape.size s` and then `unflatten` to the requested shape.
 -/
 def evalConst {α : Type} [Context α]
     (payload : Payload α) (id : Nat) (s : Shape) : Except String (Tensor α s) := do
   match payload.const? id with
   | none => throw s!"IR eval: missing const payload for node {id}"
   | some c =>
-      if h : c.n = Shape.size s then
-        let v' : Tensor α (.dim (Shape.size s) .scalar) := castDimScalar (α := α) h c.v
+      if h : c.n = Spec.Shape.size s then
+        let v' : Tensor α (.dim (Spec.Shape.size s) .scalar) := castDimScalar (α := α) h c.v
         pure (Tensor.unflattenSpec (α := α) (s := s) v')
       else
-        throw s!"IR eval: const {id}: flat length mismatch: have {c.n}, expected {Shape.size s}"
+        throw s!"IR eval: const {id}: flat length mismatch: have {c.n}, expected {Spec.Shape.size s}"
 
 /--
 Evaluate a `linear` node from the external payload.
@@ -314,8 +314,8 @@ def evalConv2D {α : Type} [Context α] [DecidableEq Shape]
       let y := Spec.conv2dSpec (α := α)
         (layer := cfg.spec)
         (input := xT)
-      let outH : Nat := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-      let outW : Nat := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+      let outH : Nat := Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+      let outW : Nat := Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
       let outShape : Shape := Shape.dim cfg.outC (Shape.dim outH (Shape.dim outW Shape.scalar))
       pure (DVal.mk (α := α) outShape y)
 
@@ -327,23 +327,21 @@ def evalBatchNorm2DNchwEval {α : Type} [Context α] [DecidableEq Shape]
   | some cfg =>
       match x.shape with
       | .dim n (.dim c (.dim h (.dim w .scalar))) =>
-          if hc : c = cfg.c then
-            match hc with
-            | rfl =>
-                let xT ← expectShape (α := α)
-                  (expected := .dim n (.dim cfg.c (.dim h (.dim w .scalar)))) x
-                let y : Tensor α (.dim n (.dim cfg.c (.dim h (.dim w .scalar)))) :=
-                  Tensor.dim fun ni =>
-                    Tensor.dim fun ci =>
-                      Tensor.dim fun hi =>
-                        Tensor.dim fun wi =>
-                          match getAtSpec (getAtSpec (getAtSpec (getAtSpec xT ni) ci) hi) wi,
-                              getAtSpec cfg.gamma ci, getAtSpec cfg.beta ci,
-                              getAtSpec cfg.mean ci, getAtSpec cfg.var ci with
-                          | .scalar xv, .scalar gamma, .scalar beta, .scalar mean, .scalar var =>
-                              let denom := MathFunctions.sqrt (max var (0 : α) + cfg.eps)
-                              Tensor.scalar (((xv - mean) / denom) * gamma + beta)
-                pure (DVal.mk (α := α) (.dim n (.dim cfg.c (.dim h (.dim w .scalar)))) y)
+          if _hc : c = cfg.c then
+            let xT ← expectShape (α := α)
+              (expected := .dim n (.dim cfg.c (.dim h (.dim w .scalar)))) x
+            let y : Tensor α (.dim n (.dim cfg.c (.dim h (.dim w .scalar)))) :=
+              Tensor.dim fun ni =>
+                Tensor.dim fun ci =>
+                  Tensor.dim fun hi =>
+                    Tensor.dim fun wi =>
+                      match getAtSpec (getAtSpec (getAtSpec (getAtSpec xT ni) ci) hi) wi,
+                          getAtSpec cfg.gamma ci, getAtSpec cfg.beta ci,
+                          getAtSpec cfg.mean ci, getAtSpec cfg.var ci with
+                      | .scalar xv, .scalar gamma, .scalar beta, .scalar mean, .scalar var =>
+                          let denom := MathFunctions.sqrt (max var (0 : α) + cfg.eps)
+                          Tensor.scalar (((xv - mean) / denom) * gamma + beta)
+            pure (DVal.mk (α := α) (.dim n (.dim cfg.c (.dim h (.dim w .scalar)))) y)
           else
             throw s!"IR eval: batch_norm2d_nchw_eval channel mismatch: input={c}, payload={cfg.c}"
       | s =>
@@ -371,8 +369,8 @@ def evalConcatLeadingAxisFold {α : Type} [Context α]
     (i : Nat) (nOut : Nat) (rest : Shape) (parents : List (DVal α)) :
     Except String (DVal α) := do
   let toSigma (pv : DVal α) : Except String (Sigma fun n => Tensor α (Shape.dim n rest)) := do
-    match pv.shape, pv.tensor with
-    | Shape.dim nP restP, t =>
+    match pv with
+    | ⟨Shape.dim nP restP, t⟩ =>
         if hRest : restP = rest then
           let t' : Tensor α (Shape.dim nP rest) := by
             simpa [hRest] using t
@@ -380,7 +378,7 @@ def evalConcatLeadingAxisFold {α : Type} [Context α]
         else
           throw <|
             s!"IR eval: node {i}: concat: tail mismatch: {repr restP} vs {repr rest}"
-    | _, _ =>
+    | ⟨_, _⟩ =>
         throw s!"IR eval: node {i}: concat expects rank≥1 parents, got {repr pv.shape}"
   let sigs ← parents.mapM toSigma
   match sigs with
@@ -455,8 +453,8 @@ def evalConcat {α : Type} [Context α] [DecidableEq Shape]
   | Shape.dim nOut rest =>
       let toSigma (pv : DVal α) : Except String (Sigma fun n => Tensor α (Shape.dim n rest))
         := do
-        match pv.shape, pv.tensor with
-        | Shape.dim nP restP, t =>
+        match pv with
+        | ⟨Shape.dim nP restP, t⟩ =>
             if hRest : restP = rest then
               let t' : Tensor α (Shape.dim nP rest) := by
                 simpa [hRest] using t
@@ -465,7 +463,7 @@ def evalConcat {α : Type} [Context α] [DecidableEq Shape]
               throw <|
                 s!"IR eval: node {i}: concat: permuted tail mismatch: {repr restP} vs " ++
                   s!"{repr rest}"
-        | _, _ =>
+        | ⟨_, _⟩ =>
             throw s!"IR eval: node {i}: concat expects rank≥1 parents, got {repr pv.shape}"
       let sigs ← parentsPerm.mapM toSigma
       match sigs with
@@ -579,13 +577,13 @@ def evalAt
         match n.parents with
         | [pId] =>
             let pV := getParent pId
-            match pV.shape, pV.tensor with
-            | .scalar, Tensor.scalar keepProb =>
+            match pV with
+            | ⟨.scalar, Tensor.scalar keepProb⟩ =>
                 let key := Runtime.Autograd.TorchLean.Random.keyOf seed i
                 let t : Tensor α n.outShape :=
                   Runtime.Autograd.TorchLean.Random.mask (α := α) key keepProb (s := n.outShape)
                 pure (DVal.mk (α := α) n.outShape t)
-            | _, _ =>
+            | ⟨_, _⟩ =>
                 throw
                   s!"IR eval: node {i}: bernoulli_mask expects scalar keepProb parent ({n.summary})"
         | _ => throw s!"IR eval: node {i}: bernoulli_mask expects 1 parent ({n.summary})"
@@ -831,10 +829,10 @@ def evalAt
                 let bT ← expectShape (α := α) (expected := Shape.dim n' (Shape.dim p Shape.scalar))
                   bV
                 if h : n = n' then
-                  match h with
-                  | rfl =>
-                      let y := Spec.matMulSpec (α := α) (m := m) (n := n) (p := p) aT bT
-                      pure (DVal.mk (α := α) (Shape.dim m (Shape.dim p Shape.scalar)) y)
+                  let bT' : Tensor α (Shape.dim n (Shape.dim p Shape.scalar)) := by
+                    simpa [h] using bT
+                  let y := Spec.matMulSpec (α := α) (m := m) (n := n) (p := p) aT bT'
+                  pure (DVal.mk (α := α) (Shape.dim m (Shape.dim p Shape.scalar)) y)
                 else
                   throw s!"IR eval: node {i}: matmul inner dims mismatch: {n} vs {n'}"
             | Shape.dim batch (Shape.dim m (Shape.dim n Shape.scalar)),
@@ -845,12 +843,13 @@ def evalAt
                   (expected := Shape.dim batch' (Shape.dim n' (Shape.dim p Shape.scalar))) bV
                 if hb : batch = batch' then
                   if hn : n = n' then
-                    match hb, hn with
-                    | rfl, rfl =>
-                        let y := Tensor.bmmSpec (α := α) (batch := batch) (m := m) (n := n) (p :=
-                          p) aT bT
-                        pure (DVal.mk (α := α) (Shape.dim batch (Shape.dim m (Shape.dim p
-                          Shape.scalar))) y)
+                    let bT' : Tensor α
+                        (Shape.dim batch (Shape.dim n (Shape.dim p Shape.scalar))) := by
+                      simpa [hb, hn] using bT
+                    let y := Tensor.bmmSpec (α := α) (batch := batch) (m := m) (n := n) (p :=
+                      p) aT bT'
+                    pure (DVal.mk (α := α) (Shape.dim batch (Shape.dim m (Shape.dim p
+                      Shape.scalar))) y)
                   else
                     throw s!"IR eval: node {i}: matmul inner dims mismatch: {n} vs {n'}"
                 else
@@ -952,7 +951,7 @@ def evalAt
             let p ← expectShape (α := α) (expected := n.outShape) (getParent pId)
             -- Our spec primitive is last-axis softmax; for non-last axes we permute the chosen axis
             -- to the last position, apply softmax, then permute back.
-            if axis + 1 = Shape.rank n.outShape then
+            if axis + 1 = Spec.Shape.rank n.outShape then
               pure (DVal.mk (α := α) n.outShape (Activation.softmaxSpec (α := α) p))
             else
               let permToLast ←
@@ -989,7 +988,7 @@ def evalAt
               | .ok p => pure p
               | .error msg => throw s!"IR eval: node {i}: layernorm: {msg} ({n.summary})"
             let view2D : Shape := Shape.dim seqLen (Shape.dim embedDim Shape.scalar)
-            if hNumel : Shape.size n.outShape = Shape.size view2D then
+            if hNumel : Spec.Shape.size n.outShape = Spec.Shape.size view2D then
               let x2D : Tensor α view2D :=
                 Tensor.reshapeSpec (α := α) (s₁ := n.outShape) (s₂ := view2D) x hNumel
               let y2D ← layernormPure (α := α) (seqLen := seqLen) (embedDim := embedDim) x2D
@@ -999,7 +998,7 @@ def evalAt
             else
               throw <|
                 s!"IR eval: node {i}: layernorm internal error: bad reshape sizes " ++
-                  s!"({Shape.size n.outShape} vs {Shape.size view2D}) ({n.summary})"
+                  s!"({Spec.Shape.size n.outShape} vs {Spec.Shape.size view2D}) ({n.summary})"
         | _ =>
             throw s!"IR eval: node {i}: layernorm expects 1 parent ({n.summary})"
     | .reshape inS outS =>
@@ -1007,12 +1006,12 @@ def evalAt
         | [pId] =>
             let pV := getParent pId
             let pT ← expectShape (α := α) (expected := inS) pV
-            if h : Shape.size inS = Shape.size outS then
+            if h : Spec.Shape.size inS = Spec.Shape.size outS then
               let y := Tensor.reshapeSpec (α := α) (s₁ := inS) (s₂ := outS) pT h
               pure (DVal.mk (α := α) outS y)
             else
               throw
-                s!"IR eval: node {i}: reshape numel mismatch: {Shape.size inS} vs {Shape.size outS}"
+                s!"IR eval: node {i}: reshape numel mismatch: {Spec.Shape.size inS} vs {Spec.Shape.size outS}"
         | _ => throw s!"IR eval: node {i}: reshape expects 1 parent ({n.summary})"
     | .flatten s =>
         match n.parents with
@@ -1020,7 +1019,7 @@ def evalAt
             let pV := getParent pId
             let pT ← expectShape (α := α) (expected := s) pV
             let y := Tensor.flattenSpec (α := α) (s := s) pT
-            pure (DVal.mk (α := α) (.dim (Shape.size s) .scalar) y)
+            pure (DVal.mk (α := α) (.dim (Spec.Shape.size s) .scalar) y)
         | _ => throw s!"IR eval: node {i}: flatten expects 1 parent ({n.summary})"
     | .concat axis => do
         let parents := n.parents.map getParent

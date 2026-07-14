@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Quickstart.Common
 public import NN.Examples.Data.SamplePaths
 
@@ -57,8 +57,8 @@ def hidDim : Nat := 8
 def outDim : Nat := 1
 
 /-- Batched MLP `2 -> 8 -> 1` built from the public model constructor. -/
-def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
-  nn.models.MlpReLU
+def mkModel {batch : Nat} : nn.M (nn.Sequential (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar))) :=
+  nn.models.mlpRelu
     { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
 /-- Command-line help for the minibatch MLP quickstart. -/
@@ -114,8 +114,8 @@ def main (args : List String) : IO Unit := do
   Data.requireFile "MinibatchMLPTrain" "CSV dataset" csvPath missingCsvHint
   let trained ← trainer.train data parsed.trainOptions
   trained.printSummary
-  let heldout : Tensor.T Float (Shape.mat batch inDim) :=
-    Tensor.fill 0.25 (Shape.mat batch inDim)
+  let heldout : Tensor.T Float (.dim batch (.dim inDim .scalar)) :=
+    Tensor.fill 0.25 (.dim batch (.dim inDim .scalar))
   trained.printPrediction "predict(batch=heldout)" heldout
 
 end NN.Examples.Quickstart.MinibatchMLPTrain

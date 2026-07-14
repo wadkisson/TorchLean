@@ -71,15 +71,14 @@ def addEps (accR termR : R) (epsAcc epsTerm : ℝ) : ℝ :=
   epsAcc + epsTerm +
     neuralUlp β fexp
       (toSpec (β := β) (fexp := fexp) (rnd := rnd) accR +
-        toSpec (β := β) (fexp := fexp) (rnd := rnd) termR)
-      TrainingPhase.forward / 2
+        toSpec (β := β) (fexp := fexp) (rnd := rnd) termR) / 2
 
 /-- Absolute-error update for one rounded multiplication in the NF backend. -/
 def mulEps (xR yR : R) (epsx epsy : ℝ) : ℝ :=
   let xhat := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   let yhat := toSpec (β := β) (fexp := fexp) (rnd := rnd) yR
   (abs xhat + epsx) * epsy + (abs yhat + epsy) * epsx +
-    neuralUlp β fexp (xhat * yhat) TrainingPhase.forward / 2
+    neuralUlp β fexp (xhat * yhat) / 2
 
 /-- Fold a rounded sum while tracking an absolute-error budget, starting from an explicit state. -/
 def foldAddStateFrom {ι : Type} (l : List ι) (termR : ι → R) (epsTerm : ι → ℝ) (st0 : R × ℝ) : R ×
@@ -294,11 +293,11 @@ lemma approx_padded_input_read
 
 /-- Output height for a 2D convolution. -/
 def conv2dOutH (inH kH stride padding : Nat) : Nat :=
-  (inH + 2 * padding - kH) / stride + 1
+  Shape.slidingWindowOutDim inH kH stride padding
 
 /-- Output width for a 2D convolution. -/
 def conv2dOutW (inW kW stride padding : Nat) : Nat :=
-  (inW + 2 * padding - kW) / stride + 1
+  Shape.slidingWindowOutDim inW kW stride padding
 
 /--
 Pointwise absolute-error bound for one Conv2D output scalar in the NF backend.

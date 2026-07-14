@@ -31,7 +31,7 @@ namespace Internal
 def meanModuleLoss {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : Module.ScalarModule α (nn.paramShapes model) [σ, τ])
     (samples : List (SupervisedSample α σ τ)) : IO α := do
   match samples with
@@ -53,7 +53,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
     (afterTrain :
       {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
-      (model : nn.Sequential σ τ) →
+      (model : TorchLean.nn.Sequential σ τ) →
       Module.ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) :
     IO (Custom.TrainResult σ τ × β) := do
   let runtimeOpts := run.toOptions

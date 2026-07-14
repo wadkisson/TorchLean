@@ -99,9 +99,9 @@ but the theorem-level claim is made through a residual condition on the produced
 keeps CUDA or other fast backends honest: they should target the same checked exact/approximate
 backend record rather than changing Muon's semantics.
 
-The convergence theorems in this directory are exact `ℝ` statements. Applying them to Float32,
-CUDA, mixed precision, or a particular trained model requires a separate bridge with floating-point
-error accounting.
+The convergence theorems in this directory are exact `ℝ` statements. Applying them to executable
+Float32 operations, CUDA kernels, or a particular trained model requires a separate refinement
+argument with explicit floating-point error accounting.
 
 ## Generative And Self-Supervised Theory
 

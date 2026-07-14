@@ -21,7 +21,7 @@ This is the small “record ops” surface used by the unified front-end:
 - compiled backend: record into an SSA/DAG graph (proof-compiled)
 
 Users normally don’t import this directly; import `NN.Runtime.Autograd.TorchLean`,
-`NN.Entrypoint.API`, or `NN` instead.
+`NN.API`, or `NN` instead.
 -/
 
 @[expose] public section
@@ -52,15 +52,14 @@ end RefList
 export _root_.Runtime.Autograd.Torch
   (const add sub mul scale abs sqrt clamp max min
    broadcastTo reshape transpose2d transpose3dFirstToLast transpose3dLastToFirst
-     transpose3dLastTwo
-   swapAdjacentAtDepth
+     transpose3dLastTwo swapAdjacentAtDepth
    reduceSum reduceMean
    gatherScalar gatherRow gatherScalarNat gatherVecNat gatherRowsNat scatterAddVec
      scatterAddRow
    matmul bmm concatVectors concatLeadingAxis sliceLeadingAxisRange
+   maxPool avgPool smoothMaxPool
    maxPool2d maxPool2dPad smoothMaxPool2d avgPool2d avgPool2dPad
    relu silu gelu sigmoid tanh softmax softplus exp log inv detach safeLog logSoftmax
-   globalAvgPool2dChw globalAvgPool2dNchw
    sum flatten
    linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention
    conv convTranspose conv2d convTranspose2d
@@ -97,24 +96,6 @@ def gelu {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
   _root_.Runtime.Autograd.Torch.gelu (m := m) (α := α) (s := s) x
 
-/-- Global average pool for a `(C,H,W)` tensor, returning a length-`C` vector. -/
-def globalAvgPool2dChw {α : Type} [Context α] [DecidableEq Shape]
-    {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
-    {c h w : Nat} (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.CHW c h w)) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.Vec c)) :=
-  _root_.Runtime.Autograd.Torch.globalAvgPool2dChw (m := m) (α := α)
-    (c := c) (h := h) (w := w) h_c_pos h_h_pos h_w_pos x
-
-/-- Global average pool for a `(N,C,H,W)` tensor, returning a batch of length-`C` vectors. -/
-def globalAvgPool2dNchw {α : Type} [Context α] [DecidableEq Shape]
-    {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
-    {n c h w : Nat} (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w)) :
-    m (RefTy (m := m) (α := α) (.dim n (.dim c .scalar))) :=
-  _root_.Runtime.Autograd.Torch.globalAvgPool2dNchw (m := m) (α := α)
-    (n := n) (c := c) (h := h) (w := w) h_n_pos h_c_pos h_h_pos h_w_pos x
-
 namespace Private
 
 /-! ## Batch-first derived ops -/
@@ -129,7 +110,7 @@ def squeezeLeadingAxis {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : RefTy (m := m) (α := α) (.dim 1 s)) :
     m (RefTy (m := m) (α := α) s) :=
   _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α) (s₁ := .dim 1 s) (s₂ := s) x (by
-    simp [Shape.size])
+    simp [Spec.Shape.size])
 
 /-- Add a leading singleton dimension: `s → (1 × s)`. -/
 def unsqueezeLeadingAxis {α : Type} [Context α] [DecidableEq Shape]
@@ -137,7 +118,7 @@ def unsqueezeLeadingAxis {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : RefTy (m := m) (α := α) s) :
     m (RefTy (m := m) (α := α) (.dim 1 s)) :=
   _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α) (s₁ := s) (s₂ := .dim 1 s) x (by
-    simp [Shape.size])
+    simp [Spec.Shape.size])
 
 /--
 Map a per-sample op over the leading batch dimension.
@@ -193,6 +174,7 @@ def conv {α : Type} [Context α] [DecidableEq Shape]
     {kernel stride padding : Vector Nat d}
     {inSpatial : Vector Nat d}
     {hInC : inC ≠ 0} {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
+    {_hStride : ∀ i : Fin d, stride.get i ≠ 0}
     (weight : RefTy (m := m) (α := α) (Shape.ofList (outC :: inC :: kernel.toList)))
     (bias : RefTy (m := m) (α := α) (.dim outC .scalar))
     (input : RefTy (m := m) (α := α) (.dim batch (Shape.ofList (inC :: inSpatial.toList)))) :
@@ -246,6 +228,7 @@ def maxPool {α : Type} [Context α] [DecidableEq Shape]
     {batch d C : Nat}
     {inSpatial kernel stride padding : Vector Nat d}
     {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
+    {_hStride : ∀ i : Fin d, stride.get i ≠ 0}
     (input : RefTy (m := m) (α := α) (.dim batch (Shape.ofList (C :: inSpatial.toList)))) :
     m (RefTy (m := m) (α := α)
       (.dim batch (Shape.ofList (C :: (Spec.poolOutSpatialPad inSpatial kernel stride padding).toList))))
@@ -265,6 +248,7 @@ def avgPool {α : Type} [Context α] [DecidableEq Shape]
     {batch d C : Nat}
     {inSpatial kernel stride padding : Vector Nat d}
     (hKernel : ∀ i : Fin d, kernel.get i ≠ 0)
+    (_hStride : ∀ i : Fin d, stride.get i ≠ 0)
     (input : RefTy (m := m) (α := α) (.dim batch (Shape.ofList (C :: inSpatial.toList)))) :
     m (RefTy (m := m) (α := α)
       (.dim batch (Shape.ofList (C :: (Spec.poolOutSpatialPad inSpatial kernel stride padding).toList))))
@@ -284,6 +268,7 @@ def smoothMaxPool {α : Type} [Context α] [DecidableEq Shape]
     {batch d C : Nat}
     {inSpatial kernel stride padding : Vector Nat d}
     {hKernel : ∀ i : Fin d, kernel.get i ≠ 0}
+    {_hStride : ∀ i : Fin d, stride.get i ≠ 0}
     (input : RefTy (m := m) (α := α) (.dim batch (Shape.ofList (C :: inSpatial.toList))))
     (temp : α) :
     m (RefTy (m := m) (α := α)
@@ -346,10 +331,10 @@ def flattenKeep0 {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {batch : Nat} {s : Shape}
     (x : RefTy (m := m) (α := α) (.dim batch s)) :
-    m (RefTy (m := m) (α := α) (.dim batch (.dim (Shape.size s) .scalar))) :=
+    m (RefTy (m := m) (α := α) (.dim batch (.dim (Spec.Shape.size s) .scalar))) :=
   _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
-    (s₁ := .dim batch s) (s₂ := .dim batch (.dim (Shape.size s) .scalar))
-    x (by simp [Shape.size])
+    (s₁ := .dim batch s) (s₂ := .dim batch (.dim (Spec.Shape.size s) .scalar))
+    x (by simp [Spec.Shape.size])
 
 /-- Batched affine layer on matrices: `y = x @ Wᵀ + b`, with `x : (N,inDim)`. -/
 def linear2d {α : Type} [Context α] [DecidableEq Shape]

@@ -40,7 +40,7 @@ Model-specialized companion to `loadParamBits`: callers hand over the model they
 evaluate instead of repeating `paramShapes := nn.paramShapes model`.
 -/
 def loadModelParamBits {σ τ : Shape}
-    (model : nn.Sequential σ τ) (path : System.FilePath) :
+    (model : TorchLean.nn.Sequential σ τ) (path : System.FilePath) :
     IO (nn.ParamTensors Float (nn.paramShapes model)) :=
   loadParamBits (paramShapes := nn.paramShapes model) path
 
@@ -67,7 +67,7 @@ Load exact `Float.toBits` parameters into an existing runtime module attached to
 The model determines the parameter and input shape indices at the call site.
 -/
 def loadModelIntoModule {σ τ : Shape}
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : Module.ScalarModule Float (nn.paramShapes model) [σ, τ])
     (path : System.FilePath) : IO Unit :=
   loadModuleParamBits (paramShapes := nn.paramShapes model) (inputShapes := [σ, τ]) m path
@@ -77,7 +77,7 @@ Load exact `Float.toBits` parameters into a model-attached runtime module when a
 present.
 -/
 def loadModelIntoModuleIfSome {σ τ : Shape}
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : Module.ScalarModule Float (nn.paramShapes model) [σ, τ])
     (path? : Option System.FilePath) : IO Unit :=
   match path? with
@@ -96,7 +96,7 @@ Save a model-attached runtime module's exact `Float.toBits` parameters when an o
 present, and print the standard confirmation line.
 -/
 def saveModelIntoPathIfSome {σ τ : Shape}
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : Module.ScalarModule Float (nn.paramShapes model) [σ, τ])
     (path? : Option System.FilePath) : IO Unit := do
   match path? with

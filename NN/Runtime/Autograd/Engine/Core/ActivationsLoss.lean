@@ -288,7 +288,7 @@ def sum {α : Type} [Add α] [Zero α] [DecidableEq Shape]
  `N = Spec.meanDenom s`.
  This matches the default reduction of `torch.nn.functional.mse_loss(..., reduction="mean")`.
 
- For nonempty shapes, `Spec.meanDenom s = Shape.size s`. For empty shapes, TorchLean's totalized
+ For nonempty shapes, `Spec.meanDenom s = Spec.Shape.size s`. For empty shapes, TorchLean's totalized
  spec uses denominator `1`; the empty sum and empty gradient then contribute zero.
  -/
 def mseSpecBasic {α : Type} [Add α] [Sub α] [Mul α] [Div α] [Zero α] [Coe Nat α]

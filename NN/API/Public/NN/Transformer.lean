@@ -7,7 +7,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.NN.ResNet
+public import NN.API.Public.NN.Blocks
 
 /-!
 Transformer blocks in the public neural-network API.
@@ -21,7 +21,7 @@ models and higher-level examples.
 namespace NN
 namespace API
 namespace nn
-namespace pure
+namespace Internal
 namespace blocks
 
 /--
@@ -57,8 +57,8 @@ PyTorch analogue:
 def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : TransformerEncoderBlock)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+    Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
   let seedAttn := cfg.seedBase
   let seedNorm1Gamma := cfg.seedBase + 1
   let seedNorm1Beta := cfg.seedBase + 2
@@ -71,8 +71,8 @@ def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dM
   let seedDrop1 := cfg.seedBase + 9
   let seedDrop2 := cfg.seedBase + 10
 
-  let attn : Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+  let attn : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
     multiheadAttentionWith (batch := batch) (n := n) (dModel := dModel)
       { numHeads := cfg.numHeads, headDim := cfg.headDim, seedW := seedAttn }
       (hN := NeZero.ne (n := n))
@@ -81,25 +81,25 @@ def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dM
     match cfg.dropout? with
     | none => attn
     | some p =>
-        seq! attn, dropout (s := .dim batch (NN.Tensor.Shape.Mat n dModel)) p (seed := seedDrop1)
-  let norm1 : Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+        seq! attn, dropout (s := .dim batch (.dim n (.dim dModel .scalar))) p (seed := seedDrop1)
+  let norm1 : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
     layerNorm (batch := batch) (seqLen := n) (embedDim := dModel)
       { seedGamma := seedNorm1Gamma, seedBeta := seedNorm1Beta }
 
-  let ffn : Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+  let ffn : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
     seq!
-      linear dModel cfg.ffnHidden seedFfnW1 seedFfnB1 (pfx := .dim batch (NN.Tensor.Shape.Vec n)),
-      activation (s := .dim batch (NN.Tensor.Shape.Mat n cfg.ffnHidden)) cfg.activation,
-      linear cfg.ffnHidden dModel seedFfnW2 seedFfnB2 (pfx := .dim batch (NN.Tensor.Shape.Vec n))
+      linear dModel cfg.ffnHidden seedFfnW1 seedFfnB1 (pfx := .dim batch (.dim n .scalar)),
+      activation (s := .dim batch (.dim n (.dim cfg.ffnHidden .scalar))) cfg.activation,
+      linear cfg.ffnHidden dModel seedFfnW2 seedFfnB2 (pfx := .dim batch (.dim n .scalar))
   let ffnInner :=
     match cfg.dropout? with
     | none => ffn
     | some p =>
-        seq! ffn, dropout (s := .dim batch (NN.Tensor.Shape.Mat n dModel)) p (seed := seedDrop2)
-  let norm2 : Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+        seq! ffn, dropout (s := .dim batch (.dim n (.dim dModel .scalar))) p (seed := seedDrop2)
+  let norm2 : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
     layerNorm (batch := batch) (seqLen := n) (embedDim := dModel)
       { seedGamma := seedNorm2Gamma, seedBeta := seedNorm2Beta }
 
@@ -118,8 +118,8 @@ attention masks).
 def transformerEncoderBlock {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : TransformerEncoderBlock)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+    Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
   transformerEncoderBlockWithMask (batch := batch) (n := n) (dModel := dModel) cfg (mask := mask)
 
 /--
@@ -147,9 +147,9 @@ def transformerStackGoWithMask {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (template : TransformerEncoderBlock) (seedBase seedStride : Nat)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     (layerIdx : Nat) → (remaining : Nat) →
-      Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel))
+      Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar)))
   | _layerIdx, 0 =>
-      _root_.Runtime.Autograd.TorchLean.NN.Seq.id (.dim batch (NN.Tensor.Shape.Mat n dModel))
+      _root_.Runtime.Autograd.TorchLean.NN.Seq.id (.dim batch (.dim n (.dim dModel .scalar)))
   | layerIdx, remaining + 1 =>
       let seed := seedBase + layerIdx * seedStride
       let blockCfg : TransformerEncoderBlock := { template with seedBase := seed }
@@ -169,7 +169,7 @@ This is `transformerStackGoWithMask` with `mask := none`.
 def transformerStackGo {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (template : TransformerEncoderBlock) (seedBase seedStride : Nat) :
     (layerIdx : Nat) → (remaining : Nat) →
-      Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+      Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar))) :=
   transformerStackGoWithMask (batch := batch) (n := n) (dModel := dModel)
     template seedBase seedStride (mask := none)
 
@@ -182,7 +182,7 @@ TorchLean analogue of composing `torch.nn.TransformerEncoderLayer` into a
 def transformerEncoderStackWithMask {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : TransformerEncoderStack)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+    Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar))) :=
   transformerStackGoWithMask (batch := batch) (n := n) (dModel := dModel)
     cfg.block cfg.seedBase cfg.seedStride (mask := mask) 0 cfg.layers
 
@@ -195,28 +195,28 @@ attention masks).
 def transformerEncoderStack {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : TransformerEncoderStack)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel)) :=
+    Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar))) :=
   transformerEncoderStackWithMask (batch := batch) (n := n) (dModel := dModel) cfg (mask := mask)
 
 /--
 Transformer encoder followed by a flatten+linear classification head.
 
-PyTorch analogue (approximately): `nn.TransformerEncoder(...)` + pooling/flattening + `nn.Linear`.
+PyTorch analogue (approximately): `nn.TransformerEncoder(...)` + pooling/flattening + `nn.linear`.
 -/
 def transformerEncoderClassifier {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (classes : Nat) (cfg : TransformerEncoderStack) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Vec classes)) :=
+    Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim classes .scalar)) :=
   let enc := transformerEncoderStack (batch := batch) (n := n) (dModel := dModel) cfg
   let seedHeadW := cfg.seedBase + cfg.layers * cfg.seedStride
   let seedHeadB := seedHeadW + 1
-  let flat : Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (NN.Tensor.Shape.Mat batch (Spec.Shape.size (NN.Tensor.Shape.Mat n dModel))) :=
-    flattenBatch (n := batch) (s := NN.Tensor.Shape.Mat n dModel)
-  let head : Sequential (NN.Tensor.Shape.Mat batch (Spec.Shape.size (NN.Tensor.Shape.Mat n dModel)))
-      (.dim batch (NN.Tensor.Shape.Vec classes)) :=
-    linear (Spec.Shape.size (NN.Tensor.Shape.Mat n dModel)) classes
+  let flat : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim (Spec.Shape.size (.dim n (.dim dModel .scalar))) .scalar)) :=
+    flattenBatch (n := batch) (s := .dim n (.dim dModel .scalar))
+  let head : Sequential (.dim batch (.dim (Spec.Shape.size (.dim n (.dim dModel .scalar))) .scalar))
+      (.dim batch (.dim classes .scalar)) :=
+    linear (Spec.Shape.size (.dim n (.dim dModel .scalar))) classes
       (seedW := seedHeadW) (seedB := seedHeadB)
-      (pfx := NN.Tensor.Shape.Vec batch)
+      (pfx := .dim batch .scalar)
   seq! enc, flat, head
 
 end blocks

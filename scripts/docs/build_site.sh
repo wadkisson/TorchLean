@@ -14,8 +14,16 @@ echo "==> Building DocGen API reference"
 #
 # Lake does not include DISABLE_EQUATIONS in the docInfo trace, so remove the cached DocGen DB/data
 # before rebuilding. Otherwise Lake may replay old noisy docInfo artifacts.
-rm -rf .lake/build/doc .lake/build/doc-data .lake/build/api-docs.db
-DISABLE_EQUATIONS=1 lake build NN:docs
+if [ "${SKIP_DOCGEN:-0}" = "1" ]; then
+  if [ ! -d .lake/build/doc ]; then
+    echo "error: SKIP_DOCGEN=1 requires an existing .lake/build/doc directory" >&2
+    exit 1
+  fi
+  echo "    Reusing .lake/build/doc"
+else
+  rm -rf .lake/build/doc .lake/build/doc-data .lake/build/api-docs.db
+  DISABLE_EQUATIONS=1 lake build NN:docs
+fi
 
 echo "==> Copying DocGen output"
 # The public site serves DocGen from `home_page/docs`. Strip trace/hash files so
@@ -55,7 +63,7 @@ echo "==> Building interactive import graph HTML"
 # The import graph is generated from Lean imports after the library build, so it
 # reflects the same module graph users get from the current checkout.
 mkdir -p home_page/importgraph
-lake exe graph --to NN.Library home_page/importgraph/index.html
+lake exe graph --to NN home_page/importgraph/index.html
 python3 - <<'PY'
 import re
 from pathlib import Path

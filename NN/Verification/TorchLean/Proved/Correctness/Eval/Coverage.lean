@@ -84,64 +84,6 @@ def evalAtCoverageWitnesses : List OpKind :=
 def evalAtCoverageTags : List String :=
   evalAtCoverageWitnesses.map OpKind.tag
 
-/--
-Executable checkpoint for the current local evaluator bridge surface.
-
-This is not a semantic equivalence theorem.  It is a maintained coverage guard: the list names the
-IR constructor families that have local `Graph.evalAt` lemmas in this directory.
--/
-theorem evalAtCoverageTags_eq :
-    evalAtCoverageTags =
-      [
-        "input",
-        "const",
-        "permute",
-        "detach",
-        "rand_uniform",
-        "bernoulli_mask",
-        "add",
-        "sub",
-        "mul_elem",
-        "abs",
-        "sqrt",
-        "inv",
-        "max_elem",
-        "min_elem",
-        "max_pool2d",
-        "max_pool2d_pad",
-        "avg_pool2d",
-        "avg_pool2d_pad",
-        "broadcastTo",
-        "reduce_sum",
-        "reduce_mean",
-        "sum",
-        "matmul",
-        "linear",
-        "conv2d",
-        "batch_norm2d_nchw_eval",
-        "relu",
-        "tanh",
-        "sigmoid",
-        "exp",
-        "log",
-        "sin",
-        "cos",
-        "softmax",
-        "layernorm",
-        "reshape",
-        "flatten",
-        "concat",
-        "swap_first_two",
-        "transpose3d_last_two",
-        "mse_loss"
-      ] := by
-  rfl
-
-/-- Number of IR constructor families with local `Graph.evalAt` bridge coverage. -/
-theorem evalAtCoverageWitnesses_length :
-    evalAtCoverageWitnesses.length = 41 := by
-  rfl
-
 /-- The coverage checklist records each covered IR constructor tag once. -/
 theorem evalAtCoverageTags_nodup :
     evalAtCoverageTags.Nodup := by

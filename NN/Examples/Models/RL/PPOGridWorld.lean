@@ -8,7 +8,8 @@ End-to-end PPO example: train an actor-critic on a Lean-native GridWorld environ
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 public import NN.Runtime.RL.Artifacts.GridWorld
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
@@ -140,17 +141,17 @@ instance : Fact (0 < horizon) := ⟨by decide⟩
 instance : Fact (0 < nActions) := ⟨by decide⟩
 
 /-- The observation tensor shape used by this example: `[..., nStates]` one-hot vectors. -/
-def obsShape : Shape := shape![nStates]
+def obsShape : Spec.Shape := shape![nStates]
 
-def pfxBatch : Shape := shape![horizon]
-def sStateBatch : Shape := rl.ppo.StateBatchShape horizon obsShape
-def sLogitsBatch : Shape := rl.ppo.LogitsBatchShape horizon nActions
-def sScalarBatch : Shape := rl.ppo.ScalarBatchShape horizon
-def sValueBatch : Shape := rl.ppo.ValueBatchShape horizon
+def pfxBatch : Spec.Shape := shape![horizon]
+def sStateBatch : Spec.Shape := rl.ppo.StateBatchShape horizon obsShape
+def sLogitsBatch : Spec.Shape := rl.ppo.LogitsBatchShape horizon nActions
+def sScalarBatch : Spec.Shape := rl.ppo.ScalarBatchShape horizon
+def sValueBatch : Spec.Shape := rl.ppo.ValueBatchShape horizon
 
-def stateShape : Shape := obsShape
-def logitsShape : Shape := shape![nActions]
-def valueShape : Shape := shape![1]
+def stateShape : Spec.Shape := obsShape
+def logitsShape : Spec.Shape := shape![nActions]
+def valueShape : Spec.Shape := shape![1]
 
 /-!
 ## Formal GridWorld model (spec/proof layer)
@@ -285,12 +286,12 @@ def modelCfg : nn.models.PPOActorCriticConfig :=
   { obsDim := nStates, hiddenDim := hiddenDim, nActions := nActions }
 
 /-- Construct the actor network as an MLP mapping one-hot observations to action logits. -/
-def actorMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim nActions)) :=
-  nn.models.PPOActor modelCfg pfx
+def actorMk (pfx : Spec.Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim nActions)) :=
+  nn.models.ppoActor modelCfg pfx
 
 /-- Construct the critic network as an MLP mapping one-hot observations to a scalar value estimate. -/
-def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim 1)) :=
-  nn.models.PPOCritic modelCfg pfx
+def criticMk (pfx : Spec.Shape) : nn.M (nn.Sequential (pfx.appendDim nStates) (pfx.appendDim 1)) :=
+  nn.models.ppoCritic modelCfg pfx
 
 /-!
 ## Rollout collection (Lean-native environment)

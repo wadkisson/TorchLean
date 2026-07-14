@@ -27,8 +27,6 @@ bridges needed by concrete model-correctness theorems:
 
 namespace NN.Verification.TorchLean
 
-open Spec
-open Tensor
 open NN.IR
 
 /--
@@ -56,14 +54,15 @@ def payloadOfParamStore {α : Type} [Context α] (ps : NN.MLTheory.CROWN.Graph.P
         { c := p.c, gamma := p.gamma, beta := p.beta, mean := p.mean, var := p.var, eps := p.eps }) }
 
 /-- Cast a tensor across a proved shape equality. -/
-def castTensor {α : Type} [Context α] {s s' : Shape} (h : s = s') (t : Tensor α s) : Tensor α s' :=
-  cast (congrArg (fun s : Shape => Tensor α s) h) t
+def castTensor {α : Type} [Context α] {s s' : Spec.Shape} (h : s = s')
+    (t : Spec.Tensor α s) : Spec.Tensor α s' :=
+  cast (congrArg (fun s : Spec.Shape => Spec.Tensor α s) h) t
 
 /-- Evaluate a `CompiledIR` forward graph on an input tensor, returning a shape-checked tensor. -/
 def runForwardIR
-    {α : Type} [Context α] [DecidableEq Shape]
-    {inShape outShape : Shape}
-    (c : CompiledIR α) (x : Tensor α inShape) : Except String (Tensor α outShape) := do
+    {α : Type} [Context α] [DecidableEq Spec.Shape]
+    {inShape outShape : Spec.Shape}
+    (c : CompiledIR α) (x : Spec.Tensor α inShape) : Except String (Spec.Tensor α outShape) := do
   let input : DVal α := DVal.mk (α := α) inShape x
   let out ←
     Graph.denote (α := α) (g := c.graph) (payload := payloadOfParamStore (α := α) c.ps)

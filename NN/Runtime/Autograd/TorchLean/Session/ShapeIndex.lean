@@ -174,13 +174,13 @@ def sum {α : Type} (s : Session α) [Context α] [DecidableEq Shape] {sh : Shap
       _root_.Runtime.Autograd.Torch.Internal.SessionIR.sum (α := α) sess (sh := sh) x
 
 /--
-Flatten a tensor to a 1D vector of length `Shape.size sh`.
+Flatten a tensor to a 1D vector of length `Spec.Shape.size sh`.
 
 PyTorch analogy: `torch.flatten(x)` or `x.reshape(-1)`.
 -/
 def flatten {α : Type} (s : Session α) [Inhabited α] [Zero α] [DecidableEq Shape] {sh : Shape}
   (x : _root_.Runtime.Autograd.Torch.TensorRef α sh) :
-  IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim (Shape.size sh) .scalar)) := do
+  IO (_root_.Runtime.Autograd.Torch.TensorRef α (.dim (Spec.Shape.size sh) .scalar)) := do
   match s.impl with
   | .eager sess => EagerSession.flatten (α := α) sess (sh := sh) x
   | .compiled sess =>
@@ -189,13 +189,13 @@ def flatten {α : Type} (s : Session α) [Inhabited α] [Zero α] [DecidableEq S
 /--
 Reshape a tensor without changing the number of elements.
 
-The proof `h : Shape.size sh1 = Shape.size sh2` plays the role of PyTorch’s runtime check performed
+The proof `h : Spec.Shape.size sh1 = Spec.Shape.size sh2` plays the role of PyTorch’s runtime check performed
 by `reshape`/`view`.
 
 PyTorch analogy: `x.reshape(new_shape)` (when the element count matches).
 -/
 def reshape {α : Type} (s : Session α) [Inhabited α] [Zero α] [DecidableEq Shape] {sh1 sh2 : Shape}
-  (x : _root_.Runtime.Autograd.Torch.TensorRef α sh1) (h : Shape.size sh1 = Shape.size sh2) :
+  (x : _root_.Runtime.Autograd.Torch.TensorRef α sh1) (h : Spec.Shape.size sh1 = Spec.Shape.size sh2) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α sh2) := do
   match s.impl with
   | .eager sess => EagerSession.reshape (α := α) sess (sh1 := sh1) (sh2 := sh2) x h

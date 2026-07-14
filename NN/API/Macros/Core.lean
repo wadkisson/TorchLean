@@ -13,7 +13,7 @@ public import Lean
 
 This file contains only **general-purpose** syntactic sugar:
 - `seq! a, b, c` for composing TorchLean `Seq` models without chaining `>>>` manually.
-- `tensorpack! x, y, ...` for building `TorchLean.tensorpack.TensorPack` values without
+- `tensorpack! x, y, ...` for building `TorchLean.TensorPack` values without
   `.cons ... .nil` boilerplate.
 
 Both macros expand to fully-qualified names under `NN.API.TorchLean.*`, so in practice you will
@@ -55,18 +55,18 @@ private meta def mkGlobalIdent (val : Lean.Name) : Lean.Ident :=
 
 macro_rules (kind := nnSequentialBangLit)
   | `(nn.Sequential![$a:term]) =>
-      let f := mkGlobalIdent `NN.API.TorchLean.NN.AsSeqK.asSeq
+      let f := mkGlobalIdent `NN.API.TorchLean.LayerCore.AsSeqK.asSeq
       `(do
         let a ← ($a)
         pure ($f a))
   | `(nn.Sequential![$a:term, $b:term]) =>
-      let f := mkGlobalIdent `NN.API.TorchLean.NN.compAny
+      let f := mkGlobalIdent `NN.API.TorchLean.LayerCore.compAny
       `(do
         let a ← ($a)
         let b ← ($b)
         pure ($f a b))
   | `(nn.Sequential![$a:term, $b:term, $rest:term,*]) =>
-      let f := mkGlobalIdent `NN.API.TorchLean.NN.compAny
+      let f := mkGlobalIdent `NN.API.TorchLean.LayerCore.compAny
       `(do
         let a ← ($a)
         let bc ← (nn.Sequential![$b, $rest,*])
@@ -75,13 +75,13 @@ macro_rules (kind := nnSequentialBangLit)
 macro_rules (kind := seqLit)
   | `(seq! $a:term) => `($a)
   | `(seq! $a:term, $b:term) =>
-      let f := mkGlobalIdent `NN.API.TorchLean.NN.compAny
+      let f := mkGlobalIdent `NN.API.TorchLean.LayerCore.compAny
       `($f $a $b)
   | `(seq! $a:term, $b:term, $rest:term,*) =>
-      let f := mkGlobalIdent `NN.API.TorchLean.NN.compAny
+      let f := mkGlobalIdent `NN.API.TorchLean.LayerCore.compAny
       `($f $a (seq! $b, $rest,*))
 
-/-- Build a `TorchLean.tensorpack.TensorPack` from comma-separated tensors. -/
+/-- Build a `TorchLean.TensorPack` from comma-separated tensors. -/
 syntax (name := tensorpackLit) "tensorpack!" term,+ : term
 
 macro_rules (kind := tensorpackLit)

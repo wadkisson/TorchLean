@@ -8,7 +8,7 @@ Usage: scripts/checks/example_regression.sh [options]
 Run a sequential regression check over the public `lake exe torchlean ...` commands.
 
 Default:
-  - check that `import NN.Entrypoint.API` exposes the usual `TorchLean.*` names;
+  - check that `import NN.API` exposes the usual `TorchLean.*` names;
   - verify every registered subcommand accepts `--help`;
   - run a compact CPU/tutorial/interop regression set.
 
@@ -90,18 +90,21 @@ run() {
 
 public_api_check="$tmp_dir/public_api_check.lean"
 cat > "$public_api_check" <<'LEAN'
-import NN.Entrypoint.API
+import NN.API
 
 open TorchLean
 
-#check TorchLean.nn.Linear
+#check TorchLean.nn.linear
 #check TorchLean.optim.adam
 #check TorchLean.Trainer.new
 #check TorchLean.Data.tensorDataset
 #check TorchLean.Loss.mse
 #check TorchLean.Metrics.argmax?
+#check TorchLean.classical.knn.Model
+#check TorchLean.classical.randomForest.regression.Model
+#check TorchLean.classical.pca.forward
 LEAN
-run "$LAKE" build +NN.Entrypoint.API
+run "$LAKE" build +NN.API
 run "$LAKE" env lean "$public_api_check"
 
 if [[ "$run_help" == true ]]; then

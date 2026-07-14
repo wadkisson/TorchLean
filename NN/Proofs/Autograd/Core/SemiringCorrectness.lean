@@ -31,7 +31,7 @@ their reverse-mode rules can be proved from algebraic identities alone. This fil
 “pure algebra” portion so it can be instantiated for exact backends (e.g. `ℚ`) without pulling in
 real-analytic structure.
 
-Ops that require extra structure (e.g. ReLU needs an order/max, MSE needs division by `Shape.size`)
+Ops that require extra structure (e.g. ReLU needs an order/max, MSE needs division by `Spec.Shape.size`)
 appear here only under the corresponding extra typeclass assumptions.
 
 If you only care about real-valued training semantics, prefer `NN.Proofs.Autograd.Core.RealCorrectness`. If you
@@ -159,7 +159,7 @@ Correctness of a linear layer’s backward rule (matrix–vector multiply), stat
 
 This is purely algebraic: it relies only on semiring laws and the adjointness lemma for matrix
 multiplication in `TensorAlgebra`.
-PyTorch analogue: `torch.nn.Linear`’s linear map.
+PyTorch analogue: `torch.nn.linear`’s linear map.
 -/
 def linearCorrect {α : Type} [CommSemiring α]
   {inDim outDim : Nat} (m : Spec.LinearSpec α inDim outDim) :

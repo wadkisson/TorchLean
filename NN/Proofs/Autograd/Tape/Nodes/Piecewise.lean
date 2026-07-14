@@ -37,23 +37,23 @@ namespace TapeNodes
 def maxElem {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun xV =>
-      vecOfFun (n := Shape.size s) fun i =>
+      vecOfFun (n := Spec.Shape.size s) fun i =>
         max (CtxVec.get (Γ := Γ) (s := s) a xV i) (CtxVec.get (Γ := Γ) (s := s) b xV i))
     (jvp := fun xV dxV =>
-      vecOfFun (n := Shape.size s) fun i =>
+      vecOfFun (n := Spec.Shape.size s) fun i =>
         let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
         let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
         let da := CtxVec.get (Γ := Γ) (s := s) a dxV i
         let db := CtxVec.get (Γ := Γ) (s := s) b dxV i
         if xa > xb then da else db)
     (vjp := fun xV δV =>
-      let vA : Vec (Shape.size s) :=
-        vecOfFun (n := Shape.size s) fun i =>
+      let vA : Vec (Spec.Shape.size s) :=
+        vecOfFun (n := Spec.Shape.size s) fun i =>
           let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
           let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
           if xa > xb then δV i else 0
-      let vB : Vec (Shape.size s) :=
-        vecOfFun (n := Shape.size s) fun i =>
+      let vB : Vec (Spec.Shape.size s) :=
+        vecOfFun (n := Spec.Shape.size s) fun i =>
           let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
           let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
           if xa > xb then 0 else δV i
@@ -77,23 +77,23 @@ def maxElem {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
 def minElem {Γ : List Shape} {s : Shape} (a b : Idx Γ s) : Node Γ s :=
   Node.ofVec (Γ := Γ) (τ := s)
     (f := fun xV =>
-      vecOfFun (n := Shape.size s) fun i =>
+      vecOfFun (n := Spec.Shape.size s) fun i =>
         min (CtxVec.get (Γ := Γ) (s := s) a xV i) (CtxVec.get (Γ := Γ) (s := s) b xV i))
     (jvp := fun xV dxV =>
-      vecOfFun (n := Shape.size s) fun i =>
+      vecOfFun (n := Spec.Shape.size s) fun i =>
         let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
         let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
         let da := CtxVec.get (Γ := Γ) (s := s) a dxV i
         let db := CtxVec.get (Γ := Γ) (s := s) b dxV i
         if xa < xb then da else db)
     (vjp := fun xV δV =>
-      let vA : Vec (Shape.size s) :=
-        vecOfFun (n := Shape.size s) fun i =>
+      let vA : Vec (Spec.Shape.size s) :=
+        vecOfFun (n := Spec.Shape.size s) fun i =>
           let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
           let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
           if xa < xb then δV i else 0
-      let vB : Vec (Shape.size s) :=
-        vecOfFun (n := Shape.size s) fun i =>
+      let vB : Vec (Spec.Shape.size s) :=
+        vecOfFun (n := Spec.Shape.size s) fun i =>
           let xa := CtxVec.get (Γ := Γ) (s := s) a xV i
           let xb := CtxVec.get (Γ := Γ) (s := s) b xV i
           if xa < xb then 0 else δV i
@@ -149,42 +149,42 @@ lemma hasFDerivAt_min_of_lt {Γ : List Shape} {f g : CtxVec Γ → ℝ} {f' g' :
 
 /-- Pointwise `NodeFDerivCorrectAt` for `max_elem`, assuming there are no ties. -/
 def maxElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec Γ)
-    (hneq : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) a xV i ≠ CtxVec.get (Γ := Γ) (s
+    (hneq : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) a xV i ≠ CtxVec.get (Γ := Γ) (s
       := s) b xV i) :
     NodeFDerivCorrectAt (maxElem (Γ := Γ) (s := s) a b) xV := by
   classical
-  let aCLM : CtxVec Γ →L[ℝ] Vec (Shape.size s) := CtxVec.getCLM (Γ := Γ) (s := s) a
-  let bCLM : CtxVec Γ →L[ℝ] Vec (Shape.size s) := CtxVec.getCLM (Γ := Γ) (s := s) b
+  let aCLM : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s) := CtxVec.getCLM (Γ := Γ) (s := s) a
+  let bCLM : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s) := CtxVec.getCLM (Γ := Γ) (s := s) b
   have ha0 : HasFDerivAt (fun x : CtxVec Γ => aCLM x) aCLM xV := aCLM.hasFDerivAt (x := xV)
   have hb0 : HasFDerivAt (fun x : CtxVec Γ => bCLM x) bCLM xV := bCLM.hasFDerivAt (x := xV)
   -- coordinatewise derivative via branch stability
   have hcoord :
-      ∀ i : Fin (Shape.size s),
+      ∀ i : Fin (Spec.Shape.size s),
         HasFDerivAt (fun x : CtxVec Γ => max (aCLM x i) (bCLM x i))
-          (if aCLM xV i > bCLM xV i then (evalCLM (n := Shape.size s) i).comp aCLM
-           else (evalCLM (n := Shape.size s) i).comp bCLM) xV := by
+          (if aCLM xV i > bCLM xV i then (evalCLM (n := Spec.Shape.size s) i).comp aCLM
+           else (evalCLM (n := Spec.Shape.size s) i).comp bCLM) xV := by
     intro i
     have hne : aCLM xV i ≠ bCLM xV i := by
       simpa [aCLM, bCLM, CtxVec.getCLM_apply] using hneq i
     -- coordinate projections are linear, so their derivatives are just `evalCLM ∘ getCLM`
     have ha_i :
-        HasFDerivAt (fun x : CtxVec Γ => aCLM x i) ((evalCLM (n := Shape.size s) i).comp aCLM) xV :=
+        HasFDerivAt (fun x : CtxVec Γ => aCLM x i) ((evalCLM (n := Spec.Shape.size s) i).comp aCLM) xV :=
           by
       have houter :
-          HasFDerivAt (fun v : Vec (Shape.size s) => (evalCLM (n := Shape.size s) i) v) (evalCLM (n
-            := Shape.size s) i)
+          HasFDerivAt (fun v : Vec (Spec.Shape.size s) => (evalCLM (n := Spec.Shape.size s) i) v) (evalCLM (n
+            := Spec.Shape.size s) i)
             (aCLM xV) :=
-        (evalCLM (n := Shape.size s) i).hasFDerivAt (x := aCLM xV)
+        (evalCLM (n := Spec.Shape.size s) i).hasFDerivAt (x := aCLM xV)
       have hcomp := houter.comp xV ha0
       exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hb_i :
-        HasFDerivAt (fun x : CtxVec Γ => bCLM x i) ((evalCLM (n := Shape.size s) i).comp bCLM) xV :=
+        HasFDerivAt (fun x : CtxVec Γ => bCLM x i) ((evalCLM (n := Spec.Shape.size s) i).comp bCLM) xV :=
           by
       have houter :
-          HasFDerivAt (fun v : Vec (Shape.size s) => (evalCLM (n := Shape.size s) i) v) (evalCLM (n
-            := Shape.size s) i)
+          HasFDerivAt (fun v : Vec (Spec.Shape.size s) => (evalCLM (n := Spec.Shape.size s) i) v) (evalCLM (n
+            := Spec.Shape.size s) i)
             (bCLM xV) :=
-        (evalCLM (n := Shape.size s) i).hasFDerivAt (x := bCLM xV)
+        (evalCLM (n := Spec.Shape.size s) i).hasFDerivAt (x := bCLM xV)
       have hcomp := houter.comp xV hb0
       exact hcomp.congr_of_eventuallyEq (Filter.Eventually.of_forall fun _ => rfl)
     have hlt : aCLM xV i < bCLM xV i ∨ aCLM xV i > bCLM xV i := lt_or_gt_of_ne hne
@@ -196,45 +196,45 @@ def maxElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec 
         have hgt : bCLM xV i > aCLM xV i := hlt
         have h' :
             HasFDerivAt (fun x : CtxVec Γ => max (bCLM x i) (aCLM x i))
-              ((evalCLM (n := Shape.size s) i).comp bCLM) xV :=
+              ((evalCLM (n := Spec.Shape.size s) i).comp bCLM) xV :=
           hasFDerivAt_max_of_lt hb_i ha_i hgt
         -- rewrite back (and match the `if` branch)
         simpa [hn, if_neg hn, max_comm] using h'
   -- assemble
   refine
       { deriv :=
-          (euclideanEquiv (Shape.size s)).symm.toContinuousLinearMap.comp <|
-            ContinuousLinearMap.pi fun i : Fin (Shape.size s) =>
-              if aCLM xV i > bCLM xV i then (evalCLM (n := Shape.size s) i).comp aCLM
-              else (evalCLM (n := Shape.size s) i).comp bCLM
+          (euclideanEquiv (Spec.Shape.size s)).symm.toContinuousLinearMap.comp <|
+            ContinuousLinearMap.pi fun i : Fin (Spec.Shape.size s) =>
+              if aCLM xV i > bCLM xV i then (evalCLM (n := Spec.Shape.size s) i).comp aCLM
+              else (evalCLM (n := Spec.Shape.size s) i).comp bCLM
         hasFDerivAt := ?_
         jvp_eq := ?_ }
   · -- package coordinate statements, then transport `Fin n → ℝ` to `Vec n`
     have hpi :
         HasFDerivAt
-          (fun x : CtxVec Γ => fun i : Fin (Shape.size s) => max (aCLM x i) (bCLM x i))
-          (ContinuousLinearMap.pi fun i : Fin (Shape.size s) =>
-            if aCLM xV i > bCLM xV i then (evalCLM (n := Shape.size s) i).comp aCLM
-            else (evalCLM (n := Shape.size s) i).comp bCLM)
+          (fun x : CtxVec Γ => fun i : Fin (Spec.Shape.size s) => max (aCLM x i) (bCLM x i))
+          (ContinuousLinearMap.pi fun i : Fin (Spec.Shape.size s) =>
+            if aCLM xV i > bCLM xV i then (evalCLM (n := Spec.Shape.size s) i).comp aCLM
+            else (evalCLM (n := Spec.Shape.size s) i).comp bCLM)
           xV := by
       refine (hasFDerivAt_pi (𝕜 := ℝ)
-        (φ := fun i : Fin (Shape.size s) => fun x : CtxVec Γ => max (aCLM x i) (bCLM x i))
-        (φ' := fun i : Fin (Shape.size s) =>
-          if aCLM xV i > bCLM xV i then (evalCLM (n := Shape.size s) i).comp aCLM
-          else (evalCLM (n := Shape.size s) i).comp bCLM)
+        (φ := fun i : Fin (Spec.Shape.size s) => fun x : CtxVec Γ => max (aCLM x i) (bCLM x i))
+        (φ' := fun i : Fin (Spec.Shape.size s) =>
+          if aCLM xV i > bCLM xV i then (evalCLM (n := Spec.Shape.size s) i).comp aCLM
+          else (evalCLM (n := Spec.Shape.size s) i).comp bCLM)
         (x := xV)).2 ?_
       intro i
       simpa using hcoord i
     have he' :
-        HasFDerivAt (fun g : Fin (Shape.size s) → ℝ => (euclideanEquiv (Shape.size s)).symm g)
-          ((euclideanEquiv (Shape.size s)).symm.toContinuousLinearMap)
-          (fun i : Fin (Shape.size s) => max (aCLM xV i) (bCLM xV i)) :=
-      (ContinuousLinearMap.hasFDerivAt (euclideanEquiv (Shape.size s)).symm.toContinuousLinearMap)
+        HasFDerivAt (fun g : Fin (Spec.Shape.size s) → ℝ => (euclideanEquiv (Spec.Shape.size s)).symm g)
+          ((euclideanEquiv (Spec.Shape.size s)).symm.toContinuousLinearMap)
+          (fun i : Fin (Spec.Shape.size s) => max (aCLM xV i) (bCLM xV i)) :=
+      (ContinuousLinearMap.hasFDerivAt (euclideanEquiv (Spec.Shape.size s)).symm.toContinuousLinearMap)
     have hcomp := he'.comp xV hpi
     have hEq :
         (Node.forwardVec (Γ := Γ) (τ := s) (maxElem (Γ := Γ) (s := s) a b)) =
           (fun x : CtxVec Γ =>
-            vecOfFun (n := Shape.size s) fun i : Fin (Shape.size s) => max (aCLM x i) (bCLM x i)) :=
+            vecOfFun (n := Spec.Shape.size s) fun i : Fin (Spec.Shape.size s) => max (aCLM x i) (bCLM x i)) :=
               by
       funext x
       ext i
@@ -259,11 +259,11 @@ def maxElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec 
 
 /-- Pointwise `NodeFDerivCorrectAt` for `min_elem`, assuming there are no ties. -/
 def minElemFderivAt {Γ : List Shape} {s : Shape} (a b : Idx Γ s) (xV : CtxVec Γ)
-    (hneq : ∀ i : Fin (Shape.size s), CtxVec.get (Γ := Γ) (s := s) a xV i ≠ CtxVec.get (Γ := Γ) (s
+    (hneq : ∀ i : Fin (Spec.Shape.size s), CtxVec.get (Γ := Γ) (s := s) a xV i ≠ CtxVec.get (Γ := Γ) (s
       := s) b xV i) :
     NodeFDerivCorrectAt (minElem (Γ := Γ) (s := s) a b) xV := by
   classical
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   let aCLM : CtxVec Γ →L[ℝ] Vec n := CtxVec.getCLM (Γ := Γ) (s := s) a
   let bCLM : CtxVec Γ →L[ℝ] Vec n := CtxVec.getCLM (Γ := Γ) (s := s) b
   have ha0 : HasFDerivAt (fun x : CtxVec Γ => aCLM x) aCLM xV := aCLM.hasFDerivAt (x := xV)

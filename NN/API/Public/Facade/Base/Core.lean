@@ -9,7 +9,6 @@ module
 public import NN.API.Public.Facade.Base.Root
 public import NN.API.Public.Facade.Base.Verification
 public import NN.API.Public.Facade.Base.CLI
-public import NN.API.Public.Facade.Base.ModelZoo
 public import NN.API.Public.Facade.Base.Runtime
 public import NN.API.Public.Facade.Base.Tensor
 public import NN.API.Public.Facade.Base.Json

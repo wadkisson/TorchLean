@@ -96,16 +96,6 @@ def scalarPowNat {α : Type} [One α] [Mul α] (x : α) : Nat → α
   | 0 => 1
   | n + 1 => scalarPowNat x n * x
 
-/-- Scalar exponentiation starts at `1`. -/
-@[simp] theorem scalarPowNat_zero {α : Type} [One α] [Mul α] (x : α) :
-    scalarPowNat x 0 = 1 := by
-  rfl
-
-/-- Successor case for scalar exponentiation. -/
-@[simp] theorem scalarPowNat_succ {α : Type} [One α] [Mul α] (x : α) (n : Nat) :
-    scalarPowNat x (n + 1) = scalarPowNat x n * x := by
-  rfl
-
 /-! ## Shared utilities -/
 namespace OptimizerUtils
 
@@ -146,13 +136,6 @@ def SGD.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → P
   (lr : α) (_ : Tensor α s) : SGD.State α s :=
   { lr := lr }
 
-/-- SGD initialization records exactly the requested learning rate. -/
-@[simp] theorem SGD.init_lr {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr : α) (params : Tensor α s) :
-    (SGD.init lr params).lr = lr := by
-  rfl
-
 /--
 One SGD step: `p ← p - lr * g`.
 
@@ -187,13 +170,6 @@ def MomentumSGD.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → 
   (lr : α) (momentum : α) (_ : Tensor α s) : MomentumSGD.State α s :=
   { lr := lr, momentum := momentum, buf := fill 0 s }
 
-/-- Momentum-SGD starts with a zero momentum buffer. -/
-@[simp] theorem MomentumSGD.init_buf {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr momentum : α) (params : Tensor α s) :
-    (MomentumSGD.init lr momentum params).buf = fill 0 s := by
-  rfl
-
 /-- One momentum-SGD step (returns updated state and parameters). -/
 def MomentumSGD.update {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
   (state : MomentumSGD.State α s) (params : Tensor α s) (grads : Tensor α s) : (MomentumSGD.State α
@@ -222,13 +198,6 @@ structure AdaGrad.State (α : Type) (s : Shape) where
 def AdaGrad.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
   (lr : α) (epsilon : α) (_ : Tensor α s) : AdaGrad.State α s :=
   { lr := lr, epsilon := epsilon, accumulator := fill 0 s }
-
-/-- AdaGrad starts with a zero squared-gradient accumulator. -/
-@[simp] theorem AdaGrad.init_accumulator {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr epsilon : α) (params : Tensor α s) :
-    (AdaGrad.init lr epsilon params).accumulator = fill 0 s := by
-  rfl
 
 /-- One AdaGrad step (returns updated state and parameters). -/
 def AdaGrad.update {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
@@ -261,13 +230,6 @@ structure RMSProp.State (α : Type) (s : Shape) where
 def RMSProp.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
   (lr : α) (decay : α) (epsilon : α) (_ : Tensor α s) : RMSProp.State α s :=
   { lr := lr, decay := decay, epsilon := epsilon, accumulator := fill 0 s }
-
-/-- RMSProp starts with a zero running average of squared gradients. -/
-@[simp] theorem RMSProp.init_accumulator {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr decay epsilon : α) (params : Tensor α s) :
-    (RMSProp.init lr decay epsilon params).accumulator = fill 0 s := by
-  rfl
 
 /-- One RMSProp step (returns updated state and parameters). -/
 def RMSProp.update {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
@@ -316,27 +278,6 @@ def Adam.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → 
     v := fill 0 s,
     t := 0
   }
-
-/-- Adam starts at step `0`. -/
-@[simp] theorem Adam.init_t {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr beta1 beta2 epsilon : α) (params : Tensor α s) :
-    (Adam.init lr beta1 beta2 epsilon params).t = 0 := by
-  rfl
-
-/-- Adam starts with a zero first-moment buffer. -/
-@[simp] theorem Adam.init_m {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr beta1 beta2 epsilon : α) (params : Tensor α s) :
-    (Adam.init lr beta1 beta2 epsilon params).m = fill 0 s := by
-  rfl
-
-/-- Adam starts with a zero second-moment buffer. -/
-@[simp] theorem Adam.init_v {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr beta1 beta2 epsilon : α) (params : Tensor α s) :
-    (Adam.init lr beta1 beta2 epsilon params).v = fill 0 s := by
-  rfl
 
 /--
 One Adam step (returns updated state and parameters).
@@ -425,20 +366,6 @@ def AdamW.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α →
     t := 0
   }
 
-/-- AdamW initialization records the requested decoupled weight-decay coefficient. -/
-@[simp] theorem AdamW.init_weight_decay {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr weightDecay beta1 beta2 epsilon : α) (params : Tensor α s) :
-    (AdamW.init lr weightDecay beta1 beta2 epsilon params).weight_decay = weightDecay := by
-  rfl
-
-/-- AdamW starts at step `0`. -/
-@[simp] theorem AdamW.init_t {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr weightDecay beta1 beta2 epsilon : α) (params : Tensor α s) :
-    (AdamW.init lr weightDecay beta1 beta2 epsilon params).t = 0 := by
-  rfl
-
 /--
 One AdamW step (returns updated state and parameters).
 
@@ -504,20 +431,6 @@ structure Adadelta.State (α : Type) (s : Shape) where
 def Adadelta.init {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
   (lr : α) (rho : α) (epsilon : α) (_ : Tensor α s) : Adadelta.State α s :=
   { lr := lr, rho := rho, epsilon := epsilon, v := fill 0 s, u := fill 0 s }
-
-/-- Adadelta starts with a zero squared-gradient EMA. -/
-@[simp] theorem Adadelta.init_v {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr rho epsilon : α) (params : Tensor α s) :
-    (Adadelta.init lr rho epsilon params).v = fill 0 s := by
-  rfl
-
-/-- Adadelta starts with a zero squared-update EMA. -/
-@[simp] theorem Adadelta.init_u {α : Type} [Context α]
-    [DecidableRel ((· > ·) : α → α → Prop)] {s : Shape}
-    (lr rho epsilon : α) (params : Tensor α s) :
-    (Adadelta.init lr rho epsilon params).u = fill 0 s := by
-  rfl
 
 /--
 One Adadelta step (returns updated state and parameters).

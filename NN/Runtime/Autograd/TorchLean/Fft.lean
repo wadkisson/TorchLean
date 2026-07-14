@@ -106,10 +106,10 @@ front, call `fftLeadingAxis`, then permute back.
 def fftLeadingAxis (n : Nat) (rest : Shape) :
     LayerDef (.dim n rest) (.dim n rest) :=
   let sIn : Shape := .dim n rest
-  let cols : Nat := Shape.size rest
+  let cols : Nat := Spec.Shape.size rest
   let sMat : Shape := mat n cols
-  have hSz : Shape.size sIn = Shape.size sMat := by
-    simp [Shape.size, sIn, sMat, cols]
+  have hSz : Spec.Shape.size sIn = Spec.Shape.size sMat := by
+    simp [Spec.Shape.size, sIn, sMat, cols]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -133,10 +133,10 @@ See `fftLeadingAxis` for the implementation strategy.
 def ifftLeadingAxis (n : Nat) (rest : Shape) :
     LayerDef (.dim n rest) (.dim n rest) :=
   let sIn : Shape := .dim n rest
-  let cols : Nat := Shape.size rest
+  let cols : Nat := Spec.Shape.size rest
   let sMat : Shape := mat n cols
-  have hSz : Shape.size sIn = Shape.size sMat := by
-    simp [Shape.size, sIn, sMat, cols]
+  have hSz : Spec.Shape.size sIn = Spec.Shape.size sMat := by
+    simp [Spec.Shape.size, sIn, sMat, cols]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -188,7 +188,7 @@ FFT along an axis at a given depth (0-based from the outermost).
 This is implemented by swapping the target axis outward (one adjacent swap per step) until it
 reaches depth `0`, applying `fftLeadingAxis`, then swapping back.
 
-If `depth ≥ Shape.rank s`, this layer is the identity.
+If `depth ≥ Spec.Shape.rank s`, this layer is the identity.
 -/
 def fftAtDepth : {s : Shape} → Nat → LayerDef s s
   | s, depth =>
@@ -198,7 +198,7 @@ def fftAtDepth : {s : Shape} → Nat → LayerDef s s
         fun {m} _ _ =>
           fun x =>
             (show m (RefTy (m := m) (α := α) s) from do
-              if depth ≥ Shape.rank s then
+              if depth ≥ Spec.Shape.rank s then
                 pure x
               else
                 let swapsToFront : List Nat := (List.range depth).reverse
@@ -233,7 +233,7 @@ def ifftAtDepth : {s : Shape} → Nat → LayerDef s s
         fun {m} _ _ =>
           fun x =>
             (show m (RefTy (m := m) (α := α) s) from do
-              if depth ≥ Shape.rank s then
+              if depth ≥ Spec.Shape.rank s then
                 pure x
               else
                 let swapsToFront : List Nat := (List.range depth).reverse

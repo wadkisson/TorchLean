@@ -53,9 +53,9 @@ python3 NN/Examples/Data/plot_fno1d_burgers.py \
 ## Runtime and Verification Boundary
 
 On CUDA, this example uses a real-split FNO path with fused `spectralConv1dRfft` autograd support
-and cuFFT-backed kernels. On CPU, it falls back to a dense DFT reference path. The mathematical FNO
-structure, dataset metadata, and prediction artifacts are visible in TorchLean; CUDA/cuFFT remain
-native runtime boundaries.
+and cuFFT-backed kernels. The generic real-split FNO model supplies the dense mathematical reference.
+Dataset metadata and prediction artifacts are visible in TorchLean; CUDA/cuFFT remain native runtime
+boundaries.
 
 For PINN residual certificates and scientific ML verification artifacts, use
 `NN/Examples/Verification/PINN` and `NN/Verification/PINN`. The FNO command is a training/prediction

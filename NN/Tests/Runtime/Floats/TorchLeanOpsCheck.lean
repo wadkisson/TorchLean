@@ -364,6 +364,56 @@ def checkBatchNormNchw : IO Unit := do
 
   checkBatchNormNchwAgainstPyTorch trainY evalY mean var
 
+/-! ## Loss and attention specification regressions -/
+
+/-- Check reduction axes and the selected derivatives at clipped loss branches. -/
+def checkLossSemantics : IO Unit := do
+  let logits : Tensor Float (.dim 2 (.dim 3 .scalar)) :=
+    tensorOfList! [2, 3] [0, 0, 0, 0, 0, 0]
+  let target : Tensor Float (.dim 2 (.dim 3 .scalar)) :=
+    tensorOfList! [2, 3] [1, 0, 0, 0, 1, 0]
+  let logitsLoss := Spec.crossEntropyLogitsSpec logits target
+  assertApprox "cross entropy averages samples, not classes" logitsLoss (Float.log 3) 1e-5
+
+  let probabilities : Tensor Float (.dim 3 .scalar) :=
+    tensorOfList! [3] [0.05, 0.5, 0.95]
+  let distribution : Tensor Float (.dim 3 .scalar) :=
+    tensorOfList! [3] [1, 1, 1]
+  let probabilityGrad :=
+    Spec.crossEntropyDerivSpec probabilities distribution (epsilon := 0.1)
+  assertApprox "cross entropy lower clipped branch" (vecVal probabilityGrad ⟨0, by decide⟩) 0
+  assertApprox "cross entropy interior branch" (vecVal probabilityGrad ⟨1, by decide⟩) (-2)
+  assertApprox "cross entropy upper clipped branch" (vecVal probabilityGrad ⟨2, by decide⟩) 0
+
+  assertApprox "BCE lower clipped branch"
+    (Spec.binaryCrossEntropyDerivSpec 0.05 1 (epsilon := 0.1)) 0
+  assertApprox "BCE interior branch"
+    (Spec.binaryCrossEntropyDerivSpec 0.5 1 (epsilon := 0.1)) (-2)
+  assertApprox "BCE upper clipped branch"
+    (Spec.binaryCrossEntropyDerivSpec 0.95 1 (epsilon := 0.1)) 0
+
+  let huberPrediction : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [1, 3]
+  let huberTarget : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0, 0]
+  assertApprox "Huber delta=2 forward"
+    (Spec.huberSpec huberPrediction huberTarget (delta := 2)) 2.25
+  let huberGrad := Spec.huberDerivSpec huberPrediction huberTarget (delta := 2)
+  assertApprox "Huber delta=2 quadratic gradient"
+    (vecVal huberGrad ⟨0, by decide⟩) 0.5
+  assertApprox "Huber delta=2 linear gradient"
+    (vecVal huberGrad ⟨1, by decide⟩) 1
+  assertApprox "RL Huber uses the same delta convention"
+    (Runtime.RL.Core.huberLoss (α := Float) 3 0 2) 4
+
+  let shortPrediction : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.05, 0]
+  let unitTarget : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [1, 0]
+  let cosineGrad :=
+    Spec.cosineSimilarityDerivSpec shortPrediction unitTarget (epsilon := 0.1)
+  assertApprox "cosine epsilon branch[0]" (vecVal cosineGrad ⟨0, by decide⟩) (-10)
+  assertApprox "cosine epsilon branch[1]" (vecVal cosineGrad ⟨1, by decide⟩) 0
+
+  assertApprox "zero-feature attention scale"
+    (Spec.attentionScaleDenom (α := Float) 0) 1
+
 /-- Entrypoint called by the curated float runtime suite. -/
 def run : IO Unit := do
   IO.println "torchlean_ops_check: begin"
@@ -399,6 +449,7 @@ def run : IO Unit := do
         1e-5
 
   checkBatchNormNchw
+  checkLossSemantics
 
   IO.println "torchlean_ops_check: ok"
 

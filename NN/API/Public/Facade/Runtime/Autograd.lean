@@ -29,14 +29,12 @@ export NN.API.autograd.model
    jvpParams hvpParams)
 
 /--
-Pack explicit weight and bias tensors for the public `nn.linear` constructor.
-
-Parameter-side companion to `nn.linear inDim outDim seedW seedB`.
+Pack explicit weight and bias tensors for a deterministically initialized linear layer.
 -/
 def linearParams {α : Type} {inDim outDim : Nat} {seedW seedB : Nat}
-    (w : Tensor.T α (Shape.mat outDim inDim))
-    (b : Tensor.T α (Shape.vec outDim)) :
-    Params (nn.linear inDim outDim seedW seedB) α :=
+    (w : Tensor.T α (.dim outDim (.dim inDim .scalar)))
+    (b : Tensor.T α (.dim outDim .scalar)) :
+    Params (TorchLean.nn.deterministic.linear inDim outDim seedW seedB) α :=
   nn.ParamTensors.pair w b
 
 /--

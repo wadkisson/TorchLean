@@ -115,8 +115,8 @@ Generated locally:
 - `checks/check_case_collisions.py`: CI guard for case-insensitive filesystem name
   collisions.
 - `checks/repo_lint.py`: repository lint used by `lake lint`. It checks source hygiene, public API
-  boundaries, trusted-axiom quarantine, public-example spellings, and module docstrings for `NN/`
-  Lean files.
+  boundaries, import-only aggregators, fixed-rank names in public tensor/model APIs,
+  trusted-axiom quarantine, public-example spellings, and module docstrings for `NN/` Lean files.
 - `checks/dependency_audit.py`: repository-level module/import graph audit inspired by
   Li et al., "The Network Structure of Mathlib" (arXiv:2604.24797). It reports
   broad imports, layer-boundary smells, fan-in/fan-out hubs, and Markdown/JSON

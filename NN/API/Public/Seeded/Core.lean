@@ -30,8 +30,8 @@ namespace API
 /-!
 # Seeded model builders
 
-This module reopens `NN.API.nn` with the PyTorch-style seeded builder API.  It sits on top of the
-pure builders from `NN.API.Public.NN` and allocates deterministic initialization seeds for users.
+This module defines the public model-building API and allocates deterministic initialization seeds
+from an explicit seed stream.
 -/
 
 namespace nn
@@ -41,20 +41,8 @@ namespace nn
 
 TorchLean keeps initialization randomness explicit so examples are reproducible.
 
-- `nn.*` is the default *seeded builder* API: layer constructors allocate initialization seeds
-  via `nn.M` (a deterministic seed stream).
-- `nn.pure.*` contains the explicit-seed constructors (proof/reproducibility-friendly).
-
-Typical patterns:
-
-1. Explicit seeds (best for proofs / reproducibility-sensitive code):
-   - build with `nn.pure.linear ... (seedW := ...) (seedB := ...)` etc
-   - compose with `seq! ...` / `>>>`
-
-2. Script-style “manual seed once”:
-   - `nn.manualSeed seed`
-   - `let seed ← nn.nextSeed`
-   - `let model := nn.run seed <| nn.Sequential![ ... ]`
+Layer constructors return `nn.M`, a deterministic state computation over the initialization seed
+stream. Call `nn.run seed` to construct a model reproducibly.
 
 Note: `nn.Sequential` lives in `Type 2`, so it cannot be returned directly from `IO`. We keep
 model building pure by drawing a base seed in `IO` and then calling `nn.run`.
@@ -69,85 +57,39 @@ def manualSeed (seed : Nat) : IO Unit :=
   rand.manualSeed seed
 
 /-
-`nn.pure.*` holds the explicit-seed constructors (proof/reproducibility-friendly).
-
-For user ergonomics, we re-export the *config records* and the pure construction namespaces
-(`functional`, `blocks`, `heads`) at `nn.*`, while keeping the explicit layer constructors under
-`nn.pure.*`.
+Configuration records are re-exported at `nn.*`; implementation constructors remain internal to
+the public builder.
 -/
 
-@[inherit_doc pure.Embedding]
-abbrev Embedding := pure.Embedding
+export Internal
+  (Embedding LearnedPositionalEmbedding SinusoidalPositionalEncoding RoPE
+   Conv Pool LayerNorm RMSNorm ChannelNorm MultiheadAttention)
 
-@[inherit_doc pure.LearnedPositionalEmbedding]
-abbrev LearnedPositionalEmbedding := pure.LearnedPositionalEmbedding
-
-@[inherit_doc pure.SinusoidalPositionalEncoding]
-abbrev SinusoidalPositionalEncoding := pure.SinusoidalPositionalEncoding
-
-@[inherit_doc pure.RoPE]
-abbrev RoPE := pure.RoPE
-
-@[inherit_doc pure.Conv2d]
-abbrev Conv2d := pure.Conv2d
-
-@[inherit_doc Conv2d]
-abbrev Conv := Conv2d
-
-@[inherit_doc pure.MaxPool2d]
-abbrev MaxPool2d := pure.MaxPool2d
-
-@[inherit_doc MaxPool2d]
-abbrev MaxPool := MaxPool2d
-
-@[inherit_doc pure.AvgPool2d]
-abbrev AvgPool2d := pure.AvgPool2d
-
-@[inherit_doc AvgPool2d]
-abbrev AvgPool := AvgPool2d
-
-@[inherit_doc pure.LayerNorm]
-abbrev LayerNorm := pure.LayerNorm
-
-@[inherit_doc pure.RMSNorm]
-abbrev RMSNorm := pure.RMSNorm
-
-@[inherit_doc pure.BatchNorm2d]
-abbrev BatchNorm2d := pure.BatchNorm2d
-
-@[inherit_doc pure.InstanceNorm2d]
-abbrev InstanceNorm2d := pure.InstanceNorm2d
-
-@[inherit_doc pure.MultiheadAttention]
-abbrev MultiheadAttention := pure.MultiheadAttention
-
-@[inherit_doc pure.globalAvgPoolCHW]
-def globalAvgPoolCHW := pure.globalAvgPoolCHW
-
-@[inherit_doc pure.globalAvgPoolNCHW]
-def globalAvgPoolNCHW := pure.globalAvgPoolNCHW
+@[inherit_doc Internal.globalAvgPool]
+def globalAvgPool (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (spatialNonzero : ∀ i : Fin d, spatial.get i ≠ 0) :
+    rand.SeedM (Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (.dim channels .scalar))) :=
+  fun state =>
+    (Internal.globalAvgPool leading (channels := channels) spatial spatialNonzero, state)
 
 namespace functional
-export pure.functional
+export Internal.functional
   (square checkpoint
    exp log scale shift affine
-   detach stopGrad
+   detach
    addB mulB
    embedding mean
    dropoutSeeded)
 end functional
 
 namespace blocks
-export pure.blocks
+export Internal.blocks
   (Activation activation
    MLP mlp
-   Conv2dAct conv2dAct
-   Conv2dNormAct conv2dNormActCHW conv2dNormAct
-   Conv2dNormActPool conv2dNormActPoolCHW conv2dNormActPool
-   strideTwoOutput strideTwoOutput_pos
-   conv3x3Same conv3x3Down conv1x1Same conv1x1Down
-   conv3x3SameImages conv3x3DownImages conv1x1SameImages conv1x1DownImages
-   ResNetBasicBlock resnetBasicBlock
+   ConvAct convAct ConvActPool convActPool
+   residualBlock
    TransformerEncoderBlock transformerEncoderBlockWithMask transformerEncoderBlock
    TransformerEncoderStack transformerEncoderStackWithMask transformerEncoderStack
    transformerEncoderClassifier
@@ -156,7 +98,7 @@ export pure.blocks
 end blocks
 
 namespace heads
-export pure.heads (classifier regressor classifierBatch regressorBatch)
+export Internal.heads (classifier regressor classifierBatch regressorBatch)
 end heads
 
 /-!
@@ -165,7 +107,6 @@ end heads
 For end-user code, the default `nn.*` layer constructors allocate initialization seeds
 automatically via `nn.M` (a deterministic seed-stream builder).
 
-Use `nn.pure.*` when you want to pass explicit seeds (proof-friendly / fully reproducible).
 -/
 
 open Spec
@@ -181,6 +122,11 @@ def run {α : Type 2} (seed : Nat) (x : M α) : α :=
 def lift {α : Type 2} (x : α) : M α :=
   pure x
 
+/-- Apply a model independently over an arbitrary collection of leading dimensions. -/
+def mapLeading (leading : Spec.Shape) {σ τ : Spec.Shape} (model : Sequential σ τ) :
+    M (Sequential (leading.concat σ) (leading.concat τ)) :=
+  lift (Internal.mapLeading leading model)
+
 /-- Consume one fresh seed and pass it to `k`. -/
 def withSeed {α : Type 2} (k : Nat → α) : M α :=
   fun st =>
@@ -194,242 +140,206 @@ def withSeedPair {α : Type 2} (k : Nat → Nat → α) : M α :=
     let (b, st'') := rand.SeedStream.next st'
     (k a b, st'')
 
-@[inherit_doc pure.relu]
+@[inherit_doc Internal.relu]
 def relu {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.relu (s := s))
+  lift (Internal.relu (s := s))
 
-@[inherit_doc relu]
-abbrev ReLU {s : Spec.Shape} : M (Sequential s s) := relu (s := s)
-
-@[inherit_doc pure.silu]
+@[inherit_doc Internal.silu]
 def silu {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.silu (s := s))
+  lift (Internal.silu (s := s))
 
-@[inherit_doc silu]
-abbrev SiLU {s : Spec.Shape} : M (Sequential s s) := silu (s := s)
-
-@[inherit_doc pure.gelu]
+@[inherit_doc Internal.gelu]
 def gelu {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.gelu (s := s))
+  lift (Internal.gelu (s := s))
 
-@[inherit_doc gelu]
-abbrev GELU {s : Spec.Shape} : M (Sequential s s) := gelu (s := s)
-
-@[inherit_doc pure.sigmoid]
+@[inherit_doc Internal.sigmoid]
 def sigmoid {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.sigmoid (s := s))
+  lift (Internal.sigmoid (s := s))
 
-@[inherit_doc sigmoid]
-abbrev Sigmoid {s : Spec.Shape} : M (Sequential s s) := sigmoid (s := s)
-
-@[inherit_doc pure.tanh]
+@[inherit_doc Internal.tanh]
 def tanh {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.tanh (s := s))
+  lift (Internal.tanh (s := s))
 
-@[inherit_doc tanh]
-abbrev Tanh {s : Spec.Shape} : M (Sequential s s) := tanh (s := s)
-
-@[inherit_doc pure.softmax]
+@[inherit_doc Internal.softmax]
 def softmax {s : Spec.Shape} : M (Sequential s s) :=
-  lift (pure.softmax (s := s))
+  lift (Internal.softmax (s := s))
 
-@[inherit_doc softmax]
-abbrev Softmax {s : Spec.Shape} : M (Sequential s s) := softmax (s := s)
-
-@[inherit_doc pure.sum]
+@[inherit_doc Internal.sum]
 def sum {s : Spec.Shape} : M (Sequential s Spec.Shape.scalar) :=
-  lift (pure.sum (s := s))
+  lift (Internal.sum (s := s))
 
-@[inherit_doc pure.flatten]
+@[inherit_doc Internal.flatten]
 def flatten {s : Spec.Shape} : M (Sequential s (.dim (Spec.Shape.size s) .scalar)) :=
-  lift (pure.flatten (s := s))
+  lift (Internal.flatten (s := s))
 
-@[inherit_doc flatten]
-abbrev Flatten {s : Spec.Shape} : M (Sequential s (.dim (Spec.Shape.size s) .scalar)) :=
-  flatten (s := s)
-
-@[inherit_doc pure.flattenBatch]
+@[inherit_doc Internal.flattenBatch]
 def flattenBatch {n : Nat} {s : Spec.Shape} :
-    M (Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s))) :=
-  lift (pure.flattenBatch (n := n) (s := s))
+    M (Sequential (.dim n s) (.dim n (.dim (Spec.Shape.size s) .scalar))) :=
+  lift (Internal.flattenBatch (n := n) (s := s))
 
-@[inherit_doc flattenBatch]
-abbrev FlattenBatch {n : Nat} {s : Spec.Shape} :
-    M (Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s))) :=
-  flattenBatch (n := n) (s := s)
+@[inherit_doc Internal.maxPool]
+def maxPool (leading : Spec.Shape := .scalar) {d channels : Nat} (spatial : Vector Nat d)
+    (cfg : Pool d) :=
+  lift (Internal.maxPool leading (channels := channels) spatial cfg)
 
-@[inherit_doc pure.maxPool2d]
-def maxPool2d {n inC inH inW : Nat} (cfg : MaxPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    M (Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1))) :=
-  lift (pure.maxPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg)
+@[inherit_doc Internal.avgPool]
+def avgPool (leading : Spec.Shape := .scalar) {d channels : Nat} (spatial : Vector Nat d)
+    (cfg : Pool d) :=
+  lift (Internal.avgPool leading (channels := channels) spatial cfg)
 
-/--
-Max pooling over batched CHW images, allocating any required initialization seeds automatically.
-
-Shorthand for `maxPool2d`.
--/
-def maxPool {n inC inH inW : Nat} (cfg : MaxPool) [NeZero cfg.kH] [NeZero cfg.kW] :=
-  maxPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-@[inherit_doc pure.avgPool2d]
-def avgPool2d {n inC inH inW : Nat} (cfg : AvgPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    M (Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1))) :=
-  lift (pure.avgPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg)
-
-/--
-Average pooling over batched CHW images, allocating any required initialization seeds automatically.
-
-Shorthand for `avgPool2d`.
--/
-def avgPool {n inC inH inW : Nat} (cfg : AvgPool) [NeZero cfg.kH] [NeZero cfg.kW] :=
-  avgPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-@[inherit_doc pure.linear]
+@[inherit_doc Internal.linear]
 def linear (inDim outDim : Nat) (pfx : Spec.Shape := Spec.Shape.scalar) :
     M (Sequential (pfx.appendDim inDim) (pfx.appendDim outDim)) :=
   withSeedPair (fun seedW seedB =>
-    pure.linear inDim outDim seedW seedB (pfx := pfx))
-
-@[inherit_doc linear]
-abbrev Linear (inDim outDim : Nat) (pfx : Spec.Shape := Spec.Shape.scalar) :
-    M (Sequential (pfx.appendDim inDim) (pfx.appendDim outDim)) :=
-  linear inDim outDim (pfx := pfx)
+    Internal.linear inDim outDim seedW seedB (pfx := pfx))
 
 /-- Vector-only linear layer, specialized to the scalar prefix shape. -/
-def linearV (inDim outDim : Nat) : M (Sequential (NN.Tensor.Shape.Vec inDim)
-    (NN.Tensor.Shape.Vec outDim)) :=
+def linearV (inDim outDim : Nat) : M (Sequential (.dim inDim .scalar)
+    (.dim outDim .scalar)) :=
   linear inDim outDim
 
-@[inherit_doc linearV]
-abbrev LinearV (inDim outDim : Nat) :
-    M (Sequential (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim)) :=
-  linearV inDim outDim
+namespace deterministic
 
-@[inherit_doc pure.rnn]
+/-- Construct a linear layer with explicit parameter-initialization seeds. -/
+def linear (inDim outDim : Nat) (seedWeight seedBias : Nat)
+    (leading : Spec.Shape := .scalar) :
+    Sequential (leading.appendDim inDim) (leading.appendDim outDim) :=
+  Internal.linear inDim outDim seedWeight seedBias (pfx := leading)
+
+end deterministic
+
+@[inherit_doc Internal.rnn]
 def rnn (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar))) :=
   withSeedPair (fun seedW seedB =>
-    pure.rnn seqLen inputSize hiddenSize seedW seedB)
+    Internal.rnn seqLen inputSize hiddenSize seedW seedB)
 
-@[inherit_doc pure.gru]
+@[inherit_doc Internal.gru]
 def gru (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar))) :=
   withSeedPair (fun seedW seedB =>
-    pure.gru seqLen inputSize hiddenSize seedW seedB)
+    Internal.gru seqLen inputSize hiddenSize seedW seedB)
 
-@[inherit_doc pure.mamba]
+@[inherit_doc Internal.mamba]
 def mamba (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar))) :=
   withSeedPair (fun seedW seedB =>
-    pure.mamba seqLen inputSize hiddenSize seedW seedB)
+    Internal.mamba seqLen inputSize hiddenSize seedW seedB)
 
-@[inherit_doc pure.lstm]
+@[inherit_doc Internal.lstm]
 def lstm (seqLen inputSize hiddenSize : Nat) :
     M (Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize)) :=
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar))) :=
   withSeedPair (fun seedW seedB =>
-    pure.lstm seqLen inputSize hiddenSize seedW seedB)
+    Internal.lstm seqLen inputSize hiddenSize seedW seedB)
 
-@[inherit_doc pure.conv2d]
-def conv2d {n inC inH inW : Nat} (cfg : Conv2d) [NeZero inC] [NeZero cfg.kH] [NeZero cfg.kW] :
+@[inherit_doc Internal.conv]
+def conv (leading : Spec.Shape := .scalar) {d inChannels : Nat} (spatial : Vector Nat d)
+    (cfg : Conv d) [NeZero inChannels] :
     M (Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n cfg.outC
-        ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-        ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1))) :=
-  withSeedPair (fun seedK seedB =>
-    let cfg' : Conv2d := { cfg with seedK := seedK, seedB := seedB }
-    pure.conv2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg')
+      (leading.concat (Spec.Shape.ofList (inChannels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList
+        (cfg.outChannels ::
+          (Spec.convOutSpatial spatial cfg.kernel cfg.stride cfg.padding).toList)))) :=
+  withSeedPair (fun seedKernel seedBias =>
+    let cfg' : Conv d := { cfg with seedKernel := seedKernel, seedBias := seedBias }
+    by
+      simpa [cfg'] using Internal.conv leading (inChannels := inChannels) spatial cfg')
 
-/--
-Convolution over batched CHW images, allocating initialization seeds automatically.
-
-Shorthand for `conv2d`.
--/
-def conv {n inC inH inW : Nat} (cfg : Conv) [NeZero inC] [NeZero cfg.kH] [NeZero cfg.kW] :=
-  conv2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-@[inherit_doc pure.batchNorm2d]
-def batchNorm2d {n c h w : Nat} (cfg : BatchNorm2d := {})
-    [NeZero n] [NeZero c] [NeZero h] [NeZero w] :
-    M (Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w)) :=
+@[inherit_doc Internal.batchNorm]
+def batchNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (cfg : ChannelNorm := {})
+    [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    M (Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))) :=
   withSeedPair (fun seedGamma seedBeta =>
-    let cfg' : BatchNorm2d := { cfg with seedGamma := seedGamma, seedBeta := seedBeta }
-    pure.batchNorm2d (n := n) (c := c) (h := h) (w := w) cfg')
+    Internal.batchNorm leading spatial
+      { cfg with seedGamma := seedGamma, seedBeta := seedBeta })
 
-/--
-BatchNorm over batched CHW images, allocating initialization seeds automatically.
+@[inherit_doc Internal.instanceNorm]
+def instanceNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (cfg : ChannelNorm := {})
+    [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    M (Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))) :=
+  withSeedPair (fun seedGamma seedBeta =>
+    Internal.instanceNorm leading spatial
+      { cfg with seedGamma := seedGamma, seedBeta := seedBeta })
 
-Shorthand for `batchNorm2d`.
--/
-def batchNorm {n c h w : Nat} (cfg : BatchNorm2d := {}) [NeZero n] [NeZero c] [NeZero h] [NeZero w] :=
-  batchNorm2d (n := n) (c := c) (h := h) (w := w) cfg
+@[inherit_doc Internal.groupNorm]
+def groupNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (groups : Nat) (hGroups : groups > 0)
+    (hGroupsLe : channels >= groups) (hDiv : channels % groups = 0)
+    (cfg : ChannelNorm := {}) [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    M (Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))) :=
+  withSeedPair (fun seedGamma seedBeta =>
+    Internal.groupNorm leading spatial groups hGroups hGroupsLe hDiv
+      { cfg with seedGamma := seedGamma, seedBeta := seedBeta })
 
-@[inherit_doc pure.embedding]
+@[inherit_doc Internal.embedding]
 def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) {pfx : Spec.Shape} :
     M (Sequential (pfx.appendDim vocab) (pfx.appendDim embedDim)) :=
   withSeed (fun seedW =>
-    pure.embedding vocab embedDim { cfg with seedW := seedW } (pfx := pfx))
+    Internal.embedding vocab embedDim { cfg with seedW := seedW } (pfx := pfx))
 
-@[inherit_doc pure.sinusoidalPositionalEncoding]
+@[inherit_doc Internal.sinusoidalPositionalEncoding]
 def sinusoidalPositionalEncoding {batch seqLen embedDim : Nat}
     (cfg : SinusoidalPositionalEncoding := {}) :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))) :=
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))) :=
   lift <|
-    pure.sinusoidalPositionalEncoding (batch := batch) (seqLen := seqLen) (embedDim := embedDim) cfg
+    Internal.sinusoidalPositionalEncoding (batch := batch) (seqLen := seqLen) (embedDim := embedDim) cfg
 
-@[inherit_doc pure.rope]
+@[inherit_doc Internal.rope]
 def rope {batch numHeads seqLen headDim : Nat} (cfg : RoPE := {}) :
     M (Sequential
-      (.dim batch (.dim numHeads (NN.Tensor.Shape.Mat seqLen headDim)))
-      (.dim batch (.dim numHeads (NN.Tensor.Shape.Mat seqLen headDim)))) :=
+      (.dim batch (.dim numHeads (.dim seqLen (.dim headDim .scalar))))
+      (.dim batch (.dim numHeads (.dim seqLen (.dim headDim .scalar))))) :=
   lift <|
-    pure.rope (batch := batch) (numHeads := numHeads) (seqLen := seqLen) (headDim := headDim) cfg
+    Internal.rope (batch := batch) (numHeads := numHeads) (seqLen := seqLen) (headDim := headDim) cfg
 
-@[inherit_doc pure.learnedPositionalEmbedding]
+@[inherit_doc Internal.learnedPositionalEmbedding]
 def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPositionalEmbedding := {}) :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))) :=
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))) :=
   withSeed (fun seedPos =>
-    pure.learnedPositionalEmbedding (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
+    Internal.learnedPositionalEmbedding (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
       { cfg with seedPos := seedPos })
 
-@[inherit_doc pure.layerNorm]
+@[inherit_doc Internal.layerNorm]
 def layerNorm {batch seqLen embedDim : Nat} [NeZero seqLen] [NeZero embedDim] :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))) :=
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))) :=
   withSeedPair (fun seedGamma seedBeta =>
-    pure.layerNorm (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
+    Internal.layerNorm (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
       { seedGamma := seedGamma, seedBeta := seedBeta })
 
-@[inherit_doc pure.multiheadAttention]
+@[inherit_doc Internal.multiheadAttention]
 def multiheadAttention {batch n dModel : Nat} [NeZero n]
     (cfg : MultiheadAttention)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))) :=
+      (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar)))) :=
   withSeed (fun seedW =>
-    pure.multiheadAttention (batch := batch) (n := n) (dModel := dModel)
+    Internal.multiheadAttention (batch := batch) (n := n) (dModel := dModel)
       { cfg with seedW := seedW } (mask := mask))
 
 @[inherit_doc blocks.transformerEncoderBlock]
@@ -437,8 +347,8 @@ def transformerEncoderBlock {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : blocks.TransformerEncoderBlock)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))) :=
+      (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar)))) :=
   withSeed (fun seedBase =>
     let cfg' : blocks.TransformerEncoderBlock := { cfg with seedBase := seedBase }
     blocks.transformerEncoderBlock (batch := batch) (n := n) (dModel := dModel) cfg'
@@ -449,29 +359,17 @@ def transformerEncoderStack {batch n dModel : Nat} [NeZero n] [NeZero dModel]
     (cfg : blocks.TransformerEncoderStack)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     M (Sequential
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))
-      (.dim batch (NN.Tensor.Shape.Mat n dModel))) :=
+      (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar)))) :=
   withSeed (fun seedBase =>
     let cfg' : blocks.TransformerEncoderStack := { cfg with seedBase := seedBase }
     blocks.transformerEncoderStack (batch := batch) (n := n) (dModel := dModel) cfg'
       (mask := mask))
 
-@[inherit_doc blocks.resnetBasicBlock]
-def resnetBasicBlock {n inC h w : Nat} (cfg : blocks.ResNetBasicBlock)
-    [NeZero n] [NeZero inC] [NeZero h] [NeZero w] [NeZero cfg.outC] :
-    M (Sequential
-      (NN.Tensor.Shape.Images n inC h w)
-      (NN.Tensor.Shape.Images n cfg.outC
-        (if cfg.downsample then blocks.strideTwoOutput h else h)
-        (if cfg.downsample then blocks.strideTwoOutput w else w))) :=
-  withSeed (fun seedBase =>
-    let cfg' : blocks.ResNetBasicBlock := { cfg with seedBase := seedBase }
-    blocks.resnetBasicBlock (n := n) (inC := inC) (h := h) (w := w) cfg')
-
-@[inherit_doc pure.dropout]
+@[inherit_doc Internal.dropout]
 def dropout {s : Spec.Shape} (p : Float) : M (Sequential s s) :=
   withSeed (fun seed =>
-    pure.dropout (s := s) p (seed := seed))
+    Internal.dropout (s := s) p (seed := seed))
 
 /--
 Run a seeded builder using the global seed stream set by `nn.manualSeed` (results in `Type`).

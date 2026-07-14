@@ -102,7 +102,7 @@ theorem permuteDVal_eq_applySwapsTensor
     {α : Type} [Context α] {sIn : Shape} (t : Tensor α sIn)
     (perm : List Nat) (expected : Shape) (swaps : List Nat)
     (hPerm : Spec.Shape.permute? sIn perm = some expected)
-    (hSwaps : NN.IR.Graph.swapDepthsForPerm perm (Shape.rank sIn) = .ok swaps) :
+    (hSwaps : NN.IR.Graph.swapDepthsForPerm perm (Spec.Shape.rank sIn) = .ok swaps) :
     NN.IR.Graph.permuteDVal (α := α) (v := NN.IR.DVal.mk (α := α) sIn t) perm =
       .ok (NN.IR.DVal.mk (α := α) (swapShapeBySwaps sIn swaps)
         (applySwapsTensor (α := α) (s := sIn) (swaps := swaps) t)) := by

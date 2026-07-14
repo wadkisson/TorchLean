@@ -219,11 +219,11 @@ PyTorch analogue: `torch.nn.functional.silu`, equivalently `x * sigmoid(x)`.
 def siluCorrect {s : Shape} :
   OpSpecCorrect s s :=
 {
-  op := Spec.swishOp (α:=ℝ) (s:=s)
+  op := Spec.siluOp (α:=ℝ) (s:=s)
   jvp := fun x dx => mulSpec dx (Activation.swishDerivSpec (α:=ℝ) (s:=s) x)
   correct := by
     intro x dx δ
-    simpa [Spec.swishOp, Activation.swishDerivSpec] using (dot_elemwise_adjoint (dx:=dx)
+    simpa [Spec.siluOp, Activation.swishDerivSpec] using (dot_elemwise_adjoint (dx:=dx)
       (df:=Activation.swishDerivSpec (α:=ℝ) (s:=s) x) (δ:=δ))
 }
 
@@ -386,7 +386,7 @@ def logCorrect {s : Shape} :
 /--
 Correctness of a linear layer’s backward rule (matrix–vector multiply).
 
-PyTorch analogue: `torch.nn.Linear` (restricted here to the “weights only” linear map).
+PyTorch analogue: `torch.nn.linear` (restricted here to the “weights only” linear map).
 -/
 def linearCorrect {inDim outDim : Nat}
   (m : Spec.LinearSpec ℝ inDim outDim) :

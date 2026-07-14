@@ -227,8 +227,7 @@ theorem approxT_reduce_mean_by_row_2d
             Tensor.scalar (
               neuralUlp β fexp
                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR /
-                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R))
-                  TrainingPhase.forward / 2
+                    toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R)) / 2
                 + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR) *
                     abs (1 / toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R))
                 + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR)
@@ -251,8 +250,7 @@ theorem approxT_reduce_mean_by_row_2d
               Tensor.scalar (
                 neuralUlp β fexp
                     (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR /
-                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R))
-                    TrainingPhase.forward / 2
+                      toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R)) / 2
                   + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR) *
                       abs (1 / toSpec (β := β) (fexp := fexp) (rnd := rnd) (n : R))
                   + abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) sumR)

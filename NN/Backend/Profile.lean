@@ -168,6 +168,22 @@ def macOSCpu : BackendProfile :=
 def windowsCpu : BackendProfile :=
   checkedCpuTarget .windows .x86_64
 
+/-- Construct a named target whose runtime capsules are not implemented yet. -/
+def future
+    (name : String)
+    (device : Device)
+    (target : Target)
+    (backend : BackendPreference := .auto)
+    (trustPolicy : TrustPolicy := .checked)
+    (vjpMode : VJPMode := .torchLeanTape)
+    (acceptancePolicy : AcceptancePolicy := .strict) : BackendProfile :=
+  { name
+    config := { device, backend, trustPolicy, vjpMode }
+    target
+    registryMode := .default
+    loweringMode := .coalesced
+    acceptancePolicy }
+
 /--
 Future Metal/MPS profile.
 
@@ -176,94 +192,32 @@ non-reference op under this profile therefore fails with a missing-capsule error
 back silently to CUDA or CPU.
 -/
 def futureMetal : BackendProfile :=
-  { name := "future_metal"
-    config :=
-      { device := .metal
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.macOSMetal
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_metal" .metal Target.macOSMetal
 
 /-- Future ROCm profile. It is a named planning target until HIP/ROCm capsules are added. -/
 def futureRocm : BackendProfile :=
-  { name := "future_rocm"
-    config :=
-      { device := .rocm
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.linuxRocm
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_rocm" .rocm Target.linuxRocm
 
 /-- Future WebGPU/WASM profile. It is a named planning target until WebGPU capsules are added. -/
 def futureWasm : BackendProfile :=
-  { name := "future_wasm"
-    config :=
-      { device := .wasm
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.wasm
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_wasm" .wasm Target.wasm
 
 /-- Future TPU/XLA profile. It is a named planning target until TPU capsules are added. -/
 def futureTpu : BackendProfile :=
-  { name := "future_tpu"
-    config :=
-      { device := .tpu
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.linuxTpu
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_tpu" .tpu Target.linuxTpu
 
 /-- Future AWS Trainium/Neuron profile. It is a named planning target until Neuron capsules exist. -/
 def futureTrainium : BackendProfile :=
-  { name := "future_trainium"
-    config :=
-      { device := .trainium
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.linuxTrainium
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_trainium" .trainium Target.linuxTrainium
 
 /-- Future first-party/lab custom accelerator profile. -/
 def futureCustomChip : BackendProfile :=
-  { name := "future_custom_chip"
-    config :=
-      { device := .custom
-        backend := .auto
-        trustPolicy := .checked
-        vjpMode := .torchLeanTape }
-    target := Target.customChip
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .strict }
+  future "future_custom_chip" .custom Target.customChip
 
 /-- Future caller-supplied external accelerator profile. -/
 def futureExternal : BackendProfile :=
-  { name := "future_external"
-    config :=
-      { device := .external
-        backend := .only .external
-        trustPolicy := .allowTrustedExternal
-        vjpMode := .externalAutograd }
-    target := Target.external
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .allowTrustedRuntime }
+  future "future_external" .external Target.external
+    (.only .external) .allowTrustedExternal .externalAutograd .allowTrustedRuntime
 
 end BackendProfile
 

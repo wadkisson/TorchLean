@@ -8,7 +8,8 @@ End-to-end PPO example: train an actor-critic on Gymnasium `CartPole-v1` using T
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
@@ -148,7 +149,7 @@ def valueShape : Shape := shape![1]
 ## Model (Actor + Critic)
 
 We use the public `TorchLean.nn` surface, which provides prefix-shape preserving layers:
-if `x` has shape `[..., inDim]`, `nn.Linear inDim outDim` maps it to `[..., outDim]`.
+if `x` has shape `[..., inDim]`, `nn.linear inDim outDim` maps it to `[..., outDim]`.
 -/
 
 def modelCfg : nn.models.PPOActorCriticConfig :=
@@ -156,11 +157,11 @@ def modelCfg : nn.models.PPOActorCriticConfig :=
 
 /-- Construct the actor network as an MLP mapping observations to action logits. -/
 def actorMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim nActions)) :=
-  nn.models.PPOActor modelCfg pfx
+  nn.models.ppoActor modelCfg pfx
 
 /-- Construct the critic network as an MLP mapping observations to a scalar value estimate. -/
 def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim 1)) :=
-  nn.models.PPOCritic modelCfg pfx
+  nn.models.ppoCritic modelCfg pfx
 
 /-!
 ## Gymnasium Bridge

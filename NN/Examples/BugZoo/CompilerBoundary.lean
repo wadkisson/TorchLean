@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Spec.Core.Tensor
+import NN.Spec.Core.Tensor
 
 /-!
 # BugZoo: compiler and export semantic mismatches

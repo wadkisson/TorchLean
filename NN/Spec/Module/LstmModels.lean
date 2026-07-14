@@ -60,7 +60,7 @@ gate-aware BPTT implementation in `NN/Spec/Layers/Lstm.lean`.
 /--
 Gradients for a linear layer `y = W x + b`.
 
-This is the natural gradient bundle for `Spec.LinearSpec` (PyTorch analogue: `torch.nn.Linear`),
+This is the natural gradient bundle for `Spec.LinearSpec` (PyTorch analogue: `torch.nn.linear`),
 with `dW` matching the weight shape `[outDim, inDim]` and `db` matching `[outDim]`.
 -/
 structure LinearGrads (α : Type) (inDim outDim : Nat) where
@@ -109,7 +109,7 @@ structure SimpleLSTMModelGrads (α : Type) (inputSize hiddenSize outputSize : Na
 /--
 Sequence-to-sequence LSTM model as a `SpecChain`: LSTM over time, then a per-timestep linear head.
 
-PyTorch analogue: `nn.LSTM` producing an output sequence, followed by `nn.Linear` applied at each
+PyTorch analogue: `nn.LSTM` producing an output sequence, followed by `nn.linear` applied at each
 time step.
 -/
 def simpleLstmModelSpec
@@ -128,7 +128,7 @@ def simpleLstmModelSpec
 Many-to-one LSTM classifier as a `SpecChain`.
 
 This runs an LSTM over the sequence and applies a linear classifier head to the final hidden state.
-PyTorch analogue: `nn.LSTM` + `nn.Linear`, taking the last output/hidden.
+PyTorch analogue: `nn.LSTM` + `nn.linear`, taking the last output/hidden.
 -/
 def lstmClassifierModelSpec
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -167,7 +167,7 @@ def multilayerLstmSpec
 Simple LSTM language-model pipeline as a `SpecChain`: embedding, LSTM core, and output projection.
 
 In this spec layer we represent the embedding/projection as `LinearSpec`s (often used with one-hot
-token vectors). PyTorch analogue: `nn.Embedding` (conceptually) + `nn.LSTM` + `nn.Linear`.
+token vectors). PyTorch analogue: `nn.Embedding` (conceptually) + `nn.LSTM` + `nn.linear`.
 -/
 def lstmLanguageModelSpec
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -270,7 +270,7 @@ structure LSTMLanguageModel (α : Type) (vocabSize hiddenSize : Nat) where
 One-step forward pass for `SimpleLSTMModel`.
 
 Given an input vector and the previous LSTM state `(hidden, cell)`, compute `(output, new_state)`.
-PyTorch analogue: `nn.LSTMCell` step followed by a `nn.Linear` head.
+PyTorch analogue: `nn.LSTMCell` step followed by a `nn.linear` head.
 -/
 def simpleLstmForward {inputSize hiddenSize outputSize : Nat}
   (model : SimpleLSTMModel α inputSize hiddenSize outputSize)
@@ -637,7 +637,7 @@ def simpleLSTMToModuleSpec {seqLen inputSize hiddenSize outputSize : Nat}
 /--
 Package `LSTMClassifier` as an `NNModuleSpec`.
 
-PyTorch analogue: `nn.LSTM` feeding a `nn.Linear` classifier head.
+PyTorch analogue: `nn.LSTM` feeding a `nn.linear` classifier head.
 -/
 def lstmClassifierToModuleSpec {seqLen inputSize hiddenSize numClasses : Nat}
   (model : LSTMClassifier α inputSize hiddenSize numClasses) :

@@ -107,15 +107,6 @@ class Numbers (α : Type) where
   log10000 : α
   epsilon : α
 
-/-!
-Friendly aliases: these keep the original names (`MathFunctions`, `Numbers`) and give more
-descriptive names for scalar-facing code.
--/
-/-- Alias for `MathFunctions`. -/
-abbrev ScalarMath := MathFunctions
-/-- Alias for `Numbers`. -/
-abbrev ScalarConstants := Numbers
-
 /-- The full scalar interface required by spec‑level tensors and models. -/
 class Context (α : Type) extends
   Inhabited α, One α, Zero α,

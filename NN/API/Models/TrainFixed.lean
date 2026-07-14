@@ -48,18 +48,18 @@ deriving Repr
 
 /-- One fixed-sample run for an arbitrary scalar backend. -/
 def steps
-    {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
+    {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    {σ τ : Shape}
+    {σ τ : Spec.Shape}
     (mkModel : nn.M (nn.Sequential σ τ))
     (mkModuleDef :
       (model : nn.Sequential σ τ) →
         TorchLean.Module.ScalarModuleDef (nn.paramShapes model) [σ, τ])
     (mkOptim :
-      (cast : Float → α) → (paramShapes : List Shape) → TorchLean.Optim.Optimizer α paramShapes)
+      (cast : Float → α) → (paramShapes : List Spec.Shape) → TorchLean.Optim.Optimizer α paramShapes)
     (cast : Float → α)
     (opts : TorchLean.Options)
-    (sample : SupervisedSample α σ τ)
+    (sample : TorchLean.Sample.Supervised α σ τ)
     (steps : Nat)
     (cudaMemWatch : Nat := 0) :
     IO (LossPair α) := do
@@ -81,15 +81,15 @@ def steps
 
 /-- Fixed-sample run specialized to `Float`, returning a full per-step curve. -/
 def curveFloat
-    {σ τ : Shape}
+    {σ τ : Spec.Shape}
     (mkModel : nn.M (nn.Sequential σ τ))
     (mkModuleDef :
       (model : nn.Sequential σ τ) →
         TorchLean.Module.ScalarModuleDef (nn.paramShapes model) [σ, τ])
     (mkOptim :
-      (paramShapes : List Shape) → TorchLean.Optim.Optimizer Float paramShapes)
+      (paramShapes : List Spec.Shape) → TorchLean.Optim.Optimizer Float paramShapes)
     (opts : TorchLean.Options)
-    (sample : SupervisedSample Float σ τ)
+    (sample : TorchLean.Sample.Supervised Float σ τ)
     (steps : Nat)
     (cudaMemWatch : Nat := 0) :
     IO _root_.Runtime.Training.Curve := do

@@ -36,7 +36,7 @@ lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 200 --
 
 A few details to notice in that file:
 
-- `import NN` is the supported tutorial entrypoint.
+- `import NN.API` is the supported application entrypoint.
 - `open TorchLean` gives you the public namespaces: `nn`, `Trainer`, `optim`, `Data`, and CLI parsers.
 - `Trainer.new mkModel { task := .regression, seed := seed }` fixes initialization and returns the training task.
 - The dataset is ordinary Lean data with tensor shapes.
@@ -47,10 +47,10 @@ A few details to notice in that file:
 Here is the core model definition pattern used across the tutorials:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
-def mkModel : nn.M (nn.Sequential (Shape.vec 2) (Shape.vec 1)) :=
+def mkModel : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
   nn.Sequential![
     nn.Linear 2 8,
     nn.ReLU,
@@ -82,10 +82,10 @@ opt = torch.optim.Adam(model.parameters(), lr=0.03)
 TorchLean writes the same structure in Lean, but makes the parameter bundle explicit:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
-def mkModel : nn.M (nn.Sequential (Shape.vec 2) (Shape.vec 1)) :=
+def mkModel : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
   nn.Sequential![
     nn.Linear 2 8,
     nn.ReLU,
@@ -180,7 +180,7 @@ The current tutorial files stay short by using the public API directly:
   loaders.
 - `Trainer.new` and `trainer.train` own the runtime scalar and backend
   selection.
-- `Tensor`, `TensorPack`, and the `tensor!` / `tensorND!` / `tensorpack!` macros keep examples
+- `Tensor`, `TensorPack`, and the `tensor!` / `tensorOfList!` / `tensorpack!` macros keep examples
   typed without making each tutorial reopen the runtime callback layer.
 
 Public tutorials should describe the model, data, optimizer, and training options. The
@@ -250,7 +250,7 @@ depend on them are visible to the type checker.
 ## 2. Model builder
 
 ```
-def mkModel : nn.M (nn.Sequential (Shape.vec inDim) (Shape.vec outDim)) :=
+def mkModel : nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar)) :=
   nn.Sequential![
     nn.Linear inDim hidden,
     nn.ReLU,
@@ -273,7 +273,7 @@ This line chooses the public model and loss family. For classification examples,
 ## 4. Dataset or loader
 
 ```
-let data : Trainer.Dataset (Shape.vec inDim) (Shape.vec outDim) :=
+let data : Trainer.Dataset (.dim inDim .scalar) (.dim outDim .scalar) :=
   Data.tensorDataset xs ys
 ```
 
@@ -287,7 +287,7 @@ let trainer := Trainer.new mkModel
   { task := .regression, optimizer := optim.adam { lr := 0.03 }, seed := seed }
 let trained ← trainer.train data { steps := steps, batchSize := 16 }
 trained.printSummary
-let yhat ← trained.predict (tensorND! [2] [0.25, -0.75])
+let yhat ← trained.predict (tensorOfList! [2] [0.25, -0.75])
 IO.println s!"heldout={yhat}"
 ```
 
@@ -305,8 +305,8 @@ let trained ← trainer.train data trainOpts
 
 trained.printSummary
 
-let probe : Tensor.T Float (Shape.vec inDim) :=
-  tensorND! [inDim] [0.25, -0.75]
+let probe : Tensor.T Float (.dim inDim .scalar) :=
+  tensorOfList! [inDim] [0.25, -0.75]
 
 let pred ← trained.predict probe
 IO.println s!"prediction={pred}"

@@ -11,7 +11,7 @@ Device-agnostic real-data example:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common
 
 /-!
@@ -59,8 +59,7 @@ def cfg : nn.models.KANConfig :=
     inDim := inDim
     hidden := []
     outDim := outDim
-    edge := nn.models.KANPiecewiseLinear.edgeFamily { gridSize := 4, inputScale := 3 }
-    seedBase := 10 }
+    edge := nn.models.KANPiecewiseLinear.edgeFamily { gridSize := 4, inputScale := 3 } }
 
 abbrev σ := nn.models.kanInShape cfg
 abbrev τ := nn.models.kanOutShape cfg
@@ -93,7 +92,7 @@ def train (opts : Options) (flags : ModelZoo.CsvTrainFlags) :
 
 /-- CLI entrypoint for Auto MPG regression with a KAN model. -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionCsv exeName args
+  TrainCommand.regressionCsv exeName args
     _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 20 1e-2
     (ModelZoo.bannerWithDevice exeName "Auto MPG KAN regression")
     train

@@ -130,15 +130,15 @@ def idxWo {n dModel numHeads headDim : Nat} {ss : List Shape} :
   ⟨⟨4, by simp [ΓMHA]⟩, by simp [ΓMHA]⟩
 
 lemma size_big_to_heads (n numHeads headDim : Nat) :
-    Shape.size (BigShape n numHeads headDim) = Shape.size (HeadsShape n numHeads headDim) := by
-  -- `Shape.size` multiplies dimension sizes; the remaining goal is a commutative-monoid identity.
-  simp [Shape.size]
+    Spec.Shape.size (BigShape n numHeads headDim) = Spec.Shape.size (HeadsShape n numHeads headDim) := by
+  -- `Spec.Shape.size` multiplies dimension sizes; the remaining goal is a commutative-monoid identity.
+  simp [Spec.Shape.size]
   ac_rfl
 
 lemma size_swap_to_concat (n numHeads headDim : Nat) :
-    Shape.size (.dim n (.dim numHeads (.dim headDim .scalar))) = Shape.size (BigShape n numHeads
+    Spec.Shape.size (.dim n (.dim numHeads (.dim headDim .scalar))) = Spec.Shape.size (BigShape n numHeads
       headDim) := by
-  simp [Shape.size]
+  simp [Spec.Shape.size]
 
 section
 

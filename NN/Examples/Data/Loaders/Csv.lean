@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Data.SamplePaths
 
 /-!
@@ -62,8 +62,8 @@ def inDim : Nat := 2
 def outDim : Nat := 1
 
 /-- A small 2-layer batched MLP `2 -> 8 -> 1`. -/
-def mkModel {batch : Nat} : nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
-  nn.models.MlpReLU
+def mkModel {batch : Nat} : nn.M (nn.Sequential (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar))) :=
+  nn.models.mlpRelu
     { batch := batch, inDim := inDim, hidDim := 8, outDim := outDim }
 
 /-- Command-line help for the CSV loader tutorial. -/
@@ -121,8 +121,8 @@ def main (args : List String) : IO Unit := do
   Data.requireFile label "CSV dataset" csvPath missingCsvHint
   let trained ← trainer.train data { steps := steps }
   trained.printSummary
-  let heldout : Tensor.T Float (Shape.mat batch inDim) :=
-    Tensor.fill 0.25 (Shape.mat batch inDim)
+  let heldout : Tensor.T Float (.dim batch (.dim inDim .scalar)) :=
+    Tensor.fill 0.25 (.dim batch (.dim inDim .scalar))
   trained.printPrediction "predict(batch=heldout)" heldout
 
 end NN.Examples.Data.Loaders.Csv

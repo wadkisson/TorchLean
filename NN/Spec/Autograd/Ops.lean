@@ -106,15 +106,12 @@ def softplusOp {s : Shape} : OpSpec α s s :=
 { forward      := liftElementwise (α:=α) (s:=s) Activation.Math.softplusSpec
 , backward     := liftElementwiseBackward (α:=α) (s:=s) Activation.Math.softplusDerivSpec }
 
-/-- Elementwise Swish / SiLU OpSpec on any shape.
+/-- Elementwise SiLU (also called Swish) OpSpec on any shape.
 
 PyTorch analogy: `torch.nn.functional.silu(x)`. -/
-def swishOp {s : Shape} : OpSpec α s s :=
+def siluOp {s : Shape} : OpSpec α s s :=
 { forward      := fun x => Activation.swishSpec (α := α) (s := s) x
 , backward     := fun x dLdy => mulSpec (Activation.swishDerivSpec (α := α) (s := s) x) dLdy }
-
-/-- Alias for `swishOp`, using the common SiLU name. -/
-abbrev siluOp {s : Shape} : OpSpec α s s := swishOp (α := α) (s := s)
 
 /-- Elementwise ELU OpSpec on any shape. -/
 def eluOp {s : Shape} (eluAlpha : α) : OpSpec α s s :=
@@ -165,7 +162,7 @@ def logSoftmaxOp {s : Shape} : OpSpec α s s :=
 This `OpSpec` only returns the input gradient `dL/dx`. Parameter gradients for `W` and `b`
 are not part of `OpSpec` (those live at the graph/runtime level).
 
-PyTorch analogy: `torch.nn.Linear` forward, with autograd producing grads for `x/W/b`. -/
+PyTorch analogy: `torch.nn.linear` forward, with autograd producing grads for `x/W/b`. -/
 def linearOp {α : Type} [Add α] [Mul α] [Zero α] [One α] {inDim outDim : Nat}
   (m : LinearSpec α inDim outDim) :
   OpSpec α (.dim inDim .scalar) (.dim outDim .scalar) :=
@@ -178,9 +175,6 @@ We use this when an upstream gradient is a scalar (e.g. for reduced losses). In 
 the common pattern "loss is scalar, so `grad_output` is a scalar too". -/
 def scalarOf : Tensor α Shape.scalar → α
   | Tensor.scalar a => a
-
-/-- Alias for `scalarOf` (clarifies intent at call sites). -/
-abbrev scalarValue {α : Type} : Tensor α Shape.scalar → α := scalarOf
 
 /-- Generic elementwise binary OpSpec with captured right-hand tensor and `d/dx`.
 

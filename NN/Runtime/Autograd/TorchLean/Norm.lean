@@ -22,7 +22,7 @@ PyTorch analogy: these correspond to the functional/core math behind `InstanceNo
 can run eagerly or be compiled into the verifier IR.
 
 Conventions:
-- CNN tensors use PyTorch's `N×C×H×W` via `NN.Tensor.Shape.NCHW`.
+- CNN operators use PyTorch's `N×C×H×W` axis convention on ordinary rank-four tensors.
 - We keep epsilon explicit where it matters for stability.
 
 Note: we do **not** implement PyTorch-style running-stat updates as a backend-generic op.
@@ -43,7 +43,7 @@ open Tensor
 namespace Norm
 
 /-- Proof helper: if `a > 0` and `b > 0`, then `a * b > 0`. -/
-def natMulPos (a b : Nat) (ha : a > 0) (hb : b > 0) : a * b > 0 :=
+theorem natMulPos (a b : Nat) (ha : a > 0) (hb : b > 0) : a * b > 0 :=
   Nat.mul_pos ha hb
 
 /--
@@ -51,25 +51,25 @@ Size lemma for flattening spatial dimensions in `N×C×H×W`.
 
 This is used to justify `reshape` from `N×C×H×W` to `N×C×(H*W)` (a common trick in normalization).
 -/
-def reshapeNCHWToNCHWFlatSize {n c h w : Nat} :
-    Shape.size (NN.Tensor.Shape.NCHW n c h w) = Shape.size (.dim n (.dim c (.dim (h * w) .scalar)))
+theorem reshapeNCHWToNCHWFlatSize {n c h w : Nat} :
+    Spec.Shape.size (.dim n (.dim c (.dim h (.dim w .scalar)))) = Spec.Shape.size (.dim n (.dim c (.dim (h * w) .scalar)))
       := by
-  simp [Shape.size]
+  simp [Spec.Shape.size]
 
 /-- Inverse of `reshapeNCHW_to_NC_HW` (same equality, reversed). -/
-def reshapeNCHWFlatToNCHWSize {n c h w : Nat} :
-    Shape.size (.dim n (.dim c (.dim (h * w) .scalar))) = Shape.size (NN.Tensor.Shape.NCHW n c h w)
+theorem reshapeNCHWFlatToNCHWSize {n c h w : Nat} :
+    Spec.Shape.size (.dim n (.dim c (.dim (h * w) .scalar))) = Spec.Shape.size (.dim n (.dim c (.dim h (.dim w .scalar))))
       := by
   simpa using (reshapeNCHWToNCHWFlatSize (n := n) (c := c) (h := h) (w := w)).symm
 
 /-- Size lemma for flattening spatial dimensions in `C×H×W` to `C×(H*W)`. -/
-def reshapeCHWToCHWFlatSize {c h w : Nat} :
-    Shape.size (NN.Tensor.Shape.CHW c h w) = Shape.size (.dim c (.dim (h * w) .scalar)) := by
-  simp [Shape.size]
+theorem reshapeCHWToCHWFlatSize {c h w : Nat} :
+    Spec.Shape.size (.dim c (.dim h (.dim w .scalar))) = Spec.Shape.size (.dim c (.dim (h * w) .scalar)) := by
+  simp [Spec.Shape.size]
 
 /-- Inverse of `reshapeCHW_to_C_HW` (same equality, reversed). -/
-def reshapeCHWFlatToCHWSize {c h w : Nat} :
-    Shape.size (.dim c (.dim (h * w) .scalar)) = Shape.size (NN.Tensor.Shape.CHW c h w) := by
+theorem reshapeCHWFlatToCHWSize {c h w : Nat} :
+    Spec.Shape.size (.dim c (.dim (h * w) .scalar)) = Spec.Shape.size (.dim c (.dim h (.dim w .scalar))) := by
   simpa using (reshapeCHWToCHWFlatSize (c := c) (h := h) (w := w)).symm
 
 /--
@@ -126,8 +126,8 @@ def rmsNormLast {α : Type} [Context α] [DecidableEq Shape]
   let _ : Shape.WellFormed s := ⟨⟨h_seq_pos, ⟨h_embed_pos, trivial⟩⟩⟩
   -- mean(x^2) over last axis
   let sq ← F.square (m := m) (α := α) (s := s) x
-  let axis : Nat := Shape.rank s - 1
-  have hrank : Shape.rank s > 0 := by simp [s, Shape.rank]
+  let axis : Nat := Spec.Shape.rank s - 1
+  have hrank : Spec.Shape.rank s > 0 := by simp [s, Spec.Shape.rank]
   let _ : Shape.valid_axis_inst axis s := Shape.validAxisLastAuto hrank
   let meanSq ← reduceMean (m := m) (α := α) (s := s) axis sq
   let meanSqShape : Shape := shapeAfterSum s axis
@@ -170,12 +170,12 @@ def instanceNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {n c h w : Nat}
     (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w))
+    (x : RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))))
     (gamma beta : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w)) := do
+    m (RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar))))) := do
   let hw : Nat := h * w
-  let sNCHW : Shape := NN.Tensor.Shape.NCHW n c h w
+  let sNCHW : Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
   let sNCHWFlat : Shape := .dim n (.dim c (.dim hw .scalar))
   let _ : Shape.WellFormed sNCHW := ⟨⟨h_n_pos, ⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩⟩
   let _ : Shape.WellFormed sNCHWFlat :=
@@ -183,8 +183,8 @@ def instanceNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
   let xFlat ← reshape (m := m) (α := α) (s₁ := sNCHW) (s₂ := sNCHWFlat) x (reshapeNCHWToNCHWFlatSize (n
     := n) (c := c) (h := h) (w := w))
   -- mean over last axis (HW)
-  let axisHW : Nat := Shape.rank sNCHWFlat - 1
-  have hrank : Shape.rank sNCHWFlat > 0 := by simp [sNCHWFlat, Shape.rank]
+  let axisHW : Nat := Spec.Shape.rank sNCHWFlat - 1
+  have hrank : Spec.Shape.rank sNCHWFlat > 0 := by simp [sNCHWFlat, Spec.Shape.rank]
   let _ : Shape.valid_axis_inst axisHW sNCHWFlat := Shape.validAxisLastAuto hrank
   let mean ← reduceMean (m := m) (α := α) (s := sNCHWFlat) axisHW xFlat
   let meanShape : Shape := shapeAfterSum sNCHWFlat axisHW  -- `N×C`
@@ -221,12 +221,12 @@ def groupNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
     {n c h w groups : Nat}
     (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0) (h_g_pos : groups > 0)
     (h_ge : c ≥ groups) (h_div : c % groups = 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w))
+    (x : RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))))
     (gamma beta : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w)) := do
+    m (RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar))))) := do
   let channelsPerGroup : Nat := c / groups
-  let sNCHW : Shape := NN.Tensor.Shape.NCHW n c h w
+  let sNCHW : Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
   let sG : Shape := .dim n (.dim groups (.dim channelsPerGroup (.dim h (.dim w .scalar))))
   let chw : Nat := channelsPerGroup * h * w
   let sGF : Shape := .dim n (.dim groups (.dim chw .scalar))
@@ -240,7 +240,7 @@ def groupNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
       exact h_ge
       exact h_g_pos
     exact ⟨h_cpg_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩
-  have hSize : Shape.size sNCHW = Shape.size sG := by
+  have hSize : Spec.Shape.size sNCHW = Spec.Shape.size sG := by
     -- `c = groups * (c/groups)` since `c % groups = 0`
     have hc : c = groups * channelsPerGroup := by
       have := (Nat.mod_add_div c groups).symm
@@ -251,7 +251,7 @@ def groupNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
       simpa [channelsPerGroup, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc, Nat.zero_add] using
         this
     -- now compare sizes
-    simp [sNCHW, sG, Shape.size, hc, Nat.mul_left_comm, Nat.mul_comm]
+    simp [sNCHW, sG, Spec.Shape.size, hc, Nat.mul_left_comm, Nat.mul_comm]
   have h_chw_pos : chw > 0 := by
     -- channelsPerGroup, h, w are positive; multiplication preserves positivity.
     have h_cpg_pos : channelsPerGroup > 0 := by
@@ -262,14 +262,14 @@ def groupNorm2dNchw {α : Type} [Context α] [DecidableEq Shape]
     have : channelsPerGroup * h > 0 := Nat.mul_pos h_cpg_pos h_h_pos
     exact Nat.mul_pos this h_w_pos
   let _ : Shape.WellFormed sGF := ⟨⟨h_n_pos, ⟨h_g_pos, ⟨h_chw_pos, trivial⟩⟩⟩⟩
-  have hSizeG_F : Shape.size sG = Shape.size sGF := by
-    simp [sG, sGF, Shape.size, chw, Nat.mul_left_comm, Nat.mul_comm]
+  have hSizeG_F : Spec.Shape.size sG = Spec.Shape.size sGF := by
+    simp [sG, sGF, Spec.Shape.size, chw, Nat.mul_left_comm, Nat.mul_comm]
 
   let xG ← reshape (m := m) (α := α) (s₁ := sNCHW) (s₂ := sG) x hSize
   let xGF ← reshape (m := m) (α := α) (s₁ := sG) (s₂ := sGF) xG hSizeG_F
   -- mean/var over last axis (`channelsPerGroup * h * w`)
-  let axis : Nat := Shape.rank sGF - 1
-  have hrank : Shape.rank sGF > 0 := by simp [sGF, Shape.rank]
+  let axis : Nat := Spec.Shape.rank sGF - 1
+  have hrank : Spec.Shape.rank sGF > 0 := by simp [sGF, Spec.Shape.rank]
   let _ : Shape.valid_axis_inst axis sGF := Shape.validAxisLastAuto hrank
   let mean ← reduceMean (m := m) (α := α) (s := sGF) axis xGF
   let meanShape : Shape := shapeAfterSum sGF axis -- `N×groups`
@@ -312,14 +312,14 @@ def batchNorm2dNchwTrainStats {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {n c h w : Nat}
     (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w))
+    (x : RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))))
     (gamma beta : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w) ×
+    m (RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))) ×
        RefTy (m := m) (α := α) (.dim c .scalar) ×
        RefTy (m := m) (α := α) (.dim c .scalar)) := do
   let hw : Nat := h * w
-  let sNCHW : Shape := NN.Tensor.Shape.NCHW n c h w
+  let sNCHW : Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
   let sNCHWFlat : Shape := .dim n (.dim c (.dim hw .scalar))
   let _ : Shape.WellFormed sNCHW := ⟨⟨h_n_pos, ⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩⟩
   let _ : Shape.WellFormed sNCHWFlat :=
@@ -327,13 +327,13 @@ def batchNorm2dNchwTrainStats {α : Type} [Context α] [DecidableEq Shape]
   let xFlat ← reshape (m := m) (α := α) (s₁ := sNCHW) (s₂ := sNCHWFlat) x (reshapeNCHWToNCHWFlatSize (n
     := n) (c := c) (h := h) (w := w))
   -- mean over HW then mean over batch
-  let axisHW : Nat := Shape.rank sNCHWFlat - 1
-  have hrank : Shape.rank sNCHWFlat > 0 := by simp [sNCHWFlat, Shape.rank]
+  let axisHW : Nat := Spec.Shape.rank sNCHWFlat - 1
+  have hrank : Spec.Shape.rank sNCHWFlat > 0 := by simp [sNCHWFlat, Spec.Shape.rank]
   let _ : Shape.valid_axis_inst axisHW sNCHWFlat := Shape.validAxisLastAuto hrank
   let meanHW ← reduceMean (m := m) (α := α) (s := sNCHWFlat) axisHW xFlat -- `N×C`
   let sNC : Shape := shapeAfterSum sNCHWFlat axisHW
   have hsNC : sNC = .dim n (.dim c .scalar) := by
-    simp [sNC, sNCHWFlat, axisHW, Shape.rank, shapeAfterSum]
+    simp [sNC, sNCHWFlat, axisHW, Spec.Shape.rank, shapeAfterSum]
   let _ : Shape.WellFormed sNC := by
     simpa [hsNC] using (show Shape.WellFormed (.dim n (.dim c .scalar)) from ⟨⟨h_n_pos, ⟨h_c_pos,
       trivial⟩⟩⟩)
@@ -377,10 +377,10 @@ def batchNorm2dNchwTrain {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {n c h w : Nat}
     (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w))
+    (x : RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))))
     (gamma beta : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w)) := do
+    m (RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar))))) := do
   let (y, _mean, _var) ← batchNorm2dNchwTrainStats
     (α := α) (m := m) (n := n) (c := c) (h := h) (w := w)
     h_n_pos h_c_pos h_h_pos h_w_pos x gamma beta (ε := ε)
@@ -419,12 +419,12 @@ def batchNorm2dNchwEval {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {n c h w : Nat}
     (h_n_pos : n > 0) (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w))
+    (x : RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar)))))
     (gamma beta mean var : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.NCHW n c h w)) := do
+    m (RefTy (m := m) (α := α) (.dim n (.dim c (.dim h (.dim w .scalar))))) := do
   let hw : Nat := h * w
-  let sNCHW : Shape := NN.Tensor.Shape.NCHW n c h w
+  let sNCHW : Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
   let sNCHWFlat : Shape := .dim n (.dim c (.dim hw .scalar))
   let _ : Shape.WellFormed sNCHW := ⟨⟨h_n_pos, ⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩⟩
   let _ : Shape.WellFormed sNCHWFlat :=
@@ -456,12 +456,12 @@ def batchNorm2dChwEval {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {c h w : Nat}
     (h_c_pos : c > 0) (h_h_pos : h > 0) (h_w_pos : w > 0)
-    (x : RefTy (m := m) (α := α) (NN.Tensor.Shape.CHW c h w))
+    (x : RefTy (m := m) (α := α) (.dim c (.dim h (.dim w .scalar))))
     (gamma beta mean var : RefTy (m := m) (α := α) (.dim c .scalar))
     (ε : α := Numbers.epsilon) :
-    m (RefTy (m := m) (α := α) (NN.Tensor.Shape.CHW c h w)) := do
+    m (RefTy (m := m) (α := α) (.dim c (.dim h (.dim w .scalar)))) := do
   let hw : Nat := h * w
-  let sCHW : Shape := NN.Tensor.Shape.CHW c h w
+  let sCHW : Shape := .dim c (.dim h (.dim w .scalar))
   let sC_HW : Shape := .dim c (.dim hw .scalar)
   let _ : Shape.WellFormed sCHW := ⟨⟨h_c_pos, ⟨h_h_pos, ⟨h_w_pos, trivial⟩⟩⟩⟩
   let _ : Shape.WellFormed sC_HW := ⟨⟨h_c_pos, ⟨natMulPos h w h_h_pos h_w_pos, trivial⟩⟩⟩

@@ -45,6 +45,21 @@ ALLOWED_LINTER_SUPPRESSION_FILES = {
     "NN/Tensor/API.lean",
 }
 
+# These modules were pure compatibility routes or duplicate import surfaces. New code must use the
+# canonical subsystem umbrellas and namespaces instead of recreating them.
+REMOVED_COMPATIBILITY_PATHS = {
+    "NN/API/TorchLean/Optimizers.lean",
+    "NN/Examples/Verification/LiRPA.lean",
+    "NN/GraphSpec/Models/TorchLean/Fno1d.lean",
+    "NN/Library.lean",
+    "NN/Spec/Layers/Pooling/Aliases.lean",
+    "NN/Verification/TorchLean/Verified.lean",
+}
+
+REMOVED_COMPATIBILITY_PREFIXES = (
+    "NN/Entrypoint/",
+)
+
 # Documentation may mention producer-side environment variables only when the implementation hook
 # exists in source. This prevents guide text from advertising phantom integration flags.
 DOCUMENTED_ENV_VAR_IMPLEMENTATIONS = {
@@ -237,11 +252,11 @@ PUBLIC_GUIDE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
             r"\brunCifar(Classifier|Regression|Curve)Train\b|"
             r"\brun(RegressionCsv|ClassificationNpy|RegressionNpy|ForecastWindow)\b"
         ),
-        "public guides should show `Trainer.new` / `trainer.train` or `Trainer.Command` runners, not removed command-wrapper names.",
+        "public guides should show `Trainer.new` / `trainer.train`, not removed command-wrapper names.",
     ),
     (
-        re.compile(r"\bModelZoo\.Command\b|\bTrainCommand\.run\b"),
-        "public guides should use `Trainer.Command` for runnable model-zoo command glue.",
+        re.compile(r"\bModelZoo\.Command\b|\bTrainer\.Command\b|\bTrainCommand\.run\b"),
+        "public guides should teach `Trainer.new` / `trainer.train`; repository command glue belongs in examples.",
     ),
     (
         re.compile(r"\btrain\.\*"),
@@ -338,7 +353,7 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(
             r"\bRealData\.fit(CifarClassifierModel|CifarRegressionModel|CsvRegressionModel|HouseholdPowerRegressionModel)\b"
         ),
-        "public model-zoo examples should use the current `Trainer.Command` runners, not the old `*Model` wrappers.",
+        "public model-zoo examples should use the shared example `TrainCommand` runners, not the old `*Model` wrappers.",
     ),
     (
         re.compile(r"\bTrainer\.NewConfig\b|\bNewConfig\b"),
@@ -350,11 +365,11 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
             r"\brunCifar(Classifier|Regression|Curve)Train\b|"
             r"\brun(RegressionCsv|ClassificationNpy|RegressionNpy|ForecastWindow)\b"
         ),
-        "public examples should use `Trainer.new` / `trainer.train` or `Trainer.Command` runners, not removed command-wrapper names.",
+        "public examples should use `Trainer.new` / `trainer.train` or the shared example `TrainCommand` runners, not removed command-wrapper names.",
     ),
     (
-        re.compile(r"\bModelZoo\.Command\b|\bTrainCommand\.run\b"),
-        "public examples should use `Trainer.Command` for runnable model-zoo command glue.",
+        re.compile(r"\bModelZoo\.Command\b|\bTrainer\.Command\b"),
+        "repository command glue belongs under `NN.Examples.Models.TrainCommand`, outside the public Trainer namespace.",
     ),
     (
         re.compile(r"\bSimpleText\.main\b"),
@@ -425,8 +440,8 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "public examples should `open TorchLean`, not `open NN.API`.",
     ),
     (
-        re.compile(r"^\s*(public\s+)?import\s+NN\.API\b", flags=re.MULTILINE),
-        "public examples should import `TorchLean`, not `NN.API.*` directly.",
+        re.compile(r"^\s*(public\s+)?import\s+NN\s*$", flags=re.MULTILINE),
+        "public examples should import the focused `NN.API`, not the complete `NN` umbrella.",
     ),
     (
         re.compile(r"\bNN\.API\."),
@@ -488,6 +503,19 @@ PUBLIC_TUTORIAL_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 TOP_LEVEL_API_DECL_RE = re.compile(
     r"^\s*(def|structure|inductive|class|abbrev|instance|theorem|lemma)\s+",
     flags=re.MULTILINE,
+)
+
+PUBLIC_DECL_RE = re.compile(
+    r"^\s*(?:public\s+)?(?:def|structure|inductive|class|abbrev)\s+"
+    r"(?P<name>[A-Za-z0-9_'.]+)\b",
+    flags=re.MULTILINE,
+)
+
+# Public tensor and model APIs describe axes through shapes and vectors. Layout spellings and fixed
+# spatial ranks belong in low-level kernels or domain examples, not in user-facing declaration names.
+PUBLIC_LAYOUT_NAME_RE = re.compile(
+    r"(?:chw|nchw|(?:^|_)[123]d(?:_|$)|[a-z][123]d$)",
+    flags=re.IGNORECASE,
 )
 
 CONTRACT_SOURCE_FILE_RE = re.compile(
@@ -1045,6 +1073,31 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
                     Finding("ERROR", path, None, None, "`scripts/README.md` should explain this script.")
                 )
 
+    for rel in sorted(REMOVED_COMPATIBILITY_PATHS):
+        path = REPO_ROOT / rel
+        if path.exists():
+            findings.append(
+                Finding(
+                    "ERROR",
+                    path,
+                    None,
+                    None,
+                    "removed compatibility module has been restored; use the canonical API or subsystem import.",
+                )
+            )
+    for prefix in REMOVED_COMPATIBILITY_PREFIXES:
+        directory = REPO_ROOT / prefix
+        if directory.exists() and any(directory.rglob("*.lean")):
+            findings.append(
+                Finding(
+                    "ERROR",
+                    directory,
+                    None,
+                    None,
+                    "removed compatibility import tree has been restored; use the canonical subsystem umbrellas.",
+                )
+            )
+
     banned_regexes: list[tuple[re.Pattern[str], str]] = [
         (re.compile(r"\bnative_decide\b"), "`native_decide` is banned in TorchLean."),
         (re.compile(r"\bsorry\b"), "`sorry` is banned in TorchLean sources."),
@@ -1065,6 +1118,20 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
             re.compile(r"\bverifyLInfIBP\b|\b(Trainer\.)?Verify\.robustLInf\b"),
             "duplicate verification helper names are removed; use `verifyRobustLInf` on trained results or `Trainer.Verify.lInfIBP` for requests.",
         ),
+        (
+            re.compile(
+                r"\b(?:Conv2dLayer|Core\.oneHotAction|scalarValue|CROWNNodeCertificate|"
+                r"ToTorchLean\.Sequential)\b"
+            ),
+            "removed duplicate name found; use the canonical declaration directly.",
+        ),
+        (
+            re.compile(
+                r"\b(?:SequentialModel|ModelBuilder|modelParamShapes|LossReduction)\b|"
+                r"\bTorchLean\.ParamTensors\b|\bNN\.API\.TensorPack\b"
+            ),
+            "removed facade alias found; use the owning `nn`, `Module`, `Loss`, or `TensorPack` API.",
+        ),
         (re.compile(r"\bby\s+omega\b"), "`omega` is banned in TorchLean; prefer `linarith`/`nlinarith`/`grind` or small arithmetic lemmas."),
         (re.compile(r"^\s*omega\b", flags=re.MULTILINE), "`omega` is banned in TorchLean; prefer `linarith`/`nlinarith`/`grind` or small arithmetic lemmas."),
         (re.compile(r"\bsimp\s*\[\s*\*(\s*[,\]])"), "`simp [*]` is banned; prefer `simp [h₁, h₂]` or `simp (config := ...)` with explicit hypotheses."),
@@ -1077,6 +1144,14 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
             "Do not `import Mathlib.Tactic` (umbrella import). Import the specific `Mathlib.Tactic.*` modules you use.",
         ),
         (re.compile(r"@\[\s*de" r"precated\b"), "`@[de" "precated]` is banned in TorchLean sources."),
+        (
+            re.compile(
+                r"\b(?:compatibility (?:alias|shim|wrapper|layer)|legacy (?:alias|name)|"
+                r"deprecated alias|old import path|migration shim|kept for compatibility)\b",
+                flags=re.IGNORECASE,
+            ),
+            "compatibility aliases and shims are not allowed; migrate callers to the canonical API and delete the old route.",
+        ),
     ]
 
     axiom_re = re.compile(r"^\s*axiom\s+([A-Za-z0-9_'.]+)\b", flags=re.MULTILINE)
@@ -1134,6 +1209,31 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
                 findings.append(Finding("ERROR", path, line, col, msg))
 
         rel = path.relative_to(REPO_ROOT).as_posix()
+        is_shape_generic_public_api = any(
+            rel.startswith(prefix)
+            for prefix in (
+                "NN/API/Public/",
+                "NN/API/Models/",
+                "NN/API/Samples/",
+            )
+        )
+        if is_shape_generic_public_api:
+            for declaration in PUBLIC_DECL_RE.finditer(masked):
+                name = declaration.group("name")
+                if PUBLIC_LAYOUT_NAME_RE.search(name):
+                    line, col = _line_col(text, declaration.start("name"))
+                    findings.append(
+                        Finding(
+                            "ERROR",
+                            path,
+                            line,
+                            col,
+                            f"public declaration `{name}` encodes a fixed rank or memory layout; "
+                            "express axes through `Spec.Shape`, `Vector Nat d`, or a domain-specific "
+                            "example outside the public tensor/model API.",
+                        )
+                    )
+
         if rel.startswith("NN/API/Public/Facade/Trainer/Train/") and rel.endswith(".lean"):
             if "(opts : Options)" in masked and "(opts : TrainOptions" in masked:
                 findings.append(
@@ -1277,7 +1377,7 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
                     findings.append(Finding("ERROR", path, line, col, msg))
 
         if rel == "NN/API/Public.lean" and re.search(
-            r"^\s*public\s+import\s+NN\.API\.Public\.Training\b", masked, flags=re.MULTILINE
+            r"^\s*public\s+import\s+NN\.API\.Public\.Training\s*$", masked, flags=re.MULTILINE
         ):
             findings.append(
                 Finding(
@@ -1294,7 +1394,7 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
         )
         is_training_entrypoint = rel == "NN/API/Public/Training.lean"
         if re.search(
-            r"^\s*public\s+import\s+NN\.API\.Public\.Training\b", masked, flags=re.MULTILINE
+            r"^\s*public\s+import\s+NN\.API\.Public\.Training\s*$", masked, flags=re.MULTILINE
         ) and not (is_trainer_facade or is_training_entrypoint):
             findings.append(
                 Finding(

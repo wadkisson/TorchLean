@@ -21,11 +21,11 @@ namespace TorchLean
 namespace Data
 
 def regressionGrid (lo hi : Float) (count : Nat) (target : Float → Float → Float) :
-    Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+    Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   { build := fun {α} _ => pure <|
-      let X : Tensor.T Float (.dim (count * count) (Shape.vec 2)) :=
+      let X : Tensor.T Float (.dim (count * count) (.dim 2 .scalar)) :=
         NN.API.Samples.squareGrid lo hi count
-      let Y : Tensor.T Float (.dim (count * count) (Shape.vec 1)) :=
+      let Y : Tensor.T Float (.dim (count * count) (.dim 1 .scalar)) :=
         NN.API.Samples.regressionTargetsFloat X target
       supervisedFromLeadingAxisFloat (α := α) X Y }
 
@@ -135,7 +135,7 @@ def causalLmTokenIdSampleRowsFromTokenArray
       let (xs, ys) := acc
       let (xRow, yRow) := causalLmTokenIdRows seqLen (idsAt bi) (padId := padId)
       (xs ++ xRow, ys ++ yRow)) ([], [])
-  NN.API.Sample.mk
+  Sample.mk
     (causalLmTokenIdFloatVec (α := α) batch seqLen xList)
     (causalLmTokenIdFloatVec (α := α) batch seqLen yList)
 
@@ -148,13 +148,13 @@ truncated by the causal-LM construction.
 def causalLmOneHotMatSample
     {α : Type} [Runtime.SemanticScalar α] [Runtime.Scalar α]
     (seqLen vocab : Nat) (tokens : List Nat) :
-    SupervisedSample α (Shape.mat seqLen vocab) (Shape.mat seqLen vocab) :=
+    SupervisedSample α (.dim seqLen (.dim vocab .scalar)) (.dim seqLen (.dim vocab .scalar)) :=
   let (xF, yF) := text.causalLmXYOneHotMatFloat seqLen vocab tokens
-  let x : Tensor.T α (Shape.mat seqLen vocab) :=
+  let x : Tensor.T α (.dim seqLen (.dim vocab .scalar)) :=
     Tensor.castFloat Runtime.ofFloat xF
-  let y : Tensor.T α (Shape.mat seqLen vocab) :=
+  let y : Tensor.T α (.dim seqLen (.dim vocab .scalar)) :=
     Tensor.castFloat Runtime.ofFloat yF
-  NN.API.Sample.mk x y
+  Sample.mk x y
 
 /--
 Build one unbatched one-hot causal-language-model sample from a text corpus string.
@@ -165,7 +165,7 @@ This takes one `(seqLen + 1)` byte window from the UTF-8 bytes of `input`, conve
 def textCausalSample
     {α : Type} [Runtime.SemanticScalar α] [Runtime.Scalar α]
     (seqLen vocab : Nat) (input : String) :
-    SupervisedSample α (Shape.mat seqLen vocab) (Shape.mat seqLen vocab) :=
+    SupervisedSample α (.dim seqLen (.dim vocab .scalar)) (.dim seqLen (.dim vocab .scalar)) :=
   let bytes := input.toUTF8
   let toks := (text.byteTokenWindow bytes (seqLen + 1)).map (fun b => b % vocab)
   causalLmOneHotMatSample (α := α) seqLen vocab toks
@@ -177,12 +177,12 @@ the same text window across every batch row.
 def textCausalBatchSample
     {α : Type} [Runtime.SemanticScalar α] [Runtime.Scalar α]
     (batch seqLen vocab : Nat) (input : String) :
-    SupervisedSample α (_root_.Spec.Shape.dim batch (Shape.mat seqLen vocab))
-      (_root_.Spec.Shape.dim batch (Shape.mat seqLen vocab)) :=
+    SupervisedSample α (_root_.Spec.Shape.dim batch (.dim seqLen (.dim vocab .scalar)))
+      (_root_.Spec.Shape.dim batch (.dim seqLen (.dim vocab .scalar))) :=
   let s := textCausalSample (α := α) seqLen vocab input
-  NN.API.Sample.mk
-    (_root_.Spec.Tensor.dim (fun _ => NN.API.Sample.x s))
-    (_root_.Spec.Tensor.dim (fun _ => NN.API.Sample.y s))
+  Sample.mk
+    (_root_.Spec.Tensor.dim (fun _ => Sample.x s))
+    (_root_.Spec.Tensor.dim (fun _ => Sample.y s))
 
 /--
 Build a runtime-polymorphic dataset containing one unbatched causal-language-model sample from a
@@ -190,7 +190,7 @@ text corpus string.
 -/
 def textCausalDataset
     (seqLen vocab : Nat) (input : String) :
-    Trainer.Dataset (Shape.mat seqLen vocab) (Shape.mat seqLen vocab) :=
+    Trainer.Dataset (.dim seqLen (.dim vocab .scalar)) (.dim seqLen (.dim vocab .scalar)) :=
   Data.singletonFrom input (fun {α} _ _ text =>
     textCausalSample (α := α) seqLen vocab text)
 
@@ -203,8 +203,8 @@ text window.
 -/
 def textCausalBatchDataset
     (batch seqLen vocab : Nat) (input : String) :
-    Trainer.Dataset (_root_.Spec.Shape.dim batch (Shape.mat seqLen vocab))
-      (_root_.Spec.Shape.dim batch (Shape.mat seqLen vocab)) :=
+    Trainer.Dataset (_root_.Spec.Shape.dim batch (.dim seqLen (.dim vocab .scalar)))
+      (_root_.Spec.Shape.dim batch (.dim seqLen (.dim vocab .scalar))) :=
   Data.singletonFrom input (fun {α} _ _ text =>
     textCausalBatchSample (α := α) batch seqLen vocab text)
 

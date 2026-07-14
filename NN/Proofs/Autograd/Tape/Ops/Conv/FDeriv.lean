@@ -61,35 +61,35 @@ private def idx4 {OC IC KH KW : Nat} (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (
   -- Unfold once: the underlying linear map is exactly `castVec h`.
   simp [Graph.castCLM]
 
-/-- `Shape.size (.dim n .scalar)` (kept as a name for casts). -/
+/-- `Spec.Shape.size (.dim n .scalar)` (kept as a name for casts). -/
 private abbrev vecSize (n : Nat) : Nat :=
-  Shape.size (.dim n .scalar)
+  Spec.Shape.size (.dim n .scalar)
 
 -- Indices for `toVecT`/`ofVecT` on 3D/4D shapes.
 /-- Flattened index for `toVecT`/`ofVecT` on shape `.dim C (.dim H (.dim W .scalar))`. -/
 private def idx3S {C H W : Nat} (c : Fin C) (i : Fin H) (j : Fin W) :
-    Fin (Shape.size (.dim C (.dim H (.dim W .scalar)))) :=
-  Fin.cast (by simp [Shape.size]) (idx3 (C := C) (H := H) (W := W) c i j)
+    Fin (Spec.Shape.size (.dim C (.dim H (.dim W .scalar)))) :=
+  Fin.cast (by simp [Spec.Shape.size]) (idx3 (C := C) (H := H) (W := W) c i j)
 
 /-- Flattened index for `toVecT`/`ofVecT` on shape `.dim OC (.dim IC (.dim KH (.dim KW .scalar)))`.
   -/
 private def idx4S {OC IC KH KW : Nat} (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (dj : Fin KW) :
-    Fin (Shape.size (.dim OC (.dim IC (.dim KH (.dim KW .scalar))))) :=
-  Fin.cast (by simp [Shape.size]) (idx4 (OC := OC) (IC := IC) (KH := KH) (KW := KW) oc ic di dj)
+    Fin (Spec.Shape.size (.dim OC (.dim IC (.dim KH (.dim KW .scalar))))) :=
+  Fin.cast (by simp [Spec.Shape.size]) (idx4 (OC := OC) (IC := IC) (KH := KH) (KW := KW) oc ic di dj)
 
 /-- `toVecT` on scalar tensors always returns the scalar value (the only coordinate is `0`). -/
-private lemma toVecT_scalar_apply (x : ℝ) (i : Fin (Shape.size Shape.scalar)) :
+private lemma toVecT_scalar_apply (x : ℝ) (i : Fin (Spec.Shape.size Shape.scalar)) :
     toVecT (t := (Tensor.scalar x : Tensor ℝ Shape.scalar)) i = x := by
-  simpa [toVecT, toVecE, Spec.Tensor.flattenSpec, Shape.size, Spec.toVec] using
+  simpa [toVecT, toVecE, Spec.Tensor.flattenSpec, Spec.Shape.size, Spec.toVec] using
     (euclideanEquiv_symm_ofLp
-      (n := Shape.size Shape.scalar)
-      (f := fun _ : Fin (Shape.size Shape.scalar) => x)
+      (n := Spec.Shape.size Shape.scalar)
+      (f := fun _ : Fin (Spec.Shape.size Shape.scalar) => x)
       (i := i))
 
 /-- Relate 1D tensor `toVecT` coordinates to `get_at_or_zero` via the scalar last-axis encoding. -/
 private lemma toVecT_get1
     {C : Nat} (A : Tensor ℝ (.dim C .scalar)) (c : Fin C) :
-    toVecT (t := A) (Fin.cast (by simp [Shape.size]) c) =
+    toVecT (t := A) (Fin.cast (by simp [Spec.Shape.size]) c) =
       getAtOrZero A [c.val] := by
   classical
   cases C with
@@ -98,8 +98,8 @@ private lemma toVecT_get1
       cases A with
       | dim f =>
           let k0 : Fin 1 := 0
-          have hmposSc : 0 < Shape.size Shape.scalar := by
-            simp [Shape.size]
+          have hmposSc : 0 < Spec.Shape.size Shape.scalar := by
+            simp [Spec.Shape.size]
           have hinner :
               toVecT (t := (Tensor.dim f : Tensor ℝ (.dim (Nat.succ C) .scalar)))
                   (finProdFinEquiv (c, k0))
@@ -121,7 +121,7 @@ private lemma toVecT_get1
                 simp [hcell, c.isLt]
               calc
                 toVecT (t := (Tensor.dim f : Tensor ℝ (.dim (Nat.succ C) .scalar)))
-                    (Fin.cast (by simp [Shape.size]) c)
+                    (Fin.cast (by simp [Spec.Shape.size]) c)
                     =
                   toVecT (t := (Tensor.dim f : Tensor ℝ (.dim (Nat.succ C) .scalar)))
                     (finProdFinEquiv (c, k0)) := by
@@ -136,11 +136,11 @@ private lemma toVecT_get1
 /-- `get_at_or_zero` on an `ofVecT`-constructed 1D tensor reads back the corresponding flattened
   entry. -/
 private lemma get1_ofVecT
-    {C : Nat} (v : Vec (Shape.size (.dim C .scalar))) (c : Fin C) :
+    {C : Nat} (v : Vec (Spec.Shape.size (.dim C .scalar))) (c : Fin C) :
     getAtOrZero (ofVecT (s := .dim C .scalar) v) [c.val] =
-      v (Fin.cast (by simp [Shape.size]) c) := by
+      v (Fin.cast (by simp [Spec.Shape.size]) c) := by
   have htv :=
-    congrArg (fun w => w (Fin.cast (by simp [Shape.size]) c))
+    congrArg (fun w => w (Fin.cast (by simp [Spec.Shape.size]) c))
       (toVecT_ofVecT (s := .dim C .scalar) v)
   exact (toVecT_get1 (A := ofVecT (s := .dim C .scalar) v) c).symm.trans htv
 
@@ -149,7 +149,7 @@ private lemma idx3S_eq_nested
     idx3S (C := C) (H := H) (W := W) c i j =
       finProdFinEquiv (c, finProdFinEquiv (i, finProdFinEquiv (j, (0 : Fin 1)))) := by
   apply Fin.ext
-  simp [idx3S, idx3, Shape.size, finProdFinEquiv, Fin.cast]
+  simp [idx3S, idx3, Spec.Shape.size, finProdFinEquiv, Fin.cast]
 
 private lemma idx4S_eq_nested
     {OC IC KH KW : Nat} (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (dj : Fin KW) :
@@ -157,7 +157,7 @@ private lemma idx4S_eq_nested
       finProdFinEquiv
         (oc, finProdFinEquiv (ic, finProdFinEquiv (di, finProdFinEquiv (dj, (0 : Fin 1))))) := by
   apply Fin.ext
-  simp [idx4S, idx4, Shape.size, finProdFinEquiv, Fin.cast]
+  simp [idx4S, idx4, Spec.Shape.size, finProdFinEquiv, Fin.cast]
 
 /-- Relate 3D tensor `toVecT` coordinates to `get_at_or_zero` via the `idx3S` index encoding. -/
 private lemma toVecT_get3
@@ -174,14 +174,14 @@ private lemma toVecT_get3
     | succ H =>
       cases A with
       | dim fC =>
-        let hW : vecSize (Nat.succ W) = Nat.succ W := by simp [vecSize, Shape.size]
+        let hW : vecSize (Nat.succ W) = Nat.succ W := by simp [vecSize, Spec.Shape.size]
         let j' : Fin (vecSize (Nat.succ W)) := Fin.cast hW.symm j
-        have hmposHW : 0 < Shape.size (.dim (Nat.succ H) (.dim (Nat.succ W) .scalar)) := by
-          simp [Shape.size]
-        have hmposW : 0 < Shape.size (.dim (Nat.succ W) .scalar) := by
-          simp [Shape.size]
+        have hmposHW : 0 < Spec.Shape.size (.dim (Nat.succ H) (.dim (Nat.succ W) .scalar)) := by
+          simp [Spec.Shape.size]
+        have hmposW : 0 < Spec.Shape.size (.dim (Nat.succ W) .scalar) := by
+          simp [Spec.Shape.size]
         let k0 : Fin 1 := 0
-        have hmposSc : 0 < Shape.size Shape.scalar := by simp [Shape.size]
+        have hmposSc : 0 < Spec.Shape.size Shape.scalar := by simp [Spec.Shape.size]
         -- peel all three dims using `toVecT_dim_apply`
         have houter :
             toVecT (t := (Tensor.dim fC : Tensor ℝ (.dim C (.dim (Nat.succ H) (.dim (Nat.succ W)
@@ -280,7 +280,7 @@ private lemma toVecT_get3
 /-- `get_at_or_zero` on an `ofVecT`-constructed 3D tensor reads back the corresponding flattened
   entry. -/
 private lemma get3_ofVecT
-    {C H W : Nat} (v : Vec (Shape.size (.dim C (.dim H (.dim W .scalar)))))
+    {C H W : Nat} (v : Vec (Spec.Shape.size (.dim C (.dim H (.dim W .scalar)))))
     (c : Fin C) (i : Fin H) (j : Fin W) :
     getAtOrZero (ofVecT (s := .dim C (.dim H (.dim W .scalar))) v) [c.val, i.val, j.val] =
       v (idx3S (C := C) (H := H) (W := W) c i j) := by
@@ -311,17 +311,17 @@ private lemma toVecT_get4
       | succ IC =>
         cases K with
         | dim fOC =>
-          let hKW : vecSize (Nat.succ KW) = Nat.succ KW := by simp [vecSize, Shape.size]
+          let hKW : vecSize (Nat.succ KW) = Nat.succ KW := by simp [vecSize, Spec.Shape.size]
           let dj' : Fin (vecSize (Nat.succ KW)) := Fin.cast hKW.symm dj
-          have hmposInner : 0 < Shape.size (.dim (Nat.succ IC) (.dim (Nat.succ KH) (.dim (Nat.succ
+          have hmposInner : 0 < Spec.Shape.size (.dim (Nat.succ IC) (.dim (Nat.succ KH) (.dim (Nat.succ
             KW) .scalar))) := by
-            simp [Shape.size]
-          have hmposKH : 0 < Shape.size (.dim (Nat.succ KH) (.dim (Nat.succ KW) .scalar)) := by
-            simp [Shape.size]
-          have hmposKW : 0 < Shape.size (.dim (Nat.succ KW) .scalar) := by
-            simp [Shape.size]
+            simp [Spec.Shape.size]
+          have hmposKH : 0 < Spec.Shape.size (.dim (Nat.succ KH) (.dim (Nat.succ KW) .scalar)) := by
+            simp [Spec.Shape.size]
+          have hmposKW : 0 < Spec.Shape.size (.dim (Nat.succ KW) .scalar) := by
+            simp [Spec.Shape.size]
           let k0 : Fin 1 := 0
-          have hmposSc : 0 < Shape.size Shape.scalar := by simp [Shape.size]
+          have hmposSc : 0 < Spec.Shape.size Shape.scalar := by simp [Spec.Shape.size]
           have houter :
               toVecT (t := (Tensor.dim fOC : Tensor ℝ (.dim OC (.dim (Nat.succ IC) (.dim (Nat.succ
                 KH) (.dim (Nat.succ KW) .scalar))))))
@@ -450,7 +450,7 @@ private lemma toVecT_get4
 /-- `get_at_or_zero` on an `ofVecT`-constructed 4D tensor reads back the corresponding flattened
   entry. -/
 private lemma get4_ofVecT
-    {OC IC KH KW : Nat} (v : Vec (Shape.size (.dim OC (.dim IC (.dim KH (.dim KW .scalar))))))
+    {OC IC KH KW : Nat} (v : Vec (Spec.Shape.size (.dim OC (.dim IC (.dim KH (.dim KW .scalar))))))
     (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (dj : Fin KW) :
     getAtOrZero (ofVecT (s := .dim OC (.dim IC (.dim KH (.dim KW .scalar)))) v)
         [oc.val, ic.val, di.val, dj.val]
@@ -682,10 +682,10 @@ private def convBilin
 
   /-- Output height of `conv2d`, computed from input height, kernel height, stride, and padding. -/
   abbrev outH {IH KH stride padding : Nat} : Nat :=
-    (IH + 2 * padding - KH) / stride + 1
+    Shape.slidingWindowOutDim IH KH stride padding
   /-- Output width of `conv2d`, computed from input width, kernel width, stride, and padding. -/
   abbrev outW {IW KW stride padding : Nat} : Nat :=
-    (IW + 2 * padding - KW) / stride + 1
+    Shape.slidingWindowOutDim IW KW stride padding
 
   /-- Shape of the Conv2D kernel parameter `K` (a `OC × IC × KH × KW` tensor). -/
   abbrev sK (OC IC KH KW : Nat) : Shape := .dim OC (.dim IC (.dim KH (.dim KW .scalar)))
@@ -697,40 +697,40 @@ private def convBilin
   abbrev sY (OC OH OW : Nat) : Shape := .dim OC (.dim OH (.dim OW .scalar))
 
   private lemma size_sK (OC IC KH KW : Nat) :
-      Shape.size (sK OC IC KH KW) = OC * (IC * (KH * KW)) := by
-    simp [Shape.size]
+      Spec.Shape.size (sK OC IC KH KW) = OC * (IC * (KH * KW)) := by
+    simp [Spec.Shape.size]
 
-  private lemma size_sB (OC : Nat) : Shape.size (sB OC) = OC := by
-    simp [Shape.size]
+  private lemma size_sB (OC : Nat) : Spec.Shape.size (sB OC) = OC := by
+    simp [Spec.Shape.size]
 
-  private lemma size_sX (IC IH IW : Nat) : Shape.size (sX IC IH IW) = IC * (IH * IW) := by
-    simp [Shape.size]
+  private lemma size_sX (IC IH IW : Nat) : Spec.Shape.size (sX IC IH IW) = IC * (IH * IW) := by
+    simp [Spec.Shape.size]
 
-  private lemma size_sY (OC OH OW : Nat) : Shape.size (sY OC OH OW) = OC * (OH * OW) := by
-    simp [Shape.size]
+  private lemma size_sY (OC OH OW : Nat) : Spec.Shape.size (sY OC OH OW) = OC * (OH * OW) := by
+    simp [Spec.Shape.size]
 
   private lemma idx3S_cast_size_sX {IC IH IW : Nat} (ic : Fin IC) (i : Fin IH) (j : Fin IW) :
       Fin.cast (size_sX IC IH IW) (idx3S (C := IC) (H := IH) (W := IW) ic i j)
         =
       idx3 (C := IC) (H := IH) (W := IW) ic i j := by
-    simp [idx3S, idx3, Shape.size]
+    simp [idx3S, idx3, Spec.Shape.size]
 
   private lemma idx3S_cast_size_sY {OC OH OW : Nat} (oc : Fin OC) (i : Fin OH) (j : Fin OW) :
       Fin.cast (size_sY OC OH OW) (idx3S (C := OC) (H := OH) (W := OW) oc i j)
         =
       idx3 (C := OC) (H := OH) (W := OW) oc i j := by
-    simp [idx3S, idx3, Shape.size]
+    simp [idx3S, idx3, Spec.Shape.size]
 
   private lemma idx4S_cast_size_sK {OC IC KH KW : Nat}
       (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (dj : Fin KW) :
       Fin.cast (size_sK OC IC KH KW) (idx4S (OC := OC) (IC := IC) (KH := KH) (KW := KW) oc ic di dj)
         =
       idx4 (OC := OC) (IC := IC) (KH := KH) (KW := KW) oc ic di dj := by
-    simp [idx4S, idx4, Shape.size]
+    simp [idx4S, idx4, Spec.Shape.size]
 
   private lemma get_at_or_zero_ofVecT_sX_eq_getInput
       {IC IH IW : Nat} (xRaw : Vec (IC * (IH * IW))) (ic : Fin IC) (p q : Nat) :
-      let xShape : Vec (Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
+      let xShape : Vec (Spec.Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
       getAtOrZero (ofVecT (s := sX IC IH IW) xShape) [ic.val, p, q]
         =
       getInput (IC := IC) (IH := IH) (IW := IW) xRaw ic p q := by
@@ -767,7 +767,7 @@ private def convBilin
   private lemma get_at_or_zero_ofVecT_sK_eq_idx4
       {OC IC KH KW : Nat} (kRaw : Vec (OC * (IC * (KH * KW))))
       (oc : Fin OC) (ic : Fin IC) (di : Fin KH) (dj : Fin KW) :
-      let kShape : Vec (Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
+      let kShape : Vec (Spec.Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
       getAtOrZero (ofVecT (s := sK OC IC KH KW) kShape) [oc.val, ic.val, di.val, dj.val]
         =
       kRaw (idx4 (OC := OC) (IC := IC) (KH := KH) (KW := KW) oc ic di dj) := by
@@ -793,8 +793,8 @@ private def convBilin
       (xRaw : Vec (IC * (IH * IW))) :
       let OH := outH (IH := IH) (KH := KH) (stride := stride) (padding := padding)
       let OW := outW (IW := IW) (KW := KW) (stride := stride) (padding := padding)
-      let kShape : Vec (Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
-      let xShape : Vec (Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
+      let kShape : Vec (Spec.Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
+      let xShape : Vec (Spec.Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
       let dKernel : Tensor ℝ (sK OC IC KH KW) := ofVecT (s := sK OC IC KH KW) kShape
       let input : Tensor ℝ (sX IC IH IW) := ofVecT (s := sX IC IH IW) xShape
       let layerK : Spec.Conv2DSpec IC OC KH KW stride padding ℝ h1 h2 h3 :=
@@ -913,7 +913,7 @@ private def convBilin
 
   private lemma cast_toVecT_biasBroadcast_eq_biasBroadcastVec
       {OC OH OW : Nat} (bRaw : Vec OC) :
-      let bShape : Vec (Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
+      let bShape : Vec (Spec.Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
       let db : Tensor ℝ (sB OC) := ofVecT (s := sB OC) bShape
       castVec (size_sY OC OH OW)
           (toVecT (t := Proofs.Autograd.Conv2D.biasBroadcast (outC := OC) (outH := OH) (outW := OW)
@@ -943,8 +943,8 @@ private def convBilin
       have hget1 :=
         get1_ofVecT (v := bShape) (c := oc)
       have hbShape :
-          bShape (Fin.cast (by simp [Shape.size]) oc) = bRaw oc := by
-        simp [bShape, Shape.size]
+          bShape (Fin.cast (by simp [Spec.Shape.size]) oc) = bRaw oc := by
+        simp [bShape, Spec.Shape.size]
       simpa [db] using hget1.trans hbShape
 
     -- finish by rewriting the casted index to a 3D coordinate and evaluating one broadcast entry
@@ -1044,7 +1044,7 @@ private def convBilin
       (kernelIdx : Idx Γ (sK OC IC KH KW))
       (biasIdx : Idx Γ (sB OC))
       (inputIdx : Idx Γ (sX IC IH IW)) :
-      CtxVec Γ → Vec (Shape.size (sY OC (outH (IH := IH) (KH := KH) (stride := stride) (padding :=
+      CtxVec Γ → Vec (Spec.Shape.size (sY OC (outH (IH := IH) (KH := KH) (stride := stride) (padding :=
         padding))
         (outW (IW := IW) (KW := KW) (stride := stride) (padding := padding)))) :=
     fun x =>
@@ -1063,7 +1063,7 @@ private def convBilin
       (kernelIdx : Idx Γ (sK OC IC KH KW))
       (biasIdx : Idx Γ (sB OC))
       (inputIdx : Idx Γ (sX IC IH IW)) :
-      CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Shape.size (sY OC (outH (IH := IH) (KH := KH) (stride :=
+      CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Spec.Shape.size (sY OC (outH (IH := IH) (KH := KH) (stride :=
         stride) (padding := padding))
         (outW (IW := IW) (KW := KW) (stride := stride) (padding := padding))))) :=
     fun x =>
@@ -1137,9 +1137,9 @@ private def convBilin
           let kRaw := projK (Γ := Γ) (OC := OC) (IC := IC) (KH := KH) (KW := KW) kernelIdx x
           let bRaw := projB (Γ := Γ) (OC := OC) biasIdx x
           let xRaw := projX (Γ := Γ) (IC := IC) (IH := IH) (IW := IW) inputIdx x
-          let kShape : Vec (Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
-          let bShape : Vec (Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
-          let xShape : Vec (Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
+          let kShape : Vec (Spec.Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
+          let bShape : Vec (Spec.Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
+          let xShape : Vec (Spec.Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
           let kernelT : Tensor ℝ (sK OC IC KH KW) := ofVecT (s := sK OC IC KH KW) kShape
           let biasT : Tensor ℝ (sB OC) := ofVecT (s := sB OC) bShape
           let inputT : Tensor ℝ (sX IC IH IW) := ofVecT (s := sX IC IH IW) xShape
@@ -1165,13 +1165,13 @@ private def convBilin
           let dkRaw := projK (Γ := Γ) (OC := OC) (IC := IC) (KH := KH) (KW := KW) kernelIdx dx
           let dbRaw := projB (Γ := Γ) (OC := OC) biasIdx dx
           let dxRaw := projX (Γ := Γ) (IC := IC) (IH := IH) (IW := IW) inputIdx dx
-          let kShape : Vec (Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
-          let bShape : Vec (Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
-          let xShape : Vec (Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
-          let dkShape : Vec (Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm
+          let kShape : Vec (Spec.Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm kRaw
+          let bShape : Vec (Spec.Shape.size (sB OC)) := castVec (size_sB OC).symm bRaw
+          let xShape : Vec (Spec.Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm xRaw
+          let dkShape : Vec (Spec.Shape.size (sK OC IC KH KW)) := castVec (size_sK OC IC KH KW).symm
             dkRaw
-          let dbShape : Vec (Shape.size (sB OC)) := castVec (size_sB OC).symm dbRaw
-          let dxShape : Vec (Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm dxRaw
+          let dbShape : Vec (Spec.Shape.size (sB OC)) := castVec (size_sB OC).symm dbRaw
+          let dxShape : Vec (Spec.Shape.size (sX IC IH IW)) := castVec (size_sX IC IH IW).symm dxRaw
           let kernelT : Tensor ℝ (sK OC IC KH KW) := ofVecT (s := sK OC IC KH KW) kShape
           let biasT : Tensor ℝ (sB OC) := ofVecT (s := sB OC) bShape
           let inputT : Tensor ℝ (sX IC IH IW) := ofVecT (s := sX IC IH IW) xShape

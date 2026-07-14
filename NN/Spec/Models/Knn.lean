@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Spec.Models.CommonHelpers
-public import Lean.Data.RBMap
+public import Std.Data.TreeMap.Basic
 
 /-!
 # k‑Nearest Neighbors (kNN) (spec model)
@@ -149,11 +149,11 @@ def classify (α β : Type) (n : ℕ)
       if tied.any (fun l => l == nearestLabel) then nearestLabel
       else tied.headD default
 
-/-- Classification using an RBMap for label counts.
+/-- Classification using an ordered tree map for label counts.
 
 This variant avoids hashing, at the cost of requiring an `Ord β` instance.
 -/
-def classifyRBMap (α β : Type) (n : ℕ)
+def classifyTreeMap (α β : Type) (n : ℕ)
   [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
   [Ord β] [Inhabited β]
   (knn : KNN α β n) (input : Tensor α (.dim n .scalar)) : Option β :=
@@ -161,9 +161,9 @@ def classifyRBMap (α β : Type) (n : ℕ)
   let labels := neighbors.map (fun (_, label) => label)
   if labels.isEmpty then none
   else
-    let labelCounts := labels.foldl (fun (acc : Lean.RBMap β Nat compare) label =>
-      acc.insert label (acc.findD label 0 + 1)
-    ) Lean.RBMap.empty
+    let labelCounts := labels.foldl (fun (acc : Std.TreeMap β Nat compare) label =>
+      acc.insert label (acc.getD label 0 + 1)
+    ) Std.TreeMap.empty
     let groupedList := labelCounts.toList
     some (groupedList.foldl
       (fun best cur => if cur.snd > best.snd then cur else best)

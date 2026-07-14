@@ -36,68 +36,36 @@ namespace TorchLean
 @[inherit_doc Spec.Shape]
 abbrev Shape := Spec.Shape
 
-/-- Runtime options such as backend, dtype, and CUDA fast-kernel settings. -/
+@[inherit_doc TorchLean.Sample.Supervised]
+abbrev SupervisedSample := TorchLean.Sample.Supervised
+
+@[inherit_doc NN.API.TorchLean.Options]
 abbrev Options := NN.API.TorchLean.Options
 
-/-- One supervised training example with an input tensor and target tensor. -/
-abbrev SupervisedSample := NN.API.SupervisedSample
-
-/-- Shape-indexed sequential model. Most examples use the shorter `nn.Sequential` name. -/
-abbrev SequentialModel := NN.API.nn.Sequential
-
-/-- Randomized model builder used by `nn.run` and built-in examples. -/
-abbrev ModelBuilder := NN.API.nn.M
-
-/-- Parameter shapes required by a sequential model. -/
-abbrev modelParamShapes {σ τ : Shape} (model : SequentialModel σ τ) : List Shape :=
-  NN.API.nn.paramShapes model
-
-/--
-TorchLean's typed tuple of tensors.
-
-A `TensorPack α [s₁, s₂, ...]` is a fixed tuple whose tensor shapes are tracked by the type-level
-list.
--/
-abbrev TensorPack (α : Type) (shapes : List Shape) :=
-  NN.API.TensorPack α shapes
-
-/--
-Concrete parameter tensors for a model or model slice. The `nn.ParamTensors` spelling points back to
-this same type.
--/
-abbrev ParamTensors (α : Type) (shapes : List Shape) :=
-  TensorPack α shapes
-
-/-- Shape-indexed module definition used by the executable TorchLean training runtime. -/
-abbrev ScalarModuleDef := NN.API.TorchLean.Module.ScalarModuleDef
-
-/-- How a vector of per-example losses is reduced to one scalar loss. -/
-abbrev LossReduction := NN.API.TorchLean.Loss.Reduction
-
-/-- CSV parsing options used by the public data loaders. -/
-abbrev CsvOptions := NN.API.Data.CsvOptions
+@[inherit_doc NN.API.TorchLean.TensorPack]
+abbrev TensorPack := NN.API.TorchLean.TensorPack
 
 namespace Training
 
-/-- A scalar metric curve, usually a loss or accuracy series over training steps. -/
+@[inherit_doc _root_.Runtime.Training.Curve]
 abbrev Curve := _root_.Runtime.Training.Curve
 
-/-- JSON-serializable training log with metrics and run metadata. -/
+@[inherit_doc _root_.Runtime.Training.TrainLog]
 abbrev TrainLog := _root_.Runtime.Training.TrainLog
 
-/-- Mutable experiment log used by longer-running examples. -/
+@[inherit_doc _root_.Runtime.Training.ExperimentLog]
 abbrev ExperimentLog := _root_.Runtime.Training.ExperimentLog
 
-/-- Output destination for training logs. -/
+@[inherit_doc _root_.Runtime.Training.LogDestination]
 abbrev LogDestination := _root_.Runtime.Training.LogDestination
 
-/-- In-memory history for named training metrics. -/
+@[inherit_doc _root_.Runtime.Training.MetricHistory]
 abbrev MetricHistory := _root_.Runtime.Training.MetricHistory
 
-/-- Finite in-memory dataset used by TorchLean trainers. -/
+@[inherit_doc _root_.Runtime.Autograd.Train.Dataset]
 abbrev Dataset := _root_.Runtime.Autograd.Train.Dataset
 
-/-- Stateful minibatch loader for finite datasets. -/
+@[inherit_doc _root_.Runtime.Autograd.Train.DataLoader]
 abbrev DataLoader := _root_.Runtime.Autograd.Train.DataLoader
 
 namespace MetricHistory

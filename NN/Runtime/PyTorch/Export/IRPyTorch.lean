@@ -60,7 +60,7 @@ open Export.PyTorch
 /-- Flatten a tensor and render it as a Python list literal (used for
   `torch.tensor([...]).reshape(...)`). -/
 def tensorToPyFlat {s : Shape} (t : Tensor Float s) : String :=
-  vectorTensorToPy (n := Shape.size s) (Tensor.flattenSpec (α := Float) t)
+  vectorTensorToPy (n := Spec.Shape.size s) (Tensor.flattenSpec (α := Float) t)
 
 /-- Return `true` iff every element of the list equals the first element (vacuously true on `[]`).
   -/

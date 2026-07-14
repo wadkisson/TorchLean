@@ -12,7 +12,7 @@ A GraphSpec model has two interpretations:
 Use the subsystem entrypoint:
 
 ```lean
-import NN.Entrypoint.GraphSpec
+import NN.GraphSpec
 ```
 
 `NN/IR` is the shared op-tagged graph IR used by runtime compilation and verification. GraphSpec is
@@ -64,7 +64,7 @@ interpretation.
 `ps : List Shape` tracked at the type level.
 
 ```lean
-import NN.Entrypoint.GraphSpec
+import NN.GraphSpec
 
 open NN
 open NN.GraphSpec

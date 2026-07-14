@@ -153,7 +153,7 @@ def mseLoss {s : Shape} (t : Tape) (yhatId targetId : Nat) : Result (Tape × Nat
   let diff := Buffer.sub yhat target
   let squared := Buffer.mul diff diff
   let sum := Buffer.reduceSum squared
-  let denom : Float := Float.ofNat (Shape.size s)
+  let denom : Float := Float.ofNat (Spec.Shape.size s)
   let mean := Buffer.scale sum (1.0 / denom)
   let node : Node :=
     { name := some "mse_loss"

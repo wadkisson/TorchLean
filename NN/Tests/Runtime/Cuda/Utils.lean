@@ -61,7 +61,7 @@ def bufferToTensor {s : Shape} (b : Runtime.Autograd.Cuda.Buffer) : IO (Tensor F
   | some t => pure t
   | none =>
       throw <| IO.userError
-        s!"cuda test: buffer size mismatch (expected {Shape.size s} elements, got {a.size})"
+        s!"cuda test: buffer size mismatch (expected {Spec.Shape.size s} elements, got {a.size})"
 
 /-- Convert a CUDA `AnyBuffer` back to a typed spec tensor (checks shape + size). -/
 def anyBufferToTensor {s : Shape} (ab : Runtime.Autograd.Cuda.AnyBuffer) : IO (Tensor Float s) := do

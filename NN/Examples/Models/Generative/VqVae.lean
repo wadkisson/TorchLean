@@ -10,7 +10,7 @@ Run:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 public import NN.Spec.Models.VqVae
 public import NN.MLTheory.Generative.Latent.VQVAE
@@ -56,7 +56,7 @@ The codebook-facing objective is handled in the imported spec/theory modules; th
 the executable reconstruction path with a narrow quantization-style bottleneck.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.VectorVQVAE cfg
+  nn.models.vectorVqVae cfg
 
 /-- Public singleton dataset for compact CIFAR reconstruction. -/
 def data (flags : RealData.CifarModelTrainFlags) : Trainer.Dataset σ τ :=
@@ -89,7 +89,7 @@ The command loads a real CIFAR minibatch, trains the reconstruction objective, a
 summary/log artifact format as the other public trainer commands.
 -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionNpy exeName args
+  TrainCommand.regressionNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 10 1e-3)
     (ModelZoo.bannerWithDevice exeName "CIFAR VQ-VAE-style training")
     train

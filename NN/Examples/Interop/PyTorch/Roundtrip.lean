@@ -8,7 +8,8 @@ module
 
 import NN.Examples.Interop.PyTorch.Export
 import NN.Examples.Interop.PyTorch.Import
-import NN
+import NN.API
+import NN.Examples.ModelZoo
 
 /-!
 # PyTorch Round-Trip Driver
@@ -229,7 +230,7 @@ private def importMLP : IO Unit := do
   let some sd := Import.MLPPyTorch.loadMlpStateDict mlpInDim mlpHidDim mlpOutDim j
     | throw <| IO.userError "Failed to load MLP state dict"
 
-  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.vec mlpInDim) := tensor! [0.5, 0.8]
+  let x : _root_.Spec.Tensor Float (.dim mlpInDim .scalar) := tensor! [0.5, 0.8]
   let y := Import.MLPPyTorch.forward sd x
 
   IO.println "== MLP import example =="
@@ -270,7 +271,7 @@ private def importCNN : IO Unit := do
       conv1 conv2 pool1 pool2 linear
 
   -- Deterministic input matching the Python training script: values 1..64 laid out row-major.
-  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.image cnnInC cnnInH cnnInW) :=
+  let x : _root_.Spec.Tensor Float (.dim cnnInC (.dim cnnInH (.dim cnnInW .scalar))) :=
     _root_.Spec.Tensor.dim (fun _ =>
       _root_.Spec.Tensor.dim (fun i =>
         _root_.Spec.Tensor.dim (fun j =>
@@ -300,7 +301,7 @@ private def importTransformer : IO Unit := do
     :=
     { layers := [layer] }
 
-  let x : _root_.Spec.Tensor Float (_root_.TorchLean.Shape.mat trSeqLen trEmbedDim) := tensor! [[1.5, 1.5]]
+  let x : _root_.Spec.Tensor Float (.dim trSeqLen (.dim trEmbedDim .scalar)) := tensor! [[1.5, 1.5]]
   let y := _root_.Spec.TransformerEncoder.forward (seqLen := trSeqLen) (embedDim := trEmbedDim)
     encoder x (by decide) (by decide)
 
@@ -322,9 +323,9 @@ public def main (args : List String) : IO Unit := do
   if _root_.TorchLean.CLI.hasHelp args then
     IO.println usage
     return
-  let (modelArg?, args) ← _root_.TorchLean.ModelZoo.orThrow "PyTorch.Roundtrip" <|
+  let (modelArg?, args) ← _root_.NN.Examples.ModelZoo.orThrow "PyTorch.Roundtrip" <|
     _root_.TorchLean.CLI.takeFlagValueOnce args "model"
-  let (actionArg?, args) ← _root_.TorchLean.ModelZoo.orThrow "PyTorch.Roundtrip" <|
+  let (actionArg?, args) ← _root_.NN.Examples.ModelZoo.orThrow "PyTorch.Roundtrip" <|
     _root_.TorchLean.CLI.takeFlagValueOnce args "action"
   _root_.TorchLean.CLI.requireNoArgs "PyTorch.Roundtrip" args
 

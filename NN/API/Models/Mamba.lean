@@ -38,24 +38,24 @@ structure MambaTextConfig where
 deriving Repr
 
 /-- One-hot token vector shape. -/
-abbrev mambaTokenVec (cfg : MambaTextConfig) : Shape :=
-  NN.Tensor.Shape.Vec cfg.vocab
+abbrev mambaTokenVec (cfg : MambaTextConfig) : Spec.Shape :=
+  .dim cfg.vocab .scalar
 
 /-- Compact hidden-state shape. -/
-abbrev mambaStateVec (cfg : MambaTextConfig) : Shape :=
-  NN.Tensor.Shape.Vec cfg.stateDim
+abbrev mambaStateVec (cfg : MambaTextConfig) : Spec.Shape :=
+  .dim cfg.stateDim .scalar
 
 /-- Full selective-scan state shape. -/
-abbrev mambaFullState (cfg : MambaTextConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.stateDim cfg.ssmStateDim
+abbrev mambaFullState (cfg : MambaTextConfig) : Spec.Shape :=
+  .dim cfg.stateDim (.dim cfg.ssmStateDim .scalar)
 
 /-- Sequence-major one-hot token matrix shape. -/
-abbrev mambaTokenMat (cfg : MambaTextConfig) (seqLen : Nat) : Shape :=
-  NN.Tensor.Shape.Mat seqLen cfg.vocab
+abbrev mambaTokenMat (cfg : MambaTextConfig) (seqLen : Nat) : Spec.Shape :=
+  .dim seqLen (.dim cfg.vocab .scalar)
 
 /-- Output logits shape for byte-level causal language modeling. -/
-abbrev mambaLogitMat (cfg : MambaTextConfig) (seqLen : Nat) : Shape :=
-  NN.Tensor.Shape.Mat seqLen cfg.vocab
+abbrev mambaLogitMat (cfg : MambaTextConfig) (seqLen : Nat) : Spec.Shape :=
+  .dim seqLen (.dim cfg.vocab .scalar)
 
 /--
 Trainable Mamba-style causal language model over one-hot token inputs.
@@ -72,7 +72,7 @@ def mambaTextLm (cfg : MambaTextConfig) (seqLen : Nat) :
     nn.M (nn.Sequential (mambaTokenMat cfg seqLen) (mambaLogitMat cfg seqLen)) :=
   nn.Sequential![
     nn.mamba seqLen cfg.vocab cfg.stateDim,
-    Linear cfg.stateDim cfg.vocab (pfx := NN.Tensor.Shape.Vec seqLen)
+    linear cfg.stateDim cfg.vocab (pfx := .dim seqLen .scalar)
   ]
 
 /-- Small deterministic initializer for spec-level reference blocks. -/

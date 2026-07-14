@@ -78,15 +78,6 @@ open NN.Tensor
 def err {α : Sort _} (msg : String) : Except String α := .error msg
 
 /--
-Public alias for TorchLean's sequential model type used as the lowering target.
-
-This is definitionally the same type as `NN.API.nn.Sequential`, but avoids importing the full
-public API back into GraphSpec.
--/
-abbrev Sequential (σ τ : Shape) : Type 2 :=
-  _root_.Runtime.Autograd.TorchLean.NN.Seq σ τ
-
-/--
 Lower a graph to a TorchLean `Seq`, threading a “layer occurrence index”.
 
 The index is incremented for primitives with `countsAsLayer = true`.
@@ -94,17 +85,17 @@ The index is incremented for primitives with `countsAsLayer = true`.
 def toSeqAux
     {ps : List Shape} {σ τ : Shape}
     (g : Graph ps σ τ) (i : Nat) :
-    Except String (Sequential σ τ × Nat) := do
+    Except String (_root_.Runtime.Autograd.TorchLean.NN.Seq σ τ × Nat) :=
   match g with
-  | .id s =>
+  | .id s => do
       -- Identity graph becomes identity sequential model.
       return (_root_.Runtime.Autograd.TorchLean.NN.Seq.id s, i)
-  | .seq g₁ g₂ =>
+  | .seq g₁ g₂ => do
       -- Sequential composition becomes sequential composition.
       let (s₁, i') ← toSeqAux (ps := _) (σ := _) (τ := _) g₁ i
       let (s₂, i'') ← toSeqAux (ps := _) (σ := _) (τ := _) g₂ i'
       return (_root_.Runtime.Autograd.TorchLean.NN.Seq.comp s₁ s₂, i'')
-  | .prim p =>
+  | .prim p => do
       -- A primitive can only be lowered if it provides a `LayerDef`.
       match p.toLayerDefM? with
       | none =>
@@ -128,7 +119,7 @@ require every primitive to have a `LayerDef` view.
 def toSeq
     {ps : List Shape} {σ τ : Shape}
     (g : Graph ps σ τ) :
-    Except String (Sequential σ τ) :=
+    Except String (_root_.Runtime.Autograd.TorchLean.NN.Seq σ τ) :=
   match toSeqAux (ps := ps) (σ := σ) (τ := τ) g 0 with
   | .ok (s, _i) => .ok s
   | .error e => .error e

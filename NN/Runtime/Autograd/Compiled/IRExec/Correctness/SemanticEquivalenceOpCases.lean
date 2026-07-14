@@ -237,8 +237,8 @@ theorem buildFrom_denoteAllFrom_conv2d
                   simp (config := { failIfUnchanged := false }) [Bind.bind, Except.bind, hIdx0] at hBuild
                   let expected : Shape :=
                     .dim cfg.outC
-                      (.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-                        (.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) .scalar))
+                      (.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+                        (.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding) .scalar))
                   by_cases hOut : expected = n.outShape
                   ·
                     simp (config := { failIfUnchanged := false }) [expected, hOut] at hBuild
@@ -280,15 +280,15 @@ theorem buildFrom_denoteAllFrom_conv2d
                       -- form to make the final produced-shape check reduce.
                       have hOut0 :
                           Shape.dim cfg.outC
-                              (Shape.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-                                (Shape.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1)
+                              (Shape.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+                                (Shape.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding)
                                   Shape.scalar)) =
                             n.outShape := by
                         simpa [expected] using hOut
                       have hOutBool0 :
                           (Shape.dim cfg.outC
-                                  (Shape.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-                                    (Shape.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1)
+                                  (Shape.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+                                    (Shape.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding)
                                       Shape.scalar)) !=
                                 n.outShape) =
                               false := by
@@ -361,7 +361,7 @@ theorem buildFrom_denoteAllFrom_reshape
               cases hBuild'
           | ok ip =>
               simp [Bind.bind, Except.bind, hp, hIdx] at hBuild
-              by_cases hNumel : Shape.size inS = Shape.size outS
+              by_cases hNumel : Spec.Shape.size inS = Spec.Shape.size outS
               ·
                 simp [hNumel] at hBuild
                 by_cases hOut : outS = n.outShape
@@ -462,7 +462,7 @@ theorem buildFrom_denoteAllFrom_flatten
               cases hBuild'
           | ok ip =>
               simp [Bind.bind, Except.bind, hp, hIdx] at hBuild
-              let expected : Shape := .dim (Shape.size s) .scalar
+              let expected : Shape := .dim (Spec.Shape.size s) .scalar
               by_cases hOut : expected = n.outShape
               ·
                 simp [expected, hOut] at hBuild

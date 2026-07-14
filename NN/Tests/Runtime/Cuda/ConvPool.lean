@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 import Batteries.Data.Vector.Lemmas
 
@@ -44,21 +44,21 @@ abbrev padding : Nat := 0
 abbrev inH : Nat := 3
 abbrev inW : Nat := 3
 
-def hInC : inC ≠ 0 := by decide
-def hKH : kH ≠ 0 := by decide
-def hKW : kW ≠ 0 := by decide
+theorem hInC : inC ≠ 0 := by decide
+theorem hKH : kH ≠ 0 := by decide
+theorem hKW : kW ≠ 0 := by decide
 
-def outH : Nat := (inH + 2 * padding - kH) / stride + 1
-def outW : Nat := (inW + 2 * padding - kW) / stride + 1
+def outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+def outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
 
 def kernel : Tensor Float (shape![outC, inC, kH, kW]) :=
-  tensorND! [outC, inC, kH, kW] [0.2, -0.1, 0.3, 0.4]
+  tensorOfList! [outC, inC, kH, kW] [0.2, -0.1, 0.3, 0.4]
 
 def bias : Tensor Float (shape![outC]) :=
-  tensorND! [outC] [0.05]
+  tensorOfList! [outC] [0.05]
 
 def input : Tensor Float (shape![inC, inH, inW]) :=
-  tensorND! [inC, inH, inW] [
+  tensorOfList! [inC, inH, inW] [
     1.0, 2.0, 3.0,
     4.0, 5.0, 6.0,
     7.0, 8.0, 9.0
@@ -92,7 +92,7 @@ def stride3V : Vector Nat d3 :=
 def padding3V : Vector Nat d3 :=
   #v[0, 0, 0]
 
-def hKernel3V : ∀ i : Fin d3, kernel3V.get i ≠ 0 := by
+theorem hKernel3V : ∀ i : Fin d3, kernel3V.get i ≠ 0 := by
   intro i
   fin_cases i <;> simp [kernel3V, Vector.get]
 
@@ -103,7 +103,7 @@ def outShape3 : Shape :=
   Shape.ofList (outC :: outSpatial3.toList)
 
 def kernel3 : Tensor Float (Shape.ofList (outC :: inC :: kernel3V.toList)) :=
-  tensorND! [outC, inC, k0, k1, k2] [
+  tensorOfList! [outC, inC, k0, k1, k2] [
     0.2, -0.1,
     0.3, 0.4,
     -0.25, 0.15,
@@ -111,7 +111,7 @@ def kernel3 : Tensor Float (Shape.ofList (outC :: inC :: kernel3V.toList)) :=
   ]
 
 def input3 : Tensor Float (Shape.ofList (inC :: inSpatial3.toList)) :=
-  tensorND! [inC, inD0, inD1, inD2] [
+  tensorOfList! [inC, inD0, inD1, inD2] [
     1.0,  2.0,  3.0,
     4.0,  5.0,  6.0,
     7.0,  8.0,  9.0,
@@ -163,7 +163,7 @@ def runConv3 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := outShape3) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape3
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape3)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape3)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dKCuda ← Utils.cudaGrad (s := Shape.ofList (outC :: inC :: kernel3V.toList)) gradsCuda kIdc
@@ -208,7 +208,7 @@ def runMaxPool3 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := yShape
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := Shape.ofList (inC :: inSpatial3.toList)) gradsCuda xIdc
@@ -249,7 +249,7 @@ def runSmoothMaxPool3 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := yShape
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := Shape.ofList (inC :: inSpatial3.toList)) gradsCuda xIdc
@@ -289,7 +289,7 @@ def runAvgPool3 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := yShape
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := Shape.ofList (inC :: inSpatial3.toList)) gradsCuda xIdc
@@ -335,7 +335,7 @@ def runConv2d : IO Unit := do
       kIdc bIdc xIdc)
   let yCuda ← Utils.cudaValue (s := yShape) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dKCuda ← Utils.cudaGrad (s := shape![outC, inC, kH, kW]) gradsCuda kIdc
@@ -375,7 +375,7 @@ def runMaxPool : IO Unit := do
       (h1 := hKH) (h2 := hKW) xIdc)
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := shape![inC, inH, inW]) gradsCuda xIdc
@@ -387,12 +387,12 @@ def runMaxPoolPadNegative : IO Unit := do
   IO.println "== max_pool2d padding negative inputs =="
 
   let x : Tensor Float (shape![1, 1, 1]) :=
-    tensorND! [1, 1, 1] [-3.0]
+    tensorOfList! [1, 1, 1] [-3.0]
   let yShape : Shape := shape![1, 2, 2]
   let expectedY : Tensor Float (shape![1, 2, 2]) :=
-    tensorND! [1, 2, 2] [-3.0, -3.0, -3.0, -3.0]
+    tensorOfList! [1, 2, 2] [-3.0, -3.0, -3.0, -3.0]
   let expectedDx : Tensor Float (shape![1, 1, 1]) :=
-    tensorND! [1, 1, 1] [4.0]
+    tensorOfList! [1, 1, 1] [4.0]
 
   let t0 : Tape Float := Tape.empty
   let (t1, xId) := Tape.leaf (t := t0) x (name := some "input")
@@ -414,7 +414,7 @@ def runMaxPoolPadNegative : IO Unit := do
       (h1 := by decide) (h2 := by decide) xIdc)
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := shape![1, 1, 1]) gradsCuda xIdc
@@ -438,11 +438,11 @@ def runMaxPool3PadNegative : IO Unit := do
     fin_cases i <;> simp [kernel, Vector.get]
   let yShape : Shape := Shape.ofList [1, 2, 2, 2]
   let x : Tensor Float (Shape.ofList [1, 1, 1, 1]) :=
-    tensorND! [1, 1, 1, 1] [-3.0]
+    tensorOfList! [1, 1, 1, 1] [-3.0]
   let expectedY : Tensor Float (Shape.ofList [1, 2, 2, 2]) :=
-    tensorND! [1, 2, 2, 2] [-3.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0]
+    tensorOfList! [1, 2, 2, 2] [-3.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0]
   let expectedDx : Tensor Float (Shape.ofList [1, 1, 1, 1]) :=
-    tensorND! [1, 1, 1, 1] [8.0]
+    tensorOfList! [1, 1, 1, 1] [8.0]
 
   let t0 : Tape Float := Tape.empty
   let (t1, xId) := Tape.leaf (t := t0) x (name := some "input")
@@ -466,7 +466,7 @@ def runMaxPool3PadNegative : IO Unit := do
       (hKernel := hKernel) xIdc)
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := Shape.ofList [1, 1, 1, 1]) gradsCuda xIdc
@@ -507,7 +507,7 @@ def runSmoothMaxPool : IO Unit := do
       (h1 := hKH) (h2 := hKW) xIdc beta)
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := shape![inC, inH, inW]) gradsCuda xIdc
@@ -542,7 +542,7 @@ def runAvgPool : IO Unit := do
       (h1 := hKH) (h2 := hKW) xIdc)
   let yCuda ← Utils.cudaValue (s := yShape) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size yShape)) 1.0 }
+    { s := yShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size yShape)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := shape![inC, inH, inW]) gradsCuda xIdc

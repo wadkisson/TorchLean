@@ -34,7 +34,7 @@ infoview via:
 module
 
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -109,7 +109,7 @@ abbrev τ : Shape :=
 
 /-- Public GPT-style causal Transformer constructor specialized to the byte-level config. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.CausalTransformerOneHot
+  nn.models.causalTransformerOneHot
     { batch := batch
       seqLen := seqLen
       vocab := vocab

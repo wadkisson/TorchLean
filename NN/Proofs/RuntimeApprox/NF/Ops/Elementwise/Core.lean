@@ -45,7 +45,7 @@ is used as the output epsilon in `approxT_add_spec`.
 def addBoundTensor {s : Shape} (epsx epsy : ℝ) (xR yR : Tensor R s) : SpecTensor s :=
   map2Spec
     (fun a b =>
-      epsx + epsy + neuralUlp β fexp (a + b) TrainingPhase.forward / 2)
+      epsx + epsy + neuralUlp β fexp (a + b) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
 
@@ -57,7 +57,7 @@ Analogous to `add_bound_tensor`, but for `xR - yR` (and the corresponding spec s
 def subBoundTensor {s : Shape} (epsx epsy : ℝ) (xR yR : Tensor R s) : SpecTensor s :=
   map2Spec
     (fun a b =>
-      epsx + epsy + neuralUlp β fexp (a - b) TrainingPhase.forward / 2)
+      epsx + epsy + neuralUlp β fexp (a - b) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
 
@@ -70,8 +70,7 @@ propagation plus one rounding term.
 def mulBoundTensor {s : Shape} (epsx epsy : ℝ) (xR yR : Tensor R s) : SpecTensor s :=
   map2Spec
     (fun a b =>
-      (abs a + epsx) * epsy + (abs b + epsy) * epsx + neuralUlp β fexp (a * b)
-        TrainingPhase.forward / 2)
+      (abs a + epsx) * epsy + (abs b + epsy) * epsx + neuralUlp β fexp (a * b) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
 
@@ -85,20 +84,20 @@ def scaleBoundTensor {s : Shape} (eps : ℝ) (c : R) (xR : Tensor R s) : SpecTen
   mapSpec
     (fun a =>
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) c) * eps +
-        neuralUlp β fexp (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) c) TrainingPhase.forward
+        neuralUlp β fexp (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) c)
           / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /-- Per-entry bound tensor for negation. -/
 def negBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
-    (fun a => eps + neuralUlp β fexp (-a) TrainingPhase.forward / 2)
+    (fun a => eps + neuralUlp β fexp (-a) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /-- Per-entry bound tensor for absolute value. -/
 def absBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
-    (fun a => eps + neuralUlp β fexp (abs a) TrainingPhase.forward / 2)
+    (fun a => eps + neuralUlp β fexp (abs a) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--
@@ -109,7 +108,7 @@ This matches `approx_exp_nf`: a mean-value-theorem bound on the real `exp` plus 
 def expBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
     (fun a =>
-      Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) TrainingPhase.forward / 2)
+      Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--
@@ -119,7 +118,7 @@ Currently uses the coarse unconditional bound from `approx_tanh_nf` (boundedness
 -/
 def tanhBoundTensor {s : Shape} (_eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
-    (fun a => (2 : ℝ) + neuralUlp β fexp (Real.tanh a) TrainingPhase.forward / 2)
+    (fun a => (2 : ℝ) + neuralUlp β fexp (Real.tanh a) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 -- Safe log (clamped) bound.
@@ -134,7 +133,7 @@ def safeLogBoundTensor {s : Shape} (ε eps : ℝ) (xR : Tensor R s) : SpecTensor
   mapSpec
     (fun a =>
       (1 / ε) * eps +
-        neuralUlp β fexp (safeLog (ε := ε) a) TrainingPhase.forward / 2)
+        neuralUlp β fexp (safeLog (ε := ε) a) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--

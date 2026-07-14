@@ -58,7 +58,7 @@ theorem evalAt_layernorm_eq
     {s : Shape} (axis seqLen embedDim : Nat)
     (x : Tensor α s)
     (hParams : OpContracts.layerNorm2DParams axis s = .ok (seqLen, embedDim))
-    (hNumel : Shape.size s = Shape.size (.dim seqLen (.dim embedDim .scalar)))
+    (hNumel : Spec.Shape.size s = Spec.Shape.size (.dim seqLen (.dim embedDim .scalar)))
     (y2D : Tensor α (.dim seqLen (.dim embedDim .scalar)))
     (hPure :
       Graph.layernormPure (α := α) (seqLen := seqLen) (embedDim := embedDim)

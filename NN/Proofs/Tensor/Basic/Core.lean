@@ -36,7 +36,7 @@ The tensor proof folder has two layers:
 
 The statements use PyTorch-shaped names where that helps readers:
 
-- `flattenR` / `unflattenR` give a `Fin (Shape.size s) → ℝ` view of `Tensor ℝ s`.
+- `flattenR` / `unflattenR` give a `Fin (Spec.Shape.size s) → ℝ` view of `Tensor ℝ s`.
 - lemmas relate `toVec` views to `add_spec`, `scale_spec`, etc.
 
 We re-export selected generic helpers from `NN.Proofs.Tensor.Algebra` into the `Spec.*` namespace so
@@ -49,7 +49,7 @@ downstream proof files can use one consistent tensor vocabulary (`Spec.toVec`, `
   https://pytorch.org/docs/stable/generated/torch.flatten.html
   https://pytorch.org/docs/stable/generated/torch.reshape.html
   https://pytorch.org/docs/stable/generated/torch.Tensor.view.html
-- “numel”: `tensor.numel()` corresponds to `Shape.size`.
+- “numel”: `tensor.numel()` corresponds to `Spec.Shape.size`.
   https://pytorch.org/docs/stable/generated/torch.Tensor.numel.html
 -/
 
@@ -120,7 +120,7 @@ lemma toVec_scale_spec {n : Nat} (x : Tensor ℝ (.dim n .scalar)) (c : ℝ) :
     simp [toVec, scaleSpec, mapSpec, hx]
 
 /--
-Flatten a tensor of shape `s` into a 1D view `Fin (Shape.size s) → ℝ`.
+Flatten a tensor of shape `s` into a 1D view `Fin (Spec.Shape.size s) → ℝ`.
 
 This is the proof layer counterpart of `Spec.Tensor.flatten_spec` specialized to `ℝ`. In PyTorch
 terms it is the functional analogue of flattening a tensor and then indexing it linearly
@@ -131,17 +131,17 @@ Citations:
 https://pytorch.org/docs/stable/generated/torch.flatten.html
 https://pytorch.org/docs/stable/generated/torch.Tensor.view.html
 -/
-def flattenR {s : Shape} (x : Tensor ℝ s) : Fin (Shape.size s) → ℝ :=
+def flattenR {s : Shape} (x : Tensor ℝ s) : Fin (Spec.Shape.size s) → ℝ :=
   toVec (flattenSpec (α:=ℝ) x)
 
 /--
-Unflatten a 1D view `Fin (Shape.size s) → ℝ` back into a tensor of shape `s`.
+Unflatten a 1D view `Fin (Spec.Shape.size s) → ℝ` back into a tensor of shape `s`.
 
 This is the proof layer counterpart of `Spec.Tensor.unflatten_spec` specialized to `ℝ`, and is
 intended to round-trip with `flattenR` under the spec lemmas in
 `NN/Spec/Core/TensorReductionShape.lean`.
 -/
-def unflattenR {s : Shape} (v : Fin (Shape.size s) → ℝ) : Tensor ℝ s :=
+def unflattenR {s : Shape} (v : Fin (Spec.Shape.size s) → ℝ) : Tensor ℝ s :=
   unflattenSpec (α:=ℝ) s (ofVec v)
 
 /-! ## Pointwise tensor algebra -/

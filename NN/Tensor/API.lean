@@ -22,21 +22,21 @@ it provides constructors and syntax intended for examples, tests, compact models
 
 Typical responsibilities here:
 
-- shape aliases such as `Shape.Vec` and `Shape.NCHW`,
+- arbitrary-rank shapes represented by `Spec.Shape`,
 - friendly constructors from lists and literals,
 - small syntax helpers for examples/tests,
 - and printing support for runtime-friendly dtypes.
 
 Notation policy:
-- keep compact literal constructors (`shape!`, `tensor!`, `tensorND!`, `tensorF!`, `tensor32!`,
+- keep compact literal constructors (`shape!`, `tensor!`, `tensorOfList!`, `tensorF!`, `tensor32!`,
   `fin!`) in this module so they are easy to find and do not leak into unrelated imports,
 - keep more semantic glyphs scoped when possible (as in `NN.IR` and `NN.Floats.IEEEExec`),
 - and prefer namespace-local aliases over reusing the same unscoped token in multiple layers.
 
 Lean is statically typed, so the element type usually plays the role of “dtype”:
 
-  `let x := NN.Tensor.tensor1d (α := Float) [0.1, 0.2]`
-  `let q := NN.Tensor.tensor1d (α := ℚ) [1, 2]`
+  `let x := NN.Tensor.vector (α := Float) [0.1, 0.2]`
+  `let q := NN.Tensor.vector (α := ℚ) [1, 2]`
 
 If you ever see `Tensor Float _` in code: the `_` is just “let Lean infer the shape from the RHS”.
 In examples we prefer to omit the type annotation entirely unless it helps readability.
@@ -56,32 +56,8 @@ namespace NN.Tensor
 
 open Spec
 
-set_option linter.dupNamespace false in
-/-- Local alias for the canonical spec tensor type. -/
-abbrev Tensor := Spec.Tensor
 /-- Local alias for the canonical spec shape type. -/
 abbrev Shape := Spec.Shape
-
-namespace Tensor
-
-set_option linter.dupNamespace false in
-/-- Scalar tensor constructor alias. -/
-abbrev scalar {α : Type} (x : α) : Tensor α Spec.Shape.scalar :=
-  Spec.Tensor.scalar x
-
-set_option linter.dupNamespace false in
-/-- Dimension tensor constructor alias. -/
-abbrev dim {α : Type} {n : Nat} {s : Spec.Shape}
-    (xs : Fin n → Tensor α s) : Tensor α (.dim n s) :=
-  Spec.Tensor.dim xs
-
-set_option linter.dupNamespace false in
-/-- Shape cast alias. -/
-abbrev castShape {α : Type} {s₁ s₂ : Spec.Shape} (t : Tensor α s₁) (h : s₁ = s₂) :
-    Tensor α s₂ :=
-  Spec.Tensor.castShape t h
-
-end Tensor
 
 /-! ## Scalar extraction -/
 
@@ -90,7 +66,7 @@ Extract the scalar value from a scalar-shaped tensor.
 
 PyTorch comparison: like `t.item()` for a 0-dim tensor.
 -/
-def scalarOf {α : Type} (t : Tensor α Spec.Shape.scalar) : α :=
+def scalarOf {α : Type} (t : Spec.Tensor α Spec.Shape.scalar) : α :=
   match t with
   | .scalar v => v
 
@@ -99,150 +75,12 @@ Dot-notation sugar for scalar tensors: `t.item`.
 
 This is defined at the `Spec.Tensor` namespace so that it works with the canonical tensor type.
 -/
-abbrev _root_.Spec.Tensor.item {α : Type} (t : Tensor α Spec.Shape.scalar) : α :=
+abbrev _root_.Spec.Tensor.item {α : Type} (t : Spec.Tensor α Spec.Shape.scalar) : α :=
   NN.Tensor.scalarOf t
 
 /-- `Tensor.scalar x` round-trips through `Spec.Tensor.item`. -/
 @[simp] theorem _root_.Spec.Tensor.item_scalar {α : Type} (x : α) :
-    (Tensor.scalar x).item = x := rfl
-
-/-! ## Common shape aliases -/
-
-namespace Shape
-
-/-- Scalar shape alias. -/
-abbrev scalar : Spec.Shape := Spec.Shape.scalar
-
-/-- Dimension shape constructor alias. -/
-abbrev dim : Nat → Spec.Shape → Spec.Shape := Spec.Shape.dim
-
-/-- Total number of scalar leaves in a shape. -/
-def size (s : Spec.Shape) : Nat := Spec.Shape.size s
-
-/-- Number of dimensions in a shape. -/
-def rank (s : Spec.Shape) : Nat := Spec.Shape.rank s
-
-/-- Vector shape `n`. -/
-abbrev Vec (n : Nat) : Spec.Shape := .dim n .scalar
-
-/-- Matrix shape `rows × cols`. -/
-abbrev Mat (rows cols : Nat) : Spec.Shape := .dim rows (.dim cols .scalar)
-
-/-- 1D signal shape `C × L` (channels-first). PyTorch analogy: `Conv1d` input without batch. -/
-abbrev CL (c l : Nat) : Spec.Shape := .dim c (.dim l .scalar)
-
-/-- Batched 1D signal shape `N × C × L`. PyTorch analogy: `Conv1d` input. -/
-abbrev NCL (n c l : Nat) : Spec.Shape := .dim n (CL c l)
-
-/-- Image shape `C × H × W` (channel-first). -/
-abbrev CHW (c h w : Nat) : Spec.Shape := .dim c (.dim h (.dim w .scalar))
-
-/-- Image shape `H × W × C` (channel-last). -/
-abbrev HWC (h w c : Nat) : Spec.Shape := .dim h (.dim w (.dim c .scalar))
-
-/-- Batched image shape `N × C × H × W` (PyTorch default for images). -/
-abbrev NCHW (n c h w : Nat) : Spec.Shape := .dim n (.dim c (.dim h (.dim w .scalar)))
-
-/-- Batched image shape `N × H × W × C` (channel-last). -/
-abbrev NHWC (n h w c : Nat) : Spec.Shape := .dim n (HWC h w c)
-
-/-- 3D volume shape `C × D × H × W` (channels-first). PyTorch analogy: `Conv3d` input without batch. -/
-abbrev CDHW (c d h w : Nat) : Spec.Shape := .dim c (.dim d (.dim h (.dim w .scalar)))
-
-/-- Batched 3D volume shape `N × C × D × H × W`. PyTorch analogy: `Conv3d` input. -/
-abbrev NCDHW (n c d h w : Nat) : Spec.Shape := .dim n (CDHW c d h w)
-
-/--
-User-facing alias for a single image shape.
-
-This is the shape you usually think of as `(C, H, W)` in PyTorch.
-Internally it is the same as `Shape.CHW`.
--/
-abbrev Image (c h w : Nat) : Spec.Shape := CHW c h w
-
-/--
-User-facing alias for a batch of images.
-
-This is the shape you usually think of as `(N, C, H, W)` in PyTorch.
-Internally it is the same as `Shape.NCHW`.
--/
-abbrev Images (n c h w : Nat) : Spec.Shape := NCHW n c h w
-
-/-- Conv kernel shape `OutC × InC × kH × kW`. -/
-abbrev OIHW (outC inC kH kW : Nat) : Spec.Shape :=
-  .dim outC (.dim inC (.dim kH (.dim kW .scalar)))
-
-/-- 1D conv kernel shape `OutC × InC × kL`. -/
-abbrev OIL (outC inC kL : Nat) : Spec.Shape :=
-  .dim outC (.dim inC (.dim kL .scalar))
-
-/-- 3D conv kernel shape `OutC × InC × kD × kH × kW`. -/
-abbrev OIDHW (outC inC kD kH kW : Nat) : Spec.Shape :=
-  .dim outC (.dim inC (.dim kD (.dim kH (.dim kW .scalar))))
-
-/-- Generic leading batch dimension: `N × s`. -/
-abbrev Batch (n : Nat) (s : Spec.Shape) : Spec.Shape := .dim n s
-
-end Shape
-
-/--
-Canonical TorchLean shape alias inside the `NN` namespace.
-
-Most user examples live under `namespace NN...`, where unqualified `Shape` resolves through `NN`.
-This alias keeps those examples readable while the underlying type remains `Spec.Shape`.
--/
-abbrev _root_.NN.Shape := Spec.Shape
-
-/-- Vector shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.Vec := NN.Tensor.Shape.Vec
-/-- Matrix shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.Mat := NN.Tensor.Shape.Mat
-/-- 1D channel-first signal shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.CL := NN.Tensor.Shape.CL
-/-- Batched 1D channel-first signal shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.NCL := NN.Tensor.Shape.NCL
-/-- Channel-first image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.CHW := NN.Tensor.Shape.CHW
-/-- Channel-last image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.HWC := NN.Tensor.Shape.HWC
-/-- Batched channel-first image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.NCHW := NN.Tensor.Shape.NCHW
-/-- Batched channel-last image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.NHWC := NN.Tensor.Shape.NHWC
-/-- Channel-first 3D volume shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.CDHW := NN.Tensor.Shape.CDHW
-/-- Batched channel-first 3D volume shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.NCDHW := NN.Tensor.Shape.NCDHW
-/-- Single image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.Image := NN.Tensor.Shape.Image
-/-- Batched image shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.Images := NN.Tensor.Shape.Images
-/-- Conv2d kernel shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.OIHW := NN.Tensor.Shape.OIHW
-/-- Conv1d kernel shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.OIL := NN.Tensor.Shape.OIL
-/-- Conv3d kernel shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.OIDHW := NN.Tensor.Shape.OIDHW
-/-- Leading-batch shape alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.Batch := NN.Tensor.Shape.Batch
-/-- Size alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.size := Spec.Shape.size
-/-- Rank alias under `NN.Shape`. -/
-abbrev _root_.NN.Shape.rank := Spec.Shape.rank
-
-/-! ## Common tensor type aliases -/
-
-/-- Vector tensor `n` (shape-indexed, like a 1-D PyTorch tensor of length `n`). -/
-abbrev VecTensor (α : Type) (n : Nat) := Tensor α (Shape.Vec n)
-
-/-- Matrix tensor `rows × cols` (shape-indexed). -/
-abbrev MatTensor (α : Type) (rows cols : Nat) := Tensor α (Shape.Mat rows cols)
-
-/-- Image tensor `C × H × W` (shape-indexed). -/
-abbrev ImageTensor (α : Type) (c h w : Nat) := Tensor α (Shape.Image c h w)
-
-/-- Batched image tensor `N × C × H × W` (shape-indexed). -/
-abbrev ImagesTensor (α : Type) (n c h w : Nat) := Tensor α (Shape.Images n c h w)
+    (Spec.Tensor.scalar x).item = x := rfl
 
 /-! ## Construction -/
 
@@ -268,7 +106,7 @@ Why this exists:
 
 /-- Number of scalar elements (“numel”) implied by a runtime `dims` list. -/
 def numelDims (dims : List Nat) : Nat :=
-  Shape.size (shapeOfDims dims)
+  Spec.Shape.size (shapeOfDims dims)
 
 /-- Create a 1-D tensor from a Lean `List`.
 
@@ -278,22 +116,23 @@ Notes:
 
 PyTorch analogy: `torch.tensor(xs)` producing a 1D tensor.
 -/
-def tensor1d (α : Type := Float) (xs : List α) :
-    Tensor α (.dim xs.length .scalar) :=
+def vector (α : Type := Float) (xs : List α) :
+    Spec.Tensor α (.dim xs.length .scalar) :=
   Spec.vectorFromList xs
 
 /-! ### One-hot vectors -/
 
 /-- One-hot vector of length `n`, with a single `1` at index `k`. -/
-def oneHot {α : Type} [Zero α] [One α] (n : Nat) (k : Fin n) : Tensor α (.dim n .scalar) :=
-  Tensor.dim (fun i => Tensor.scalar (if decide (i = k) then (1 : α) else 0))
+def oneHot {α : Type} [Zero α] [One α] (n : Nat) (k : Fin n) :
+    Spec.Tensor α (.dim n .scalar) :=
+  Spec.Tensor.dim (fun i => Spec.Tensor.scalar (if decide (i = k) then (1 : α) else 0))
 
 /-- One-hot vector using a raw `Nat` index.
 
 If `k ≥ n`, we return the all-zeros vector instead of failing.
 This is convenient in data-conversion code where carrying a `Fin n` would obscure the caller.
 -/
-def oneHotNat {α : Type} [Zero α] [One α] (n k : Nat) : Tensor α (.dim n .scalar) :=
+def oneHotNat {α : Type} [Zero α] [One α] (n k : Nat) : Spec.Tensor α (.dim n .scalar) :=
   if h : k < n then
     oneHot (α := α) n ⟨k, h⟩
   else
@@ -308,38 +147,39 @@ This delegates to `Spec.from_list_2d`, which refuses:
 
 PyTorch analogy: `torch.tensor(xss)` also refuses ragged inputs.
 -/
-def tensor2d? (α : Type := Float) [Inhabited α] (xss : List (List α)) :
-    Option (Tensor α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar)))
+def matrix? (α : Type := Float) [Inhabited α] (xss : List (List α)) :
+    Option (Spec.Tensor α (.dim xss.length
+      (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar)))
       :=
   Spec.matrixFromRows xss
 
 /-- 2-D tensor from nested lists, with a clear error message on failure. -/
-def tensor2d (α : Type := Float) [Inhabited α] (xss : List (List α)) :
-    Except String (Tensor α (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length)
-      .scalar))) :=
-  match tensor2d? (α := α) xss with
+def matrix (α : Type := Float) [Inhabited α] (xss : List (List α)) :
+    Except String (Spec.Tensor α (.dim xss.length
+      (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar))) :=
+  match matrix? (α := α) xss with
   | some t => .ok t
-  | none => .error "tensor2d: empty or ragged nested lists"
+  | none => .error "matrix: empty or ragged nested lists"
 
 /-! ### Ragged-friendly 2D constructors -/
 
 /-- 2-D tensor from nested lists, padding/truncating each row to `nCols`.
 
-This is the permissive sibling of `tensor2d`: it never fails, but it will silently pad with
+This is the permissive sibling of `matrix`: it never fails, but it will silently pad with
 `default` (and drop extra entries beyond `nCols`). This is useful when you *intend* ragged inputs
 (e.g. batching variable-length sequences after padding).
 
 PyTorch analogy: closer to `pad_sequence(..., batch_first=True)` followed by `torch.tensor`.
 -/
-def tensor2dPadTo (α : Type := Float) [Inhabited α] (nCols : Nat) (xss : List (List α)) :
-    Tensor α (.dim xss.length (.dim nCols .scalar)) :=
+def matrixPadTo (α : Type := Float) [Inhabited α] (nCols : Nat) (xss : List (List α)) :
+    Spec.Tensor α (.dim xss.length (.dim nCols .scalar)) :=
   Spec.matrixFromRowsPadTo (nCols := nCols) xss
 
 /-- 2-D tensor from nested lists, padding to the maximum row length (`0` if empty).
 
 This is convenient when you just want a rectangular tensor without precomputing `nCols`. -/
-def tensor2dPadRight (α : Type := Float) [Inhabited α] (xss : List (List α)) :
-    Tensor α (.dim xss.length (.dim (Spec.maxRowLength xss) .scalar)) :=
+def matrixPadRight (α : Type := Float) [Inhabited α] (xss : List (List α)) :
+    Spec.Tensor α (.dim xss.length (.dim (Spec.maxRowLength xss) .scalar)) :=
   Spec.matrixFromRowsPadRight xss
 
 /-! ### General N-D tensors from a flat list -/
@@ -355,32 +195,32 @@ So we do a small amount of reshaping here.
 
 Implementation note:
 - `buildFromFlat_ofLenEq` consumes the flat list using a proof that lengths match.
-- The public APIs (`tensorND` and `tensorND_ofLenEq`) are the ones that establish that proof.
+- The public APIs (`ofListOfLength` and `ofList`) are the ones that establish that proof.
 -/
 /--
 Build a shape-indexed tensor from a flat list, given a proof that the lengths match.
 
-This is a helper for `tensorND_ofLenEq`/`tensorND`: users typically want those APIs rather than
+This is a helper for `ofListOfLength`/`ofList`: users typically want those APIs rather than
 recursing over `Shape` directly.
 -/
 def buildFromFlatOfLenEq {α : Type} :
-    (s : Shape) → (xs : List α) → xs.length = Shape.size s → Tensor α s
+    (s : Shape) → (xs : List α) → xs.length = Spec.Shape.size s → Spec.Tensor α s
   | .scalar, xs, h => by
       have hx : xs.length = 1 := by
         have h' := h
-        simp [Shape.size] at h'
+        simp [Spec.Shape.size] at h'
         exact h'
       have h0 : 0 < xs.length := by
         simp [hx]
-      exact Tensor.scalar (xs.get ⟨0, h0⟩)
+      exact Spec.Tensor.scalar (xs.get ⟨0, h0⟩)
   | .dim n s', xs, h => by
-      let chunkSize : Nat := Shape.size s'
+      let chunkSize : Nat := Spec.Shape.size s'
       have hxLen : xs.length = n * chunkSize := by
         have h' := h
-        simp [Shape.size] at h'
+        simp [Spec.Shape.size] at h'
         dsimp [chunkSize]
         exact h'
-      refine Tensor.dim (fun i => ?_)
+      refine Spec.Tensor.dim (fun i => ?_)
       let start : Nat := i.val * chunkSize
       let chunk : List α := (xs.drop start).take chunkSize
       have hAdd : start + chunkSize ≤ xs.length := by
@@ -397,7 +237,7 @@ def buildFromFlatOfLenEq {α : Type} :
         exact (Nat.le_sub_iff_add_le hStartLe).2 hAdd'
       have hChunkLen : chunk.length = chunkSize := by
         simp [chunk, List.length_take, List.length_drop, Nat.min_eq_left hChunkSub]
-      have hChunkLen' : chunk.length = Shape.size s' := by
+      have hChunkLen' : chunk.length = Spec.Shape.size s' := by
         simpa [chunkSize] using hChunkLen
       exact buildFromFlatOfLenEq (s := s') (xs := chunk) hChunkLen'
 
@@ -406,8 +246,8 @@ def buildFromFlatOfLenEq {α : Type} :
 This is the “static / proof-carrying” version: if you can prove the length match, you avoid any
 runtime checks and you keep a precise shape in the type.
 -/
-def tensorNDOfLenEq {α : Type} (dims : List Nat) (xs : List α)
-    (h : xs.length = numelDims dims) : Tensor α (shapeOfDims dims) :=
+def ofListOfLength {α : Type} (dims : List Nat) (xs : List α)
+    (h : xs.length = numelDims dims) : Spec.Tensor α (shapeOfDims dims) :=
   buildFromFlatOfLenEq (α := α) (s := shapeOfDims dims) (xs := xs) (by
     simpa [numelDims] using h)
 
@@ -416,38 +256,42 @@ def tensorNDOfLenEq {α : Type} (dims : List Nat) (xs : List α)
 This is the “dynamic / user-friendly” version: it fails with a descriptive message if the number
 of provided scalars doesn’t match the implied `numel`.
 -/
-def tensorND {α : Type} (dims : List Nat) (xs : List α) :
-    Except String (Tensor α (shapeOfDims dims)) :=
+def ofList {α : Type} (dims : List Nat) (xs : List α) :
+    Except String (Spec.Tensor α (shapeOfDims dims)) :=
   let expected := numelDims dims
   if h : xs.length = expected then
-    .ok (tensorNDOfLenEq (α := α) (dims := dims) (xs := xs) h)
+    .ok (ofListOfLength (α := α) (dims := dims) (xs := xs) h)
   else
-    .error s!"tensorND: expected {expected} elements for dims={dims}, got {xs.length}"
+    .error s!"ofList: expected {expected} elements for dims={dims}, got {xs.length}"
 
-/-! ### Fill/zeros/ones from runtime dims -/
+/-! ### Fill, zeros, and ones from runtime dimensions -/
 
-/-- Fill an N-D tensor with a constant, where the shape is given as a runtime `List Nat`. -/
-def fillND {α : Type} (value : α) (dims : List Nat) : Tensor α (shapeOfDims dims) :=
+/-- Fill a tensor from a runtime dimension list.
+
+The `OfDims` suffix distinguishes this constructor from `Spec.fill`, whose second argument is an
+already-typed `Shape`.
+-/
+def fillOfDims {α : Type} (value : α) (dims : List Nat) : Spec.Tensor α (shapeOfDims dims) :=
   Spec.fill value (shapeOfDims dims)
 
 /-- All-zeros tensor, from a runtime `dims` list. -/
-def zerosND {α : Type} [Zero α] (dims : List Nat) : Tensor α (shapeOfDims dims) :=
-  fillND (α := α) 0 dims
+def zerosOfDims {α : Type} [Zero α] (dims : List Nat) : Spec.Tensor α (shapeOfDims dims) :=
+  fillOfDims (α := α) 0 dims
 
 /-- All-ones tensor, from a runtime `dims` list. -/
-def onesND {α : Type} [One α] (dims : List Nat) : Tensor α (shapeOfDims dims) :=
-  fillND (α := α) 1 dims
+def onesOfDims {α : Type} [One α] (dims : List Nat) : Spec.Tensor α (shapeOfDims dims) :=
+  fillOfDims (α := α) 1 dims
 
 /-! ## Tactics -/
 
 /-!
-`tensorND_ofLenEq` needs a proof that your flat list has the right length.
+`ofListOfLength` needs a proof that your flat list has the right length.
 
 For the common “all dimensions and lists are literals/abbrevs” case, this tactic
 usually closes that goal automatically.
 
 Usage:
-  `tensorND_ofLenEq ... (by tensor_len)`
+  `ofListOfLength ... (by tensor_len)`
 -/
 macro "tensor_len" : tactic =>
   `(tactic| first
@@ -456,38 +300,38 @@ macro "tensor_len" : tactic =>
     | simp [NN.Tensor.numelDims, NN.Tensor.shapeOfDims, Spec.Shape.size])
 
 /-!
-`tensorND!` is the checked literal constructor for constants whose length proof should be solved
+`tensorOfList!` is the checked literal constructor for constants whose length proof should be solved
 by `tensor_len`.
 
-It expands to `tensorND_ofLenEq ... (by tensor_len)`, so you usually don’t have to write the proof.
-If the proof can’t be solved (e.g. truly dynamic `dims`), elaboration fails; use `tensorND` in that
+It expands to `ofListOfLength ... (by tensor_len)`, so you usually don’t have to write the proof.
+If the proof can’t be solved (e.g. truly dynamic `dims`), elaboration fails; use `ofList` in that
   case.
 -/
-macro "tensorND!" dims:term:max xs:term:max : term =>
-  `(NN.Tensor.tensorNDOfLenEq (dims := $dims) (xs := $xs) (by tensor_len))
+macro "tensorOfList!" dims:term:max xs:term:max : term =>
+  `(NN.Tensor.ofListOfLength (dims := $dims) (xs := $xs) (by tensor_len))
 
 /--
-Typed variant of `tensorND!`.
+Typed variant of `tensorOfList!`.
 
-This is the same constructor as `tensorND! dims xs`, but lets you explicitly specify the element
+This is the same constructor as `tensorOfList! dims xs`, but lets you explicitly specify the element
 type when numeric literals would otherwise default to an undesired type.
 
 Example:
-`def x : Tensor ℚ (shape![2, 2]) := tensorND! (ty := ℚ) [2, 2] [1, 2, 3, 4]`
+`def x : Tensor ℚ (shape![2, 2]) := tensorOfList! (ty := ℚ) [2, 2] [1, 2, 3, 4]`
 
 Implementation note: we avoid reserving a common identifier as a syntax keyword (Lean would then
 treat it as a keyword in downstream files). Instead, we parse an `ident` and check that it is
 `ty`.
 -/
-macro "tensorND!" "(" name:ident ":=" elemTy:term ")" dims:term:max xs:term:max : term => do
+macro "tensorOfList!" "(" name:ident ":=" elemTy:term ")" dims:term:max xs:term:max : term => do
   if name.getId != `ty then
-    Lean.Macro.throwErrorAt name "tensorND!: expected `(ty := <type>)`"
-  `(NN.Tensor.tensorNDOfLenEq (α := $elemTy) (dims := $dims) (xs := $xs) (by tensor_len))
+    Lean.Macro.throwErrorAt name "tensorOfList!: expected `(ty := <type>)`"
+  `(NN.Tensor.ofListOfLength (α := $elemTy) (dims := $dims) (xs := $xs) (by tensor_len))
 
 /-!
 `shape!` is a compact convenience macro for examples: build a `Shape` from a bracketed dimension list.
 
-It expands through reducible `shapeOfDims`, so it stays definitionally aligned with `tensorND!`
+It expands through reducible `shapeOfDims`, so it stays definitionally aligned with `tensorOfList!`
 while still unfolding for dependent proofs and shape typeclass search.
 
 Example:
@@ -515,9 +359,9 @@ def x :=
 
 It is fully general over rank: the nesting depth determines the rank.
 Internally, it computes the dims from list lengths and flattens in row-major order
-(last dimension changes fastest), then calls `tensorND!`.
+(last dimension changes fastest), then calls `tensorOfList!`.
 
-If you need runtime/ragged handling, use `tensorND`/`tensorDynND` instead.
+If you need runtime/ragged handling, use `ofList`/`dynamicOfList` instead.
 -/
 
 open Lean
@@ -577,7 +421,7 @@ macro "tensor!" "(" name:ident ":=" elemTy:term ")" xs:term:max : term => do
   let flatSep := Syntax.TSepArray.ofElems (sep := ",") flatElems
   let dimsTerm ← `(term| [$(dimsSep),*])
   let flatTerm ← `(term| [$(flatSep),*])
-  `(NN.Tensor.tensorNDOfLenEq (α := $elemTy) (dims := $dimsTerm) (xs := $flatTerm) (by tensor_len))
+  `(NN.Tensor.ofListOfLength (α := $elemTy) (dims := $dimsTerm) (xs := $flatTerm) (by tensor_len))
 
 /--
 Untyped variant of `tensor!`.
@@ -596,7 +440,7 @@ macro "tensor!" xs:term:max : term => do
   let flatSep := Syntax.TSepArray.ofElems (sep := ",") flatElems
   let dimsTerm ← `(term| [$(dimsSep),*])
   let flatTerm ← `(term| [$(flatSep),*])
-  `(NN.Tensor.tensorNDOfLenEq (dims := $dimsTerm) (xs := $flatTerm) (by tensor_len))
+  `(NN.Tensor.ofListOfLength (dims := $dimsTerm) (xs := $flatTerm) (by tensor_len))
 
 /-! ## Small index helpers -/
 
@@ -636,7 +480,7 @@ This avoids noisy lists like `[cast 0.1, cast 0.2, ...]`.
 -/
 macro "tensorF!" cast:term:max dims:term:max xs:term:max : term =>
   `(Spec.mapTensor $cast
-      (NN.Tensor.tensorNDOfLenEq (α := Float) (dims := $dims) (xs := $xs) (by tensor_len)))
+      (NN.Tensor.ofListOfLength (α := Float) (dims := $dims) (xs := $xs) (by tensor_len)))
 
 /-!
 `tensor32!` is the `tensor!` macro specialized to the executable IEEE-754 binary32 backend.
@@ -665,25 +509,25 @@ structure DynTensor (α : Type) where
   /-- Runtime shape tag carried alongside the tensor. -/
   s : Shape
   /-- Shape-indexed tensor whose type is tied to `s`. -/
-  t : Tensor α s
+  t : Spec.Tensor α s
 
 /-- Build a `DynTensor` from runtime dims + flat data, with a runtime length check. -/
-def tensorDynND {α : Type} (dims : List Nat) (xs : List α) : Except String (DynTensor α) := do
-  let t ← tensorND (α := α) dims xs
+def dynamicOfList {α : Type} (dims : List Nat) (xs : List α) : Except String (DynTensor α) := do
+  let t ← ofList (α := α) dims xs
   pure { s := shapeOfDims dims, t := t }
 
 /-! ## Common dtype helpers (from Float literals) -/
 
 /-- 1-D tensor from Float literals, cast into the executable IEEE-754 FP32 backend. -/
-def tensorF321d (xs : List Float) :
-    Tensor (TorchLean.Floats.F32 .ieee754Exec) (.dim xs.length .scalar) :=
-  Spec.mapTensor TorchLean.Floats.IEEE754.IEEE32Exec.ofFloat (tensor1d (α := Float) xs)
+def float32Vector (xs : List Float) :
+    Spec.Tensor (TorchLean.Floats.F32 .ieee754Exec) (.dim xs.length .scalar) :=
+  Spec.mapTensor TorchLean.Floats.IEEE754.IEEE32Exec.ofFloat (vector (α := Float) xs)
 
 /-- 2-D tensor from Float literals, cast into the executable IEEE-754 FP32 backend. -/
-def tensorF322d (xss : List (List Float)) :
-    Except String (Tensor (TorchLean.Floats.F32 .ieee754Exec)
+def float32Matrix (xss : List (List Float)) :
+    Except String (Spec.Tensor (TorchLean.Floats.F32 .ieee754Exec)
       (.dim xss.length (.dim (if xss.isEmpty then 0 else xss.head!.length) .scalar))) := do
-  let t ← tensor2d (α := Float) xss
+  let t ← matrix (α := Float) xss
   pure (Spec.mapTensor TorchLean.Floats.IEEE754.IEEE32Exec.ofFloat t)
 
 /-! ## Printing -/
@@ -724,7 +568,7 @@ We model printing as `Except String String` because some tensor element types ar
 non-printable (e.g. `ℝ` or proof-only floating-point models).
 -/
 class TensorPrintable (α : Type) where
-  pretty : {s : Shape} → Tensor α s → Except String String
+  pretty : {s : Shape} → Spec.Tensor α s → Except String String
 
 /-- Default printing for element types that support `ToString`. -/
 instance (priority := 10) {α : Type} [ToString α] : TensorPrintable α where
@@ -744,7 +588,8 @@ instance (priority := 100) : TensorPrintable TorchLean.Floats.FP32 where
         "use `IEEE32Exec`/`Float` for runtime printing.")
 
 /-- Print a tensor with a dtype tag, or throw an `IO.userError` if the dtype refuses to print. -/
-def print {α : Type} [DTypeName α] [TensorPrintable α] {s : Shape} (t : Tensor α s) : IO Unit := do
+def print {α : Type} [DTypeName α] [TensorPrintable α] {s : Shape}
+    (t : Spec.Tensor α s) : IO Unit := do
   match (TensorPrintable.pretty (α := α) t) with
   | .ok str => IO.println s!"[{DTypeName.name (α := α)}] {str}"
   | .error msg => throw <| IO.userError msg

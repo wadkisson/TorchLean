@@ -30,17 +30,17 @@ namespace API
 /-!
 # Public neural-network builders
 
-This module defines the `NN.API.nn.pure` layer builders and block constructors.  The names stay
+This module defines the `NN.API.nn.Internal` layer builders and block constructors.  The names stay
 under `NN.API.nn`; the split only keeps the source file small enough to maintain.
 -/
 
 namespace nn
 
 /-- Sequential model type (TorchLean `Seq`), analogous to PyTorch `nn.Sequential`. -/
-abbrev Sequential := TorchLean.NN.Seq
+abbrev Sequential := TorchLean.LayerCore.Seq
 
 /-- Single-layer definition type (TorchLean `LayerDef`), analogous to PyTorch `nn.Module`. -/
-abbrev LayerDef := TorchLean.NN.LayerDef
+abbrev LayerDef := TorchLean.LayerCore.LayerDef
 
 /-!
 Re-export common `Seq` helpers under `API.nn.*` so examples can use the stable public API.
@@ -48,7 +48,7 @@ Re-export common `Seq` helpers under `API.nn.*` so examples can use the stable p
 The names mirror the TorchLean runtime layer so users can move between the public API and
 runtime layer code without learning a second vocabulary.
 -/
-export TorchLean.NN.Seq
+export TorchLean.LayerCore.Seq
   (paramShapes paramRequiresGrad initParams updateBuffers
    programWithMode forwardProgram
    scalarModuleDefWithMode scalarModuleDef
@@ -62,18 +62,18 @@ def of {σ τ : Spec.Shape} (layer : LayerDef σ τ) : Sequential σ τ :=
   TorchLean.Layers.of layer
 
 /-!
-All explicit-seed layer constructors live under `nn.pure.*`.
+All explicit-seed layer constructors live under `nn.Internal.*`.
 
 The top-level `nn.*` namespace is reserved for the *seeded builder* API that allocates
 initialization seeds automatically (PyTorch-style ergonomics).
 -/
-namespace pure
+namespace Internal
 
 /--
 Linear layer on the last axis (prefix-shape preserving).
 
-PyTorch analogue: `torch.nn.Linear`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.Linear.html`.
+PyTorch analogue: `torch.nn.linear`.
+See `https://pytorch.org/docs/stable/generated/torch.nn.linear.html`.
 
 Unlike the runtime TorchLean layer constructor (which is vector-only),
 this public layer constructor follows PyTorch’s convention:
@@ -87,8 +87,8 @@ the affine map is applied once, and the result is reshaped back).
 def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
     (pfx : Spec.Shape := Spec.Shape.scalar) :
     Sequential (pfx.appendDim inDim) (pfx.appendDim outDim) :=
-  let WShape : Spec.Shape := NN.Tensor.Shape.Mat outDim inDim
-  let bShape : Spec.Shape := NN.Tensor.Shape.Vec outDim
+  let WShape : Spec.Shape := .dim outDim (.dim inDim .scalar)
+  let bShape : Spec.Shape := .dim outDim .scalar
   let w0 : Spec.Tensor Float WShape := _root_.Runtime.Autograd.Torch.Init.xavierW
     (outDim := outDim) (inDim := inDim) (seed := seedW)
   let b0 : Spec.Tensor Float bShape := _root_.Runtime.Autograd.Torch.Init.tensor
@@ -108,7 +108,7 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
               let x2D ←
                 TorchLean.reshape (m := m) (α := α)
                   (s₁ := sIn)
-                  (s₂ := NN.Tensor.Shape.Mat batch inDim)
+                  (s₂ := .dim batch (.dim inDim .scalar))
                   x (by
                     -- size(sIn) = size(pfx) * inDim = batch * inDim = size(Mat batch inDim)
                     simp [sIn, batch, Spec.Shape.size_appendDim, Spec.Shape.size])
@@ -119,9 +119,9 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
               let y ← TorchLean.matmul (m := m) (α := α)
                 (mDim := batch) (nDim := inDim) (pDim := outDim) x2D wT
               let y2D ←
-                TorchLean.F.addB (m := m) (α := α) (t := NN.Tensor.Shape.Mat batch outDim) y b
+                TorchLean.F.addB (m := m) (α := α) (t := .dim batch (.dim outDim .scalar)) y b
               TorchLean.reshape (m := m) (α := α)
-                (s₁ := NN.Tensor.Shape.Mat batch outDim)
+                (s₁ := .dim batch (.dim outDim .scalar))
                 (s₂ := sOut)
                 y2D (by
                   -- size(Mat batch outDim) = batch * outDim = size(pfx) * outDim = size(sOut)
@@ -143,9 +143,9 @@ PyTorch analogy: `torch.nn.RNN(inputSize, hiddenSize, nonlinearity="tanh")` with
 -/
 def rnn (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize) :=
-  of (TorchLean.NN.rnn (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar)) :=
+  of (TorchLean.LayerCore.rnn (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
     seedB)
 
 /--
@@ -159,9 +159,9 @@ single batch element.
 -/
 def gru (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize) :=
-  of (TorchLean.NN.gru (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar)) :=
+  of (TorchLean.LayerCore.gru (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
     seedB)
 
 /--
@@ -173,9 +173,9 @@ TorchLean ops, so CPU and CUDA training use the same API.
 -/
 def mamba (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize) :=
-  of (TorchLean.NN.mamba (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize)
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar)) :=
+  of (TorchLean.LayerCore.mamba (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize)
     seedW seedB)
 
 /--
@@ -189,9 +189,9 @@ single batch element.
 -/
 def lstm (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     Sequential
-      (NN.Tensor.Shape.Mat seqLen inputSize)
-      (NN.Tensor.Shape.Mat seqLen hiddenSize) :=
-  of (TorchLean.NN.lstm (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
+      (.dim seqLen (.dim inputSize .scalar))
+      (.dim seqLen (.dim hiddenSize .scalar)) :=
+  of (TorchLean.LayerCore.lstm (seqLen := seqLen) (inputSize := inputSize) (hiddenSize := hiddenSize) seedW
     seedB)
 
 /--
@@ -217,7 +217,7 @@ PyTorch analogue: conceptually `nn.Embedding(vocab, embedDim)` but applied to on
 -/
 def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape := Spec.Shape.scalar) :
     Sequential (pfx.appendDim vocab) (pfx.appendDim embedDim) :=
-  let WShape : Spec.Shape := NN.Tensor.Shape.Mat vocab embedDim
+  let WShape : Spec.Shape := .dim vocab (.dim embedDim .scalar)
   let w0 : Spec.Tensor Float WShape :=
     _root_.Runtime.Autograd.Torch.Init.tensor (s := WShape) (sch := cfg.wInit) (seed := cfg.seedW)
   let batch : Nat := Spec.Shape.size pfx
@@ -235,7 +235,7 @@ def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape :
               let x2D ←
                 TorchLean.reshape (m := m) (α := α)
                   (s₁ := sIn)
-                  (s₂ := NN.Tensor.Shape.Mat batch vocab)
+                  (s₂ := .dim batch (.dim vocab .scalar))
                   x (by
                     -- size(sIn) = size(pfx) * vocab = batch * vocab
                     simp [sIn, batch, Spec.Shape.size_appendDim, Spec.Shape.size])
@@ -244,7 +244,7 @@ def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape :
                   (mDim := batch) (nDim := vocab) (pDim := embedDim)
                   x2D w
               TorchLean.reshape (m := m) (α := α)
-                (s₁ := NN.Tensor.Shape.Mat batch embedDim)
+                (s₁ := .dim batch (.dim embedDim .scalar))
                 (s₂ := sOut)
                 y (by
                   -- size(Mat batch embedDim) = batch * embedDim = size(pfx) * embedDim = size(sOut)
@@ -271,9 +271,9 @@ PyTorch analogue: `x + pos[:seqLen]` where `pos` is a parameter table.
 -/
 def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPositionalEmbedding := {}) :
     Sequential
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
-  let posShape : Spec.Shape := NN.Tensor.Shape.Mat seqLen embedDim
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
+  let posShape : Spec.Shape := .dim seqLen (.dim embedDim .scalar)
   let xShape : Spec.Shape := .dim batch posShape
   let pos0 : Spec.Tensor Float posShape :=
     _root_.Runtime.Autograd.Torch.Init.tensor (s := posShape) (sch := cfg.posInit) (seed := cfg.seedPos)
@@ -309,9 +309,9 @@ Implementation:
 def sinusoidalPositionalEncoding {batch seqLen embedDim : Nat}
     (cfg : SinusoidalPositionalEncoding := {}) :
     Sequential
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
-  let peShape : Spec.Shape := NN.Tensor.Shape.Mat seqLen embedDim
+      (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
+  let peShape : Spec.Shape := .dim seqLen (.dim embedDim .scalar)
   let xShape : Spec.Shape := .dim batch peShape
   let pe0 : Spec.Tensor Float peShape :=
     Spec.sinusoidalPositionalEncodingSpec (α := Float) seqLen embedDim cfg.startPos
@@ -352,10 +352,10 @@ Notes:
 -/
 def rope {batch numHeads seqLen headDim : Nat} (cfg : RoPE := {}) :
     Sequential
-      (.dim batch (.dim numHeads (NN.Tensor.Shape.Mat seqLen headDim)))
-      (.dim batch (.dim numHeads (NN.Tensor.Shape.Mat seqLen headDim))) :=
-  let xShape : Spec.Shape := .dim batch (.dim numHeads (NN.Tensor.Shape.Mat seqLen headDim))
-  let csShape : Spec.Shape := NN.Tensor.Shape.Mat seqLen headDim
+      (.dim batch (.dim numHeads (.dim seqLen (.dim headDim .scalar))))
+      (.dim batch (.dim numHeads (.dim seqLen (.dim headDim .scalar)))) :=
+  let xShape : Spec.Shape := .dim batch (.dim numHeads (.dim seqLen (.dim headDim .scalar)))
+  let csShape : Spec.Shape := .dim seqLen (.dim headDim .scalar)
 
   -- Precompute cos/sin tables (as Float buffers). These depend only on `(seqLen, headDim, startPos)`.
   let cos0 : Spec.Tensor Float csShape :=
@@ -388,7 +388,7 @@ def rope {batch numHeads seqLen headDim : Nat} (cfg : RoPE := {}) :
             ((do
             -- Rotate last-dim pairs by a fixed 2D permutation/sign pattern.
             let rowsFold : Nat := batch * numHeads * seqLen
-            let flatShape : Spec.Shape := NN.Tensor.Shape.Mat rowsFold headDim
+            let flatShape : Spec.Shape := .dim rowsFold (.dim headDim .scalar)
 
             let x2d ←
               TorchLean.reshape (m := m) (α := α)
@@ -445,17 +445,17 @@ def rope {batch numHeads seqLen headDim : Nat} (cfg : RoPE := {}) :
             ) : m (TorchLean.RefTy (m := m) (α := α) xShape))
     }
 
-/-- Elementwise ReLU. PyTorch analogue: `torch.nn.ReLU` / `torch.nn.functional.relu`. -/
+/-- Elementwise ReLU. PyTorch analogue: `torch.nn.relu` / `torch.nn.functional.relu`. -/
 def relu {s : Spec.Shape} : Sequential s s := TorchLean.Layers.relu (s := s)
-/-- Elementwise SiLU/Swish. PyTorch analogue: `torch.nn.SiLU` / `torch.nn.functional.silu`. -/
+/-- Elementwise SiLU/Swish. PyTorch analogue: `torch.nn.silu` / `torch.nn.functional.silu`. -/
 def silu {s : Spec.Shape} : Sequential s s := TorchLean.Layers.silu (s := s)
-/-- Elementwise GELU. PyTorch analogue: `torch.nn.GELU` / `torch.nn.functional.gelu`. -/
+/-- Elementwise GELU. PyTorch analogue: `torch.nn.gelu` / `torch.nn.functional.gelu`. -/
 def gelu {s : Spec.Shape} : Sequential s s := TorchLean.Layers.gelu (s := s)
-/-- Elementwise sigmoid. PyTorch analogue: `torch.nn.Sigmoid` / `torch.nn.functional.sigmoid`. -/
+/-- Elementwise sigmoid. PyTorch analogue: `torch.nn.sigmoid` / `torch.nn.functional.sigmoid`. -/
 def sigmoid {s : Spec.Shape} : Sequential s s := TorchLean.Layers.sigmoid (s := s)
-/-- Elementwise tanh. PyTorch analogue: `torch.nn.Tanh` / `torch.nn.functional.tanh`. -/
+/-- Elementwise tanh. PyTorch analogue: `torch.nn.tanh` / `torch.nn.functional.tanh`. -/
 def tanh {s : Spec.Shape} : Sequential s s := TorchLean.Layers.tanh (s := s)
-/-- Softmax. PyTorch analogue: `torch.nn.Softmax` / `torch.nn.functional.softmax`. -/
+/-- Softmax. PyTorch analogue: `torch.nn.softmax` / `torch.nn.functional.softmax`. -/
 def softmax {s : Spec.Shape} : Sequential s s := TorchLean.Layers.softmax (s := s)
 /-- Reduce-sum to a scalar. PyTorch analogue: `torch.sum`. -/
 def sum {s : Spec.Shape} : Sequential s Spec.Shape.scalar := TorchLean.Layers.sum (s := s)
@@ -469,7 +469,7 @@ Flatten a batched tensor `N × σ` into a matrix `N × (size σ)`.
 PyTorch analogue: `torch.flatten(x, start_dim=1)`.
 -/
 def flattenBatch {n : Nat} {s : Spec.Shape} :
-    Sequential (.dim n s) (NN.Tensor.Shape.Mat n (Spec.Shape.size s)) :=
+    Sequential (.dim n s) (.dim n (.dim (Spec.Shape.size s) .scalar)) :=
   of
     { kind := "FlattenBatch"
       paramShapes := []
@@ -480,7 +480,7 @@ def flattenBatch {n : Nat} {s : Spec.Shape} :
           fun x =>
             TorchLean.reshape (m := m) (α := α)
               (s₁ := .dim n s)
-              (s₂ := NN.Tensor.Shape.Mat n (Spec.Shape.size s))
+              (s₂ := .dim n (.dim (Spec.Shape.size s) .scalar))
               x (by simp [Spec.Shape.size])
     }
 
@@ -497,5 +497,5 @@ Convenience block: `Flatten -> Linear`.
 This is common for "image to classifier head" models.
 -/
 def flattenLinear {s : Spec.Shape} (outDim : Nat) (seedW seedB : Nat := 0) :
-    Sequential s (NN.Tensor.Shape.Vec outDim) :=
+    Sequential s (.dim outDim .scalar) :=
   TorchLean.Layers.flattenLinear (s := s) outDim seedW seedB

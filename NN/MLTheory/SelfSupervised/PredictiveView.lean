@@ -88,13 +88,6 @@ def predictiveViewObjective {n : Nat} {Context Target TargetRep Prediction : Typ
     (contract : PredictiveViewContract n Context Target TargetRep Prediction) : Nat :=
   predictiveLoss contract + contract.geometryGuard
 
-/-- The generic SSL objective decomposes into prediction/alignment plus geometry guard. -/
-theorem predictiveViewObjective_decomposes
-    {n : Nat} {Context Target TargetRep Prediction : Type}
-    (contract : PredictiveViewContract n Context Target TargetRep Prediction) :
-    predictiveViewObjective contract = predictiveLoss contract + contract.geometryGuard := by
-  rfl
-
 /-- If the geometry guard is zero, the full objective is exactly the predictive loss. -/
 @[simp] theorem predictiveViewObjective_zero_geometry
     {n : Nat} {Context Target TargetRep Prediction : Type}
@@ -291,24 +284,6 @@ structure BarlowGuard where
 /-- Evaluate a finite Barlow-style redundancy guard. -/
 def BarlowGuard.value (guard : BarlowGuard) : Nat :=
   redundancyReductionObjective guard.lambda guard.diag guard.offDiag
-
-/-- Adding a VICReg guard gives prediction plus the VICReg geometry value. -/
-theorem predictiveViewObjective_with_vicreg_guard
-    {n : Nat} {Context Target TargetRep Prediction : Type}
-    (contract : PredictiveViewContract n Context Target TargetRep Prediction)
-    (guard : VICRegGuard) :
-    predictiveViewObjective (withGeometryGuard contract guard.value) =
-      predictiveLoss contract + guard.value := by
-  rfl
-
-/-- Adding a Barlow-style guard gives prediction plus the redundancy-reduction geometry value. -/
-theorem predictiveViewObjective_with_barlow_guard
-    {n : Nat} {Context Target TargetRep Prediction : Type}
-    (contract : PredictiveViewContract n Context Target TargetRep Prediction)
-    (guard : BarlowGuard) :
-    predictiveViewObjective (withGeometryGuard contract guard.value) =
-      predictiveLoss contract + guard.value := by
-  rfl
 
 /--
 A pure variance VICReg guard is positive when both the variance weight and variance summary are

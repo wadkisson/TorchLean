@@ -12,10 +12,10 @@ Most downstream code should not import modules from this directory directly. Pre
 
 * `import NN` for ordinary model and training code,
 * `import NN.API.Runtime` when you are extending the runtime subsystem itself, or
-* `import NN.Entrypoint.Runtime` when you need the broad executable umbrella.
+* `import NN.Runtime` when you need the broad executable umbrella.
 
 There is no top level `NN.Runtime` Lean file. User-facing code goes through the `TorchLean` facade;
-subsystem code uses focused `NN.API.*` or `NN.Entrypoint.*` imports so implementation files do not
+subsystem code uses focused `NN.API.*` or direct subsystem imports so implementation files do not
 become a second public API.
 
 ## How A Run Moves

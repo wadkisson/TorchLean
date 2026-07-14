@@ -35,7 +35,7 @@ Notes on trust boundaries:
 - The JSON is an *untrusted* artifact; we only accept it if Lean recomputation agrees.
 - Agreement is checked with a tolerance because the JSON uses decimal serialization.
 - This checker validates an exported artifact against Lean execution. The theorem-backed path is
-  separate: use `NN.Entrypoint.Verification` when you need a Lean theorem connecting checker
+  separate: use `NN.Verification` when you need a Lean theorem connecting checker
   hypotheses to semantic enclosure.
 
 References (informal):

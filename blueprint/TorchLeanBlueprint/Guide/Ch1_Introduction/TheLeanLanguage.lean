@@ -175,11 +175,11 @@ checked at all. In TorchLean, the tensor type can carry the scalar type and the 
 shape. This uses Lean's *dependent types*.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
--- A 4D NCHW tensor with batch 16, 3 channels, and 224x224 spatial dimensions.
+-- A rank-four tensor with batch, channel, height, and width axes.
 def inputImageShape : Shape :=
   shape![16, 3, 224, 224]
 
@@ -232,7 +232,7 @@ tells you the type of an expression. If you type `#eval`, Lean executes an expre
 result dynamically inside your editor.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 

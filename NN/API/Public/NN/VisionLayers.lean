@@ -12,9 +12,9 @@ public import NN.API.Public.NN.FunctionalBatch
 /-!
 # Public Vision Layers
 
-This file provides named-field, PyTorch-style layer records for common image operators. The API
-keeps user-facing configuration explicit while lowering to TorchLean's typed channel-first tensor
-operations.
+This file provides named-field layer records for spatial operators. Tensors remain ordinary
+arbitrary-rank tensors; each operator states the trailing axes it consumes, while `leading` records
+any axes mapped pointwise by the layer.
 -/
 
 @[expose] public section
@@ -22,211 +22,120 @@ operations.
 namespace NN
 namespace API
 namespace nn
-namespace pure
+namespace Internal
 
-/--
-Named-field Conv2d configuration (CHW layout).
+/-! ## Spatial layers -/
 
-Public, PyTorch-like convolution entrypoint for TorchLean.
-PyTorch analogue: `torch.nn.Conv2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html`.
--/
-structure Conv2d where
-  /-- Output channels. -/
-  outC : Nat
-  /-- Kernel height. -/
-  kH : Nat
-  /-- Kernel width. -/
-  kW : Nat
-  /-- Stride (shared for height/width). -/
-  stride : Nat := 1
-  /-- Zero-padding (shared for height/width). -/
-  padding : Nat := 0
+/-- Configuration shared by arbitrary-dimensional convolution layers. -/
+structure Conv (d : Nat) where
+  /-- Number of output channels. -/
+  outChannels : Nat
+  /-- Kernel extent along each spatial axis. -/
+  kernel : Vector Nat d
+  /-- Step along each spatial axis. -/
+  stride : Vector Nat d := Vector.replicate d 1
+  /-- Symmetric zero-padding along each spatial axis. -/
+  padding : Vector Nat d := Vector.replicate d 0
+  /-- Every kernel extent is positive. -/
+  kernelNonzero : ∀ i : Fin d, kernel.get i ≠ 0
+  /-- Every stride is positive. -/
+  strideNonzero : ∀ i : Fin d, stride.get i ≠ 0
   /-- Seed for deterministic kernel initialization. -/
-  seedK : Nat := 0
+  seedKernel : Nat := 0
   /-- Seed for deterministic bias initialization. -/
-  seedB : Nat := 0
+  seedBias : Nat := 0
   /-- Initialization scheme for the kernel weights. -/
-  kInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1
-
-@[inherit_doc Conv2d]
-abbrev Conv := Conv2d
+  kernelInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .uniform (-0.1) 0.1
 
 /--
-2D convolution over a CHW tensor, using explicit well-formedness proofs.
+Apply an arbitrary-dimensional convolution to the channel and spatial suffix of a tensor.
+
+The input suffix is `(inChannels, spatial...)`. Any axes in `leading` are preserved; internally
+they are flattened into one runtime batch and restored after the convolution.
 -/
-def conv2dCHWWith {inC inH inW : Nat} (cfg : Conv2d)
-    (hInC : inC ≠ 0) (hKH : cfg.kH ≠ 0) (hKW : cfg.kW ≠ 0) :
+def conv (leading : Spec.Shape := .scalar) {d inChannels : Nat} (spatial : Vector Nat d)
+    (cfg : Conv d) [NeZero inChannels] :
     Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image cfg.outC
-        ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-        ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1)) :=
-  TorchLean.Layers.conv2d inC cfg.outC cfg.kH cfg.kW cfg.stride cfg.padding inH inW
-    (hInC := hInC) (hKH := hKH) (hKW := hKW)
-    (seedK := cfg.seedK) (seedB := cfg.seedB) (kInit := cfg.kInit)
+      (leading.concat (Spec.Shape.ofList (inChannels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList
+        (cfg.outChannels :: (Spec.convOutSpatial spatial cfg.kernel cfg.stride cfg.padding).toList))) :=
+  nn.of <| Implementation.adaptFlatBatch leading <|
+    _root_.Runtime.Autograd.TorchLean.NN.conv
+      (Spec.Shape.size leading) d inChannels cfg.outChannels
+      cfg.kernel cfg.stride cfg.padding spatial
+      (hInC := NeZero.ne _) (hKernel := cfg.kernelNonzero) (hStride := cfg.strideNonzero)
+      cfg.seedKernel cfg.seedBias cfg.kernelInit
+
+/-- Configuration shared by arbitrary-dimensional pooling layers. -/
+structure Pool (d : Nat) where
+  /-- Window extent along each spatial axis. -/
+  kernel : Vector Nat d
+  /-- Step along each spatial axis. -/
+  stride : Vector Nat d := Vector.replicate d 1
+  /-- Symmetric padding along each spatial axis. -/
+  padding : Vector Nat d := Vector.replicate d 0
+  /-- Every window extent is positive. -/
+  kernelNonzero : ∀ i : Fin d, kernel.get i ≠ 0
+  /-- Every stride is positive. -/
+  strideNonzero : ∀ i : Fin d, stride.get i ≠ 0
+
+/-- Apply max pooling to the channel and spatial suffix of a tensor. -/
+def maxPool (leading : Spec.Shape := .scalar) {d channels : Nat} (spatial : Vector Nat d)
+    (cfg : Pool d) :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList
+        (channels :: (Spec.poolOutSpatialPad spatial cfg.kernel cfg.stride cfg.padding).toList))) :=
+  nn.of <| Implementation.adaptFlatBatch leading <|
+    _root_.Runtime.Autograd.TorchLean.NN.maxPool (Spec.Shape.size leading) d channels
+      cfg.kernel cfg.stride cfg.padding spatial
+      (hKernel := cfg.kernelNonzero) (hStride := cfg.strideNonzero)
+
+/-- Apply average pooling to the channel and spatial suffix of a tensor. -/
+def avgPool (leading : Spec.Shape := .scalar) {d channels : Nat} (spatial : Vector Nat d)
+    (cfg : Pool d) :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList
+        (channels :: (Spec.poolOutSpatialPad spatial cfg.kernel cfg.stride cfg.padding).toList))) :=
+  nn.of <| Implementation.adaptFlatBatch leading <|
+    _root_.Runtime.Autograd.TorchLean.NN.avgPool (Spec.Shape.size leading) d channels
+      cfg.kernel cfg.stride cfg.padding spatial cfg.kernelNonzero cfg.strideNonzero
 
 /--
-2D convolution over a CHW tensor, with a PyTorch-like named-field spec.
-
-This hides the Nat-side proof arguments via the `NeZero` typeclass.
+Global average pooling over every spatial axis, preserving the leading axes and channels.
 -/
-def conv2dCHW {inC inH inW : Nat} (cfg : Conv2d) [NeZero inC] [NeZero cfg.kH] [NeZero cfg.kW] :
+def globalAvgPool (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (spatialNonzero : ∀ i : Fin d, spatial.get i ≠ 0) :
     Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image cfg.outC
-        ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-        ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) ) :=
-  conv2dCHWWith (inC := inC) (inH := inH) (inW := inW) cfg (NeZero.ne _) (NeZero.ne _) (NeZero.ne _)
-
-/-- 2D convolution over a batched image tensor (shape `N×C×H×W`, like PyTorch). -/
-def conv2d {n inC inH inW : Nat} (cfg : Conv2d) [NeZero inC] [NeZero cfg.kH] [NeZero cfg.kW] :
-    Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n cfg.outC
-        ((inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-        ((inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1)) :=
-  batchPointwise n (conv2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
-
-@[inherit_doc conv2dCHWWith]
-def convCHWWith := @conv2dCHWWith
-
-@[inherit_doc conv2dCHW]
-def convCHW := @conv2dCHW
-
-/--
-Convolution over batched CHW images, using the PyTorch-style `Conv2d` config record.
-
-Shorthand for `conv2d`.
--/
-def conv {n inC inH inW : Nat} (cfg : Conv) [NeZero inC] [NeZero cfg.kH] [NeZero cfg.kW] :=
-  conv2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-/--
-MaxPool2d configuration for CHW inputs.
-
-PyTorch analogue: `torch.nn.MaxPool2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html`.
--/
-structure MaxPool2d where
-  /-- Kernel height. -/
-  kH : Nat
-  /-- Kernel width. -/
-  kW : Nat
-  /-- Stride (shared for height/width). -/
-  stride : Nat := 2
-
-@[inherit_doc MaxPool2d]
-abbrev MaxPool := MaxPool2d
-
-/-- MaxPool2d with explicit nonzero kernel proofs. -/
-def maxPool2dWith {inC inH inW : Nat} (cfg : MaxPool2d) (hKH : cfg.kH ≠ 0) (hKW : cfg.kW ≠ 0) :
-    Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  TorchLean.Layers.maxPool2d cfg.kH cfg.kW inH inW inC cfg.stride (hKH := hKH) (hKW := hKW)
-
-/-- MaxPool2d over CHW inputs using `NeZero` to hide nonzero kernel proofs. -/
-def maxPool2dCHW {inC inH inW : Nat} (cfg : MaxPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  maxPool2dWith (inC := inC) (inH := inH) (inW := inW) cfg (NeZero.ne _) (NeZero.ne _)
-
-/-- MaxPool2d using `NeZero` to hide nonzero kernel proofs. -/
-def maxPool2d {n inC inH inW : Nat} (cfg : MaxPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  batchPointwise n (maxPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
-
-/-- Shorthand for `maxPool2dWith` (PyTorch-style). -/
-def maxPoolWith := @maxPool2dWith
-
-/-- Shorthand for `maxPool2dCHW` (PyTorch-style). -/
-def maxPoolCHW := @maxPool2dCHW
-
-/--
-Max pooling over batched CHW images, using the PyTorch-style `MaxPool2d` config record.
-
-Shorthand for `maxPool2d`.
--/
-def maxPool {n inC inH inW : Nat} (cfg : MaxPool) [NeZero cfg.kH] [NeZero cfg.kW] :=
-  maxPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-/--
-AvgPool2d configuration for CHW inputs.
-
-PyTorch analogue: `torch.nn.AvgPool2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.AvgPool2d.html`.
--/
-structure AvgPool2d where
-  /-- Kernel height. -/
-  kH : Nat
-  /-- Kernel width. -/
-  kW : Nat
-  /-- Stride (shared for height/width). -/
-  stride : Nat := 2
-
-@[inherit_doc AvgPool2d]
-abbrev AvgPool := AvgPool2d
-
-/-- AvgPool2d with explicit nonzero kernel proofs. -/
-def avgPool2dWith {inC inH inW : Nat} (cfg : AvgPool2d) (hKH : cfg.kH ≠ 0) (hKW : cfg.kW ≠ 0) :
-    Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  TorchLean.Layers.avgPool2d cfg.kH cfg.kW inH inW inC cfg.stride (hKH := hKH) (hKW := hKW)
-
-/-- AvgPool2d over CHW inputs using `NeZero` to hide nonzero kernel proofs. -/
-def avgPool2dCHW {inC inH inW : Nat} (cfg : AvgPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    Sequential
-      (NN.Tensor.Shape.Image inC inH inW)
-      (NN.Tensor.Shape.Image inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  avgPool2dWith (inC := inC) (inH := inH) (inW := inW) cfg (NeZero.ne _) (NeZero.ne _)
-
-/-- AvgPool2d over batched NCHW inputs (shape `N×C×H×W`, like PyTorch). -/
-def avgPool2d {n inC inH inW : Nat} (cfg : AvgPool2d) [NeZero cfg.kH] [NeZero cfg.kW] :
-    Sequential
-      (NN.Tensor.Shape.Images n inC inH inW)
-      (NN.Tensor.Shape.Images n inC
-        ((inH - cfg.kH) / cfg.stride + 1)
-        ((inW - cfg.kW) / cfg.stride + 1)) :=
-  batchPointwise n (avgPool2dCHW (inC := inC) (inH := inH) (inW := inW) cfg)
-
-/-- Shorthand for `avgPool2dWith` (PyTorch-style). -/
-def avgPoolWith := @avgPool2dWith
-
-/-- Shorthand for `avgPool2dCHW` (PyTorch-style). -/
-def avgPoolCHW := @avgPool2dCHW
-
-/--
-Average pooling over batched CHW images, using the PyTorch-style `AvgPool2d` config record.
-
-Shorthand for `avgPool2d`.
--/
-def avgPool {n inC inH inW : Nat} (cfg : AvgPool) [NeZero cfg.kH] [NeZero cfg.kW] :=
-  avgPool2d (n := n) (inC := inC) (inH := inH) (inW := inW) cfg
-
-/--
-Global average pooling over a CHW tensor.
-
-PyTorch analogue: `torch.nn.AdaptiveAvgPool2d((1, 1))` followed by flattening.
--/
-def globalAvgPoolCHW := TorchLean.Layers.globalAvgPoolCHW
-
-/-- Global average pooling over an NCHW tensor (preserves the batch dimension). -/
-def globalAvgPoolNCHW := TorchLean.Layers.globalAvgPoolNCHW
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (.dim channels .scalar)) :=
+  let config : Pool d :=
+    { kernel := spatial
+      stride := Vector.replicate d 1
+      padding := Vector.replicate d 0
+      kernelNonzero := spatialNonzero
+      strideNonzero := by intro i; simp [Vector.get] }
+  let pooled := avgPool leading spatial config
+  let pooledShape := leading.concat (Spec.Shape.ofList
+    (channels :: (Spec.poolOutSpatialPad spatial spatial
+      (Vector.replicate d 1) (Vector.replicate d 0)).toList))
+  let outputShape := leading.concat (.dim channels .scalar)
+  let removeSingletons : LayerDef pooledShape outputShape :=
+    { kind := "GlobalAvgPool"
+      paramShapes := []
+      initParams := .nil
+      paramRequiresGrad := []
+      forward := fun _ {α} _ _ =>
+        fun {m} _ _ =>
+          fun x =>
+            TorchLean.reshape (m := m) (α := α) (s₁ := pooledShape) (s₂ := outputShape)
+              x (by
+                dsimp [pooledShape, outputShape]
+                rw [Spec.poolOutSpatialPad_global spatial spatialNonzero]
+                simp [Spec.Shape.size_concat, Spec.Shape.ofList,
+                  Spec.Shape.size]) }
+  seq! pooled, nn.of removeSingletons
 
 /--
 LayerNorm configuration for batched `(batch x seqLen x embedDim)` tensors.
@@ -253,8 +162,8 @@ Call `nn.layerNorm` when `NeZero` can discharge the positivity proofs automatica
 -/
 def layerNormWith {batch seqLen embedDim : Nat} (cfg : LayerNorm)
     (hSeq : seqLen > 0) (hEmbed : embedDim > 0) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
+    Sequential (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
   TorchLean.Layers.layerNorm (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
     (hSeq := hSeq) (hEmbed := hEmbed)
     (seedGamma := cfg.seedGamma) (seedBeta := cfg.seedBeta)
@@ -272,8 +181,8 @@ TorchLean uses `NeZero` to ensure `seqLen` and `embedDim` are positive, avoiding
 -/
 def layerNorm {batch seqLen embedDim : Nat} (cfg : LayerNorm := {})
     [NeZero seqLen] [NeZero embedDim] :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
+    Sequential (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
   layerNormWith (batch := batch) (seqLen := seqLen) (embedDim := embedDim) cfg
     (Nat.pos_of_ne_zero (NeZero.ne (n := seqLen)))
     (Nat.pos_of_ne_zero (NeZero.ne (n := embedDim)))
@@ -300,8 +209,8 @@ Call `nn.rmsNorm` when `NeZero` can discharge the positivity proofs automaticall
 -/
 def rmsNormWith {batch seqLen embedDim : Nat} (cfg : RMSNorm)
     (hSeq : seqLen > 0) (hEmbed : embedDim > 0) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
+    Sequential (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
   TorchLean.Layers.rmsNorm (batch := batch) (seqLen := seqLen) (embedDim := embedDim)
     (hSeq := hSeq) (hEmbed := hEmbed)
     (seedGamma := cfg.seedGamma)
@@ -317,100 +226,107 @@ TorchLean uses `NeZero` to ensure `seqLen` and `embedDim` are positive, avoiding
 -/
 def rmsNorm {batch seqLen embedDim : Nat} (cfg : RMSNorm := {})
     [NeZero seqLen] [NeZero embedDim] :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim))
-      (.dim batch (NN.Tensor.Shape.Mat seqLen embedDim)) :=
+    Sequential (.dim batch (.dim seqLen (.dim embedDim .scalar)))
+      (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
   rmsNormWith (batch := batch) (seqLen := seqLen) (embedDim := embedDim) cfg
     (Nat.pos_of_ne_zero (NeZero.ne (n := seqLen)))
     (Nat.pos_of_ne_zero (NeZero.ne (n := embedDim)))
 
-/--
-BatchNorm2d configuration (learned scale/shift).
-
-PyTorch analogue: `torch.nn.BatchNorm2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html`.
--/
-structure BatchNorm2d where
-  /-- Seed for deterministic initialization of `gamma` (scale). -/
+/-- Parameter initialization for affine channel normalization. -/
+structure ChannelNorm where
   seedGamma : Nat := 0
-  /-- Seed for deterministic initialization of `beta` (shift). -/
   seedBeta : Nat := 0
 
-/-- BatchNorm2d over NCHW inputs (train/eval is handled by `Seq` mode). -/
-def batchNorm2dNCHWWith {n c h w : Nat} (cfg : BatchNorm2d)
-    (hN : n > 0) (hC : c > 0) (hH : h > 0) (hW : w > 0) :
-    Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w) :=
-  TorchLean.Layers.batchNorm2dNCHW (n := n) (c := c) (h := h) (w := w)
-    (hN := hN) (hC := hC) (hH := hH) (hW := hW)
-    (seedGamma := cfg.seedGamma) (seedBeta := cfg.seedBeta)
+namespace Implementation
 
-/--
-BatchNorm2d over NCHW inputs, using `NeZero` to hide the positivity proofs.
+/-- A checked reshape layer used internally to flatten and restore spatial axes. -/
+def reshapeLayer (source target : Spec.Shape)
+    (sameSize : Spec.Shape.size source = Spec.Shape.size target) :
+    LayerDef source target :=
+  { kind := "Reshape"
+    paramShapes := []
+    initParams := .nil
+    paramRequiresGrad := []
+    forward := fun _ {α} _ _ => fun {m} _ _ => fun x =>
+      TorchLean.reshape (m := m) (α := α) (s₁ := source) (s₂ := target) x sameSize }
 
-PyTorch analogue: `torch.nn.BatchNorm2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.BatchNorm2d.html`.
--/
-def batchNorm2d {n c h w : Nat} (cfg : BatchNorm2d := {})
-    [NeZero n] [NeZero c] [NeZero h] [NeZero w] :
-    Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w) :=
-  batchNorm2dNCHWWith (n := n) (c := c) (h := h) (w := w) cfg
-    (Nat.pos_of_ne_zero (NeZero.ne (n := n)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := c)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := h)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := w)))
+/-- Flatten arbitrary spatial axes to the channel-first kernel representation. -/
+def spatialReshape {d channels : Nat} (leading : Spec.Shape)
+    (spatial : Vector Nat d) :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (.dim (Spec.Shape.size leading)
+        (.dim channels (.dim (Spec.Shape.size (Spec.Shape.ofList spatial.toList)) .scalar))) :=
+  of <| reshapeLayer _ _ (by simp [Spec.Shape.size_concat, Spec.Shape.ofList, Spec.Shape.size])
 
-/--
-InstanceNorm2d configuration (learned scale/shift).
+/-- Restore the original spatial axes after channel normalization. -/
+def spatialRestore {d channels : Nat} (leading : Spec.Shape)
+    (spatial : Vector Nat d) :
+    Sequential
+      (.dim (Spec.Shape.size leading)
+        (.dim channels (.dim (Spec.Shape.size (Spec.Shape.ofList spatial.toList)) .scalar)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList))) :=
+  of <| reshapeLayer _ _ (by simp [Spec.Shape.size_concat, Spec.Shape.ofList, Spec.Shape.size])
 
-PyTorch analogue: `torch.nn.InstanceNorm2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.InstanceNorm2d.html`.
--/
-structure InstanceNorm2d where
-  /-- Seed for deterministic initialization of `gamma` (scale). -/
-  seedGamma : Nat := 0
-  /-- Seed for deterministic initialization of `beta` (shift). -/
-  seedBeta : Nat := 0
+end Implementation
 
-/--
-InstanceNorm2d over NCHW inputs, using explicit positivity proofs.
+/-- Batch normalization over `(leading..., channels, spatial...)` for any spatial rank. -/
+def batchNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (cfg : ChannelNorm := {})
+    [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList))) :=
+  let n := Spec.Shape.size leading
+  let extent := Spec.Shape.size (Spec.Shape.ofList spatial.toList)
+  seq!
+    Implementation.spatialReshape (channels := channels) leading spatial,
+    TorchLean.Layers.batchNormChannelFirst n channels extent
+      (hLeading := Nat.pos_of_ne_zero (NeZero.ne n))
+      (hChannels := Nat.pos_of_ne_zero (NeZero.ne channels))
+      (hSpatial := Nat.pos_of_ne_zero (NeZero.ne extent))
+      cfg.seedGamma cfg.seedBeta,
+    Implementation.spatialRestore (channels := channels) leading spatial
 
-PyTorch analogue: `torch.nn.InstanceNorm2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.InstanceNorm2d.html`.
--/
-def instanceNorm2dWith {n c h w : Nat} (cfg : InstanceNorm2d)
-    (hN : n > 0) (hC : c > 0) (hH : h > 0) (hW : w > 0) :
-    Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w) :=
-  TorchLean.Layers.instanceNorm2dNCHW (n := n) (c := c) (h := h) (w := w)
-    (hN := hN) (hC := hC) (hH := hH) (hW := hW)
-    (seedGamma := cfg.seedGamma) (seedBeta := cfg.seedBeta)
+/-- Instance normalization over `(leading..., channels, spatial...)` for any spatial rank. -/
+def instanceNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (cfg : ChannelNorm := {})
+    [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList))) :=
+  let n := Spec.Shape.size leading
+  let extent := Spec.Shape.size (Spec.Shape.ofList spatial.toList)
+  seq!
+    Implementation.spatialReshape (channels := channels) leading spatial,
+    TorchLean.Layers.instanceNormChannelFirst n channels extent
+      (hLeading := Nat.pos_of_ne_zero (NeZero.ne n))
+      (hChannels := Nat.pos_of_ne_zero (NeZero.ne channels))
+      (hSpatial := Nat.pos_of_ne_zero (NeZero.ne extent))
+      cfg.seedGamma cfg.seedBeta,
+    Implementation.spatialRestore (channels := channels) leading spatial
 
-/--
-InstanceNorm2d over NCHW inputs, using `NeZero` to hide the positivity proofs.
-
-PyTorch analogue: `torch.nn.InstanceNorm2d`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.InstanceNorm2d.html`.
--/
-def instanceNorm2d {n c h w : Nat} (cfg : InstanceNorm2d := {})
-    [NeZero n] [NeZero c] [NeZero h] [NeZero w] :
-    Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w) :=
-  instanceNorm2dWith (n := n) (c := c) (h := h) (w := w) cfg
-    (Nat.pos_of_ne_zero (NeZero.ne (n := n)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := c)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := h)))
-    (Nat.pos_of_ne_zero (NeZero.ne (n := w)))
-
-/--
-GroupNorm over NCHW inputs.
-
-PyTorch analogue: `torch.nn.GroupNorm`.
-See `https://pytorch.org/docs/stable/generated/torch.nn.GroupNorm.html`.
--/
-def groupNorm2dNCHW (n c h w groups : Nat) {hN : n > 0} {hC : c > 0} {hH : h > 0} {hW : w > 0}
-    {hG : groups > 0} (hGE : c ≥ groups) (hDiv : c % groups = 0)
-    (seedGamma seedBeta : Nat := 0) :
-    Sequential (NN.Tensor.Shape.Images n c h w) (NN.Tensor.Shape.Images n c h w) :=
-  TorchLean.Layers.groupNorm2dNCHW (n := n) (c := c) (h := h) (w := w) (groups := groups)
-    (hN := hN) (hC := hC) (hH := hH) (hW := hW) (hG := hG)
-    (hGE := hGE) (hDiv := hDiv) (seedGamma := seedGamma) (seedBeta := seedBeta)
+/-- Group normalization over `(leading..., channels, spatial...)` for any spatial rank. -/
+def groupNorm (leading : Spec.Shape := .scalar) {d channels : Nat}
+    (spatial : Vector Nat d) (groups : Nat) (hGroups : groups > 0)
+    (hGroupsLe : channels ≥ groups) (hDiv : channels % groups = 0)
+    (cfg : ChannelNorm := {}) [NeZero (Spec.Shape.size leading)] [NeZero channels]
+    [NeZero (Spec.Shape.size (Spec.Shape.ofList spatial.toList))] :
+    Sequential
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (channels :: spatial.toList))) :=
+  let n := Spec.Shape.size leading
+  let extent := Spec.Shape.size (Spec.Shape.ofList spatial.toList)
+  seq!
+    Implementation.spatialReshape (channels := channels) leading spatial,
+    TorchLean.Layers.groupNormChannelFirst n channels extent groups
+      (hLeading := Nat.pos_of_ne_zero (NeZero.ne n))
+      (hChannels := Nat.pos_of_ne_zero (NeZero.ne channels))
+      (hSpatial := Nat.pos_of_ne_zero (NeZero.ne extent))
+      (hGroups := hGroups) hGroupsLe hDiv cfg.seedGamma cfg.seedBeta,
+    Implementation.spatialRestore (channels := channels) leading spatial
 
 /--
 Multi-head self-attention configuration.
@@ -433,7 +349,7 @@ If `mask` is provided, it is a boolean attention mask of shape `(n × n)` (e.g. 
 -/
 def multiheadAttentionWith {batch n dModel : Nat} (cfg : MultiheadAttention) (hN : n ≠ 0)
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel))
+    Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar)))
       :=
   TorchLean.Layers.attention (batch := batch) (n := n) (dModel := dModel)
     (numHeads := cfg.numHeads) (headDim := cfg.headDim)
@@ -446,7 +362,7 @@ If `mask` is provided, it is a boolean attention mask of shape `(n × n)` (e.g. 
 -/
 def multiheadAttention {batch n dModel : Nat} (cfg : MultiheadAttention) [NeZero n]
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
-    Sequential (.dim batch (NN.Tensor.Shape.Mat n dModel)) (.dim batch (NN.Tensor.Shape.Mat n dModel))
+    Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar)))
       :=
   multiheadAttentionWith (batch := batch) (n := n) (dModel := dModel) cfg (NeZero.ne (n := n))
     (mask := mask)

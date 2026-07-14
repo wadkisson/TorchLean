@@ -369,17 +369,17 @@ rounding term propagated through the 1-Lipschitz ReLU and scaled by `|cᵢ|`.
     let term32 := hingeTermFp32 c t x i
     let termR := hingeTermReal c t x i
     |term32.val - termR| ≤
-      neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val) TrainingPhase.forward /
+      neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val) /
         2
       + |(c i).val| *
-          (neuralUlp binaryRadix fexp32 (x.val - (t i).val) TrainingPhase.forward / 2) := by
+          (neuralUlp binaryRadix fexp32 (x.val - (t i).val) / 2) := by
   intro term32 termR
   -- Notation for the intermediate subtraction and ReLU.
   let u32 : FP32 := x - t i
   let r32 : FP32 := reluFp32 u32
   have hsub :
       |u32.val - (x.val - (t i).val)| ≤
-        neuralUlp binaryRadix fexp32 (x.val - (t i).val) TrainingPhase.forward / 2 := by
+        neuralUlp binaryRadix fexp32 (x.val - (t i).val) / 2 := by
     -- `sub_abs_error` is exactly this statement.
     simpa [u32] using (TorchLean.Floats.FP32.sub_abs_error (a := x) (b := t i))
   have hrelu :
@@ -389,7 +389,7 @@ rounding term propagated through the 1-Lipschitz ReLU and scaled by `|cᵢ|`.
     simpa [r32, u32] using (relu_lipschitz u32.val (x.val - (t i).val))
   have hmul :
       |term32.val - ((c i).val * r32.val)| ≤
-        neuralUlp binaryRadix fexp32 ((c i).val * r32.val) TrainingPhase.forward / 2 := by
+        neuralUlp binaryRadix fexp32 ((c i).val * r32.val) / 2 := by
     -- `mul_abs_error` compares `(a*b).val` to `a.val*b.val`.
     have := TorchLean.Floats.FP32.mul_abs_error (a := c i) (b := r32)
     simpa [term32, hingeTermFp32, r32] using this
@@ -407,7 +407,7 @@ rounding term propagated through the 1-Lipschitz ReLU and scaled by `|cᵢ|`.
               -- use `abs_sub_le` directly
               simpa [termR, hingeTermReal] using
                 (abs_sub_le (term32.val) ((c i).val * r32.val) termR)
-    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) TrainingPhase.forward / 2 +
+    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) / 2 +
           (|(c i).val| * |r32.val - relu (x.val - (t i).val)|) := by
           -- Apply the two bounds.
           have hmul' := hmul
@@ -415,24 +415,24 @@ rounding term propagated through the 1-Lipschitz ReLU and scaled by `|cᵢ|`.
               |(c i).val| * |r32.val - relu (x.val - (t i).val)| := by
             simp [hlin]
           exact add_le_add hmul' hlin'
-    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) TrainingPhase.forward / 2 +
+    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) / 2 +
           (|(c i).val| * |u32.val - (x.val - (t i).val)|) := by
           gcongr
-    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) TrainingPhase.forward / 2 +
-          (|(c i).val| * (neuralUlp binaryRadix fexp32 (x.val - (t i).val) TrainingPhase.forward /
+    _ ≤ neuralUlp binaryRadix fexp32 ((c i).val * r32.val) / 2 +
+          (|(c i).val| * (neuralUlp binaryRadix fexp32 (x.val - (t i).val) /
             2)) := by
           gcongr
-    _ = neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val) TrainingPhase.forward
+    _ = neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val)
       / 2
-        + |(c i).val| * (neuralUlp binaryRadix fexp32 (x.val - (t i).val) TrainingPhase.forward /
+        + |(c i).val| * (neuralUlp binaryRadix fexp32 (x.val - (t i).val) /
           2) := by
           simp [u32, r32]
 
 /-- The per-hinge error bound used by `hinge_term_abs_error`. -/
 noncomputable def hingeTermErrorBound {n : ℕ} (c t : Fin n → FP32) (x : FP32) (i : Fin n) : ℝ :=
-  neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val) TrainingPhase.forward / 2
+  neuralUlp binaryRadix fexp32 ((c i).val * (reluFp32 (x - t i)).val) / 2
   + |(c i).val| *
-      (neuralUlp binaryRadix fexp32 (x.val - (t i).val) TrainingPhase.forward / 2)
+      (neuralUlp binaryRadix fexp32 (x.val - (t i).val) / 2)
 
 /-- Named version of `hinge_term_abs_error` using `hingeTermErrorBound`. -/
   @[simp] lemma hinge_term_abs_error' {n : ℕ} (c t : Fin n → FP32) (x : FP32) (i : Fin n) :
@@ -456,7 +456,7 @@ noncomputable def hingeSumStateStep {n : ℕ} (c t : Fin n → FP32) (x : FP32) 
       let termR : ℝ := hingeTermReal c t x i
       let termErr : ℝ := hingeTermErrorBound c t x i
       let addErr : ℝ :=
-        neuralUlp binaryRadix fexp32 (acc32.val + term32.val) TrainingPhase.forward / 2
+        neuralUlp binaryRadix fexp32 (acc32.val + term32.val) / 2
       (acc32 + term32, accR + termR, err + termErr + addErr)
 
 /-- Compute the hinge-term sum state over all `Fin n` in a fixed order (`List.finRange`). -/
@@ -499,7 +499,7 @@ not associative.
       let termR : ℝ := hingeTermReal c t x i
       let termErr : ℝ := hingeTermErrorBound c t x i
       let addErr : ℝ :=
-        neuralUlp binaryRadix fexp32 (acc32.val + term32.val) TrainingPhase.forward / 2
+        neuralUlp binaryRadix fexp32 (acc32.val + term32.val) / 2
       have hterm : |term32.val - termR| ≤ termErr := by
         dsimp [term32, termR, termErr]
         exact hinge_term_abs_error' (c := c) (t := t) (x := x) (i := i)
@@ -558,7 +558,7 @@ noncomputable def hingeFunReal {n : ℕ} (t c : Fin n → FP32) (b : FP32) (x : 
 /-- Total FP32 hinge-network error budget, including the final rounded bias addition. -/
   noncomputable def hingeFunErrorBound {n : ℕ} (t c : Fin n → FP32) (b : FP32) (x : FP32) : ℝ :=
   hingeSumErrorBound c t x
-    + neuralUlp binaryRadix fexp32 ((hingeSumFp32 c t x).val + b.val) TrainingPhase.forward / 2
+    + neuralUlp binaryRadix fexp32 ((hingeSumFp32 c t x).val + b.val) / 2
 
 /--
 Certified absolute-error bound for the complete FP32 hinge network.
@@ -576,7 +576,7 @@ used by the executable approximation theorems.
   set eS : ℝ := hingeSumErrorBound c t x
   have hadd :
       |(s32 + b).val - (s32.val + b.val)| ≤
-        neuralUlp binaryRadix fexp32 (s32.val + b.val) TrainingPhase.forward / 2 := by
+        neuralUlp binaryRadix fexp32 (s32.val + b.val) / 2 := by
     simpa using (TorchLean.Floats.FP32.add_abs_error (a := s32) (b := b))
   have htri :
       |(s32 + b).val - (sR + b.val)| ≤
@@ -586,9 +586,9 @@ used by the executable approximation theorems.
   -- Combine and finish.
   have hbound :
       |(s32 + b).val - (sR + b.val)| ≤
-        (neuralUlp binaryRadix fexp32 (s32.val + b.val) TrainingPhase.forward / 2) + eS := by
+        (neuralUlp binaryRadix fexp32 (s32.val + b.val) / 2) + eS := by
     have : |(s32 + b).val - (sR + b.val)| ≤
-        (neuralUlp binaryRadix fexp32 (s32.val + b.val) TrainingPhase.forward / 2) + |s32.val -
+        (neuralUlp binaryRadix fexp32 (s32.val + b.val) / 2) + |s32.val -
           sR| := by
       simpa [hcancel] using le_trans htri (add_le_add hadd (le_rfl))
     exact le_trans this (by gcongr)

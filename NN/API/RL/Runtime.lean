@@ -132,11 +132,11 @@ def instantiateActorCritic
     [API.Semantics.Scalar α] [DecidableEq _root_.Spec.Shape] [API.Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : _root_.Runtime.Autograd.Torch.Options)
-    (actor : API.TorchLean.NN.Seq stateShape (.dim batch (.dim nActions .scalar)))
-    (critic : API.TorchLean.NN.Seq stateShape (.dim batch (.dim 1 .scalar)))
+    (actor : API.TorchLean.LayerCore.Seq stateShape (.dim batch (.dim nActions .scalar)))
+    (critic : API.TorchLean.LayerCore.Seq stateShape (.dim batch (.dim 1 .scalar)))
     (cast : Float → α := API.Runtime.ofFloat) :
     IO (API.TorchLean.Module.ScalarModule α
-      (API.TorchLean.NN.Seq.paramShapes actor ++ API.TorchLean.NN.Seq.paramShapes critic)
+      (API.TorchLean.LayerCore.Seq.paramShapes actor ++ API.TorchLean.LayerCore.Seq.paramShapes critic)
       [stateShape, (.dim batch (.dim nActions .scalar)), (.dim batch .scalar), (.dim batch .scalar),
         (.dim batch (.dim 1 .scalar))]) :=
   API.TorchLean.Module.instantiateConfigured (α := α)
@@ -232,7 +232,7 @@ def splitActorCriticParams
           _root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes critic)) :
     _root_.Runtime.Autograd.Torch.TList α (_root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes actor) ×
       _root_.Runtime.Autograd.Torch.TList α (_root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes critic) :=
-  _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
+  _root_.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
     (ss₁ := _root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes actor)
     (ss₂ := _root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes critic)
     ps
@@ -247,24 +247,24 @@ shared-parameter assumption explicit.
 def actorPolicyFromParams
     {obsShape logitsShape rolloutStateShape rolloutLogitsShape rolloutValueShape : _root_.Spec.Shape}
     {α : Type} [API.Semantics.Scalar α]
-    (actorObs : API.TorchLean.NN.Seq obsShape logitsShape)
+    (actorObs : API.TorchLean.LayerCore.Seq obsShape logitsShape)
     (actorCompiled :
       _root_.Runtime.Autograd.Torch.CompiledGraph α
-        (API.TorchLean.NN.Seq.paramShapes actorObs ++ [obsShape]) logitsShape)
-    (actorRollout : API.TorchLean.NN.Seq rolloutStateShape rolloutLogitsShape)
-    (criticRollout : API.TorchLean.NN.Seq rolloutStateShape rolloutValueShape)
+        (API.TorchLean.LayerCore.Seq.paramShapes actorObs ++ [obsShape]) logitsShape)
+    (actorRollout : API.TorchLean.LayerCore.Seq rolloutStateShape rolloutLogitsShape)
+    (criticRollout : API.TorchLean.LayerCore.Seq rolloutStateShape rolloutValueShape)
     (psAll : _root_.Runtime.Autograd.Torch.TList α
-      (API.TorchLean.NN.Seq.paramShapes actorRollout ++
-        API.TorchLean.NN.Seq.paramShapes criticRollout))
+      (API.TorchLean.LayerCore.Seq.paramShapes actorRollout ++
+        API.TorchLean.LayerCore.Seq.paramShapes criticRollout))
     (sameActorParams :
-      API.TorchLean.NN.Seq.paramShapes actorRollout =
-        API.TorchLean.NN.Seq.paramShapes actorObs := by rfl) :
+      API.TorchLean.LayerCore.Seq.paramShapes actorRollout =
+        API.TorchLean.LayerCore.Seq.paramShapes actorObs := by rfl) :
     _root_.Spec.Tensor α obsShape → _root_.Spec.Tensor α logitsShape :=
   let (psActor, _psCritic) := splitActorCriticParams actorRollout criticRollout psAll
   let psActorObs : _root_.Runtime.Autograd.Torch.TList α
-      (API.TorchLean.NN.Seq.paramShapes actorObs) :=
+      (API.TorchLean.LayerCore.Seq.paramShapes actorObs) :=
     Eq.mp (by rw [← sameActorParams]) psActor
-  fun obs => API.TorchLean.NN.Seq.forwardArtifact actorObs actorCompiled psActorObs obs
+  fun obs => API.TorchLean.LayerCore.Seq.forwardArtifact actorObs actorCompiled psActorObs obs
 
 /--
 Build a compiled critic-value forward function from an actor-critic parameter pack.
@@ -275,26 +275,26 @@ length-one output vector.
 def criticValueFromParams
     {obsShape rolloutStateShape rolloutLogitsShape rolloutValueShape : _root_.Spec.Shape}
     {α : Type} [API.Semantics.Scalar α]
-    (criticObs : API.TorchLean.NN.Seq obsShape (.dim 1 .scalar))
+    (criticObs : API.TorchLean.LayerCore.Seq obsShape (.dim 1 .scalar))
     (criticCompiled :
       _root_.Runtime.Autograd.Torch.CompiledGraph α
-        (API.TorchLean.NN.Seq.paramShapes criticObs ++ [obsShape]) (.dim 1 .scalar))
-    (actorRollout : API.TorchLean.NN.Seq rolloutStateShape rolloutLogitsShape)
-    (criticRollout : API.TorchLean.NN.Seq rolloutStateShape rolloutValueShape)
+        (API.TorchLean.LayerCore.Seq.paramShapes criticObs ++ [obsShape]) (.dim 1 .scalar))
+    (actorRollout : API.TorchLean.LayerCore.Seq rolloutStateShape rolloutLogitsShape)
+    (criticRollout : API.TorchLean.LayerCore.Seq rolloutStateShape rolloutValueShape)
     (psAll : _root_.Runtime.Autograd.Torch.TList α
-      (API.TorchLean.NN.Seq.paramShapes actorRollout ++
-        API.TorchLean.NN.Seq.paramShapes criticRollout))
+      (API.TorchLean.LayerCore.Seq.paramShapes actorRollout ++
+        API.TorchLean.LayerCore.Seq.paramShapes criticRollout))
     (sameCriticParams :
-      API.TorchLean.NN.Seq.paramShapes criticRollout =
-        API.TorchLean.NN.Seq.paramShapes criticObs := by rfl) :
+      API.TorchLean.LayerCore.Seq.paramShapes criticRollout =
+        API.TorchLean.LayerCore.Seq.paramShapes criticObs := by rfl) :
     _root_.Spec.Tensor α obsShape → α :=
   let (_psActor, psCritic) := splitActorCriticParams actorRollout criticRollout psAll
   let psCriticObs : _root_.Runtime.Autograd.Torch.TList α
-      (API.TorchLean.NN.Seq.paramShapes criticObs) :=
+      (API.TorchLean.LayerCore.Seq.paramShapes criticObs) :=
     Eq.mp (by rw [← sameCriticParams]) psCritic
   fun obs =>
     _root_.Spec.Tensor.vecGet
-      (API.TorchLean.NN.Seq.forwardArtifact criticObs criticCompiled psCriticObs obs)
+      (API.TorchLean.LayerCore.Seq.forwardArtifact criticObs criticCompiled psCriticObs obs)
       ⟨0, by decide⟩
 
 end ppo

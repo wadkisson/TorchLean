@@ -61,7 +61,8 @@ abbrev F : Type := IEEE32Exec
  /-- Maximum normal exponent `emax` for IEEE binary32. -/
  def emax : Int := 127
 
--- Machine epsilon ε = 2^{-23} (as a real number).
+-- Spacing at 1, often called machine epsilon: ε = 2^{-23}. The nearest-rounding unit roundoff is
+-- half of this, 2^{-24}.
 noncomputable def ε : ℝ := neuralBpow binaryRadix (-23)
 
 -- Smallest positive float ω = 2^{-149} (as a real number).

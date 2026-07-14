@@ -38,14 +38,14 @@ and uses the stable identity `BCEWithLogits(x,t) = softplus(x) - t*x`.
 -/
 def bceWithLogits {Γ : List Shape} {s : Shape}
     (logits target : Idx Γ s) : Node Γ Shape.scalar :=
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   let c : ℝ := (1 : ℝ) / (n : ℝ)
   Node.ofVec (Γ := Γ) (τ := Shape.scalar)
     (f := fun xV =>
       let x : Vec n := CtxVec.get (Γ := Γ) (s := s) logits xV
       let t : Vec n := CtxVec.get (Γ := Γ) (s := s) target xV
       let sp : Vec n := elemwiseVec (n := n) (f := Activation.Math.softplusSpec (α := ℝ)) x
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         c * (sumCLM (n := n) (sp - (vecOfFun (n := n) fun i => t i * x i))))
     (jvp := fun xV dxV =>
       let x : Vec n := CtxVec.get (Γ := Γ) (s := s) logits xV
@@ -55,10 +55,10 @@ def bceWithLogits {Γ : List Shape} {s : Shape}
       let sp' : Vec n := elemwiseVec (n := n) (f := Activation.Math.softplusDerivSpec (α := ℝ)) x
       -- d/dx softplus(x) = sigmoid(x)
       let dsp : Vec n := vecOfFun (n := n) fun i => dx i * sp' i
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         c * (sumCLM (n := n) (dsp - (vecOfFun (n := n) fun i => dt i * x i + t i * dx i))))
     (vjp := fun xV δV =>
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let x : Vec n := CtxVec.get (Γ := Γ) (s := s) logits xV
       let t : Vec n := CtxVec.get (Γ := Γ) (s := s) target xV
@@ -71,9 +71,9 @@ def bceWithLogits {Γ : List Shape} {s : Shape}
     (correct_inner := by
       intro xV dxV δV
       classical
-      let n : Nat := Shape.size s
+      let n : Nat := Spec.Shape.size s
       let c : ℝ := (1 : ℝ) / (n : ℝ)
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let x : Vec n := CtxVec.get (Γ := Γ) (s := s) logits xV
       let dx : Vec n := CtxVec.get (Γ := Γ) (s := s) logits dxV
@@ -84,8 +84,8 @@ def bceWithLogits {Γ : List Shape} {s : Shape}
       let scale : ℝ := c * δ0
       let dLogits : Vec n := vecOfFun (n := n) fun i => scale * (sp' i - t i)
       let dTarget : Vec n := vecOfFun (n := n) fun i => scale * (-x i)
-      let jvpOut : Vec (Shape.size Shape.scalar) :=
-        vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      let jvpOut : Vec (Spec.Shape.size Shape.scalar) :=
+        vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
           c * sumCLM (n := n) (dsp - (vecOfFun (n := n) fun i => dt i * x i + t i * dx i))
       have hL :
           inner ℝ jvpOut δV =
@@ -212,7 +212,7 @@ def bceWithLogits {Γ : List Shape} {s : Shape}
 def bceWithLogitsFderiv {Γ : List Shape} {s : Shape} (logits target : Idx Γ s) :
     NodeFDerivCorrect (bceWithLogits (Γ := Γ) (s := s) logits target) := by
   classical
-  let n : Nat := Shape.size s
+  let n : Nat := Spec.Shape.size s
   let logitsV : CtxVec Γ → Vec n := fun xV => CtxVec.get (Γ := Γ) (s := s) logits xV
   let targetV : CtxVec Γ → Vec n := fun xV => CtxVec.get (Γ := Γ) (s := s) target xV
   let logitsCLM : CtxVec Γ →L[ℝ] Vec n := CtxVec.getCLM (Γ := Γ) (s := s) logits
@@ -366,7 +366,7 @@ def bceWithLogitsFderiv {Γ : List Shape} {s : Shape} (logits target : Idx Γ s)
         c * sumCLM (n := n) (vecOfFun (n := n) (fun j => dx j * sp' j) -
             (vecOfFun (n := n) fun j => dt j * x j + t j * dx j)) := by
       have hscalar :
-          ((EuclideanSpace.equiv (𝕜 := ℝ) (ι := Fin (Shape.size Shape.scalar))).symm
+          ((EuclideanSpace.equiv (𝕜 := ℝ) (ι := Fin (Spec.Shape.size Shape.scalar))).symm
               (fun _ =>
                 c * sumCLM (n := n) (vecOfFun (n := n) (fun j => dx j * sp' j) -
                   (vecOfFun (n := n) fun j => dt j * x j + t j * dx j)))).ofLp i
@@ -375,13 +375,13 @@ def bceWithLogitsFderiv {Γ : List Shape} {s : Shape} (logits target : Idx Γ s)
             (vecOfFun (n := n) fun j => dt j * x j + t j * dx j)) := by
         convert
           euclideanEquiv_symm_ofLp
-            (n := Shape.size Shape.scalar)
-            (f := fun _ : Fin (Shape.size Shape.scalar) =>
+            (n := Spec.Shape.size Shape.scalar)
+            (f := fun _ : Fin (Spec.Shape.size Shape.scalar) =>
               c * sumCLM (n := n) (vecOfFun (n := n) (fun j => dx j * sp' j) -
                 (vecOfFun (n := n) fun j => dt j * x j + t j * dx j)))
             (i := i) using 1
       simpa [bceWithLogits, Node.jvpVec_ofVec, x, dx, t, dt, sp', logitsV, targetV, c,
-        elemwiseVec, vecOfFun, Shape.size, n] using hscalar
+        elemwiseVec, vecOfFun, Spec.Shape.size, n] using hscalar
     let spDeriv : CtxVec Γ →L[ℝ] Vec n :=
       (elemwiseDerivCLM (n := n) (f' := Activation.Math.softplusDerivSpec (α := ℝ)) x).comp
         logitsCLM

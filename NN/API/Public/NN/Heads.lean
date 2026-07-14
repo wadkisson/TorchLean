@@ -21,7 +21,7 @@ the reusable block and Transformer APIs.
 namespace NN
 namespace API
 namespace nn
-namespace pure
+namespace Internal
 namespace heads
 
 
@@ -31,12 +31,12 @@ Classification head: `Flatten -> Linear`.
 Named head constructor built from `nn.flattenLinear`.
 -/
 def classifier {s : Spec.Shape} (classes : Nat) (seedW seedB : Nat := 0) :
-    Sequential s (NN.Tensor.Shape.Vec classes) :=
+    Sequential s (.dim classes .scalar) :=
   flattenLinear (s := s) classes seedW seedB
 
 /-- Regression head: `Flatten -> Linear` with `outDim` outputs. -/
 def regressor {s : Spec.Shape} (outDim : Nat := 1) (seedW seedB : Nat := 0) :
-    Sequential s (NN.Tensor.Shape.Vec outDim) :=
+    Sequential s (.dim outDim .scalar) :=
   flattenLinear (s := s) outDim seedW seedB
 
 /--
@@ -46,24 +46,24 @@ Input:  `N × σ`
 Output: `Mat N classes`
 -/
 def classifierBatch {n : Nat} {s : Spec.Shape} (classes : Nat) (seedW seedB : Nat := 0) :
-    Sequential (.dim n s) (NN.Tensor.Shape.Mat n classes) :=
+    Sequential (.dim n s) (.dim n (.dim classes .scalar)) :=
   seq!
     flattenBatch (n := n) (s := s),
     linear (Spec.Shape.size s) classes (seedW := seedW) (seedB := seedB) (pfx :=
-      NN.Tensor.Shape.Vec n)
+      .dim n .scalar)
 
 /-- Batched regression head: `Flatten(start_dim=1) -> Linear(_, outDim)` producing `Mat N outDim`.
   -/
 def regressorBatch {n : Nat} {s : Spec.Shape} (outDim : Nat := 1) (seedW seedB : Nat := 0) :
-    Sequential (.dim n s) (NN.Tensor.Shape.Mat n outDim) :=
+    Sequential (.dim n s) (.dim n (.dim outDim .scalar)) :=
   seq!
     flattenBatch (n := n) (s := s),
     linear (Spec.Shape.size s) outDim (seedW := seedW) (seedB := seedB) (pfx :=
-      NN.Tensor.Shape.Vec n)
+      .dim n .scalar)
 
 end heads
 
-end pure
+end Internal
 
 end nn
 

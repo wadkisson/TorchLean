@@ -14,28 +14,30 @@ public import NN.API.Public.Seeded
 public import NN.API.Public.Autograd
 
 /-!
-# API Public
+# Public API Implementation
 
-Clean public API for TorchLean model code.
+Model builders, seeded construction, tensor packs, and autograd operations used to implement the
+`TorchLean.*` API.
 
-User code should use the umbrella import:
+Application code should use the focused public import:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
 
-This module sits one level below the short public names. Those names come through
-`NN.Entrypoint.API` and the `NN` umbrella:
+The application entrypoint is `NN.API`, which exposes these operations through the short public
+names:
 
 - `TorchLean.nn` (model/layer builders)
 - `TorchLean.optim` (optimizer configs)
 - `TorchLean.Trainer` (train/evaluate APIs)
 - `TorchLean.Data` (datasets/loaders + CSV/NPY readers)
 - `TorchLean.Loss` and `TorchLean.Metrics`
+- `TorchLean.classical` (classical and statistical models)
 
-Import `NN.API.Public` directly when extending TorchLean or working below the `NN` umbrella. Use
-`NN.Entrypoint.API` when you only want the focused `TorchLean.*` names.
+Import `NN.API.Public` only when extending this implementation layer. Application code should use
+`NN.API`.
 
 The callback-heavy training namespace lives in `NN.API.Public.Training`. It is deliberately not
 re-exported from this umbrella module: ordinary code should get training through `TorchLean.Trainer`,

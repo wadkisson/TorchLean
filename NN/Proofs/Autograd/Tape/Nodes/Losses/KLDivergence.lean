@@ -44,7 +44,7 @@ where `target` entries are nonzero.
 def klDivLast {Γ : List Shape} {m n : Nat}
     (logProbs target : Idx Γ (.dim m (.dim n .scalar))) : Node Γ Shape.scalar :=
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let c : ℝ := (1 : ℝ) / (m : ℝ)
   Node.ofVec (Γ := Γ) (τ := Shape.scalar)
     (f := fun xV =>
@@ -52,7 +52,7 @@ def klDivLast {Γ : List Shape} {m n : Nat}
       let lp : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs xV)
       let logq : Vec (m * n) := elemwiseVec (n := m * n) (f := Real.log) q
       let rhs : Vec (m * n) := logq - lp
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         c * inner ℝ q rhs)
     (jvp := fun xV dxV =>
       let q : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
@@ -63,10 +63,10 @@ def klDivLast {Γ : List Shape} {m n : Nat}
       let dlogq : Vec (m * n) := vecOfFun (n := m * n) fun i => dq i * (q i)⁻¹
       let rhs : Vec (m * n) := logq - lp
       let drhs : Vec (m * n) := dlogq - dlp
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         c * (inner ℝ dq rhs + inner ℝ q drhs))
     (vjp := fun xV δV =>
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let q : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let lp : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs xV)
@@ -82,9 +82,9 @@ def klDivLast {Γ : List Shape} {m n : Nat}
       intro xV dxV δV
       classical
       let s : Shape := .dim m (.dim n .scalar)
-      let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+      let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
       let c : ℝ := (1 : ℝ) / (m : ℝ)
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let q : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let dq : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target dxV)
@@ -100,7 +100,7 @@ def klDivLast {Γ : List Shape} {m n : Nat}
       let dTarget : Vec (m * n) := vecOfFun (n := m * n) fun i => scale * (rhs i + qInvMul i)
       have hL :
           inner ℝ
-              (vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+              (vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
                 c * (inner ℝ dq rhs + inner ℝ q drhs))
               δV
             =
@@ -191,7 +191,7 @@ def klDivLast {Γ : List Shape} {m n : Nat}
                     simp [hBterm']
       calc
         inner ℝ
-            (vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+            (vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
               c * (inner ℝ dq rhs + inner ℝ q drhs))
             δV
             =
@@ -283,12 +283,12 @@ def klDivLast {Γ : List Shape} {m n : Nat}
 def klDivLastFderivAt {Γ : List Shape} {m n : Nat}
     (logProbs target : Idx Γ (.dim m (.dim n .scalar))) (xV : CtxVec Γ)
     (ht :
-      ∀ i : Fin (Shape.size (.dim m (.dim n .scalar))),
+      ∀ i : Fin (Spec.Shape.size (.dim m (.dim n .scalar))),
         CtxVec.get (Γ := Γ) (s := .dim m (.dim n .scalar)) target xV i ≠ 0) :
     NodeFDerivCorrectAt (klDivLast (Γ := Γ) (m := m) (n := n) logProbs target) xV := by
   classical
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let qMN : CtxVec Γ → Vec (m * n) := fun x => castVec hsz (CtxVec.get (Γ := Γ) (s := s) target x)
   let lpMN : CtxVec Γ → Vec (m * n) := fun x => castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs
     x)
@@ -392,17 +392,17 @@ def klDivLastFderivAt {Γ : List Shape} {m n : Nat}
           =
         c * (inner ℝ dq rhs + inner ℝ q drhs) := by
       have hscalar :
-          ((EuclideanSpace.equiv (𝕜 := ℝ) (ι := Fin (Shape.size Shape.scalar))).symm
+          ((EuclideanSpace.equiv (𝕜 := ℝ) (ι := Fin (Spec.Shape.size Shape.scalar))).symm
               (fun _ => c * (inner ℝ dq rhs + inner ℝ q drhs))).ofLp i
             =
           c * (inner ℝ dq rhs + inner ℝ q drhs) := by
         convert
           euclideanEquiv_symm_ofLp
-            (n := Shape.size Shape.scalar)
-            (f := fun _ : Fin (Shape.size Shape.scalar) => c * (inner ℝ dq rhs + inner ℝ q drhs))
+            (n := Spec.Shape.size Shape.scalar)
+            (f := fun _ : Fin (Spec.Shape.size Shape.scalar) => c * (inner ℝ dq rhs + inner ℝ q drhs))
             (i := i) using 1
       simpa [klDivLast, Node.jvpVec_ofVec, qMN, lpMN, logqMN, c, s,
-        q, dq, lp, dlp, logq, dlogq, rhs, drhs, vecOfFun, Shape.size] using hscalar
+        q, dq, lp, dlp, logq, dlogq, rhs, drhs, vecOfFun, Spec.Shape.size] using hscalar
     let D : CtxVec Γ →L[ℝ] ℝ := c • (fderivInnerCLM ℝ (qMN xV, rhsMN xV)).comp (qMNCLM.prod
       rhsDeriv)
     have hD :

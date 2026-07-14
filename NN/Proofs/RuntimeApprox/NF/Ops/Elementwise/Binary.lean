@@ -84,8 +84,7 @@ theorem approxT_add_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                           (le_abs_self (epsx + epsy +
                             neuralUlp β fexp
                               (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR +
-                                toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-                              TrainingPhase.forward / 2))
+                                toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2))
                       exact
                         (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd
                           := rnd))
@@ -229,7 +228,7 @@ theorem approxT_sub_spec {s : Shape} :
       (s := s)
       (fS := fun a b => a - b) (fR := fun a b => a - b)
       (bnd := fun a b epsx epsy =>
-        epsx + epsy + neuralUlp β fexp (a - b) TrainingPhase.forward / 2)
+        epsx + epsy + neuralUlp β fexp (a - b) / 2)
       (xS := xS) (yS := yS) (xR := xR) (yR := yR) (epsx := epsx) (epsy := epsy)
       hx hy (by
         intro x y xR yR hx hy
@@ -288,8 +287,7 @@ theorem approxT_mul_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                               (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) + epsy) * epsx +
                               neuralUlp β fexp
                                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR *
-                                    toSpec (β := β) (fexp := fexp) (rnd := rnd) yR)
-                                  TrainingPhase.forward / 2))
+                                    toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) / 2))
                       exact
                         (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd
                           := rnd))

@@ -102,9 +102,9 @@ def usage (tools : List Tool) : String :=
 
 /-- Extract a single optional path argument, falling back to a default path. -/
 def getPathOrDefault (args : List String) (defaultPath : String) : Except String String := do
-  let args := NN.API.CLI.dropDashDash args
-  let (path, rest) ← NN.API.CLI.takePositionalDefault args defaultPath
-  NN.API.CLI.requireNoArgs rest
+  let args := TorchLean.CLI.dropDashDash args
+  let (path, rest) ← TorchLean.CLI.takePositionalDefault args defaultPath
+  TorchLean.CLI.checkNoArgs rest
   pure path
 
 /-- Tool group: LiRPA-style bound propagation and certificate checking. -/
@@ -114,7 +114,7 @@ def lirpaTools : List Tool :=
       description := desc
       defaultArg := some defaultPath
       run := fun args => do
-        let path ← NN.API.CLI.orThrow <| getPathOrDefault args defaultPath
+        let path ← TorchLean.CLI.orThrowIO <| getPathOrDefault args defaultPath
         k path }
   [
     mk "lirpa-mlp" "IBP cert: feed-forward MLP"
@@ -147,7 +147,7 @@ def otherTools : List Tool :=
       description := "PINN certificate recomputation check"
       defaultArg := some NN.Verification.PINN.Certificate.defaultCertPath
       run := fun args => do
-        let path ← NN.API.CLI.orThrow <|
+        let path ← TorchLean.CLI.orThrowIO <|
           getPathOrDefault args NN.Verification.PINN.Certificate.defaultCertPath
         NN.Verification.PINN.Certificate.verifyCert path }
   , { name := "spline-cert"

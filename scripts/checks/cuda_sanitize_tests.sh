@@ -108,14 +108,7 @@ if [[ ${#tools[@]} -eq 0 ]]; then
 fi
 
 if [[ -z "$sanitizer" ]]; then
-  # `compute-sanitizer` is NVIDIA's current correctness checker. Keep a
-  # `cuda-memcheck` fallback so older CUDA installations can still run the same
-  # TorchLean gate.
-  if command -v compute-sanitizer >/dev/null 2>&1; then
-    sanitizer="compute-sanitizer"
-  else
-    sanitizer="cuda-memcheck"
-  fi
+  sanitizer="compute-sanitizer"
 fi
 
 if ! command -v "$sanitizer" >/dev/null 2>&1; then

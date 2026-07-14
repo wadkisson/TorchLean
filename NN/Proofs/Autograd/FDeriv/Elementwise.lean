@@ -545,7 +545,7 @@ def silu {n : Nat} : OpSpecFDerivCorrect n n :=
           elemwiseVec (n := n) (fun z => Activation.Math.swishSpec z) := by
       funext xV
       ext i
-      simp [siluCorrect, Spec.swishOp, Activation.swishSpec, elemwiseVec]
+      simp [siluCorrect, Spec.siluOp, Activation.swishSpec, elemwiseVec]
     rw [hfun]
     exact h
   jvp_eq := by
@@ -557,7 +557,7 @@ def silu {n : Nat} : OpSpecFDerivCorrect n n :=
         dxV i *
           Spec.toVec (mapSpec (s := .dim n .scalar) Activation.Math.swishDerivSpec (ofVecE xV))
             i := by
-      simp [siluCorrect, Spec.swishOp,
+      simp [siluCorrect, Spec.siluOp,
         Activation.swishDerivSpec, toVecE, ofVecE, Spec.toVec_ofVec, Spec.toVec_mul_spec]
     have hMap :
         Spec.toVec (mapSpec (s := .dim n .scalar) Activation.Math.swishDerivSpec (ofVecE xV)) i

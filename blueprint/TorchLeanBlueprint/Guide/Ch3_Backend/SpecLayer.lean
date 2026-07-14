@@ -124,14 +124,35 @@ the objective. TorchLean keeps losses in the spec vocabulary too.
 For example:
 
 - `mseSpec predicted target` is a scalar objective over two tensors of the same shape.
-- `crossEntropySpec predicted target` is cross entropy between probability tensors.
-- `crossEntropyLogitsSpec logits target` names the stable logits form, with log-softmax inside the
-  spec.
+- `crossEntropySpec predicted target` is cross entropy between probability tensors. Probabilities
+  are clipped to the declared epsilon interval before taking a logarithm; the selected derivative is
+  zero outside the active clipping interval and at its kinks.
+- `crossEntropyLogitsSpec logits target` uses log-softmax internally and does not clip logits.
+
+For a tensor whose final axis contains the classes, both cross-entropy definitions sum over that
+class axis and average over the preceding slices. Thus logits of shape `[batch, classes]` are
+averaged over `batch`, not over `batch * classes`. The logits derivative uses the same denominator,
+so for one-hot targets it has the familiar form
+
+$$`\frac{\operatorname{softmax}(z)-y}{\text{number of non-class slices}}.`
 
 This avoids a common ambiguity. In code, "cross entropy" may mean probabilities passed through a
 log, logits passed through a stable log-softmax, a mean reduction, a sum reduction, or a version
 with ignored labels. A verification or autograd claim needs the exact specification behind the
 phrase "cross entropy."
+
+# Sliding-Window Geometry
+
+Convolution and pooling use one dimension-general output-size function. For input extent `n`,
+kernel extent `k`, padding `p`, and stride `s`, a valid window geometry has output extent
+
+$$`\left\lfloor\frac{n+2p-k}{s}\right\rfloor+1.`
+
+The Lean definition is total. It returns `0` when `k = 0`, `s = 0`, or the padded input is smaller
+than the kernel. This avoids the phantom one-element output that truncated natural-number
+subtraction can otherwise create. Runtime and graph validators may reject such unsupported calls;
+when a shape must still be computed at the specification boundary, the result is the empty output
+shape rather than an invented window.
 
 # Stochastic Behavior Is Made Explicit
 
@@ -184,7 +205,7 @@ open Spec
 def affinePlane {α : Type} [Context α]
     (firstRowFirstCol firstRowSecondCol secondRowFirstCol secondRowSecondCol
       firstBias secondBias : α) :
-    Spec.Tensor α (Shape.vec 2) -> Spec.Tensor α (Shape.vec 2)
+    Spec.Tensor α (.dim 2 .scalar) -> Spec.Tensor α (.dim 2 .scalar)
   | x =>
       let firstOutput := firstRowFirstCol * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
               + firstRowSecondCol * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)

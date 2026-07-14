@@ -6,22 +6,6 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.NN
-public import NN.API.Public.TensorPack
-public import NN.API.Public.Seeded
-public import NN.API.Public.Autograd
-public import NN.API.Data
-public import NN.API.Data.Transforms
-public import NN.API.Runtime
-public import NN.API.Models
-public import NN.API.Public.NN.Transformer
-public import NN.API.RL
-public import NN.API.Rand
-public import NN.API.Samples.Bands
-public import NN.API.Text.Bpe
-public import NN.MLTheory.CROWN.Flatbox
-public import NN.MLTheory.CROWN.Graph
-public import NN.Verification.TorchLean.Compile
 public import NN.Backend.Report
 public import NN.API.Public.Facade.Base.Root
 
@@ -43,8 +27,10 @@ abbrev DType := NN.API.DType
 namespace DType
 
 @[inherit_doc NN.API.DType.float]
-abbrev float : DType :=
-  NN.API.DType.float
+abbrev float := NN.API.DType.float
+
+@[inherit_doc NN.API.DType.real]
+abbrev real := NN.API.DType.real
 
 @[inherit_doc NN.API.DType.float32]
 abbrev float32 (cfg : NN.API.Float32Config := {}) : DType :=
@@ -53,10 +39,6 @@ abbrev float32 (cfg : NN.API.Float32Config := {}) : DType :=
 @[inherit_doc NN.API.DType.complex]
 abbrev complex (cfg : NN.API.Float32Config := {}) : DType :=
   NN.API.DType.complex cfg
-
-@[inherit_doc NN.API.DType.real]
-abbrev real : DType :=
-  NN.API.DType.real
 
 end DType
 
@@ -69,7 +51,7 @@ backend. These classes stay under `TorchLean.Runtime` so the root namespace can 
 models, data, and training.
 -/
 
-/--
+/-
 Executable scalar support for TorchLean examples.
 
 Use this when an example chooses a scalar backend or writes code that is polymorphic over the
@@ -96,59 +78,51 @@ abbrev Backend := _root_.Runtime.Autograd.Torch.Backend
 namespace Backend
 
 @[inherit_doc _root_.Runtime.Autograd.Torch.Backend.eager]
-abbrev eager : Backend :=
-  _root_.Runtime.Autograd.Torch.Backend.eager
+abbrev eager : Backend := _root_.Runtime.Autograd.Torch.Backend.eager
 
 @[inherit_doc _root_.Runtime.Autograd.Torch.Backend.compiled]
-abbrev compiled : Backend :=
-  _root_.Runtime.Autograd.Torch.Backend.compiled
+abbrev compiled : Backend := _root_.Runtime.Autograd.Torch.Backend.compiled
 
 end Backend
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device]
-abbrev Device := _root_.Runtime.Autograd.Torch.Device
+@[inherit_doc NN.Backend.Device]
+abbrev Device := NN.Backend.Device
 
 namespace Device
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.auto]
-abbrev auto : Device :=
-  _root_.Runtime.Autograd.Torch.Device.auto
+@[inherit_doc NN.Backend.Device.cpu]
+abbrev cpu : Device := NN.Backend.Device.cpu
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.cpu]
-abbrev cpu : Device :=
-  _root_.Runtime.Autograd.Torch.Device.cpu
+@[inherit_doc NN.Backend.Device.cuda]
+abbrev cuda : Device := NN.Backend.Device.cuda
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.cuda]
-abbrev cuda : Device :=
-  _root_.Runtime.Autograd.Torch.Device.cuda
+@[inherit_doc NN.Backend.Device.rocm]
+abbrev rocm : Device := NN.Backend.Device.rocm
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.rocm]
-abbrev rocm : Device :=
-  _root_.Runtime.Autograd.Torch.Device.rocm
+@[inherit_doc NN.Backend.Device.metal]
+abbrev metal : Device := NN.Backend.Device.metal
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.metal]
-abbrev metal : Device :=
-  _root_.Runtime.Autograd.Torch.Device.metal
+@[inherit_doc NN.Backend.Device.wasm]
+abbrev wasm : Device := NN.Backend.Device.wasm
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.wasm]
-abbrev wasm : Device :=
-  _root_.Runtime.Autograd.Torch.Device.wasm
+@[inherit_doc NN.Backend.Device.tpu]
+abbrev tpu : Device := NN.Backend.Device.tpu
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.tpu]
-abbrev tpu : Device :=
-  _root_.Runtime.Autograd.Torch.Device.tpu
+@[inherit_doc NN.Backend.Device.trainium]
+abbrev trainium : Device := NN.Backend.Device.trainium
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.trainium]
-abbrev trainium : Device :=
-  _root_.Runtime.Autograd.Torch.Device.trainium
+@[inherit_doc NN.Backend.Device.custom]
+abbrev custom : Device := NN.Backend.Device.custom
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.custom]
-abbrev custom : Device :=
-  _root_.Runtime.Autograd.Torch.Device.custom
+@[inherit_doc NN.Backend.Device.external]
+abbrev external : Device := NN.Backend.Device.external
 
-@[inherit_doc _root_.Runtime.Autograd.Torch.Device.external]
-abbrev external : Device :=
-  _root_.Runtime.Autograd.Torch.Device.external
+/--
+Parse a public device selector. `auto` chooses the portable CPU runtime; every other value is
+validated against the devices known to the backend registry.
+-/
+def parse (value : String) : Except String Device :=
+  if value == "auto" then pure .cpu else NN.Backend.Device.parse value
 
 end Device
 

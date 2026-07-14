@@ -146,7 +146,7 @@ inductive Node
       (a : Idx (Ctx inShape ss) (.dim batch (.dim m (.dim n .scalar))))
       (b : Idx (Ctx inShape ss) (.dim batch (.dim n (.dim p .scalar)))) :
       Node α paramShapes inShape ss (.dim batch (.dim m (.dim p .scalar)))
-  | reshape (inS outS : Shape) (h : Shape.size inS = Shape.size outS)
+  | reshape (inS outS : Shape) (h : Spec.Shape.size inS = Spec.Shape.size outS)
       (x : Idx (Ctx inShape ss) inS) :
       Node α paramShapes inShape ss outS
   | swap_first_two (m n : Nat) (rest : Shape)
@@ -155,7 +155,7 @@ inductive Node
   | transpose3dLastTwo (a b c : Nat)
       (x : Idx (Ctx inShape ss) (.dim a (.dim b (.dim c .scalar)))) :
       Node α paramShapes inShape ss (.dim a (.dim c (.dim b .scalar)))
-  | softmaxLast {s : Shape} (hRank : 0 < Shape.rank s) (x : Idx (Ctx inShape ss) s) :
+  | softmaxLast {s : Shape} (hRank : 0 < Spec.Shape.rank s) (x : Idx (Ctx inShape ss) s) :
       Node α paramShapes inShape ss s
   | layernorm2d (seqLen embedDim : Nat) (hSeq : 0 < seqLen) (hEmb : 0 < embedDim)
       (x : Idx (Ctx inShape ss) (.dim seqLen (.dim embedDim .scalar))) :
@@ -175,8 +175,8 @@ inductive Node
       (x : Idx (Ctx inShape ss) (.dim inC (.dim inH (.dim inW .scalar)))) :
       Node α paramShapes inShape ss
         (.dim outC
-          (.dim ((inH + 2 * padding - kH) / stride + 1)
-            (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)))
+          (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+            (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar)))
   | mseLoss {s : Shape} (yhat target : Idx (Ctx inShape ss) s) :
       Node α paramShapes inShape ss .scalar
 
@@ -237,31 +237,31 @@ def evalNode
     {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
     (node : Node α paramShapes inShape ss out)
     (params : Runtime.Autograd.Torch.TList α paramShapes)
-    (vals : Array (DVal α)) : Except String (DVal α) := do
+    (vals : Array (DVal α)) : Except String (DVal α) :=
   match node with
-  | .const (s := s) _wf t =>
+  | .const (s := s) _wf t => do
       pure <| DVal.mk (α := α) s t
-  | .paramConst (s := s) _wf p =>
+  | .paramConst (s := s) _wf p => do
       pure <| DVal.mk (α := α) s (getParam (α := α) (paramShapes := paramShapes) params p)
-  | .add (s := s) a b =>
+  | .add (s := s) a b => do
       let ta ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals a
       let tb ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals b
       pure <| DVal.mk (α := α) s (Tensor.addSpec (α := α) ta tb)
-  | .sub (s := s) a b =>
+  | .sub (s := s) a b => do
       let ta ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals a
       let tb ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals b
       pure <| DVal.mk (α := α) s (Tensor.subSpec (α := α) ta tb)
-  | .mulElem (s := s) a b =>
+  | .mulElem (s := s) a b => do
       let ta ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals a
       let tb ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals b
       pure <| DVal.mk (α := α) s (Tensor.mulSpec (α := α) ta tb)
-  | .relu (s := s) x =>
+  | .relu (s := s) x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       pure <| DVal.mk (α := α) s (Activation.reluSpec (α := α) tx)
-  | .exp (s := s) x =>
+  | .exp (s := s) x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       pure <| DVal.mk (α := α) s (Tensor.expSpec (α := α) tx)
-  | .log (s := s) x =>
+  | .log (s := s) x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       -- Domain discipline: align the verified execution model with the IR semantics. The raw
       -- `log` is treated as undefined on nonpositive inputs; use `safe_log` in models that require
@@ -271,39 +271,39 @@ def evalNode
       else
         throw
           "IR eval: log: input contains values <= 0 (or NaN); use `safe_log` if you want epsilon protection"
-  | .inv (s := s) x =>
+  | .inv (s := s) x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       pure <| DVal.mk (α := α) s (Tensor.invSpec (α := α) tx)
-  | .matmul2d m n p a b =>
+  | .matmul2d m n p a b => do
       let ta ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim m (.dim n .scalar)) vals a
       let tb ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim n (.dim p .scalar)) vals b
       pure <| DVal.mk (α := α) (.dim m (.dim p .scalar))
         (Tensor.matMulSpec (α := α) (m := m) (n := n) (p := p) ta tb)
-  | .bmm batch m n p a b =>
+  | .bmm batch m n p a b => do
       let ta ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim batch (.dim m (.dim n .scalar))) vals a
       let tb ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim batch (.dim n (.dim p .scalar))) vals b
       pure <| DVal.mk (α := α) (.dim batch (.dim m (.dim p .scalar)))
         (Tensor.bmmSpec (α := α) (batch := batch) (m := m) (n := n) (p := p) ta tb)
-  | .reshape inS outS h x =>
+  | .reshape inS outS h x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := inS) vals x
       pure <| DVal.mk (α := α) outS (Tensor.reshapeSpec (α := α) (s₁ := inS) (s₂ := outS) tx h)
-  | .swap_first_two m n rest x =>
+  | .swap_first_two m n rest x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := .dim m (.dim n rest)) vals x
       pure <| DVal.mk (α := α) (.dim n (.dim m rest))
         (Tensor.swapFirstTwoSpec (α := α) (m := m) (n := n) (s := rest) tx)
-  | .transpose3dLastTwo a b c x =>
+  | .transpose3dLastTwo a b c x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim a (.dim b (.dim c .scalar))) vals x
       pure <| DVal.mk (α := α) (.dim a (.dim c (.dim b .scalar)))
         (Tensor.transpose3DLastTwoSpec (α := α) (a := a) (b := b) (c := c) tx)
-  | .softmaxLast (s := s) _hRank x =>
+  | .softmaxLast (s := s) _hRank x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss) (s := s) vals x
       pure <| DVal.mk (α := α) s (Activation.softmaxSpec (α := α) tx)
-  | .layernorm2d seqLen embedDim hSeq hEmb x =>
+  | .layernorm2d seqLen embedDim hSeq hEmb x => do
       let tx ← getVal (α := α) (inShape := inShape) (ss := ss)
         (s := .dim seqLen (.dim embedDim .scalar)) vals x
       let y := Spec.layerNorm (α := α) (seqLen := seqLen) (embedDim := embedDim)
@@ -312,7 +312,7 @@ def evalNode
         (beta := Spec.fill (α := α) 0 (.dim embedDim .scalar))
         (h_seq_pos := hSeq) (h_embed_pos := hEmb)
       pure <| DVal.mk (α := α) (.dim seqLen (.dim embedDim .scalar)) y
-  | .linear inDim outDim w b x =>
+  | .linear inDim outDim w b x => do
       let wT := getParam (α := α) (paramShapes := paramShapes) params w
       let bT := getParam (α := α) (paramShapes := paramShapes) params b
       let xT ← getVal (α := α) (inShape := inShape) (ss := ss)
@@ -320,7 +320,7 @@ def evalNode
       let y := Tensor.addSpec (α := α)
         (Tensor.matVecMulSpec (α := α) (m := outDim) (n := inDim) wT xT) bT
       pure <| DVal.mk (α := α) (.dim outDim .scalar) y
-  | .conv2d inC outC kH kW stride padding inH inW hIn hKH hKW _hStride _hHeight _hWidth kernel bias x =>
+  | .conv2d inC outC kH kW stride padding inH inW hIn hKH hKW _hStride _hHeight _hWidth kernel bias x => do
       let kT := getParam (α := α) (paramShapes := paramShapes) params kernel
       let bT := getParam (α := α) (paramShapes := paramShapes) params bias
       let xT ← getVal (α := α) (inShape := inShape) (ss := ss)
@@ -330,9 +330,9 @@ def evalNode
       let y := Spec.conv2dSpec (α := α) (layer := spec) (input := xT)
       pure <| DVal.mk (α := α)
         (.dim outC
-          (.dim ((inH + 2 * padding - kH) / stride + 1)
-            (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar))) y
-  | .mseLoss (s := _s) yhat target =>
+          (.dim (Spec.Shape.slidingWindowOutDim inH kH stride padding)
+            (.dim (Spec.Shape.slidingWindowOutDim inW kW stride padding) .scalar))) y
+  | .mseLoss (s := _s) yhat target => do
       -- Mirror the IR semantics: `mse_loss` is dynamically shape-checked (both parents must have
       -- equal shape),
       -- then reduces to a scalar by averaging the squared error.
@@ -362,15 +362,15 @@ def evalFGraph
     {paramShapes : List Shape} {inShape : Shape} {ss : List Shape} {out : Shape}
     (g : FGraph α paramShapes inShape ss out)
     (params : Runtime.Autograd.Torch.TList α paramShapes)
-    (vals : Array (DVal α)) : Except String (Tensor α out) := do
+    (vals : Array (DVal α)) : Except String (Tensor α out) :=
   match g with
-  | .ret y =>
+  | .ret y => do
       let v : DVal α ← getDVal? vals y.id
       if h : v.shape = out then
         pure (h ▸ v.tensor)
       else
         throw s!"TorchLeanVerified: expected shape {repr out}, got {repr v.shape}"
-  | .let1 (ss := ss) (mid := mid) (out := out) node gNext =>
+  | .let1 (ss := ss) (mid := mid) (out := out) node gNext => do
       let vOut ←
         evalNode (α := α) (paramShapes := paramShapes) (inShape := inShape) (ss := ss) (out := mid)
           node params vals

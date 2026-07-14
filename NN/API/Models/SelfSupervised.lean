@@ -33,61 +33,35 @@ namespace models
 /-! ## ViT-MAE -/
 
 /--
-Configuration for a compact ViT-MAE image reconstructor.
+Configuration for a compact masked patch-transformer reconstructor.
 
 The input/output contract is MAE-style:
-- input: a masked image tensor, `N×C×H×W`;
+- input: a masked tensor, `(batch, channels, spatial...)`;
 - output: a flattened reconstruction vector, `N×reconDim`.
 
 `reconDim` can be the full image size (`C*H*W`) or a prefix for faster experiments.
 -/
-structure VitMaeConfig where
-  batch : Nat
-  inC : Nat
-  inH : Nat
-  inW : Nat
-  patchH : Nat
-  patchW : Nat
-  stride : Nat
-  padding : Nat := 0
-  dModel : Nat
+structure VitMaeConfig (d : Nat) where
+  /-- Patch-transformer encoder configuration. -/
+  encoder : VitConfig d
+  /-- Number of reconstructed output coordinates. -/
   reconDim : Nat
-  numHeads : Nat
-  headDim : Nat
-  ffnHidden : Nat
-deriving Repr
 
-/-- Convert a ViT-MAE configuration into the classifier-style ViT config used by the encoder. -/
-def VitMaeConfig.toVitConfig (cfg : VitMaeConfig) : VitConfig :=
-  { batch := cfg.batch
-    inC := cfg.inC
-    inH := cfg.inH
-    inW := cfg.inW
-    patchH := cfg.patchH
-    patchW := cfg.patchW
-    stride := cfg.stride
-    padding := cfg.padding
-    dModel := cfg.dModel
-    outDim := cfg.reconDim
-    numHeads := cfg.numHeads
-    headDim := cfg.headDim
-    ffnHidden := cfg.ffnHidden }
+/-- Masked input shape. -/
+def vitMaeInShape {d : Nat} (cfg : VitMaeConfig d) : Spec.Shape :=
+  vitInShape cfg.encoder
 
-/-- Batched masked-image input shape for the ViT-MAE helper. -/
-abbrev vitMaeInShape (cfg : VitMaeConfig) : Shape :=
-  NN.Tensor.Shape.Images cfg.batch cfg.inC cfg.inH cfg.inW
-
-/-- Batched reconstruction-vector output shape for the ViT-MAE helper. -/
-abbrev vitMaeOutShape (cfg : VitMaeConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.reconDim
+/-- Reconstruction-vector output shape. -/
+def vitMaeOutShape {d : Nat} (cfg : VitMaeConfig d) : Spec.Shape :=
+  .dim cfg.encoder.batch (.dim cfg.reconDim .scalar)
 
 /-- Number of patch tokens produced by the ViT-MAE patch embedding. -/
-def VitMaeConfig.seqLen (cfg : VitMaeConfig) : Nat :=
-  cfg.toVitConfig.seqLen
+def VitMaeConfig.seqLen {d : Nat} (cfg : VitMaeConfig d) : Nat :=
+  cfg.encoder.seqLen
 
 /-- Flattened encoded-token representation size before the MAE decoder head. -/
-def VitMaeConfig.flatDim (cfg : VitMaeConfig) : Nat :=
-  cfg.toVitConfig.flatDim
+def VitMaeConfig.flatDim {d : Nat} (cfg : VitMaeConfig d) : Nat :=
+  cfg.encoder.flatDim
 
 /--
 Compact ViT-MAE image reconstructor.
@@ -98,36 +72,32 @@ This is a real image/patch transformer path:
 3. one transformer encoder block,
 4. a linear pixel decoder from encoded patch tokens to a reconstruction vector.
 
-The masking objective is provided by `NN.API.ssl.imagePatchMaeSample`, so any image model with this
-input/output shape can use the same SSL training sample.
+The masking objective is provided by `NN.API.ssl.blockMaeSample`. Its axis policy is independent of
+the model architecture and spatial rank, so this constructor uses the same checked operation as
+signal, volume, and higher-dimensional masked-prediction models.
 -/
-def vitMaskedAutoencoder (cfg : VitMaeConfig)
-    (h_inC : cfg.inC ≠ 0 := by decide)
-    (h_patchH : cfg.patchH ≠ 0 := by decide)
-    (h_patchW : cfg.patchW ≠ 0 := by decide)
+def vitMaskedAutoencoder {d : Nat} (cfg : VitMaeConfig d)
+    (h_inC : cfg.encoder.inChannels ≠ 0 := by decide)
     (h_seqLen : cfg.seqLen ≠ 0 := by decide)
-    (h_dModel : cfg.dModel ≠ 0 := by decide) :
+    (h_dModel : cfg.encoder.patch.outChannels ≠ 0 := by decide) :
     nn.M (nn.Sequential (vitMaeInShape cfg) (vitMaeOutShape cfg)) :=
-  let vitCfg := cfg.toVitConfig
-  letI : NeZero cfg.inC := ⟨h_inC⟩
-  letI : NeZero cfg.patchH := ⟨h_patchH⟩
-  letI : NeZero cfg.patchW := ⟨h_patchW⟩
+  let vitCfg := cfg.encoder
+  letI : NeZero vitCfg.inChannels := ⟨h_inC⟩
   letI : NeZero vitCfg.seqLen := ⟨h_seqLen⟩
-  letI : NeZero cfg.dModel := ⟨h_dModel⟩
-  letI : NeZero vitCfg.dModel := ⟨by
-    change cfg.dModel ≠ 0
-    exact h_dModel⟩
+  letI : NeZero vitCfg.patch.outChannels := ⟨h_dModel⟩
+  let patchEmbedding :=
+    nn.conv (leading := .dim vitCfg.batch .scalar) vitCfg.spatial vitCfg.patch
   nn.Sequential![
-    nn.conv { outC := cfg.dModel, kH := cfg.patchH, kW := cfg.patchW, stride := cfg.stride, padding := cfg.padding },
-    nn.lift (nn.of (nchwToTokens vitCfg)),
+    patchEmbedding,
+    nn.lift (nn.of (spatialToTokens vitCfg)),
     nn.transformerEncoderBlock
-      { numHeads := cfg.numHeads
-        headDim := cfg.headDim
-        ffnHidden := cfg.ffnHidden
+      { numHeads := vitCfg.numHeads
+        headDim := vitCfg.headDim
+        ffnHidden := vitCfg.ffnHidden
         activation := .gelu
         dropout? := none },
-    FlattenBatch,
-    Linear cfg.flatDim cfg.reconDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    flattenBatch,
+    linear cfg.flatDim cfg.reconDim (pfx := .dim vitCfg.batch .scalar)
   ]
 
 /--

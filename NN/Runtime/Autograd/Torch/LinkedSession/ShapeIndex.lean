@@ -101,10 +101,10 @@ PyTorch comparison: `torch.nn.functional.max_pool2d` (for NCHW-like layouts, her
 def maxPool2d {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
-  IO (TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  IO (TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   commitGraphM (α := α) s
-    (β := TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+    (β := TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
       .scalar))))
     (fun {Γ} {ss} xv nat g => do
       let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -125,10 +125,10 @@ pooling window with inverse-temperature `beta` and returning the expected value.
 def smoothMaxPool2d {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) (beta : α) :
-  IO (TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  IO (TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   commitGraphM (α := α) s
-    (β := TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+    (β := TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
       .scalar))))
     (fun {Γ} {ss} xv nat g => do
       let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -148,10 +148,10 @@ PyTorch comparison: `torch.nn.functional.avg_pool2d` (for NCHW-like layouts, her
 def avgPool2d {α : Type} (s : SessionIR α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
-  IO (TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+  IO (TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
     .scalar)))) :=
   commitGraphM (α := α) s
-    (β := TensorRef α (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1)
+    (β := TensorRef α (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0)
       .scalar))))
     (fun {Γ} {ss} xv nat g => do
       let (v, st') ← runGraphM (α := α) (Γ := Γ)
@@ -181,13 +181,13 @@ def relu {α : Type} (s : SessionIR α)
     pure ({ id := v.id }, st1))
 
 /--
-Flatten a tensor into a 1D vector of length `Shape.size sh`.
+Flatten a tensor into a 1D vector of length `Spec.Shape.size sh`.
 
 PyTorch comparison: `torch.flatten(x)` (with default `start_dim=0`).
 -/
 def flatten {α : Type} (s : SessionIR α) [Inhabited α] [Zero α] [DecidableEq Shape] {sh : Shape}
-  (x : TensorRef α sh) : IO (TensorRef α (.dim (Shape.size sh) .scalar)) :=
-  commitGraphM (α := α) s (β := TensorRef α (.dim (Shape.size sh) .scalar)) (fun {Γ} {ss} xv nat g
+  (x : TensorRef α sh) : IO (TensorRef α (.dim (Spec.Shape.size sh) .scalar)) :=
+  commitGraphM (α := α) s (β := TensorRef α (.dim (Spec.Shape.size sh) .scalar)) (fun {Γ} {ss} xv nat g
     => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)
       (Runtime.Autograd.Compiled.GraphM.flatten (α := α) (Γ := Γ) (s := sh) { id := x.id })
@@ -199,11 +199,11 @@ def flatten {α : Type} (s : SessionIR α) [Inhabited α] [Zero α] [DecidableEq
 /--
 Reshape a tensor while preserving total number of elements.
 
-The proof argument `h` enforces `Shape.size sh1 = Shape.size sh2`.
+The proof argument `h` enforces `Spec.Shape.size sh1 = Spec.Shape.size sh2`.
 PyTorch comparison: `torch.reshape(x, new_shape)` / `x.view(new_shape)` (when contiguous).
 -/
 def reshape {α : Type} (s : SessionIR α) [Inhabited α] [Zero α] [DecidableEq Shape]
-  {sh1 sh2 : Shape} (x : TensorRef α sh1) (h : Shape.size sh1 = Shape.size sh2) : IO (TensorRef α
+  {sh1 sh2 : Shape} (x : TensorRef α sh1) (h : Spec.Shape.size sh1 = Spec.Shape.size sh2) : IO (TensorRef α
     sh2) :=
   commitGraphM (α := α) s (β := TensorRef α sh2) (fun {Γ} {ss} xv nat g => do
     let (v, st') ← runGraphM (α := α) (Γ := Γ)

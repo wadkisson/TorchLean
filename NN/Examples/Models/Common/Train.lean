@@ -6,7 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 
 /-!
 # Shared Model Training Commands
@@ -20,9 +21,9 @@ print the standard summary.
 
 @[expose] public section
 
-namespace TorchLean
+namespace NN.Examples.Models.TrainCommand
 
-namespace Trainer.Command
+open TorchLean
 
 /-- Run one parsed model-training command and finish with access to runtime flags and result. -/
 def runParsedWith {φ ρ : Type}
@@ -126,7 +127,7 @@ structure Config (δ : Type) where
   /-- Run the actual training body after data, device, and training flags have been parsed. -/
   train : Options → δ → ModelZoo.LoggedTrainFlags → IO Unit
 
-/-- Usage text for shared `Trainer.Command.run` model examples. -/
+/-- Usage text for model examples using the shared runner. -/
 def usage {δ : Type} (cfg : Config δ) : String :=
   let dataSection :=
     if cfg.dataOptions.isEmpty then []
@@ -164,7 +165,4 @@ def run {δ : Type} (cfg : Config δ) (args : List String) : IO UInt32 := do
       CLI.requireNoArgs cfg.exeName rest
       cfg.train opts dataArgs train)
 
-end Command
-end Trainer
-
-end TorchLean
+end NN.Examples.Models.TrainCommand

@@ -14,7 +14,6 @@ public import NN.Spec.Module.DecisionTree
 public import NN.Spec.Module.Dropout
 public import NN.Spec.Module.Embedding
 public import NN.Spec.Module.Flatten
-public import NN.Spec.Module.GlobalPooling
 public import NN.Spec.Module.Gmm
 public import NN.Spec.Module.Gnn
 public import NN.Spec.Module.GradientBoostedTrees
@@ -28,7 +27,6 @@ public import NN.Spec.Module.Normalization
 public import NN.Spec.Module.Pca
 public import NN.Spec.Module.Pooling
 public import NN.Spec.Module.PositionalEncoding
-public import NN.Spec.Module.Resnet
 public import NN.Spec.Module.Rnn
 public import NN.Spec.Module.RnnModels
 public import NN.Spec.Module.Seq2seq

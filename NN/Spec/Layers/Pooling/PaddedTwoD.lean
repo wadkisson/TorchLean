@@ -64,8 +64,8 @@ def maxPool2dMultiSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 : kH ≠ 
     {hStride : stride ≠ 0}
     (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
     (input : MultiChannelImage inC inH inW α) :
-    MultiChannelImage inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) / stride
-      + 1) α :=
+    MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) α :=
   Tensor.dim (fun c =>
     Tensor.dim (fun oh =>
       Tensor.dim (fun ow =>
@@ -106,8 +106,8 @@ def maxPool2dMultiLinearizationSpecPad {kH kW inH inW inC stride padding : ℕ} 
     {h2 : kW ≠ 0} {hStride : stride ≠ 0}
     (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
     (input tangent : MultiChannelImage inC inH inW α) :
-    MultiChannelImage inC ((inH + 2 * padding - kH) / stride + 1)
-      ((inW + 2 * padding - kW) / stride + 1) α :=
+    MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) α :=
   Tensor.dim (fun c =>
     Tensor.dim (fun oh =>
       Tensor.dim (fun ow =>
@@ -151,12 +151,13 @@ def avgPool2dMultiSpecPad {kH kW inH inW inC stride padding : ℕ} (h1 : kH ≠ 
     {hStride : stride ≠ 0}
     (layer : AvgPool2DSpec kH kW stride h1 h2 hStride)
     (input : MultiChannelImage inC inH inW α) :
-    MultiChannelImage inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) / stride
-      + 1) α :=
+    MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) α := by
   -- PyTorch note: this matches `count_include_pad=true` (the padded zeros are part of the average).
   let inputPad : MultiChannelImage inC (inH + 2 * padding) (inW + 2 * padding) α :=
     padMultiChannel (inC := inC) (inH := inH) (inW := inW) input padding
-  avgPool2dMultiSpec (h1 := h1) (h2 := h2) (layer := layer) (input := inputPad)
+  simpa [Shape.slidingWindowOutDim, Nat.add_assoc] using
+    avgPool2dMultiSpec (h1 := h1) (h2 := h2) (layer := layer) (input := inputPad)
 
 /-- Multi-channel max-pooling backward pass with PyTorch-style padding (`-∞` outside bounds). -/
 def maxPool2dMultiBackwardSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 : kH ≠ 0} {h2 : kW
@@ -165,11 +166,11 @@ def maxPool2dMultiBackwardSpecPad {kH kW inH inW inC stride padding : ℕ} {h1 :
     (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
-    MultiChannelImage inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
-        stride + 1) α) :
+    MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) α) :
     MultiChannelImage inC inH inW α :=
-  let outH := (inH + 2 * padding - kH) / stride + 1
-  let outW := (inW + 2 * padding - kW) / stride + 1
+  let outH := Shape.slidingWindowOutDim inH kH stride padding
+  let outW := Shape.slidingWindowOutDim inW kW stride padding
   let grad_init : MultiChannelImage inC inH inW α :=
     Tensor.dim (fun _ => Tensor.dim (fun _ => Tensor.dim (fun _ => Tensor.scalar 0)))
   (List.range inC).foldl (fun acc cNat =>
@@ -227,13 +228,18 @@ def avgPool2dMultiBackwardSpecPad {kH kW inH inW inC stride padding : ℕ} (h1 :
     {hStride : stride ≠ 0}
     (layer : AvgPool2DSpec kH kW stride h1 h2 hStride)
     (grad_output :
-      MultiChannelImage inC ((inH + 2 * padding - kH) / stride + 1) ((inW + 2 * padding - kW) /
-        stride + 1) α) :
-    MultiChannelImage inC inH inW α :=
+      MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride padding)
+        (Shape.slidingWindowOutDim inW kW stride padding) α) :
+    MultiChannelImage inC inH inW α := by
+  let gradOutputPadded :
+      MultiChannelImage inC
+        (Shape.slidingWindowOutDim (inH + 2 * padding) kH stride 0)
+        (Shape.slidingWindowOutDim (inW + 2 * padding) kW stride 0) α := by
+    simpa [Shape.slidingWindowOutDim, Nat.add_assoc] using grad_output
   let gradPad : MultiChannelImage inC (inH + 2 * padding) (inW + 2 * padding) α :=
     Tensor.dim (fun c =>
-      avgPool2dBackwardSpec (α := α) h1 h2 layer (getAtSpec grad_output c))
-  unpadMultiChannel (α := α) (C := inC) (H := inH) (W := inW) (padding := padding) gradPad
+      avgPool2dBackwardSpec (α := α) h1 h2 layer (getAtSpec gradOutputPadded c))
+  exact unpadMultiChannel (α := α) (C := inC) (H := inH) (W := inW) (padding := padding) gradPad
 
 -- Smooth max pooling backward pass (log-sum-exp surrogate)
 /-- Backward/VJP for `smooth_max_pool2d_spec` (log-sum-exp surrogate). -/
@@ -242,14 +248,14 @@ def smoothMaxPool2dBackwardSpec {kH kW inH inW stride : ℕ} {h1 : kH ≠ 0} {h2
   (_layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
   (beta : α)
   (input : Image inH inW α)
-  (grad_output : Image ((inH - kH) / stride + 1) ((inW - kW) / stride + 1) α) :
+  (grad_output : Image (Shape.slidingWindowOutDim inH kH stride 0) (Shape.slidingWindowOutDim inW kW stride 0) α) :
   Image inH inW α :=
   -- This is the VJP of the log-sum-exp surrogate:
   --   smooth_max(x) = (1/beta) * log(sum(exp(beta*x))).
   -- The gradient distributes `grad_output` proportionally to `exp(beta*x)` inside each window.
   let input_grad_init : Image inH inW α := createZeroImage inH inW
-  let outH := (inH - kH) / stride + 1
-  let outW := (inW - kW) / stride + 1
+  let outH := Shape.slidingWindowOutDim inH kH stride 0
+  let outW := Shape.slidingWindowOutDim inW kW stride 0
   let coeff : α := 1
   (List.finRange outH).foldl (fun acc_grad (out_i : Fin outH) =>
     (List.finRange outW).foldl (fun acc_grad_inner (out_j : Fin outW) =>
@@ -301,7 +307,7 @@ def smoothMaxPool2dMultiBackwardSpec {kH kW inH inW inC stride : ℕ} {h1 : kH �
   (layer : MaxPool2DSpec kH kW stride h1 h2 hStride)
   (beta : α)
   (input : MultiChannelImage inC inH inW α)
-  (grad_output : MultiChannelImage inC ((inH - kH) / stride + 1) ((inW - kW) / stride + 1) α) :
+  (grad_output : MultiChannelImage inC (Shape.slidingWindowOutDim inH kH stride 0) (Shape.slidingWindowOutDim inW kW stride 0) α) :
   MultiChannelImage inC inH inW α :=
   Tensor.dim (fun c =>
     smoothMaxPool2dBackwardSpec (_layer := layer) (beta := beta)

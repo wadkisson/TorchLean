@@ -10,14 +10,14 @@ one IR component should import the focused leaf directly.
 ```lean
 import NN
 -- or, if you only want this subsystem:
-import NN.Entrypoint.IR
+import NN.IR
 -- or a focused internal leaf, for example:
 import NN.IR.Graph
 import NN.IR.Semantics
 ```
 
 There is intentionally no extra top-level `NN.IR` umbrella. Use `NN` for the broad library import,
-`NN.Entrypoint.IR` for the IR subsystem, and the individual `NN.IR.*` files when a module needs a
+`NN.IR` for the IR subsystem, and the individual `NN.IR.*` files when a module needs a
 precise internal dependency.
 
 ## What Belongs Here

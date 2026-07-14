@@ -131,7 +131,7 @@ def tensor (sch : Scheme) (seed : Nat := 0) : {s : Shape} → Tensor Float s
   | .scalar =>
       Tensor.scalar (sampleAt sch seed 0)
   | .dim _n s' =>
-      let chunk := Shape.size s'
+      let chunk := Spec.Shape.size s'
       Tensor.dim (fun i =>
         -- offset-by-block so different blocks get different samples
         let seed' := seed
@@ -140,7 +140,7 @@ def tensor (sch : Scheme) (seed : Nat := 0) : {s : Shape} → Tensor Float s
         let rec build : {t : Shape} → Nat → Tensor Float t
           | .scalar, k => Tensor.scalar (sampleAt sch seed' (idxBase + k))
           | .dim _m t', k =>
-              let chunk' := Shape.size t'
+              let chunk' := Spec.Shape.size t'
               Tensor.dim (fun j => build (t := t') (k + j.val * chunk'))
         build (t := s') 0)
 
@@ -212,7 +212,7 @@ This is meant for training code where `tlistSingleton`/`tlistPair`/… becomes t
 Example:
 
 ```lean
-let xs : TList Float [Shape.Vec 2, Shape.Vec 1] :=
+let xs : TList Float [.dim 2 .scalar, .dim 1 .scalar] :=
   tlist![x, y]
 ```
 -/

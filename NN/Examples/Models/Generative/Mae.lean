@@ -10,7 +10,7 @@ Run:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -22,7 +22,7 @@ The data path is explicit:
 
 1. load real CIFAR-10 `.npy` arrays through `Data`;
 2. take a typed image batch with shape `[batch, channels, height, width]`;
-3. hide deterministic image patches with `ssl.imagePatchMaeSample`;
+3. hide deterministic spatial blocks with `ssl.blockMaeSample`;
 4. run a ViT encoder over patch tokens;
 5. train a decoder head to reconstruct the original image vector.
 
@@ -90,20 +90,23 @@ The command crops CIFAR images to `2×2`, uses one image patch, and reconstructs
 flattened image. That keeps MAE in the runnable quick-check suite while still checking the patch masking,
 patch embedding, transformer token, decoder, data loading, and CUDA training path.
 -/
-def cfg : nn.models.VitMaeConfig :=
-  { batch := batch
-    inC := inC
-    inH := inH
-    inW := inW
-    patchH := patchH
-    patchW := patchW
-    stride := stride
-    padding := padding
-    dModel := dModel
-    reconDim := reconDim
-    numHeads := numHeads
-    headDim := headDim
-    ffnHidden := ffnHidden }
+def cfg : nn.models.VitMaeConfig 2 :=
+  { encoder :=
+      { batch := batch
+        inChannels := inC
+        spatial := #v[inH, inW]
+        patch :=
+          { outChannels := dModel
+            kernel := #v[patchH, patchW]
+            stride := #v[stride, stride]
+            padding := #v[padding, padding]
+            kernelNonzero := by intro i; fin_cases i <;> decide
+            strideNonzero := by intro i; fin_cases i <;> simp [stride, Vector.get] }
+        outDim := reconDim
+        numHeads := numHeads
+        headDim := headDim
+        ffnHidden := ffnHidden }
+    reconDim := reconDim }
 
 /--
 Hide one patch-index class every four patch positions.
@@ -131,7 +134,15 @@ The architecture lives in the public self-supervised model API; this example onl
 loads data, and trains it.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.VitMAE cfg
+  nn.models.vitMaskedAutoencoder cfg
+    (h_inC := by decide)
+    (h_seqLen := by
+      norm_num [nn.models.VitMaeConfig.seqLen, nn.models.VitConfig.seqLen,
+        nn.models.VitConfig.patchSpatial, cfg, Spec.convOutSpatial,
+        Spec.Shape.slidingWindowOutDim,
+        inH, inW, patchH, patchW, stride, padding, Spec.Shape.ofList, Spec.Shape.size,
+        Vector.get, Vector.toList, Vector.ofFn])
+    (h_dModel := by decide)
 
 /--
 Turn a typed CIFAR image batch into the compact MAE training sample.
@@ -140,10 +151,13 @@ The input stays an image tensor with some patches zeroed out. The target is the 
 flattened to a vector because the current decoder head predicts a batched matrix.
 -/
 def mkMaeSample
-    (b : SupervisedSample Float (Shape.images cfg.batch cfg.inC cfg.inH cfg.inW)
-      (Shape.mat cfg.batch RealData.cifarClasses)) :
+    (b : SupervisedSample Float
+      (.dim cfg.encoder.batch (.dim cfg.encoder.inChannels (.dim inH (.dim inW .scalar))))
+      (.dim cfg.encoder.batch (.dim RealData.cifarClasses .scalar))) :
   SupervisedSample Float σ τ :=
-  ssl.imagePatchMaeSample cfg.batch cfg.inC cfg.inH cfg.inW cfg.reconDim cfg.patchH cfg.patchW
+  ssl.blockMaeSample cfg.encoder.batch cfg.reconDim
+    #v[cfg.encoder.inChannels, inH, inW]
+    #v[none, some patchH, some patchW]
     maskPeriod maskOffset (by decide) (Sample.x b)
 
 /--
@@ -155,10 +169,10 @@ data boundary, then cast into the runtime-selected scalar by the public dataset 
 def data (flags : RealData.CifarModelTrainFlags) : Trainer.Dataset σ τ :=
   Data.ioSingletonFloat do
     let batch ←
-      RealData.loadCifarBatch exeName cfg.batch flags.nRows flags.seed
+      RealData.loadCifarBatch exeName cfg.encoder.batch flags.nRows flags.seed
         flags.xPath flags.yPath
     pure <| mkMaeSample <|
-      RealData.cropCifarBatch cfg.batch cfg.inH cfg.inW (by decide) (by decide) batch
+      RealData.cropCifarBatch cfg.encoder.batch inH inW (by decide) (by decide) batch
 
 /-- Train the compact MAE model with the public `Trainer` surface. -/
 def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
@@ -177,7 +191,7 @@ def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
     (data flags)
     (ModelZoo.TrainFlags.trainOptions flags.toModelTrainFlags
       (title := "MAE CIFAR masked reconstruction")
-      (notes := RealData.cifarClassifierNotes cfg.batch flags
+      (notes := RealData.cifarClassifierNotes cfg.encoder.batch flags
         #[s!"maskPeriod={maskPeriod}", s!"maskOffset={maskOffset}"]))
 
 /--
@@ -190,7 +204,7 @@ Useful flags:
 - `--log <path>` writes the standard TorchLean training log JSON.
 -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionNpy exeName args
+  TrainCommand.regressionNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 10 1e-3)
     (ModelZoo.bannerWithDevice exeName "CIFAR masked reconstruction")
     train

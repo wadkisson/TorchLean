@@ -108,17 +108,20 @@ def mkTransposeInputIdx?
   match outIdx, kIdx, stride, padding with
   | [], [], [], [] => some []
   | o :: os, k :: ks, s :: ss, p :: ps =>
-      let q := o + p
-      if _h : q < k then
+      if s = 0 then
         none
       else
-        let r := q - k
-        if _hs : r % s = 0 then
-          match mkTransposeInputIdx? os ks ss ps with
-          | none => none
-          | some rest => some ((r / s) :: rest)
-        else
+        let q := o + p
+        if _h : q < k then
           none
+        else
+          let r := q - k
+          if _hs : r % s = 0 then
+            match mkTransposeInputIdx? os ks ss ps with
+            | none => none
+            | some rest => some ((r / s) :: rest)
+          else
+            none
   | _, _, _, _ => none
 
 def matchesInputPos
@@ -140,14 +143,32 @@ structure ConvSpec (d inC outC : Nat) (kernel stride padding : Vector Nat d) (α
   /-- Bias, shape `(outC)`. -/
   bias   : Tensor α (.dim outC .scalar)
 
-/-- Output size along a single axis (PyTorch formula, floor division). -/
-def convOutDim (inDim kDim stride padding : Nat) : Nat :=
-  (inDim + 2 * padding - kDim) / stride + 1
-
 /-- Output spatial sizes (`Vector Nat d`). -/
 def convOutSpatial {d : Nat} (inSpatial kernel stride padding : Vector Nat d) : Vector Nat d :=
   Vector.ofFn (fun a =>
-    convOutDim (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
+    Shape.slidingWindowOutDim
+      (inSpatial.get a) (kernel.get a) (stride.get a) (padding.get a))
+
+/-- A unit kernel with unit stride and no padding preserves every positive spatial extent. -/
+theorem convOutSpatial_unit {d : Nat} (spatial : Vector Nat d)
+    (hSpatial : ∀ i : Fin d, spatial.get i ≠ 0) :
+    convOutSpatial spatial (Vector.replicate d 1) (Vector.replicate d 1)
+      (Vector.replicate d 0) = spatial := by
+  apply Vector.ext
+  intro i hi
+  have hPos : 1 ≤ spatial.get ⟨i, hi⟩ :=
+    Nat.one_le_iff_ne_zero.mpr (hSpatial ⟨i, hi⟩)
+  have hZero : (Vector.replicate d 0).get ⟨i, hi⟩ = 0 := by
+    change (Vector.replicate d 0)[i] = 0
+    simp
+  have hOne : (Vector.replicate d 1).get ⟨i, hi⟩ = 1 := by
+    change (Vector.replicate d 1)[i] = 1
+    simp
+  have hPosElem : 1 ≤ spatial[i] := by simpa [Vector.get] using hPos
+  have hNonzero : spatial[i] ≠ 0 := Nat.ne_of_gt (Nat.lt_of_lt_of_le Nat.zero_lt_one hPosElem)
+  simpa [convOutSpatial, Shape.slidingWindowOutDim, Vector.get, hNonzero,
+    Nat.not_lt.mpr hPosElem] using
+    Nat.sub_add_cancel hPosElem
 
 /-- Output spatial shape `Shape.ofList [out0, ..., out(d-1)]`. -/
 def convOutShape {d : Nat} (inSpatial kernel stride padding : Vector Nat d) : Shape :=
@@ -343,9 +364,20 @@ structure ConvTransposeSpec (d inC outC : Nat) (kernel stride padding : Vector N
   /-- Bias, shape `(outC)`. -/
   bias   : Tensor α (.dim outC .scalar)
 
-/-- Output size along a single axis for transpose convolution (`output_padding = 0`). -/
+/--
+Output size along one transpose-convolution axis with `output_padding = 0`.
+
+For positive input, kernel, and stride this is
+`(input - 1) * stride + kernel - 2 * padding`. A zero input, kernel, or stride is treated as an
+invalid axis and has size zero; excessive padding also saturates the final subtraction at zero.
+The addition precedes subtraction intentionally: Nat subtraction in
+`(input - 1) * stride - 2 * padding + kernel` does not represent the integer formula.
+-/
 def convTransposeOutDim (inDim kDim stride padding : Nat) : Nat :=
-  (inDim - 1) * stride - 2 * padding + kDim
+  if inDim = 0 || kDim = 0 || stride = 0 then
+    0
+  else
+    (inDim - 1) * stride + kDim - 2 * padding
 
 /-- Output spatial sizes (`Vector Nat d`) for transpose convolution (`output_padding = 0`). -/
 def convTransposeOutSpatial {d : Nat} (inSpatial kernel stride padding : Vector Nat d) :
@@ -538,14 +570,14 @@ abbrev Conv2DSpec (inC outC kH kW stride padding : Nat) (α : Type)
 
 /-- Output spatial shape `(outH,outW)` for a Conv2D with given hyperparameters. -/
 def conv2dOutShape (inH inW kH kW stride padding : Nat) : Shape :=
-  let outH := (inH + 2 * padding - kH) / stride + 1
-  let outW := (inW + 2 * padding - kW) / stride + 1
+  let outH := Shape.slidingWindowOutDim inH kH stride padding
+  let outW := Shape.slidingWindowOutDim inW kW stride padding
   .dim outH (.dim outW .scalar)
 
 /-- Output shape including channels: `(outC,outH,outW)`. -/
 def conv2dMultiOutShape (_inC outC inH inW kH kW stride padding : Nat) : Shape :=
-  let outH := (inH + 2 * padding - kH) / stride + 1
-  let outW := (inW + 2 * padding - kW) / stride + 1
+  let outH := Shape.slidingWindowOutDim inH kH stride padding
+  let outW := Shape.slidingWindowOutDim inW kW stride padding
   .dim outC (.dim outH (.dim outW .scalar))
 
 theorem Private.conv2d_multi_out_shape_eq
@@ -555,9 +587,9 @@ theorem Private.conv2d_multi_out_shape_eq
           (convOutSpatial (d := 2) (#v[inH, inW]) (#v[kH, kW]) (#v[stride, stride])
                 (#v[padding, padding])).toList) =
       .dim outC
-        (.dim ((inH + 2 * padding - kH) / stride + 1)
-          (.dim ((inW + 2 * padding - kW) / stride + 1) .scalar)) := by
-  simp [convOutSpatial, convOutDim, Vector.get, Vector.toList, Shape.ofList]
+        (.dim (Shape.slidingWindowOutDim inH kH stride padding)
+          (.dim (Shape.slidingWindowOutDim inW kW stride padding) .scalar)) := by
+  simp [convOutSpatial, Shape.slidingWindowOutDim, Vector.get, Vector.toList, Shape.ofList]
 
 /--
 Conv2D forward pass on a single image `C×H×W` (no batch dimension).
@@ -570,8 +602,8 @@ def conv2dSpec {inC outC kH kW stride padding inH inW : Nat}
     (layer : Conv2DSpec inC outC kH kW stride padding α h1 h2 h3)
     (input : MultiChannelImage inC inH inW α) :
     MultiChannelImage outC
-      ((inH + 2 * padding - kH) / stride + 1)
-      ((inW + 2 * padding - kW) / stride + 1) α := by
+      (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) α := by
   have _ := h1
   have _ := h2
   have _ := h3
@@ -585,8 +617,8 @@ def conv2dSpec {inC outC kH kW stride padding inH inW : Nat}
   --
   -- Instead, we replay the same `mkInputIdx?`-based definition with explicit 2D dimension lists,
   -- which makes the output tensor constructor-built at the expected `(outC,outH,outW)` shape.
-  let outH : Nat := ((inH + 2 * padding - kH) / stride + 1)
-  let outW : Nat := ((inW + 2 * padding - kW) / stride + 1)
+  let outH : Nat := Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Shape.slidingWindowOutDim inW kW stride padding
   let strideDims : List Nat := [stride, stride]
   let padDims : List Nat := [padding, padding]
   -- We keep the loop structure explicit (`inC × kH × kW`) so it matches the Conv2D pointwise
@@ -618,16 +650,16 @@ def conv2dKernelDerivSpec
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH + 2 * padding - kH) / stride + 1)
-        ((inW + 2 * padding - kW) / stride + 1) α) :
+        (Shape.slidingWindowOutDim inH kH stride padding)
+        (Shape.slidingWindowOutDim inW kW stride padding) α) :
     Tensor α (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))) := by
   have _ := h1
   have _ := h2
   have _ := h3
   let _ := layer
   let _ := input
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Shape.slidingWindowOutDim inW kW stride padding
   let strideDims : List Nat := [stride, stride]
   let padDims : List Nat := [padding, padding]
   exact Tensor.dim (fun out_ch =>
@@ -653,16 +685,16 @@ def conv2dBiasDerivSpec
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH + 2 * padding - kH) / stride + 1)
-        ((inW + 2 * padding - kW) / stride + 1) α) :
+        (Shape.slidingWindowOutDim inH kH stride padding)
+        (Shape.slidingWindowOutDim inW kW stride padding) α) :
     Tensor α (.dim outC .scalar) := by
   have _ := h1
   have _ := h2
   have _ := h3
   let _ := layer
   let _ := input
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Shape.slidingWindowOutDim inW kW stride padding
   exact Tensor.dim (fun out_ch =>
     let total_sum : α :=
       (List.finRange outH).foldl (fun acc i =>
@@ -678,15 +710,15 @@ def conv2dInputDerivSpec
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH + 2 * padding - kH) / stride + 1)
-        ((inW + 2 * padding - kW) / stride + 1) α) :
+        (Shape.slidingWindowOutDim inH kH stride padding)
+        (Shape.slidingWindowOutDim inW kW stride padding) α) :
     MultiChannelImage inC inH inW α := by
   have _ := h1
   have _ := h2
   have _ := h3
   let _ := input
-  let outH : Nat := (inH + 2 * padding - kH) / stride + 1
-  let outW : Nat := (inW + 2 * padding - kW) / stride + 1
+  let outH : Nat := Shape.slidingWindowOutDim inH kH stride padding
+  let outW : Nat := Shape.slidingWindowOutDim inW kW stride padding
   exact Tensor.dim (fun in_ch =>
     Tensor.dim (fun i =>
       Tensor.dim (fun j =>
@@ -716,8 +748,8 @@ def conv2dBackwardSpec
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH + 2 * padding - kH) / stride + 1)
-        ((inW + 2 * padding - kW) / stride + 1) α) :
+        (Shape.slidingWindowOutDim inH kH stride padding)
+        (Shape.slidingWindowOutDim inW kW stride padding) α) :
     (Tensor α (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))) ×
      Tensor α (.dim outC .scalar) ×
        MultiChannelImage inC inH inW α) := by
@@ -767,8 +799,8 @@ theorem Private.conv_transpose2d_multi_out_shape_eq
           (convTransposeOutSpatial (d := 2) (#v[inH, inW]) (#v[kH, kW]) (#v[stride, stride])
                 (#v[padding, padding])).toList) =
       .dim outC
-        (.dim ((inH - 1) * stride - 2 * padding + kH)
-          (.dim ((inW - 1) * stride - 2 * padding + kW) .scalar)) := by
+        (.dim (convTransposeOutDim inH kH stride padding)
+          (.dim (convTransposeOutDim inW kW stride padding) .scalar)) := by
   simp [convTransposeOutSpatial, convTransposeOutDim, Vector.get, Vector.toList, Shape.ofList]
 
 /--
@@ -781,8 +813,8 @@ def convTranspose2dSpec {inC outC kH kW stride padding inH inW : Nat}
     (layer : ConvTranspose2DSpec inC outC kH kW stride padding α h1 h2 h3)
     (input : MultiChannelImage inC inH inW α) :
     MultiChannelImage outC
-      ((inH - 1) * stride - 2 * padding + kH)
-      ((inW - 1) * stride - 2 * padding + kW) α := by
+      (convTransposeOutDim inH kH stride padding)
+      (convTransposeOutDim inW kW stride padding) α := by
   have _ := h1
   have _ := h2
   have _ := h3
@@ -809,8 +841,8 @@ def convTranspose2dWeightsDerivSpec {inC outC kH kW stride padding inH inW : Nat
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH - 1) * stride - 2 * padding + kH)
-        ((inW - 1) * stride - 2 * padding + kW) α) :
+        (convTransposeOutDim inH kH stride padding)
+        (convTransposeOutDim inW kW stride padding) α) :
     ConvTransposeKernel outC inC kH kW α := by
   let grad_output' :
       Tensor α
@@ -832,8 +864,8 @@ def convTranspose2dWeightsDerivSpec {inC outC kH kW stride padding inH inW : Nat
 def convTranspose2dBiasDerivSpec {_inC outC kH kW stride padding inH inW : Nat}
     (grad_output :
       MultiChannelImage outC
-        ((inH - 1) * stride - 2 * padding + kH)
-        ((inW - 1) * stride - 2 * padding + kW) α) :
+        (convTransposeOutDim inH kH stride padding)
+        (convTransposeOutDim inW kW stride padding) α) :
     Tensor α (.dim outC .scalar) := by
   let grad_output' :
       Tensor α
@@ -857,8 +889,8 @@ def convTranspose2dInputDerivSpec {inC outC kH kW stride padding inH inW : Nat}
     (weights : ConvTransposeKernel outC inC kH kW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH - 1) * stride - 2 * padding + kH)
-        ((inW - 1) * stride - 2 * padding + kW) α) :
+        (convTransposeOutDim inH kH stride padding)
+        (convTransposeOutDim inW kW stride padding) α) :
     MultiChannelImage inC inH inW α := by
   let grad_output' :
       Tensor α
@@ -883,8 +915,8 @@ def convTranspose2dBackwardSpec {inC outC kH kW stride padding inH inW : Nat}
     (input : MultiChannelImage inC inH inW α)
     (grad_output :
       MultiChannelImage outC
-        ((inH - 1) * stride - 2 * padding + kH)
-        ((inW - 1) * stride - 2 * padding + kW) α) :
+        (convTransposeOutDim inH kH stride padding)
+        (convTransposeOutDim inW kW stride padding) α) :
     (ConvTransposeKernel outC inC kH kW α ×
      Tensor α (.dim outC .scalar) ×
      MultiChannelImage inC inH inW α) := by
@@ -912,14 +944,5 @@ def convTranspose2dBackwardSpec {inC outC kH kW stride padding inH inW : Nat}
       (padding := #v[padding, padding])
       (inSpatial := #v[inH, inW])
       layer' input grad_output'
-
-/-!
-## Friendly alias
-
-We keep the `_spec` suffix as the canonical name, with a forward shorthand for model expressions.
--/
-
-/-- Alias for `conv_spec`. -/
-abbrev conv := @convSpec
 
 end Spec

@@ -37,16 +37,16 @@ namespace Matmul
 
 open scoped BigOperators
 
-/-- Flattened size of an `m×n` matrix shape: `Shape.size (.dim m (.dim n .scalar)) = m*n`. -/
+/-- Flattened size of an `m×n` matrix shape: `Spec.Shape.size (.dim m (.dim n .scalar)) = m*n`. -/
 abbrev matSize (m n : Nat) : Nat :=
-  Shape.size (.dim m (.dim n .scalar))
+  Spec.Shape.size (.dim m (.dim n .scalar))
 
-/-- Flattened size of a length-`n` vector shape: `Shape.size (.dim n .scalar) = n`. -/
+/-- Flattened size of a length-`n` vector shape: `Spec.Shape.size (.dim n .scalar) = n`. -/
 abbrev vecSize (n : Nat) : Nat :=
-  Shape.size (.dim n .scalar)
+  Spec.Shape.size (.dim n .scalar)
 
   @[simp] lemma vecSize_eq (n : Nat) : vecSize n = n := by
-    simp [vecSize, Shape.size]
+    simp [vecSize, Spec.Shape.size]
 
   /-- Convert `(i,j)` coordinates into a flattened index for an `m×n` matrix vectorization. -/
   def idxMN {m n : Nat} (i : Fin m) (j : Fin n) : Fin (matSize m n) :=
@@ -65,16 +65,16 @@ abbrev vecSize (n : Nat) : Nat :=
     | succ n =>
         cases A with
         | dim rows =>
-            let hn : vecSize (Nat.succ n) = Nat.succ n := by simp [vecSize, Shape.size]
+            let hn : vecSize (Nat.succ n) = Nat.succ n := by simp [vecSize, Spec.Shape.size]
             let j' : Fin (vecSize (Nat.succ n)) := Fin.cast hn.symm j
-            have hmpos : 0 < vecSize (Nat.succ n) := by simp [vecSize, Shape.size]
+            have hmpos : 0 < vecSize (Nat.succ n) := by simp [vecSize, Spec.Shape.size]
             have houter :=
               toVecT_dim_apply (n := m) (s := .dim (Nat.succ n) .scalar) (hmpos := hmpos) (f := rows)
                 (p := (i, j'))
             cases hrow : rows i with
             | dim cols =>
                 let k0 : Fin 1 := 0
-                have hinnerPos : 0 < Shape.size Shape.scalar := by simp [Shape.size]
+                have hinnerPos : 0 < Spec.Shape.size Shape.scalar := by simp [Spec.Shape.size]
                 have hinner :=
                   toVecT_dim_apply (n := Nat.succ n) (s := Shape.scalar) (hmpos := hinnerPos) (f :=
                     cols)
@@ -86,10 +86,10 @@ abbrev vecSize (n : Nat) : Nat :=
                 | scalar x =>
                     have hscalar : toVecT (t := (Tensor.scalar x : Tensor ℝ Shape.scalar)) k0 = x :=
                       by
-                      simpa [toVecT, toVecE, flattenSpec, Shape.size, Spec.toVec, k0] using
+                      simpa [toVecT, toVecE, flattenSpec, Spec.Shape.size, Spec.toVec, k0] using
                         (euclideanEquiv_symm_ofLp
-                          (n := Shape.size Shape.scalar)
-                          (f := fun _ : Fin (Shape.size Shape.scalar) => x)
+                          (n := Spec.Shape.size Shape.scalar)
+                          (f := fun _ : Fin (Spec.Shape.size Shape.scalar) => x)
                           (i := k0))
                     have hidx : idxMN (m := m) (n := Nat.succ n) i j = finProdFinEquiv (i, j') := by
                       apply Fin.ext
@@ -149,7 +149,7 @@ abbrev vecSize (n : Nat) : Nat :=
       toVecT (t := addSpec A B) = toVecT (t := A) + toVecT (t := B) := by
     classical
     ext ip
-    let hp : vecSize n = n := by simp [vecSize, Shape.size]
+    let hp : vecSize n = n := by simp [vecSize, Spec.Shape.size]
     let i : Fin m := (ip.divNat (m := m) (n := vecSize n))
     let j' : Fin (vecSize n) := (ip.modNat (m := m) (n := vecSize n))
     let j : Fin n := Fin.cast hp j'
@@ -158,7 +158,7 @@ abbrev vecSize (n : Nat) : Nat :=
         simpa [i, j'] using
           (Equiv.apply_symm_apply (e := (finProdFinEquiv : Fin m × Fin (vecSize n) ≃ Fin (m * vecSize
             n))) ip)
-      simpa [idxMN, j, hp, matSize, vecSize, Shape.size] using hbase
+      simpa [idxMN, j, hp, matSize, vecSize, Spec.Shape.size] using hbase
     -- Convert the LHS via `get2`, use elementwise addition, then convert back.
     have hgetL : toVecT (t := addSpec A B) ip = Spec.get2 (addSpec A B) i j := by
       -- rewrite the index to match `toVecT_get2`
@@ -176,7 +176,7 @@ abbrev vecSize (n : Nat) : Nat :=
       _ = Spec.get2 A i j + Spec.get2 B i j := get2_add_spec (A := A) (B := B) i j
       _ = toVecT (t := A) ip + toVecT (t := B) ip := by simp [hgetA, hgetB]
 
-/-- A bilinear map on flattened matrices: `(m×n) × (n×p) → (m×p)` on `Vec (Shape.size ...)`. -/
+/-- A bilinear map on flattened matrices: `(m×n) × (n×p) → (m×p)` on `Vec (Spec.Shape.size ...)`. -/
 def matmulVec {m n p : Nat} (a : Vec (matSize m n)) (b : Vec (matSize n p)) : Vec (matSize m p) :=
   vecOfFun (n := matSize m p) fun ip =>
     let hp : vecSize p = p := vecSize_eq p
@@ -418,7 +418,7 @@ lemma forward_eq_matmulVec {m n p : Nat} (aV : Vec (matSize m n)) (bV : Vec (mat
   -- represent `ip` as a row/column pair using `Fin.divNat/modNat` for `m * vecSize p`
   let i : Fin m := (ip.divNat (m := m) (n := vecSize p))
   let k' : Fin (vecSize p) := (ip.modNat (m := m) (n := vecSize p))
-  let hp : vecSize p = p := by simp [vecSize, Shape.size]
+  let hp : vecSize p = p := by simp [vecSize, Spec.Shape.size]
   let k : Fin p := Fin.cast hp k'
   -- interpret LHS coordinate via `get2` and the matrix entry lemma
   have hL :
@@ -435,7 +435,7 @@ lemma forward_eq_matmulVec {m n p : Nat} (aV : Vec (matSize m n)) (bV : Vec (mat
         simpa [i, k'] using
           (Equiv.apply_symm_apply (e := (finProdFinEquiv : Fin m × Fin (vecSize p) ≃ Fin (m *
             vecSize p))) ip)
-      simpa [idxMN, k, hp, matSize, vecSize, Shape.size] using hbase
+      simpa [idxMN, k, hp, matSize, vecSize, Spec.Shape.size] using hbase
     rw [←hip]
     exact toVecT_get2
       (A := Spec.matMulSpec (ofVecT (s := .dim m (.dim n .scalar)) aV)
@@ -481,7 +481,7 @@ open Matmul
 
 /-- Helper: `matSize m n` is definitionally `m * n`. -/
 lemma matSize_eq_mul (m n : Nat) : Matmul.matSize m n = m * n := by
-  simp [Matmul.matSize, Shape.size]
+  simp [Matmul.matSize, Spec.Shape.size]
 
 /-- Equivalence implementing matrix transpose on flattened indices. -/
 def transposeEquiv (m n : Nat) : Fin (m * n) ≃ Fin (n * m) :=
@@ -874,7 +874,7 @@ def broadcastRowCLM {m n : Nat} : Vec m →L[ℝ] Vec (matSize m n) := by
 /-- Broadcast a vector `v : Vec n` across the first axis to a flattened `(m×n)` matrix. -/
 def broadcastColCLM {m n : Nat} : Vec n →L[ℝ] Vec (matSize m n) := by
   classical
-  let hn : vecSize n = n := by simp [vecSize, Shape.size]
+  let hn : vecSize n = n := by simp [vecSize, Spec.Shape.size]
   let fLin : Vec n →ₗ[ℝ] Vec (matSize m n) :=
     { toFun := fun v =>
         let v' : Vec (vecSize n) := castVec hn.symm v
@@ -1037,7 +1037,7 @@ Shape-only nodes (`reshape`, `flatten`, and similar) live in `NN.Proofs.Autograd
 def rowMean {Γ : List Shape} {m n : Nat}
     (idx : Idx Γ (.dim m (.dim n .scalar))) : Node Γ (.dim m .scalar) :=
   let outShape : Shape := .dim m .scalar
-  let hsz : Shape.size outShape = m := by simp [outShape, Shape.size]
+  let hsz : Spec.Shape.size outShape = m := by simp [outShape, Spec.Shape.size]
   Node.ofVec (Γ := Γ) (τ := outShape)
     (f := fun xV =>
       castVec hsz.symm <|
@@ -1091,7 +1091,7 @@ def rowMeanFderiv {Γ : List Shape} {m n : Nat}
 by
   classical
   let outShape : Shape := .dim m .scalar
-  let hsz : Shape.size outShape = m := by simp [outShape, Shape.size]
+  let hsz : Spec.Shape.size outShape = m := by simp [outShape, Spec.Shape.size]
   refine
     { deriv := fun _ =>
         (Graph.castCLM (h := hsz.symm)).comp
@@ -1100,7 +1100,7 @@ by
       hasFDerivAt := ?_
       jvp_eq := ?_ }
   · intro xV
-    let D : CtxVec Γ →L[ℝ] Vec (Shape.size outShape) :=
+    let D : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size outShape) :=
       (Graph.castCLM (h := hsz.symm)).comp
         ((MatrixLinear.rowMeanCLM (m := m) (n := n)).comp
           (CtxVec.getCLM (Γ := Γ) (s := .dim m (.dim n .scalar)) idx))

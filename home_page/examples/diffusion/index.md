@@ -133,9 +133,11 @@ Two choices matter in the example:
 That “append time as a channel” trick is defined once in the API:
 
 ```lean
-def appendTimeChannel {batch c h w : Nat}
-    (x : Spec.Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (tNorm : Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.NCHW batch (c + 1) h w) := ...
+def appendTimeChannel (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
+    (x : Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (tNorm : Float) :
+    Spec.Tensor Float
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList))) := ...
 ```
 
 The model is a same-resolution residual CNN sized to run as an example. The excerpt below is
@@ -156,8 +158,9 @@ def epsResidualConvNet (cfg : EpsConvNetConfig) :
   ]
 ```
 
-The tutorial contract is precise: input is noisy `NCHW` image plus time channel, output is predicted
-noise with the original image shape.
+The contract is dimension-general: the input has arbitrary leading axes, one channel axis, and an
+arbitrary number of spatial axes. The runnable image example instantiates this with batch, channel,
+height, and width axes. Its output predicts noise with the original data shape.
 
 ## Training: What Gets Optimized
 
@@ -177,12 +180,13 @@ The excerpt below leaves out the local definitions of `sqrtAb`, `sqrtOneMinusAb`
 keeps the actual tensor transformation:
 
 ```lean
-def noisedSampleFromEps
+def noisedSampleFromEps (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
     (alphaBars : Array Float) (T : Nat)
-    (x0 eps : Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) (step : Nat) :
+    (x0 eps : Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (step : Nat) :
     SupervisedSample Float
-      (NN.Tensor.Shape.NCHW batch (c + 1) h w)
-      (NN.Tensor.Shape.NCHW batch c h w) :=
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList))) :=
   let x_t :=
     Spec.Tensor.scaleSpec x0 sqrtAb +
     Spec.Tensor.scaleSpec eps sqrtOneMinusAb
@@ -204,10 +208,9 @@ The implementation follows that recipe. Here is the compact form, with the sched
 shown by name:
 
 ```lean
-def ddimPrev
+def ddimPrev {s : Spec.Shape}
     (abPrev ab : Float)
-    (x_t epsHat : Tensor Float (NN.Tensor.Shape.NCHW batch c h w)) :
-    Tensor Float (NN.Tensor.Shape.NCHW batch c h w) :=
+    (x_t epsHat : Tensor Float s) : Tensor Float s :=
   let x0Hat :=
     Spec.Tensor.scaleSpec
       (Spec.Tensor.subSpec x_t (Spec.Tensor.scaleSpec epsHat sqrtOneMinusAb))

@@ -17,7 +17,7 @@ proofs we only need *some* analytic bound saying the Taylor approximation is clo
 
 Mathlib provides clean, reusable bounds for the first nontrivial truncations:
 
-- `Real.sin_bound`: `|sin x - (x - x^3/6)| ≤ |x|^4 * (5/96)` for `|x| ≤ 1`,
+- `Real.sin_bound`: `|sin x - (x - x^3/6)| ≤ |x|^5/100` for `|x| ≤ 1`,
 - `Real.cos_bound`: `|cos x - (1 - x^2/2)| ≤ |x|^4 * (5/96)` for `|x| ≤ 1`.
 
 These are coarse but robust and are often sufficient as a local ingredient in larger numerical
@@ -40,7 +40,7 @@ def sinTaylor2 (x : ℝ) : ℝ :=
   x - x ^ 3 / 6
 
 theorem abs_sin_sub_sinTaylor2_le (x : ℝ) (hx : |x| ≤ 1) :
-    |Real.sin x - sinTaylor2 x| ≤ |x| ^ 4 * (5 / 96) := by
+    |Real.sin x - sinTaylor2 x| ≤ |x| ^ 5 / 100 := by
   simpa [sinTaylor2] using (Real.sin_bound (x := x) hx)
 
 theorem abs_cos_sub_cosTaylor2_le (x : ℝ) (hx : |x| ≤ 1) :
@@ -51,4 +51,3 @@ end
 
 end IEEE32Exec
 end TorchLean.Floats.IEEE754
-

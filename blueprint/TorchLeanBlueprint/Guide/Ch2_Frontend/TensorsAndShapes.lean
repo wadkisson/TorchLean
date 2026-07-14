@@ -37,8 +37,8 @@ $$`\mathrm{Shape} ::= \mathrm{scalar}\;|\;\mathrm{dim}(n,\mathrm{Shape})`
 So a matrix is not a tensor plus a loose runtime rank field. It is a value whose type remembers that
 it has two dimensions.
 
-User-facing code does not write `Spec.Tensor` explicitly. Instead, examples usually import
-`TorchLean` and use the public `Tensor`, `Shape`, and constructor macros from the `NN` umbrella.
+User-facing code does not write `Spec.Tensor` explicitly. Examples import `NN.API`, open
+`TorchLean`, and use the public `Tensor`, `Shape`, and constructor macros.
 
 It is still a tensor in the spec layer, with a precise meaning. The `NN.Tensor` layer gives you good
 constructors and printing without changing the math.
@@ -58,7 +58,7 @@ z = x + y
 In TorchLean, the same idea is written with shape information in the type:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def x : Tensor.T Float (shape![2, 2]) :=
@@ -79,22 +79,23 @@ A tensor shape is a `TorchLean.Shape`. In examples, the most convenient way to w
 `shape![...]` macro:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def sVec : TorchLean.Shape := shape![4]
 def sMat : TorchLean.Shape := shape![3, 2]
 ```
 
-For common ML shapes, TorchLean also provides readable constructors:
+Every rank is built from the same two constructors:
 
-- `Shape.vec n` for length-`n` vectors,
-- `Shape.mat rows cols` for matrices,
-- `Shape.images n c h w` for NCHW image batches,
-- plus `Shape.CHW`, `Shape.nchw`, `Shape.NHWC`, and others.
+- `.dim n .scalar` for length-`n` vectors,
+- `.dim rows (.dim cols .scalar)` for matrices,
+- `.dim n (.dim c (.dim h (.dim w .scalar)))` for a rank-four tensor whose axes are interpreted as
+  batch, channel, height, and width,
+- arbitrary ranks built from the same general shape constructors.
 
-The full list is generated in the tensor reference, but the convention is simple: names such as
-`vec`, `mat`, `nchw`, and `images` are readable names for repeated `Shape.dim` constructors.
+There are no separate vector, matrix, or image tensor types. Names such as NCHW describe how an
+operator or dataset interprets the axes of an ordinary shaped tensor.
 
 # DTypes: Just Lean Types
 
@@ -124,16 +125,16 @@ TorchLean uses these scalar choices in different contexts:
 
 ```
 -- Executable tutorial value.
-def xf : Tensor.T Float (Shape.vec 3) :=
+def xf : Tensor.T Float (.dim 3 .scalar) :=
   tensor! [1.0, 2.0, 3.0]
 
 -- Exact arithmetic value, useful for tiny algebraic examples.
-def xq : Tensor.T Rat (Shape.vec 3) :=
+def xq : Tensor.T Rat (.dim 3 .scalar) :=
   tensor! [1, 2, 3]
 
 -- Mathematical proof shape. Values of this type belong in theorem statements,
 -- not in `#eval` examples.
--- def xr : Tensor.T Real (Shape.vec 3) := ...
+-- def xr : Tensor.T Real (.dim 3 .scalar) := ...
 ```
 
 The last line is intentionally only a comment. `Real` is the right scalar for mathematical
@@ -147,28 +148,27 @@ In the codebase, the scalar layer splits into a few pieces:
 - public trainers choose the runtime scalar through the `dtype` field passed to `Trainer.new`,
   while proof and runtime
   internals still quantify over scalar interfaces directly.
-- `tensorF!` and `tensorF321d` let you author examples once in `Float` and then cast to a runtime
+- `tensorF!` and `float32Vector` let you author examples once in `Float` and then cast to a runtime
   scalar or executable FP32 backend.
 
-For readers in a theorem file, `α` often means “the scalar the theorem is polymorphic over”. In a
-training tutorial, the beginner path usually avoids exposing `α` at all: the trainer picks the
-runtime scalar from the `dtype` field in the `Trainer.new` config. Runtime-internal files may still
-spell out the scalar parameter because the same model can be instantiated over `Float`,
-`IEEE32Exec`, or `ℝ` depending on whether you are executing, validating, or proving.
+In a theorem, `α` often means “the scalar the theorem is polymorphic over”. Training code usually
+avoids exposing `α`: the trainer picks the runtime scalar from the `dtype` field in the
+`Trainer.new` config. Runtime internals spell out the parameter when the same model is instantiated
+over `Float`, `IEEE32Exec`, or `ℝ` for execution, validation, or proof.
 
 # The Bug This Prevents
 
 Here is the shape mismatch from the opening, written as a TorchLean object:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def pred : Tensor.T Float (shape![32, 1]) :=
-  tensorND! [32, 1] (List.replicate 32 0.0)
+  tensorOfList! [32, 1] (List.replicate 32 0.0)
 
 def label : Tensor.T Float (shape![32]) :=
-  tensorND! [32] (List.replicate 32 0.0)
+  tensorOfList! [32] (List.replicate 32 0.0)
 ```
 
 TorchLean does not decide whether this should be a squeeze, a reshape, a one-hot encoding, or a
@@ -179,15 +179,15 @@ keeps later graph and verification code from inheriting a silent broadcasting co
 
 For compact examples, the most common constructors are:
 
-- `tensor1d` / `tensor2d` for lists of numbers,
-- `tensorND` for runtime dims plus a flat row-major list,
-- `tensorND!` for constants when the length proof should be solved automatically,
+- `vector` / `matrix` for lists of numbers,
+- `ofList` for runtime dims plus a flat row-major list,
+- `tensorOfList!` for constants when the length proof should be solved automatically,
 - `tensor!` for nested bracket literals (often the nicest for handwritten tensors).
 
 Example (nested brackets, like nested Python lists):
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 -- A 2×2 tensor (shape inferred from the nesting)
@@ -207,7 +207,7 @@ def w {α : Type} (cast : Float → α) : Tensor.T α (shape![3, 2]) :=
 For runtime examples, the same idea shows up as a cast from `Float` constants into the active
 backend scalar in the model code. The [runtime module API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Module.lean)
 contains tensor-casting operations; at the public API boundary these values are exposed as
-`TensorPack`/`ParamTensors` rather than as the runtime heterogeneous-list representation.
+`TensorPack`/`nn.ParamTensors` rather than as the runtime heterogeneous-list representation.
 
 # Four Everyday Shapes
 
@@ -217,7 +217,7 @@ not as abstract syntax.
 ## A feature vector
 
 ```
-def x : Tensor.T Float (Shape.vec 3) :=
+def x : Tensor.T Float (.dim 3 .scalar) :=
   tensor! [0.2, -0.1, 0.7]
 ```
 
@@ -226,7 +226,7 @@ Read this as one sample with three features.
 ## A matrix batch
 
 ```
-def xs : Tensor.T Float (Shape.mat 4 3) :=
+def xs : Tensor.T Float (.dim 4 (.dim 3 .scalar)) :=
   tensor! [
     [0.0, 0.1, 0.2],
     [0.3, 0.4, 0.5],
@@ -236,13 +236,13 @@ def xs : Tensor.T Float (Shape.mat 4 3) :=
 ```
 
 Read this as four samples, each with three features. A linear layer with
-`pfx := Shape.vec 4` will act on the last dimension and preserve the batch axis.
+`pfx := .dim 4 .scalar` will act on the last dimension and preserve the batch axis.
 
-## A CHW image
+## A rank-three channel-first tensor
 
 ```
-def img : Tensor.T Float (Shape.CHW 1 4 4) :=
-  tensorND! [1, 4, 4] [
+def img : Tensor.T Float (.dim 1 (.dim 4 (.dim 4 .scalar))) :=
+  tensorOfList! [1, 4, 4] [
     0, 0, 1, 1,
     0, 1, 1, 0,
     1, 1, 0, 0,
@@ -250,25 +250,27 @@ def img : Tensor.T Float (Shape.CHW 1 4 4) :=
   ]
 ```
 
-Read this as one channel, height four, width four. The CNN tutorials use this convention because it
-matches the usual PyTorch `NCHW` layout once a batch axis is added.
+Here the three axes are interpreted as channel, height, and width. Adding a leading batch axis gives
+the NCHW convention used by the CNN examples and by PyTorch's channel-first convolution path.
 
-## An image batch
+## A rank-four channel-first batch
 
 ```
-Shape.images batch channels height width
+.dim batch (.dim channels (.dim height (.dim width .scalar)))
 ```
 
-The public `nn.conv` builder expects this shape. The batch dimension is part of the model type, so a
-model trained with batch size `8` and a model trained with batch size `16` have different types
-unless the file abstracts over `batch`.
+The dimension-general `nn.conv` builder consumes a channel axis followed by an arbitrary vector of
+spatial axes. A two-dimensional convolution is simply `nn.conv` with a length-two spatial vector;
+there is no separate image tensor type or public `conv2d` layer family. The leading axes are part of
+the model type, so a model trained with batch size `8` and one trained with batch size `16` have
+different types unless the file abstracts over `batch`.
 
 # Reading Tensor Types In Model Code
 
 When you see a model type such as:
 
 ```
-nn.Sequential (Shape.mat batch 2) (Shape.mat batch 1)
+nn.Sequential (.dim batch (.dim 2 .scalar)) (.dim batch (.dim 1 .scalar))
 ```
 
 read it from right to left as a contract:
@@ -280,7 +282,7 @@ read it from right to left as a contract:
 When you see:
 
 ```
-nn.Sequential (Shape.images batch 3 32 32) (shape![batch, 10])
+nn.Sequential (.dim batch (.dim 3 (.dim 32 (.dim 32 .scalar)))) (shape![batch, 10])
 ```
 
 read it as an image classifier: a batch of RGB images goes to ten logits per image.
@@ -327,7 +329,7 @@ the mistake only when `matmul` runs.
 In TorchLean, the intended shapes are visible at the definition site:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def xs : Tensor.T Float (shape![2, 3]) :=
@@ -346,7 +348,7 @@ wiring mistakes from reaching the runtime or verifier.
 Sometimes you truly do not know the shape statically (CLI inputs, JSON, file formats). For those
 cases TorchLean provides:
 
-- `tensorND : List Nat → List α → Except String (Tensor α (shapeOfDims dims))`, with a runtime
+- `ofList : List Nat → List α → Except String (Tensor α (shapeOfDims dims))`, with a runtime
   length check;
 - `DynTensor α`, which stores the `Shape` as data alongside the tensor.
 
@@ -354,16 +356,16 @@ Tooling can remain shape aware even when the type cannot carry the full shape in
 
 If you want the most permissive constructors, the API also includes:
 
-- `tensor2d?` and `tensor2d` for nested lists,
-- `tensor2dPadTo` and `tensor2dPadRight` for ragged inputs that you intend to pad,
-- `tensorDynND` when you want a dynamic container rather than a static shape index.
+- `matrix?` and `matrix` for nested lists,
+- `matrixPadTo` and `matrixPadRight` for ragged inputs that you intend to pad,
+- `dynamicOfList` when you want a dynamic container rather than a static shape index.
 
 The relevant design note is that TorchLean does not force every input format to be perfectly typed at
 the boundary. Instead, it lets you choose between:
 
-- shapes with explicit proofs (`tensorNDOfLenEq`),
-- shapes checked at runtime (`tensorND`, `tensorDynND`), and
-- permissive padding behavior for sequence data (`tensor2dPadTo`, `tensor2dPadRight`).
+- shapes with explicit proofs (`ofListOfLength`),
+- shapes checked at runtime (`ofList`, `dynamicOfList`), and
+- permissive padding behavior for sequence data (`matrixPadTo`, `matrixPadRight`).
 
 The middle ground is precise shapes where the program owns them, runtime checks where data enters
 from the outside, and explicit padding only when padding is part of the model.
@@ -374,8 +376,8 @@ File formats and CLI inputs arrive as ordinary data, so TorchLean cannot know th
 loader reads them. The boundary therefore has a common pattern:
 
 ```
-def loadVector4 (xs : List Float) : Except String (Tensor.T Float (Shape.vec 4)) :=
-  tensorND [4] xs
+def loadVector4 (xs : List Float) : Except String (Tensor.T Float (.dim 4 .scalar)) :=
+  ofList [4] xs
 ```
 
 If `xs` has four elements, the loader returns a typed tensor. If it has three or five, the function
@@ -385,16 +387,16 @@ object after it succeeds.
 The static version is different:
 
 ```
-def knownVector4 : Tensor.T Float (Shape.vec 4) :=
-  tensorND! [4] [0.0, 1.0, 2.0, 3.0]
+def knownVector4 : Tensor.T Float (.dim 4 .scalar) :=
+  tensorOfList! [4] [0.0, 1.0, 2.0, 3.0]
 ```
 
 Here the shape and the payload are visible in the Lean file, so the macro can discharge the length
 obligation while the file elaborates. The important distinction is not syntax. It is where the
 evidence comes from:
 
-- `tensorND!` is for data that is literally present in the source file;
-- `tensorND` is for data that must be checked when the program runs;
+- `tensorOfList!` is for data that is literally present in the source file;
+- `ofList` is for data that must be checked when the program runs;
 - theorem statements usually quantify over `x : Tensor.T α s` and do not load data at all.
 
 That same three-way split appears throughout TorchLean: static snippets, runtime checks, and
@@ -431,8 +433,8 @@ This file shows:
 
 - dtype-as-type (`Float`, `ℚ`, `Int`),
 - `tensor!` nesting + row-major flattening,
-- `tensorF321d` for executable float32,
-- `tensorND` / `tensorDynND` for runtime-shaped inputs,
+- `float32Vector` for executable float32,
+- `ofList` / `dynamicOfList` for runtime-shaped inputs,
 - and the fact that printing is disabled by design for proof-only scalar backends like `ℝ`.
 
 # What the Tensor Layer Gives You

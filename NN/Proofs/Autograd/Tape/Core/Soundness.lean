@@ -62,13 +62,7 @@ namespace TList
 
 variable {ss : List Shape}
 
-/--
-Constructor aliases for the specialized `TList`.
-
-We reuse the inductive type from `Proofs.Autograd.Algebra.TList`, so its constructors are actually
-`Proofs.Autograd.Algebra.TList.nil/cons`. A few analytic files expect the shorter names
-`Proofs.Autograd.TList.nil/cons`, so we provide them here as abbreviations.
--/
+/-- Empty real-valued tensor context. -/
 abbrev nil : TList ([] : List Shape) :=
   Proofs.Autograd.Algebra.TList.nil (α := ℝ)
 

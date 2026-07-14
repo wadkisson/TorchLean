@@ -140,7 +140,7 @@ def evalNode? (nodes : Array Node) (ps : ParamStore ℝ) (inputs : Std.HashMap N
                       let sIn : Shape := .dim inC (.dim inH (.dim inW .scalar))
                       let sFlat : Shape := .dim x.n .scalar
                       have hsize : sFlat.size = sIn.size := by
-                        simp [Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
+                        simp [Spec.Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
                       let xCHW : Tensor ℝ sIn := Tensor.reshapeSpec (α := ℝ) (s₁ := sFlat) (s₂ :=
                         sIn) x.v hsize
                       let outShape : Shape := Spec.pool2dMultiOutShape inC inH inW kH kW stride
@@ -174,7 +174,7 @@ def evalNode? (nodes : Array Node) (ps : ParamStore ℝ) (inputs : Std.HashMap N
                       let sIn : Shape := .dim inC (.dim inH (.dim inW .scalar))
                       let sFlat : Shape := .dim x.n .scalar
                       have hsize : sFlat.size = sIn.size := by
-                        simp [Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
+                        simp [Spec.Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
                       let xCHW : Tensor ℝ sIn := Tensor.reshapeSpec (α := ℝ) (s₁ := sFlat) (s₂ :=
                         sIn) x.v hsize
                       let outShape : Shape := Spec.pool2dMultiOutShapePad inC inH inW kH kW
@@ -210,7 +210,7 @@ def evalNode? (nodes : Array Node) (ps : ParamStore ℝ) (inputs : Std.HashMap N
                       let sIn : Shape := .dim inC (.dim inH (.dim inW .scalar))
                       let sFlat : Shape := .dim x.n .scalar
                       have hsize : sFlat.size = sIn.size := by
-                        simp [Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
+                        simp [Spec.Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
                       let xCHW : Tensor ℝ sIn := Tensor.reshapeSpec (α := ℝ) (s₁ := sFlat) (s₂ :=
                         sIn) x.v hsize
                       let outShape : Shape := Spec.pool2dMultiOutShape inC inH inW kH kW stride
@@ -244,7 +244,7 @@ def evalNode? (nodes : Array Node) (ps : ParamStore ℝ) (inputs : Std.HashMap N
                       let sIn : Shape := .dim inC (.dim inH (.dim inW .scalar))
                       let sFlat : Shape := .dim x.n .scalar
                       have hsize : sFlat.size = sIn.size := by
-                        simp [Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
+                        simp [Spec.Shape.size, sFlat, sIn, hIn, expectedInDim, Nat.mul_assoc]
                       let xCHW : Tensor ℝ sIn := Tensor.reshapeSpec (α := ℝ) (s₁ := sFlat) (s₂ :=
                         sIn) x.v hsize
                       let outShape : Shape := Spec.pool2dMultiOutShapePad inC inH inW kH kW

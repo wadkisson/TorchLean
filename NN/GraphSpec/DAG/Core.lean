@@ -50,7 +50,7 @@ The constructors are:
 For a fixed scalar type `α` with `[Context α]`, we interpret an environment as a typed list of
 tensors `TList α Γ`. Then:
 
-- `Term.eval : TList α Γ → Term Γ τ → Tensor α τ` is the *pure* reference semantics.
+- `Term.eval : TList α Γ → Term Γ τ → Spec.Tensor α τ` is the *pure* reference semantics.
 - `Term.compile` produces a backend-generic TorchLean program that computes the same graph, but in
   the executable (monadic, reference-based) runtime world.
 
@@ -87,7 +87,7 @@ namespace GraphSpec
 namespace DAG
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 /-! ## Primitives (arbitrary arity) -/
@@ -107,7 +107,7 @@ structure PrimOp (ins : List Shape) (τ : Shape) where
   /-- Debug name for error messages / inspection. -/
   name : String
   /-- Pure reference semantics (`ins` arguments packed as a typed list). -/
-  specFwd : ∀ {α : Type 0}, [Context α] → Runtime.Autograd.Torch.TList α ins → Tensor α τ
+  specFwd : ∀ {α : Type 0}, [Context α] → Runtime.Autograd.Torch.TList α ins → Spec.Tensor α τ
   /-- Executable TorchLean program with arguments of shapes `ins`. -/
   torchProgram :
     ∀ {α : Type 0}, [Context α] → [DecidableEq Shape] →
@@ -169,7 +169,7 @@ Typed environment lookup for pure tensors.
 
 This is the underlying “variable semantics” for `Term.eval`.
  -/
-def tget {α : Type} : {ss : List Shape} → TList α ss → (i : Fin ss.length) → Tensor α (ss.get i)
+def tget {α : Type} : {ss : List Shape} → TList α ss → (i : Fin ss.length) → Spec.Tensor α (ss.get i)
   | [], .nil, i => nomatch i
   | s :: ss, .cons x xs, i =>
       -- We use `Fin.cases` rather than pattern-matching on `⟨0, _⟩` / `⟨Nat.succ _, _⟩`.
@@ -177,7 +177,7 @@ def tget {α : Type} : {ss : List Shape} → TList α ss → (i : Fin ss.length)
       -- This makes evaluation/`simp` behave well even when indices are produced by numeric notation
       -- (which may elaborate via `OfNat` rather than literally as `Fin.mk`).
       Fin.cases
-        (motive := fun i : Fin (s :: ss).length => Tensor α ((s :: ss).get i))
+        (motive := fun i : Fin (s :: ss).length => Spec.Tensor α ((s :: ss).get i))
         (by simpa using x)
         (fun j => by
           -- `List.get` at a successor index reduces definitionally to the tail.
@@ -235,7 +235,7 @@ mutual
       {Γ : List Shape} {τ : Shape}
       {α : Type 0} [Context α]
       (env : TList α Γ) :
-      Term Γ τ → Tensor α τ
+      Term Γ τ → Spec.Tensor α τ
     | .var i => Env.tget (α := α) (ss := Γ) env i
     | .cast t h =>
         match h with
@@ -286,7 +286,7 @@ mutual
   Compile a typed `Term Γ τ` into the backend monad `m`, producing a reference to a tensor of shape
     `τ`.
 
-  This is the "executable" counterpart of `Term.eval`: instead of returning a pure `Tensor`, we
+  This is the "executable" counterpart of `Term.eval`: instead of returning a pure `Spec.Tensor`, we
   emit backend ops (`Runtime.Autograd.Torch.Ops`) that allocate tensors and apply primitives.
   -/
   def compile
@@ -351,7 +351,7 @@ then evaluate the body using `Term.eval`.
  -/
 def specFwd {ps ins : List Shape} {τ : Shape} (m : Model ps ins τ)
     {α : Type 0} [Context α]
-    (params : TList α ps) (xs : TList α ins) : Tensor α τ :=
+    (params : TList α ps) (xs : TList α ins) : Spec.Tensor α τ :=
   let env := Proofs.Autograd.Algebra.TList.append (α := α) (ss₁ := ps) (ss₂ := ins) params xs
   Term.eval (Γ := ps ++ ins) (α := α) env m.body
 

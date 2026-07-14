@@ -32,10 +32,10 @@ Flatten a tensor to a 1D vector (preserving total size).
 PyTorch comparison: `torch.flatten(x)` (for a single tensor value).
 -/
 def flatten {α : Type} {Δ : Type} [Inhabited α] [Zero α] [DecidableEq Shape]
-  {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var (.dim (Shape.size s) .scalar)) := do
+  {Γ : List Shape} {s : Shape} (x : Var s) : MWith α Δ Γ (Var (.dim (Spec.Shape.size s) .scalar)) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)
-  let outS : Shape := .dim (Shape.size s) .scalar
+  let outS : Shape := .dim (Spec.Shape.size s) .scalar
   let node : NodeData α Δ (Γ ++ ss) outS :=
     { forward := fun ctx _d => flattenSpec (α := α) (s := s) (getIdx (α := α) (xs := ctx) ix)
       jvp := fun _ctx dctx _d =>
@@ -50,7 +50,7 @@ Reshape a tensor, given a proof that the total sizes match.
 PyTorch comparison: `torch.reshape(x, new_shape)`.
 -/
 def reshape {α : Type} {Δ : Type} [Inhabited α] [Zero α] [DecidableEq Shape]
-  {Γ : List Shape} {s₁ s₂ : Shape} (x : Var s₁) (h : Shape.size s₁ = Shape.size s₂) :
+  {Γ : List Shape} {s₁ s₂ : Shape} (x : Var s₁) (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) :
     MWith α Δ Γ (Var s₂) := do
   let ⟨ss, g⟩ ← get
   let ix ← liftM (mkIdx (_α := α) (Γ := Γ) ss x)

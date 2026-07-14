@@ -32,7 +32,7 @@ theorem evalAt_softmax_last_axis_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (axis : Nat) (x : Tensor α s)
     (hAxis : OpContracts.checkAxisValid axis s = .ok ())
-    (hLast : axis + 1 = Shape.rank s) :
+    (hLast : axis + 1 = Spec.Shape.rank s) :
     Graph.evalAt (α := α) (g := unaryGraphOut (.softmax axis) s s)
         (payload := {})
         (input := DVal.mk (α := α) s x)
@@ -48,7 +48,7 @@ theorem evalAt_softmax_permuted_axis_eq
     {s : Shape} (axis : Nat) (x : Tensor α s)
     (permToLast permBack : List Nat) (xLast yBack : DVal α) (y : Tensor α s)
     (hAxis : OpContracts.checkAxisValid axis s = .ok ())
-    (hNotLast : ¬ axis + 1 = Shape.rank s)
+    (hNotLast : ¬ axis + 1 = Spec.Shape.rank s)
     (hToLast : OpContracts.permMoveAxisToLast axis s = .ok permToLast)
     (hBack : OpContracts.inversePerm permToLast = .ok permBack)
     (hXLast :

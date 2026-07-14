@@ -6,8 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Widgets
-public import NN.Runtime.RL.Boundary.Core
+import NN.Widgets
+import NN.Runtime.RL.Boundary.Core
 
 /-!
 # Gymnasium Rollout Boundary Viewer

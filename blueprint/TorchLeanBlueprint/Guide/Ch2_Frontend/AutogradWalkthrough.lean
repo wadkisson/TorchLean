@@ -24,17 +24,17 @@ The objects to watch are:
 The smallest case is a scalar valued tensor function.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
-def sumsq : autograd.func.Fn (Shape.vec 2) Shape.scalar :=
+def sumsq : autograd.func.Fn (.dim 2 .scalar) Shape.scalar :=
   fun x => do
     let y ← nn.functional.square x
     nn.functional.mean y
 
 def example : IO Unit := do
-  let x : Tensor Float (Shape.vec 2) := tensorND! [2] [0.5, -1.2]
+  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, -1.2]
   let g ← autograd.func.grad (α := Float) sumsq x
   IO.println s!"grad = {Spec.pretty g}"
 ```
@@ -78,7 +78,7 @@ A common debugging pattern is to print both:
 
 ```
 def debugGrad : IO Unit := do
-  let x : Tensor Float (Shape.vec 2) := tensorND! [2] [0.5, -1.2]
+  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, -1.2]
   let (value, grad) ← autograd.func.valueAndGradScalar (α := Float) sumsq x
   IO.println s!"value = {value}"
   IO.println s!"grad = {Tensor.pretty grad}"
@@ -114,14 +114,14 @@ back.
 A tiny example is a diagonal scaling function:
 
 ```
-def scale2 : autograd.func.Fn (Shape.vec 2) (Shape.vec 2) :=
+def scale2 : autograd.func.Fn (.dim 2 .scalar) (.dim 2 .scalar) :=
   fun x => do
     let twoX ← nn.functional.scale x 2.0
     pure twoX
 
 def vjpExample : IO Unit := do
-  let x : Tensor Float (Shape.vec 2) := tensorND! [2] [3.0, 4.0]
-  let seed : Tensor Float (Shape.vec 2) := tensorND! [2] [1.0, 10.0]
+  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [3.0, 4.0]
+  let seed : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [1.0, 10.0]
   let dx ← autograd.func.vjp (α := Float) scale2 x seed
   IO.println s!"dx = {Tensor.pretty dx}"
 ```

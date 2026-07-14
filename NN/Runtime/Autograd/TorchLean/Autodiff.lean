@@ -76,7 +76,7 @@ keeps the shape indices explicit and type-correct.
 -/
 abbrev tlistAppend {α : Type} :
     {ss₁ ss₂ : List Shape} → TList α ss₁ → TList α ss₂ → TList α (ss₁ ++ ss₂) :=
-  _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
+  _root_.Proofs.Autograd.Algebra.TList.append (α := α)
 
 /--
 Split a typed list indexed by `ss₁ ++ ss₂` back into `(ss₁, ss₂)` pieces.
@@ -85,7 +85,7 @@ This is the inverse of `tlistAppend`.
 -/
 abbrev tlistSplitAppend {α : Type} :
     {ss₁ ss₂ : List Shape} → TList α (ss₁ ++ ss₂) → TList α ss₁ × TList α ss₂ :=
-  _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
+  _root_.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
 
 /--
 Cast a prefix of a dense gradient array into a typed list `TList α ss`.

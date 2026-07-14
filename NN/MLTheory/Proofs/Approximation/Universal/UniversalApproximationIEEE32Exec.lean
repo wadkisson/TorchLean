@@ -810,7 +810,7 @@ quantization budgets.
 -/
 theorem fp32Round_abs_error_bound (x : ℝ) :
     abs (TorchLean.Floats.IEEE754.IEEE32Exec.fp32Round x - x) ≤
-      neuralUlp binaryRadix fexp32 x TrainingPhase.forward / 2 := by
+      neuralUlp binaryRadix fexp32 x / 2 := by
   simpa [TorchLean.Floats.IEEE754.IEEE32Exec.fp32Round] using
     (neural_error_bound_ulp
       (β := binaryRadix) (fexp := fexp32) (rnd := TorchLean.Floats.rnd32) x)
@@ -824,7 +824,7 @@ with the same real `fp32Round` operation used by the FP32 model.
 theorem toReal_roundDyadicToIEEE32_abs_error_bound (d : IEEE32Exec.Dyadic)
     (hfin : IEEE32Exec.isFinite (IEEE32Exec.roundDyadicToIEEE32 d) = true) :
     abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 d) - IEEE32Exec.dyadicToReal d) ≤
-      neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal d) TrainingPhase.forward / 2 := by
+      neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal d) / 2 := by
   have hbridge :=
     TorchLean.Floats.IEEE754.IEEE32Exec.toReal_roundDyadicToIEEE32_eq_fp32Round (d := d) hfin
   -- Reduce to the generic rounding bound for `fp32Round`.
@@ -1217,13 +1217,13 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
             (c := embedVec (fun i => IEEE32Exec.roundDyadicToIEEE32 (cD i)))
             (b := embed (IEEE32Exec.roundDyadicToIEEE32 bD))
             (x := embed x)) ≤
-      neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) TrainingPhase.forward / 2 +
+      neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) / 2 +
         ∑ i : Fin n,
-          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward / 2
+          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) / 2
             *
               abs (b - a) +
             abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-              (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) TrainingPhase.forward
+              (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i))
                 / 2)) := by
   classical
   -- Start from the raw parameter-sensitivity bound.
@@ -1233,7 +1233,7 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
   -- `toReal_roundDyadicToIEEE32_abs_error_bound`.
   have hb :
       abs (IEEE32Exec.dyadicToReal bD - IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 bD)) ≤
-        neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) TrainingPhase.forward / 2 := by
+        neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) / 2 := by
     simpa [abs_sub_comm] using
       (toReal_roundDyadicToIEEE32_abs_error_bound (d := bD) (hfin := hbfin))
   have hterm :
@@ -1245,24 +1245,23 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
               abs (IEEE32Exec.dyadicToReal (tD i) - IEEE32Exec.toReal
                 (IEEE32Exec.roundDyadicToIEEE32 (tD i))))
           ≤
-            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward /
+            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) /
               2 *
                 abs (b - a) +
               abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-                (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i))
-                  TrainingPhase.forward / 2)) := by
+                (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) / 2)) := by
     intro i
     have hc :
         abs (IEEE32Exec.dyadicToReal (cD i) - IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD
           i))) ≤
-          neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward / 2
+          neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) / 2
             := by
       simpa [abs_sub_comm] using
         (toReal_roundDyadicToIEEE32_abs_error_bound (d := cD i) (hfin := hcfin i))
     have ht :
         abs (IEEE32Exec.dyadicToReal (tD i) - IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (tD
           i))) ≤
-          neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) TrainingPhase.forward / 2
+          neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) / 2
             := by
       simpa [abs_sub_comm] using
         (toReal_roundDyadicToIEEE32_abs_error_bound (d := tD i) (hfin := htfin i))
@@ -1270,7 +1269,7 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
         abs (IEEE32Exec.dyadicToReal (cD i) - IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD
           i))) *
             abs (b - a) ≤
-          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward /
+          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) /
             2) *
             abs (b - a) := by
       exact mul_le_mul_of_nonneg_right hc (abs_nonneg (b - a))
@@ -1279,7 +1278,7 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
             abs (IEEE32Exec.dyadicToReal (tD i) - IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32
               (tD i))) ≤
           abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) TrainingPhase.forward /
+            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) /
               2) := by
       exact mul_le_mul_of_nonneg_left ht (abs_nonneg _)
     exact add_le_add hc' ht'
@@ -1293,12 +1292,11 @@ theorem hinge_fun_dyadic_quantization_error_le_Icc_halfUlp
                 abs (IEEE32Exec.dyadicToReal (tD i) - IEEE32Exec.toReal
                   (IEEE32Exec.roundDyadicToIEEE32 (tD i))))) ≤
         ∑ i : Fin n,
-          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward / 2
+          (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) / 2
             *
                 abs (b - a) +
               abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-                (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i))
-                  TrainingPhase.forward / 2)) := by
+                (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) / 2)) := by
     exact Finset.sum_le_sum (fun i _ => hterm i)
   -- Finish by transitivity.
   have := add_le_add hb hsum
@@ -1354,15 +1352,13 @@ theorem reluApproximationIccIEEE32Exec_dyadicHalfUlp
                   (c := fun i => IEEE32Exec.roundDyadicToIEEE32 (cD i))
                   (b := IEEE32Exec.roundDyadicToIEEE32 bD) x)| <
             (εApprox +
-              (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) TrainingPhase.forward / 2
+              (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) / 2
                 +
                 ∑ i : Fin hidDim,
-                  (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i))
-                    TrainingPhase.forward / 2 *
+                  (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) / 2 *
                       abs (b - a) +
                     abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-                      (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i))
-                        TrainingPhase.forward / 2)))) +
+                      (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) / 2)))) +
               hingeFunErrorBound
                 (t := embedVec (fun i => IEEE32Exec.roundDyadicToIEEE32 (tD i)))
                 (c := embedVec (fun i => IEEE32Exec.roundDyadicToIEEE32 (cD i)))
@@ -1373,12 +1369,12 @@ theorem reluApproximationIccIEEE32Exec_dyadicHalfUlp
   have hc : ∀ i, IEEE32Exec.isFinite (IEEE32Exec.roundDyadicToIEEE32 (cD i)) = true := hcfin
   -- Now apply the general 3-term (bias-parametric) theorem.
   let εQdy : ℝ :=
-    neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) TrainingPhase.forward / 2 +
+    neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal bD) / 2 +
       ∑ i : Fin hidDim,
-        (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) TrainingPhase.forward / 2 *
+        (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (cD i)) / 2 *
             abs (b - a) +
           abs (IEEE32Exec.toReal (IEEE32Exec.roundDyadicToIEEE32 (cD i))) *
-            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) TrainingPhase.forward /
+            (neuralUlp binaryRadix fexp32 (IEEE32Exec.dyadicToReal (tD i)) /
               2))
   have :=
     (reluApproximationIccIEEE32Exec_threeTerm_bias

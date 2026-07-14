@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.Facade
+public import NN.API
 
 /-!
 # TorchLean MLP Train-Then-Verify Workflow
@@ -44,9 +44,9 @@ def hiddenDim : Nat := 100
 def outDim : Nat := 1
 
 /-- Input shape for the workflow model. -/
-def xShape : Shape := Shape.vec inDim
+def xShape : Spec.Shape := .dim inDim .scalar
 /-- Output shape for the workflow model. -/
-def yShape : Shape := Shape.vec outDim
+def yShape : Spec.Shape := .dim outDim .scalar
 
 /-- Batched inputs for training. -/
 def XFloat : Spec.Tensor Float (.dim 3 xShape) :=
@@ -61,9 +61,9 @@ def YFloat : Spec.Tensor Float (.dim 3 yShape) :=
 /-- TorchLean model used for training and verification. -/
 def mkModel : nn.M (nn.Sequential xShape yShape) :=
   nn.Sequential![
-    nn.Linear inDim hiddenDim,
-    nn.ReLU,
-    nn.Linear hiddenDim outDim
+    nn.linear inDim hiddenDim,
+    nn.relu,
+    nn.linear hiddenDim outDim
   ]
 
 def model : nn.Sequential xShape yShape :=
@@ -76,7 +76,7 @@ The trained result owns the trained parameters. Calling `trained.verifyRobustLIn
 model that was actually trained, without reopening a polymorphic low-level callback in this example
 file.
 -/
-def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] (opts : Options) : IO Unit := do
   let dataset := Data.tensorDataset XFloat YFloat
   let trainer := Trainer.new model <|
@@ -85,7 +85,7 @@ def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
       .regression
 
   IO.println s!"== TorchLean MLP workflow ({inDim} → {hiddenDim} → {outDim}) =="
-  IO.println s!"Training with backend={reprStr opts.backend}, {ModelZoo.deviceNote opts}"
+  IO.println s!"Training with backend={reprStr opts.backend}, device={opts.device.cliName}"
   let trained ← trainer.train dataset { steps := 10 }
   IO.println s!"avg_loss(on samples)={trained.report.after}"
   IO.println "Checking public IBP bounds on a small input box"
@@ -94,7 +94,7 @@ def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
   cert.printSummary
 
 /-- Runtime-selected typed runner used by the CLI entrypoint. -/
-def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] (opts : Options) (rest : List String) : IO Unit := do
   CLI.requireNoArgs "torchlean-mlp-workflow" rest
   if opts.usesCuda then

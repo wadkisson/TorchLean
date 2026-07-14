@@ -155,14 +155,14 @@ lemma conv2d_bias_deriv_get
     (layer : Spec.Conv2DSpec inC outC kH kW stride padding ℝ h1 h2 h3)
     (input : Spec.MultiChannelImage inC inH inW ℝ)
     (δ : Spec.MultiChannelImage outC
-      ((inH + 2 * padding - kH) / stride + 1)
-      ((inW + 2 * padding - kW) / stride + 1) ℝ)
+      (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) ℝ)
     (oc : Fin outC) :
     getAtOrZero (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layer) (input := input)
       (grad_output := δ)) [oc.val]
       =
-    ∑ i : Fin ((inH + 2 * padding - kH) / stride + 1),
-      ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1),
+    ∑ i : Fin (Shape.slidingWindowOutDim inH kH stride padding),
+      ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding),
         getAtOrZero δ [oc.val, i.val, j.val] := by
   classical
   unfold Spec.conv2dBiasDerivSpec
@@ -172,52 +172,52 @@ lemma conv2d_bias_deriv_get
   -- After unfolding, the value is a scalar tensor, so `get_at_or_zero .. []` extracts the scalar.
   -- Convert the inner fold and then the outer fold.
   have houtW :
-      ∀ (i : Fin ((inH + 2 * padding - kH) / stride + 1)) (acc : ℝ),
-        (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl
+      ∀ (i : Fin (Shape.slidingWindowOutDim inH kH stride padding)) (acc : ℝ),
+        (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl
             (fun acc j => acc + getAtOrZero δ [oc.val, i.val, j.val]) acc
           =
-        acc + ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1), getAtOrZero δ [oc.val, i.val,
+        acc + ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding), getAtOrZero δ [oc.val, i.val,
           j.val] := by
     intro i acc
     -- Use `foldl_add_init` then `Spec.finRange_foldl_add_eq_finset_sum`.
     have h1 :=
-      List.foldl_add_init (l := List.finRange ((inW + 2 * padding - kW) / stride + 1))
-        (f := fun j : Fin ((inW + 2 * padding - kW) / stride + 1) => getAtOrZero δ [oc.val,
+      List.foldl_add_init (l := List.finRange (Shape.slidingWindowOutDim inW kW stride padding))
+        (f := fun j : Fin (Shape.slidingWindowOutDim inW kW stride padding) => getAtOrZero δ [oc.val,
           i.val, j.val])
         (acc := acc)
     -- Convert the `0`-initialized fold into a `Finset` sum.
     have h2 :
-        (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl
+        (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl
             (fun s j => s + getAtOrZero δ [oc.val, i.val, j.val]) 0
           =
-        ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1), getAtOrZero δ [oc.val, i.val, j.val]
+        ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding), getAtOrZero δ [oc.val, i.val, j.val]
           := by
       simpa using
-        (Spec.finRange_foldl_add_eq_finset_sum (f := fun j : Fin ((inW + 2 * padding - kW) / stride
-          + 1) =>
-        getAtOrZero δ [oc.val, i.val, j.val]))
+        (Spec.finRange_foldl_add_eq_finset_sum
+          (f := fun j : Fin (Shape.slidingWindowOutDim inW kW stride padding) =>
+            getAtOrZero δ [oc.val, i.val, j.val]))
     simpa [h2] using h1
 
   -- Now handle the outer fold over `out_h`.
   have houtH :
-      (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl
-          (fun acc (i : Fin ((inH + 2 * padding - kH) / stride + 1)) =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl
+      (List.finRange (Shape.slidingWindowOutDim inH kH stride padding)).foldl
+          (fun acc (i : Fin (Shape.slidingWindowOutDim inH kH stride padding)) =>
+            (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl
                 (fun acc j => acc + getAtOrZero δ [oc.val, i.val, j.val]) acc)
           0
         =
-      ∑ i : Fin ((inH + 2 * padding - kH) / stride + 1),
-        ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1), getAtOrZero δ [oc.val, i.val, j.val]
+      ∑ i : Fin (Shape.slidingWindowOutDim inH kH stride padding),
+        ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding), getAtOrZero δ [oc.val, i.val, j.val]
           := by
     -- Rewrite the step function using `houtW`, then convert the resulting fold to a sum.
     -- First show the fold is equivalent to `foldl (fun acc i => acc + innerSum i) 0`.
     have hstep :
-        (fun acc (i : Fin ((inH + 2 * padding - kH) / stride + 1)) =>
-          (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl
+        (fun acc (i : Fin (Shape.slidingWindowOutDim inH kH stride padding)) =>
+          (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl
               (fun acc j => acc + getAtOrZero δ [oc.val, i.val, j.val]) acc)
         =
-        (fun acc (i : Fin ((inH + 2 * padding - kH) / stride + 1)) =>
-          acc + ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1), getAtOrZero δ [oc.val, i.val,
+        (fun acc (i : Fin (Shape.slidingWindowOutDim inH kH stride padding)) =>
+          acc + ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding), getAtOrZero δ [oc.val, i.val,
             j.val]) := by
       funext acc i
       simpa using (houtW i acc)
@@ -226,7 +226,8 @@ lemma conv2d_bias_deriv_get
 
   -- Finish by `simp`ing the definition back to the fold we rewrote (and normalizing away the
   -- `tensor_cast` inserted by `conv2d_bias_deriv_spec`).
-  simpa [Spec.convBiasDerivSpec, Spec.Private.foldlIndices, Spec.convOutSpatial, Spec.convOutDim,
+  simpa [Spec.convBiasDerivSpec, Spec.Private.foldlIndices, Spec.convOutSpatial,
+    Spec.Shape.slidingWindowOutDim,
     Vector.get, Vector.toList, oc.isLt] using houtH
 
 lemma dot_biasBroadcast_eq_dot_bias_deriv
@@ -236,12 +237,12 @@ lemma dot_biasBroadcast_eq_dot_bias_deriv
     (input : Spec.MultiChannelImage inC inH inW ℝ)
     (db : Tensor ℝ (.dim outC .scalar))
     (δ : Spec.MultiChannelImage outC
-      ((inH + 2 * padding - kH) / stride + 1)
-      ((inW + 2 * padding - kW) / stride + 1) ℝ) :
+      (Shape.slidingWindowOutDim inH kH stride padding)
+      (Shape.slidingWindowOutDim inW kW stride padding) ℝ) :
     dot (biasBroadcast
           (outC := outC)
-          (outH := ((inH + 2 * padding - kH) / stride + 1))
-          (outW := ((inW + 2 * padding - kW) / stride + 1))
+          (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+          (outW := (Shape.slidingWindowOutDim inW kW stride padding))
           db) δ
       =
     dot db (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layer) (input := input) (grad_output :=
@@ -252,27 +253,27 @@ lemma dot_biasBroadcast_eq_dot_bias_deriv
   have hdot3 :
       dot (biasBroadcast
             (outC := outC)
-            (outH := ((inH + 2 * padding - kH) / stride + 1))
-            (outW := ((inW + 2 * padding - kW) / stride + 1))
+            (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+            (outW := (Shape.slidingWindowOutDim inW kW stride padding))
             db) δ
         =
       ∑ oc : Fin outC,
-        ∑ i : Fin ((inH + 2 * padding - kH) / stride + 1),
-          ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1),
+        ∑ i : Fin (Shape.slidingWindowOutDim inH kH stride padding),
+          ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding),
             (getAtOrZero db [oc.val]) * (getAtOrZero δ [oc.val, i.val, j.val]) := by
     -- Outer dimension over channels.
     rw [dot_dim (a := biasBroadcast (outC := outC)
-            (outH := ((inH + 2 * padding - kH) / stride + 1))
-            (outW := ((inW + 2 * padding - kW) / stride + 1)) db) (b := δ)]
+            (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+            (outW := (Shape.slidingWindowOutDim inW kW stride padding)) db) (b := δ)]
     refine Finset.sum_congr rfl ?_
     intro oc _
     -- Matrix dot on the spatial slice.
     have hmat :=
-      Spec.dot_mat_eq_sum (m := ((inH + 2 * padding - kH) / stride + 1))
-        (n := ((inW + 2 * padding - kW) / stride + 1))
+      Spec.dot_mat_eq_sum (m := (Shape.slidingWindowOutDim inH kH stride padding))
+        (n := (Shape.slidingWindowOutDim inW kW stride padding))
         (A := get (biasBroadcast (outC := outC)
-          (outH := ((inH + 2 * padding - kH) / stride + 1))
-          (outW := ((inW + 2 * padding - kW) / stride + 1)) db) oc)
+          (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+          (outW := (Shape.slidingWindowOutDim inW kW stride padding)) db) oc)
         (B := get δ oc)
     -- Rewrite `get2` to `get_at_or_zero`, and simplify the broadcast slice entry.
     -- `get2 (get (biasBroadcast db) oc) i j = db[oc]`.
@@ -280,8 +281,8 @@ lemma dot_biasBroadcast_eq_dot_bias_deriv
     -- Rewrite the slice `get2` in terms of `get_at_or_zero`, then lift it back to the 3D index.
     -- `get δ oc` is the `oc`-th channel slice.
     have hδ :
-        ∀ (i : Fin ((inH + 2 * padding - kH) / stride + 1)) (j : Fin ((inW + 2 * padding - kW) /
-          stride + 1)),
+        ∀ (i : Fin (Shape.slidingWindowOutDim inH kH stride padding))
+          (j : Fin (Shape.slidingWindowOutDim inW kW stride padding)),
           getAtOrZero (get δ oc) [i.val, j.val] = getAtOrZero δ [oc.val, i.val, j.val] := by
       intro i j
       simpa using (get_at_or_zero_get_channel (t := δ) (c := oc) (i := i) (j := j))
@@ -295,16 +296,16 @@ lemma dot_biasBroadcast_eq_dot_bias_deriv
     -- Convert `get2` to `get_at_or_zero` on both slices.
     have hA2 :
         get2 (get (biasBroadcast (outC := outC)
-          (outH := ((inH + 2 * padding - kH) / stride + 1))
-          (outW := ((inW + 2 * padding - kW) / stride + 1)) db) oc) i j
+          (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+          (outW := (Shape.slidingWindowOutDim inW kW stride padding)) db) oc) i j
           =
         getAtOrZero db [oc.val] := by
       -- `biasBroadcast` is constant across the spatial indices.
       -- First rewrite `get2` to a `get_at_or_zero` on the matrix slice.
       have h := get2_eq_get_at_or_zero
         (A := get (biasBroadcast (outC := outC)
-          (outH := ((inH + 2 * padding - kH) / stride + 1))
-          (outW := ((inW + 2 * padding - kW) / stride + 1)) db) oc) i j
+          (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+          (outW := (Shape.slidingWindowOutDim inW kW stride padding)) db) oc) i j
       -- Then simplify the broadcast slice read.
       -- (All indices are in bounds, so `get_at_or_zero` takes the `if_pos` branches.)
       simpa [biasBroadcast, get_eq, oc.isLt, i.isLt, j.isLt] using h
@@ -333,18 +334,18 @@ lemma dot_biasBroadcast_eq_dot_bias_deriv
   -- Rewrite each bias-deriv coordinate as the spatial sum, then compare with `hdot3`.
   calc
     dot (biasBroadcast (outC := outC)
-          (outH := ((inH + 2 * padding - kH) / stride + 1))
-          (outW := ((inW + 2 * padding - kW) / stride + 1)) db) δ
+          (outH := (Shape.slidingWindowOutDim inH kH stride padding))
+          (outW := (Shape.slidingWindowOutDim inW kW stride padding)) db) δ
         =
       ∑ oc : Fin outC,
-        ∑ i : Fin ((inH + 2 * padding - kH) / stride + 1),
-          ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1),
+        ∑ i : Fin (Shape.slidingWindowOutDim inH kH stride padding),
+          ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding),
             (getAtOrZero db [oc.val]) * (getAtOrZero δ [oc.val, i.val, j.val]) := hdot3
     _ =
       ∑ oc : Fin outC,
         (getAtOrZero db [oc.val]) *
-          (∑ i : Fin ((inH + 2 * padding - kH) / stride + 1),
-            ∑ j : Fin ((inW + 2 * padding - kW) / stride + 1),
+          (∑ i : Fin (Shape.slidingWindowOutDim inH kH stride padding),
+            ∑ j : Fin (Shape.slidingWindowOutDim inW kW stride padding),
               getAtOrZero δ [oc.val, i.val, j.val]) := by
         simp [Finset.mul_sum]
     _ =
@@ -667,11 +668,11 @@ They are kept as definitions so later statements can share the same expression.
 -/
 
 def outH (inH kH stride padding : Nat) : Nat :=
-  (inH + 2 * padding - kH) / stride + 1
+  Shape.slidingWindowOutDim inH kH stride padding
 
 /-- Output width helper (no dilation). -/
 def outW (inW kW stride padding : Nat) : Nat :=
-  (inW + 2 * padding - kW) / stride + 1
+  Shape.slidingWindowOutDim inW kW stride padding
 
 -- ---------------------------------------------------------------------------
 -- Kernel bridge: dot(conv(dKernel, x), δ) = dot(dKernel, ∂L/∂kernel)
@@ -698,13 +699,8 @@ lemma conv2d_spec_noBias_get
   classical
   unfold Spec.conv2dSpec
   -- Peel the requested output entry and convert the nested `finRange` folds into `Finset` sums.
-  simp [layerK, fill, getAtOrZero, oc.isLt, Spec.finRange_foldl_add_acc]
-  -- Discharge the bounds checks introduced by `getAtOrZero` (these follow from `i.isLt` / `j.isLt`).
-  have hi : (i : Nat) ≤ (inH + 2 * padding - kH) / stride := by
-    simpa [outH] using (Nat.lt_succ_iff.mp i.isLt)
-  have hj : (j : Nat) ≤ (inW + 2 * padding - kW) / stride := by
-    simpa [outW] using (Nat.lt_succ_iff.mp j.isLt)
-  simp [hi, hj]
+  simp [outH, outW, layerK, fill, getAtOrZero, oc.isLt,
+    Spec.finRange_foldl_add_acc]
   -- Rewrite the `mkInputIdx?`-based read into the `paddedInput` helper, then commute the product
   -- so the summand matches the statement (`kernel * paddedInput`).
   refine Finset.sum_congr rfl ?_

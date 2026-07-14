@@ -127,15 +127,15 @@ def usage : String :=
 
 /-- Parse CLI flags into `MnistFCOpts`. -/
 def parseArgs (args : List String) : Except String MnistFCOpts := do
-  let args := NN.API.CLI.dropDashDash args
-  if NN.API.CLI.hasHelp args then
+  let args := TorchLean.CLI.dropDashDash args
+  if TorchLean.CLI.hasHelp args then
     throw usage
-  let (weights, args) ← NN.API.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
-  let (suite, args) ← NN.API.CLI.takeFlagValueDefault args "suite" defaultSuitePath
-  let (max, args) ← NN.API.CLI.takeNatFlagDefault args "max" 30
-  let (mode, args) ← NN.API.CLI.takeParsedFlagDefault args "mode" "ibp" Mode.parse
-  let (alphas, args) ← NN.API.CLI.takeFlagValueDefault args "alphas" ""
-  NN.API.CLI.requireNoArgs args
+  let (weights, args) ← TorchLean.CLI.takeFlagValueDefault args "weights" defaultWeightsPath
+  let (suite, args) ← TorchLean.CLI.takeFlagValueDefault args "suite" defaultSuitePath
+  let (max, args) ← TorchLean.CLI.takeNatFlagDefault args "max" 30
+  let (mode, args) ← TorchLean.CLI.takeParsedFlagDefault args "mode" "ibp" Mode.parse
+  let (alphas, args) ← TorchLean.CLI.takeFlagValueDefault args "alphas" ""
+  TorchLean.CLI.checkNoArgs args
   pure { weights := weights, suite := suite, max := max, mode := mode, alphas := alphas }
 
 /-- Fail early with a helpful message when an external artifact is missing. -/
@@ -541,7 +541,7 @@ def main (args : List String) : IO Unit := do
     match args with
     | "--" :: rest => rest
     | _ => args
-  if NN.API.CLI.hasHelp args then
+  if TorchLean.CLI.hasHelp args then
     IO.println usage
     return
   let opts ←

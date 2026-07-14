@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -47,13 +47,13 @@ def run : IO Unit := do
   let sX : Shape := shape![inDim]
 
   let W : Tensor Float sW :=
-    tensorND! [outDim, inDim] [
+    tensorOfList! [outDim, inDim] [
       0.10, -0.20, 0.30,
       -0.05, 0.25, 0.15
     ]
-  let b : Tensor Float sB := tensorND! [outDim] [0.01, -0.02]
-  let x : Tensor Float sX := tensorND! [inDim] [0.50, -0.40, 0.20]
-  let target : Tensor Float sB := tensorND! [outDim] [0.05, -0.10]
+  let b : Tensor Float sB := tensorOfList! [outDim] [0.01, -0.02]
+  let x : Tensor Float sX := tensorOfList! [inDim] [0.50, -0.40, 0.20]
+  let target : Tensor Float sB := tensorOfList! [outDim] [0.05, -0.10]
 
   -- CPU tape
   let t0 : Tape Float := Tape.empty
@@ -112,8 +112,8 @@ def run : IO Unit := do
   let len : Nat := 3
   have hSlice : len + start ≤ n + m := by decide
 
-  let a : Tensor Float sA := tensorND! [n] [0.20, -0.10]
-  let bV : Tensor Float sBv := tensorND! [m] [0.30, 0.05, -0.25]
+  let a : Tensor Float sA := tensorOfList! [n] [0.20, -0.10]
+  let bV : Tensor Float sBv := tensorOfList! [m] [0.30, 0.05, -0.25]
 
   -- CPU
   let t0s : Tape Float := Tape.empty
@@ -139,7 +139,7 @@ def run : IO Unit := do
   let yCudaSlice ← Utils.cudaValue (s := shape![len]) t4sc ySliceIdc
   let seedCudaSlice : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := shape![len]
-      , buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size (shape![len]))) 1.0 }
+      , buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size (shape![len]))) 1.0 }
   let gradsCudaSlice ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4sc) ySliceIdc seedCudaSlice)
   let dA_cuda ← Utils.cudaGrad (s := sA) gradsCudaSlice aIdc
@@ -153,7 +153,7 @@ def run : IO Unit := do
   IO.println "== gather_scalar =="
   let nG : Nat := 5
   let sG : Shape := shape![nG]
-  let xG : Tensor Float sG := tensorND! [nG] [0.10, -0.20, 0.30, 0.05, -0.15]
+  let xG : Tensor Float sG := tensorOfList! [nG] [0.10, -0.20, 0.30, 0.05, -0.15]
   let iG : Fin nG := ⟨3, by decide⟩
 
   -- CPU
@@ -228,7 +228,7 @@ def run : IO Unit := do
   let sRow : Shape := shape![2]
   let sM : Shape := shape![3, 2]
   let xM : Tensor Float sM :=
-    tensorND! [3, 2] [
+    tensorOfList! [3, 2] [
       0.10, 0.20,
       -0.30, 0.40,
       0.50, -0.60
@@ -255,7 +255,7 @@ def run : IO Unit := do
   let yCudaRow ← Utils.cudaValue (s := sRow) t2rc yRowIdc
   let seedCudaRow : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := sRow
-      , buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sRow)) 1.0 }
+      , buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sRow)) 1.0 }
   let gradsCudaRow ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2rc) yRowIdc seedCudaRow)
   let dxCudaRow ← Utils.cudaGrad (s := sM) gradsCudaRow xMidc

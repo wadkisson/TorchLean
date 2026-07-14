@@ -61,7 +61,6 @@ export _root_.Spec.RL
    generalizedAdvantageEstimation returnsFromAdvantages)
 export _root_.Runtime.RL.Core
   (Transition IndexedTransition
-   oneHotAction
    discountedReturnsVecFrom discountedReturnsVec discountedReturnsVecDone
    generalizedAdvantageEstimationVec returnsFromAdvantagesVec
    squaredError huberLoss)

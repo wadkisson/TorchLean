@@ -7,19 +7,15 @@ open Verso.Genre Manual
 tag := "running-example"
 %%%
 
-A compact example makes the design concrete. We will use an ordinary two-layer classifier. Its job
-is not to be impressive as a model. Its job is to let us watch one computation
-move through the library: user code, parameters, a graph, a Float32 execution, and a verification
-problem.
+We begin with a two-layer classifier from four input features to two output logits. The model is
+small enough that its architecture, parameters, lowered graph, numerical execution, and verification
+problem can all be written down explicitly. Larger models add operators and state, but they cross
+the same boundaries.
 
-The example is deliberately small because the bookkeeping is the lesson. A ResNet, transformer, or
-scientific surrogate has more operators and more state, but the same questions return: what is the
-input shape, where are the parameters, which graph was lowered, which scalar semantics are in use,
-and what exactly did the checker establish?
-
-The question to keep asking is simple:
-
-> What is the same model at this layer?
+At each boundary we will identify the model's input shape, parameter payload, graph, scalar
+semantics, and checked claim. These objects are related, but they are not interchangeable: a graph
+does not contain a robustness theorem, and a successful runtime execution is not by itself a proof
+about every input in a region.
 
 The path looks like this:
 
@@ -33,23 +29,21 @@ tinyClassifier
   -> semantic claim
 ```
 
-Later examples use the same pattern for more interesting objects: causal masks with zero future
-attention weight, fused attention specs related to ordinary scaled dot product attention, 3D
-projection certificates, PINN residual bounds, neural-controller checks, and CROWN margin
-certificates.
+The later chapters apply the same structure to causal attention, fused kernels, PINN residuals,
+neural controllers, geometric certificates, and CROWN margin bounds.
 
 # The Public Model
 
-The ordinary entry point is `import NN`. A small multilayer perceptron looks like familiar
+The ordinary application entry point is `import NN.API`. A small multilayer perceptron looks like familiar
 model construction code, but the input and output shapes are part of the type. Here the model consumes a
 feature vector of length `4` and produces two logits:
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
-def tinyClassifier : nn.M (nn.Sequential (Shape.vec 4) (Shape.vec 2)) :=
+def tinyClassifier : nn.M (nn.Sequential (.dim 4 .scalar) (.dim 2 .scalar)) :=
   nn.Sequential![
     nn.Linear 4 8,
     nn.ReLU,
@@ -122,7 +116,7 @@ or normalized features:
 $$`x_i \in [c_i-\varepsilon_i, c_i+\varepsilon_i]`
 
 Changing that convention changes the verification problem even when the tensor shape stays
-`Shape.vec 4`.
+`.dim 4 .scalar`.
 
 # The Same Model As A Graph
 
@@ -234,7 +228,7 @@ different shapes cannot be passed to the same typed binary op without an explici
 proof.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
@@ -276,7 +270,7 @@ that question is clear.
 The same classifier produces several artifacts, and each artifact supports a different kind of
 sentence.
 
-- Model source: "this is a two-layer classifier from `Shape.vec 4` to `Shape.vec 2`."
+- Model source: "this is a two-layer classifier from `.dim 4 .scalar` to `.dim 2 .scalar`."
 - Parameter payload: "these tensors instantiate that architecture."
 - Runtime output: "this backend produced these logits on this input."
 - Lowered graph: "these named operations are the graph view of the model."

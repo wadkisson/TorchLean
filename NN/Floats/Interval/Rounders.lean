@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.NeuralFloat.Rounding
+public import NN.Floats.NeuralFloat.Rounding.Core
 
 /-!
 # Directed rounding (down/up) for Flocq-style formats
@@ -19,7 +19,7 @@ typically wants **directed rounding** at interval endpoints:
 
 In IEEE-754 hardware this corresponds to rounding modes “toward -∞” and “toward +∞”. In TorchLean’s
 proof-oriented model we represent this with Flocq-style rounding on `ℝ` via `neural_round` together with
-the floor/ceil rounding functions from `NN/Floats/NeuralFloat/Rounding.lean`.
+the floor/ceil rounding functions from `NN/Floats/NeuralFloat/Rounding/Core.lean`.
 
 This file is *format-generic*: it works for any radix `β` and exponent selection
 function `fexp` satisfying `NeuralValidExp`.
@@ -61,7 +61,7 @@ theorem roundDown_le (x : ℝ) : roundDown (β := β) (fexp := fexp) x ≤ x := 
   set s : ℝ := neuralScaledMantissa β fexp x
   set e : ℤ := neuralCexp β fexp x
   have hx : s * neuralBpow β e = x := by
-    -- `scaled_mantissa * bpow = x` is a helper lemma in `NeuralFloat/Rounding.lean`.
+    -- `scaled_mantissa * bpow = x` is proved in `NeuralFloat/Rounding/Core.lean`.
     simpa [s, e] using (TorchLean.Floats.neural_scaled_mantissa_mul_bpow (β := β) (fexp := fexp) x)
   have hb : 0 ≤ neuralBpow β e := neuralBpow.nonneg β e
   have hf : (⌊s⌋ : ℝ) ≤ s := Int.floor_le s

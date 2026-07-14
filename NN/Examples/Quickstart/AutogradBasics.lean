@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 
 /-!
 # Quickstart: Autograd Basics
@@ -31,8 +31,8 @@ open TorchLean
 
 abbrev XShape := Shape.scalar.appendDim 2
 abbrev YShape := Shape.scalar.appendDim 3
-abbrev WShape := Shape.mat 3 2
-abbrev BShape := Shape.vec 3
+abbrev WShape : Shape := .dim 3 (.dim 2 .scalar)
+abbrev BShape : Shape := .dim 3 .scalar
 
 /-!
 The tour stays on the public Float autodiff surface. It avoids:
@@ -46,7 +46,7 @@ Instead, it uses `TorchLean.autograd.*` directly on a tiny fixed payload.
 
 def model : nn.Sequential XShape YShape :=
   -- One Linear layer: y = x ↦ W*x + b.
-  nn.linear 2 3 0 1
+  nn.deterministic.linear 2 3 0 1
 
 def mseLoss : autograd.model.OutputLoss YShape YShape :=
   -- Reusable scalar loss on model outputs: MSE(pred, target).
@@ -83,14 +83,14 @@ structure DemoPayload (α : Type) where
 
 /-- Fixed Float tensors used by the walkthrough. -/
 def demoPayloadF : DemoPayload Float :=
-  { W := tensorND! [3, 2] [
+  { W := tensorOfList! [3, 2] [
       0.2, -0.1,
       0.0,  0.3,
      -0.4,  0.1
     ]
-    b := tensorND! [3] [0.01, -0.02, 0.03]
-    x := tensorND! [2] [0.5, -1.2]
-    y := tensorND! [3] [0.7, 0.1, -0.5]
+    b := tensorOfList! [3] [0.01, -0.02, 0.03]
+    x := tensorOfList! [2] [0.5, -1.2]
+    y := tensorOfList! [3] [0.7, 0.1, -0.5]
     vW := Tensor.fill 0.1 WShape
     vb := Tensor.fill (-0.2) BShape }
 
@@ -111,7 +111,7 @@ def paramDirection {α : Type} (payload : DemoPayload α) :
 /-- Unpack this tutorial's single Linear-layer parameter pack. -/
 def unpackLinearParams {α : Type} (params : autograd.model.Params model α) :
     Tensor.T α WShape × Tensor.T α BShape := by
-  simpa [autograd.model.Params, model, BShape] using tensorpack.unpackPair params
+  simpa [autograd.model.Params, model, BShape] using nn.ParamTensors.unpackPair params
 
 /-- Run the Float autograd walkthrough. -/
 def runDemo : IO Unit := do

@@ -91,9 +91,9 @@ modes  = 8
 blocks = 1
 ```
 
-The run is enough to exercise the actual operator-learning path while keeping the tensors, modes, and
-artifacts readable. On CUDA, the example uses a fused real-FFT FNO primitive backed by cuFFT. On CPU,
-it falls back to a dense DFT reference path, which is slower but easier to inspect.
+The run is enough to exercise the actual operator-learning path while keeping the tensors, modes,
+and artifacts readable. CPU execution uses the dense multidimensional real-split DFT. CUDA uses a
+fused real-FFT FNO primitive backed by cuFFT.
 
 ## What TorchLean Owns
 

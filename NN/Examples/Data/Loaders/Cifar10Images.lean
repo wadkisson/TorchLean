@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Data.RealPaths
 public import NN.Examples.Data.SamplePaths
 
@@ -78,31 +78,40 @@ abbrev nTotal : Nat := 200
 
 /-- Small CNN (no BatchNorm): Conv -> ReLU -> Pool -> Conv -> ReLU -> Pool -> Linear(10). -/
 def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (Shape.images batch channels height width) (shape![batch, classes])) :=
+    nn.M (nn.Sequential (.dim batch (.dim channels (.dim height (.dim width .scalar)))) (shape![batch, classes])) :=
   let outC1 : Nat := 16
   let outC2 : Nat := 32
-  let conv1 : nn.Conv :=
-    { outC := outC1, kH := 3, kW := 3, stride := 1, padding := 1 }
-  let conv2 : nn.Conv :=
-    { outC := outC2, kH := 3, kW := 3, stride := 1, padding := 1 }
-  let pool : nn.MaxPool :=
-    { kH := 2, kW := 2, stride := 2 }
-  let h1 : Nat := (height + 2 * conv1.padding - conv1.kH) / conv1.stride + 1
-  let w1 : Nat := (width + 2 * conv1.padding - conv1.kW) / conv1.stride + 1
-  let h2 : Nat := (h1 - pool.kH) / pool.stride + 1
-  let w2 : Nat := (w1 - pool.kW) / pool.stride + 1
-  let h3 : Nat := (h2 + 2 * conv2.padding - conv2.kH) / conv2.stride + 1
-  let w3 : Nat := (w2 + 2 * conv2.padding - conv2.kW) / conv2.stride + 1
-  let h4 : Nat := (h3 - pool.kH) / pool.stride + 1
-  let w4 : Nat := (w3 - pool.kW) / pool.stride + 1
+  let spatial0 : Vector Nat 2 := #v[height, width]
+  let conv1 : nn.Conv 2 :=
+    { outChannels := outC1
+      kernel := #v[3, 3]
+      padding := #v[1, 1]
+      kernelNonzero := by intro i; fin_cases i <;> decide
+      strideNonzero := by intro i; fin_cases i <;> decide }
+  let conv2 : nn.Conv 2 :=
+    { outChannels := outC2
+      kernel := #v[3, 3]
+      padding := #v[1, 1]
+      kernelNonzero := by intro i; fin_cases i <;> decide
+      strideNonzero := by intro i; fin_cases i <;> decide }
+  let pool : nn.Pool 2 :=
+    { kernel := #v[2, 2]
+      stride := #v[2, 2]
+      kernelNonzero := by intro i; fin_cases i <;> decide
+      strideNonzero := by intro i; fin_cases i <;> decide }
+  let spatial1 := Spec.convOutSpatial spatial0 conv1.kernel conv1.stride conv1.padding
+  let spatial2 := Spec.poolOutSpatialPad spatial1 pool.kernel pool.stride pool.padding
+  let spatial3 := Spec.convOutSpatial spatial2 conv2.kernel conv2.stride conv2.padding
+  let spatial4 := Spec.poolOutSpatialPad spatial3 pool.kernel pool.stride pool.padding
   nn.Sequential![
-    nn.Conv2d (n := batch) (inC := channels) (inH := height) (inW := width) conv1,
-    nn.ReLU,
-    nn.MaxPool2d (n := batch) (inC := outC1) (inH := h1) (inW := w1) pool,
-    nn.Conv2d (n := batch) (inC := outC1) (inH := h2) (inW := w2) conv2,
-    nn.ReLU,
-    nn.MaxPool2d (n := batch) (inC := outC2) (inH := h3) (inW := w3) pool,
-    nn.ClassifierBatch (n := batch) (s := Shape.image outC2 h4 w4) classes
+    nn.conv (leading := .dim batch .scalar) (inChannels := channels) spatial0 conv1,
+    nn.relu,
+    nn.maxPool (leading := .dim batch .scalar) (channels := outC1) spatial1 pool,
+    nn.conv (leading := .dim batch .scalar) (inChannels := outC1) spatial2 conv2,
+    nn.relu,
+    nn.maxPool (leading := .dim batch .scalar) (channels := outC2) spatial3 pool,
+    nn.lift (nn.heads.classifierBatch (n := batch)
+      (s := Spec.Shape.ofList (outC2 :: spatial4.toList)) classes)
   ]
 
 /-- Shared offline CIFAR10-like tensor source used by this tutorial. -/
@@ -110,12 +119,12 @@ def source (xPath yPath : System.FilePath) (nRows : Nat) : Data.LabeledSource :=
   Data.LabeledSource.ofPaths .npy xPath yPath nRows [channels, height, width] classes
 
 def trainDataset (xPath yPath : System.FilePath) (nRows trainSize seed : Nat) :
-    Trainer.Dataset (Shape.image channels height width) (Shape.vec classes) :=
+    Trainer.Dataset (.dim channels (.dim height (.dim width .scalar))) (.dim classes .scalar) :=
   (Data.randomSplitDataset trainSize (Data.labeledDataset (source xPath yPath nRows)) seed).1
 
 /-- Runtime-polymorphic test split used for `--check-only` reporting. -/
 def testDataset (xPath yPath : System.FilePath) (nRows trainSize seed : Nat) :
-    Trainer.Dataset (Shape.image channels height width) (Shape.vec classes) :=
+    Trainer.Dataset (.dim channels (.dim height (.dim width .scalar))) (.dim classes .scalar) :=
   (Data.randomSplitDataset trainSize (Data.labeledDataset (source xPath yPath nRows)) seed).2
 
 /-- Command-line help for the CIFAR10-style NPY loader tutorial. -/
@@ -230,8 +239,8 @@ def main (args : List String) : IO Unit := do
             s!"train_size={trainSize}", s!"test_size={dsTest.size}",
             s!"epochs={eb.epochs}", s!"batch={eb.batch}", s!"lr={lr}"] }
     trained.printSummary
-    let blank : Tensor.T Float (Shape.image channels height width) :=
-      Tensor.fill 0.0 (Shape.image channels height width)
+    let blank : Tensor.T Float (.dim channels (.dim height (.dim width .scalar))) :=
+      Tensor.fill 0.0 (.dim channels (.dim height (.dim width .scalar)))
     trained.printPrediction "blank" (Tensor.repeatBatch eb.batch blank)
 
 end NN.Examples.Data.Loaders.Cifar10Images

@@ -52,7 +52,7 @@ variable {α : Type} [Context α]
 Pipeline:
 `GRU(seqLen, inputSize → hiddenSize)` then `Linear` applied at each timestep.
 
-PyTorch analogy: `nn.GRU(..., batch_first=False)` followed by an `nn.Linear` on the output sequence.
+PyTorch analogy: `nn.GRU(..., batch_first=False)` followed by an `nn.linear` on the output sequence.
 -/
 def simpleGruModelSpec
   [DecidableRel ((· > ·) : α → α → Prop)]
@@ -247,7 +247,7 @@ def simpleGruForward {inputSize hiddenSize outputSize : Nat}
 
 Returns `(outputs, final_hidden)`.
 
-PyTorch analogy: run `nn.GRU` over the sequence, then apply `nn.Linear` at each timestep.
+PyTorch analogy: run `nn.GRU` over the sequence, then apply `nn.linear` at each timestep.
 -/
 def simpleGruSequenceForward {seqLen inputSize hiddenSize outputSize : Nat}
   (model : SimpleGRUModel α inputSize hiddenSize outputSize)
@@ -604,7 +604,7 @@ def simpleGRUToModuleSpec {seqLen inputSize hiddenSize outputSize : Nat}
 /--
 Package `GRUClassifier` as an `NNModuleSpec`.
 
-PyTorch analogue: `nn.GRU` feeding a `nn.Linear` classifier head.
+PyTorch analogue: `nn.GRU` feeding a `nn.linear` classifier head.
 -/
 def gruClassifierToModuleSpec {seqLen inputSize hiddenSize numClasses : Nat}
   (model : GRUClassifier α inputSize hiddenSize numClasses) (h : 0 < seqLen) :

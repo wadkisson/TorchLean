@@ -219,16 +219,16 @@ theorem approx_conv2d_bias_point
         simp [termR]
       simpa [hNested] using hsumR_nested
     have hFoldR' :
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (Shape.slidingWindowOutDim inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl (fun acc j =>
                 acc + getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 = sumR := by
       simpa [out_h, out_w, conv2dOutH, conv2dOutW] using hFoldR
     have hSpec :
         getAtOrZero (Spec.conv2dBiasDerivSpec (α := R) (layer := layerR) (input := inputR)
           (grad_output := δR))
           [out_ch.val] =
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (Shape.slidingWindowOutDim inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl (fun acc j =>
                 acc + getAtOrZero δR [out_ch.val, i.val, j.val]) acc) 0 := by
       simp [Spec.conv2dBiasDerivSpec, out_ch.isLt]
       rfl
@@ -264,16 +264,16 @@ theorem approx_conv2d_bias_point
         simp [termS]
       simpa [hNested] using hsumS_nested
     have hFoldS' :
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (Shape.slidingWindowOutDim inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl (fun acc j =>
                 acc + getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 = sumS := by
       simpa [out_h, out_w, conv2dOutH, conv2dOutW] using hFoldS
     have hSpec :
         getAtOrZero (Spec.conv2dBiasDerivSpec (α := ℝ) (layer := layerS) (input := inputS)
           (grad_output := δS))
           [out_ch.val] =
-        (List.finRange ((inH + 2 * padding - kH) / stride + 1)).foldl (fun acc i =>
-            (List.finRange ((inW + 2 * padding - kW) / stride + 1)).foldl (fun acc j =>
+        (List.finRange (Shape.slidingWindowOutDim inH kH stride padding)).foldl (fun acc i =>
+            (List.finRange (Shape.slidingWindowOutDim inW kW stride padding)).foldl (fun acc j =>
                 acc + getAtOrZero δS [out_ch.val, i.val, j.val]) acc) 0 := by
       simp [Spec.conv2dBiasDerivSpec, out_ch.isLt]
       rfl

@@ -39,24 +39,24 @@ structure MlpConfig where
 deriving Repr
 
 /-- Input shape `(batch × inDim)` for an `MlpConfig`. -/
-abbrev mlpInShape (cfg : MlpConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.inDim
+abbrev mlpInShape (cfg : MlpConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.inDim .scalar)
 
 /-- Output shape `(batch × outDim)` for an `MlpConfig`. -/
-abbrev mlpOutShape (cfg : MlpConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.outDim
+abbrev mlpOutShape (cfg : MlpConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.outDim .scalar)
 
 /--
-Build a single-hidden-layer MLP with ReLU activation:
+Build a single-hidden-layer MLP with relu activation:
 
 `linear(inDim → hidDim) → relu → linear(hidDim → outDim)`.
 -/
 def mlpRelu (cfg : MlpConfig) :
     nn.M (nn.Sequential (mlpInShape cfg) (mlpOutShape cfg)) :=
   nn.Sequential![
-    Linear cfg.inDim cfg.hidDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hidDim cfg.outDim (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    linear cfg.inDim cfg.hidDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hidDim cfg.outDim (pfx := .dim cfg.batch .scalar)
   ]
 
 end models

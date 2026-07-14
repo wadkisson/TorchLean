@@ -61,7 +61,7 @@ Most IR ops are “shape transparent” (elementwise, permute, etc.). A few need
 /--
 Infer the output shape of a node from its kind + parent shapes.
 
-This function is used by `Graph.checkInferredShapes` below.
+This function is used by `Graph.checkShapes` below.
 -/
 def inferNodeOutShape (n : Node) (parentShapes : List Shape) : Except String Shape := do
   match n.kind with
@@ -193,8 +193,8 @@ def inferNodeOutShape (n : Node) (parentShapes : List Shape) : Except String Sha
       | [s] =>
           if s != inS then
             throw s!"reshape: parent shape mismatch: expected {repr inS}, got {repr s}"
-          if Shape.size inS != Shape.size outS then
-            throw s!"reshape: numel mismatch: {Shape.size inS} vs {Shape.size outS}"
+          if Spec.Shape.size inS != Spec.Shape.size outS then
+            throw s!"reshape: numel mismatch: {Spec.Shape.size inS} vs {Spec.Shape.size outS}"
           pure outS
       | _ => throw "reshape: expected 1 parent"
   | .flatten s =>
@@ -237,7 +237,7 @@ Infer shapes for every node (in topo/id order) and check that `Node.outShape` ma
 This is meant as a compiler/back-end consistency check and as a clean IR invariant for the docs:
 well-formed graphs have *self-consistent declared shapes*.
 -/
-def checkInferredShapes (g : Graph) : Except String Unit := do
+def checkShapes (g : Graph) : Except String Unit := do
   g.checkWellFormed
   let mut inferred : Array Shape := #[]
   for i in [0:g.nodes.size] do

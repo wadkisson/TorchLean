@@ -49,9 +49,8 @@ def softmaxBoundScalar (eps : ℝ) (xR : R) : ℝ :=
   let epsNum : ℝ :=
     Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
       Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
-      neuralUlp β fexp (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-        TrainingPhase.forward / 2
-  neuralUlp β fexp qhat TrainingPhase.forward / 2 +
+      neuralUlp β fexp (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2
+  neuralUlp β fexp qhat / 2 +
     abs numHat * abs (1 / denomHat) + abs numHat + epsNum
 
 /-- Per-entry bound tensor for the scalar logistic NF node. -/
@@ -100,8 +99,7 @@ theorem approxT_softmax_spec {s : Shape} :
                     Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
                       Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
                       neuralUlp β fexp
-                          (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))
-                          TrainingPhase.forward / 2)
+                          (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2)
                   hy hnum
               have hb :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd)

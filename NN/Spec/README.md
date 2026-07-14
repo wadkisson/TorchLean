@@ -15,7 +15,7 @@ The practical goal is to avoid a gap between the network we run and the network 
 define the reference behavior once, then make runtime, graph, and verifier layers say how they
 connect back to it.
 
-Ordinary model/training code should start from `import NN`. Use `NN.Entrypoint.Spec` when a file is
+Ordinary model/training code should start from `import NN`. Use `NN.Spec` when a file is
 spec-focused and should avoid importing the full public API.
 
 ## How To Navigate
@@ -44,9 +44,9 @@ spec-focused and should avoid importing the full public API.
 
 - spec = pure reference definitions in this folder.
 - runtime = tape/graph execution, compilation, CUDA paths, and training loops (see `NN/Runtime/*` and
-  `NN.Entrypoint.Runtime`).
+  `NN.Runtime`).
 - verification = bound propagation, certificate checking, and artifact replay (see `NN/Verification/*` and
-  `NN.Entrypoint.Verification`).
+  `NN.Verification`).
 
 ## What A Spec Claim Means
 

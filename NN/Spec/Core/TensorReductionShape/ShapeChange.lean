@@ -25,32 +25,32 @@ Flatten, unflatten, reshape, and small construction helpers for shape-indexed te
 -/
 
 
-/-- Flatten a tensor into a 1‑D vector (length = `Shape.size s`).
+/-- Flatten a tensor into a 1‑D vector (length = `Spec.Shape.size s`).
 
 The order is outermost‑dimension major (row‑major w.r.t. the shape tree).
-For proofs, the key invariant is that the output length matches `Shape.size`.
+For proofs, the key invariant is that the output length matches `Spec.Shape.size`.
 
 Why this exists: a lot of shape-changing ops are easiest to specify as "flatten, then rebuild",
 and this is also the bridge we use for some runtime interop where we want a plain sequence of
 scalars (e.g. importing weights or serializing test vectors).
 -/
-def flattenSpec {α : Type} [Inhabited α] : ∀ {s : Shape}, Tensor α s → Tensor α (.dim (Shape.size
+def flattenSpec {α : Type} [Inhabited α] : ∀ {s : Shape}, Tensor α s → Tensor α (.dim (Spec.Shape.size
   s) .scalar)
 | Shape.scalar, Tensor.scalar x =>
   Tensor.dim (fun i =>
     have _ : i.val < 1 := i.isLt
     if i.val = 0 then Tensor.scalar x else Tensor.scalar (Inhabited.default))
 | Shape.dim n s', Tensor.dim f =>
-  let _ := n * Shape.size s'
+  let _ := n * Spec.Shape.size s'
   Tensor.dim (fun i =>
-    let outerIdx := i.val / (Shape.size s')
-    let innerIdx := i.val % (Shape.size s')
+    let outerIdx := i.val / (Spec.Shape.size s')
+    let innerIdx := i.val % (Spec.Shape.size s')
     if h1 : outerIdx < n then
-      if _ : innerIdx < (Shape.size s') then
+      if _ : innerIdx < (Spec.Shape.size s') then
         let innerTensor := flattenSpec (f ⟨outerIdx, h1⟩)
         match innerTensor with
         | Tensor.dim g =>
-          if h3 : innerIdx < (Shape.size s') then
+          if h3 : innerIdx < (Spec.Shape.size s') then
             g ⟨innerIdx, h3⟩
           else
             Tensor.scalar (Inhabited.default)
@@ -63,21 +63,21 @@ def flattenSpec {α : Type} [Inhabited α] : ∀ {s : Shape}, Tensor α s → Te
 
 PyTorch analogy: `flat.view(shape)` (assuming the element count matches).
 This is the inverse of `flattenSpec` up to the ordering convention. -/
-def unflattenSpec {α : Type} [Inhabited α] : ∀ (s : Shape), Tensor α (.dim (Shape.size s) .scalar)
+def unflattenSpec {α : Type} [Inhabited α] : ∀ (s : Shape), Tensor α (.dim (Spec.Shape.size s) .scalar)
   → Tensor α s
 | Shape.scalar, Tensor.dim f =>
-  -- `Shape.size Shape.scalar = 1`, so the input always has an element at index `0`.
+  -- `Spec.Shape.size Shape.scalar = 1`, so the input always has an element at index `0`.
   -- Matching directly avoids extra proof obligations downstream.
-  match f ⟨0, by simp [Shape.size]⟩ with
+  match f ⟨0, by simp [Spec.Shape.size]⟩ with
   | Tensor.scalar x => Tensor.scalar x
 | Shape.dim n s', Tensor.dim f =>
   Tensor.dim (fun i =>
     -- For each position i in the outer dimension, extract a sub-tensor
-    let startIdx := i.val * (Shape.size s')
-    let subTensor : Tensor α (.dim (Shape.size s') .scalar) :=
+    let startIdx := i.val * (Spec.Shape.size s')
+    let subTensor : Tensor α (.dim (Spec.Shape.size s') .scalar) :=
       Tensor.dim (fun j =>
         let globalIdx := startIdx + j.val
-        if h : globalIdx < n * (Shape.size s') then
+        if h : globalIdx < n * (Spec.Shape.size s') then
           f ⟨globalIdx, h⟩
         else
           Tensor.scalar (Inhabited.default))
@@ -110,54 +110,54 @@ This is used to prove `unflattenSpec s (flattenSpec t) = t` by reducing the stat
 induction hypothesis on each slice.
 -/
 private lemma flattenSpec_dim_apply {α : Type} [Inhabited α] {n : Nat} {s : Shape}
-    (f : Fin n → Tensor α s) (i : Fin n) (j : Fin (Shape.size s))
-    (hmpos : 0 < Shape.size s)
-    (hidx : i.val * Shape.size s + j.val < n * Shape.size s) :
+    (f : Fin n → Tensor α s) (i : Fin n) (j : Fin (Spec.Shape.size s))
+    (hmpos : 0 < Spec.Shape.size s)
+    (hidx : i.val * Spec.Shape.size s + j.val < n * Spec.Shape.size s) :
     (match flattenSpec (Tensor.dim f) with
-      | Tensor.dim g => g ⟨i.val * Shape.size s + j.val, hidx⟩) =
+      | Tensor.dim g => g ⟨i.val * Spec.Shape.size s + j.val, hidx⟩) =
     (match flattenSpec (f i) with
       | Tensor.dim g => g j) := by
-  have hdiv : (i.val * Shape.size s + j.val) / Shape.size s = i.val := by
+  have hdiv : (i.val * Spec.Shape.size s + j.val) / Spec.Shape.size s = i.val := by
     calc
-      (i.val * Shape.size s + j.val) / Shape.size s
-          = (Shape.size s * i.val + j.val) / Shape.size s := by
+      (i.val * Spec.Shape.size s + j.val) / Spec.Shape.size s
+          = (Spec.Shape.size s * i.val + j.val) / Spec.Shape.size s := by
               simp [Nat.mul_comm]
-      _ = i.val + j.val / Shape.size s := by
-            simpa using (Nat.mul_add_div (m := Shape.size s) hmpos i.val j.val)
+      _ = i.val + j.val / Spec.Shape.size s := by
+            simpa using (Nat.mul_add_div (m := Spec.Shape.size s) hmpos i.val j.val)
       _ = i.val := by
             simp [Nat.div_eq_of_lt j.isLt]
-  have hmod : (i.val * Shape.size s + j.val) % Shape.size s = j.val :=
-    Nat.mul_add_mod_of_lt (a := i.val) (b := Shape.size s) (c := j.val) j.isLt
+  have hmod : (i.val * Spec.Shape.size s + j.val) % Spec.Shape.size s = j.val :=
+    Nat.mul_add_mod_of_lt (a := i.val) (b := Spec.Shape.size s) (c := j.val) j.isLt
 
-  have houter : (i.val * Shape.size s + j.val) / Shape.size s < n := by
+  have houter : (i.val * Spec.Shape.size s + j.val) / Spec.Shape.size s < n := by
     simp [hdiv]
-  have hinner : (i.val * Shape.size s + j.val) % Shape.size s < Shape.size s := by
+  have hinner : (i.val * Spec.Shape.size s + j.val) % Spec.Shape.size s < Spec.Shape.size s := by
     simp [hmod]
 
-  have hfin_outer : (⟨(i.val * Shape.size s + j.val) / Shape.size s, houter⟩ : Fin n) = i := by
+  have hfin_outer : (⟨(i.val * Spec.Shape.size s + j.val) / Spec.Shape.size s, houter⟩ : Fin n) = i := by
     apply Fin.ext
     simp [hdiv]
   have hfin_inner :
-      (⟨(i.val * Shape.size s + j.val) % Shape.size s, hinner⟩ : Fin (Shape.size s)) = j := by
+      (⟨(i.val * Spec.Shape.size s + j.val) % Spec.Shape.size s, hinner⟩ : Fin (Spec.Shape.size s)) = j := by
     apply Fin.ext
     simp [hmod]
 
   simp [flattenSpec, hdiv, hmod]
 
 /-!
-If a shape has `Shape.size s = 0`, then it contains **no scalar leaves** (it has a `0`-length
+If a shape has `Spec.Shape.size s = 0`, then it contains **no scalar leaves** (it has a `0`-length
 dimension somewhere). In that case, there is essentially only one possible tensor value of shape
 `s` (up to definitional equality), because at the `0`-length dimension the indexing function has
 domain `Fin 0`.
 
-We use this as a “vacuity” lemma to avoid needing division/modulo arithmetic when `Shape.size s =
+We use this as a “vacuity” lemma to avoid needing division/modulo arithmetic when `Spec.Shape.size s =
   0`.
 -/
-/-- If `Shape.size s = 0`, then any two tensors of shape `s` are equal (vacuity via `Fin 0`). -/
+/-- If `Spec.Shape.size s = 0`, then any two tensors of shape `s` are equal (vacuity via `Fin 0`). -/
 private theorem tensor_eq_of_size_zero {α : Type} :
-    ∀ {s : Shape}, Shape.size s = 0 → (x y : Tensor α s) → x = y
+    ∀ {s : Shape}, Spec.Shape.size s = 0 → (x y : Tensor α s) → x = y
   | .scalar, h, _x, _y => by
-      simp [Shape.size] at h
+      simp [Spec.Shape.size] at h
   | .dim n s, h, x, y => by
       cases x with
       | dim fx =>
@@ -169,8 +169,8 @@ private theorem tensor_eq_of_size_zero {α : Type} :
                   funext i
                   exact Fin.elim0 i
               | succ n =>
-                  have hs0 : Shape.size s = 0 := by
-                    have : (Nat.succ n = 0) ∨ (Shape.size s = 0) := Nat.mul_eq_zero.mp h
+                  have hs0 : Spec.Shape.size s = 0 := by
+                    have : (Nat.succ n = 0) ∨ (Spec.Shape.size s = 0) := Nat.mul_eq_zero.mp h
                     exact this.resolve_left (Nat.succ_ne_zero n)
                   apply congrArg Tensor.dim
                   funext i
@@ -191,7 +191,7 @@ theorem flatten_unflatten_inverse {α : Type} [Inhabited α] :
       | scalar x =>
           -- Do the computation step by step instead of asking `simp` to choose how far to unfold
           -- the shape-indexed round trip.
-          simp [flattenSpec, Shape.size]
+          simp [flattenSpec, Spec.Shape.size]
           unfold unflattenSpec
           rfl
   | .dim n s, t => by
@@ -201,23 +201,23 @@ theorem flatten_unflatten_inverse {α : Type} [Inhabited α] :
           | dim flat =>
               simp [unflattenSpec]
               funext i
-              by_cases hm : Shape.size s = 0
+              by_cases hm : Spec.Shape.size s = 0
               ·
                 exact
                   Private.tensor_eq_of_size_zero (α := α) (s := s) hm
                     (unflattenSpec s
-                      (Tensor.dim (fun j : Fin (Shape.size s) =>
-                        if hIdx : i.val * Shape.size s + j.val < n * Shape.size s then
-                          flat ⟨i.val * Shape.size s + j.val, hIdx⟩
+                      (Tensor.dim (fun j : Fin (Spec.Shape.size s) =>
+                        if hIdx : i.val * Spec.Shape.size s + j.val < n * Spec.Shape.size s then
+                          flat ⟨i.val * Spec.Shape.size s + j.val, hIdx⟩
                         else
                           Tensor.scalar Inhabited.default)))
                     (f i)
               ·
-                have hmpos : 0 < Shape.size s := Nat.pos_of_ne_zero hm
+                have hmpos : 0 < Spec.Shape.size s := Nat.pos_of_ne_zero hm
                 have sub_eq :
-                    (Tensor.dim (fun j : Fin (Shape.size s) =>
-                      if hIdx : i.val * Shape.size s + j.val < n * Shape.size s then
-                        flat ⟨i.val * Shape.size s + j.val, hIdx⟩
+                    (Tensor.dim (fun j : Fin (Spec.Shape.size s) =>
+                      if hIdx : i.val * Spec.Shape.size s + j.val < n * Spec.Shape.size s then
+                        flat ⟨i.val * Spec.Shape.size s + j.val, hIdx⟩
                       else
                         Tensor.scalar Inhabited.default))
                       = flattenSpec (f i) := by
@@ -225,14 +225,14 @@ theorem flatten_unflatten_inverse {α : Type} [Inhabited α] :
                   | dim gfi =>
                       apply congrArg Tensor.dim
                       funext j
-                      have hidx : i.val * Shape.size s + j.val < n * Shape.size s := by
+                      have hidx : i.val * Spec.Shape.size s + j.val < n * Spec.Shape.size s := by
                         have hisucc : i.val + 1 ≤ n := Nat.succ_le_of_lt i.isLt
                         have hlt :
-                            i.val * Shape.size s + j.val < (i.val + 1) * Shape.size s := by
-                          have := Nat.add_lt_add_left j.isLt (i.val * Shape.size s)
+                            i.val * Spec.Shape.size s + j.val < (i.val + 1) * Spec.Shape.size s := by
+                          have := Nat.add_lt_add_left j.isLt (i.val * Spec.Shape.size s)
                           simp [Nat.succ_mul]
-                        have hle : (i.val + 1) * Shape.size s ≤ n * Shape.size s :=
-                          Nat.mul_le_mul_right (Shape.size s) hisucc
+                        have hle : (i.val + 1) * Spec.Shape.size s ≤ n * Spec.Shape.size s :=
+                          Nat.mul_le_mul_right (Spec.Shape.size s) hisucc
                         exact Nat.lt_of_lt_of_le hlt hle
                       simp [hidx]
                       have :=
@@ -248,18 +248,18 @@ Round-trip `flatten ∘ unflatten = id`.
 This is the spec-layer analogue of flattening a reshaped/viewed tensor in PyTorch.
 -/
 theorem unflatten_flatten_inverse {α : Type} [Inhabited α] :
-    ∀ {s : Shape}, (v : Tensor α (.dim (Shape.size s) .scalar)) → flattenSpec (unflattenSpec s v)
+    ∀ {s : Shape}, (v : Tensor α (.dim (Spec.Shape.size s) .scalar)) → flattenSpec (unflattenSpec s v)
       = v
   | .scalar, v => by
       cases v with
       | dim f =>
-          let idx0 : Fin Shape.scalar.size := ⟨0, by simp [Shape.size]⟩
+          let idx0 : Fin Shape.scalar.size := ⟨0, by simp [Spec.Shape.size]⟩
           cases h0 : f idx0 with
           | scalar x =>
               have hunflat : unflattenSpec Shape.scalar (Tensor.dim f) = Tensor.scalar x := by
                 simp [unflattenSpec, idx0, h0]
               rw [hunflat]
-              simp [flattenSpec, Shape.size]
+              simp [flattenSpec, Spec.Shape.size]
               funext i
               have hival : i.val = 0 := by
                 have : i.val < 1 := by simp
@@ -272,18 +272,18 @@ theorem unflatten_flatten_inverse {α : Type} [Inhabited α] :
   | .dim n s, v => by
       cases v with
       | dim g =>
-          by_cases hm : Shape.size s = 0
+          by_cases hm : Spec.Shape.size s = 0
           ·
             cases hflat : flattenSpec (unflattenSpec (Shape.dim n s) (Tensor.dim g)) with
             | dim gf =>
                 apply congrArg Tensor.dim
                 funext idx
                 have : False := by
-                  have : idx.val < 0 := by simpa [Shape.size, hm] using idx.isLt
+                  have : idx.val < 0 := by simpa [Spec.Shape.size, hm] using idx.isLt
                   exact Nat.not_lt_zero _ this
                 exact False.elim this
           ·
-            let m : Nat := Shape.size s
+            let m : Nat := Spec.Shape.size s
             have hmpos : 0 < m := by
               have : m ≠ 0 := by simpa [m] using hm
               exact Nat.pos_of_ne_zero this
@@ -411,7 +411,7 @@ theorem flatten_unflatten_inverse_wf {α : Type} [Inhabited α] {s : Shape}
 def reshapeSpec {α : Type} [Inhabited α]
   {s₁ s₂ : Shape} (t : Tensor α s₁) (h : s₁.size = s₂.size) : Tensor α s₂ :=
   let flattened := flattenSpec t
-  let retyped : Tensor α (.dim (Shape.size s₂) .scalar) :=
+  let retyped : Tensor α (.dim (Spec.Shape.size s₂) .scalar) :=
     Eq.recOn h flattened
   unflattenSpec s₂ retyped
 
@@ -419,7 +419,7 @@ def reshapeSpec {α : Type} [Inhabited α]
 def reshapeExplicitSpec {α : Type} [Inhabited α] {s₁ s₂ : Shape} (t : Tensor α s₁)
   (h : s₁.size = s₂.size) : Tensor α s₂ :=
   let flattened := flattenSpec t
-  let retyped : Tensor α (.dim (Shape.size s₂) .scalar) :=
+  let retyped : Tensor α (.dim (Spec.Shape.size s₂) .scalar) :=
     by rw [h.symm]; exact flattened
   unflattenSpec s₂ retyped
 

@@ -85,12 +85,12 @@ theorem crossEntropyLogits_uses_logSoftmax {s : Spec.Shape}
     Spec.crossEntropyLogitsSpec logits target =
       let logp := Activation.logSoftmaxSpec (α := α) (s := s) logits
       let total := Spec.Tensor.sumSpec (Spec.Tensor.mulSpec target logp)
-      Spec.meanOver (s := s) (-total) := by
+      Spec.meanOverLastAxisSlices (s := s) (-total) := by
   rfl
 
 /--
-The logits-loss gradient spec is the familiar `softmax(logits) - target`, scaled by the number of
-entries.
+The logits-loss gradient spec is the familiar `softmax(logits) - target`, averaged over the
+non-class axes. The last axis is the class distribution and is summed, not averaged.
 
 Verified AD can only prove the gradient for the loss we actually specify. This theorem makes the
 specified training signal visible, so a future implementation can be checked against this contract
@@ -102,7 +102,7 @@ theorem crossEntropyLogitsDeriv_is_softmax_minus_target {s : Spec.Shape}
     Spec.crossEntropyLogitsDerivSpec logits target =
       Spec.Tensor.scaleSpec
         (Spec.Tensor.subSpec (Activation.softmaxSpec (α := α) (s := s) logits) target)
-        (1 / (Spec.meanDenom s : α)) := by
+        (1 / (Spec.lastAxisMeanDenom s : α)) := by
   rfl
 
 /--
@@ -122,7 +122,7 @@ theorem crossEntropyProbabilities_clips_before_log {s : Spec.Shape}
       let q := Spec.Tensor.mapSpec clamp01 predicted
       let logq := Spec.Tensor.logSpec q
       let total := Spec.Tensor.sumSpec (Spec.Tensor.mulSpec target logq)
-      Spec.meanOver (s := s) (-total) := by
+      Spec.meanOverLastAxisSlices (s := s) (-total) := by
   simp [Spec.crossEntropySpec]
 
 /-- Epsilon-protected division is a separate named tensor operation, not a hidden rewrite. -/

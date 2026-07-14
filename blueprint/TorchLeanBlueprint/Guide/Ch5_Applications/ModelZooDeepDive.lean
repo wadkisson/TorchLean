@@ -263,13 +263,10 @@ https://arxiv.org/abs/1406.1078) for GRU style gating.
 
 # ResNet
 
-The spec side in [NN.Spec.Models.Resnet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Resnet.lean) defines residual blocks
-with identity/projection shortcuts, proves that ResNet configs are well formed, records
-convolution output size facts, and gives forward/backward structure for a basic residual block.
-
-The executable example set currently keeps runnable vision checks to `cnn` and `vit`. ResNet remains
-an API/spec component until the residual/BatchNorm runtime path is fast enough for a normal
-`lake exe torchlean ...` command.
+The public [ResNet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/ResNet.lean)
+constructs residual networks over an arbitrary number of spatial dimensions. A configuration fixes
+the channel widths, block counts, convolution parameters, and class count; the resulting model uses
+the same typed layer API as other TorchLean models.
 
 ResNet stresses the graph boundary because residual connections create branching structure that later rejoins.
 A purely sequential chain can postpone many mistakes; a residual add makes shape agreement explicit. If the
@@ -332,9 +329,9 @@ lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda \
 ```
 
 FNO stresses a runtime boundary that language and vision models do not: spectral convolution. The
-CPU path uses a portable dense DFT reference implementation, while the CUDA run can use a fused
-`spectralConv1dRfft` autograd primitive backed by cuFFT. That split gives us a readable reference
-path for inspection and a practical path for training.
+public model applies a dense tensor-product DFT over an arbitrary number of spatial axes while
+carrying real and imaginary components separately. CUDA execution replaces that dense calculation
+with the fused `spectralConv1dRfft` autograd primitive backed by cuFFT.
 
 The operator learning map is:
 

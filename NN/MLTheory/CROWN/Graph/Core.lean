@@ -64,7 +64,7 @@ namespace FlatBox
 /-- Flatten a shaped center/radius pair into the graph-level interval-box representation. -/
 def lInfBox {α : Type} [Context α] {s : Shape}
     (center radius : Tensor α s) : FlatBox α :=
-  { dim := Shape.size s
+  { dim := Spec.Shape.size s
     lo := Tensor.flattenSpec (α := α) <| Tensor.subSpec center radius
     hi := Tensor.flattenSpec (α := α) <| Tensor.addSpec center radius }
 

@@ -105,11 +105,11 @@ The commands above are compact.  They are runtime checks, not leaderboard experi
 The model code follows the same pattern as the running example:
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
-def smallVisionHead : nn.M (nn.Sequential (Shape.vec 64) (Shape.vec 10)) :=
+def smallVisionHead : nn.M (nn.Sequential (.dim 64 .scalar) (.dim 10 .scalar)) :=
   nn.Sequential![
     nn.Linear 64 32,
     nn.ReLU,
@@ -317,9 +317,9 @@ Plot one held-out prediction with the [plot helper](https://github.com/lean-dojo
 python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.csv
 ```
 
-CUDA mode uses the fused cuFFT-backed `spectralConv1dRfft` autograd primitive.  CPU mode keeps a
-portable dense-DFT reference path.  We use that split because one path is convenient for
-inspection and the other is practical for training.
+The generic FNO API defines a dense multidimensional real-split model. On CUDA, the Burgers command
+uses the fused cuFFT-backed `spectralConv1dRfft` autograd primitive in place of dense transform
+matrices.
 
 The operator learning claim has a different type from classification:
 

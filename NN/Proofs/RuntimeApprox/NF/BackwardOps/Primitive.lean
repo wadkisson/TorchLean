@@ -475,7 +475,7 @@ by
         let onesR : Tensor R s := Spec.fill (1 : R) s
         let epsDf :=
           linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
-            (s := s) (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2) epsSq onesR (mulSpec tR
+            (s := s) (neuralUlp β fexp (1 : ℝ) / 2) epsSq onesR (mulSpec tR
               tR))
         let dfR := subSpec onesR (mulSpec tR tR)
         let epsOut :=
@@ -527,7 +527,7 @@ by
   have hones :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
         (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s)
-        (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2) :=
+        (neuralUlp β fexp (1 : ℝ) / 2) :=
     approxT_fill_one (β := β) (fexp := fexp) (rnd := rnd) (s := s)
   have hdf :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -539,7 +539,7 @@ by
             (mapSpec (s := s) MathFunctions.tanh (getIdx (α := R) ctxR a))))
         (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (mulBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
             (linfNorm (tanhBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
@@ -560,7 +560,7 @@ by
         (xR := Spec.fill (1 : R) s)
         (yR := mulSpec (mapSpec (s := s) MathFunctions.tanh (getIdx (α := R) ctxR a))
           (mapSpec (s := s) MathFunctions.tanh (getIdx (α := R) ctxR a)))
-        (epsx := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+        (epsx := neuralUlp β fexp (1 : ℝ) / 2)
         (epsy := linfNorm (mulBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
           (linfNorm (tanhBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
@@ -586,7 +586,7 @@ by
           (s := s)
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (mulBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s)
               (linfNorm (tanhBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
@@ -616,7 +616,7 @@ by
         (yR := δR)
         (epsx := linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (mulBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
             (linfNorm (tanhBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
@@ -647,7 +647,7 @@ by
         (s := s)
         (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (mulBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
             (linfNorm (tanhBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
@@ -691,7 +691,7 @@ by
         let epsS :=
           linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) xR)
-        let epsOne : ℝ := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2
+        let epsOne : ℝ := neuralUlp β fexp (1 : ℝ) / 2
         let epsOneMinus :=
           linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) epsOne epsS (Spec.fill (1 : R) s) sR)
@@ -724,7 +724,7 @@ by
   have hones :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
         (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s)
-        (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2) :=
+        (neuralUlp β fexp (1 : ℝ) / 2) :=
     approxT_fill_one (β := β) (fexp := fexp) (rnd := rnd) (s := s)
   have honeMinus :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -735,7 +735,7 @@ by
           (mapSpec (s := s) (Activation.Math.sigmoidSpec (α := R)) (getIdx (α := R) ctxR a)))
         (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (Spec.fill (1 : R) s)
@@ -749,7 +749,7 @@ by
           ctxS a))
         (xR := Spec.fill (1 : R) s)
         (yR := mapSpec (s := s) (Activation.Math.sigmoidSpec (α := R)) (getIdx (α := R) ctxR a))
-        (epsx := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+        (epsx := neuralUlp β fexp (1 : ℝ) / 2)
         (epsy := linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
         hones hs)
@@ -771,7 +771,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)
@@ -795,7 +795,7 @@ by
           (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
         (epsy := linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (Spec.fill (1 : R) s)
@@ -825,7 +825,7 @@ by
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s)
-              (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+              (neuralUlp β fexp (1 : ℝ) / 2)
               (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
                 (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
               (Spec.fill (1 : R) s)
@@ -861,7 +861,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)
@@ -896,7 +896,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (sigmoidBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)
@@ -1008,7 +1008,7 @@ def safeLogRevNode {Γ : List Shape} {s : Shape} (a : Idx Γ s) (ε : ℝ) (hε 
 by
   classical
   let epsR : R := TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd) ε
-  let epsErr : ℝ := neuralUlp β fexp ε TrainingPhase.forward / 2
+  let epsErr : ℝ := neuralUlp β fexp ε / 2
   refine
     { toFwdNode := safeLogSoftplusNode (β := β) (fexp := fexp) (rnd := rnd) a ε hε
       vjpSpec := fun ctx δ =>
@@ -1340,7 +1340,7 @@ by
         let epsS :=
           linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) xR)
-        let epsOne : ℝ := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2
+        let epsOne : ℝ := neuralUlp β fexp (1 : ℝ) / 2
         let epsOneMinus :=
           linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) epsOne epsS (Spec.fill (1 : R) s) sR)
@@ -1373,7 +1373,7 @@ by
   have hones :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
         (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s)
-        (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2) :=
+        (neuralUlp β fexp (1 : ℝ) / 2) :=
     approxT_fill_one (β := β) (fexp := fexp) (rnd := rnd) (s := s)
   have honeMinus :
       approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
@@ -1384,7 +1384,7 @@ by
           (mapSpec (s := s) (Activation.Math.logisticSpec (α := R)) (getIdx (α := R) ctxR a)))
         (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (Spec.fill (1 : R) s)
@@ -1398,7 +1398,7 @@ by
           ctxS a))
         (xR := Spec.fill (1 : R) s)
         (yR := mapSpec (s := s) (Activation.Math.logisticSpec (α := R)) (getIdx (α := R) ctxR a))
-        (epsx := neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+        (epsx := neuralUlp β fexp (1 : ℝ) / 2)
         (epsy := linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
         hones hs)
@@ -1420,7 +1420,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)
@@ -1444,7 +1444,7 @@ by
           (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
         (epsy := linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
           (s := s)
-          (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+          (neuralUlp β fexp (1 : ℝ) / 2)
           (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (Spec.fill (1 : R) s)
@@ -1474,7 +1474,7 @@ by
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s)
-              (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+              (neuralUlp β fexp (1 : ℝ) / 2)
               (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
                 (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
               (Spec.fill (1 : R) s)
@@ -1510,7 +1510,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)
@@ -1545,7 +1545,7 @@ by
             (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
           (linfNorm (subBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
             (s := s)
-            (neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2)
+            (neuralUlp β fexp (1 : ℝ) / 2)
             (linfNorm (softmaxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
               (s := s) (getIdxEps (Γ := Γ) (s := s) epsCtx a) (getIdx (α := R) ctxR a)))
             (Spec.fill (1 : R) s)

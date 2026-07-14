@@ -32,7 +32,7 @@ variable {α : Type} [Add α] [Mul α] [Zero α]
 /--
 Linear layer specification (pure, shape-indexed).
 
-This is the spec-level analogue of PyTorch `torch.nn.Linear` / `torch.nn.functional.linear`:
+This is the spec-level analogue of PyTorch `torch.nn.linear` / `torch.nn.functional.linear`:
 - `weights` has shape `[outDim, inDim]`,
 - `bias` has shape `[outDim]`.
 -/
@@ -59,7 +59,7 @@ Batched forward pass (map the unbatched `linear_spec` over the batch axis).
 Input shape:  `[batch, inDim]`
 Output shape: `[batch, outDim]`
 
-PyTorch analogue: applying `nn.Linear` to a batched tensor.
+PyTorch analogue: applying `nn.linear` to a batched tensor.
 -/
 def linearBatchedSpec {batch inDim outDim : Nat}
   (m : LinearSpec α inDim outDim)

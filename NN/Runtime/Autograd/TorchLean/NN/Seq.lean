@@ -67,7 +67,7 @@ def initParams : {σ τ : Shape} → (m : Seq σ τ) → Torch.TList Float (para
   | _, _, .cons l rest =>
       let xs := l.initParams
       let ys := initParams rest
-      Torch.Proofs.Autograd.Algebra.TList.append (α := Float)
+      _root_.Proofs.Autograd.Algebra.TList.append (α := Float)
         (ss₁ := l.paramShapes) (ss₂ := paramShapes rest) xs ys
 
 /--
@@ -243,7 +243,7 @@ def programWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
       (params : _root_.Runtime.Autograd.Torch.TList α (paramShapes model))
       (x : Spec.Tensor α σ) : Spec.Tensor α τ :=
       let args : _root_.Runtime.Autograd.Torch.TList α (paramShapes model ++ [σ]) :=
-        _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append
+        _root_.Proofs.Autograd.Algebra.TList.append
           (α := α) (ss₁ := paramShapes model) (ss₂ := [σ]) params (.cons x .nil)
       _root_.Runtime.Autograd.Torch.CompiledGraph.forward compiled args
 
@@ -260,12 +260,12 @@ PyTorch analogy: updating `running_mean` / `running_var` buffers during a forwar
 def updateBuffers {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
     {α : Type} [Context α] [DecidableEq Shape]
     (ps : Torch.TList α (paramShapes model)) (x : Tensor α σ) :
-    IO (Torch.TList α (paramShapes model)) := do
+    IO (Torch.TList α (paramShapes model)) :=
   match model with
   | .id _ => pure .nil
-  | .cons l rest =>
+  | .cons l rest => do
       let (psL, psR) :=
-        Torch.Proofs.Autograd.Algebra.TList.splitAppend
+        _root_.Proofs.Autograd.Algebra.TList.splitAppend
           (α := α) (ss₁ := l.paramShapes) (ss₂ := paramShapes rest) ps
       let psL' ←
         match l.updateBuffers with
@@ -273,7 +273,7 @@ def updateBuffers {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
         | none => pure psL
       let y ← LayerDef.forwardTensor l mode psL' x
       let psR' ← updateBuffers mode rest psR y
-      pure <| Torch.Proofs.Autograd.Algebra.TList.append
+      pure <| _root_.Proofs.Autograd.Algebra.TList.append
         (α := α) (ss₁ := l.paramShapes) (ss₂ := paramShapes rest) psL' psR'
 
 /-! ## Build a runnable `ScalarModuleDef` -/

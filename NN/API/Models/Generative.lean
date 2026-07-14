@@ -51,12 +51,12 @@ def compactImageConfig (batch : Nat := 1) (dataDim : Nat := 16)
   vectorGenerativeConfig batch dataDim hiddenDim latentDim
 
 /-- Batched data-vector shape shared by vector generative examples. -/
-abbrev vectorDataShape (cfg : VectorGenerativeConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.dataDim
+abbrev vectorDataShape (cfg : VectorGenerativeConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.dataDim .scalar)
 
 /-- Batched latent-vector shape shared by vector generative examples. -/
-abbrev vectorLatentShape (cfg : VectorGenerativeConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch cfg.latentDim
+abbrev vectorLatentShape (cfg : VectorGenerativeConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim cfg.latentDim .scalar)
 
 /--
 β-VAE-style supervised output shape.
@@ -70,25 +70,25 @@ The runnable example trains this compact target with MSE, which is a practical p
 runtime. The formal VAE ELBO/KL objective lives in `NN.Spec.Models.Vae` and
 `NN.MLTheory.Generative.Latent.VAE`.
 -/
-abbrev vectorVaeOutShape (cfg : VectorGenerativeConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.batch (cfg.dataDim + 2 * cfg.latentDim)
+abbrev vectorVaeOutShape (cfg : VectorGenerativeConfig) : Spec.Shape :=
+  .dim cfg.batch (.dim (cfg.dataDim + 2 * cfg.latentDim) .scalar)
 
 /--
-Flatten each sample in a batch and keep the first `cfg.dataDim` entries.
+flatten each sample in a batch and keep the first `cfg.dataDim` entries.
 
 This is useful for image-vector experiments: a model can train on a typed vector view of an image
 without every example needing to carry its own flattening proof adapters.
 -/
-def flattenBatchPrefix {α : Type} [Inhabited α] (cfg : VectorGenerativeConfig) {source : Shape}
-    (hData : cfg.dataDim ≤ Shape.size source)
+def flattenBatchPrefix {α : Type} [Inhabited α] (cfg : VectorGenerativeConfig) {source : Spec.Shape}
+    (hData : cfg.dataDim ≤ Spec.Shape.size source)
     (x : Spec.Tensor α (.dim cfg.batch source)) : Spec.Tensor α (vectorDataShape cfg) :=
   _root_.NN.API.tensor.flattenBatchPrefix cfg.batch cfg.dataDim hData x
 
 /-- Supervised reconstruction sample: target equals input. -/
 def reconstructionSample {α : Type} (cfg : VectorGenerativeConfig)
     (x : Spec.Tensor α (vectorDataShape cfg)) :
-    SupervisedSample α (vectorDataShape cfg) (vectorDataShape cfg) :=
-  Sample.mk x x
+    TorchLean.Sample.Supervised α (vectorDataShape cfg) (vectorDataShape cfg) :=
+  TorchLean.Sample.mk x x
 
 /--
 Target for compact VAE-style examples.
@@ -110,12 +110,12 @@ def zeroLatentStatsTarget (cfg : VectorGenerativeConfig)
 /-- Supervised compact VAE sample: image reconstruction plus zero latent-stat targets. -/
 def vaeSample (cfg : VectorGenerativeConfig)
     (x : Spec.Tensor Float (vectorDataShape cfg)) :
-    SupervisedSample Float (vectorDataShape cfg) (vectorVaeOutShape cfg) :=
-  Sample.mk x (zeroLatentStatsTarget cfg x)
+    TorchLean.Sample.Supervised Float (vectorDataShape cfg) (vectorVaeOutShape cfg) :=
+  TorchLean.Sample.mk x (zeroLatentStatsTarget cfg x)
 
 /-- Deterministic matrix-valued pseudo-random tensor in `[lo, hi)`. -/
 def vectorNoise (batch dim seed salt : Nat) (lo hi : Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.Mat batch dim) :=
+    Spec.Tensor Float (.dim batch (.dim dim .scalar)) :=
   Spec.Tensor.dim (fun bi =>
     Spec.Tensor.dim (fun j =>
       let k := bi.val * dim + j.val
@@ -135,28 +135,28 @@ def dataNoise (cfg : VectorGenerativeConfig) (seed : Nat) :
 
 /-- Constant discriminator/critic target. -/
 def scoreTarget (cfg : VectorGenerativeConfig) (value : Float) :
-    Spec.Tensor Float (NN.Tensor.Shape.Mat cfg.batch 1) :=
+    Spec.Tensor Float (.dim cfg.batch (.dim 1 .scalar)) :=
   Spec.Tensor.dim (fun _ => Spec.Tensor.dim (fun _ => Spec.Tensor.scalar value))
 
 /-- Target score for real samples. -/
-def onesScore (cfg : VectorGenerativeConfig) : Spec.Tensor Float (NN.Tensor.Shape.Mat cfg.batch 1) :=
+def onesScore (cfg : VectorGenerativeConfig) : Spec.Tensor Float (.dim cfg.batch (.dim 1 .scalar)) :=
   scoreTarget cfg 1.0
 
 /-- Target score for generated or noise samples. -/
-def zerosScore (cfg : VectorGenerativeConfig) : Spec.Tensor Float (NN.Tensor.Shape.Mat cfg.batch 1) :=
+def zerosScore (cfg : VectorGenerativeConfig) : Spec.Tensor Float (.dim cfg.batch (.dim 1 .scalar)) :=
   scoreTarget cfg 0.0
 
 /-- Autoencoder: `x -> hidden -> latent -> hidden -> reconstruction`. -/
 def vectorAutoencoder (cfg : VectorGenerativeConfig) :
     nn.M (nn.Sequential (vectorDataShape cfg) (vectorDataShape cfg)) :=
   nn.Sequential![
-    Linear cfg.dataDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.latentDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.latentDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.dataDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    linear cfg.dataDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.latentDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.latentDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.dataDim (pfx := .dim cfg.batch .scalar),
     nn.sigmoid
   ]
 
@@ -164,27 +164,27 @@ def vectorAutoencoder (cfg : VectorGenerativeConfig) :
 def vectorVae (cfg : VectorGenerativeConfig) :
     nn.M (nn.Sequential (vectorDataShape cfg) (vectorVaeOutShape cfg)) :=
   nn.Sequential![
-    Linear cfg.dataDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.latentDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.latentDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim (cfg.dataDim + 2 * cfg.latentDim)
-      (pfx := NN.Tensor.Shape.Vec cfg.batch)
+    linear cfg.dataDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.latentDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.latentDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim (cfg.dataDim + 2 * cfg.latentDim)
+      (pfx := .dim cfg.batch .scalar)
   ]
 
 /-- VQ-VAE-style encoder/decoder with a narrow discrete-code proxy bottleneck. -/
 def vectorVqVae (cfg : VectorGenerativeConfig) :
     nn.M (nn.Sequential (vectorDataShape cfg) (vectorDataShape cfg)) :=
   nn.Sequential![
-    Linear cfg.dataDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.latentDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    linear cfg.dataDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.latentDim (pfx := .dim cfg.batch .scalar),
     nn.tanh,
-    Linear cfg.latentDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.dataDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    linear cfg.latentDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.dataDim (pfx := .dim cfg.batch .scalar),
     nn.sigmoid
   ]
 
@@ -192,23 +192,23 @@ def vectorVqVae (cfg : VectorGenerativeConfig) :
 def vectorGanGenerator (cfg : VectorGenerativeConfig) :
     nn.M (nn.Sequential (vectorLatentShape cfg) (vectorDataShape cfg)) :=
   nn.Sequential![
-    Linear cfg.latentDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.dataDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    linear cfg.latentDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.dataDim (pfx := .dim cfg.batch .scalar),
     nn.sigmoid
   ]
 
 /-- Discriminator/critic `x -> score`. -/
 def vectorGanDiscriminator (cfg : VectorGenerativeConfig) :
-    nn.M (nn.Sequential (vectorDataShape cfg) (NN.Tensor.Shape.Mat cfg.batch 1)) :=
+    nn.M (nn.Sequential (vectorDataShape cfg) (.dim cfg.batch (.dim 1 .scalar))) :=
   nn.Sequential![
-    Linear cfg.dataDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim cfg.hiddenDim (pfx := NN.Tensor.Shape.Vec cfg.batch),
-    ReLU,
-    Linear cfg.hiddenDim 1 (pfx := NN.Tensor.Shape.Vec cfg.batch),
+    linear cfg.dataDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim cfg.hiddenDim (pfx := .dim cfg.batch .scalar),
+    relu,
+    linear cfg.hiddenDim 1 (pfx := .dim cfg.batch .scalar),
     nn.sigmoid
   ]
 

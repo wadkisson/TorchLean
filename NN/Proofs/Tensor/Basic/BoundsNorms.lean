@@ -218,12 +218,12 @@ Size preservation under operations.
 Essential for proving tensor operations maintain expected dimensions.
 -/
 theorem shape_size_add {s : Shape} (a b : Tensor ℝ s) :
-  Shape.size (shapeOf (addSpec a b)) = Shape.size s := by
+  Spec.Shape.size (shapeOf (addSpec a b)) = Spec.Shape.size s := by
   rw [shapeOf_eq_shape]
 
 /-- Size preservation for `mul_spec`: elementwise multiplication does not change shape size. -/
 theorem shape_size_mul {s : Shape} (a b : Tensor ℝ s) :
-  Shape.size (shapeOf (mulSpec a b)) = Shape.size s := by
+  Spec.Shape.size (shapeOf (mulSpec a b)) = Spec.Shape.size s := by
   rw [shapeOf_eq_shape]
 
 -- Error and approximation theorems

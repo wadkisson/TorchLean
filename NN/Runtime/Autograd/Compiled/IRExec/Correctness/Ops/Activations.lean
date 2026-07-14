@@ -506,7 +506,7 @@ Semantic-preservation lemma for `.softmax axis` lowering.
 
 Implementation note: TorchLean's compiled softmax operator supports the last axis.
 This is reflected by an explicit guard in `buildFrom`:
-`axis + 1 = Shape.rank outShape` (equivalently, `axis = rank-1`).
+`axis + 1 = Spec.Shape.rank outShape` (equivalently, `axis = rank-1`).
 -/
 theorem buildFrom_denoteAllFrom_softmax
     {α : Type} [Context α] [DecidableEq Shape]
@@ -560,16 +560,16 @@ theorem buildFrom_denoteAllFrom_softmax
                   try cases hBuild
               | ok ip =>
                   simp [hp, hIdx] at hBuild
-                  have hAxisLast : axis + 1 = Shape.rank n.outShape := by
+                  have hAxisLast : axis + 1 = Spec.Shape.rank n.outShape := by
                     have hAxis' := hAxis
                     unfold OpContracts.checkLastAxis at hAxis'
                     -- `checkLastAxis` succeeds only if its internal `if` is taken.
                     cases hAxisValid : OpContracts.checkAxisValid axis n.outShape <;>
                       simp [hAxisValid] at hAxis'
-                    · by_cases h : axis + 1 = Shape.rank n.outShape
+                    · by_cases h : axis + 1 = Spec.Shape.rank n.outShape
                       · exact h
                       · simp [h] at hAxis'
-                  have hAxisLt : axis < Shape.rank n.outShape := by
+                  have hAxisLt : axis < Spec.Shape.rank n.outShape := by
                     have : axis < axis + 1 := Nat.lt_succ_self axis
                     simpa [hAxisLast] using this
 

@@ -272,7 +272,7 @@ def maxPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} {h1 : kH ≠ 0} {h2 : kW ≠ 0}
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) := do
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) := do
   match s.impl with
   | .eager sess =>
       EagerSession.maxPool2d (α := α) sess (kH := kH) (kW := kW) (inH := inH) (inW := inW)
@@ -281,9 +281,6 @@ def maxPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
       _root_.Runtime.Autograd.Torch.Internal.SessionIR.maxPool2d (α := α) sess
         (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
         (h1 := h1) (h2 := h2) x
-
-/-- Alias for `max_pool2d` (PyTorch-style shorthand). -/
-abbrev maxPool {α : Type} := maxPool2d (α := α)
 
 /--
 Smooth max pooling (differentiable surrogate for max pooling) on a CHW tensor.
@@ -296,7 +293,7 @@ def smoothMaxPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) (beta :
     α) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) := do
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) := do
   match s.impl with
   | .eager sess =>
       EagerSession.smoothMaxPool2d (α := α) sess (kH := kH) (kW := kW) (inH := inH) (inW := inW)
@@ -305,9 +302,6 @@ def smoothMaxPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape
       _root_.Runtime.Autograd.Torch.Internal.SessionIR.smoothMaxPool2d (α := α) sess
         (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
         (h1 := h1) (h2 := h2) x beta
-
-/-- Alias for `smooth_max_pool2d` (PyTorch-style shorthand). -/
-abbrev smoothMaxPool {α : Type} := smoothMaxPool2d (α := α)
 
 /--
 2D average pooling on a CHW tensor.
@@ -318,7 +312,7 @@ def avgPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
   {kH kW inH inW inC stride : Nat} (h1 : kH ≠ 0) (h2 : kW ≠ 0)
   (x : _root_.Runtime.Autograd.Torch.TensorRef α (.dim inC (.dim inH (.dim inW .scalar)))) :
   IO (_root_.Runtime.Autograd.Torch.TensorRef α
-    (.dim inC (.dim ((inH - kH) / stride + 1) (.dim ((inW - kW) / stride + 1) .scalar)))) := do
+    (.dim inC (.dim (Spec.Shape.slidingWindowOutDim inH kH stride 0) (.dim (Spec.Shape.slidingWindowOutDim inW kW stride 0) .scalar)))) := do
   match s.impl with
   | .eager sess =>
       EagerSession.avgPool2d (α := α) sess (kH := kH) (kW := kW) (inH := inH) (inW := inW)
@@ -327,9 +321,6 @@ def avgPool2d {α : Type} (s : Session α) [Context α] [DecidableEq Shape]
       _root_.Runtime.Autograd.Torch.Internal.SessionIR.avgPool2d (α := α) sess
         (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
         h1 h2 x
-
-/-- Alias for `avg_pool2d` (PyTorch-style shorthand). -/
-abbrev avgPool {α : Type} := avgPool2d (α := α)
 
 end Session
 

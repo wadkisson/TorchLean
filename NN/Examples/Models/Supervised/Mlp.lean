@@ -12,7 +12,7 @@ Device-agnostic real-data example:
 module
 
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common
 
 /-!
@@ -64,14 +64,14 @@ def cfg : nn.models.MlpConfig :=
   { batch := batch, inDim := inDim, hidDim := hidDim, outDim := outDim }
 
 /-- Input shape: a minibatch of Auto MPG feature vectors. -/
-abbrev σ := Shape.mat batch inDim
+abbrev σ : Shape := .dim batch (.dim inDim .scalar)
 
 /-- Output shape: one scalar regression prediction per row. -/
-abbrev τ := Shape.mat batch outDim
+abbrev τ : Shape := .dim batch (.dim outDim .scalar)
 
 /-- One-hidden-layer ReLU MLP from the public model API. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.MlpReLU cfg
+  nn.models.mlpRelu cfg
 
 /--
 Auto MPG as a public TorchLean dataset.
@@ -104,7 +104,7 @@ def train (opts : Options) (flags : ModelZoo.CsvTrainFlags) :
 
 /-- CLI entrypoint for Auto MPG regression on CPU or CUDA. -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.regressionCsv exeName args
+  TrainCommand.regressionCsv exeName args
     _root_.NN.Examples.Data.RealPaths.autoMpgCsv defaultLogJson 1 1e-3
     (ModelZoo.bannerWithDevice exeName "Auto MPG MLP regression")
     train

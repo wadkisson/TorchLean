@@ -12,7 +12,6 @@ public import NN.Spec.Layers.Conv
 public import NN.Spec.Layers.Dropout
 public import NN.Spec.Layers.Embedding
 public import NN.Spec.Layers.FlashAttention
-public import NN.Spec.Layers.GlobalPooling
 public import NN.Spec.Layers.Gnn
 public import NN.Spec.Layers.Gru
 public import NN.Spec.Layers.Linear
@@ -35,4 +34,3 @@ models, runtime execution, and verification all build on these reference definit
 -/
 
 @[expose] public section
-

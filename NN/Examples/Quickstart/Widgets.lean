@@ -6,10 +6,10 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Widgets
+public import NN.Widgets
 public import NN.Floats.IEEEExec.Exec32
 public import NN.IR.Graph
-public import NN
+public import NN.API
 
 /-!
 # Quickstart: Widgets

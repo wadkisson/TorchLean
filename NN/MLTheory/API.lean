@@ -12,7 +12,6 @@ public import NN.MLTheory.Generative.Latent
 public import NN.MLTheory.LearningTheory
 public import NN.MLTheory.Optimization.FirstOrder
 public import NN.MLTheory.Optimization.GDLinearConvergence
-public import NN.MLTheory.Optimization.LowRank
 public import NN.MLTheory.Optimization.Muon
 public import NN.MLTheory.Optimization.OptimizerLaws
 public import NN.MLTheory.Optimization.SmoothStrongConvexBridge
@@ -32,7 +31,7 @@ public import NN.MLTheory.CROWN.Proofs.Distillation
 public import NN.MLTheory.CROWN.Proofs.SoundnessProofs
 public import NN.MLTheory.CROWN.Propagation.LinearSignsplit
 
-public import NN.Floats.NeuralFloat.ErrorBounds
+public import NN.Floats.NeuralFloat.Error.Bounds
 
 /-!
 Public entry point for machine-learning theory modules.

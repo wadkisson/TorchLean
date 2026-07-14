@@ -126,19 +126,13 @@ def checkpoint {α : Type} [Context α] [DecidableEq Shape]
     m (RefTy (m := m) (α := α) t) :=
   f x
 
-/-! ## Detach / stop-grad -/
+/-! ## Detach -/
 
 /-- Stop-gradient boundary (forward identity). -/
 def detach {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
     {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
   _root_.Runtime.Autograd.Torch.detach (m := m) (α := α) (s := s) x
-
-/-- Alias for `detach`. -/
-def stopGrad {α : Type} [Context α] [DecidableEq Shape]
-    {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
-    {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) s) :=
-  detach (m := m) (α := α) (s := s) x
 
 /-! ## Broadcasting helpers -/
 
@@ -220,7 +214,7 @@ def embeddingBatchSeqNat {α : Type} [Context α] [DecidableEq Shape]
     (s₁ := .dim (batch * seqLen) (.dim dim .scalar))
     (s₂ := .dim batch (.dim seqLen (.dim dim .scalar)))
     gathered (by
-      simp [Shape.size, Nat.mul_assoc])
+      simp [Spec.Shape.size, Nat.mul_assoc])
 
 /--
 Read float-encoded token ids as a `Tensor Nat` index vector.
@@ -246,7 +240,7 @@ def mean {α : Type} [Context α] [DecidableEq Shape]
   {s : Shape} (x : RefTy (m := m) (α := α) s) : m (RefTy (m := m) (α := α) Shape.scalar) := do
   let total ← sum (m := m) (α := α) (s := s) x
   -- `sum` returns a scalar tensor; scale by `1 / numel` to get a mean.
-  let denom : Nat := if Shape.size s = 0 then 1 else Shape.size s
+  let denom : Nat := if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
   scale (m := m) (α := α) (s := Shape.scalar) total (1 / (denom : α))
 
 /-! ## Seeded RNG helpers -/

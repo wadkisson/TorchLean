@@ -306,20 +306,20 @@ def write_index(docs: Path) -> None:
   <main>
     <a id="top"></a>
     <section class="tl-api-grid" aria-label="Main API entrypoints">
-      <a class="tl-api-card" href="./NN/Library.html">
+      <a class="tl-api-card" href="./NN.html">
         <strong>Start with one import</strong>
-        <span>NN.Library</span>
-        <p>The broad umbrella import for ordinary downstream use.</p>
+        <span>NN</span>
+        <p>The complete TorchLean library.</p>
       </a>
-      <a class="tl-api-card" href="./NN/API/Public.html">
+      <a class="tl-api-card" href="./NN/API.html">
         <strong>Write model code</strong>
-        <span>NN.API.Public</span>
-        <p>The PyTorch-shaped public surface for model code and examples.</p>
+        <span>NN.API</span>
+        <p>The focused application API for models, data, and training.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Entrypoint/Tensor.html">
+      <a class="tl-api-card" href="./NN/Tensor.html">
         <strong>Work with tensors</strong>
-        <span>NN.Tensor.API</span>
-        <p>Tensor operations, shapes, and the user-facing tensor layer.</p>
+        <span>NN.Tensor</span>
+        <p>The focused tensor, shape, and operation import.</p>
       </a>
       <a class="tl-api-card" href="./NN/IR/Graph.html">
         <strong>Inspect graph IR</strong>
@@ -331,17 +331,17 @@ def write_index(docs: Path) -> None:
         <span>NN.IR.Semantics</span>
         <p>The executable meaning attached to IR operators and graph evaluation.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Entrypoint/Runtime.html">
+      <a class="tl-api-card" href="./NN/Runtime.html">
         <strong>Run training code</strong>
-        <span>NN.Runtime.Autograd.TorchLean</span>
+        <span>NN.Runtime</span>
         <p>Runtime autograd, compiled execution, and training support.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Verification/CLI.html">
+      <a class="tl-api-card" href="./NN/Verification.html">
         <strong>Check certificates</strong>
-        <span>NN.Verification.CLI</span>
+        <span>NN.Verification</span>
         <p>The registered certificate and verification command surface.</p>
       </a>
-      <a class="tl-api-card" href="./NN/Floats/IEEEExec/Exec32.html">
+      <a class="tl-api-card" href="./NN/Floats.html">
         <strong>Audit Float32 execution</strong>
         <span>NN.Floats.IEEEExec</span>
         <p>Executable IEEE-754 binary32 semantics used in float audits.</p>
@@ -351,13 +351,13 @@ def write_index(docs: Path) -> None:
     <section class="tl-api-section">
       <h2>Browse By Layer</h2>
       <div class="tl-link-list">
-        <a href="./NN/API/Public.html">API</a>
-        <a href="./NN/Spec/Core/Shape.html">Spec</a>
-        <a href="./NN/Entrypoint/Runtime.html">Runtime</a>
+        <a href="./NN/API.html">API</a>
+        <a href="./NN/Spec.html">Spec</a>
+        <a href="./NN/Runtime.html">Runtime</a>
         <a href="./NN/IR/Graph.html">IR</a>
-        <a href="./NN/GraphSpec/Models.html">GraphSpec</a>
-        <a href="./NN/Entrypoint/Proofs.html">Proofs</a>
-        <a href="./NN/Verification/CLI.html">Verification</a>
+        <a href="./NN/GraphSpec.html">GraphSpec</a>
+        <a href="./NN/Proofs.html">Proofs</a>
+        <a href="./NN/Verification.html">Verification</a>
         <a href="./NN/Examples/Zoo.html">Examples</a>
       </div>
     </section>
@@ -369,21 +369,21 @@ def write_index(docs: Path) -> None:
           Start from the thing you want to do, then jump into the declaration namespace from there.
         </p>
       </article>
-      <a href="./NN/API/Public.html">
+      <a href="./NN/API.html">
         <strong>Write model code</strong>
-        <span>NN.API.Public</span>
+        <span>NN.API</span>
       </a>
       <a href="./NN/IR/Graph.html">
         <strong>Inspect lowering</strong>
         <span>NN.IR.Graph</span>
       </a>
-      <a href="./NN/Entrypoint/Runtime.html">
+      <a href="./NN/Runtime.html">
         <strong>Run autograd</strong>
-        <span>NN.Runtime.Autograd.TorchLean</span>
+        <span>NN.Runtime</span>
       </a>
-      <a href="./NN/Verification/CLI.html">
+      <a href="./NN/Verification.html">
         <strong>Check certificates</strong>
-        <span>NN.Verification.CLI</span>
+        <span>NN.Verification</span>
       </a>
     </section>
 
@@ -1345,7 +1345,7 @@ def rename_docgen_header(docs: Path) -> None:
             updated = updated.replace("</body>", DOC_THEME_SCRIPT + "\n</body>", 1)
 
         # Only declaration-heavy pages need the color legend.  Module-only pages
-        # such as `NN.Library` would waste sidebar space with it.
+        # such as `NN` would waste sidebar space with it.
         if has_declarations and "tl-kind-legend-side" not in updated:
             updated = updated.replace('<nav class="internal_nav">', '<nav class="internal_nav">' + legend, 1)
         if updated != text:

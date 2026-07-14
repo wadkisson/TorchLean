@@ -83,12 +83,12 @@ def einsumBhidBhjdBhij {α : Type} [Context α] [DecidableEq Shape]
   let sKT : Shape := .dim bh (.dim dDim (.dim jDim .scalar))
   let sOut3 : Shape := .dim bh (.dim iDim (.dim jDim .scalar))
   let sOut4 : Shape := .dim batch (.dim heads (.dim iDim (.dim jDim .scalar)))
-  have hQ : Shape.size sQ4 = Shape.size sQ3 := by
-    simp [sQ4, sQ3, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
-  have hK : Shape.size sK4 = Shape.size sK3 := by
-    simp [sK4, sK3, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
-  have hOut : Shape.size sOut3 = Shape.size sOut4 := by
-    simp [sOut3, sOut4, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hQ : Spec.Shape.size sQ4 = Spec.Shape.size sQ3 := by
+    simp [sQ4, sQ3, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hK : Spec.Shape.size sK4 = Spec.Shape.size sK3 := by
+    simp [sK4, sK3, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hOut : Spec.Shape.size sOut3 = Spec.Shape.size sOut4 := by
+    simp [sOut3, sOut4, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
   let q3 ← reshape (m := m) (α := α) (s₁ := sQ4) (s₂ := sQ3) q hQ
   let k3 ← reshape (m := m) (α := α) (s₁ := sK4) (s₂ := sK3) k hK
   let kt ← transpose3dLastTwo (m := m) (α := α) (a := bh) (b := jDim) (c := dDim) k3
@@ -109,12 +109,12 @@ def einsumBhijBhjdBhid {α : Type} [Context α] [DecidableEq Shape]
   let sV3 : Shape := .dim bh (.dim jDim (.dim dDim .scalar))
   let sOut3 : Shape := .dim bh (.dim iDim (.dim dDim .scalar))
   let sOut4 : Shape := .dim batch (.dim heads (.dim iDim (.dim dDim .scalar)))
-  have hA : Shape.size sA4 = Shape.size sA3 := by
-    simp [sA4, sA3, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
-  have hV : Shape.size sV4 = Shape.size sV3 := by
-    simp [sV4, sV3, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
-  have hOut : Shape.size sOut3 = Shape.size sOut4 := by
-    simp [sOut3, sOut4, Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hA : Spec.Shape.size sA4 = Spec.Shape.size sA3 := by
+    simp [sA4, sA3, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hV : Spec.Shape.size sV4 = Spec.Shape.size sV3 := by
+    simp [sV4, sV3, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
+  have hOut : Spec.Shape.size sOut3 = Spec.Shape.size sOut4 := by
+    simp [sOut3, sOut4, Spec.Shape.size, bh, Nat.mul_left_comm, Nat.mul_comm]
   let a3 ← reshape (m := m) (α := α) (s₁ := sA4) (s₂ := sA3) attn hA
   let v3 ← reshape (m := m) (α := α) (s₁ := sV4) (s₂ := sV3) v hV
   let out3 ← bmm (m := m) (α := α) (batch := bh) (mDim := iDim) (nDim := jDim) (pDim := dDim) a3 v3
@@ -262,11 +262,11 @@ def swapDepthsForPerm? (perm : List Nat) (r : Nat) : Option (List Nat) :=
 Expand an input operand’s labels to a full label list matching the operand’s rank.
 
 If the subscript contains an ellipsis, this inserts fresh `Label.ell` labels so that the total
-label count matches `Shape.rank s`.
+label count matches `Spec.Shape.rank s`.
 -/
 def expandInputLabels (sub : Subscript) (s : Shape) (maxEll : Nat) : Except String (List Label) :=
   do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   let fixed := sub.pre.length + sub.post.length
   if sub.hasEll then
     if r < fixed then
@@ -513,11 +513,11 @@ def firstDup? (xs : List Label) : Option (Label × Nat × Nat) :=
         | none => go ((x, i) :: seen) (i + 1) xs
   go [] 0 xs
 
-/-- `Shape.appendDim s 1` preserves `Shape.size` (used to justify reshape tricks). -/
-theorem size_appendDim_one (s : Shape) : Shape.size (Shape.appendDim s 1) = Shape.size s := by
+/-- `Shape.appendDim s 1` preserves `Spec.Shape.size` (used to justify reshape tricks). -/
+theorem size_appendDim_one (s : Shape) : Spec.Shape.size (Shape.appendDim s 1) = Spec.Shape.size s := by
   induction s with
-  | scalar => simp [Shape.appendDim, Shape.size]
-  | dim n s ih => simp [Shape.appendDim, Shape.size, ih]
+  | scalar => simp [Shape.appendDim, Spec.Shape.size]
+  | dim n s ih => simp [Shape.appendDim, Spec.Shape.size, ih]
 
 /-- Permutation list that moves `axis` to the last position (keeping relative order of others). -/
 def permMoveAxisToLast (r axis : Nat) : List Nat :=
@@ -601,21 +601,21 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
           match x1 with
           | ⟨.dim jDim2 (.dim kDim .scalar), b⟩ =>
               if hJ : jDim = jDim2 then
-                match hJ with
-                | rfl =>
-                    -- Extract labels (must be length-2 on both operands).
-                    let some li0 := listGet? sub0.pre 0 | failure
-                    let some lj0 := listGet? sub0.pre 1 | failure
-                    if sub0.pre.length != 2 then failure
-                    let some lj1 := listGet? sub1.pre 0 | failure
-                    let some lk1 := listGet? sub1.pre 1 | failure
-                    if sub1.pre.length != 2 then failure
-                    if lj0 != lj1 then failure
-                    expectOut [li0, lk1]
-                    let out ← OptionT.lift <|
-                      einsumIjJkIk (m := m) (α := α)
-                        (iDim := iDim) (jDim := jDim) (kDim := kDim) a b
-                    pure ⟨.dim iDim (.dim kDim .scalar), out⟩
+                let b' : RefTy (m := m) (α := α) (.dim jDim (.dim kDim .scalar)) := by
+                  simpa [hJ] using b
+                -- Extract labels (must be length-2 on both operands).
+                let some li0 := listGet? sub0.pre 0 | failure
+                let some lj0 := listGet? sub0.pre 1 | failure
+                if sub0.pre.length != 2 then failure
+                let some lj1 := listGet? sub1.pre 0 | failure
+                let some lk1 := listGet? sub1.pre 1 | failure
+                if sub1.pre.length != 2 then failure
+                if lj0 != lj1 then failure
+                expectOut [li0, lk1]
+                let out ← OptionT.lift <|
+                  einsumIjJkIk (m := m) (α := α)
+                    (iDim := iDim) (jDim := jDim) (kDim := kDim) a b'
+                pure ⟨.dim iDim (.dim kDim .scalar), out⟩
               else
                 failure
           | _ => failure
@@ -624,28 +624,27 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
           match x1 with
           | ⟨.dim batch2 (.dim jDim2 (.dim kDim .scalar)), b⟩ =>
               if hB : batch = batch2 then
-                match hB with
-                | rfl =>
-                    if hJ : jDim = jDim2 then
-                      match hJ with
-                      | rfl =>
-                          let some lb0 := listGet? sub0.pre 0 | failure
-                          let some li0 := listGet? sub0.pre 1 | failure
-                          let some lj0 := listGet? sub0.pre 2 | failure
-                          if sub0.pre.length != 3 then failure
-                          let some lb1 := listGet? sub1.pre 0 | failure
-                          let some lj1 := listGet? sub1.pre 1 | failure
-                          let some lk1 := listGet? sub1.pre 2 | failure
-                          if sub1.pre.length != 3 then failure
-                          if lb0 != lb1 then failure
-                          if lj0 != lj1 then failure
-                          expectOut [lb0, li0, lk1]
-                          let out ← OptionT.lift <|
-                            einsumBijBjkBik (m := m) (α := α)
-                              (batch := batch) (iDim := iDim) (jDim := jDim) (kDim := kDim) a b
-                          pure ⟨.dim batch (.dim iDim (.dim kDim .scalar)), out⟩
-                    else
-                      failure
+                if hJ : jDim = jDim2 then
+                  let b' : RefTy (m := m) (α := α)
+                      (.dim batch (.dim jDim (.dim kDim .scalar))) := by
+                    simpa [hB, hJ] using b
+                  let some lb0 := listGet? sub0.pre 0 | failure
+                  let some li0 := listGet? sub0.pre 1 | failure
+                  let some lj0 := listGet? sub0.pre 2 | failure
+                  if sub0.pre.length != 3 then failure
+                  let some lb1 := listGet? sub1.pre 0 | failure
+                  let some lj1 := listGet? sub1.pre 1 | failure
+                  let some lk1 := listGet? sub1.pre 2 | failure
+                  if sub1.pre.length != 3 then failure
+                  if lb0 != lb1 then failure
+                  if lj0 != lj1 then failure
+                  expectOut [lb0, li0, lk1]
+                  let out ← OptionT.lift <|
+                    einsumBijBjkBik (m := m) (α := α)
+                      (batch := batch) (iDim := iDim) (jDim := jDim) (kDim := kDim) a b'
+                  pure ⟨.dim batch (.dim iDim (.dim kDim .scalar)), out⟩
+                else
+                  failure
               else
                 failure
           | _ => failure
@@ -654,61 +653,58 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
           match x1 with
           | ⟨.dim batch2 (.dim heads2 (.dim jDim (.dim dDim .scalar))), x1Ref⟩ =>
               if hB : batch = batch2 then
-                match hB with
-                | rfl =>
-                    if hH : heads = heads2 then
-                      match hH with
-                      | rfl =>
-                          let some lb0 := listGet? sub0.pre 0 | failure
-                          let some lh0 := listGet? sub0.pre 1 | failure
-                          let some l2_0 := listGet? sub0.pre 2 | failure
-                          let some l3_0 := listGet? sub0.pre 3 | failure
-                          if sub0.pre.length != 4 then failure
-                          let some lb1 := listGet? sub1.pre 0 | failure
-                          let some lh1 := listGet? sub1.pre 1 | failure
-                          let some l2_1 := listGet? sub1.pre 2 | failure
-                          let some l3_1 := listGet? sub1.pre 3 | failure
-                          if sub1.pre.length != 4 then failure
-                          if lb0 != lb1 then failure
-                          if lh0 != lh1 then failure
-                          -- Two attention-like cases:
-                          -- 1) Q·Kᵀ: `bhid,bhjd -> bhij`  (shared last label across inputs).
-                          -- 2) Attn·V: `bhij,bhjd -> bhid` (contract sub0 last label with sub1
-                          -- third label).
-                          if l3_0 = l3_1 then
-                            -- Q·Kᵀ: sub0 = [b,h,i,d], sub1 = [b,h,j,d], and shapes must agree on
-                            -- `d`.
-                            if hD : dDim = tDim then
-                              match hD with
-                              | rfl =>
-                                  expectOut [lb0, lh0, l2_0, l2_1]
-                                  let out ← OptionT.lift <|
-                                    einsumBhidBhjdBhij (m := m) (α := α)
-                                      (batch := batch) (heads := heads) (iDim := iDim) (jDim :=
-                                        jDim) (dDim := dDim) x0Ref x1Ref
-                                  pure ⟨.dim batch (.dim heads (.dim iDim (.dim jDim .scalar))),
-                                    out⟩
-                            else
-                              failure
-                          else if l3_0 = l2_1 then
-                            -- Attn·V: sub0 = [b,h,i,j], sub1 = [b,h,j,d], and shapes must agree on
-                            -- `j`.
-                            if hJ : jDim = tDim then
-                              match hJ with
-                              | rfl =>
-                                  expectOut [lb0, lh0, l2_0, l3_1]
-                                  let out ← OptionT.lift <|
-                                    einsumBhijBhjdBhid (m := m) (α := α)
-                                      (batch := batch) (heads := heads) (iDim := iDim) (jDim :=
-                                        jDim) (dDim := dDim) x0Ref x1Ref
-                                  pure ⟨.dim batch (.dim heads (.dim iDim (.dim dDim .scalar))),
-                                    out⟩
-                            else
-                              failure
-                          else
-                            failure
+                if hH : heads = heads2 then
+                  let x1Ref' : RefTy (m := m) (α := α)
+                      (.dim batch (.dim heads (.dim jDim (.dim dDim .scalar)))) := by
+                    simpa [hB, hH] using x1Ref
+                  let some lb0 := listGet? sub0.pre 0 | failure
+                  let some lh0 := listGet? sub0.pre 1 | failure
+                  let some l2_0 := listGet? sub0.pre 2 | failure
+                  let some l3_0 := listGet? sub0.pre 3 | failure
+                  if sub0.pre.length != 4 then failure
+                  let some lb1 := listGet? sub1.pre 0 | failure
+                  let some lh1 := listGet? sub1.pre 1 | failure
+                  let some l2_1 := listGet? sub1.pre 2 | failure
+                  let some l3_1 := listGet? sub1.pre 3 | failure
+                  if sub1.pre.length != 4 then failure
+                  if lb0 != lb1 then failure
+                  if lh0 != lh1 then failure
+                  -- Two attention-like cases:
+                  -- 1) Q·Kᵀ: `bhid,bhjd -> bhij`  (shared last label across inputs).
+                  -- 2) Attn·V: `bhij,bhjd -> bhid` (contract sub0 last label with sub1
+                  -- third label).
+                  if l3_0 = l3_1 then
+                    -- Q·Kᵀ: sub0 = [b,h,i,d], sub1 = [b,h,j,d], and shapes must agree on `d`.
+                    if hD : dDim = tDim then
+                      let x0Ref' : RefTy (m := m) (α := α)
+                          (.dim batch (.dim heads (.dim iDim (.dim dDim .scalar)))) := by
+                        simpa [hD] using x0Ref
+                      expectOut [lb0, lh0, l2_0, l2_1]
+                      let out ← OptionT.lift <|
+                        einsumBhidBhjdBhij (m := m) (α := α)
+                          (batch := batch) (heads := heads) (iDim := iDim) (jDim := jDim)
+                          (dDim := dDim) x0Ref' x1Ref'
+                      pure ⟨.dim batch (.dim heads (.dim iDim (.dim jDim .scalar))), out⟩
                     else
                       failure
+                  else if l3_0 = l2_1 then
+                    -- Attn·V: sub0 = [b,h,i,j], sub1 = [b,h,j,d], and shapes must agree on `j`.
+                    if hJ : jDim = tDim then
+                      let x0Ref' : RefTy (m := m) (α := α)
+                          (.dim batch (.dim heads (.dim iDim (.dim jDim .scalar)))) := by
+                        simpa [hJ] using x0Ref
+                      expectOut [lb0, lh0, l2_0, l3_1]
+                      let out ← OptionT.lift <|
+                        einsumBhijBhjdBhid (m := m) (α := α)
+                          (batch := batch) (heads := heads) (iDim := iDim) (jDim := jDim)
+                          (dDim := dDim) x0Ref' x1Ref'
+                      pure ⟨.dim batch (.dim heads (.dim iDim (.dim dDim .scalar))), out⟩
+                    else
+                      failure
+                  else
+                    failure
+                else
+                  failure
               else
                 failure
           | _ => failure
@@ -719,7 +715,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
       return r
 
     let shapes0 : List Shape := xs.map Sigma.fst
-    let ranks : List Nat := shapes0.map Shape.rank
+    let ranks : List Nat := shapes0.map Spec.Shape.rank
 
     -- Compute max ellipsis length across inputs.
     let mut maxEll : Nat := 0
@@ -760,7 +756,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
               let maskT : Tensor α curShape := Einsum.diagMaskForShape (α := α) curShape p q
               let mask ← OptionT.lift <| const (m := m) (α := α) (s := curShape) maskT
               let xMasked ← OptionT.lift <| mul (m := m) (α := α) (s := curShape) cur.snd mask
-              let r := Shape.rank curShape
+              let r := Spec.Shape.rank curShape
               if hRank : r > 0 then
                 if hq : q < r then
                   let perm := Einsum.permMoveAxisToLast r q
@@ -770,7 +766,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
                     | none => failure
                   let ⟨sPerm, xPerm⟩ ← OptionT.lift <|
                     Einsum.permuteBySwaps (α := α) (m := m) (x := ⟨curShape, xMasked⟩) swaps
-                  let rPerm := Shape.rank sPerm
+                  let rPerm := Spec.Shape.rank sPerm
                   if hRankPerm : rPerm > 0 then
                     if hw : sPerm.wellFormed then
                       let axis : Nat := rPerm - 1
@@ -869,7 +865,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
         | none => failure
         | some i => perm := perm ++ [i]
       let swaps : List Nat ←
-        match Einsum.swapDepthsForPerm? perm (Shape.rank sIn) with
+        match Einsum.swapDepthsForPerm? perm (Spec.Shape.rank sIn) with
         | some ss => pure ss
         | none => failure
       let ⟨sPerm, xPerm⟩ ← OptionT.lift <|
@@ -887,7 +883,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
           insertedDims := insertedDims ++ [1]
       let sInserted : Shape := Shape.ofList insertedDims
       let xInserted : RefTy (m := m) (α := α) sInserted ←
-        if h : Shape.size sPerm = Shape.size sInserted then
+        if h : Spec.Shape.size sPerm = Spec.Shape.size sInserted then
           OptionT.lift <| reshape (m := m) (α := α) (s₁ := sPerm) (s₂ := sInserted) xPerm h
         else
           failure
@@ -913,9 +909,9 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
       | 0 => pure cur
       | n + 1 =>
           let curShape := cur.fst
-          if hRank : Shape.rank curShape > 0 then
+          if hRank : Spec.Shape.rank curShape > 0 then
             if hw : curShape.wellFormed then
-              let axis : Nat := Shape.rank curShape - 1
+              let axis : Nat := Spec.Shape.rank curShape - 1
               let nextRef :=
                 (← OptionT.lift <|
                   (by
@@ -952,7 +948,7 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
         let some baseIdx := Einsum.findIndex? outLabels l | failure
         let d := Einsum.dimFindD dimMap l 1
         let sReshape : Shape := Shape.appendDim cur.fst 1
-        have hSz : Shape.size cur.fst = Shape.size sReshape := by
+        have hSz : Spec.Shape.size cur.fst = Spec.Shape.size sReshape := by
           simpa [sReshape] using (Eq.symm (Einsum.size_appendDim_one cur.fst))
         let xReshaped ← OptionT.lift <|
           reshape (m := m) (α := α) (s₁ := cur.fst) (s₂ := sReshape) cur.snd hSz
@@ -963,14 +959,14 @@ def einsumDyn {α : Type} [Context α] [DecidableEq Shape]
           | none => failure
         let xExpanded ← OptionT.lift <|
           broadcastTo (m := m) (α := α) (s₁ := sReshape) (s₂ := sBroad) cb xReshaped
-        let qIdx : Nat := Shape.rank sBroad - 1
+        let qIdx : Nat := Spec.Shape.rank sBroad - 1
         let maskT : Tensor α sBroad := Einsum.diagMaskForShape (α := α) sBroad baseIdx qIdx
         let mask ← OptionT.lift <| const (m := m) (α := α) (s := sBroad) maskT
         let xMasked ← OptionT.lift <| mul (m := m) (α := α) (s := sBroad) xExpanded mask
         cur := ⟨sBroad, xMasked⟩
 
       let some perm := Einsum.permForDuplicateLabels? outCanon outLabelsRaw | failure
-      let some swaps := Einsum.swapDepthsForPerm? perm (Shape.rank cur.fst) | failure
+      let some swaps := Einsum.swapDepthsForPerm? perm (Spec.Shape.rank cur.fst) | failure
       OptionT.lift <| Einsum.permuteBySwaps (α := α) (m := m) (x := cur) swaps
   computation.run
 

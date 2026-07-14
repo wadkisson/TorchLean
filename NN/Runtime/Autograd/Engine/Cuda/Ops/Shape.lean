@@ -42,9 +42,9 @@ def sum {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) := do
         pure [(xId, { s := s, buf := dx })] }
   pure (t.addNode node)
 
-/-- Flatten `s` into a 1D vector of length `Shape.size s`. -/
+/-- Flatten `s` into a 1D vector of length `Spec.Shape.size s`. -/
 def flatten {s : Shape} (t : Tape) (xId : Nat) : Result (Tape × Nat) :=
-  unary (t := t) "flatten" xId s (.dim (Shape.size s) .scalar)
+  unary (t := t) "flatten" xId s (.dim (Spec.Shape.size s) .scalar)
     (forward := fun x => x)
     (backward := fun _x dLdy => Buffer.copy dLdy)
 
@@ -53,7 +53,7 @@ Reshape a buffer while preserving number of elements.
 
 This is a no-copy view operation: it reuses the same contiguous buffer.
 -/
-def reshape {s₁ s₂ : Shape} (t : Tape) (xId : Nat) (_h : Shape.size s₁ = Shape.size s₂) :
+def reshape {s₁ s₂ : Shape} (t : Tape) (xId : Nat) (_h : Spec.Shape.size s₁ = Spec.Shape.size s₂) :
     Result (Tape × Nat) :=
   unary (t := t) "reshape" xId s₁ s₂
     (forward := fun x => x)
@@ -77,7 +77,7 @@ def swapAdjacentAtDepth {s : Shape} (t : Tape) (depth : Nat) (xId : Nat) : Resul
   let dimsIn : Array Nat := Shape.toArray s
   let outShape : Shape := s.swapAdjacentAtDepth depth
   let dimsOut : Array Nat := Shape.toArray outShape
-  let validDepth := depth + 1 < Shape.rank s
+  let validDepth := depth + 1 < Spec.Shape.rank s
   unary (t := t) "swapAdjacentAtDepth" xId s outShape
     (forward := fun x =>
       if validDepth then

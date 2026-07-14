@@ -33,7 +33,7 @@ namespace GraphSpec
 namespace Primitive
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 open Runtime.Autograd.Torch (TList)
@@ -46,18 +46,18 @@ This typed-list fact is used internally by `LowerToDAG.Primitive.toDAGPrimOp`.
 theorem splitAppend_appendSingleton
     {α : Type} [Context α] :
     {ps : List Shape} → {σ : Shape} →
-      (params : TList α ps) → (x : Tensor α σ) →
-        Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend (α := α)
+      (params : TList α ps) → (x : Spec.Tensor α σ) →
+        Proofs.Autograd.Algebra.TList.splitAppend (α := α)
             (ss₁ := ps) (ss₂ := [σ])
-            (Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
+            (Proofs.Autograd.Algebra.TList.append (α := α)
               (ss₁ := ps) (ss₂ := [σ]) params (.cons x .nil))
           =
         (params, .cons x .nil)
   | [], _σ, .nil, x => rfl
   | _s :: ps, σ, .cons p params, x => by
       simp
-        [ Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append
-        , Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend
+        [ Proofs.Autograd.Algebra.TList.append
+        , Proofs.Autograd.Algebra.TList.splitAppend
         , splitAppend_appendSingleton (α := α) (ps := ps) (σ := σ) params x
         ]
 
@@ -71,9 +71,9 @@ theorem toDAGPrimOp_specFwd_eq
     {α : Type} [Context α]
     {ps : List Shape} {σ τ : Shape}
     (p : Primitive ps σ τ)
-    (params : TList α ps) (x : Tensor α σ) :
+    (params : TList α ps) (x : Spec.Tensor α σ) :
     (LowerToDAG.Primitive.toDAGPrimOp (ps := ps) (σ := σ) (τ := τ) p).specFwd (α := α)
-        (Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := α)
+        (Proofs.Autograd.Algebra.TList.append (α := α)
           (ss₁ := ps) (ss₂ := [σ]) params (.cons x .nil))
     =
     p.specFwd (α := α) params x := by

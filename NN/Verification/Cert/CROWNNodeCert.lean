@@ -66,11 +66,8 @@ the artifact, compare decimal-serialized floats with an explicit tolerance, and 
 requirements before invoking the semantic checker.
 -/
 
-/-- In-memory representation of a node-wise α-CROWN certificate read from JSON. -/
-abbrev CROWNNodeCertificate := CROWNNodeCoreCertificate
-
 /-- Read a CROWN node certificate from JSON on disk. -/
-def readCROWNNodeCertificate (g : Graph) (path : String) : IO CROWNNodeCertificate := do
+def readCROWNNodeCertificate (g : Graph) (path : String) : IO CROWNNodeCoreCertificate := do
   let topObj ← readJsonObjectFile path
   parseCROWNNodeCoreCertificate g topObj
 

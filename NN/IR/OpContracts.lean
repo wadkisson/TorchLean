@@ -40,7 +40,7 @@ namespace ShapeUtil
 
 /-- The output shape of flattening a tensor of shape `s` to a 1D vector. -/
 def flattenOutShape (s : Shape) : Shape :=
-  .dim (Shape.size s) .scalar
+  .dim (Spec.Shape.size s) .scalar
 
 /--
 If `s` has rank ≥ 2, return the shape obtained by swapping its first two axes.
@@ -73,10 +73,10 @@ reused without introducing import cycles.
 
 /-- Check that an `axis` is in-bounds for a given shape. -/
 def checkAxisValid (axis : Nat) (s : Shape) : Except String Unit := do
-  if axis < Shape.rank s then
+  if axis < Spec.Shape.rank s then
     pure ()
   else
-    throw s!"invalid axis {axis} for rank {Shape.rank s}"
+    throw s!"invalid axis {axis} for rank {Spec.Shape.rank s}"
 
 /-- Check that a natural-number op parameter is nonzero. -/
 def checkPositive (tag param : String) (n : Nat) : Except String Unit := do
@@ -139,10 +139,10 @@ use this check to fail fast with a readable error.
 -/
 def checkLastAxis (tag : String) (axis : Nat) (s : Shape) : Except String Unit := do
   checkAxisValid axis s
-  if axis + 1 = Shape.rank s then
+  if axis + 1 = Spec.Shape.rank s then
     pure ()
   else
-    throw s!"{tag}: only last-axis is supported (axis={axis}, rank={Shape.rank s})"
+    throw s!"{tag}: only last-axis is supported (axis={axis}, rank={Spec.Shape.rank s})"
 
 /--
 Compute the inverse of a permutation list.
@@ -195,7 +195,7 @@ Example: rank=4 and `axis=1` yields `[0,2,3,1]`.
 -/
 def permMoveAxisToLast (axis : Nat) (s : Shape) : Except String (List Nat) := do
   checkAxisValid axis s
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   pure <| (List.range r).erase axis ++ [axis]
 
 /--
@@ -206,7 +206,7 @@ Example: rank=4 and `axis=2` yields `[2,0,1,3]`.
 -/
 def permMoveAxisToFront (axis : Nat) (s : Shape) : Except String (List Nat) := do
   checkAxisValid axis s
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   pure <| axis :: (List.range r).erase axis
 
 /--
@@ -256,10 +256,10 @@ def inferConcatOutShape (axis : Nat) (parents : List Shape) : Except String Shap
     | [] => throw "concat: internal error"
     | s :: _ => pure s
   checkAxisValid axis s0
-  let r0 := Shape.rank s0
+  let r0 := Spec.Shape.rank s0
   for s in parents do
-    if Shape.rank s != r0 then
-      throw s!"concat: rank mismatch: expected {r0}, got {Shape.rank s} ({repr s})"
+    if Spec.Shape.rank s != r0 then
+      throw s!"concat: rank mismatch: expected {r0}, got {Spec.Shape.rank s} ({repr s})"
 
   let rec go (axis : Nat) (shs : List Shape) : Except String Shape := do
     match axis, shs with
@@ -313,12 +313,12 @@ for convolution and pooling shapes.
 
 /-- Output length for a 1D sliding-window op without padding: `⌊(in - k)/stride⌋ + 1`. -/
 def slideOut (inLen k stride : Nat) : Nat :=
-  (inLen - k) / stride + 1
+  Shape.slidingWindowOutDim inLen k stride 0
 
 /-- Output length for a 1D sliding-window op with symmetric padding: `⌊(in + 2*pad - k)/stride⌋ +
   1`. -/
 def slideOutPad (inLen k stride padding : Nat) : Nat :=
-  (inLen + 2 * padding - k) / stride + 1
+  Shape.slidingWindowOutDim inLen k stride padding
 
 /--
 Reject sliding-window shapes where the kernel has no valid placement.

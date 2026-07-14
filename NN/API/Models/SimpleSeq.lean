@@ -42,12 +42,12 @@ structure SeqRnnHeadConfig where
 deriving Repr
 
 /-- Input shape `(seqLen × inputSize)` for `SeqRnnHeadConfig`. -/
-abbrev seqRnnHeadInShape (cfg : SeqRnnHeadConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.seqLen cfg.inputSize
+abbrev seqRnnHeadInShape (cfg : SeqRnnHeadConfig) : Spec.Shape :=
+  .dim cfg.seqLen (.dim cfg.inputSize .scalar)
 
 /-- Output shape `(seqLen × inputSize)` for `SeqRnnHeadConfig`. -/
-abbrev seqRnnHeadOutShape (cfg : SeqRnnHeadConfig) : Shape :=
-  NN.Tensor.Shape.Mat cfg.seqLen cfg.inputSize
+abbrev seqRnnHeadOutShape (cfg : SeqRnnHeadConfig) : Spec.Shape :=
+  .dim cfg.seqLen (.dim cfg.inputSize .scalar)
 
 /--
 Vanilla RNN core plus time-distributed linear head:
@@ -58,7 +58,7 @@ def rnnWithLinearHead (cfg : SeqRnnHeadConfig) :
     nn.M (nn.Sequential (seqRnnHeadInShape cfg) (seqRnnHeadOutShape cfg)) :=
   nn.Sequential![
     nn.rnn cfg.seqLen cfg.inputSize cfg.hiddenSize,
-    Linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
+    linear cfg.hiddenSize cfg.inputSize (pfx := .dim cfg.seqLen .scalar)
   ]
 
 /--
@@ -70,7 +70,7 @@ def lstmWithLinearHead (cfg : SeqRnnHeadConfig) :
     nn.M (nn.Sequential (seqRnnHeadInShape cfg) (seqRnnHeadOutShape cfg)) :=
   nn.Sequential![
     nn.lstm cfg.seqLen cfg.inputSize cfg.hiddenSize,
-    Linear cfg.hiddenSize cfg.inputSize (pfx := NN.Tensor.Shape.Vec cfg.seqLen)
+    linear cfg.hiddenSize cfg.inputSize (pfx := .dim cfg.seqLen .scalar)
   ]
 
 end models

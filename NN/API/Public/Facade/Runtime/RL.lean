@@ -47,7 +47,6 @@ export NN.API.rl.core
    continueMask discountedBackup tdTarget tdResidual
    discountedReturns discountedReturnsFrom discountedReturnsDone
    generalizedAdvantageEstimation returnsFromAdvantages
-   oneHotAction
    discountedReturnsVecFrom discountedReturnsVec discountedReturnsVecDone
    generalizedAdvantageEstimationVec returnsFromAdvantagesVec
    squaredError huberLoss)
@@ -163,8 +162,8 @@ def actorPolicyFromParams
     {actorParamShapes : List Shape}
     {α : Type} [Runtime.TensorScalar α]
     (actorCompiled : nn.Compiled actorParamShapes obsShape logitsShape α)
-    (actorRollout : nn.Sequential rolloutStateShape rolloutLogitsShape)
-    (criticRollout : nn.Sequential rolloutStateShape rolloutValueShape)
+    (actorRollout : TorchLean.nn.Sequential rolloutStateShape rolloutLogitsShape)
+    (criticRollout : TorchLean.nn.Sequential rolloutStateShape rolloutValueShape)
     (psAll : _root_.Runtime.Autograd.Torch.TList α
       (nn.paramShapes actorRollout ++ nn.paramShapes criticRollout))
     (sameActorParams :
@@ -172,7 +171,7 @@ def actorPolicyFromParams
         actorParamShapes := by rfl) :
     Tensor.T α obsShape → Tensor.T α logitsShape :=
   let (psActor, _psCritic) := NN.API.rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
-  let psActorObs : ParamTensors α actorParamShapes :=
+  let psActorObs : nn.ParamTensors α actorParamShapes :=
     Eq.mp (by rw [← sameActorParams]) psActor
   fun obs => actorCompiled.forward psActorObs obs
 
@@ -185,8 +184,8 @@ def criticValueFromParams
     {criticParamShapes : List Shape}
     {α : Type} [Runtime.TensorScalar α]
     (criticCompiled : nn.Compiled criticParamShapes obsShape (.dim 1 .scalar) α)
-    (actorRollout : nn.Sequential rolloutStateShape rolloutLogitsShape)
-    (criticRollout : nn.Sequential rolloutStateShape rolloutValueShape)
+    (actorRollout : TorchLean.nn.Sequential rolloutStateShape rolloutLogitsShape)
+    (criticRollout : TorchLean.nn.Sequential rolloutStateShape rolloutValueShape)
     (psAll : _root_.Runtime.Autograd.Torch.TList α
       (nn.paramShapes actorRollout ++ nn.paramShapes criticRollout))
     (sameCriticParams :
@@ -194,7 +193,7 @@ def criticValueFromParams
         criticParamShapes := by rfl) :
     Tensor.T α obsShape → α :=
   let (_psActor, psCritic) := NN.API.rl.ppo.splitActorCriticParams actorRollout criticRollout psAll
-  let psCriticObs : ParamTensors α criticParamShapes :=
+  let psCriticObs : nn.ParamTensors α criticParamShapes :=
     Eq.mp (by rw [← sameCriticParams]) psCritic
   fun obs =>
     _root_.Spec.Tensor.vecGet

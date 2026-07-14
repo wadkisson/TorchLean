@@ -6,8 +6,10 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.NeuralFloat.Formats
-public import NN.Floats.NeuralFloat.NF
+public import NN.Floats.Calc.Round
+public import NN.Floats.NeuralFloat.Format.Formats
+public import NN.Floats.NeuralFloat.Metadata
+public import NN.Floats.NeuralFloat.Scalar.NF
 import Mathlib.Algebra.Order.Algebra
 
 /-!
@@ -37,7 +39,7 @@ namespace TorchLean.Floats
 /-! ## Canonical IEEE-754 binary32 configuration -/
 
 /--
-Exponent function for IEEE-754 binary32 (gradual underflow), expressed in Flocq style.
+Exponent function for the gradual-underflow part of IEEE-754 binary32, expressed in Flocq style.
 
 Two numbers here matter:
 
@@ -45,6 +47,9 @@ Two numbers here matter:
   once you include the implicit leading `1`.
 - `emin = -149`: the smallest positive *subnormal* is `2^-149`. Using `emin = -149` is the usual
   way to encode gradual underflow in this “rounding-on-ℝ” model.
+
+`FLTExp` has no upper exponent bound. Overflow and the transition to infinity belong to
+`IEEE32Exec`, not this exponent function.
 -/
 def fexp32 : ℤ → ℤ := FLTExp (-149) 24
 
@@ -82,16 +87,69 @@ namespace FP32
 /-- Forgetful projection: treat an `FP32` value as a real number. -/
 abbrev toReal (x : FP32) : ℝ := x.val
 
-/--
-Convenience constant: the largest finite magnitude representable by the binary32 parameters used by
-this model (i.e. approximately `(2 - 2^-23) * 2^127`).
+/-- Canonical effective mantissa/exponent representation of binary32 rounded-real rounding. -/
+theorem round_eq_computed (x : ℝ) :
+    neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 x =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 x)
+        exponent := neuralCexp binaryRadix fexp32 x } := by
+  simpa [rnd32] using
+    (neuralRound_nearestEven_computed (β := binaryRadix) (fexp := fexp32) x)
 
-We keep this in `FP32` because it is a useful *proof-level* guard when you want to state “no
-overflow” side-conditions in a readable way.
+/--
+The result of FP32 addition has the canonical mantissa/exponent representation computed by the
+effective nearest-even rounding layer.
 -/
-noncomputable def maxFinite : ℝ :=
-  (binaryRadix.toReal - NeuralPrecision.machineEpsilon NeuralPrecision.ieee_single) *
-    neuralBpow binaryRadix (2^(NeuralPrecision.expBits NeuralPrecision.ieee_single - 1) - 1)
+theorem add_toReal_eq_computed (a b : FP32) :
+    toReal (a + b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (a.val + b.val))
+        exponent := neuralCexp binaryRadix fexp32 (a.val + b.val) } := by
+  change neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 (a.val + b.val) = _
+  exact round_eq_computed (a.val + b.val)
+
+/-- Effective representation of FP32 subtraction. -/
+theorem sub_toReal_eq_computed (a b : FP32) :
+    toReal (a - b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (a.val - b.val))
+        exponent := neuralCexp binaryRadix fexp32 (a.val - b.val) } := by
+  change neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 (a.val - b.val) = _
+  exact round_eq_computed (a.val - b.val)
+
+/-- Effective representation of FP32 multiplication. -/
+theorem mul_toReal_eq_computed (a b : FP32) :
+    toReal (a * b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (a.val * b.val))
+        exponent := neuralCexp binaryRadix fexp32 (a.val * b.val) } := by
+  change neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 (a.val * b.val) = _
+  exact round_eq_computed (a.val * b.val)
+
+/-- Effective representation of FP32 division. -/
+theorem div_toReal_eq_computed (a b : FP32) :
+    toReal (a / b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (a.val / b.val))
+        exponent := neuralCexp binaryRadix fexp32 (a.val / b.val) } := by
+  change neuralRound (β := binaryRadix) (fexp := fexp32) rnd32 (a.val / b.val) = _
+  exact round_eq_computed (a.val / b.val)
+
+/--
+The largest finite IEEE-754 binary32 magnitude, `(2 - 2^-23) * 2^127`.
+
+This is a bridge guard, not a maximum of `FP32`: the proof-oriented `FLTExp (-149) 24` model has
+gradual underflow but no upper exponent bound.  Executable IEEE binary32 operations must establish
+this bound before transferring a finite result into the rounded-real model.
+-/
+noncomputable def ieeeMaxFinite : ℝ :=
+  (binaryRadix.toReal - NeuralPrecision.machineEpsilon NeuralPrecision.ieeeSingle) *
+    neuralBpow binaryRadix (2^(NeuralPrecision.expBits NeuralPrecision.ieeeSingle - 1) - 1)
 
 /--
 Convenience constant: the smallest positive normal binary32 number (approximately `2^-126`).
@@ -100,7 +158,11 @@ Subnormals exist below this; this constant is mainly useful when you want to dis
 “normal-range” arguments from “subnormal-range” arguments in proofs.
 -/
 noncomputable def minNormal : ℝ :=
-  neuralBpow binaryRadix (-(2^(NeuralPrecision.expBits NeuralPrecision.ieee_single - 1) : ℤ) + 2)
+  neuralBpow binaryRadix (-(2^(NeuralPrecision.expBits NeuralPrecision.ieeeSingle - 1) : ℤ) + 2)
+
+/-- The binary32 minimum normal value is `2^-126`. -/
+@[simp] theorem minNormal_eq_bpow : minNormal = neuralBpow binaryRadix (-126) := by
+  norm_num [minNormal, NeuralPrecision.expBits]
 
 end FP32
 

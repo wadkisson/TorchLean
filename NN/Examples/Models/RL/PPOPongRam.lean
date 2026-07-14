@@ -8,7 +8,8 @@ End-to-end PPO example: train an actor-critic on Atari Pong (ALE) using TorchLea
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 public import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
@@ -173,11 +174,11 @@ def modelCfg : nn.models.PPOActorCriticConfig :=
 
 /-- Construct the actor network as an MLP mapping RAM observations to action logits. -/
 def actorMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim nActions)) :=
-  nn.models.PPOActor modelCfg pfx
+  nn.models.ppoActor modelCfg pfx
 
 /-- Construct the critic network as an MLP mapping RAM observations to a scalar value estimate. -/
 def criticMk (pfx : Shape) : nn.M (nn.Sequential (pfx.appendDim stateDim) (pfx.appendDim 1)) :=
-  nn.models.PPOCritic modelCfg pfx
+  nn.models.ppoCritic modelCfg pfx
 
 /-!
 ## Gymnasium / ALE bridge

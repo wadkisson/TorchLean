@@ -37,13 +37,13 @@ The seed is consumed only by the builder case. Already-built models pass through
 -/
 class ToModel (model : Type u) (σ τ : outParam Shape) where
   /-- Materialize the model, using the seed only when the value still needs initialization. -/
-  build : Nat → model → nn.Sequential σ τ
+  build : Nat → model → TorchLean.nn.Sequential σ τ
 
-instance {σ τ : Shape} : ToModel (nn.Sequential σ τ) σ τ where
+instance {σ τ : Shape} : ToModel (TorchLean.nn.Sequential σ τ) σ τ where
   build _ model := model
 
-instance {σ τ : Shape} : ToModel (nn.M (nn.Sequential σ τ)) σ τ where
-  build seed model := nn.run seed model
+instance {σ τ : Shape} : ToModel (TorchLean.nn.M (TorchLean.nn.Sequential σ τ)) σ τ where
+  build seed model := TorchLean.nn.run seed model
 
 /-- Build one unified public trainer from a sequential model or seedable model builder. -/
 def new {model : Type u} {σ τ : Shape} [ToModel model σ τ] (m : model)

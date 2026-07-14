@@ -118,6 +118,8 @@ def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox Float)) := do
         | throw <| IO.userError s!"Invalid ibp[i].hi: expected float array length {dim}"
       unless finiteVec dim loVec && finiteVec dim hiVec do
         throw <| IO.userError "Invalid ibp[i]: interval bounds must be finite"
+      unless (List.finRange dim).all (fun i => decide (loVec i <= hiVec i)) do
+        throw <| IO.userError "Invalid ibp[i]: every lower bound must be <= its upper bound"
       let loT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor loVec
       let hiT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor hiVec
       pure (some { dim := dim, lo := loT, hi := hiT })

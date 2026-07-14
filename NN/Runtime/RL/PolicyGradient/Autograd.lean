@@ -204,7 +204,7 @@ def ppoActorCriticScalarModuleDef
       [stateShape, (.dim batch (.dim nActions .scalar)), (.dim batch .scalar), (.dim batch .scalar),
         (.dim batch (.dim 1 .scalar))] :=
   { initParams :=
-      _root_.Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append (α := Float)
+      _root_.Proofs.Autograd.Algebra.TList.append (α := Float)
         (ss₁ := _root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes actor) (ss₂ := _root_.Runtime.Autograd.TorchLean.NN.Seq.paramShapes critic)
         (_root_.Runtime.Autograd.TorchLean.NN.Seq.initParams actor) (_root_.Runtime.Autograd.TorchLean.NN.Seq.initParams critic)
     initRequiresGrad := _root_.Runtime.Autograd.TorchLean.NN.Seq.paramRequiresGrad actor ++ _root_.Runtime.Autograd.TorchLean.NN.Seq.paramRequiresGrad critic

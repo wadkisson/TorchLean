@@ -6,13 +6,14 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.NeuralFloat.Conversion
+public import NN.Floats.NeuralFloat.Analysis
 public import NN.Floats.NeuralFloat.Core
-public import NN.Floats.NeuralFloat.ErrorBounds
-public import NN.Floats.NeuralFloat.Formats
-public import NN.Floats.NeuralFloat.NF
-public import NN.Floats.NeuralFloat.NNOps
+public import NN.Floats.NeuralFloat.Error
+public import NN.Floats.NeuralFloat.Format
+public import NN.Floats.NeuralFloat.Metadata
 public import NN.Floats.NeuralFloat.Rounding
+public import NN.Floats.NeuralFloat.Scalar
+public import NN.Floats.NeuralFloat.Special
 
 /-!
 # `NN.Floats.NeuralFloat`

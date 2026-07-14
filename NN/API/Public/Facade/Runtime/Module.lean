@@ -21,15 +21,15 @@ namespace TorchLean
 
 namespace Module
 
-/-- Executable module instance with mutable runtime parameters and optimizer state. -/
-abbrev ScalarModule := NN.API.TorchLean.Module.ScalarModule
-
-/-- The module-definition type used by `Module` runtime operations. -/
-abbrev ScalarModuleDef := NN.API.TorchLean.Module.ScalarModuleDef
-
 export NN.API.TorchLean.Module
   (instantiateConfigured forward backward step initOptim stepWith
    params setParams trainSGD trainWith meanLoss run)
+
+@[inherit_doc NN.API.TorchLean.Module.ScalarModule]
+abbrev ScalarModule := NN.API.TorchLean.Module.ScalarModule
+
+@[inherit_doc NN.API.TorchLean.Module.ScalarModuleDef]
+abbrev ScalarModuleDef := NN.API.TorchLean.Module.ScalarModuleDef
 
 /--
 Instantiate an executable runtime module from a public `ScalarModuleDef`.
@@ -56,7 +56,7 @@ def predict {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : ScalarModule α (nn.paramShapes model) [σ, τ])
     (x : Tensor.T α σ) : IO (Tensor.T α τ) :=
   nn.predict (α := α) model opts m.trainer.params x
@@ -68,8 +68,8 @@ def instantiateMse {σ τ : Shape} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
-    (model : nn.Sequential σ τ)
-    (reduction : LossReduction := .mean)
+    (model : TorchLean.nn.Sequential σ τ)
+    (reduction : NN.API.TorchLean.Loss.Reduction := .mean)
     (cast : Float → α := Runtime.ofFloat) :
     IO (ScalarModule α (nn.paramShapes model) [σ, τ]) :=
   instantiate (α := α) opts
@@ -82,8 +82,8 @@ def instantiateCrossEntropyOneHot {σ τ : Shape} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
-    (model : nn.Sequential σ τ)
-    (reduction : LossReduction := .mean)
+    (model : TorchLean.nn.Sequential σ τ)
+    (reduction : NN.API.TorchLean.Loss.Reduction := .mean)
     (cast : Float → α := Runtime.ofFloat) :
     IO (ScalarModule α (nn.paramShapes model) [σ, τ]) :=
   instantiate (α := α) opts
@@ -93,7 +93,7 @@ def instantiateCrossEntropyOneHot {σ τ : Shape} {α : Type}
 /--
 Instantiate a custom supervised runtime module directly from a sequential model.
 
-Use this when a public example keeps the ordinary `nn.Sequential` model API but needs a custom
+Use this when a public example keeps the ordinary `TorchLean.nn.Sequential` model API but needs a custom
 loss/module definition instead of the standard MSE or cross-entropy module constructors.
 -/
 def instantiateModuleDefModel
@@ -101,8 +101,8 @@ def instantiateModuleDefModel
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
-    (model : nn.Sequential σ τ)
-    (moduleDefOf : (model : nn.Sequential σ τ) →
+    (model : TorchLean.nn.Sequential σ τ)
+    (moduleDefOf : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModuleDef (nn.paramShapes model) [σ, τ])
     (cast : Float → α := Runtime.ofFloat) :
     IO (ScalarModule α (nn.paramShapes model) [σ, τ]) :=
@@ -118,8 +118,8 @@ def instantiatePpoActorCritic
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (opts : Options)
-    (actor : nn.Sequential stateShape (.dim batch (.dim nActions .scalar)))
-    (critic : nn.Sequential stateShape (.dim batch (.dim 1 .scalar)))
+    (actor : TorchLean.nn.Sequential stateShape (.dim batch (.dim nActions .scalar)))
+    (critic : TorchLean.nn.Sequential stateShape (.dim batch (.dim 1 .scalar)))
     (cast : Float → α := Runtime.ofFloat) :
     IO (ScalarModule α
       (nn.paramShapes actor ++ nn.paramShapes critic)
@@ -141,11 +141,11 @@ def withCrossEntropyOneHotModel
     {σ τ : Shape} {α : Type} {β : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (mkModel : nn.M (nn.Sequential σ τ))
+    (mkModel : TorchLean.nn.M (TorchLean.nn.Sequential σ τ))
     (opts : Options)
-    (reduction : LossReduction := .mean)
+    (reduction : NN.API.TorchLean.Loss.Reduction := .mean)
     (cast : Float → α := Runtime.ofFloat)
-    (k : (model : nn.Sequential σ τ) →
+    (k : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) : IO β :=
   nn.withModel mkModel fun model => do
     let m ← instantiateCrossEntropyOneHot
@@ -159,11 +159,11 @@ def withMseModel
     {σ τ : Shape} {α : Type} {β : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (mkModel : nn.M (nn.Sequential σ τ))
+    (mkModel : TorchLean.nn.M (TorchLean.nn.Sequential σ τ))
     (opts : Options)
-    (reduction : LossReduction := .mean)
+    (reduction : NN.API.TorchLean.Loss.Reduction := .mean)
     (cast : Float → α := Runtime.ofFloat)
-    (k : (model : nn.Sequential σ τ) →
+    (k : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) : IO β :=
   nn.withModel mkModel fun model => do
     let m ← instantiateMse
@@ -181,12 +181,12 @@ def withModuleDefModel
     {σ τ : Shape} {α : Type} {β : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (mkModel : nn.M (nn.Sequential σ τ))
+    (mkModel : TorchLean.nn.M (TorchLean.nn.Sequential σ τ))
     (opts : Options)
-    (moduleDefOf : (model : nn.Sequential σ τ) →
+    (moduleDefOf : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModuleDef (nn.paramShapes model) [σ, τ])
     (cast : Float → α := Runtime.ofFloat)
-    (k : (model : nn.Sequential σ τ) →
+    (k : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) : IO β :=
   nn.withModel mkModel fun model => do
     let m ← instantiateModuleDefModel
@@ -198,19 +198,19 @@ Build a sequential model, instantiate a runtime module for a custom scalar loss 
 continue with both values.
 
 Custom-loss sibling of `withMseModel` / `withCrossEntropyOneHotModel`. Use it when the model is
-ordinary `nn.Sequential`, but the loss needs task-specific logic beyond the standard MSE or
+ordinary `TorchLean.nn.Sequential`, but the loss needs task-specific logic beyond the standard MSE or
 cross-entropy module constructors.
 -/
 def withScalarLossModel
     {σ τ : Shape} {α : Type} {β : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [Runtime.Scalar α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (mkModel : nn.M (nn.Sequential σ τ))
+    (mkModel : TorchLean.nn.M (TorchLean.nn.Sequential σ τ))
     (opts : Options)
     (loss : ∀ {α : Type}, [Runtime.TensorScalar α] → [DecidableEq Shape] →
       _root_.Runtime.Autograd.TorchLean.Program α [τ, τ] Shape.scalar)
     (cast : Float → α := Runtime.ofFloat)
-    (k : (model : nn.Sequential σ τ) →
+    (k : (model : TorchLean.nn.Sequential σ τ) →
       ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) : IO β :=
   withModuleDefModel
     (α := α) (mkModel := mkModel) (opts := opts)
@@ -225,7 +225,7 @@ This packages the common public example pattern `Module.forward ...; Tensor.toSc
 def lossScalar {σ τ : Shape} {α : Type}
     [Runtime.TensorScalar α] [DecidableEq Shape]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
-    (model : nn.Sequential σ τ)
+    (model : TorchLean.nn.Sequential σ τ)
     (m : ScalarModule α (nn.paramShapes model) [σ, τ])
     (sample : SupervisedSample α σ τ) : IO α := do
   let loss ← forward (α := α) m sample

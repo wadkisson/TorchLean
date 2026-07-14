@@ -58,7 +58,7 @@ The same style scales to vector inputs when the first step is to split or projec
 
 ```
 -- Sketch: x contains [ndvi, roughness, incidence].
-def retrievalTerm : autograd.func.Fn (Shape.vec 3) Shape.scalar :=
+def retrievalTerm : autograd.func.Fn (.dim 3 .scalar) Shape.scalar :=
   fun x => do
     let ndvi ← nn.functional.index1d x 0
     let rough ← nn.functional.index1d x 1

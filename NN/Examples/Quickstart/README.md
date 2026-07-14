@@ -11,7 +11,7 @@ This folder is the starting path for TorchLean. It focuses on the moves people c
 New code should start from the root API:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
 
@@ -34,7 +34,7 @@ under `NN/Examples/Verification`; reusable checkers live under `NN/Verification`
 
 2. `StarterWorkflow.lean`
    Build check: `lake build NN.Examples.Quickstart.StarterWorkflow`
-   This is the API shape we want people to copy first: `import NN`, `nn.Sequential![...]`,
+   This is the API shape we want people to copy first: `import NN.API`, `nn.Sequential![...]`,
    `Data.tensorDataset xs ys`, `Trainer.new model { task := .regression, optimizer := ... }`,
    `trainer.predict x`, `trainer.train data { steps := ..., batchSize := ..., logEvery := ... }`,
    and then one trained-handle prediction plus one `ℓ∞` IBP verification call. The task field chooses
@@ -82,7 +82,7 @@ under `NN/Examples/Verification`; reusable checkers live under `NN/Verification`
 
 The quickstarts teach the public story in its smallest complete form:
 
-- user code starts with `import NN` and `open TorchLean`;
+- user code starts with `import NN.API` and `open TorchLean`;
 - tensors carry enough shape information to make common mistakes visible;
 - training code goes through `Trainer.new`, `trainer.train`, and trained handles;
 - backend and dtype choices are configuration, not separate public forward functions;
@@ -93,6 +93,6 @@ external artifacts, CUDA runs, and theorem-backed checkers.
 
 ## Where The Bigger Examples Live
 
-The quickstarts use the `NN` public API and keep ordinary training behind `Trainer` and
+The quickstarts use `NN.API` and keep ordinary training behind `Trainer` and
 `Data`. Larger architectures, real datasets, PyTorch interop, RL, and verification examples live in
 their specialized folders under `NN/Examples`.

@@ -307,10 +307,9 @@ Third, we avoid silent semantic changes. CUDA is a runtime backend, not a new me
 model. The same model API and IR should describe CPU eager, CUDA eager, and compiled execution.
 So `--device cuda` stays narrow: it changes where work runs, not what the operation is supposed to mean.
 
-Fourth, we started with float32 because it is the smallest concrete target that covers the
-training examples, has an executable `IEEE32Exec` bridge, and keeps the native-bit agreement
-contract tractable. Float64, complex tensors, mixed precision, Tensor Cores, and approximate math modes
-can be added later with equally explicit contracts.
+Fourth, we started with float32 because it covers the training examples, has an executable
+`IEEE32Exec` bridge, and keeps the native-bit agreement contract tractable. Any additional numeric
+mode needs its own equally explicit contract.
 
 Fifth, the fused kernels are correctness first. The attention kernel follows the FlashAttention
 shape, but the contract we state is fused SDPA with a fused VJP. A stronger claim about a production
@@ -432,8 +431,9 @@ TorchLean uses vendor libraries where that is the right engineering choice:
 
 The FNO Burgers example is exactly why this distinction matters. The mathematical operation is
 spectral convolution, the practical implementation uses cuFFT, and the proof story needs to know
-which part is spec and which part is runtime agreement. The portable CPU path keeps a dense DFT
-reference implementation. CUDA mode uses a fused real-FFT spectral convolution:
+which part is spec and which part is runtime agreement. The generic API contains a dense
+multidimensional real-split reference model. CUDA execution uses a fused real-FFT spectral
+convolution:
 
 ```
 Runtime.Autograd.Cuda.Tape.spectralConv1dRfft

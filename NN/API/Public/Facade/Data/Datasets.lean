@@ -21,9 +21,10 @@ namespace TorchLean
 
 namespace Data
 
+@[inherit_doc Training.Dataset]
 abbrev Dataset := Training.Dataset
 
-/-- Stateful minibatch loader used by public dataset APIs. -/
+@[inherit_doc Training.DataLoader]
 abbrev DataLoader := Training.DataLoader
 
 export NN.API.Data
@@ -100,9 +101,9 @@ def ioSingletonFloat
   { build := fun {_} _ _ => do
       let sample ← mk
       pure <| fromList
-        [ NN.API.Sample.mk
-            (Tensor.castFloat Runtime.ofFloat (NN.API.Sample.x sample))
-            (Tensor.castFloat Runtime.ofFloat (NN.API.Sample.y sample)) ] }
+        [ Sample.mk
+            (Tensor.castFloat Runtime.ofFloat (Sample.x sample))
+            (Tensor.castFloat Runtime.ofFloat (Sample.y sample)) ] }
 
 /--
 Runtime-polymorphic dataset from an in-memory list of `Float` supervised samples.
@@ -118,9 +119,9 @@ def floatSamples
     Trainer.Dataset σ τ :=
   { build := fun {_} _ _ =>
       pure <| fromList <| samples.map (fun sample =>
-        NN.API.Sample.mk
-          (Tensor.castFloat Runtime.ofFloat (NN.API.Sample.x sample))
-          (Tensor.castFloat Runtime.ofFloat (NN.API.Sample.y sample))) }
+        Sample.mk
+          (Tensor.castFloat Runtime.ofFloat (Sample.x sample))
+          (Tensor.castFloat Runtime.ofFloat (Sample.y sample))) }
 
 /-- Array form of `floatSamples`. -/
 def floatSampleArray
@@ -178,13 +179,13 @@ Load a numeric CSV table as a dataset of fixed-size tabular regression batches.
 
 Each CSV row is interpreted as `inDim` feature columns followed by `outDim` target columns.
 The returned dataset already has the leading batch dimension expected by a model with input
-shape `Shape.mat batch inDim` and output shape `Shape.mat batch outDim`.
+shape `.dim batch (.dim inDim .scalar)` and output shape `.dim batch (.dim outDim .scalar)`.
 -/
 def tabularCsvDataset
     (path : System.FilePath) (batch inDim outDim : Nat)
     (csvOptions : CsvOptions := {}) (shuffle : Bool := true) (seed : Nat := 0)
     (dropLast : Bool := true) :
-    Trainer.Dataset (Shape.mat batch inDim) (Shape.mat batch outDim) :=
+    Trainer.Dataset (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar)) :=
   { build := fun {α} _ => do
       if !dropLast then
         throw <| IO.userError
@@ -237,7 +238,7 @@ Public file-data analogue of `torch.utils.data.TensorDataset`: the source record
 integer labels live, and the trainer materializes them at the selected scalar type.
 -/
 def labeledDataset (src : LabeledSource) :
-    Trainer.Dataset (Shape.ofDims src.xDims) (Shape.vec src.classes) :=
+    Trainer.Dataset (Shape.ofDims src.xDims) (.dim src.classes .scalar) :=
   { build := fun {α} _ => do
       let loaded ← src.load (α := α)
       match loaded with

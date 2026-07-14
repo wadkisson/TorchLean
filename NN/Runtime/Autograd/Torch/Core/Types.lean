@@ -60,88 +60,6 @@ inductive Backend where
 deriving Repr, DecidableEq
 
 /--
-Execution device requested by the Torch-style front-end.
-
-`cpu` and `cuda` are implemented by the current eager runtime. The other constructors are reserved
-platform targets: they are valid names for configuration, backend planning, and diagnostics, but
-runtime execution rejects them until the corresponding engine is implemented.
--/
-inductive Device where
-  | auto
-  | cpu
-  | cuda
-  | rocm
-  | metal
-  | wasm
-  | tpu
-  | trainium
-  | custom
-  | external
-deriving Repr, DecidableEq
-
-namespace Device
-
-/-- Stable CLI spelling for a runtime device. -/
-def cliName : Device → String
-  | .auto => "auto"
-  | .cpu => "cpu"
-  | .cuda => "cuda"
-  | .rocm => "rocm"
-  | .metal => "metal"
-  | .wasm => "wasm"
-  | .tpu => "tpu"
-  | .trainium => "trainium"
-  | .custom => "custom"
-  | .external => "external"
-
-/-- Parse the public `--device` value. -/
-def parse? : String → Option Device
-  | "auto" => some .auto
-  | "cpu" => some .cpu
-  | "cuda" => some .cuda
-  | "gpu" => some .cuda
-  | "rocm" => some .rocm
-  | "amd" => some .rocm
-  | "metal" => some .metal
-  | "mps" => some .metal
-  | "wasm" => some .wasm
-  | "webgpu" => some .wasm
-  | "tpu" => some .tpu
-  | "xla" => some .tpu
-  | "trainium" => some .trainium
-  | "neuron" => some .trainium
-  | "custom" => some .custom
-  | "custom-chip" => some .custom
-  | "external" => some .external
-  | _ => none
-
-/-- Parse the public `--device` value or return a CLI error. -/
-def parse (v : String) : Except String Device :=
-  match parse? v with
-  | some d => pure d
-  | none =>
-      throw s!"unknown --device {v} (supported names: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
-
-/-- Whether the current eager runtime has an implementation for this selected device. -/
-def runtimeImplemented : Device → Bool
-  | .auto => true
-  | .cpu => true
-  | .cuda => true
-  | .rocm => false
-  | .metal => false
-  | .wasm => false
-  | .tpu => false
-  | .trainium => false
-  | .custom => false
-  | .external => false
-
-/-- Human-facing explanation for a device that is named but not implemented in this runtime. -/
-def unsupportedRuntimeMessage (d : Device) : String :=
-  s!"device `{d.cliName}` is a named TorchLean target, but this runtime build only implements cpu and cuda execution"
-
-end Device
-
-/--
 Options controlling the behavior of the Torch-style front-end.
 
 PyTorch comparison: these are approximately session/global settings, such as the default
@@ -173,17 +91,12 @@ structure Options where
   backward, not whether forward execution is allowed to allocate intermediate values.
   -/
   trackGradients : Bool := true
-  /--
-  Requested eager execution device.
-
-  `.auto` currently resolves to CPU. CUDA and future accelerators are selected explicitly with
-  `--device`.
-  -/
-  requestedDevice : Device := .auto
+  /-- Explicit eager execution device. The CLI resolves `auto` before constructing this record. -/
+  device : NN.Backend.Device := .cpu
   /--
   Optional backend-contract profile selected by higher-level helpers.
 
-  If omitted, `Options.backendProfile` derives a conservative profile from `Options.device`.
+  If omitted, `Options.backendProfile` derives a conservative profile from `device`.
   -/
   backendProfile? : Option NN.Backend.BackendProfile := none
   /-- Print each accepted backend capsule the first time an eager session executes it. -/
@@ -193,15 +106,18 @@ deriving Repr
 /- Convenience API for PyTorch-style device selection. -/
 namespace Options
 
-/-- Read the effective device selector. -/
-def device (opts : Options) : Device :=
-  match opts.requestedDevice with
-  | .auto => .cpu
-  | d => d
-
 /-- Return a copy of the options that selects the requested execution device. -/
-def toDevice (opts : Options) (d : Device) : Options :=
-  { opts with requestedDevice := d, backendProfile? := none }
+def toDevice (opts : Options) (device : NN.Backend.Device) : Options :=
+  { opts with device, backendProfile? := none }
+
+/-- Whether the current eager runtime implements an explicit backend device. -/
+def runtimeImplementsDevice : NN.Backend.Device → Bool
+  | .cpu | .cuda => true
+  | .rocm | .metal | .wasm | .tpu | .trainium | .custom | .external => false
+
+/-- Explain why an explicit backend target cannot execute in the current eager runtime. -/
+def unsupportedDeviceMessage (device : NN.Backend.Device) : String :=
+  s!"device `{device.cliName}` is a named TorchLean target, but this runtime build only implements cpu and cuda execution"
 
 /-- Whether the effective runtime device is CUDA. -/
 def usesCuda (opts : Options) : Bool :=
@@ -209,11 +125,10 @@ def usesCuda (opts : Options) : Bool :=
 
 /-- Reject devices that are named for planning but not implemented by the eager runtime yet. -/
 def validateDevice (opts : Options) : Except String Unit :=
-  let d := opts.device
-  if d.runtimeImplemented then
+  if runtimeImplementsDevice opts.device then
     pure ()
   else
-    throw d.unsupportedRuntimeMessage
+    throw <| unsupportedDeviceMessage opts.device
 
 /-- Validate both the named device and the linked native runtime before executing user code. -/
 def validateForExecution (opts : Options) : IO Unit := do
@@ -230,7 +145,6 @@ def deviceName (opts : Options) : String :=
 /-- Conservative backend-contract profile implied by the selected runtime device. -/
 def defaultBackendProfile (opts : Options) : NN.Backend.BackendProfile :=
   match opts.device with
-  | .auto => NN.Backend.BackendProfile.checkedCpu
   | .cpu => NN.Backend.BackendProfile.checkedCpu
   | .cuda => NN.Backend.BackendProfile.checkedCuda
   | .rocm => NN.Backend.BackendProfile.futureRocm

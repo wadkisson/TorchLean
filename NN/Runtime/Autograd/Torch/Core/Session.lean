@@ -72,9 +72,9 @@ instance (priority := 1000) : TensorConv Float where
     pure { s := s, buf := b }
   ofAnyBuffer := fun any => do
     let a := Runtime.Autograd.Cuda.Buffer.toFloatArray any.buf
-    if a.size != Shape.size any.s then
+    if a.size != Spec.Shape.size any.s then
       throw <| IO.userError
-        s!"torch: cuda: bad buffer length (expected {Shape.size any.s}, got {a.size})"
+        s!"torch: cuda: bad buffer length (expected {Spec.Shape.size any.s}, got {a.size})"
     let t : Tensor Float any.s :=
       Runtime.Autograd.Cuda.Convert.unflattenFloatUnsafe (s := any.s) a
     pure { s := any.s, t := t }
@@ -335,7 +335,7 @@ def releaseCudaGradMap (xs : CudaGradMap) : IO Unit := do
 /-- Check that a shape-erased CUDA buffer has the number of elements promised by its shape. -/
 def checkCudaAnyBufferSize (where_ : String)
     (x : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit := do
-  let expected := Shape.size x.s
+  let expected := Spec.Shape.size x.s
   if _hExpected : expected ≤ UInt32.size then
     let got := Runtime.Autograd.Cuda.Buffer.size x.buf
     let expectedU32 : UInt32 := UInt32.ofNat expected
@@ -490,7 +490,7 @@ def randUniform {α : Type} [Context α] [CudaBridge.TensorConv α]
     let counter := t0.size
     let key := Runtime.Autograd.TorchLean.Random.keyOf seed counter
     let n32 ← Runtime.Autograd.okOrThrow <|
-      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Shape.size sh)
+      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Spec.Shape.size sh)
     let buf := Runtime.Autograd.Cuda.Buffer.randUniform n32 key
     let any : Runtime.Autograd.Cuda.AnyBuffer := { s := sh, buf := buf }
     let (t1, id) :=
@@ -519,7 +519,7 @@ def bernoulliMask {α : Type} [Context α] [CudaBridge.TensorConv α]
     let counter := t0.size
     let key := Runtime.Autograd.TorchLean.Random.keyOf seed counter
     let n32 ← Runtime.Autograd.okOrThrow <|
-      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Shape.size sh)
+      Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked (Spec.Shape.size sh)
     let keepF ← CudaBridge.TensorConv.toFloat (α := α) keepProbVal
     let buf := Runtime.Autograd.Cuda.Buffer.bernoulliMask n32 keepF key
     let any : Runtime.Autograd.Cuda.AnyBuffer := { s := sh, buf := buf }

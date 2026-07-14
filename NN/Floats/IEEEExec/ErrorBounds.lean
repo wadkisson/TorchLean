@@ -44,6 +44,13 @@ theorem fp32Round_abs_error (x : ℝ) :
   -- `fp32Round` is definitionally the `FP32` rounding operator.
   simpa [fp32Round] using (TorchLean.Floats.FP32.round_abs_error (x := x))
 
+/-- In the normal range, executable binary32 rounding has relative error at most `2^-24`. -/
+theorem fp32Round_relative_error_of_normal (x : ℝ) (hx : x ≠ 0)
+    (hnormal : TorchLean.Floats.FP32.minNormal ≤ _root_.abs x) :
+    ErrorBounds.relativeError x (fp32Round x) hx ≤ neuralBpow binaryRadix (-24) := by
+  simpa [fp32Round] using
+    (TorchLean.Floats.FP32.round_relative_error_of_normal x hx hnormal)
+
 /--
 Addition absolute error bound for `IEEE32Exec` on the finite branch.
 
@@ -55,6 +62,14 @@ theorem toReal_add_abs_error_of_isFinite (x y : IEEE32Exec)
     _root_.abs (toReal (add x y) - (toReal x + toReal y)) ≤ eps₃₂ (toReal x + toReal y) := by
   simpa [toReal_add_eq_fp32Round_of_isFinite (x := x) (y := y) hfin] using
     fp32Round_abs_error (x := toReal x + toReal y)
+
+/-- Subtraction has the standard half-ULP bound whenever the executable result is finite. -/
+theorem toReal_sub_abs_error_of_isFinite (x y : IEEE32Exec)
+    (hx : isFinite x = true) (hy : isFinite y = true)
+    (hfin : isFinite (sub x y) = true) :
+    _root_.abs (toReal (sub x y) - (toReal x - toReal y)) ≤ eps₃₂ (toReal x - toReal y) := by
+  simpa [toReal_sub_eq_fp32Round_of_isFinite (x := x) (y := y) hx hy hfin] using
+    fp32Round_abs_error (x := toReal x - toReal y)
 
 /--
 Multiplication absolute error bound for `IEEE32Exec` on the finite branch.

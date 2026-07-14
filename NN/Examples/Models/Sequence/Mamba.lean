@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -59,7 +59,7 @@ abbrev τ := nn.models.mambaLogitMat cfg seqLen
 
 /-- Public Mamba language-model constructor specialized to the example config. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.MambaTextLM cfg seqLen
+  nn.models.mambaTextLm cfg seqLen
 
 /-- Convert a token window into the one-hot next-token sample consumed by the Mamba model. -/
 def sampleFromTokenIds (ids : List Nat) : SupervisedSample Float σ τ :=

@@ -87,7 +87,7 @@ structure that comes with *two linked meanings*:
 
 You *can* write models directly in TorchLean, but then the “thing you reason about” is already in
 the executable world (monadic references + backend ops). For many proofs, it is much cleaner to
-reason about a pure function `Params → Tensor → Tensor` and separately prove that compilation to
+reason about a pure function `Params → Spec.Tensor → Spec.Tensor` and separately prove that compilation to
 the runtime preserves that meaning.
 
 In other words:
@@ -100,7 +100,7 @@ In other words:
 
 For `g : Graph ps σ τ`, think of `g` as denoting a function
 
-`⟦g⟧ : Params(ps) → Tensor σ → Tensor τ`.
+`⟦g⟧ : Params(ps) → Spec.Tensor σ → Spec.Tensor τ`.
 
 In this file, that semantics is implemented by `Interp.spec`, and it is defined structurally:
 
@@ -156,7 +156,7 @@ namespace NN
 namespace GraphSpec
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 
 /-! ## Core graph language -/
@@ -195,7 +195,7 @@ structure Primitive (ps : List Shape) (σ τ : Shape) where
   -/
   specFwd :
     ∀ {α : Type 0}, [Context α] →
-      Runtime.Autograd.Torch.TList α ps → Tensor α σ → Tensor α τ
+      Runtime.Autograd.Torch.TList α ps → Spec.Tensor α σ → Spec.Tensor α τ
   /--
   Executable TorchLean forward program.
 
@@ -259,7 +259,7 @@ Let `x : Vec inDim`, `W : Mat outDim inDim`, and `b : Vec outDim`. Then:
 
 `linear(W,b,x) = W * x + b`.
 
-This matches the standard dense layer as in PyTorch `torch.nn.Linear` / `torch.nn.functional.linear`
+This matches the standard dense layer as in PyTorch `torch.nn.linear` / `torch.nn.functional.linear`
 (up to the usual row/column convention; here the shape indices make the intended dimensions
 explicit).
 
@@ -273,7 +273,7 @@ So a graph containing a `linear` node *forces* you to supply exactly a weight ma
 vector of the right shapes, and it fixes their ordering in the model’s parameter list.
 
 References:
-- Dense layers are standard; for PyTorch behavior see `torch.nn.Linear` documentation.
+- Dense layers are standard; for PyTorch behavior see `torch.nn.linear` documentation.
 - For the semantics used by the spec interpreter, see `NN.Spec.Module.Linear` (`Spec.linear_spec`).
 
 Initialization semantics:
@@ -286,8 +286,8 @@ single GraphSpec → TorchLean → training path.
 -/
 def linear (inDim outDim : Nat) :
     Primitive
-      [NN.Tensor.Shape.Mat outDim inDim, NN.Tensor.Shape.Vec outDim]
-      (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
+      [.dim outDim (.dim inDim .scalar), .dim outDim .scalar]
+      (.dim inDim .scalar) (.dim outDim .scalar) :=
   { name := s!"linear({inDim},{outDim})"
     specFwd := fun {α} _ctx params x =>
       match params with
@@ -371,8 +371,8 @@ namespace Graph
 
 /-- Graph constructor for `Primitive.linear`. -/
 def linear (inDim outDim : Nat) :
-    Graph [NN.Tensor.Shape.Mat outDim inDim, NN.Tensor.Shape.Vec outDim]
-      (NN.Tensor.Shape.Vec inDim) (NN.Tensor.Shape.Vec outDim) :=
+    Graph [.dim outDim (.dim inDim .scalar), .dim outDim .scalar]
+      (.dim inDim .scalar) (.dim outDim .scalar) :=
   .prim (Primitive.linear inDim outDim)
 
 /-- Graph constructor for `Primitive.relu`. -/
@@ -535,7 +535,7 @@ def Primitive.toDAGPrimOp {ps : List Shape} {σ τ : Shape} (p : Primitive ps σ
   { name := p.name
     specFwd := fun {α} _ctx xs =>
       let (params, xs') :=
-        Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.splitAppend
+        Proofs.Autograd.Algebra.TList.splitAppend
           (α := α) (ss₁ := ps) (ss₂ := [σ]) xs
       match xs' with
       | .cons x .nil => p.specFwd (α := α) params x
@@ -816,7 +816,7 @@ def Graph.detInitParamsAux
           | .error e => .error e
           | .ok (ys, i'') =>
               .ok
-                ( Runtime.Autograd.Torch.Proofs.Autograd.Algebra.TList.append
+                ( Proofs.Autograd.Algebra.TList.append
                     (α := Float) (ss₁ := ps₁) (ss₂ := ps₂) xs ys
                 , i'')
 
@@ -938,7 +938,7 @@ def spec
     {ps : List Shape} {σ τ : Shape}
     (g : Graph ps σ τ)
     {α : Type 0} [Context α] :
-    Params α ps → Tensor α σ → Tensor α τ :=
+    Params α ps → Spec.Tensor α σ → Spec.Tensor α τ :=
   fun params x =>
     match g with
     | .id _ => x

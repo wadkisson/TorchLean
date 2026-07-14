@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.API.SelfSupervised.Core
+public import NN.API.SelfSupervised.BlockMask
 
 /-!
 # Self-Supervised API

@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.Facade
+public import NN.API
 public import NN.Verification.TorchLean.Compile
 
 /-!
@@ -49,24 +49,24 @@ def headDim : Nat := 2
 def batch : Nat := 1
 
 /-- Input shape `(batch × n × dModel)`. -/
-def xShape : Shape := .dim batch (Shape.mat n dModel)
+def xShape : Spec.Shape := .dim batch (.dim n (.dim dModel .scalar))
 /-- Projection weight shape for Q/K/V: `(dModel × (numHeads*headDim))`. -/
-def wProjShape : Shape := Shape.mat dModel (numHeads * headDim)
+def wProjShape : Spec.Shape := .dim dModel (.dim (numHeads * headDim) .scalar)
 /-- Output projection weight shape: `((numHeads*headDim) × dModel)`. -/
-def wOShape : Shape := Shape.mat (numHeads * headDim) dModel
+def wOShape : Spec.Shape := .dim (numHeads * headDim) (.dim dModel .scalar)
 /-- LayerNorm scale parameter shape, matching the feature dimension. -/
-def gammaShape : Shape := Shape.vec dModel
+def gammaShape : Spec.Shape := .dim dModel .scalar
 /-- LayerNorm beta shape, matching the feature dimension. -/
-def betaShape : Shape := Shape.vec dModel
+def betaShape : Spec.Shape := .dim dModel .scalar
 /-- MSE target shape (matches the model output shape). -/
-def targetShape : Shape := xShape
+def targetShape : Spec.Shape := xShape
 
 /-- Parameter shapes list for `modelLoss` (`Wq,Wk,Wv,Wo,gamma,beta,target`). -/
-def paramShapes : List Shape :=
+def paramShapes : List Spec.Shape :=
   [wProjShape, wProjShape, wProjShape, wOShape, gammaShape, betaShape, targetShape]
 
 /-- TorchLean program: `mha -> layer_norm -> mse_loss`, returning a scalar loss. -/
-def modelLoss {α : Type} [Context α] [DecidableEq Shape] :
+def modelLoss {α : Type} [Context α] [DecidableEq Spec.Shape] :
     _root_.Runtime.Autograd.TorchLean.Program α (paramShapes ++ [xShape])
       _root_.TorchLean.Shape.scalar :=
   fun {m} _ _ =>
@@ -83,24 +83,24 @@ def modelLoss {α : Type} [Context α] [DecidableEq Shape] :
         : m (Ops.RefTy (m := m) (α := α) _root_.TorchLean.Shape.scalar))
 
 /-- Runtime-selected typed runner used by the CLI entrypoint. -/
-def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] (withCrown : Bool) : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   let params : nn.ParamTensors α paramShapes :=
     nn.ParamTensors.septuple
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [2, 2]
         [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [2, 2]
         [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [2, 2]
         [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [2, 2]
         [cast 1.0, cast 0.0, cast 0.0, cast 1.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2]
+      (NN.Tensor.ofListOfLength (α := α) [2]
         [cast 1.0, cast 1.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2]
+      (NN.Tensor.ofListOfLength (α := α) [2]
         [cast 0.0, cast 0.0] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [1, 2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [1, 2, 2]
         [cast 0.0, cast 0.0, cast 0.0, cast 0.0] (by rfl))
 
   let compiled ←
@@ -114,7 +114,7 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α xShape :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [1, 2, 2]
+    NN.Tensor.ofListOfLength (α := α) [1, 2, 2]
       [cast 0.2, cast (-0.3), cast 0.7, cast 0.1] (by rfl)
   let eps : α := Runtime.ofFloat 0.05
   let xB : FlatBox α := Verification.lInfBall (α := α) x0 eps
@@ -152,12 +152,12 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToStrin
 
 /-- Runtime-selected typed runner for the default IBP-only path. -/
 def runMainDefault {α : Type}
-    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
   runMain (α := α) false
 
 /-- Runtime-selected typed runner for the heavier IBP+CROWN path. -/
 def runMainWithCrown {α : Type}
-    [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
   runMain (α := α) true
 
 /--

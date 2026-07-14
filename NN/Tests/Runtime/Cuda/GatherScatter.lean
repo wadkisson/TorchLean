@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -39,9 +39,9 @@ def runGatherVec : IO Unit := do
   let sX : Shape := shape![n]
   let sY : Shape := shape![k]
   let x : Tensor Float sX :=
-    tensorND! [n] [0.10, -0.20, 0.30, 0.40, -0.50]
+    tensorOfList! [n] [0.10, -0.20, 0.30, 0.40, -0.50]
   let idx : Tensor Nat (shape![k]) :=
-    tensorND! [k] [0, 2, 4]
+    tensorOfList! [k] [0, 2, 4]
 
   -- CPU
   let t0 : Tape Float := Tape.empty
@@ -61,7 +61,7 @@ def runGatherVec : IO Unit := do
     (Runtime.Autograd.Cuda.Tape.gatherVecNat (t := t1c) (n := n) (k := k) xIdc idx)
   let yCuda ← Utils.cudaValue (s := sY) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sY)) 1.0 }
+    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sY)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := sX) gradsCuda xIdc
@@ -74,7 +74,7 @@ def runScatterVec : IO Unit := do
 
   let n : Nat := 5
   let sX : Shape := shape![n]
-  let x : Tensor Float sX := tensorND! [n] [1.0, 2.0, 3.0, 4.0, 5.0]
+  let x : Tensor Float sX := tensorOfList! [n] [1.0, 2.0, 3.0, 4.0, 5.0]
   let v : Tensor Float Shape.scalar := Tensor.scalar 0.7
   let i : Fin n := ⟨2, by decide⟩
 
@@ -100,7 +100,7 @@ def runScatterVec : IO Unit := do
     (Runtime.Autograd.Cuda.Tape.scatterAddVec (t := t2c) (n := n) xIdc vIdc i)
   let yCuda ← Utils.cudaValue (s := sX) t3c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sX, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sX)) 1.0 }
+    { s := sX, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sX)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t3c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := sX) gradsCuda xIdc
@@ -119,13 +119,13 @@ def runGatherRows : IO Unit := do
   let sX : Shape := shape![rows, cols]
   let sY : Shape := shape![k, cols]
   let x : Tensor Float sX :=
-    tensorND! [rows, cols] [
+    tensorOfList! [rows, cols] [
       0.10, 0.20,
       -0.30, 0.40,
       0.50, -0.60
     ]
   let idx : Tensor Nat (shape![k]) :=
-    tensorND! [k] [0, 2]
+    tensorOfList! [k] [0, 2]
 
   -- CPU
   let t0 : Tape Float := Tape.empty
@@ -146,7 +146,7 @@ def runGatherRows : IO Unit := do
       xIdc idx)
   let yCuda ← Utils.cudaValue (s := sY) t2c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sY)) 1.0 }
+    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sY)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t2c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := sX) gradsCuda xIdc
@@ -161,13 +161,13 @@ def runScatterRow : IO Unit := do
   let cols : Nat := 2
   let sX : Shape := shape![rows, cols]
   let x : Tensor Float sX :=
-    tensorND! [rows, cols] [
+    tensorOfList! [rows, cols] [
       1.0, 2.0,
       3.0, 4.0,
       5.0, 6.0
     ]
   let v : Tensor Float (shape![cols]) :=
-    tensorND! [cols] [0.25, -0.50]
+    tensorOfList! [cols] [0.25, -0.50]
   let i : Fin rows := ⟨1, by decide⟩
 
   -- CPU
@@ -192,7 +192,7 @@ def runScatterRow : IO Unit := do
     (Runtime.Autograd.Cuda.Tape.scatterAddRow (t := t2c) (rows := rows) (cols := cols) xIdc vIdc i)
   let yCuda ← Utils.cudaValue (s := sX) t3c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sX, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sX)) 1.0 }
+    { s := sX, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sX)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t3c) yIdc seedCuda)
   let dxCuda ← Utils.cudaGrad (s := sX) gradsCuda xIdc

@@ -13,7 +13,8 @@ Interactive addition REPL:
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 
 /-!
 # minGPT-Style Addition Example
@@ -43,7 +44,7 @@ current scalar training bridge. This is the correctness-facing example; full PyT
 throughput requires persistent device parameters plus compiled/fused graph execution.
 
 The GPT-shaped architecture is constructed through the public TorchLean model constructor
-`nn.models.CausalTransformerOneHot`, so the example can stay focused on the adder task mechanics.
+`nn.models.causalTransformerOneHot`, so the example can stay focused on the adder task mechanics.
 
 Reference: <https://github.com/karpathy/minGPT/tree/master/projects/adder>.
 -/
@@ -132,7 +133,7 @@ def activeTargetCount : Nat :=
 /-- Count scalar entries across a list of parameter shapes. -/
 def paramCountShapes : List Shape → Nat
   | [] => 0
-  | s :: ss => Shape.size s + paramCountShapes ss
+  | s :: ss => Spec.Shape.size s + paramCountShapes ss
 
 local instance : NeZero seqLen := ⟨by decide⟩
 local instance : NeZero dModel := ⟨by decide⟩
@@ -158,7 +159,7 @@ abbrev τ : Shape :=
 
 /-- Compact GPT-style causal Transformer for digit addition. -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.CausalTransformerOneHot cfg
+  nn.models.causalTransformerOneHot cfg
 
 /-- Cross-entropy summed over non-ignored adder targets, normalized like minGPT `ignore_index`. -/
 def adderLoss {α : Type} [Runtime.TensorScalar α] [DecidableEq Shape]
@@ -213,8 +214,8 @@ def keepTargetPosition (t : Nat) : Bool :=
 
 /-- Apply the minGPT adder loss mask to a shifted one-hot target matrix. -/
 def maskAdderTargets {α : Type} [Zero α]
-    (y : Tensor.T α (Shape.mat seqLen vocab)) :
-    Tensor.T α (Shape.mat seqLen vocab) :=
+    (y : Tensor.T α (.dim seqLen (.dim vocab .scalar))) :
+    Tensor.T α (.dim seqLen (.dim vocab .scalar)) :=
   Spec.Tensor.dim (fun t =>
     if keepTargetPosition t.val then
       match y with
@@ -227,7 +228,7 @@ Build one unbatched one-hot causal-LM sample for an addition row, then apply the
 ignored-prefix mask to its target matrix.
 -/
 def mkRowSample (a b : Nat) :
-    SupervisedSample Float (Shape.mat seqLen vocab) (Shape.mat seqLen vocab) :=
+    SupervisedSample Float (.dim seqLen (.dim vocab .scalar)) (.dim seqLen (.dim vocab .scalar)) :=
   Sample.mapY maskAdderTargets <|
     Data.causalLmOneHotMatSample (α := Float) seqLen vocab (renderExample a b)
 
@@ -273,10 +274,10 @@ def parseProbeList (s : String) : Except String (List (Nat × Nat)) := do
 
 /-- Build a batched supervised sample with one row per one-digit addition problem. -/
 def mkTrainSample (trainSplit : Bool) : SupervisedSample Float σ τ :=
-  let row (bi : Fin batch) : Tensor.T Float (Shape.mat seqLen vocab) :=
+  let row (bi : Fin batch) : Tensor.T Float (.dim seqLen (.dim vocab .scalar)) :=
     let (a, b) := trainPairAt trainSplit bi.val
     Sample.x <| mkRowSample a b
-  let target (bi : Fin batch) : Tensor.T Float (Shape.mat seqLen vocab) :=
+  let target (bi : Fin batch) : Tensor.T Float (.dim seqLen (.dim vocab .scalar)) :=
     let (a, b) := trainPairAt trainSplit bi.val
     Sample.y <| mkRowSample a b
   Sample.mk (Spec.Tensor.dim row) (Spec.Tensor.dim target)

@@ -20,7 +20,7 @@ namespace TorchLean
 
 namespace nn
 
-abbrev ParamTensors := TorchLean.ParamTensors
+abbrev ParamTensors := TorchLean.TensorPack
 
 namespace ParamTensors
 

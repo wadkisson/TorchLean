@@ -79,10 +79,10 @@ instance (s : Shape) : Decidable s.wellFormed :=
   wellFormedDec s
 
 /-- `Shape.appendDim s 1` preserves size (used to justify `reshape` in unsqueeze/keepdim code). -/
-theorem size_appendDim_one' (s : Shape) : Shape.size (Shape.appendDim s 1) = Shape.size s := by
+theorem size_appendDim_one' (s : Shape) : Spec.Shape.size (Shape.appendDim s 1) = Spec.Shape.size s := by
   induction s with
-  | scalar => simp [Shape.appendDim, Shape.size]
-  | dim n s ih => simp [Shape.appendDim, Shape.size, ih]
+  | scalar => simp [Shape.appendDim, Spec.Shape.size]
+  | dim n s ih => simp [Shape.appendDim, Spec.Shape.size, ih]
 
 /--
 Dynamic permutation: like `permute`, but returns an existential output shape.
@@ -95,7 +95,7 @@ def permuteDyn {α : Type} [Context α] [DecidableEq Shape]
     (axes : List Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axes.length != r then
     return none
   if hasDupNat axes then
@@ -141,8 +141,8 @@ def reduceAlongLastSum {α : Type} [Context α] [DecidableEq Shape]
   let s := x.fst
   if hw : s.wellFormed then
     letI : Shape.WellFormed s := ⟨hw⟩
-    if hRank : Shape.rank s > 0 then
-      let axis := Shape.rank s - 1
+    if hRank : Spec.Shape.rank s > 0 then
+      let axis := Spec.Shape.rank s - 1
       haveI : Shape.valid_axis_inst axis s :=
         Shape.validAxisLastInst (s := s) hRank hw
       _root_.Runtime.Autograd.Torch.reduceSum (m := m) (α := α) (s := s) axis x.snd >>= fun y =>
@@ -160,8 +160,8 @@ def reduceAlongLastMean {α : Type} [Context α] [DecidableEq Shape]
   let s := x.fst
   if hw : s.wellFormed then
     letI : Shape.WellFormed s := ⟨hw⟩
-    if hRank : Shape.rank s > 0 then
-      let axis := Shape.rank s - 1
+    if hRank : Spec.Shape.rank s > 0 then
+      let axis := Spec.Shape.rank s - 1
       haveI : Shape.valid_axis_inst axis s :=
         Shape.validAxisLastInst (s := s) hRank hw
       _root_.Runtime.Autograd.Torch.reduceMean (m := m) (α := α) (s := s) axis x.snd >>= fun y =>
@@ -191,7 +191,7 @@ def reduceDimsDynCore {α : Type} [Context α] [DecidableEq Shape]
     (keepdim : Bool)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r0 := Shape.rank s
+  let r0 := Spec.Shape.rank s
   if hasDupNat axes then
     return none
   if !(axes.all (fun a => a < r0)) then
@@ -199,7 +199,7 @@ def reduceDimsDynCore {α : Type} [Context α] [DecidableEq Shape]
   let axes' := if keepdim then axes else sortDesc axes
   let mut cur : Σ s : Shape, RefTy (m := m) (α := α) s := ⟨s, x⟩
   for axis in axes' do
-    let r := Shape.rank cur.fst
+    let r := Spec.Shape.rank cur.fst
     if axis ≥ r then
       return none
     let swaps := moveAxisToLastSwaps r axis
@@ -207,7 +207,7 @@ def reduceDimsDynCore {α : Type} [Context α] [DecidableEq Shape]
     let some curRed ← reduceLast curMoved | return none
     if keepdim then
       let sReshape : Shape := Shape.appendDim curRed.fst 1
-      have hSz : Shape.size curRed.fst = Shape.size sReshape := by
+      have hSz : Spec.Shape.size curRed.fst = Spec.Shape.size sReshape := by
         simpa [sReshape] using (Eq.symm (size_appendDim_one' curRed.fst))
       let xReshaped ← reshape (m := m) (α := α) (s₁ := curRed.fst) (s₂ := sReshape) curRed.snd hSz
       let curKeep : Σ s : Shape, RefTy (m := m) (α := α) s := ⟨sReshape, xReshaped⟩
@@ -253,7 +253,7 @@ def sliceRangeAxisDyn {α : Type} [Context α] [DecidableEq Shape]
     (axis start len : Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axis ≥ r then
     return none
   let swapsToFront := moveAxisToFrontSwaps axis
@@ -279,7 +279,7 @@ def softmaxDimDyn {α : Type} [Context α] [DecidableEq Shape]
     (axis : Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (RefTy (m := m) (α := α) s)) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axis ≥ r then
     return none
   let swaps := moveAxisToLastSwaps r axis
@@ -299,7 +299,7 @@ def logSoftmaxDimDyn {α : Type} [Context α] [DecidableEq Shape]
     (x : RefTy (m := m) (α := α) s)
     (ε : α := Numbers.epsilon) :
     m (Option (RefTy (m := m) (α := α) s)) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axis ≥ r then
     return none
   let swaps := moveAxisToLastSwaps r axis
@@ -312,13 +312,13 @@ def logSoftmaxDimDyn {α : Type} [Context α] [DecidableEq Shape]
   else
     pure none
 
-/-- Helper: appending a trailing `1` dimension does not change `Shape.size`. -/
+/-- Helper: appending a trailing `1` dimension does not change `Spec.Shape.size`. -/
 private theorem size_ofList_append_one (ds : List Nat) :
-    Shape.size (Shape.ofList (ds ++ [1])) = Shape.size (Shape.ofList ds) := by
+    Spec.Shape.size (Shape.ofList (ds ++ [1])) = Spec.Shape.size (Shape.ofList ds) := by
   induction ds with
-  | nil => simp [Shape.ofList, Shape.size]
+  | nil => simp [Shape.ofList, Spec.Shape.size]
   | cons d ds ih =>
-      simp [Shape.ofList, Shape.size, ih]
+      simp [Shape.ofList, Spec.Shape.size, ih]
 
 /--
 Dynamic `unsqueeze`: insert a singleton dimension at `axis`.
@@ -331,11 +331,11 @@ def unsqueezeDyn {α : Type} [Context α] [DecidableEq Shape]
     (axis : Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axis > r then
     return none
   let sApp : Shape := Shape.appendDim s 1
-  have hSz : Shape.size s = Shape.size sApp := by
+  have hSz : Spec.Shape.size s = Spec.Shape.size sApp := by
     simpa [sApp] using (Eq.symm (size_appendDim_one' s))
   let xApp ← reshape (m := m) (α := α) (s₁ := s) (s₂ := sApp) x hSz
   let swaps :=
@@ -354,7 +354,7 @@ def squeezeDyn {α : Type} [Context α] [DecidableEq Shape]
     (axis : Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if axis ≥ r then
     return none
   let swaps := moveAxisToLastSwaps r axis
@@ -375,14 +375,14 @@ def squeezeDyn {α : Type} [Context α] [DecidableEq Shape]
             _ = (dLast :: revRest).reverse := by simp [hrev]
             _ = revRest.reverse ++ [dLast] := by simp
             _ = dims' ++ [dLast] := by rfl
-        have hSz : Shape.size xMoved.fst = Shape.size sDropped := by
+        have hSz : Spec.Shape.size xMoved.fst = Spec.Shape.size sDropped := by
           calc
-            Shape.size xMoved.fst = Shape.size (Shape.ofList dims) := by simp [hx]
-            _ = Shape.size (Shape.ofList (dims' ++ [dLast])) := by simp [hdims]
-            _ = Shape.size (Shape.ofList dims') := by
+            Spec.Shape.size xMoved.fst = Spec.Shape.size (Shape.ofList dims) := by simp [hx]
+            _ = Spec.Shape.size (Shape.ofList (dims' ++ [dLast])) := by simp [hdims]
+            _ = Spec.Shape.size (Shape.ofList dims') := by
               -- `dLast = 1` in this branch.
               simpa [hLast] using (size_ofList_append_one dims')
-            _ = Shape.size sDropped := by rfl
+            _ = Spec.Shape.size sDropped := by rfl
         let xDropped ← reshape (m := m) (α := α) (s₁ := xMoved.fst) (s₂ := sDropped) xMoved.snd hSz
         -- Note: we *do not* permute back. After moving `axis` to the last position and then
         -- deleting it, the remaining axes are already in the correct order.
@@ -401,7 +401,7 @@ def catAxis2Dyn {α : Type} [Context α] [DecidableEq Shape]
     (axis : Nat)
     (x y : Σ s : Shape, RefTy (m := m) (α := α) s) :
     m (Option (Σ s' : Shape, RefTy (m := m) (α := α) s')) := do
-  let r := Shape.rank x.fst
+  let r := Spec.Shape.rank x.fst
   if r = 0 then
     return none
   if axis ≥ r then
@@ -413,14 +413,14 @@ def catAxis2Dyn {α : Type} [Context α] [DecidableEq Shape]
   match xFront, yFront with
   | ⟨.dim nDim restX, xRef⟩, ⟨.dim mDim restY, yRef⟩ =>
       if hRest : restX = restY then
-        match hRest with
-        | rfl =>
-            let zFront ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
-              (nDim := nDim) (mDim := mDim) (s := restX) xRef yRef
-            let outFront : Σ s' : Shape, RefTy (m := m) (α := α) s' := ⟨.dim (nDim + mDim) restX,
-              zFront⟩
-            let out ← Einsum.permuteBySwaps (α := α) (m := m) outFront swapsBack
-            pure (some out)
+        let yRef' : RefTy (m := m) (α := α) (.dim mDim restX) := by
+          simpa [hRest] using yRef
+        let zFront ← _root_.Runtime.Autograd.Torch.concatLeadingAxis (m := m) (α := α)
+          (nDim := nDim) (mDim := mDim) (s := restX) xRef yRef'
+        let outFront : Σ s' : Shape, RefTy (m := m) (α := α) s' := ⟨.dim (nDim + mDim) restX,
+          zFront⟩
+        let out ← Einsum.permuteBySwaps (α := α) (m := m) outFront swapsBack
+        pure (some out)
       else
         pure none
   | _, _ => pure none
@@ -476,7 +476,7 @@ def splitAxisDyn {α : Type} [Context α] [DecidableEq Shape]
     (splitSizes : List Nat)
     (x : RefTy (m := m) (α := α) s) :
     m (Option (List (Σ s' : Shape, RefTy (m := m) (α := α) s'))) := do
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if r = 0 then
     return none
   if axis ≥ r then
@@ -510,7 +510,7 @@ def chunkAxisDyn {α : Type} [Context α] [DecidableEq Shape]
     m (Option (List (Σ s' : Shape, RefTy (m := m) (α := α) s'))) := do
   if chunkSize = 0 then
     return none
-  let r := Shape.rank s
+  let r := Spec.Shape.rank s
   if r = 0 then
     return none
   if axis ≥ r then

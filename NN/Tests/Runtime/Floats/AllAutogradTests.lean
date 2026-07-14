@@ -10,7 +10,7 @@ public import NN.Runtime.Autograd.Utils
 public import NN.Spec.Core.Tensor
 public import NN.Spec.Core.Utils
 public import NN.Spec.Models.Mlp
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 
 /-!
 # Consolidated Float Runtime Autograd Tests
@@ -64,22 +64,22 @@ structure ParamIds where
 We use a small deterministic 2-layer MLP so the gradients are stable.
 -/
 def hiddenWeight : Tensor Float (.dim hidDim (.dim inDim .scalar)) :=
-  tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+  tensorOfList! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
 def hiddenBias : Tensor Float (.dim hidDim .scalar) :=
-  tensorND! [hidDim] [0.1, 0.2, 0.3]
+  tensorOfList! [hidDim] [0.1, 0.2, 0.3]
 
 def outputWeight : Tensor Float (.dim outDim (.dim hidDim .scalar)) :=
-  tensorND! [outDim, hidDim] [0.7, 0.8, 0.9]
+  tensorOfList! [outDim, hidDim] [0.7, 0.8, 0.9]
 
 def outputBias : Tensor Float (.dim outDim .scalar) :=
-  tensorND! [outDim] [0.4]
+  tensorOfList! [outDim] [0.4]
 
 def x : Tensor Float (.dim inDim .scalar) :=
-  tensorND! [inDim] [0.5, 0.8]
+  tensorOfList! [inDim] [0.5, 0.8]
 
 def dLdy : Tensor Float (.dim outDim .scalar) :=
-  tensorND! [outDim] [1.0]
+  tensorOfList! [outDim] [1.0]
 
 def hiddenLayer : Spec.LinearSpec Float inDim hidDim := { weights := hiddenWeight, bias := hiddenBias }
 def outputLayer : Spec.LinearSpec Float hidDim outDim := { weights := outputWeight, bias := outputBias }
@@ -377,17 +377,17 @@ structure Params where
 -- A fixed initialization so the test is deterministic.
 def initParams : Params :=
   {
-    hiddenWeight := tensorND! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
-    hiddenBias := tensorND! [hidDim] [0.1, 0.2, 0.3],
-    outputWeight := tensorND! [outDim, hidDim] [0.7, 0.8, 0.9],
-    outputBias := tensorND! [outDim] [0.4]
+    hiddenWeight := tensorOfList! [hidDim, inDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+    hiddenBias := tensorOfList! [hidDim] [0.1, 0.2, 0.3],
+    outputWeight := tensorOfList! [outDim, hidDim] [0.7, 0.8, 0.9],
+    outputBias := tensorOfList! [outDim] [0.4]
   }
 
 def x : Tensor Float (.dim inDim .scalar) :=
-  tensorND! [inDim] [0.5, 0.8]
+  tensorOfList! [inDim] [0.5, 0.8]
 
 def yTarget : Tensor Float (.dim outDim .scalar) :=
-  tensorND! [outDim] [1.0]
+  tensorOfList! [outDim] [1.0]
 
 /-!
 ## One training step
@@ -467,13 +467,13 @@ abbrev seqLen := 2
 abbrev embedDim := 3
 
 def x : Tensor Float (.dim seqLen (.dim embedDim .scalar)) :=
-  tensorND! [seqLen, embedDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+  tensorOfList! [seqLen, embedDim] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 
 def gamma : Tensor Float (.dim embedDim .scalar) :=
-  tensorND! [embedDim] [1.0, 0.9, 1.1]
+  tensorOfList! [embedDim] [1.0, 0.9, 1.1]
 
 def beta : Tensor Float (.dim embedDim .scalar) :=
-  tensorND! [embedDim] [0.0, 0.1, -0.1]
+  tensorOfList! [embedDim] [0.0, 0.1, -0.1]
 
 def checkLayerNormGrads :
   Runtime.Autograd.Result (String × String × String) := do
@@ -538,21 +538,21 @@ abbrev padding := 0
 abbrev inH := 2
 abbrev inW := 2
 
-def h1 : inC ≠ 0 := by decide
-def h2 : kH ≠ 0 := by decide
-def h3 : kW ≠ 0 := by decide
+theorem h1 : inC ≠ 0 := by decide
+theorem h2 : kH ≠ 0 := by decide
+theorem h3 : kW ≠ 0 := by decide
 
-def outH : Nat := (inH + 2 * padding - kH) / stride + 1
-def outW : Nat := (inW + 2 * padding - kW) / stride + 1
+def outH : Nat := Spec.Shape.slidingWindowOutDim inH kH stride padding
+def outW : Nat := Spec.Shape.slidingWindowOutDim inW kW stride padding
 
 def kernel : Tensor Float (.dim outC (.dim inC (.dim kH (.dim kW .scalar)))) :=
-  tensorND! [outC, inC, kH, kW] [0.2, -0.1, 0.3, 0.4]
+  tensorOfList! [outC, inC, kH, kW] [0.2, -0.1, 0.3, 0.4]
 
 def bias : Tensor Float (.dim outC .scalar) :=
-  tensorND! [outC] [0.05]
+  tensorOfList! [outC] [0.05]
 
 def input : Tensor Float (.dim inC (.dim inH (.dim inW .scalar))) :=
-  tensorND! [inC, inH, inW] [1.0, 2.0, 3.0, 4.0]
+  tensorOfList! [inC, inH, inW] [1.0, 2.0, 3.0, 4.0]
 
 def checkConv2dGrads :
   Runtime.Autograd.Result (String × String) := do

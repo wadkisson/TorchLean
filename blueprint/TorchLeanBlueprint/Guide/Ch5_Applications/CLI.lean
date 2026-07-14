@@ -7,20 +7,12 @@ open Verso.Genre Manual
 tag := "cli"
 %%%
 
-The public command line has three jobs: run model examples, run individual Lean example files, and run
-verification tools. Everything else should be treated as internal unless a page points to it
-explicitly.
-
-TorchLean keeps that public command set focused. Internal scripts stay internal unless a guide page
-points to them. The first few commands cover the common cases directly:
+The public command line runs model examples, individual Lean example files, and verification tools:
 
 - `lake exe torchlean <example> [args...]` for the main model examples,
 - `lake env lean --run NN/Examples/.../Foo.lean -- [args...]` for files in the
   [examples tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/),
 - `lake exe verify -- ...` for verification workflows and checkers.
-
-Three command families cover most everyday use: run a model example, run a direct example file,
-and run a verifier tool.
 
 | Command | Purpose |
 |---|---|
@@ -47,7 +39,7 @@ Use a leading `--` separator only when another wrapper needs it:
 lake exe torchlean -- mlp --device cpu --steps 10
 ```
 
-# Building with CUDA (optional)
+# Building with CUDA
 
 GPU-backed examples require a CUDA-enabled build of the Lean project so the native archives in the
 [CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) link against the toolkit:
@@ -57,38 +49,30 @@ lake -R -K cuda=true build
 lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1
 ```
 
-If `cuda=true` is not set, the same symbols resolve to CPU stubs and `--device cuda` may error or fall back
-depending on the example. See *GPU and CUDA* for the build/runtime split and each example's module
-header for model specific flags. Verification CLI tools (`lake exe verify`) do not need CUDA.
+Without `cuda=true`, CUDA symbols resolve to stubs so CPU builds remain portable. An explicit
+`--device cuda` request then fails instead of silently changing the requested device. See *GPU and
+CUDA Boundaries* for the build/runtime split. Verification CLI tools (`lake exe verify`) do not
+require CUDA unless a particular producer workflow says otherwise.
 
-# The Two Commands To Remember
+# Shared Parsers
 
-Run one model example:
-
-```
-lake exe torchlean <example> [args...]
-```
-
-Run one direct example file:
+Command authors can import `NN.API.CLI` without loading the tensor or runtime stack. Its definitions
+live in the canonical `TorchLean.CLI` namespace:
 
 ```
-lake env lean --run NN/Examples/.../Foo.lean -- [args...]
+import NN.API.CLI
+
+open TorchLean
+
+#check CLI.takeFlagValueOnce
+#check CLI.takeNatFlagOnce
+#check CLI.takeBoolFlagOnce
+#check CLI.checkNoArgs
+#check CLI.orThrowIO
 ```
 
-List verification workflows:
-
-```
-lake exe verify -- list
-```
-
-Run one verification workflow:
-
-```
-lake exe verify -- <tool> [args...]
-```
-
-That covers most of the public CLI. The usual loop is list, pick a name, run it, then dig into source
-only when output or errors warrant it.
+The shared parsers accept both `--key value` and `--key=value`, reject duplicate flags, and return
+unconsumed arguments so each command can reject misspellings rather than ignore them.
 
 Common failure modes are usually simple: CUDA examples need `-K cuda=true`; real-data examples need
 the dataset files under `data/real`; some verifier tools need an external artifact; and Python

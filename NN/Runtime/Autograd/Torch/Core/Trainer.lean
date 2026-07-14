@@ -411,10 +411,9 @@ Allocate a fresh `ParamList` from an initial `TList` of parameter tensors.
 
 Each tensor becomes an `IO.Ref` so it can be updated by optimizer steps.
 -/
-def ofTList {α : Type} {ss : List Shape} (xs : TList α ss) : IO (ParamList α ss) := do
-  match xs with
-  | .nil => pure .nil
-  | .cons x xs =>
+def ofTList {α : Type} : {ss : List Shape} → TList α ss → IO (ParamList α ss)
+  | [], .nil => pure .nil
+  | _ :: _, .cons x xs => do
       let r ← IO.mkRef x
       let cudaValue ← IO.mkRef (none : Option Runtime.Autograd.Cuda.AnyBuffer)
       let hostCurrent ← IO.mkRef true

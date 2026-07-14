@@ -37,8 +37,8 @@ def layerNorm
     (seedGamma seedBeta : Nat := 0) :
     LayerDef (.dim batch (.dim seqLen (.dim embedDim .scalar)))
       (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec embedDim
-  let betaShape : Shape := NN.Tensor.Shape.Vec embedDim
+  let gammaShape : Shape := .dim embedDim .scalar
+  let betaShape : Shape := .dim embedDim .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -70,7 +70,7 @@ def rmsNorm
     (seedGamma : Nat := 0) :
     LayerDef (.dim batch (.dim seqLen (.dim embedDim .scalar)))
       (.dim batch (.dim seqLen (.dim embedDim .scalar))) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec embedDim
+  let gammaShape : Shape := .dim embedDim .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   { kind := "RMSNorm"
@@ -98,10 +98,10 @@ def batchnormChannelFirst
     (channels height width : Nat)
     {h_c : channels > 0} {h_h : height > 0} {h_w : width > 0}
     (seedGamma seedBeta : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.CHW channels height width) (NN.Tensor.Shape.CHW channels height width)
+    LayerDef (.dim channels (.dim height (.dim width .scalar))) (.dim channels (.dim height (.dim width .scalar)))
       :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec channels
-  let betaShape : Shape := NN.Tensor.Shape.Vec channels
+  let gammaShape : Shape := .dim channels .scalar
+  let betaShape : Shape := .dim channels .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -130,12 +130,12 @@ def batchnormChannelFirstEval
     (channels height width : Nat)
     {h_c : channels > 0} {h_h : height > 0} {h_w : width > 0}
     (seedGamma seedBeta seedMean seedVar : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.CHW channels height width) (NN.Tensor.Shape.CHW channels height width)
+    LayerDef (.dim channels (.dim height (.dim width .scalar))) (.dim channels (.dim height (.dim width .scalar)))
       :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec channels
-  let betaShape : Shape := NN.Tensor.Shape.Vec channels
-  let meanShape : Shape := NN.Tensor.Shape.Vec channels
-  let varShape : Shape := NN.Tensor.Shape.Vec channels
+  let gammaShape : Shape := .dim channels .scalar
+  let betaShape : Shape := .dim channels .scalar
+  let meanShape : Shape := .dim channels .scalar
+  let varShape : Shape := .dim channels .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -171,12 +171,12 @@ def batchnormChannelFirstMode
     {h_c : channels > 0} {h_h : height > 0} {h_w : width > 0}
     (seedGamma seedBeta seedMean seedVar : Nat := 0)
     (momentum : Float := 0.1) :
-    LayerDef (NN.Tensor.Shape.CHW channels height width) (NN.Tensor.Shape.CHW channels height width)
+    LayerDef (.dim channels (.dim height (.dim width .scalar))) (.dim channels (.dim height (.dim width .scalar)))
       :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec channels
-  let betaShape : Shape := NN.Tensor.Shape.Vec channels
-  let meanShape : Shape := NN.Tensor.Shape.Vec channels
-  let varShape : Shape := NN.Tensor.Shape.Vec channels
+  let gammaShape : Shape := .dim channels .scalar
+  let betaShape : Shape := .dim channels .scalar
+  let meanShape : Shape := .dim channels .scalar
+  let varShape : Shape := .dim channels .scalar
   let momentumShape : Shape := Shape.scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
@@ -228,9 +228,9 @@ def instanceNorm2dNchw
     (n c h w : Nat)
     {h_n_pos : n > 0} {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0}
     (seedGamma seedBeta : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec c
-  let betaShape : Shape := NN.Tensor.Shape.Vec c
+    LayerDef (.dim n (.dim c (.dim h (.dim w .scalar)))) (.dim n (.dim c (.dim h (.dim w .scalar)))) :=
+  let gammaShape : Shape := .dim c .scalar
+  let betaShape : Shape := .dim c .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -261,9 +261,9 @@ def groupNorm2dNchw
     {h_n_pos : n > 0} {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0} {h_g_pos : groups > 0}
     (h_ge : c ≥ groups) (h_div : c % groups = 0)
     (seedGamma seedBeta : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec c
-  let betaShape : Shape := NN.Tensor.Shape.Vec c
+    LayerDef (.dim n (.dim c (.dim h (.dim w .scalar)))) (.dim n (.dim c (.dim h (.dim w .scalar)))) :=
+  let gammaShape : Shape := .dim c .scalar
+  let betaShape : Shape := .dim c .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -293,9 +293,9 @@ def batchNorm2dNchw
     (n c h w : Nat)
     {h_n_pos : n > 0} {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0}
     (seedGamma seedBeta : Nat := 0) :
-    LayerDef (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec c
-  let betaShape : Shape := NN.Tensor.Shape.Vec c
+    LayerDef (.dim n (.dim c (.dim h (.dim w .scalar)))) (.dim n (.dim c (.dim h (.dim w .scalar)))) :=
+  let gammaShape : Shape := .dim c .scalar
+  let betaShape : Shape := .dim c .scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)
   let beta0 : Tensor Float betaShape := Torch.Init.tensor (s := betaShape) (sch := .zeros) (seed :=
@@ -327,11 +327,11 @@ def batchNorm2dNchwMode
     {h_n_pos : n > 0} {h_c_pos : c > 0} {h_h_pos : h > 0} {h_w_pos : w > 0}
     (seedGamma seedBeta seedMean seedVar : Nat := 0)
     (momentum : Float := 0.1) :
-    LayerDef (NN.Tensor.Shape.NCHW n c h w) (NN.Tensor.Shape.NCHW n c h w) :=
-  let gammaShape : Shape := NN.Tensor.Shape.Vec c
-  let betaShape : Shape := NN.Tensor.Shape.Vec c
-  let meanShape : Shape := NN.Tensor.Shape.Vec c
-  let varShape : Shape := NN.Tensor.Shape.Vec c
+    LayerDef (.dim n (.dim c (.dim h (.dim w .scalar)))) (.dim n (.dim c (.dim h (.dim w .scalar)))) :=
+  let gammaShape : Shape := .dim c .scalar
+  let betaShape : Shape := .dim c .scalar
+  let meanShape : Shape := .dim c .scalar
+  let varShape : Shape := .dim c .scalar
   let momentumShape : Shape := Shape.scalar
   let gamma0 : Tensor Float gammaShape := Torch.Init.tensor (s := gammaShape) (sch := .ones) (seed
     := seedGamma)

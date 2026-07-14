@@ -35,12 +35,12 @@ def verifyCert (path : String := defaultCertPath) : IO Unit :=
 
 /-- CLI entrypoint used by the unified verification dispatcher. -/
 def main (args : List String) : IO Unit := do
-  let args := NN.API.CLI.defaultPathFlagFromPositional args "cert" defaultCertPath
+  let args := TorchLean.CLI.defaultPathFlagFromPositional args "cert" defaultCertPath
   let (path, args) ←
-    match NN.API.CLI.takeFlagValueDefault args "cert" defaultCertPath with
+    match TorchLean.CLI.takeFlagValueDefault args "cert" defaultCertPath with
     | .ok result => pure result
     | .error e => throw <| IO.userError e
-  NN.API.CLI.orThrow <| NN.API.CLI.requireNoArgs args
+  TorchLean.CLI.orThrowIO <| TorchLean.CLI.checkNoArgs args
   verifyCert path
 
 end NN.Verification.Geometry3D.CLI

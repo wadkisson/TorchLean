@@ -29,10 +29,10 @@ namely:
 
 ## PyTorch correspondence / citations
 
-- `torch.nn.Linear` / `torch.nn.functional.linear` implement `y = x Wᵀ + b` with weight stored as
+- `torch.nn.linear` / `torch.nn.functional.linear` implement `y = x Wᵀ + b` with weight stored as
   shape `(out_features, in_features)` (so the math “matrix” is `W` with output rows). TorchLean’s
   `LinearSpec` follows the same convention: `weights : Tensor α (.dim outDim (.dim inDim .scalar))`.
-  https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+  https://pytorch.org/docs/stable/generated/torch.nn.linear.html
   https://pytorch.org/docs/stable/generated/torch.nn.functional.linear.html
 - The “outer product” view of the weight gradient corresponds to the common vector formula
   `grad_W = δ ⊗ x` (PyTorch has `torch.outer` for vectors).

@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.IR.Check
 public import NN.Runtime.Autograd.Compiled.IRExec
 

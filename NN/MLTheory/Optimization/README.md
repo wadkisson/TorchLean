@@ -6,16 +6,14 @@ interfaces and proves facts about convergence, fallback cases, and optimizer ext
 
 ## Files
 
-- `FirstOrder.lean`: basic first-order optimization definitions and helper statements.
+- `FirstOrder.lean`: relations between executable first-order update rules.
 - `StronglyConvexGD.lean`: gradient-descent facts for strongly convex objectives.
 - `SmoothStrongConvexBridge.lean`: bridges between smoothness/strong-convexity assumptions and
   gradient-descent-style conclusions.
 - `GDLinearConvergence.lean`: linear-convergence statements for gradient descent under the stated
   hypotheses.
 - `OptimizerLaws.lean`: a generic `TensorOptimizer` interface over runtime optimizers, plus
-  step-stream laws such as nil/cons/append behavior.
-- `LowRank.lean`: invariants for optimizer extension points, including the identity-projector
-  GaLore-style fallback and identity-orthogonalizer Muon fallback.
+  compositional step-stream laws.
 - `Muon.lean`: proof contracts for Muon-style orthogonalized momentum, including exact and
   approximate column-Gram conditions on matrix update directions.
 
@@ -37,8 +35,9 @@ The intended path is:
 
 1. implement the pure state/update equation in `NN/Runtime/Optim/Optimizers.lean`;
 2. expose a public configuration helper if the optimizer should be user-facing;
-3. package the update as a `TensorOptimizer` in `OptimizerLaws.lean`;
-4. prove basic stream laws or optimizer-specific facts in this folder;
+3. package the update as a `TensorOptimizer` in `OptimizerLaws.lean` when it participates in generic
+   step-stream reasoning;
+4. prove optimizer-specific relations or analytic results in this folder;
 5. document any backend or approximation assumption explicitly.
 
 Tests can show that a trainer runs. The files here are where reusable mathematical claims about the

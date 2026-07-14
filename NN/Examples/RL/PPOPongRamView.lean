@@ -6,8 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Entrypoint.Widgets
-public import NN.Runtime.RL.Artifacts.DefaultPaths
+import NN.Widgets
+import NN.Runtime.RL.Artifacts.DefaultPaths
 
 /-!
 # PPO Atari Pong RAM Artifacts

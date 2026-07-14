@@ -104,7 +104,7 @@ inductive Task (σ τ : Shape) where
 structure Config (σ τ : Shape) extends RuntimeSettings where
   /-- Task loss attached to this trainer. -/
   task : Task σ τ := .regression
-  /-- Seed used when the model is still a seedable `nn.M` builder. -/
+  /-- Seed used when the model is still a seedable `TorchLean.nn.M` builder. -/
   seed : Nat := 0
 
 /--
@@ -115,12 +115,12 @@ for model builders.
 -/
 structure Handle (σ τ : Shape) where
   /-- Checked TorchLean model. -/
-  model : nn.Sequential σ τ
+  model : TorchLean.nn.Sequential σ τ
   /-- Supervised objective used by `train`. -/
   task : Task σ τ
   /-- Runtime/backend/optimizer choices carried by this trainer. -/
   runtime : RuntimeSettings := {}
-  /-- Seed used to build this trainer when the input was an `nn.M` model builder. -/
+  /-- Seed used to build this trainer when the input was an `TorchLean.nn.M` model builder. -/
   seed : Nat := 0
 
 namespace Handle
@@ -151,7 +151,7 @@ carry task-specific equalities without splitting the public API into separate tr
 -/
 structure Regression (σ τ : Shape) where
   /-- The checked TorchLean model used by this trainer. -/
-  model : nn.Sequential σ τ
+  model : TorchLean.nn.Sequential σ τ
   /-- Mean vs sum loss reduction for the built regression task. -/
   reduction : Loss.Reduction := .mean
   /-- Runtime/backend/optimizer choices carried by this trainer. -/
@@ -174,7 +174,7 @@ model-specific and belongs in the text example.
 -/
 structure CrossEntropy (σ τ : Shape) where
   /-- The checked TorchLean model used by this trainer. -/
-  model : nn.Sequential σ τ
+  model : TorchLean.nn.Sequential σ τ
   /-- Mean vs sum loss reduction for the one-hot cross-entropy task. -/
   reduction : Loss.Reduction := .mean
   /-- Runtime/backend/optimizer choices carried by this trainer. -/
@@ -184,14 +184,14 @@ structure CrossEntropy (σ τ : Shape) where
 Typed dispatch record for a checked custom scalar loss.
 
 Custom losses cover masked language-model objectives, physics residuals, and algorithmic tasks
-where the model is still an ordinary `nn.Sequential`, but the loss has task logic that does not fit
+where the model is still an ordinary `TorchLean.nn.Sequential`, but the loss has task logic that does not fit
 a canned reduction. The boundary stays precise: the loss is a TorchLean program over
 `(prediction, target)`, so module construction and optimizer wiring remain inside the trainer
 facade.
 -/
 structure Custom (σ τ : Shape) where
   /-- The checked TorchLean model used by this trainer. -/
-  model : nn.Sequential σ τ
+  model : TorchLean.nn.Sequential σ τ
   /-- Checked scalar loss program applied to `(modelOutput, target)`. -/
   loss : ∀ {α : Type}, [Runtime.TensorScalar α] → [DecidableEq Shape] →
     _root_.Runtime.Autograd.TorchLean.Program α [τ, τ] Shape.scalar

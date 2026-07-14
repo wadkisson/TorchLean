@@ -29,6 +29,7 @@ Start here if you want a compact tour from typed tensors to training and verific
 | Typed tensors | `Quickstart/TensorBasics.lean` | `lake exe torchlean quickstart_tensors` | Shape-indexed tensors, constructors, and basic operations before any training machinery appears. |
 | Editor widgets | `Quickstart/Widgets.lean` | open the file and run the `#..._view` commands | Lean side views for tensors, graphs, and small runtime objects. |
 | Runtime scalar modes | `DeepDives/Floats/Float32Modes.lean` | `lake exe torchlean float32_modes` | The difference between exact/ideal values and executable Float32 paths. |
+| Effective float32 rounding | `DeepDives/Floats/EffectiveRounding.lean` | `lake build NN.Examples.DeepDives.Floats.EffectiveRounding` | The same shaped tensor addition in the `FP32` proof model and the executable IEEE model, with the resulting mantissa and exponent exposed by theorem. |
 | Autograd API | `Quickstart/AutogradBasics.lean` | `lake exe torchlean quickstart_autograd` | The tape records operations, runs backward, and reports gradients for closed-form checks. |
 | Proof basics | `Quickstart/Proofs.lean` | `lake build NN.Examples.Quickstart.Proofs` | Small theorem statements over tensor expressions and model fragments. |
 | Simple training | `Quickstart/SimpleMlpTrain.lean` | `lake exe torchlean quickstart_mlp --steps 200 --dtype float32 --backend compiled` | A public `Trainer` run with compiled execution, loss reporting, and parameter updates. |
@@ -159,24 +160,23 @@ while the external branch-and-bound search remains a named producer boundary.
 
 ## Public API Used By Examples
 
-Most runnable examples should prefer the `NN` umbrella:
+Runnable application examples use the focused public API:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
 
-Deep-dive subsystem examples can still name focused modules when the point of the example is that
-internal layer:
+Deep dives import a subsystem explicitly when they inspect its internal objects:
 
 | API area | Use |
 | --- | --- |
 | `TorchLean` | Public model, tensor, data, training, runtime, text, and RL names. |
 | `NN.API.Public` | Facade backing modules; ordinary examples should not import this directly. |
-| `NN.Tensor.API` | Typed tensor constructors and printing when working below the `NN` umbrella. |
+| `NN.Tensor` | Typed tensor constructors and semantics below the application facade. |
 | `NN.API.Runtime` | Runtime subsystem access for code that is explicitly extending the runtime layer. |
-| `NN.Entrypoint.Verification` | Verification APIs and theorem-level surfaces. |
+| `NN.Verification` | Verification APIs and theorem-level surfaces. |
 | `NN.Verification.CLI` | The `lake exe verify` registry. |
 
-When adding a new example, prefer the public `TorchLean` names first. Reach into implementation
-modules only when the point of the example is to explain that implementation layer.
+New model and training examples should use the public `TorchLean` names. An example that imports an
+implementation module should exercise a declaration from that module directly.

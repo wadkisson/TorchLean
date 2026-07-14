@@ -103,7 +103,7 @@ theorem buildFrom_denoteAllFrom_permute
                   | some expected =>
                       simp [hPerm] at hBuild
                       cases hSwaps :
-                          NN.IR.Graph.swapDepthsForPerm perm (Shape.rank pNode.outShape) with
+                          NN.IR.Graph.swapDepthsForPerm perm (Spec.Shape.rank pNode.outShape) with
                       | error msg =>
                           simp [hSwaps] at hBuild
                           try cases hBuild

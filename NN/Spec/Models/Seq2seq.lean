@@ -24,7 +24,7 @@ This file supports both:
 PyTorch mental model:
 
 - encoder: `nn.RNN` / `nn.LSTM` (or `nn.TransformerEncoder`) over source token embeddings
-- decoder: `nn.RNN` over target embeddings (teacher forcing in training), then a final `nn.Linear`
+- decoder: `nn.RNN` over target embeddings (teacher forcing in training), then a final `nn.linear`
   to vocabulary logits
 
 Scope of this baseline:
@@ -53,7 +53,7 @@ PyTorch docs (for API intuition, not semantics):
 - `torch.nn.Embedding`: https://pytorch.org/docs/stable/generated/torch.nn.Embedding.html
 - `torch.nn.RNN`: https://pytorch.org/docs/stable/generated/torch.nn.RNN.html
 - `torch.nn.LSTM`: https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
-- `torch.nn.Linear`: https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+- `torch.nn.linear`: https://pytorch.org/docs/stable/generated/torch.nn.linear.html
 - `torch.nn.MultiheadAttention`:
   https://pytorch.org/docs/stable/generated/torch.nn.MultiheadAttention.html
 - `torch.nn.TransformerEncoderLayer`:
@@ -94,7 +94,7 @@ non-differentiable.
 Gradients for a time-distributed affine map `y = x·Wᵀ + b`.
 
 This mirrors the parameters in `LinearSpec` and is used for the decoder output projection.
-PyTorch analogue: the gradient pair for `nn.Linear`.
+PyTorch analogue: the gradient pair for `nn.linear`.
 -/
 structure Seq2SeqLinearGrads (α : Type) (inDim outDim : Nat) where
   /-- Gradient of the weight matrix `W`. -/
@@ -445,7 +445,7 @@ This decoder consumes a sequence of target-side embeddings and produces vocabula
 - optionally, a self-attention block can be applied over the *decoder input embeddings* before the
   RNN.
 
-PyTorch analogue: a hand-rolled decoder using `nn.RNN` and `nn.Linear`, optionally preceded by
+PyTorch analogue: a hand-rolled decoder using `nn.RNN` and `nn.linear`, optionally preceded by
 `nn.MultiheadAttention` over the target embeddings (note: this is not encoder-decoder
   cross-attention).
 -/
@@ -549,7 +549,7 @@ Given a hidden-state sequence `hiddens : (tgtSeqLen × hiddenDim)` and upstream 
 - accumulated parameter gradients for the shared `LinearSpec`,
 - gradients w.r.t. each hidden state `(tgtSeqLen × hiddenDim)`.
 
-PyTorch analogue: backprop through `nn.Linear` applied at each timestep.
+PyTorch analogue: backprop through `nn.linear` applied at each timestep.
 -/
 def timeDistributedLinearBackward
   {tgtSeqLen hiddenDim vocabSize : Nat}
@@ -647,7 +647,7 @@ Returns:
 - the per-step logits `(maxLen × vocabSize)`,
 - the greedy-decoded token ids `(maxLen)`.
 
-PyTorch analogue: a manual decoding loop using `nn.RNNCell`/`nn.RNN` + `nn.Linear`, with
+PyTorch analogue: a manual decoding loop using `nn.RNNCell`/`nn.RNN` + `nn.linear`, with
 `argmax` sampling and embedding lookup each step.
 
 Note: `decoder.attention` is only modeled in the teacher-forcing forward/backward in this file; the
@@ -745,7 +745,7 @@ This bundles:
 - an RNN decoder with output projection (and optional decoder self-attention).
 
 PyTorch analogue: a small encoder-decoder model built from `nn.Embedding`, `nn.RNN`, and
-  `nn.Linear`.
+  `nn.linear`.
 -/
 structure Seq2SeqSpec (α : Type) [Numbers α] (srcVocabSize tgtVocabSize embedDim hiddenDim : Nat)
   where

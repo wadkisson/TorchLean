@@ -55,8 +55,7 @@ theorem approxT_scale_spec {s : Shape} (c : R) :
       (fR := fun xR => xR * c)
       (bnd := fun a eps =>
         abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) c) * eps +
-          neuralUlp β fexp (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) c)
-            TrainingPhase.forward / 2)
+          neuralUlp β fexp (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) c) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa using (approx_scale_nf (β := β) (fexp := fexp) (rnd := rnd) (c := c)
@@ -77,7 +76,7 @@ theorem approxT_neg_spec {s : Shape} :
       (s := s)
       (fS := Neg.neg) (fR := Neg.neg)
       (bnd := fun a eps =>
-        eps + neuralUlp β fexp (-a) TrainingPhase.forward / 2)
+        eps + neuralUlp β fexp (-a) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa using
@@ -98,7 +97,7 @@ theorem approxT_abs_spec {s : Shape} :
       (s := s)
       (fS := MathFunctions.abs) (fR := MathFunctions.abs)
       (bnd := fun a eps =>
-        eps + neuralUlp β fexp (abs a) TrainingPhase.forward / 2)
+        eps + neuralUlp β fexp (abs a) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         -- `MathFunctions.abs` is definitional `abs` on `ℝ`.
@@ -124,7 +123,7 @@ theorem approxT_exp_spec {s : Shape} :
       (s := s)
       (fS := MathFunctions.exp) (fR := MathFunctions.exp)
       (bnd := fun a eps =>
-        Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) TrainingPhase.forward / 2)
+        Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa [Proofs.mathfunc_exp_eq_rexp] using
@@ -149,7 +148,7 @@ theorem approxT_tanh_spec {s : Shape} :
       rnd))
       (s := s)
       (fS := MathFunctions.tanh) (fR := MathFunctions.tanh)
-      (bnd := fun a _eps => (2 : ℝ) + neuralUlp β fexp (Real.tanh a) TrainingPhase.forward / 2)
+      (bnd := fun a _eps => (2 : ℝ) + neuralUlp β fexp (Real.tanh a) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa [Proofs.mathfunc_tanh_eq_rtanh] using
@@ -174,7 +173,7 @@ step in `reluR`.
 -/
 def reluBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
-    (fun a => eps + neuralUlp β fexp (max a 0) TrainingPhase.forward / 2)
+    (fun a => eps + neuralUlp β fexp (max a 0) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--
@@ -203,7 +202,7 @@ theorem approxT_relu_spec {s : Shape} :
               have hround :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (reluR (β := β) (fexp := fexp)
                     (rnd := rnd) xR) - max xhat 0) ≤
-                    neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2 := by
+                    neuralUlp β fexp (max xhat 0) / 2 := by
                 -- `reluR` is `ofReal (max xhat 0)` so this is a single rounding step.
                 simpa [reluR, xhat, toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.ofReal,
                   TorchLean.Floats.NF.roundR, Proofs.RuntimeRoundingApprox.roundR] using
@@ -215,7 +214,7 @@ theorem approxT_relu_spec {s : Shape} :
               have htriangle :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (reluR (β := β) (fexp := fexp)
                     (rnd := rnd) xR) - max x 0) ≤
-                    eps + neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2 := by
+                    eps + neuralUlp β fexp (max xhat 0) / 2 := by
                 have hxhat : abs (xhat - x) ≤ eps := by simpa [xhat] using hx'
                 -- triangle inequality: (rounded - relu x) = (rounded - relu xhat) + (relu xhat -
                 -- relu x)
@@ -231,12 +230,12 @@ theorem approxT_relu_spec {s : Shape} :
                                   (toSpec (β := β) (fexp := fexp) (rnd := rnd) (reluR (β := β) (fexp
                                     := fexp) (rnd := rnd) xR))
                                   (max xhat 0) (max x 0)
-                    _ ≤ neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2 + abs (xhat - x) :=
+                    _ ≤ neuralUlp β fexp (max xhat 0) / 2 + abs (xhat - x) :=
                       by
                           exact add_le_add hround (le_trans hmax (le_rfl))
-                    _ ≤ neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2 + eps := by
+                    _ ≤ neuralUlp β fexp (max xhat 0) / 2 + eps := by
                           linarith [hxhat]
-                    _ = eps + neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2 := by ring
+                    _ = eps + neuralUlp β fexp (max xhat 0) / 2 := by ring
                 simpa [xhat] using this
               have hle :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (reluR (β := β) (fexp := fexp)
@@ -249,7 +248,7 @@ theorem approxT_relu_spec {s : Shape} :
                 simpa [reluBoundTensor, tensorToSpec, Spec.mapTensor, mapSpec, linfNorm,
                   RuntimeApprox.linfNorm,
                   tensorLinfNorm, MathFunctions.abs, xhat] using
-                  (le_abs_self (eps + neuralUlp β fexp (max xhat 0) TrainingPhase.forward / 2))
+                  (le_abs_self (eps + neuralUlp β fexp (max xhat 0) / 2))
               exact
                 (approxT_scalar_iff (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
                   (x := max x 0) (xR := reluR (β := β) (fexp := fexp) (rnd := rnd) xR)

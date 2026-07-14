@@ -34,7 +34,7 @@ TorchLean packages that idea with the public `Data` and `sample` namespaces. In 
 the dataset is built from two batched tensors:
 
 ```
-import NN
+import NN.API
 open TorchLean
 
 def X : Tensor.T Float (shape![25, 2]) :=
@@ -43,7 +43,7 @@ def X : Tensor.T Float (shape![25, 2]) :=
 def Y : Tensor.T Float (shape![25, 1]) :=
   Samples.regressionTargetsFloat X target
 
-def dataset : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+def dataset : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   Data.tensorDataset X Y
 ```
 
@@ -92,7 +92,7 @@ The exact constructor names vary by source, but the shape of a file-backed load 
 def source : Data.SupervisedSource :=
   Data.SupervisedSource.ofPaths .npy "data/x.npy" "data/y.npy" 100 [2] [1]
 
-def loadData : IO (Trainer.Dataset (Shape.vec 2) (Shape.vec 1)) := do
+def loadData : IO (Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar)) := do
   match ← source.load (α := Float) with
   | .ok data => pure data
   | .error msg => throw <| IO.userError msg
@@ -147,7 +147,7 @@ choice.
 
 In PyTorch, a final batch of size `3` after several batches of size `8` is usually fine. In
 TorchLean, the batch dimension can appear in the type. If the model is written for
-`Shape.mat 8 inDim`, then a final `Shape.mat 3 inDim` batch is not the same type. `dropLast := true`
+`.dim 8 (.dim inDim .scalar)`, then a final `.dim 3 (.dim inDim .scalar)` batch is not the same type. `dropLast := true`
 keeps the tutorial simple by making every batch have the same static shape.
 
 More flexible loaders can still be written, but then the file has to say how it handles the changing
@@ -177,20 +177,20 @@ Suppose a CSV row has:
 The per sample task is:
 
 ```
-Shape.vec 2 -> Shape.vec 1
+.dim 2 .scalar -> .dim 1 .scalar
 ```
 
 The minibatch model is:
 
 ```
-Shape.mat 5 2 -> Shape.mat 5 1
+.dim 5 (.dim 2 .scalar) -> .dim 5 (.dim 1 .scalar)
 ```
 
 For that reason, the quickstart writes:
 
 ```
 def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (Shape.mat batch inDim) (Shape.mat batch outDim)) :=
+    nn.M (nn.Sequential (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar))) :=
   nn.Sequential![
     nn.Linear inDim hidDim,
     nn.ReLU,
@@ -204,10 +204,10 @@ connects those two views.
 This distinction is worth making explicit in code:
 
 ```
-def perSample : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+def perSample : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   Data.tensorDataset xs ys
 
-def batched : IO (Trainer.Dataset (Shape.mat 5 2) (Shape.mat 5 1)) := do
+def batched : IO (Trainer.Dataset (.dim 5 (.dim 2 .scalar)) (.dim 5 (.dim 1 .scalar))) := do
   Data.batchDataset 5 perSample (shuffle := true) (seed := 42)
 ```
 

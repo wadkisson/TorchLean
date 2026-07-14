@@ -78,16 +78,16 @@ def usage : String :=
 
 /-- Parse command-line flags for `pinn-dataset-check`. -/
 def parseArgs (args : List String) : Except String DatasetCheckOpts := do
-  let args := NN.API.CLI.dropDashDash args
-  if NN.API.CLI.hasHelp args then
+  let args := TorchLean.CLI.dropDashDash args
+  if TorchLean.CLI.hasHelp args then
     throw usage
-  let (weights?, args) ← NN.API.CLI.takeFlagValueOnce args "weights"
-  let (dataset?, args) ← NN.API.CLI.takeFlagValueOnce args "dataset"
-  let (eps, args) ← NN.API.CLI.takeFloatFlagDefault args "eps" 0.0
-  let (tol, args) ← NN.API.CLI.takeFloatFlagDefault args "tol" 1e-3
-  let (maxPts, args) ← NN.API.CLI.takeNatFlagDefault args "max" 200
-  let (strict, args) ← NN.API.CLI.takeBoolFlagOnce args "strict"
-  NN.API.CLI.requireNoArgs args
+  let (weights?, args) ← TorchLean.CLI.takeFlagValueOnce args "weights"
+  let (dataset?, args) ← TorchLean.CLI.takeFlagValueOnce args "dataset"
+  let (eps, args) ← TorchLean.CLI.takeFloatFlagDefault args "eps" 0.0
+  let (tol, args) ← TorchLean.CLI.takeFloatFlagDefault args "tol" 1e-3
+  let (maxPts, args) ← TorchLean.CLI.takeNatFlagDefault args "max" 200
+  let (strict, args) ← TorchLean.CLI.takeBoolFlagOnce args "strict"
+  TorchLean.CLI.checkNoArgs args
   pure { weights := weights?
          dataset := dataset?
          eps := eps
@@ -143,7 +143,7 @@ This is wired into the unified dispatcher as:
 The JSON schema matches the exporter used by `train_pinn_1d.py --dataset-json`.
 -/
 def main (args : List String) : IO Unit := do
-  let args := NN.API.CLI.defaultPathFlagFromPositional args "dataset" defaultDatasetPath
+  let args := TorchLean.CLI.defaultPathFlagFromPositional args "dataset" defaultDatasetPath
   let opts ←
     match parseArgs args with
     | .ok o => pure o

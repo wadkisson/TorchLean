@@ -9,8 +9,9 @@ module
 public import NN.API.CLI.Core
 
 /-!
-# `NN.API.CLI`
+# CLI Parsers
 
-Import entrypoint for shared command-line parsers. Definitions live in
-`NN.API.CLI.Core`.
+Import entrypoint for the shared `TorchLean.CLI` parsers. Definitions live in
+`NN.API.CLI.Core`; the module path remains separate from the public namespace so lightweight
+certificate tools can import the parsers without the full TorchLean API.
 -/

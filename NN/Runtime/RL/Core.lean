@@ -70,12 +70,6 @@ structure IndexedTransition (α : Type) (nStates nActions : Nat) where
   /-- Episode termination flag. -/
   done : Bool
 
-/-- Build a typed one-hot action vector.
-
-This is an alias for `NN.Tensor.oneHot`, kept under the RL namespace for ergonomics. -/
-abbrev oneHotAction {nActions : Nat} (action : Fin nActions) : Tensor α (.dim nActions .scalar) :=
-  NN.Tensor.oneHot (α := α) nActions action
-
 /-!
 ## Fixed-Horizon Tensor Trajectory Helpers
 
@@ -190,19 +184,22 @@ def squaredError (prediction target : α) : α :=
   let d := prediction - target
   d * d
 
-/-- Scalar Huber-style loss used by robust TD objectives.
+/-- Scalar Huber loss used by robust TD objectives.
 
 We use the standard piecewise form:
-- quadratic region: `(1 / (2 * delta)) * (pred - target)^2`
-- linear region: `|pred - target| - delta / 2`
+- quadratic region: `(pred - target)^2 / 2`
+- linear region: `delta * (|pred - target| - delta / 2)`
+
+This is the `HuberLoss` convention, not the rescaled `SmoothL1Loss` convention. The intended domain
+is `delta > 0`.
 -/
 def huberLoss (prediction target : α) (delta : α := 1) : α :=
   let d := prediction - target
   let ad := MathFunctions.abs d
   if delta > ad then
-    (d * d) / (Numbers.two * delta)
+    (d * d) / Numbers.two
   else
-    ad - delta / Numbers.two
+    delta * (ad - delta / Numbers.two)
 
 end Core
 end RL

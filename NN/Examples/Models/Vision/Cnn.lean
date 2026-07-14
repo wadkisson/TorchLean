@@ -11,7 +11,7 @@ Real-data CUDA example:
 module
 
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -20,7 +20,7 @@ public import NN.Examples.Models.Common.RealData
 Runnable `torchlean cnn` example. It trains a small convolutional classifier on a prepared CIFAR-10
 minibatch.
 
-The reusable model wiring lives behind the public `TorchLean.nn.models.CNN` constructor. The command
+The reusable model wiring lives behind the public `TorchLean.nn.models.cnn` constructor. The command
 adds the pieces around it: CLI parsing, dataset selection, step-limited loader training, and TrainLog
 artifact writing.
 
@@ -63,19 +63,29 @@ def inW : Nat := 8
 def outDim : Nat := RealData.cifarClasses
 
 /-- Shared CNN configuration used by shapes and the reusable public model constructor. -/
-def cfg : nn.models.CnnConfig :=
+def cfg : nn.models.CnnConfig 2 :=
   { batch := batch
-    inC := inC
-    inH := inH
-    inW := inW
+    inChannels := inC
+    spatial := #v[inH, inW]
     outDim := outDim
-    conv := { outC := 4, kH := 3, kW := 3, stride := 2, padding := 1 } }
+    conv :=
+      { outChannels := 4
+        kernel := #v[3, 3]
+        stride := #v[2, 2]
+        padding := #v[1, 1]
+        kernelNonzero := by intro i; fin_cases i <;> decide
+        strideNonzero := by intro i; fin_cases i <;> decide }
+    pool :=
+      { kernel := #v[2, 2]
+        stride := #v[2, 2]
+        kernelNonzero := by intro i; fin_cases i <;> decide
+        strideNonzero := by intro i; fin_cases i <;> decide } }
 
 /-- Input shape: a minibatch of CIFAR images in channel-first layout. -/
-abbrev σ := Shape.images batch inC inH inW
+abbrev σ : Shape := .dim batch (.dim inC (.dim inH (.dim inW .scalar)))
 
 /-- Output shape: one row of class logits per image. -/
-abbrev τ := Shape.mat batch outDim
+abbrev τ : Shape := .dim batch (.dim outDim .scalar)
 
 /--
 Small convolutional classifier from the public model API.
@@ -84,7 +94,9 @@ The command chooses the CIFAR paths and runtime flags; the model itself stays an
 `nn.Sequential` value built from the public API.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.CNN cfg
+  by
+    simpa [σ, τ, cfg, nn.models.cnnInShape, nn.models.cnnOutShape, Spec.Shape.ofList] using
+      nn.models.cnn cfg
 
 /-- Train the CIFAR CNN with the public `Trainer` surface. -/
 def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
@@ -107,7 +119,7 @@ def train (opts : Options) (flags : RealData.CifarModelTrainFlags) :
 
 /-- CLI entrypoint for CIFAR CNN training; CUDA is the maintained validation path. -/
 def main (args : List String) : IO UInt32 :=
-  Trainer.Command.classificationNpy exeName args
+  TrainCommand.classificationNpy exeName args
     (fun rest => RealData.CifarModelTrainFlags.parse exeName rest defaultLogJson 1 1e-3)
     (ModelZoo.bannerWithDevice exeName "CNN training")
     train

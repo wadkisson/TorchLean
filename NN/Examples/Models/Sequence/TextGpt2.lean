@@ -27,7 +27,8 @@ Local file run:
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 
 /-!
 # GPU GPT-2 Corpus Trainer
@@ -135,7 +136,7 @@ The model is compact enough for the eager CUDA path while still exercising atten
 layers, byte tokenization, and the interactive prompt loop.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.CausalTransformerOneHot cfg
+  nn.models.causalTransformerOneHot cfg
 
 end ByteGpt2
 
@@ -255,7 +256,7 @@ This is not OpenAI GPT-2-small. It is a TorchLean-native Transformer whose token
 GPT-2 BPE files and whose output head uses a local projection of the observed corpus ids.
 -/
 def model : nn.M (nn.Sequential σ τ) :=
-  nn.models.CausalTransformerOneHot cfg
+  nn.models.causalTransformerOneHot cfg
 
 end BpeGpt2
 

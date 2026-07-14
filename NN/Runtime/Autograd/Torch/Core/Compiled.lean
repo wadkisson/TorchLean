@@ -182,23 +182,27 @@ def compileScalar {α : Type} [DecidableEq Shape] {Γ : List Shape}
     Shape.scalar)) :
   Runtime.Autograd.Result (CompiledScalar α Γ) := do
   let (outVar, st) ← Runtime.Autograd.Compiled.GraphM.run (α := α) (Γ := Γ) build
-  match st with
-  | ⟨_ss, g⟩ =>
-      match g with
-      | .nil =>
-          .error "torch.compile: graph produced no nodes (need a scalar output node)"
-      | .snoc (ss := ssPrev) (τ := τ) gPrev node =>
-          match τ with
-          | .scalar =>
-              let expectedOutId := Γ.length + ssPrev.length
-              if _h : outVar.id = expectedOutId then
-                .ok { ssPrev := ssPrev, gPrev := gPrev, node := node }
-              else
-                .error
-                  (s!"torch.compile: output Var is not the last node (got id={outVar.id}, " ++
-                    s!"expected id={expectedOutId})")
-          | _ =>
-              .error "torch.compile: output node is not scalar (expected Shape.scalar)"
+  finish outVar st.1 st.2
+where
+  finish {α : Type} {Γ : List Shape}
+      (outVar : Runtime.Autograd.Compiled.GraphM.Var Shape.scalar) :
+      (ss : List Shape) →
+        Runtime.Autograd.Compiled.GraphM.PGraphData α Unit Γ ss →
+          Runtime.Autograd.Result (CompiledScalar α Γ)
+    | _, .nil =>
+        .error "torch.compile: graph produced no nodes (need a scalar output node)"
+    | _, .snoc (ss := ssPrev) (τ := τ) gPrev node =>
+        match τ with
+        | .scalar =>
+            let expectedOutId := Γ.length + ssPrev.length
+            if _h : outVar.id = expectedOutId then
+              .ok { ssPrev := ssPrev, gPrev := gPrev, node := node }
+            else
+              .error
+                (s!"torch.compile: output Var is not the last node (got id={outVar.id}, " ++
+                  s!"expected id={expectedOutId})")
+        | _ =>
+            .error "torch.compile: output node is not scalar (expected Shape.scalar)"
 
 /--
 Compile a tensor-output graph builder into a `CompiledGraph`.
@@ -210,25 +214,29 @@ def compileGraph {α : Type} [DecidableEq Shape] {Γ : List Shape} {τ : Shape}
   (build : Runtime.Autograd.Compiled.GraphM.M α Γ (Runtime.Autograd.Compiled.GraphM.Var τ)) :
   Runtime.Autograd.Result (CompiledGraph α Γ τ) := do
   let (outVar, st) ← Runtime.Autograd.Compiled.GraphM.run (α := α) (Γ := Γ) build
-  match st with
-  | ⟨_ss, g⟩ =>
-      match g with
-      | .nil =>
-          .error "torch.compileGraph: graph produced no nodes (need an explicit output node)"
-      | .snoc (ss := ssPrev) (τ := τ') gPrev node =>
-          let expectedOutId := Γ.length + ssPrev.length
-          if _hOut : outVar.id = expectedOutId then
-            if hτ : τ' = τ then
-              match hτ with
-              | rfl => .ok { ssPrev := ssPrev, gPrev := gPrev, node := node }
-            else
-              .error
-                (s!"torch.compileGraph: output node shape mismatch (expected " ++
-                  s!"{Shape.pretty τ}, got {Shape.pretty τ'})")
+  finish outVar st.1 st.2
+where
+  finish {α : Type} {Γ : List Shape} {τ : Shape}
+      (outVar : Runtime.Autograd.Compiled.GraphM.Var τ) :
+      (ss : List Shape) →
+        Runtime.Autograd.Compiled.GraphM.PGraphData α Unit Γ ss →
+          Runtime.Autograd.Result (CompiledGraph α Γ τ)
+    | _, .nil =>
+        .error "torch.compileGraph: graph produced no nodes (need an explicit output node)"
+    | _, .snoc (ss := ssPrev) (τ := τ') gPrev node =>
+        let expectedOutId := Γ.length + ssPrev.length
+        if _hOut : outVar.id = expectedOutId then
+          if hτ : τ' = τ then
+            match hτ with
+            | rfl => .ok { ssPrev := ssPrev, gPrev := gPrev, node := node }
           else
             .error
-              (s!"torch.compileGraph: output Var is not the last node (got " ++
-                s!"id={outVar.id}, expected id={expectedOutId})")
+              (s!"torch.compileGraph: output node shape mismatch (expected " ++
+                s!"{Shape.pretty τ}, got {Shape.pretty τ'})")
+        else
+          .error
+            (s!"torch.compileGraph: output Var is not the last node (got " ++
+              s!"id={outVar.id}, expected id={expectedOutId})")
 end Torch
 end Autograd
 end Runtime

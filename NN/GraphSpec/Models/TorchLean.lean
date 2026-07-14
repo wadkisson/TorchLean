@@ -8,9 +8,7 @@ module
 
 public import NN.GraphSpec.Models.TorchLean.Autoencoder
 public import NN.GraphSpec.Models.TorchLean.Cnn
-public import NN.GraphSpec.Models.TorchLean.Fno1d
 public import NN.GraphSpec.Models.TorchLean.Mlp
-public import NN.GraphSpec.Models.TorchLean.Resnet18
 public import NN.GraphSpec.Models.TorchLean.TransformerBlock
 
 /-!

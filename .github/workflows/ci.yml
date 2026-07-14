@@ -38,7 +38,7 @@ jobs:
         run: ~/.elan/bin/lake clean
 
       - name: Build curated library surface
-        run: ~/.elan/bin/lake build NN.Library
+        run: ~/.elan/bin/lake build NN
 
       - name: Build broad CI import surface
         run: ~/.elan/bin/lake build NN.CI.All

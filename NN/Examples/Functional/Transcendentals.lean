@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Proofs.Autograd.FDeriv.Elementwise
 
 /-!
@@ -52,7 +52,7 @@ autograd uses the native tape externs, which the interpreter cannot load (see th
 namespace NN.Examples.Functional.Transcendentals
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 open NN.API
 

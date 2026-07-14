@@ -36,14 +36,11 @@ run; it is not itself a proof that the update map is contractive.
 # First Order Updates
 
 The first object is a first order optimizer state: parameters, gradients, an optional buffer, and a
-time counter. The simplest theorem says that the named update exposes exactly the pieces we expect:
-the returned record contains the next parameters, the next optimizer buffer, and a time counter
-equal to `state.time + 1`. In Lean this is direct algebra.
-
-The [FirstOrder optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/FirstOrder.lean) contains
-the corresponding projection theorems: `update_params_eq`, `update_buffer_eq`, and
-`update_time_eq`. These are transparency facts for the update record. They let later convergence
-proofs cite the actual algebra instead of relying on a prose description of the optimizer.
+time counter. Its executable equation belongs in the definition of the update itself. TorchLean does
+not add a theorem merely to restate each record field after reduction. The theory layer begins when
+two distinct updates are related. For example,
+`Optim.AdamW.update_weight_decay_zero_params_eq_adam_real` proves that the parameter update of
+AdamW agrees with Adam when the decoupled weight-decay coefficient is zero.
 
 For tensor optimizers with richer state, the
 [optimizer laws API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/OptimizerLaws.lean) exposes the same pattern:
@@ -51,21 +48,23 @@ For tensor optimizers with richer state, the
 ```
 #check NN.MLTheory.Optimization.TensorOptimizer.sgd
 #check NN.MLTheory.Optimization.TensorOptimizer.adamw
+#check NN.MLTheory.Optimization.TensorOptimizer.runSteps_append
 #check NN.MLTheory.Optimization.StepSpec
 #check NN.MLTheory.Optimization.StepSpec.runSteps_eq_optimizer_runSteps
-#check NN.MLTheory.Optimization.SGD.update_eq_spec
-#check NN.MLTheory.Optimization.AdamW.update_eq_spec
 ```
 
-`StepSpec` gives a proof-level equation for one optimizer step, and the generic run theorem lifts
-that equation over a stream of gradients. A claim that training used AdamW can therefore cite the
-AdamW update equation itself rather than relying on a string in a configuration file.
+`TensorOptimizer.runSteps_append` applies to every packaged optimizer. `StepSpec` is reserved for
+the stronger situation in which a separately stated mathematical recurrence is proved equal to an
+executable update; its generic run theorem then lifts that agreement over a stream of gradients.
+Concrete optimizer equations remain in `NN.Runtime.Optim.Optimizers`, while optimizer-specific
+theory files establish algebraic invariants and comparisons that are not restatements of those
+definitions.
 
-Low rank optimizer facts follow the same pattern. The
-[low rank optimization API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Optimization/LowRank.lean) records equations such as
-"with the identity projection, projected SGD is ordinary SGD" and "identity low rank state agrees
-with the corresponding momentum update." These are algebraic agreement facts, not global
-optimality claims for every low rank method.
+GaLore-style projected SGD follows the same rule. The executable projection interface and the
+identity-projection agreement theorem live together in
+[NN.Runtime.Optim.Optimizers](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Optim/Optimizers.lean).
+The theorem says that choosing the identity projector recovers ordinary SGD; it does not claim that
+an arbitrary learned low-rank projector preserves the update.
 
 For AdamW specifically, TorchLean follows the usual decoupled weight decay distinction from
 Loshchilov and Hutter,

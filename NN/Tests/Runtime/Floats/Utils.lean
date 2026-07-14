@@ -8,7 +8,7 @@ module
 
 public import Lean.Data.Json
 public import NN.Spec.Core.Tensor
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Runtime.External.Process
 public import Std
 

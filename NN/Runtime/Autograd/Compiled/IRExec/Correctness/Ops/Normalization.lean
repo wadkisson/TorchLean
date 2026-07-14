@@ -115,7 +115,7 @@ theorem buildFrom_denoteAllFrom_layernorm
               rcases p with ⟨seqLen, embedDim⟩
               let view2D : Shape := .dim seqLen (.dim embedDim .scalar)
 
-              by_cases hNumel : Shape.size n.outShape = Shape.size view2D
+              by_cases hNumel : Spec.Shape.size n.outShape = Spec.Shape.size view2D
               · by_cases hSeq : seqLen > 0
                 · by_cases hEmb : embedDim > 0
                   · cases hIdx : mkIdx (inShape := inShape) (ss := ss) pId n.outShape with

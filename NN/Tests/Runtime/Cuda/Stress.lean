@@ -10,7 +10,7 @@ public import NN.Runtime.Autograd.Engine.Cuda.Buffer
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
 public import NN.Runtime.Autograd.Engine.FastKernels
 public import NN.Runtime.Autograd.TorchLean.Random
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -123,7 +123,7 @@ def runGradientAliasingStress : IO Unit := do
   IO.println "== CUDA tape gradient aliasing regression =="
 
   let s : Shape := shape![4]
-  let x : Tensor Float s := tensorND! [4] [0.25, -0.50, 0.75, -1.00]
+  let x : Tensor Float s := tensorOfList! [4] [0.25, -0.50, 0.75, -1.00]
 
   let t0 : Cuda.Tape := Cuda.Tape.empty
   let (t1, xId) := Cuda.Tape.leaf (t := t0) (Utils.tensorToAnyBuffer x) (name := some "x")
@@ -134,7 +134,7 @@ def runGradientAliasingStress : IO Unit := do
   let seed : Cuda.AnyBuffer := { s := Shape.scalar, buf := Buffer.full 1 1.0 }
   let grads ← Utils.okOrThrow (Cuda.Tape.backwardDenseAll (t := t3) outId seed)
   let dx ← Utils.cudaGrad (s := s) grads xId
-  let expected : Tensor Float s := tensorND! [4] [2.0, 2.0, 2.0, 2.0]
+  let expected : Tensor Float s := tensorOfList! [4] [2.0, 2.0, 2.0, 2.0]
   Utils.assertTensorApprox (s := s) "add backward duplicate-parent gradient" dx expected
 
 def runLargeBufferStress : IO Unit := do
@@ -200,13 +200,13 @@ def runMatmulStress : IO Unit := do
   let sB1 : Shape := shape![4, 5]
   let sY1 : Shape := shape![3, 5]
   let a1 : Tensor Float sA1 :=
-    tensorND! [3, 4] [
+    tensorOfList! [3, 4] [
       0.10, -0.20, 0.30, -0.40,
       0.55, 0.65, -0.75, 0.85,
       -0.15, 0.25, -0.35, 0.45
     ]
   let b1 : Tensor Float sB1 :=
-    tensorND! [4, 5] [
+    tensorOfList! [4, 5] [
       0.20, -0.10, 0.05, 0.30, -0.40,
       -0.15, 0.25, -0.35, 0.45, 0.10,
       0.50, -0.60, 0.70, -0.80, 0.90,
@@ -224,9 +224,9 @@ def runMatmulStress : IO Unit := do
   let sB2 : Shape := shape![7, 1]
   let sY2 : Shape := shape![1, 1]
   let a2 : Tensor Float sA2 :=
-    tensorND! [1, 7] [0.25, -0.50, 0.75, -1.00, 1.25, -1.50, 1.75]
+    tensorOfList! [1, 7] [0.25, -0.50, 0.75, -1.00, 1.25, -1.50, 1.75]
   let b2 : Tensor Float sB2 :=
-    tensorND! [7, 1] [0.10, 0.20, -0.30, 0.40, -0.50, 0.60, -0.70]
+    tensorOfList! [7, 1] [0.10, 0.20, -0.30, 0.40, -0.50, 0.60, -0.70]
   let yRef2 := FastKernels.matmulForward (α := Float) (m := 1) (n := 7) (p := 1) a2 b2
   let yFp322 := FastKernels.Cuda.matmulForwardcuBLASWith .fp32 (m := 1) (n := 7) (p := 1) a2 b2
   let yFp642 := FastKernels.Cuda.matmulForwardcuBLASWith .fp64 (m := 1) (n := 7) (p := 1) a2 b2

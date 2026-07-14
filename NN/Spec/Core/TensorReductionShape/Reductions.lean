@@ -60,7 +60,7 @@ def prodSpec {s : Shape} (t : Tensor α s) : α :=
 abbrev productSpec {s : Shape} (t : Tensor α s) : α :=
   prodSpec t
 
-/-- Count the number of scalar entries in a tensor (= `Shape.size`). -/
+/-- Count the number of scalar entries in a tensor (= `Spec.Shape.size`). -/
 def countSpec {s : Shape} (t : Tensor α s) : Nat :=
   tensorFoldlSpec (fun acc _ => acc + 1) 0 t
 
@@ -476,85 +476,85 @@ def reduceMaxAuto {s : Shape} (axis : Nat) [h : Shape.valid_axis_inst axis s] (t
 /-- Reduce along the last axis of `s` (i.e. axis `rank s - 1`). -/
 def reduceLastDim {α : Type} [Context α] {s : Shape}
   (f : ∀ {sliceShape : Shape}, Tensor α sliceShape → α)
-  (x : Tensor α s) (h : Shape.reducibleAlong (Shape.rank s - 1) s) :
-  Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceDim f (Shape.rank s - 1) x h
+  (x : Tensor α s) (h : Shape.reducibleAlong (Spec.Shape.rank s - 1) s) :
+  Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceDim f (Spec.Shape.rank s - 1) x h
 
 /-- Like `reduce_last_dim`, but infers axis validity via `valid_axis_inst`. -/
 def reduceLastDimAuto {α : Type} [Context α] {s : Shape}
   (f : ∀ {sliceShape : Shape}, Tensor α sliceShape → α)
-  (x : Tensor α s) [h : Shape.valid_axis_inst (Shape.rank s - 1) s] :
-  Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceLastDim f x (Shape.proveReducibleAlong (Shape.rank s - 1) s h.proof)
+  (x : Tensor α s) [h : Shape.valid_axis_inst (Spec.Shape.rank s - 1) s] :
+  Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceLastDim f x (Shape.proveReducibleAlong (Spec.Shape.rank s - 1) s h.proof)
 
 -- Reduce mean along the last dimension of any tensor shape
 /-- Mean-reduce along the last axis. -/
 def reduceMeanLast {α : Type} [Context α] {s : Shape} (x : Tensor α s) (h : Shape.reducibleAlong
-  (Shape.rank s - 1) s) :
-  Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceDim meanSpec (Shape.rank s - 1) x h
+  (Spec.Shape.rank s - 1) s) :
+  Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceDim meanSpec (Spec.Shape.rank s - 1) x h
 
 -- Reduce sum along the last dimension of a 2D tensor (specialized version)
 /-- Sum-reduce along the last axis of a 2D tensor `(seqLen, embedDim)`. -/
 def reduceSumLast {seqLen embedDim : Nat} (x : Tensor α (.dim seqLen (.dim embedDim .scalar))) (h
-  : Shape.reducibleAlong (Shape.rank (.dim seqLen (.dim embedDim .scalar)) - 1) (.dim seqLen (.dim
+  : Shape.reducibleAlong (Spec.Shape.rank (.dim seqLen (.dim embedDim .scalar)) - 1) (.dim seqLen (.dim
   embedDim .scalar))) :
   Tensor α (.dim seqLen .scalar) :=
   reduceLastDim sumSpec x h
 
 /-- Product-reduce along the last axis of a 2D tensor `(seqLen, embedDim)`. -/
 def reduceProdLast {seqLen embedDim : Nat} (x : Tensor α (.dim seqLen (.dim embedDim .scalar))) (h
-  : Shape.reducibleAlong (Shape.rank (.dim seqLen (.dim embedDim .scalar)) - 1) (.dim seqLen (.dim
+  : Shape.reducibleAlong (Spec.Shape.rank (.dim seqLen (.dim embedDim .scalar)) - 1) (.dim seqLen (.dim
   embedDim .scalar))) :
   Tensor α (.dim seqLen .scalar) :=
   reduceLastDim prodSpec x h
 
 /-- Max-reduce along the last axis. -/
-def reduceMaxLast {s : Shape} (x : Tensor α s) (h : Shape.reducibleAlong (Shape.rank s - 1) s) :
-  Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceMax (Shape.rank s - 1) x h
+def reduceMaxLast {s : Shape} (x : Tensor α s) (h : Shape.reducibleAlong (Spec.Shape.rank s - 1) s) :
+  Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceMax (Spec.Shape.rank s - 1) x h
 
 /-- Min-reduce along the last axis. -/
-def reduceMinLast {s : Shape} (x : Tensor α s) (h : Shape.reducibleAlong (Shape.rank s - 1) s) :
-  Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceMin (Shape.rank s - 1) x h
+def reduceMinLast {s : Shape} (x : Tensor α s) (h : Shape.reducibleAlong (Spec.Shape.rank s - 1) s) :
+  Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceMin (Spec.Shape.rank s - 1) x h
 
 /-- Variance-reduce along the last axis (specialized to a leading batch dimension). -/
 def reduceVarLast
   {n : Nat} {s : Shape}
-  (x : Tensor α (.dim n s)) (h : Shape.reducibleAlong (Shape.rank (.dim n s) - 1) (.dim n s)) :
-  Tensor α (shapeAfterSum (.dim n s) (Shape.rank (.dim n s) - 1)) :=
-  reduceVar (Shape.rank (.dim n s) - 1) x h
+  (x : Tensor α (.dim n s)) (h : Shape.reducibleAlong (Spec.Shape.rank (.dim n s) - 1) (.dim n s)) :
+  Tensor α (shapeAfterSum (.dim n s) (Spec.Shape.rank (.dim n s) - 1)) :=
+  reduceVar (Spec.Shape.rank (.dim n s) - 1) x h
 
 /-- Variance-reduce along the last axis (with axis validity as a typeclass argument). -/
 def reduceVarLastGeneral {n : Nat}  {s : Shape}
   (x : Tensor α (.dim n s))
-  (h : Shape.valid_axis_inst (Shape.rank (.dim n s) - 1) (.dim n s))
-  : Tensor α (shapeAfterSum (.dim n s) (Shape.rank (.dim n s) - 1)) :=
-  reduceVarAuto (Shape.rank (.dim n s) - 1) h x
+  (h : Shape.valid_axis_inst (Spec.Shape.rank (.dim n s) - 1) (.dim n s))
+  : Tensor α (shapeAfterSum (.dim n s) (Spec.Shape.rank (.dim n s) - 1)) :=
+  reduceVarAuto (Spec.Shape.rank (.dim n s) - 1) h x
 
 /-- Mean-reduce along the last axis (with axis validity as a typeclass argument). -/
 def reduceMeanLastGeneral {s : Shape}
   (x : Tensor α s)
-  (h : Shape.valid_axis_inst (Shape.rank s - 1) s)
-  : Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceMeanAuto (Shape.rank s - 1) h x
+  (h : Shape.valid_axis_inst (Spec.Shape.rank s - 1) s)
+  : Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceMeanAuto (Spec.Shape.rank s - 1) h x
 
 /-- Mean-reduce along the last axis, specialized for proofs that assume well-formedness. -/
 def reduceMeanLastGeneralWf {s : Shape}
   (x : Tensor α s)
   [_h_wf : Shape.WellFormed s]
-  (_h_rank : Shape.rank s > 0)
-  (h_valid : Shape.valid_axis_inst (Shape.rank s - 1) s)
-  : Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceMean (Shape.rank s - 1) x (Shape.proveReducibleAlong (Shape.rank s - 1) s h_valid.proof)
+  (_h_rank : Spec.Shape.rank s > 0)
+  (h_valid : Shape.valid_axis_inst (Spec.Shape.rank s - 1) s)
+  : Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceMean (Spec.Shape.rank s - 1) x (Shape.proveReducibleAlong (Spec.Shape.rank s - 1) s h_valid.proof)
 
 /-- Sum-reduce along the last axis (with axis validity inferred via `valid_axis_inst`). -/
 def reduceSumLastGeneral {s : Shape}
   (x : Tensor α s)
-  [h : Shape.valid_axis_inst (Shape.rank s - 1) s]
-  : Tensor α (shapeAfterSum s (Shape.rank s - 1)) :=
-  reduceSumAuto (Shape.rank s - 1) x
+  [h : Shape.valid_axis_inst (Spec.Shape.rank s - 1) s]
+  : Tensor α (shapeAfterSum s (Spec.Shape.rank s - 1)) :=
+  reduceSumAuto (Spec.Shape.rank s - 1) x
 
 -- Transpose operations live in the linear-algebra extension modules.
 end Tensor

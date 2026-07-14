@@ -14,7 +14,8 @@ Native TorchLean 1D FNO on the Burgers operator:
 
 module
 
-public import NN
+public import NN.API
+public import NN.Examples.ModelZoo
 public import NN.Runtime.Autograd.Engine.Cuda.Fno1dRfftFused
 public import NN.Spec.Layers.Loss
 
@@ -26,13 +27,10 @@ scripts do the two jobs Lean should not own here: download and reshape the publi
 `burgers_data_R10.mat` file, then plot the prediction CSV. The model, loss, optimizer, and training
 loop stay in TorchLean.
 
-Why we use the real-split FNO path in this executable:
-- `NN.FNO1D.model` is the mathematically clean complex-domain implementation.
-- The eager CUDA backend stores float32 buffers, not complex buffers.
-- On CUDA this run uses the fused `spectralConv1dRfft` autograd primitive, which represents
-  Fourier weights by real/imaginary float32 buffers and executes the real FFT path through cuFFT.
-- On CPU it falls back to the dense DFT implementation. That is slower, but it is the useful
-  reference path when someone wants to inspect the math without CUDA in the way.
+This executable uses real-split Fourier arithmetic because the Burgers data are real-valued. The
+portable path evaluates the dense multidimensional DFT with separate real and imaginary tensors.
+On CUDA, the fused `spectralConv1dRfft` autograd primitive uses the same representation for its
+weights and executes the transforms through cuFFT.
 
 The training task follows the standard FNO Burgers setup: learn the operator
 `u₀(x) ↦ u(x,T)` on a fixed periodic grid. The default grid and row counts are modest enough for a
@@ -64,7 +62,7 @@ def width : Nat := 8
 /-- Number of Fourier modes retained on each side of the real FFT spectrum. -/
 def modes : Nat := 8
 
-/-- Number of spectral blocks. Kept small so the eager reference path remains usable. -/
+/-- Number of spectral blocks used by the compact training run. -/
 def blocks : Nat := 1
 
 /-- Default number of training rows expected from the preparation script. -/
@@ -73,15 +71,22 @@ def defaultTrainRows : Nat := 128
 /-- Default number of held-out rows expected from the preparation script. -/
 def defaultTestRows : Nat := 32
 
-/-- Shape-level FNO configuration shared by the constructor and sample loaders. -/
-def modelCfg : nn.models.Fno1dConfig :=
-  { grid := grid, width := width, modes := modes, blocks := blocks, seed := 0 }
+/-- Spec.Shape-level FNO configuration shared by the constructor and sample loaders. -/
+def modelCfg : nn.models.FNOConfig 1 :=
+  { spatial := Vector.replicate 1 grid
+    modes := Vector.replicate 1 modes
+    spatialNonzero := by intro i; fin_cases i; decide
+    modesFit := by intro i; fin_cases i; decide
+    width := width
+    widthNonzero := by decide
+    blocks := blocks
+    seed := 0 }
 
 /-- Model input shape: one sampled initial condition on the fixed grid. -/
-abbrev σ : Shape := nn.models.fno1dInShape modelCfg
+abbrev σ : Spec.Shape := .dim grid .scalar
 
 /-- Model output shape: one predicted terminal solution on the same grid. -/
-abbrev τ : Shape := nn.models.fno1dOutShape modelCfg
+abbrev τ : Spec.Shape := .dim grid .scalar
 
 /-- Directory where the preparation script writes Burgers tensors by default. -/
 def defaultDir : System.FilePath := "data/real/fno"
@@ -145,10 +150,10 @@ def parse (args : List String) :
 def effectiveCudaMemWatch (cfg : BurgersOptions) (opts : Options) : Nat :=
   ModelZoo.effectiveCudaMemWatch opts cfg.steps cfg.cudaMemWatch
 
-/-- TrainLog note fields shared by the fused CUDA and portable dense execution paths. -/
+/-- TrainLog note fields for the fused CUDA execution path. -/
 def logNotes (cfg : BurgersOptions) (spectralPath : String) (device : String) : Array String :=
   #[
-    s!"model=fno1d_real",
+    s!"model=fno",
     s!"spectral_path={spectralPath}",
     s!"device={device}",
     s!"grid={grid}",
@@ -162,7 +167,9 @@ def logNotes (cfg : BurgersOptions) (spectralPath : String) (device : String) : 
 end BurgersOptions
 
 def mkModel : nn.M (nn.Sequential σ τ) :=
-  nn.models.Fno1dReal modelCfg
+  by
+    simpa [σ, τ, nn.models.fnoInShape, nn.models.fnoOutShape, modelCfg,
+      Vector.replicate, Spec.Shape.ofList] using nn.models.fno modelCfg
 
 /-- Load one fixed-grid Burgers split as supervised TorchLean samples. -/
 def loadDataset
@@ -222,7 +229,7 @@ structure EvalData where
 Convert loaded Burgers datasets into the common runtime/evaluation view used by both execution
 paths.
 
-Both the fused CUDA path and the portable dense path:
+The fused CUDA path:
 - evaluate on fixed deterministic prefixes,
 - train by cycling through the finite dataset with `seed + step`, and
 - emit the same train/test MSE metric history.
@@ -301,7 +308,7 @@ def trainStep (lr : Float)
   _root_.Runtime.Autograd.okOrThrow <|
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.updateParamsAdam ps fw lr adamSt
 
-/-- Run the fused cuFFT/RFFT training path and emit the same artifacts as the dense path. -/
+/-- Run the fused cuFFT/RFFT training path and emit its training and prediction artifacts. -/
 def run (cfg : BurgersOptions) : IO Unit := do
   let data ← loadData cfg
   let eval := ← mkEvalData cfg data
@@ -310,7 +317,7 @@ def run (cfg : BurgersOptions) : IO Unit := do
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) cfg.seed
   let mut adamSt : _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.AdamState := {}
   let mut hist ← recordEval eval.reportTrainSamples eval.reportTestSamples metricHistory 0 ps "before"
-  let cudaOpts : _root_.Runtime.Autograd.Torch.Options := { requestedDevice := .cuda }
+  let cudaOpts : _root_.Runtime.Autograd.Torch.Options := { device := .cuda }
   let cudaMemWatch := cfg.effectiveCudaMemWatch cudaOpts
   let mut memWatch? ← ModelZoo.reportCudaMemWatch cudaOpts cudaMemWatch cfg.steps 0 none
   let progressEvery : Nat := Nat.max 1 (cfg.steps / 10)
@@ -389,6 +396,7 @@ def runPortableDense
   let hist ← histRef.get
   writeMetricLog cfg.log hist cfg "portable dense DFT ops" (ModelZoo.deviceName opts)
 
+
 def logRunHeader (opts : Options) (cfg : BurgersOptions) : IO Unit := do
   IO.println s!"{exeName}: native real-split FNO1D Burgers"
   let backendName :=
@@ -416,7 +424,7 @@ def main (args : List String) : IO UInt32 := do
           IO.println "  note: fused CUDA path uses the eager CUDA tape (ignoring --backend compiled)"
         FusedCuda.run cfg
       else
-        IO.println "  spectral path=portable dense DFT ops"
+        IO.println "  spectral path=portable dense multidimensional DFT"
         runPortableDense opts cfg)
 
 end NN.Examples.Models.Operators.Fno1dBurgers

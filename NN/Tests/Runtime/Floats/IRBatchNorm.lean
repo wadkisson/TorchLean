@@ -77,7 +77,7 @@ def expectSome {α : Type} (label : String) : Option α → IO α
   | none => throw (IO.userError s!"ir_batchnorm: expected {label}")
 
 def verifierBox : FlatBox Float :=
-  { dim := Shape.size sNCHW
+  { dim := Spec.Shape.size sNCHW
     lo := Tensor.flattenSpec input
     hi := Tensor.flattenSpec input }
 
@@ -88,7 +88,7 @@ def verifierParams : ParamStore Float :=
         { c := c, gamma := gamma, beta := beta, mean := mean, var := var, eps := bnEps }) }
 
 def unitObjective : FlatVec Float :=
-  { n := Shape.size sNCHW
+  { n := Spec.Shape.size sNCHW
     v := Tensor.dim (fun i => Tensor.scalar (if decide (i.val = 0) then 1.0 else 0.0)) }
 
 def expectNCHW (label : String) (v : DVal Float) : IO (Tensor Float sNCHW) := do
@@ -144,17 +144,17 @@ def run : IO Unit := do
   let yB ← expectSome "IBP BatchNorm box" ibp[1]!
   let want0 := expected (nchwVal input 0 0 0 0) (vecVal gamma 0) (vecVal beta 0)
     (vecVal mean 0) (vecVal var 0) bnEps
-  if hdim : yB.dim = Shape.size sNCHW then
-    let lo : Tensor Float (.dim (Shape.size sNCHW) .scalar) :=
+  if hdim : yB.dim = Spec.Shape.size sNCHW then
+    let lo : Tensor Float (.dim (Spec.Shape.size sNCHW) .scalar) :=
       NN.MLTheory.CROWN.Graph.castDimScalar (α := Float) hdim yB.lo
-    let hi : Tensor Float (.dim (Shape.size sNCHW) .scalar) :=
+    let hi : Tensor Float (.dim (Spec.Shape.size sNCHW) .scalar) :=
       NN.MLTheory.CROWN.Graph.castDimScalar (α := Float) hdim yB.hi
     assertApprox "ir_batchnorm ibp lo[0]" (flatVal lo ⟨0, by decide⟩) want0 1e-5
     assertApprox "ir_batchnorm ibp hi[0]" (flatVal hi ⟨0, by decide⟩) want0 1e-5
   else
     throw (IO.userError s!"ir_batchnorm: IBP output dimension mismatch: {yB.dim}")
 
-  let ctx : AffineCtx := { inputId := 0, inputDim := Shape.size sNCHW }
+  let ctx : AffineCtx := { inputId := 0, inputDim := Spec.Shape.size sNCHW }
   let aff := runAffine (α := Float) graph verifierParams ctx ibp
   let _ ← expectSome "affine BatchNorm transfer" aff[1]!
   let crown := runCROWN (α := Float) graph verifierParams ctx ibp

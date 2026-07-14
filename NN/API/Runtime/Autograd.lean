@@ -50,8 +50,8 @@ packing that model call sites would otherwise repeat.
 -/
 
 /-- Parameter pack type for a given model (a `TensorPack` over `Seq.paramShapes`). -/
-abbrev Params {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (α : Type) :=
-  API.TorchLean.TensorPack α (API.TorchLean.NN.Seq.paramShapes model)
+abbrev Params {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (α : Type) :=
+  API.TorchLean.TensorPack α (API.TorchLean.LayerCore.Seq.paramShapes model)
 
 /--
 Loss function over a model output and a target.
@@ -69,21 +69,21 @@ abbrev OutputLoss (τ υ : Spec.Shape) :=
 /--
 Initialize model parameters by casting the model's `Float` initializers elementwise using `cast`.
 -/
-def initParamsWith {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+def initParamsWith {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
     {α : Type} (cast : Float → α) :
     Params model α :=
-  _root_.Runtime.Autograd.TorchLean.Module.castTList cast (API.TorchLean.NN.Seq.initParams model)
+  _root_.Runtime.Autograd.TorchLean.Module.castTList cast (API.TorchLean.LayerCore.Seq.initParams model)
 
 /-- Initialize model parameters using the runtime literal injection `API.Runtime.ofFloat`. -/
-def initParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+def initParams {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
     {α : Type} [API.Runtime.Scalar α] :
     Params model α :=
   Model.initParamsWith (model := model) API.Runtime.ofFloat
 
 /-- Pack explicit weight and bias tensors for a single `Layers.linear` model. -/
 def linearParams {α : Type} {inDim outDim : Nat} {seedW seedB : Nat}
-    (w : _root_.Spec.Tensor α (NN.Tensor.Shape.Mat outDim inDim))
-    (b : _root_.Spec.Tensor α (NN.Tensor.Shape.Vec outDim)) :
+    (w : _root_.Spec.Tensor α (.dim outDim (.dim inDim .scalar)))
+    (b : _root_.Spec.Tensor α (.dim outDim .scalar)) :
     Params (API.TorchLean.Layers.linear inDim outDim seedW seedB) α :=
   API.TorchLean.tensorpackPair w b
 
@@ -124,107 +124,107 @@ Build a TorchLean `Program` that computes a scalar loss from `(params, x, target
 This is the bridge between `Seq.forwardProgram` (which produces model outputs) and the autograd entry
 points (which expect a scalar-valued program).
 -/
-def lossProgram {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ) :
+def lossProgram {σ τ υ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (loss : OutputLoss τ υ) :
     ∀ {α : Type}, [Context α] → [DecidableEq Spec.Shape] →
-      API.TorchLean.Program α (API.TorchLean.NN.Seq.paramShapes model ++ [σ, υ]) Spec.Shape.scalar
+      API.TorchLean.Program α (API.TorchLean.LayerCore.Seq.paramShapes model ++ [σ, υ]) Spec.Shape.scalar
         :=
   fun {α} _ _ =>
     fun {m} _ _ =>
       _root_.Runtime.Autograd.Torch.CurriedRef.curry
         (Ref := fun s => API.TorchLean.RefTy (m := m) (α := α) s)
-        (ss := API.TorchLean.NN.Seq.paramShapes model ++ [σ, υ])
+        (ss := API.TorchLean.LayerCore.Seq.paramShapes model ++ [σ, υ])
         (β := m (API.TorchLean.RefTy (m := m) (α := α) Spec.Shape.scalar))
         (fun args => do
           let (ps, xy) :=
             _root_.Runtime.Autograd.Torch.RefList.split
               (Ref := fun s => API.TorchLean.RefTy (m := m) (α := α) s)
-              (ss₁ := API.TorchLean.NN.Seq.paramShapes model) (ss₂ := [σ, υ]) args
+              (ss₁ := API.TorchLean.LayerCore.Seq.paramShapes model) (ss₂ := [σ, υ]) args
           let (x, y) := RefList.unpackPair xy
           let yhat ←
             _root_.Runtime.Autograd.Torch.CurriedRef.uncurry
               (Ref := fun s => API.TorchLean.RefTy (m := m) (α := α) s)
-              (ss := API.TorchLean.NN.Seq.paramShapes model ++ [σ])
+              (ss := API.TorchLean.LayerCore.Seq.paramShapes model ++ [σ])
               (β := m (API.TorchLean.RefTy (m := m) (α := α) τ))
-              (API.TorchLean.NN.Seq.forwardProgram (model := model) (α := α))
+              (API.TorchLean.LayerCore.Seq.forwardProgram (model := model) (α := α))
               (_root_.Runtime.Autograd.Torch.RefList.append ps (.cons x .nil))
           loss (α := α) (m := m) yhat y)
 
 /-- VJP of the model output w.r.t. parameters. -/
-def vjpParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+def vjpParams {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (seedOut : Spec.Tensor α τ) :
     IO (Params model α) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.vjpOutParams
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
+    (fun {β} _ _ => API.TorchLean.LayerCore.Seq.forwardProgram (model := model) (α := β))
     params (API.TorchLean.tensorpackSingleton x) seedOut
 
 /-- VJP of the model output w.r.t. inputs. -/
-def vjpInputs {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+def vjpInputs {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (seedOut : Spec.Tensor α τ) :
     IO (API.TorchLean.TensorPack α [σ]) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.vjpOutInputs
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
+    (fun {β} _ _ => API.TorchLean.LayerCore.Seq.forwardProgram (model := model) (α := β))
     params (API.TorchLean.tensorpackSingleton x) seedOut
 
 /-- Jacobian (reverse-mode) of the model output w.r.t. parameters, returned as rows. -/
-def jacrevParams {σ τ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ)
+def jacrevParams {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) :
     IO (Array (Params model α)) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.jacrevOutParams
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
-    (fun {β} _ _ => API.TorchLean.NN.Seq.forwardProgram (model := model) (α := β))
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ]) (τ := τ)
+    (fun {β} _ _ => API.TorchLean.LayerCore.Seq.forwardProgram (model := model) (α := β))
     params (API.TorchLean.tensorpackSingleton x)
 
 /-- Gradient of `loss(model(params, x), target)` w.r.t. parameters. -/
-def gradParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
+def gradParams {σ τ υ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (loss : OutputLoss τ υ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (target : Spec.Tensor α υ) :
     IO (Params model α) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.gradParams
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
     params (API.TorchLean.tensorpackPair x target)
 
 /-- Gradient of `loss(model(params, x), target)` w.r.t. inputs (`x` and `target`). -/
-def gradInputs {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
+def gradInputs {σ τ υ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (loss : OutputLoss τ υ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (target : Spec.Tensor α υ) :
     IO (API.TorchLean.TensorPack α [σ, υ]) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.gradInputs
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
     params (API.TorchLean.tensorpackPair x target)
 
 /-- JVP of a scalar loss w.r.t. parameters in direction `vparams`. -/
-def jvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
+def jvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (loss : OutputLoss τ υ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (target : Spec.Tensor α υ)
     (vparams : Params model α) :
     IO α :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.jvpLossParams
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
     params (API.TorchLean.tensorpackPair x target) vparams
 
 /-- HVP (Hessian-vector product) of a scalar loss w.r.t. parameters in direction `vparams`. -/
-def hvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.NN.Seq σ τ) (loss : OutputLoss τ υ)
+def hvpParams {σ τ υ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ) (loss : OutputLoss τ υ)
     {α : Type} [Context α] [DecidableEq Spec.Shape]
     (params : Params model α) (x : Spec.Tensor α σ) (target : Spec.Tensor α υ)
     (vparams : Params model α) :
     IO (Params model α) :=
   _root_.Runtime.Autograd.TorchLean.Autodiff.hvpParams
     (α := α)
-    (paramShapes := API.TorchLean.NN.Seq.paramShapes model) (inputShapes := [σ, υ])
+    (paramShapes := API.TorchLean.LayerCore.Seq.paramShapes model) (inputShapes := [σ, υ])
     (lossProgram (model := model) loss)
     params (API.TorchLean.tensorpackPair x target) vparams
 

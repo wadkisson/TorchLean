@@ -9,7 +9,7 @@ module
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.FastKernels
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -42,12 +42,12 @@ def runMatmul : IO Unit := do
   let sY : Shape := shape![m, p]
 
   let a : Tensor Float sA :=
-    tensorND! [m, n] [
+    tensorOfList! [m, n] [
       0.10, 0.20, 0.30,
       -0.10, 0.05, 0.15
     ]
   let b : Tensor Float sB :=
-    tensorND! [n, p] [
+    tensorOfList! [n, p] [
       0.20, -0.10,
       0.00, 0.30,
       -0.20, 0.10
@@ -75,7 +75,7 @@ def runMatmul : IO Unit := do
     (Runtime.Autograd.Cuda.Tape.matmul (t := t2c) (m := m) (n := n) (p := p) aIdc bIdc)
   let yCuda ← Utils.cudaValue (s := sY) t3c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sY)) 1.0 }
+    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sY)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t3c) yIdc seedCuda)
   let dACuda ← Utils.cudaGrad (s := sA) gradsCuda aIdc
@@ -97,14 +97,14 @@ def runBmm : IO Unit := do
   let sY : Shape := shape![batch, m, p]
 
   let a : Tensor Float sA :=
-    tensorND! [batch, m, n] [
+    tensorOfList! [batch, m, n] [
       0.10, 0.20,
       0.30, 0.40,
       -0.10, 0.05,
       0.15, -0.20
     ]
   let b : Tensor Float sB :=
-    tensorND! [batch, n, p] [
+    tensorOfList! [batch, n, p] [
       0.20, 0.10,
       -0.10, 0.30,
       0.05, -0.20,
@@ -133,7 +133,7 @@ def runBmm : IO Unit := do
     (Runtime.Autograd.Cuda.Tape.bmm (t := t2c) (batch := batch) (m := m) (n := n) (p := p) aIdc bIdc)
   let yCuda ← Utils.cudaValue (s := sY) t3c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
-    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size sY)) 1.0 }
+    { s := sY, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size sY)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t3c) yIdc seedCuda)
   let dACuda ← Utils.cudaGrad (s := sA) gradsCuda aIdc
@@ -154,12 +154,12 @@ def runFastMatmulPrecision : IO Unit := do
   let sY : Shape := shape![m, p]
 
   let a : Tensor Float sA :=
-    tensorND! [m, n] [
+    tensorOfList! [m, n] [
       0.10, 0.20, 0.30,
       -0.10, 0.05, 0.15
     ]
   let b : Tensor Float sB :=
-    tensorND! [n, p] [
+    tensorOfList! [n, p] [
       0.20, -0.10,
       0.00, 0.30,
       -0.20, 0.10

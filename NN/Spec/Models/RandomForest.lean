@@ -8,7 +8,7 @@ module
 
 public import NN.Spec.Models.GradientBoostedTrees
 public import NN.Spec.Module.DecisionTree
-public import Lean.Data.RBMap
+public import Std.Data.TreeMap.Basic
 
 /-!
 # Random Forest
@@ -69,8 +69,8 @@ def majorityVote {a : Type} [Ord a] [Inhabited a] (predictions : List a) : Optio
     -- Count frequencies using an ordered map so results are deterministic.
     let grouped := predictions.foldl
       (fun acc pred =>
-        acc.insert pred (acc.findD pred 0 + 1))
-      (Lean.RBMap.empty : Lean.RBMap a Nat compare)
+        acc.insert pred (acc.getD pred 0 + 1))
+      (Std.TreeMap.empty : Std.TreeMap a Nat compare)
 
     -- Pick the element with highest frequency.
     let groupedList := grouped.toList

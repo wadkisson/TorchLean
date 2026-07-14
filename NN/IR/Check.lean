@@ -30,15 +30,6 @@ namespace NN.IR
 
 namespace Graph
 
-/--
-Validate declared IR shapes using the central inference rules.
-
-This wrapper keeps the public checker name aligned with `Graph.checkInferredShapes`, so callers,
-widgets, and backends all use the same per-op shape contracts.
--/
-def checkShapes (g : Graph) : Except String Unit := do
-  g.checkInferredShapes
-
 /-!
 ## Prop-level well-formedness wrappers
 
@@ -59,11 +50,6 @@ def WellFormed (g : Graph) : Prop :=
 /-- Shape-consistency well-formedness (`WellFormed` + extra shape/axis checks), as a proposition. -/
 def WellShaped (g : Graph) : Prop :=
   g.checkShapes = .ok ()
-
-/-- `WellFormed g` is just the proposition that `checkWellFormed` returns `.ok ()`. -/
-theorem wellFormed_iff (g : Graph) : g.WellFormed ↔ g.checkWellFormed = .ok () := Iff.rfl
-/-- `WellShaped g` is just the proposition that `checkShapes` returns `.ok ()`. -/
-theorem wellShaped_iff (g : Graph) : g.WellShaped ↔ g.checkShapes = .ok () := Iff.rfl
 
 end Graph
 

@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.GraphSpec.Models
 public import NN.GraphSpec.ToTorchLean
 
@@ -31,12 +31,10 @@ This tutorial does two things:
 
 1. It runs the smallest complete lowering path: `GraphSpec.Models.mlp → ToTorchLean.toSeq →
   Trainer.new → trainer.train`.
-2. It typechecks and explains the broader GraphSpec model ladder: MLP, CNN, residual linear block,
-   and ResNet18.
+2. It typechecks the broader GraphSpec model ladder: MLP, CNN, and a residual linear block.
 
-Only the MLP is trained here because it is the compact check path for `Seq` lowering. The larger
-models are still GraphSpec models; they are deliberately kept as architecture terms so graph passes,
-exporters, and proofs can consume them without making this tutorial a slow vision benchmark.
+Only the MLP is trained here because it is the compact check path for `Seq` lowering. The CNN and
+residual block remain architecture terms that graph passes, exporters, and proofs can consume.
 
 Run:
 
@@ -55,7 +53,7 @@ or `--backend compiled`.
 namespace NN.Examples.DeepDives.GraphSpec.Tutorial
 
 open Spec
-open Tensor
+open Spec.Tensor
 open NN.Tensor
 open _root_.TorchLean
 
@@ -84,9 +82,9 @@ Parameter ABI:
 -/
 def tutorialMlp :
     NN.GraphSpec.Graph
-      [ Shape.mat 3 2, Shape.vec 3
-      , Shape.mat 1 3, Shape.vec 1 ]
-      (Shape.vec 2) (Shape.vec 1) :=
+      [ .dim 3 (.dim 2 .scalar), .dim 3 .scalar
+      , .dim 1 (.dim 3 .scalar), .dim 1 .scalar ]
+      (.dim 2 .scalar) (.dim 1 .scalar) :=
   NN.GraphSpec.Models.mlp (inDim := 2) (hidDim := 3) (outDim := 1)
 
 /--
@@ -119,28 +117,18 @@ sharing in a special layer. That is the pedagogical reason `GraphSpec.DAG` exist
 def tutorialResidual :=
   NN.GraphSpec.Models.residualLinear (d := 4)
 
-/--
-The larger residual-family architecture available from the same model catalog.
-
-We bind it here as a compile-time shape check: users can inspect its type in the editor, while the
-runtime tutorial below stays small enough to run instantly.
--/
-def tutorialResNet18 :=
-  NN.GraphSpec.Models.ResNet18.model
-
 /-- Print the architecture ladder this tutorial is checking. -/
 def printCatalog : IO Unit := do
   IO.println "GraphSpec architecture ladder:"
   IO.println "  1. MLP: sequential layer stack; lowers to nn.Sequential and trains below."
   IO.println "  2. CNN: sequential vision graph with checked conv/pool shape arithmetic."
   IO.println "  3. residualLinear: minimal DAG-native skip connection."
-  IO.println "  4. ResNet18: larger DAG-style residual architecture."
   IO.println ""
 
 /-- Tiny one-sample dataset for the lowered GraphSpec MLP training path. -/
-def tutorialDataset : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
-  let xF : Spec.Tensor Float (Shape.vec 2) := tensorF! id [2] [0.5, 0.8]
-  let yF : Spec.Tensor Float (Shape.vec 1) := tensorF! id [1] [1.0]
+def tutorialDataset : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
+  let xF : Spec.Tensor Float (.dim 2 .scalar) := tensorF! id [2] [0.5, 0.8]
+  let yF : Spec.Tensor Float (.dim 1 .scalar) := tensorF! id [1] [1.0]
   let XFloat : Spec.Tensor Float (shape![1, 2]) := Spec.Tensor.dim (fun _ => xF)
   let YFloat : Spec.Tensor Float (shape![1, 1]) := Spec.Tensor.dim (fun _ => yF)
   Data.tensorDataset XFloat YFloat
@@ -151,8 +139,8 @@ def runMlpTrainingPath (args : List String) : IO Unit := do
   let hidDim : Nat := 3
   let outDim : Nat := 1
 
-  let xShape : Shape := Shape.vec inDim
-  let yShape : Shape := Shape.vec outDim
+  let xShape : Spec.Shape := .dim inDim .scalar
+  let yShape : Spec.Shape := .dim outDim .scalar
 
   -- GraphSpec is the source architecture. This exact graph also has pure semantics and an
   -- executable program view; here we ask for the additional `nn.Sequential` training view.

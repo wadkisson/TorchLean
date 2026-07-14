@@ -47,7 +47,7 @@ def shiftInputAxes (m : Array Nat) : Array Nat :=
 /-- Generate the CUDA `axisMap` array from a `Shape.CanBroadcastTo` proof. -/
 def axisMap : {s₁ s₂ : Shape} → Shape.CanBroadcastTo s₁ s₂ → Array Nat
   | _, _, .scalar_to_any s₂ =>
-      Array.replicate (Shape.rank s₂) 0
+      Array.replicate (Spec.Shape.rank s₂) 0
   | _, _, .dim_eq tail =>
       #[1] ++ shiftInputAxes (axisMap tail)
   | _, _, .dim_1_to_n tail =>

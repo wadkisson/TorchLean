@@ -107,7 +107,7 @@ def uniformAux {α : Type} [Context α] (key : UInt64) :
       let u := sampleNat key linearOffset denom
       Tensor.scalar (sampleUnit (α := α) u denom)
   | .dim _n rest, linearOffset =>
-      let block := Shape.size rest
+      let block := Spec.Shape.size rest
       Tensor.dim (fun i =>
         uniformAux (α := α) key (s := rest) (linearOffset + i.1 * block))
 
@@ -132,7 +132,7 @@ def maskAux {α : Type} [Context α] (key : UInt64) (keepProb : α) :
       let u := sampleNat key linearOffset denom
       Tensor.scalar (keepBit (α := α) keepProb u denom)
   | .dim _n rest, linearOffset =>
-      let block := Shape.size rest
+      let block := Spec.Shape.size rest
       Tensor.dim (fun i =>
         maskAux (α := α) key keepProb (s := rest) (linearOffset + i.1 * block))
 
@@ -187,7 +187,7 @@ def normalAux {α : Type} [Context α] (key : UInt64) :
   | .scalar, linearOffset =>
       Tensor.scalar (normalScalar (α := α) key linearOffset)
   | .dim _n rest, linearOffset =>
-      let block := Shape.size rest
+      let block := Spec.Shape.size rest
       Tensor.dim (fun i =>
         normalAux (α := α) key (s := rest) (linearOffset + i.1 * block))
 

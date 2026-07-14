@@ -67,7 +67,7 @@ jobs:
         run: ~/.elan/bin/lake lint
 
       - name: Build curated library surface
-        run: ~/.elan/bin/lake build NN.Library
+        run: ~/.elan/bin/lake build NN
 
       - name: Cache API docs
         uses: actions/cache@v4
@@ -141,7 +141,7 @@ jobs:
       - name: Build interactive import graph HTML
         run: |
           mkdir -p home_page/importgraph
-          ~/.elan/bin/lake exe graph --to NN.Library home_page/importgraph/index.html
+          ~/.elan/bin/lake exe graph --to NN home_page/importgraph/index.html
           python3 - <<'PY'
           from pathlib import Path
 

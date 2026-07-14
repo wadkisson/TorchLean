@@ -13,12 +13,12 @@ For public use, prefer the curated library import or the tensor entrypoint:
 ```lean
 import NN
 -- or, if you only want this subsystem:
-import NN.Entrypoint.Tensor
+import NN.Tensor
 ```
 
 `NN.Tensor.API` is the implementation leaf behind the entrypoint.
 
-Use `import NN` for ordinary model code. Use `NN.Entrypoint.Tensor` only when the file is explicitly
+Use `import NN` for ordinary model code. Use `NN.Tensor` only when the file is explicitly
 about tensor construction, printing, or low-level tensor API behavior.
 
 ## What This Layer Owns
@@ -27,12 +27,12 @@ The key invariant is that semantics and proofs stay in the spec layer (`NN/Spec/
 layer stays focused on ergonomics:
 
 - DTypes are Lean types: you write `Tensor Float s`, `Tensor ℚ s`, and other scalar backends used by the project.
-- Shapes live in the type when the program asks for a static tensor: constructors like `tensor1d`
+- Shapes live in the type when the program asks for a static tensor: constructors like `vector`
   remember `xs.length` in the result type.
 - If you see `Tensor Float _`, the `_` asks Lean to infer the shape from the right hand side.
-- When you truly need dynamic shapes, use `tensorND` (runtime dims + runtime length check) or
+- When you truly need dynamic shapes, use `ofList` (runtime dims + runtime length check) or
   `DynTensor` (store the shape as data instead of in the type).
-- For constants, `tensorND!` and `tensorF!` trade a bit of macro expansion for cleaner literal code.
+- For constants, `tensorOfList!` and `tensorF!` trade a bit of macro expansion for cleaner literal code.
 - `tensor!` accepts nested bracket syntax and flattens in row-major order, which is handy for
   handwritten examples.
 
@@ -61,6 +61,6 @@ same example be read as user code, lowered into an IR, or connected to a verific
 ## Files
 
 - `../Entrypoint/Tensor.lean`: the stable tensor subsystem import.
-- `API.lean`: the implementation leaf. Includes shape aliases, `tensor1d`/`tensor2d`, dynamic N-D
+- `API.lean`: the implementation leaf. Includes shape aliases, `vector`/`matrix`, dynamic N-D
   constructors, padding friendly 2D constructors for ragged data, and a small printing API that
   refuses to print proof level scalar backends like `ℝ`.

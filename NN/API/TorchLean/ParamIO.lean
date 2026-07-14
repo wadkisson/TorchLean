@@ -52,7 +52,7 @@ This is the lowest-level API entrypoint: it is useful when you already have a mo
 shape-indexed parameter tensors and just want to persist them.
 -/
 def saveParamBits
-    {paramShapes : List Shape}
+    {paramShapes : List Spec.Shape}
     (path : System.FilePath)
   (ps : _root_.Runtime.Autograd.Torch.TList Float paramShapes)
   (pretty : Bool := true) : IO Unit := do
@@ -64,7 +64,7 @@ Save the current parameter values of a TorchLean runtime module to a JSON bits f
 This is architecture-agnostic: it works for any `ScalarModule Float …`.
 -/
 def saveModuleParamsBits
-    {paramShapes inputShapes : List Shape}
+    {paramShapes inputShapes : List Spec.Shape}
     (m : _root_.Runtime.Autograd.TorchLean.Module.ScalarModule Float paramShapes inputShapes)
     (path : System.FilePath) : IO Unit := do
   let ps ← _root_.Runtime.Autograd.Torch.ParamList.valuesSynced (α := Float) (ss := paramShapes)
@@ -78,7 +78,7 @@ This performs a shape check against `paramShapes` and fails with a readable erro
 not match the model.
 -/
 def loadModuleParamsBits
-    {paramShapes inputShapes : List Shape}
+    {paramShapes inputShapes : List Spec.Shape}
     (m : _root_.Runtime.Autograd.TorchLean.Module.ScalarModule Float paramShapes inputShapes)
     (path : System.FilePath) : IO Unit := do
   let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
@@ -95,7 +95,7 @@ Load a JSON bits checkpoint as a parameter list (without mutating a module).
 This is useful when you want to run compiled inference directly and never instantiate a trainer.
 -/
 def loadParamBits
-    {paramShapes : List Shape}
+    {paramShapes : List Spec.Shape}
     (path : System.FilePath) : IO (_root_.Runtime.Autograd.Torch.TList Float paramShapes) := do
   let psRes ← _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
   match psRes with
@@ -110,7 +110,7 @@ Read a JSON bits checkpoint, returning an error string instead of throwing an ex
 This is useful in batch tools or CI-style runs where you want to keep going and report failures.
 -/
 def readParamBits
-    {paramShapes : List Shape}
+    {paramShapes : List Spec.Shape}
     (path : System.FilePath) : IO (Except String (_root_.Runtime.Autograd.Torch.TList Float paramShapes)) :=
   _root_.Runtime.Autograd.TorchLean.ParamIO.readParamBits (ss := paramShapes) path
 

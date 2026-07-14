@@ -56,20 +56,20 @@ public lemma castVec_proof_irrel {n m : Nat} (h₁ h₂ : n = m) (v : Vec n) :
   rfl
 
 /-!
-`reshape` is linear: on vectors it is just a type cast along `Shape.size` equality.
+`reshape` is linear: on vectors it is just a type cast along `Spec.Shape.size` equality.
 We implement it as a `Node` to keep the DAG theorem applicable.
 -/
 
 /--
 `reshape` node: reinterpret the same underlying coordinates as a different shape.
 
-This is only definable when `Shape.size s₁ = Shape.size s₂`; at the vector level it is a cast.
+This is only definable when `Spec.Shape.size s₁ = Spec.Shape.size s₂`; at the vector level it is a cast.
 
 PyTorch analogue: `view`/`reshape` operations that do not change the total number of elements.
 https://pytorch.org/docs/stable/tensor_view.html
 -/
 def reshape {Γ : List Shape} {s₁ s₂ : Shape}
-    (idx : Idx Γ s₁) (h : Shape.size s₁ = Shape.size s₂) : Node Γ s₂ :=
+    (idx : Idx Γ s₁) (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) : Node Γ s₂ :=
   Node.ofVec (Γ := Γ) (τ := s₂)
     (f := fun xV => castVec h (CtxVec.get (Γ := Γ) (s := s₁) idx xV))
     (jvp := fun _xV dxV => castVec h (CtxVec.get (Γ := Γ) (s := s₁) idx dxV))
@@ -84,10 +84,10 @@ def reshape {Γ : List Shape} {s₁ s₂ : Shape}
 
 /-- `NodeFDerivCorrect` for `reshape` (it is linear/isometric). -/
 def reshapeFderiv {Γ : List Shape} {s₁ s₂ : Shape}
-    (idx : Idx Γ s₁) (h : Shape.size s₁ = Shape.size s₂) :
+    (idx : Idx Γ s₁) (h : Spec.Shape.size s₁ = Spec.Shape.size s₂) :
     NodeFDerivCorrect (reshape (Γ := Γ) (s₁ := s₁) (s₂ := s₂) idx h) := by
   classical
-  let Rlin : Vec (Shape.size s₁) →L[ℝ] Vec (Shape.size s₂) := Graph.castCLM (h := h)
+  let Rlin : Vec (Spec.Shape.size s₁) →L[ℝ] Vec (Spec.Shape.size s₂) := Graph.castCLM (h := h)
   refine
     { deriv := fun _xV => Rlin.comp (CtxVec.getCLM (Γ := Γ) (s := s₁) idx)
       hasFDerivAt := ?_
@@ -107,24 +107,24 @@ def reshapeFderiv {Γ : List Shape} {s₁ s₂ : Shape}
 
 /-!
 `flatten` is a specialization of `reshape` to the canonical vector shape
-`(.dim (Shape.size s) .scalar)`.
+`(.dim (Spec.Shape.size s) .scalar)`.
 -/
 
 /--
-`flatten` node: specialization of `reshape` to the canonical vector shape `(.dim (Shape.size s)
+`flatten` node: specialization of `reshape` to the canonical vector shape `(.dim (Spec.Shape.size s)
   .scalar)`.
 
 PyTorch analogue: `flatten` when applied to a contiguous tensor.
 https://pytorch.org/docs/stable/generated/torch.flatten.html
 -/
 def flatten {Γ : List Shape} {s : Shape} (idx : Idx Γ s) :
-    Node Γ (.dim (Shape.size s) .scalar) :=
-  reshape (Γ := Γ) (s₁ := s) (s₂ := .dim (Shape.size s) .scalar) idx (by simp [Shape.size])
+    Node Γ (.dim (Spec.Shape.size s) .scalar) :=
+  reshape (Γ := Γ) (s₁ := s) (s₂ := .dim (Spec.Shape.size s) .scalar) idx (by simp [Spec.Shape.size])
 
 /-- `NodeFDerivCorrect` for `flatten`. -/
 def flattenFderiv {Γ : List Shape} {s : Shape} (idx : Idx Γ s) :
     NodeFDerivCorrect (flatten (Γ := Γ) (s := s) idx) :=
-  reshapeFderiv (Γ := Γ) (s₁ := s) (s₂ := .dim (Shape.size s) .scalar) idx (by simp [Shape.size])
+  reshapeFderiv (Γ := Γ) (s₁ := s) (s₂ := .dim (Spec.Shape.size s) .scalar) idx (by simp [Spec.Shape.size])
 
 -- ---------------------------------------------------------------------------
 -- Generic coordinate reindexing (`Vec n` ↔ `Vec m`) via a `Fin` equivalence
@@ -208,24 +208,24 @@ def swapFirstTwo3d {Γ : List Shape} {m n : Nat} {rest : Shape}
     Node Γ (.dim n (.dim m rest)) :=
   let sIn : Shape := .dim m (.dim n rest)
   let sOut : Shape := .dim n (.dim m rest)
-  let k : Nat := Shape.size rest
-  let e : Fin (Shape.size sIn) ≃ Fin (Shape.size sOut) := swapFirstTwoEquiv m n k
+  let k : Nat := Spec.Shape.size rest
+  let e : Fin (Spec.Shape.size sIn) ≃ Fin (Spec.Shape.size sOut) := swapFirstTwoEquiv m n k
   Node.ofVec (Γ := Γ) (τ := sOut)
     (f := fun xV =>
-      reindexVec (n := Shape.size sIn) (m := Shape.size sOut) e
+      reindexVec (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
         (CtxVec.get (Γ := Γ) (s := sIn) idx xV))
     (jvp := fun _xV dxV =>
-      reindexVec (n := Shape.size sIn) (m := Shape.size sOut) e
+      reindexVec (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
         (CtxVec.get (Γ := Γ) (s := sIn) idx dxV))
     (vjp := fun _xV δV =>
       CtxVec.single (Γ := Γ) (s := sIn) idx
-        (reindexVec (n := Shape.size sOut) (m := Shape.size sIn) e.symm δV))
+        (reindexVec (n := Spec.Shape.size sOut) (m := Spec.Shape.size sIn) e.symm δV))
     (correct_inner := by
       intro _xV dxV δV
       classical
       have hctx :=
         CtxVec.inner_get_single (Γ := Γ) (s := sIn) idx dxV
-          (reindexVec (n := Shape.size sOut) (m := Shape.size sIn) e.symm δV)
+          (reindexVec (n := Spec.Shape.size sOut) (m := Spec.Shape.size sIn) e.symm δV)
       have hperm :=
         inner_reindex_left (e := e)
           (x := CtxVec.get (Γ := Γ) (s := sIn) idx dxV)
@@ -239,11 +239,11 @@ def swapFirstTwo3dFderiv {Γ : List Shape} {m n : Nat} {rest : Shape}
   classical
   let sIn : Shape := .dim m (.dim n rest)
   let sOut : Shape := .dim n (.dim m rest)
-  let k : Nat := Shape.size rest
-  let e : Fin (Shape.size sIn) ≃ Fin (Shape.size sOut) := swapFirstTwoEquiv m n k
-  let P : Vec (Shape.size sIn) →L[ℝ] Vec (Shape.size sOut) :=
-    reindexLin (n := Shape.size sIn) (m := Shape.size sOut) e
-  let D : CtxVec Γ →L[ℝ] Vec (Shape.size sOut) :=
+  let k : Nat := Spec.Shape.size rest
+  let e : Fin (Spec.Shape.size sIn) ≃ Fin (Spec.Shape.size sOut) := swapFirstTwoEquiv m n k
+  let P : Vec (Spec.Shape.size sIn) →L[ℝ] Vec (Spec.Shape.size sOut) :=
+    reindexLin (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
+  let D : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size sOut) :=
     P.comp (CtxVec.getCLM (Γ := Γ) (s := sIn) idx)
   refine
     { deriv := fun _ => D
@@ -274,7 +274,7 @@ def swapFirstTwo3dFderiv {Γ : List Shape} {m n : Nat} {rest : Shape}
 /-- Underlying coordinate permutation for transposing the last two axes of a 3D tensor. -/
 public def transposeLastTwoEquiv (a b c : Nat) :
     Fin (a * (b * (c * 1))) ≃ Fin (a * (c * (b * 1))) :=
-  -- Work with the definitional sizes coming from `Shape.size`: `c` contributes a `* 1` from the
+  -- Work with the definitional sizes coming from `Spec.Shape.size`: `c` contributes a `* 1` from the
   -- trailing `.scalar`.
   let swapBC : Fin (b * (c * 1)) ≃ Fin (c * (b * 1)) :=
     let e_b_c1 : (Fin b × Fin (c * 1)) ≃ Fin (b * (c * 1)) := finProdFinEquiv
@@ -306,23 +306,23 @@ def transpose3dLastTwo {Γ : List Shape} {a b c : Nat}
     Node Γ (.dim a (.dim c (.dim b .scalar))) :=
   let sIn : Shape := .dim a (.dim b (.dim c .scalar))
   let sOut : Shape := .dim a (.dim c (.dim b .scalar))
-  let e : Fin (Shape.size sIn) ≃ Fin (Shape.size sOut) := transposeLastTwoEquiv a b c
+  let e : Fin (Spec.Shape.size sIn) ≃ Fin (Spec.Shape.size sOut) := transposeLastTwoEquiv a b c
   Node.ofVec (Γ := Γ) (τ := sOut)
     (f := fun xV =>
-      reindexVec (n := Shape.size sIn) (m := Shape.size sOut) e
+      reindexVec (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
         (CtxVec.get (Γ := Γ) (s := sIn) idx xV))
     (jvp := fun _xV dxV =>
-      reindexVec (n := Shape.size sIn) (m := Shape.size sOut) e
+      reindexVec (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
         (CtxVec.get (Γ := Γ) (s := sIn) idx dxV))
     (vjp := fun _xV δV =>
       CtxVec.single (Γ := Γ) (s := sIn) idx
-        (reindexVec (n := Shape.size sOut) (m := Shape.size sIn) e.symm δV))
+        (reindexVec (n := Spec.Shape.size sOut) (m := Spec.Shape.size sIn) e.symm δV))
     (correct_inner := by
       intro _xV dxV δV
       classical
       have hctx :=
         CtxVec.inner_get_single (Γ := Γ) (s := sIn) idx dxV
-          (reindexVec (n := Shape.size sOut) (m := Shape.size sIn) e.symm δV)
+          (reindexVec (n := Spec.Shape.size sOut) (m := Spec.Shape.size sIn) e.symm δV)
       -- `inner_reindex_left` is exactly the isometry/adjointness property for the permutation.
       have hperm :=
         inner_reindex_left (e := e)
@@ -338,10 +338,10 @@ def transpose3dLastTwoFderiv {Γ : List Shape} {a b c : Nat}
   classical
   let sIn : Shape := .dim a (.dim b (.dim c .scalar))
   let sOut : Shape := .dim a (.dim c (.dim b .scalar))
-  let e : Fin (Shape.size sIn) ≃ Fin (Shape.size sOut) := transposeLastTwoEquiv a b c
-  let P : Vec (Shape.size sIn) →L[ℝ] Vec (Shape.size sOut) :=
-    reindexLin (n := Shape.size sIn) (m := Shape.size sOut) e
-  let D : CtxVec Γ →L[ℝ] Vec (Shape.size sOut) :=
+  let e : Fin (Spec.Shape.size sIn) ≃ Fin (Spec.Shape.size sOut) := transposeLastTwoEquiv a b c
+  let P : Vec (Spec.Shape.size sIn) →L[ℝ] Vec (Spec.Shape.size sOut) :=
+    reindexLin (n := Spec.Shape.size sIn) (m := Spec.Shape.size sOut) e
+  let D : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size sOut) :=
     P.comp (CtxVec.getCLM (Γ := Γ) (s := sIn) idx)
   refine
     { deriv := fun _ => D

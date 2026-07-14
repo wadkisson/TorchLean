@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Runtime.PyTorch.Export.IRPyTorch
 public import NN.Verification.TorchLean.Compile
 
@@ -36,66 +36,81 @@ open TorchLean
 
 /-! ## Architectures -/
 
-def archLinear : nn.M (nn.Sequential (Shape.vec 2) (Shape.vec 1)) :=
-  nn.Linear 2 1
+def archLinear : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
+  nn.linear 2 1
 
-def archMLP : nn.M (nn.Sequential (Shape.vec 2) (Shape.vec 1)) :=
+def archMLP : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
   nn.Sequential![
-    nn.Linear 2 3,
-    nn.ReLU,
-    nn.Linear 3 1
+    nn.linear 2 3,
+    nn.relu,
+    nn.linear 3 1
   ]
 
-def archSumReduce : nn.M (nn.Sequential (Shape.vec 4) Shape.scalar) :=
-  nn.Sum (s := Shape.vec 4)
+def archSumReduce : nn.M (nn.Sequential (.dim 4 .scalar) Shape.scalar) :=
+  nn.sum (s := .dim 4 .scalar)
 
-def archAutoencoder : nn.M (nn.Sequential (Shape.vec 3) (Shape.vec 3)) :=
+def archAutoencoder : nn.M (nn.Sequential (.dim 3 .scalar) (.dim 3 .scalar)) :=
   nn.Sequential![
-    nn.Linear 3 2,
-    nn.Tanh,
-    nn.Linear 2 3
+    nn.linear 3 2,
+    nn.tanh,
+    nn.linear 2 3
   ]
 
-def archCNN : nn.M (nn.Sequential (Shape.images 1 1 4 4) (shape![1, 3])) :=
-  let featDim : Nat := Shape.size (Shape.CHW 2 2 2)
-  nn.Sequential![
-    nn.Conv2d (n := 1) (inC := 1) (inH := 4) (inW := 4)
-      { outC := 2, kH := 3, kW := 3, stride := 1, padding := 0 },
-    nn.ReLU,
-    nn.FlattenBatch (n := 1) (s := Shape.CHW 2 2 2),
-    nn.Linear featDim 3 (Shape.vec 1)
-  ]
+def archCNN : nn.M (nn.Sequential (.dim 1 (.dim 1 (.dim 4 (.dim 4 .scalar)))) (shape![1, 3])) :=
+  let cfg : nn.models.CnnConfig 2 :=
+    { batch := 1
+      inChannels := 1
+      spatial := #v[4, 4]
+      outDim := 3
+      conv :=
+        { outChannels := 2
+          kernel := #v[3, 3]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide }
+      pool :=
+        { kernel := #v[1, 1]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide } }
+  by
+    simpa [cfg, nn.models.cnnInShape, nn.models.cnnOutShape, Spec.Shape.ofList] using
+      nn.models.cnn cfg
 
 def archConvMLP :
-    nn.M (nn.Sequential (Shape.images 1 1 3 3) (shape![1, 1])) :=
-  -- Conv output is `Images 1 1 2 2`; flattening gives `Mat 1 4`.
-  let featDim : Nat := Shape.size (Shape.CHW 1 2 2)
-  nn.Sequential![
-    nn.Conv2d (n := 1) (inC := 1) (inH := 3) (inW := 3)
-      { outC := 1, kH := 2, kW := 2, stride := 1, padding := 0 },
-    nn.ReLU,
-    nn.FlattenBatch (n := 1) (s := Shape.CHW 1 2 2),
-    nn.Linear featDim 3 (Shape.vec 1),
-    nn.ReLU,
-    nn.Linear 3 1 (Shape.vec 1)
-  ]
+    nn.M (nn.Sequential (.dim 1 (.dim 1 (.dim 3 (.dim 3 .scalar)))) (shape![1, 1])) :=
+  let cfg : nn.models.CnnConfig 2 :=
+    { batch := 1
+      inChannels := 1
+      spatial := #v[3, 3]
+      outDim := 1
+      conv :=
+        { outChannels := 1
+          kernel := #v[2, 2]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide }
+      pool :=
+        { kernel := #v[1, 1]
+          kernelNonzero := by intro i; fin_cases i <;> decide
+          strideNonzero := by intro i; fin_cases i <;> decide } }
+  by
+    simpa [cfg, nn.models.cnnInShape, nn.models.cnnOutShape, Spec.Shape.ofList] using
+      nn.models.cnn cfg
 
 def archMHA :
     nn.M (nn.Sequential (shape![1, 4, 8]) (shape![1, 4, 8])) :=
-  nn.MultiheadAttentionLayer (batch := 1) (n := 4) (dModel := 8)
+  nn.multiheadAttention (batch := 1) (n := 4) (dModel := 8)
     { numHeads := 2, headDim := 4 }
 
-def archMHAMask : Tensor.T Bool (Shape.mat 4 4) :=
+def archMHAMask : Tensor.T Bool (.dim 4 (.dim 4 .scalar)) :=
   text.causalMask 4
 
 def archMHAMasked :
     nn.M (nn.Sequential (shape![1, 4, 8]) (shape![1, 4, 8])) :=
-  nn.MultiheadAttentionLayer (batch := 1) (n := 4) (dModel := 8)
+  nn.multiheadAttention (batch := 1) (n := 4) (dModel := 8)
     { numHeads := 2, headDim := 4 } (mask := some archMHAMask)
 
 def archTransformer :
     nn.M (nn.Sequential (shape![1, 2, 2]) (shape![1, 2, 2])) :=
-  nn.TransformerEncoderBlock (batch := 1) (n := 2) (dModel := 2)
+  nn.transformerEncoderBlock (batch := 1) (n := 2) (dModel := 2)
     { numHeads := 1
     , headDim := 2
     , ffnHidden := 2 }

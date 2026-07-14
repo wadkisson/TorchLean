@@ -25,7 +25,7 @@ the infoview. It is designed for:
 - teaching/exposition in the manual.
 
 It is **not** intended to be used inside proofs, and it is kept out of TorchLean’s default build
-surface (you must explicitly import `NN.Entrypoint.Widgets` or a concrete widget module such as
+surface (you must explicitly import `NN.Widgets` or a concrete widget module such as
 `NN.Widgets.Core.Tensor`).
 
 Implementation note:
@@ -268,8 +268,8 @@ def tensorHtml {α : Type} [ToString α] {s : Shape} (t : Tensor α s)
   let header :=
     <div style={json% {"display": "flex", "gap": "8px", "flex-wrap": "wrap", "margin-bottom":
       "8px"}}>
-      {pill s!"shape={TensorInternal.dimsString s}"} {pill s!"rank={Shape.rank s}"} {pill
-        s!"size={Shape.size s}"}
+      {pill s!"shape={TensorInternal.dimsString s}"} {pill s!"rank={Spec.Shape.rank s}"} {pill
+        s!"size={Spec.Shape.size s}"}
     </div>;
   -- Default to `ToString` element rendering, but allow specialized renderers via
   -- `TensorElemView` instances (when the caller imports them).
@@ -341,7 +341,7 @@ def tensorStatsHtml {α : Type} [Context α] [ToString α] {s : Shape} (t : Tens
       }}>
         <div style={json% {"display": "flex", "gap": "8px", "flex-wrap": "wrap", "margin-bottom":
           "10px"}}>
-          {pill "Tensor stats"} {pill s!"shape={dimsString s}"} {pill s!"size={Shape.size s}"}
+          {pill "Tensor stats"} {pill s!"shape={dimsString s}"} {pill s!"size={Spec.Shape.size s}"}
         </div>
         <div style={json% {"display": "flex", "gap": "8px", "flex-wrap": "wrap"}}>
           {pill s!"min={toString mn}"}

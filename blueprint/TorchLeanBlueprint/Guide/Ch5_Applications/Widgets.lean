@@ -1,5 +1,5 @@
 import VersoManual
-import NN.Entrypoint.Widgets
+import NN.Widgets
 import NN.Spec.Core.Tensor.Core
 import NN.IR.Graph
 import NN.IR.Semantics
@@ -22,7 +22,7 @@ prove theorems. They let a reader see the Lean objects that the semantics and th
 tensors, IR graphs, shape inference results, Float32 bit patterns, CROWN bounds, autograd tapes,
 gradients, and training logs.
 
-The [widgets source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) is collected by `NN.Entrypoint.Widgets`. Import that entrypoint
+The [widgets source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) is collected by `NN.Widgets`. Import that module
 when you want only the widget layer; `import NN` includes it as part of the broad main library
 umbrella.
 

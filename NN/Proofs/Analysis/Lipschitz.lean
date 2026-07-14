@@ -38,7 +38,7 @@ derive Lipschitz-style bounds for common neural-network building blocks.
 - L2/L1/L∞ norms correspond to PyTorch’s `torch.linalg.*_norm` / `torch.linalg.norm` APIs.
   https://pytorch.org/docs/stable/generated/torch.linalg.vector_norm.html
   https://pytorch.org/docs/stable/generated/torch.linalg.norm.html
-- ReLU corresponds to `torch.nn.functional.relu` (and `torch.nn.ReLU`).
+- ReLU corresponds to `torch.nn.functional.relu` (and `torch.nn.relu`).
   https://pytorch.org/docs/stable/generated/torch.nn.functional.relu.html
 
 ## Typical downstream use

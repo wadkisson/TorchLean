@@ -36,7 +36,7 @@ structure TransformerEncoderConfig where
 deriving Repr
 
 /-- Batched token-embedding shape used by the Transformer encoder helper. -/
-abbrev transformerEncoderShape (cfg : TransformerEncoderConfig) : Shape :=
+abbrev transformerEncoderShape (cfg : TransformerEncoderConfig) : Spec.Shape :=
   shape![cfg.batch, cfg.seqLen, cfg.dModel]
 
 /-- Build one Transformer encoder block with input/output shape `(batch × seqLen × dModel)`. -/

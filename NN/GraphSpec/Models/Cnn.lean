@@ -27,9 +27,9 @@ The point of GraphSpec is that the *shape interface is part of the type*. Convol
 therefore bake their output shapes into the type, using the standard formulas:
 
 - Conv2D:
-  `outH = (inH + 2*padding - kH) / stride + 1` (and similarly for `outW`)
+  `outH = Spec.Shape.slidingWindowOutDim inH kH stride padding` (and similarly for `outW`)
 - MaxPool2D:
-  `outH = (inH - kH) / stride + 1` (and similarly for `outW`)
+  `outH = Spec.Shape.slidingWindowOutDim inH kH stride 0` (and similarly for `outW`)
 
 This file defines small helper abbreviations (`outH/outW/poolH/poolW`) so that the overall
 classifier head shape (the input dimension to the final `Linear`) is computed once and reused.
@@ -55,19 +55,19 @@ open NN.Tensor
 
 /-- Convolution output height formula (standard DL convention). -/
 abbrev outH (inH kH stride padding : Nat) : Nat :=
-  (inH + 2 * padding - kH) / stride + 1
+  Spec.Shape.slidingWindowOutDim inH kH stride padding
 
 /-- Convolution output width formula (standard DL convention). -/
 abbrev outW (inW kW stride padding : Nat) : Nat :=
-  (inW + 2 * padding - kW) / stride + 1
+  Spec.Shape.slidingWindowOutDim inW kW stride padding
 
 /-- MaxPool output height formula. -/
 abbrev poolH (inH kH stride : Nat) : Nat :=
-  (inH - kH) / stride + 1
+  Spec.Shape.slidingWindowOutDim inH kH stride 0
 
 /-- MaxPool output width formula. -/
 abbrev poolW (inW kW stride : Nat) : Nat :=
-  (inW - kW) / stride + 1
+  Spec.Shape.slidingWindowOutDim inW kW stride 0
 
 /--
 Final feature-map height after:
@@ -98,9 +98,11 @@ then the flattened vector length is `(CHW c2 featH featW).size`.
 abbrev featSize
     (c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1 poolStride2 : Nat)
       : Nat :=
-  (Shape.CHW c2
-    (featH inH kH stride1 padding1 poolKH poolStride1 stride2 padding2 poolStride2)
-    (featW inW kW stride1 padding1 poolKW poolStride1 stride2 padding2 poolStride2)).size
+  Spec.Shape.size
+    (.dim c2
+      (.dim (featH inH kH stride1 padding1 poolKH poolStride1 stride2 padding2 poolStride2)
+        (.dim (featW inW kW stride1 padding1 poolKW poolStride1 stride2 padding2 poolStride2)
+          .scalar)))
 
 /--
 2-conv CNN GraphSpec model.
@@ -129,21 +131,19 @@ def twoConvCnn
     {h_poolKH : poolKH ≠ 0} {h_poolKW : poolKW ≠ 0}
     {h_poolStride1 : poolStride1 ≠ 0} {h_poolStride2 : poolStride2 ≠ 0} :
     Graph
-      [ Shape.OIHW c1 inC kH kW, Shape.Vec c1
-      , Shape.OIHW c2 c1 kH kW, Shape.Vec c2
-      , Shape.Mat outDim (featSize c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW
-        poolStride1 poolStride2)
-      , Shape.Vec outDim ]
-      (Shape.CHW inC inH inW) (Shape.Vec outDim) :=
+      [ .dim c1 (.dim inC (.dim kH (.dim kW .scalar))), .dim c1 .scalar
+      , .dim c2 (.dim c1 (.dim kH (.dim kW .scalar))), .dim c2 .scalar
+      , .dim outDim (.dim (featSize c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW
+        poolStride1 poolStride2) .scalar)
+      , .dim outDim .scalar ]
+      (.dim inC (.dim inH (.dim inW .scalar))) (.dim outDim .scalar) :=
   Graph.conv2d (inC := inC) (outC := c1) (kH := kH) (kW := kW) (stride := stride1) (padding :=
     padding1)
     (inH := inH) (inW := inW) (h_inC := h_inC) (h_kH := h_kH) (h_kW := h_kW)
     (hStride := h_stride1)
   >>>
   Graph.relu
-    (Shape.CHW c1
-      (outH inH kH stride1 padding1)
-      (outW inW kW stride1 padding1))
+    (.dim c1 (.dim (outH inH kH stride1 padding1) (.dim (outW inW kW stride1 padding1) .scalar)))
   >>>
   Graph.maxPool2d
     (kH := poolKH) (kW := poolKW)
@@ -159,9 +159,7 @@ def twoConvCnn
     (h_inC := h_c1) (h_kH := h_kH) (h_kW := h_kW) (hStride := h_stride2)
   >>>
   Graph.relu
-    (Shape.CHW c2
-      (outH (poolH (outH inH kH stride1 padding1) poolKH poolStride1) kH stride2 padding2)
-      (outW (poolW (outW inW kW stride1 padding1) poolKW poolStride1) kW stride2 padding2))
+    (.dim c2 (.dim (outH (poolH (outH inH kH stride1 padding1) poolKH poolStride1) kH stride2 padding2) (.dim (outW (poolW (outW inW kW stride1 padding1) poolKW poolStride1) kW stride2 padding2) .scalar)))
   >>>
   Graph.maxPool2d
     (kH := poolKH) (kW := poolKW)
@@ -171,9 +169,7 @@ def twoConvCnn
     (h_kH := h_poolKH) (h_kW := h_poolKW) (hStride := h_poolStride2)
   >>>
   Graph.flatten
-    (Shape.CHW c2
-      (featH inH kH stride1 padding1 poolKH poolStride1 stride2 padding2 poolStride2)
-      (featW inW kW stride1 padding1 poolKW poolStride1 stride2 padding2 poolStride2))
+    (.dim c2 (.dim (featH inH kH stride1 padding1 poolKH poolStride1 stride2 padding2 poolStride2) (.dim (featW inW kW stride1 padding1 poolKW poolStride1 stride2 padding2 poolStride2) .scalar)))
   >>>
   -- Linear head: interpret the flattened feature vector as `Vec (featSize ...)`.
   Graph.linear
@@ -199,13 +195,13 @@ def twoConvCnnDAGModelZeroInit
     {h_poolKH : poolKH ≠ 0} {h_poolKW : poolKW ≠ 0}
     {h_poolStride1 : poolStride1 ≠ 0} {h_poolStride2 : poolStride2 ≠ 0} :
     DAG.Model
-      [ Shape.OIHW c1 inC kH kW, Shape.Vec c1
-      , Shape.OIHW c2 c1 kH kW, Shape.Vec c2
-      , Shape.Mat outDim (featSize c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW
-        poolStride1 poolStride2)
-      , Shape.Vec outDim ]
-      [Shape.CHW inC inH inW]
-      (Shape.Vec outDim) :=
+      [ .dim c1 (.dim inC (.dim kH (.dim kW .scalar))), .dim c1 .scalar
+      , .dim c2 (.dim c1 (.dim kH (.dim kW .scalar))), .dim c2 .scalar
+      , .dim outDim (.dim (featSize c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW
+        poolStride1 poolStride2) .scalar)
+      , .dim outDim .scalar ]
+      [.dim inC (.dim inH (.dim inW .scalar))]
+      (.dim outDim .scalar) :=
   LowerToDAG.Graph.toDAGModelZeroInit <|
     twoConvCnn
       (inC := inC) (c1 := c1) (c2 := c2) (outDim := outDim)

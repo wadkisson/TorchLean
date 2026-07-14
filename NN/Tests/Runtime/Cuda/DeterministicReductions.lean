@@ -69,7 +69,7 @@ def runScatterAddTwice : IO Unit := do
     (Buffer.toFloatArray y1) (Buffer.toFloatArray y2)
 
 def outDim (inDim k stride padding : Nat) : Nat :=
-  (inDim + 2 * padding - k) / stride + 1
+  Spec.Shape.slidingWindowOutDim inDim k stride padding
 
 def runAvgPool2dBwdTwice : IO Unit := do
   IO.println "== deterministic avgpool2d_bwd: exact repeatability =="

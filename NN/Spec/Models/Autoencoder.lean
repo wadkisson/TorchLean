@@ -93,7 +93,7 @@ def autoencoderActivationDerivSpec {n : Nat}
 
 `h = act(W_enc x + b_enc)`.
 
-PyTorch analogy: `act(linear(x))` for a single `nn.Linear`.
+PyTorch analogy: `act(linear(x))` for a single `nn.linear`.
 -/
 def autoencoderEncodeSpec {inputDim hiddenDim : Nat}
   (m : AutoencoderSpec α inputDim hiddenDim)

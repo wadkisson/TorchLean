@@ -49,7 +49,7 @@ This avoids needing a separate `log` approximation lemma while remaining extensi
 
 /-- Half-ULP rounding budget at the scalar value `1`, used in the softplus helper bounds. -/
 def oneEps : ℝ :=
-  neuralUlp β fexp (1 : ℝ) TrainingPhase.forward / 2
+  neuralUlp β fexp (1 : ℝ) / 2
 
 /--
 Scalar forward-error envelope for `exp`.
@@ -59,7 +59,7 @@ into one reusable bound for the later softplus/safe-log proofs.
 -/
 def expBoundScalar (a eps : ℝ) : ℝ :=
   Real.exp a + Real.exp (a + eps) +
-    neuralUlp β fexp (Real.exp a) TrainingPhase.forward / 2
+    neuralUlp β fexp (Real.exp a) / 2
 
 /-- Rounded representation of the scalar constant `1` at the `NF` backend. -/
 def oneHat : ℝ :=
@@ -79,15 +79,13 @@ def addBoundSoftplus (a eps : ℝ) : ℝ :=
   oneEps (β := β) (fexp := fexp) + expBoundScalar (β := β) (fexp := fexp) a eps +
     neuralUlp β fexp
         (oneHat (β := β) (fexp := fexp) (rnd := rnd) + expHat (β := β) (fexp := fexp) (rnd := rnd)
-          a)
-        TrainingPhase.forward / 2
+          a) / 2
 
 /-- Unconditional scalar forward-error bound for `softplus`, via the `safeLog` factorization. -/
 def softplusBoundScalar (a eps : ℝ) : ℝ :=
   addBoundSoftplus (β := β) (fexp := fexp) (rnd := rnd) a eps +
     neuralUlp β fexp
-        (safeLog (ε := (1 : ℝ)) (addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd) a))
-        TrainingPhase.forward / 2
+        (safeLog (ε := (1 : ℝ)) (addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd) a)) / 2
 
 /-- `softplus` implemented by `safeLog 1 (1 + exp x)` at the `NF` backend. -/
 def softplusR (xR : R) : R :=
@@ -188,8 +186,7 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
           neuralUlp β fexp
             (safeLog (ε := (1 : ℝ))
               (addHatSoftplus (β := β) (fexp := fexp) (rnd := rnd)
-                (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)))
-            TrainingPhase.forward / 2 := by
+                (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR))) / 2 := by
     simpa [NFBackend.toSpec, TorchLean.Floats.NF.toReal, hYVal] using hlog
 
   have hy_ge : (1 : ℝ) ≤ y := by
@@ -397,8 +394,7 @@ lemma approx_safe_log_nf {x : ℝ} {xR : R} {eps ε : ℝ}
       (1 / ε) * eps +
         neuralUlp β fexp
             (Activation.Math.safeLogSpec (α := ℝ)
-              (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) ε)
-            TrainingPhase.forward / 2 := by
+              (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) ε) / 2 := by
   set xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
   have hx' : abs (xhat - x) ≤ eps := by
     simpa [xhat, abs_sub_comm] using hx
@@ -408,7 +404,7 @@ lemma approx_safe_log_nf {x : ℝ} {xR : R} {eps ε : ℝ}
           (toSpec (β := β) (fexp := fexp) (rnd := rnd)
               (safeLogSoftplusR (β := β) (fexp := fexp) (rnd := rnd) ε xR) -
             Activation.Math.safeLogSpec (α := ℝ) xhat ε) ≤
-        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) TrainingPhase.forward / 2
+        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) / 2
           := by
     -- `safe_logR` rounds the real `safe_log_spec`.
     simpa [safeLogSoftplusR, xhat, toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.ofReal,
@@ -450,12 +446,12 @@ lemma approx_safe_log_nf {x : ℝ} {xR : R} {eps ε : ℝ}
                 (Activation.Math.safeLogSpec (α := ℝ) xhat ε)
                 (Activation.Math.safeLogSpec (α := ℝ) x ε)
       _ ≤
-        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) TrainingPhase.forward / 2
+        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) / 2
           +
           (1 / ε) * eps := by
             exact add_le_add hround hdiff
       _ = (1 / ε) * eps +
-        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) TrainingPhase.forward / 2
+        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) xhat ε) / 2
           := by
             ring
   simpa [xhat] using this
@@ -469,7 +465,7 @@ def safeLogSoftplusBoundTensor {s : Shape} (ε eps : ℝ) (xR : Tensor R s) : Sp
   mapSpec
     (fun a =>
       (1 / ε) * eps +
-        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) a ε) TrainingPhase.forward / 2)
+        neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) a ε) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--
@@ -495,7 +491,7 @@ theorem approxT_safe_log_spec {s : Shape} (ε : ℝ) (hε : 0 < ε) :
       (fR := safeLogSoftplusR (β := β) (fexp := fexp) (rnd := rnd) ε)
       (bnd := fun a eps =>
         (1 / ε) * eps +
-          neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) a ε) TrainingPhase.forward / 2)
+          neuralUlp β fexp (Activation.Math.safeLogSpec (α := ℝ) a ε) / 2)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa using

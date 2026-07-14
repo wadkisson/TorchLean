@@ -67,8 +67,8 @@ def reshapeVectorToMatrix (grid : Nat) :
     LayerDef (vec grid) (mat grid 1) :=
   let s₁ : Shape := vec grid
   let s₂ : Shape := mat grid 1
-  have h : Shape.size s₁ = Shape.size s₂ := by
-    simp [Shape.size, s₁, s₂]
+  have h : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
+    simp [Spec.Shape.size, s₁, s₂]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -81,8 +81,8 @@ def reshapeMatrixToVector (grid : Nat) :
     LayerDef (mat grid 1) (vec grid) :=
   let s₁ : Shape := mat grid 1
   let s₂ : Shape := vec grid
-  have h : Shape.size s₁ = Shape.size s₂ := by
-    simp [Shape.size, s₁, s₂]
+  have h : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
+    simp [Spec.Shape.size, s₁, s₂]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -129,8 +129,8 @@ def reshapeModesMatToBmmIn (modes width : Nat) :
     LayerDef (mat modes width) (.dim modes (.dim 1 (.dim width .scalar))) :=
   let s₁ : Shape := mat modes width
   let s₂ : Shape := .dim modes (.dim 1 (.dim width .scalar))
-  have h : Shape.size s₁ = Shape.size s₂ := by
-    simp [Shape.size, s₁, s₂]
+  have h : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
+    simp [Spec.Shape.size, s₁, s₂]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -143,8 +143,8 @@ def reshapeBmmOutToModesMat (modes width : Nat) :
     LayerDef (.dim modes (.dim 1 (.dim width .scalar))) (mat modes width) :=
   let s₁ : Shape := .dim modes (.dim 1 (.dim width .scalar))
   let s₂ : Shape := mat modes width
-  have h : Shape.size s₁ = Shape.size s₂ := by
-    simp [Shape.size, s₁, s₂]
+  have h : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
+    simp [Spec.Shape.size, s₁, s₂]
   { paramShapes := []
     initParams := .nil
     forward := fun _ {α} _ _ =>
@@ -494,8 +494,8 @@ def block
                 (wr wi : _root_.Runtime.Autograd.TorchLean.NN.Seq.RefT (m := m) (α := α)
                   (_root_.Runtime.Autograd.TorchLean.NN.FNO1D.spectralWShape modes width)) := do
               let hIn :
-                  Shape.size (mat modes width) = Shape.size (.dim modes (.dim 1 (.dim width .scalar))) := by
-                simp [Shape.size]
+                  Spec.Shape.size (mat modes width) = Spec.Shape.size (.dim modes (.dim 1 (.dim width .scalar))) := by
+                simp [Spec.Shape.size]
               let xr3 ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
                 (s₁ := mat modes width) (s₂ := .dim modes (.dim 1 (.dim width .scalar))) xr hIn
               let xi3 ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
@@ -513,8 +513,8 @@ def block
               let yi3 ← _root_.Runtime.Autograd.Torch.add (m := m) (α := α)
                 (s := .dim modes (.dim 1 (.dim width .scalar))) xrWi xiWr
               let hOut :
-                  Shape.size (.dim modes (.dim 1 (.dim width .scalar))) = Shape.size (mat modes width) := by
-                simp [Shape.size]
+                  Spec.Shape.size (.dim modes (.dim 1 (.dim width .scalar))) = Spec.Shape.size (mat modes width) := by
+                simp [Spec.Shape.size]
               let yr ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)
                 (s₁ := .dim modes (.dim 1 (.dim width .scalar))) (s₂ := mat modes width) yr3 hOut
               let yi ← _root_.Runtime.Autograd.Torch.reshape (m := m) (α := α)

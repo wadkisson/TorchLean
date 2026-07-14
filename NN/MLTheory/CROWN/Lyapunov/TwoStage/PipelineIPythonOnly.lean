@@ -107,10 +107,10 @@ Usage (via the CLI tool registered in `NN/Verification/CLI.lean`):
   \"[-1,1]x[-1,1]\" --dynamics van_der_pol`
 -/
 def main (args : List String) : IO Unit := do
-  let args := NN.API.CLI.dropDashDash args
+  let args := TorchLean.CLI.dropDashDash args
 
   let modelPath ←
-    match NN.API.CLI.flagValue? args "model" with
+    match TorchLean.CLI.flagValue? args "model" with
     | .ok (some path) => pure path
     | .ok none => throw <| IO.userError "expected `--model <path>`"
     | .error e => throw <| IO.userError e
@@ -132,7 +132,7 @@ def main (args : List String) : IO Unit := do
     stem.replace "-" "_" |>.replace "." "_"
 
   let outPath ←
-    match NN.API.CLI.flagValue? args "out" with
+    match TorchLean.CLI.flagValue? args "out" with
     | .ok (some path) => pure path
     | .ok none => pure s!"NN/MLTheory/CROWN/Lyapunov/Generated/{safeName}.lean"
     | .error e => throw <| IO.userError e
@@ -153,7 +153,7 @@ def main (args : List String) : IO Unit := do
       "NN.MLTheory.CROWN.Lyapunov.Generated"]
 
   let forwarded : Array String :=
-    (NN.API.CLI.stripFlagValues args ["out", "format", "lean-namespace"]).toArray
+    (TorchLean.CLI.stripFlagValues args ["out", "format", "lean-namespace"]).toArray
 
   let proc := (← IO.Process.spawn { cmd := "python3", args := baseArgs ++ forwarded, stdout := .piped, stderr := .inherit })
   let out ← proc.stdout.readToEnd

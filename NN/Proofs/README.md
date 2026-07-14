@@ -6,7 +6,7 @@ specifications, graph semantics, and verification checkers begin to acquire theo
 The curated import is:
 
 ```lean
-import NN.Entrypoint.Proofs
+import NN.Proofs
 ```
 
 Ordinary model code should not import this directory. Use it when the file is proving a fact about

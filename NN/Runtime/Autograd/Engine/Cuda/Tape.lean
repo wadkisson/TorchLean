@@ -10,7 +10,7 @@ This is the GPU/runtime analogue of `NN.Runtime.Autograd.Engine.Core`, but speci
 
 Notes:
 - The tape is pure: we use `Except String` for errors (no `IO` exceptions).
-- Buffers are assumed to be contiguous float32 arrays of length `Shape.size s`.
+- Buffers are assumed to be contiguous float32 arrays of length `Spec.Shape.size s`.
 - Backprop here is "dense": it returns a gradient buffer for every node id (zeros for unused).
 - This module contains tape machinery; differentiable CUDA ops live in
   `NN.Runtime.Autograd.Engine.Cuda.Ops`.
@@ -50,7 +50,7 @@ metadata with an opaque `Cuda.Buffer` handle.
 structure AnyBuffer where
   /-- Runtime shape metadata for the buffer. -/
   s : Shape
-  /-- Device buffer (float32). Length is expected to be `Shape.size s`. -/
+  /-- Device buffer (float32). Length is expected to be `Spec.Shape.size s`. -/
   buf : Buffer
 
 namespace AnyBuffer
@@ -65,7 +65,7 @@ def natToU32Checked (n : Nat) : Result UInt32 := do
 
 /-- Number of scalar elements as a `UInt32` (checked). -/
 def numelU32 (s : Shape) : Result UInt32 :=
-  natToU32Checked (Shape.size s)
+  natToU32Checked (Spec.Shape.size s)
 
 /-- Allocate a zero-filled buffer for a given shape. -/
 def zeros (s : Shape) : Result AnyBuffer := do
@@ -79,7 +79,7 @@ This is used by backprop to sum gradient contributions in DAGs.
 -/
 def add (a b : AnyBuffer) : Result AnyBuffer := by
   if decide (a.s = b.s) then
-    let expected := Shape.size a.s
+    let expected := Spec.Shape.size a.s
     if _hExpected : expected ≤ UInt32.size then
       let expectedU32 : UInt32 := UInt32.ofNat expected
       let aSize := Buffer.size a.buf
@@ -302,7 +302,7 @@ def addGradAll (t : Tape) (grads : Array AnyBuffer) (id : Nat) (g : AnyBuffer) :
       throw "autograd: internal error (gradient array out of bounds)"
   else if decide (g.s = node.value.s) then
     let g' : AnyBuffer := { s := node.value.s, buf := g.buf }
-    let expected := Shape.size node.value.s
+    let expected := Spec.Shape.size node.value.s
     if _hExpected : expected ≤ UInt32.size then
       let expectedU32 : UInt32 := UInt32.ofNat expected
       let gSize := Buffer.size g'.buf
@@ -318,7 +318,7 @@ def addGradAll (t : Tape) (grads : Array AnyBuffer) (id : Nat) (g : AnyBuffer) :
     if decide (existing.s = node.value.s) then
       let existing' : AnyBuffer := { s := node.value.s, buf := existing.buf }
       let existingSize := Buffer.size existing'.buf
-      let expected := Shape.size node.value.s
+      let expected := Spec.Shape.size node.value.s
       if _hExpected : expected ≤ UInt32.size then
         let expectedU32 : UInt32 := UInt32.ofNat expected
         if existingSize != expectedU32 then

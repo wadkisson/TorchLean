@@ -155,7 +155,7 @@ def mhaPostNormGraphFDerivCorrectAt
     {seqLen dModel numHeads headDim : Nat} (c ε : ℝ)
     (xV : CtxVec (ΓMHAWithNorm seqLen dModel numHeads headDim))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -176,7 +176,7 @@ def mhaPostNormGraphFDerivCorrectAt
                 (mhaResidualWithNormParamsDGraph (seqLen := seqLen) (dModel := dModel)
                   (numHeads := numHeads) (headDim := headDim) c).g xV))) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -230,7 +230,7 @@ theorem mhaPostNorm_backpropVec_eq_adjoint_fderiv_at
       CtxVec (ΓMHAWithNorm seqLen dModel numHeads headDim ++
         ssMHAWithPostNorm seqLen dModel numHeads headDim))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -251,7 +251,7 @@ theorem mhaPostNorm_backpropVec_eq_adjoint_fderiv_at
                 (mhaResidualWithNormParamsDGraph (seqLen := seqLen) (dModel := dModel)
                   (numHeads := numHeads) (headDim := headDim) c).g xV))) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -356,13 +356,13 @@ def seqFfnPostNormInputs {seqLen dModel dFF : Nat} :
 /-- Sequence-FFN graph while carrying the following LayerNorm's affine parameters. -/
 def seqFfnResidualWithNormParamsDGraph {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel))) :
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel))) :
     DGraph (ΓSeqFFNWithNorm seqLen dModel) (ssSeqFFNResidual seqLen dModel dFF) :=
   DGraph.weakenContext
     (seqFfnResidualDGraph (seqLen := seqLen) (dModel := dModel) (dFF := dFF)
@@ -376,13 +376,13 @@ Single SSA graph for the second post-norm Transformer encoder sublayer:
 -/
 def seqFfnPostNormGraph {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (ε : ℝ) :
     Graph (ΓSeqFFNWithNorm seqLen dModel) (ssSeqFFNWithPostNorm seqLen dModel dFF) :=
   .snoc
@@ -398,17 +398,17 @@ def seqFfnPostNormGraph {seqLen dModel dFF : Nat}
 def seqFfnPostNormGraphFDerivCorrectAt
     {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (ε : ℝ)
     (xV : CtxVec (ΓSeqFFNWithNorm seqLen dModel))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -427,7 +427,7 @@ def seqFfnPostNormGraphFDerivCorrectAt
                 (seqFfnResidualWithNormParamsDGraph (seqLen := seqLen) (dModel := dModel)
                   (dFF := dFF) fc1 b1 fc2 b2).g xV))) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -471,18 +471,18 @@ def seqFfnPostNormGraphFDerivCorrectAt
 theorem seqFfnPostNorm_backpropVec_eq_adjoint_fderiv_at
     {seqLen dModel dFF : Nat}
     (fc1 :
-      Vec (Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
-        Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
-    (b1 : Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)))
+      Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
+    (b1 : Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)))
     (fc2 :
-      Vec (Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
-        Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
-    (b2 : Vec (Shape.size (SeqFFNModelShape seqLen dModel)))
+      Vec (Spec.Shape.size (SeqFFNHiddenShape seqLen dFF)) →L[ℝ]
+        Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
+    (b2 : Vec (Spec.Shape.size (SeqFFNModelShape seqLen dModel)))
     (ε : ℝ)
     (xV : CtxVec (ΓSeqFFNWithNorm seqLen dModel))
     (seedV : CtxVec (ΓSeqFFNWithNorm seqLen dModel ++ ssSeqFFNWithPostNorm seqLen dModel dFF))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -501,7 +501,7 @@ theorem seqFfnPostNorm_backpropVec_eq_adjoint_fderiv_at
                 (seqFfnResidualWithNormParamsDGraph (seqLen := seqLen) (dModel := dModel)
                   (dFF := dFF) fc1 b1 fc2 b2).g xV))) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := LayerNorm.ΓLN seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -563,7 +563,7 @@ the variance-plus-epsilon branch is positive, and the standard deviation denomin
 def postNormGraphFderivCorrectAt
     {seqLen dModel : Nat} (ε : ℝ) (xV : CtxVec (ΓPostNorm seqLen dModel))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -573,7 +573,7 @@ def postNormGraphFderivCorrectAt
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε) xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -600,7 +600,7 @@ theorem postNorm_backpropVec_eq_adjoint_fderiv_at
     (xV : CtxVec (ΓPostNorm seqLen dModel))
     (seedV : CtxVec (ΓPostNorm seqLen dModel ++ ssPostNorm seqLen dModel))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -610,7 +610,7 @@ theorem postNorm_backpropVec_eq_adjoint_fderiv_at
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε) xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -659,7 +659,7 @@ theorem residualThenPostNorm_hasFDerivAt
     (x : E)
     (hResidual : HasFDerivAt residualPack DresidualPack x)
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -669,7 +669,7 @@ theorem residualThenPostNorm_hasFDerivAt
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε) (residualPack x)) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -756,7 +756,7 @@ theorem twoSublayerPostNormBlock_hasFDerivAt
     (x : E)
     (hAttnPack : HasFDerivAt attnPack DattnPack x)
     (hNorm1VarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -766,7 +766,7 @@ theorem twoSublayerPostNormBlock_hasFDerivAt
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε₁) (attnPack x)) i)
     (hNorm1StdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -782,7 +782,7 @@ theorem twoSublayerPostNormBlock_hasFDerivAt
           (ss := ssPostNorm seqLen dModel)
           (postNormGraph (seqLen := seqLen) (dModel := dModel) ε₁) (attnPack x)))
     (hNorm2VarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -797,7 +797,7 @@ theorem twoSublayerPostNormBlock_hasFDerivAt
                 (ss := ssPostNorm seqLen dModel)
                 (postNormGraph (seqLen := seqLen) (dModel := dModel) ε₁) (attnPack x)))) i)
     (hNorm2StdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -895,7 +895,7 @@ theorem residualAttentionPostNorm_backpropVec_eq_adjoint_fderiv_at
     (xV : CtxVec (ΓPostNorm seqLen dModel))
     (seedV : CtxVec (ΓPostNorm seqLen dModel ++ ssPostNorm seqLen dModel))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -905,7 +905,7 @@ theorem residualAttentionPostNorm_backpropVec_eq_adjoint_fderiv_at
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε) xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -938,7 +938,7 @@ theorem residualFeedForwardPostNorm_backpropVec_eq_adjoint_fderiv_at
     (xV : CtxVec (ΓPostNorm seqLen dModel))
     (seedV : CtxVec (ΓPostNorm seqLen dModel ++ ssPostNorm seqLen dModel))
     (hVarEpsPos :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         0 < CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix6 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)
@@ -948,7 +948,7 @@ theorem residualFeedForwardPostNorm_backpropVec_eq_adjoint_fderiv_at
             (ss := LayerNorm.ssPrefix6 seqLen dModel)
             (LayerNorm.layerNormPrefix6 (m := seqLen) (n := dModel) ε) xV) i)
     (hStdNe0 :
-      ∀ i : Fin (Shape.size (LayerNorm.VecShape seqLen)),
+      ∀ i : Fin (Spec.Shape.size (LayerNorm.VecShape seqLen)),
         CtxVec.get
           (Γ := ΓPostNorm seqLen dModel ++ LayerNorm.ssPrefix7 seqLen dModel)
           (s := LayerNorm.VecShape seqLen)

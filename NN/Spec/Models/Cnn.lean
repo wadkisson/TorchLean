@@ -42,7 +42,7 @@ nn.Sequential(
 ```
 
 All shapes are tracked at the type level; the feature dimension for the final `LinearSpec` is
-computed as `Shape.size` of the post-pooling feature map.
+computed as `Spec.Shape.size` of the post-pooling feature map.
 
 This is intended as a reference/specification of model structure, not as a tuned implementation.
 -/
@@ -59,14 +59,14 @@ open Activation
 
 namespace CNN
 
-/-- Output size for a conv along one spatial axis.
+/-- Output size for a convolution along one spatial axis.
 
-Matches the standard PyTorch formula (for `dilation = 1`, `groups = 1`):
-
-`out = (in + 2*padding - k) / stride + 1`.
+The shared shape helper agrees with the usual floor formula when the kernel and stride are valid,
+and returns zero for invalid geometry instead of manufacturing a one-cell output through truncated
+natural-number subtraction.
 -/
 abbrev convOut (input kernel stride padding : Nat) : Nat :=
-  (input + 2 * padding - kernel) / stride + 1
+  Spec.Shape.slidingWindowOutDim input kernel stride padding
 
 /-- Output size for a pooling op along one spatial axis (no padding).
 
@@ -75,7 +75,7 @@ Matches the standard formula:
 `out = (in - k) / stride + 1`.
 -/
 abbrev poolOut (input kernel stride : Nat) : Nat :=
-  (input - kernel) / stride + 1
+  Spec.Shape.slidingWindowOutDim input kernel stride 0
 
 /-- Output height after the first convolution stage. -/
 abbrev firstConvOutHeight (inH kH stride1 padding1 : Nat) : Nat :=
@@ -124,7 +124,7 @@ abbrev featShape
 abbrev featSize
   (c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1 poolStride2 : Nat) :
     Nat :=
-  Shape.size (featShape c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1
+  Spec.Shape.size (featShape c2 inH inW kH kW stride1 padding1 stride2 padding2 poolKH poolKW poolStride1
     poolStride2)
 
 end CNN

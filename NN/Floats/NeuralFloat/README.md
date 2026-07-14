@@ -14,17 +14,36 @@ the result of applying a declared rounding model to real arithmetic." Claims abo
 kernel, BLAS call, or libtorch operator should cite the executable bridge or trust-boundary statement
 that connects the backend to that rounding model.
 
-## Files
+## Relationship To Flocq
 
-- `Core.lean`: core datatypes, radix/exponent scaffolding, and the `NeuralFloat` record.
-- `Metadata.lean`: TorchLean metadata such as training phase, named precisions, and mixed-precision
-  presets.
-- `Formats.lean`: Flocq-style exponent functions and format predicates (`FIX`, `FLX`, `FLT`).
-- `Rounding.lean`: rounding modes and `neural_round` validation classes.
-- `NF.lean`: `NF`, the rounded scalar type used as a `Spec.Core.Context` instance.
-- `NNOps.lean`: rounded scalar functions used by neural-network specs.
-- `Conversion.lean`: conversion helpers with format and error metadata.
-- `ErrorBounds.lean`: reusable error-bound lemmas for composing proofs.
+This is a native Lean development that follows Flocq's mathematical organization; it is not a
+line-by-line translation of the Coq library. The implemented generic theory includes radix powers
+and magnitude, valid exponent functions, FIX/FLX/FLT and abrupt-underflow formats, canonical
+representations, directed and nearest rounding, round-away and round-to-odd, ULPs and neighboring
+values, relative and absolute error bounds, directed double rounding, and Sterbenz subtraction.
+
+Flocq is larger than this layer. In particular, its specialized proofs for individual arithmetic
+algorithms, effective-computation infrastructure, and Coq-specific application modules have not
+all been reproduced here. TorchLean's executable IEEE-754 binary32 development is instead under
+`NN/Floats/IEEEExec/`, with explicit bridge theorems connecting finite executable results to the
+rounded-real model. The calculation layer under `NN/Floats/Calc/` supplies bracket refinement,
+canonical truncation, and representation-level arithmetic used by the rounded-real proofs.
+
+## Structure
+
+- `Core.lean` defines radix powers and the exact mantissa/exponent carrier `NeuralFloat`.
+- `Metadata.lean` contains provenance annotations used by conversion and runtime-refinement code. It
+  does not define numerical semantics.
+- `Format/` defines magnitudes, digit counts, exponent functions, and representable grids.
+- `Rounding/` defines rounding modes and proves their order and double-rounding properties.
+- `Scalar/` packages rounded-real semantics as `NF` and supplies neural-network scalar operations.
+- `Analysis/` studies ULP spacing, neighboring values, and exact subtraction.
+- `Error/` proves absolute, relative, directed, and exact-residual results.
+- `Special/` contains execution policies such as flush-to-zero that intentionally differ from the
+  generic gradual-underflow model.
+
+Each directory has one umbrella module with the same name.  Import the narrow folder umbrella when
+possible; import `NN.Floats.NeuralFloat` only when the full generic theory is required.
 
 ## When To Use It
 
@@ -41,8 +60,22 @@ A useful mental model is:
 - runtime floats: what the backend actually computed, subject to the runtime boundary documented in
   `TRUST_BOUNDARIES.md`.
 
+`NF` deliberately permits direct construction from a real because comparison and approximation
+proofs sometimes need values that are not on the grid. Use `NF.ofReal` for rounded values and carry
+`NF.IsRepresentable` when a theorem relies on operand representability. Primitive arithmetic rounds
+its result even when an input was introduced through the raw constructor.
+
 ## What Belongs Here
 
 This layer is a good home for generic rounding definitions, format predicates, conversion metadata,
 and reusable error lemmas. It is not the place for CUDA performance claims, ATen kernel behavior, or
 end-to-end model accuracy results. Those claims need to name the backend and the evidence being used.
+
+## References
+
+- S. Boldo and G. Melquiond, "Flocq: A Unified Library for Proving Floating-Point Algorithms in
+  Coq," *IEEE ARITH*, 2011, doi:10.1109/ARITH.2011.40.
+- IEEE, *IEEE Standard for Floating-Point Arithmetic*, IEEE 754-2019.
+- D. Goldberg, "What Every Computer Scientist Should Know About Floating-Point Arithmetic,"
+  *ACM Computing Surveys* 23(1), 1991, doi:10.1145/103162.103163.
+- N. J. Higham, *Accuracy and Stability of Numerical Algorithms*, second edition, SIAM, 2002.

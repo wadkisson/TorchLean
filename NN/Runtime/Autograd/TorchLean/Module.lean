@@ -50,7 +50,7 @@ namespace Module
 /--
 Cast a Float tensor to a backend scalar type `α` by mapping a scalar cast function.
 
-This is mainly used to turn `tensorND!`-authored Float initializers into `Float`/`IEEE32Exec`/etc.
+This is mainly used to turn `tensorOfList!`-authored Float initializers into `Float`/`IEEE32Exec`/etc.
 -/
 def castTensor {α : Type} (cast : Float → α) {s : Shape} (t : Tensor Float s) : Tensor α s :=
   Spec.mapTensor cast t
@@ -296,7 +296,7 @@ def cudaBufferOf (n : Nat) (init : FloatInit) : IO _root_.Runtime.Autograd.Cuda.
 
 /-- Materialize a runtime initializer as a normal host tensor. Used for CPU execution. -/
 def hostTensorOf {s : Shape} (init : FloatInit) : IO (Tensor Float s) := do
-  let values ← floatArrayOf (Shape.size s) init
+  let values ← floatArrayOf (Spec.Shape.size s) init
   pure <| _root_.Runtime.Autograd.Cuda.Convert.unflattenFloatUnsafe (s := s) values
 
 /--
@@ -327,7 +327,7 @@ def applyFloatPlan (opts : Torch.Options) :
   | [], .nil, .nil => pure ()
   | s :: ss, .cons p ps, .cons init rest => do
       if opts.usesCuda then
-        let buf ← cudaBufferOf (Shape.size s) init
+        let buf ← cudaBufferOf (Spec.Shape.size s) init
         _root_.Runtime.Autograd.Torch.Internal.setParamCudaValue (α := Float) (sh := s) p
           { s := s, buf := buf }
       else
@@ -354,7 +354,7 @@ end RuntimeInit
 
 /--
 A scalar-loss module definition:
-- `initParams` is stored as Float constants (easy to write with `tensorND!`),
+- `initParams` is stored as Float constants (easy to write with `tensorOfList!`),
 - `loss` is *polymorphic in the scalar backend* (same code works for Float/IEEE32Exec/…).
 
 You can instantiate this definition as a `ScalarModule` under a chosen backend and dtype.

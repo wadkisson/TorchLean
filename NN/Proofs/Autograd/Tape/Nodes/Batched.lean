@@ -99,8 +99,8 @@ def unheadsCLM {h n : Nat} : (Fin h → Vec n) →L[ℝ] Vec (h * n) := by
   rfl
 
 lemma size3_eq (h m n : Nat) :
-    Shape.size (.dim h (.dim m (.dim n .scalar))) = h * (m * n) := by
-  simp [Shape.size]
+    Spec.Shape.size (.dim h (.dim m (.dim n .scalar))) = h * (m * n) := by
+  simp [Spec.Shape.size]
 
 -- ---------------------------------------------------------------------------
 -- Batched matmul (bilinear)
@@ -218,13 +218,13 @@ def matmul {Γ : List Shape} {h m n p : Nat}
   let sA : Shape := .dim h (.dim m (.dim n .scalar))
   let sB : Shape := .dim h (.dim n (.dim p .scalar))
   let sOut : Shape := .dim h (.dim m (.dim p .scalar))
-  let Bmul : Vec (Shape.size sA) →L[ℝ] Vec (Shape.size sB) →L[ℝ] Vec (Shape.size sOut) :=
+  let Bmul : Vec (Spec.Shape.size sA) →L[ℝ] Vec (Spec.Shape.size sB) →L[ℝ] Vec (Spec.Shape.size sOut) :=
     matmulBilin (h := h) (m := m) (n := n) (p := p)
-  let fA : CtxVec Γ → Vec (Shape.size sA) :=
+  let fA : CtxVec Γ → Vec (Spec.Shape.size sA) :=
     fun x => CtxVec.get (Γ := Γ) (s := sA) A x
-  let fB : CtxVec Γ → Vec (Shape.size sB) :=
+  let fB : CtxVec Γ → Vec (Spec.Shape.size sB) :=
     fun x => CtxVec.get (Γ := Γ) (s := sB) B x
-  let deriv0 : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Shape.size sOut)) :=
+  let deriv0 : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Spec.Shape.size sOut)) :=
     fun x =>
       (Bmul.precompR (CtxVec Γ) (fA x) (CtxVec.getCLM (Γ := Γ) (s := sB) B)) +
         (Bmul.precompL (CtxVec Γ) (CtxVec.getCLM (Γ := Γ) (s := sA) A) (fB x))
@@ -245,11 +245,11 @@ def matmulFderiv {Γ : List Shape} {h m n p : Nat}
   let sA : Shape := .dim h (.dim m (.dim n .scalar))
   let sB : Shape := .dim h (.dim n (.dim p .scalar))
   let sOut : Shape := .dim h (.dim m (.dim p .scalar))
-  let Bmul : Vec (Shape.size sA) →L[ℝ] Vec (Shape.size sB) →L[ℝ] Vec (Shape.size sOut) :=
+  let Bmul : Vec (Spec.Shape.size sA) →L[ℝ] Vec (Spec.Shape.size sB) →L[ℝ] Vec (Spec.Shape.size sOut) :=
     matmulBilin (h := h) (m := m) (n := n) (p := p)
-  let fA : CtxVec Γ → Vec (Shape.size sA) :=
+  let fA : CtxVec Γ → Vec (Spec.Shape.size sA) :=
     fun x => CtxVec.get (Γ := Γ) (s := sA) A x
-  let fB : CtxVec Γ → Vec (Shape.size sB) :=
+  let fB : CtxVec Γ → Vec (Spec.Shape.size sB) :=
     fun x => CtxVec.get (Γ := Γ) (s := sB) B x
 
   refine
@@ -304,7 +304,7 @@ def softmaxLast {Γ : List Shape} {h m n : Nat}
     (idx : Idx Γ (.dim h (.dim m (.dim n .scalar)))) :
     Node Γ (.dim h (.dim m (.dim n .scalar))) :=
   let s : Shape := .dim h (.dim m (.dim n .scalar))
-  let hsz : Shape.size s = h * (m * n) := size3_eq (h := h) (m := m) (n := n)
+  let hsz : Spec.Shape.size s = h * (m * n) := size3_eq (h := h) (m := m) (n := n)
   let forward0 : Vec (h * (m * n)) → Vec (h * (m * n)) :=
     fun x =>
       unheads (h := h) (n := m * n) (fun head =>
@@ -317,7 +317,7 @@ def softmaxLast {Γ : List Shape} {h m n : Nat}
           (SoftmaxLastAxis.derivMN (m := m) (n := n) (xH head)).comp
             (ContinuousLinearMap.proj (R := ℝ) head))
       (unheadsCLM (h := h) (n := m * n)).comp (DG.comp (headsCLM (h := h) (n := m * n)))
-  let D : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Shape.size s)) :=
+  let D : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s)) :=
     fun xV =>
       (Graph.castCLM (h := hsz.symm)).comp
         ((deriv0 (castVec hsz (CtxVec.get (Γ := Γ) (s := s) idx xV))).comp
@@ -338,7 +338,7 @@ def softmaxLastFderiv {Γ : List Shape} {h m n : Nat}
     NodeFDerivCorrect (softmaxLast (Γ := Γ) (h := h) (m := m) (n := n) idx) := by
   classical
   let s : Shape := .dim h (.dim m (.dim n .scalar))
-  let hsz : Shape.size s = h * (m * n) := size3_eq (h := h) (m := m) (n := n)
+  let hsz : Spec.Shape.size s = h * (m * n) := size3_eq (h := h) (m := m) (n := n)
   let forward0 : Vec (h * (m * n)) → Vec (h * (m * n)) :=
     fun x =>
       unheads (h := h) (n := m * n) (fun head =>
@@ -351,7 +351,7 @@ def softmaxLastFderiv {Γ : List Shape} {h m n : Nat}
           (SoftmaxLastAxis.derivMN (m := m) (n := n) (xH head)).comp
             (ContinuousLinearMap.proj (R := ℝ) head))
       (unheadsCLM (h := h) (n := m * n)).comp (DG.comp (headsCLM (h := h) (n := m * n)))
-  let D : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Shape.size s)) :=
+  let D : CtxVec Γ → (CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s)) :=
     fun xV =>
       (Graph.castCLM (h := hsz.symm)).comp
         ((deriv0 (castVec hsz (CtxVec.get (Γ := Γ) (s := s) idx xV))).comp

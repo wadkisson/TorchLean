@@ -6,7 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
+public import NN.Proofs
 
 /-!
 # Quickstart: Proving Small TorchLean Facts

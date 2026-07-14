@@ -225,10 +225,10 @@ def parseLoggedTrainFlags (exeName : String) (args : List String)
     (defaultLogPath : System.FilePath) (defaultSteps : Nat := 1)
     (allowZeroSteps : Bool := false) :
     Except String (LoggedTrainFlags × List String) := do
-  let (logRaw?, args) ← CLI.takeFlagValueOnce args "log"
-  let (steps, args) ← CLI.takeStepsFlagDefault args defaultSteps
-  let (batchSize?, args) ← CLI.takeNatFlagOnce args "batch-size"
-  let (cudaMemWatch?, args) ← CLI.takeNatFlagOnce args "cuda-mem-watch"
+  let (logRaw?, args) ← TorchLean.CLI.takeFlagValueOnce args "log"
+  let (steps, args) ← TorchLean.CLI.takeStepsFlagDefault args defaultSteps
+  let (batchSize?, args) ← TorchLean.CLI.takeNatFlagOnce args "batch-size"
+  let (cudaMemWatch?, args) ← TorchLean.CLI.takeNatFlagOnce args "cuda-mem-watch"
   unless allowZeroSteps do
     requirePositiveNatFlag exeName "steps" steps
   let batchSize := batchSize?.getD 1
@@ -255,7 +255,7 @@ def parseModelTrainFlags (exeName : String) (args : List String)
     (allowZeroSteps : Bool := false) :
     Except String (ModelTrainFlags × List String) := do
   let (train, args) ← parseLoggedTrainFlags exeName args defaultLogPath defaultSteps allowZeroSteps
-  let (lr, args) ← CLI.takePositiveFloatFlagDefault args exeName "lr" defaultLr
+  let (lr, args) ← TorchLean.CLI.takePositiveFloatFlagDefault args exeName "lr" defaultLr
   pure ({ toLoggedTrainFlags := train, lr := lr }, args)
 
 /--
@@ -278,7 +278,7 @@ def parseSeededModelTrainFlags (exeName : String) (args : List String)
     (defaultLogPath : System.FilePath) (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
     (allowZeroSteps : Bool := false) :
     Except String (SeededModelTrainFlags × List String) := do
-  let (seed, args) ← CLI.takeSeed args 0
+  let (seed, args) ← TorchLean.CLI.takeSeed args 0
   let (train, args) ← parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
     allowZeroSteps
   pure ({ toModelTrainFlags := train, seed := seed }, args)
@@ -375,7 +375,7 @@ architecture and loss, while this helper keeps the Adam hyperparameter spelling 
 MLP, CNN, ResNet, ViT, and similar model commands.
 -/
 def adamOptimizer {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
-    (cast : Float → α) (ps : List Shape) (lr : Float) :
+    (cast : Float → α) (ps : List Spec.Shape) (lr : Float) :
     TorchLean.Optim.Optimizer α ps :=
   TorchLean.Optim.adam (α := α) (paramShapes := ps)
     (lr := cast lr) (beta1 := cast 0.9) (beta2 := cast 0.999) (epsilon := cast 1e-8)
@@ -452,7 +452,7 @@ def parse
     (args : List String)
     (defaultWindows : Nat) :
     Except String (WindowOptions × List String) := do
-  let (windows, args) ← CLI.takePositiveNatFlagDefault args exeName "windows" defaultWindows
+  let (windows, args) ← TorchLean.CLI.takePositiveNatFlagDefault args exeName "windows" defaultWindows
   pure ({ windows := windows }, args)
 
 end WindowOptions
@@ -471,8 +471,8 @@ namespace CheckpointOptions
 def parse
     (args : List String) :
     Except String (CheckpointOptions × List String) := do
-  let (loadParams?, args) ← CLI.takePathFlagOnce args "load-params"
-  let (saveParams?, args) ← CLI.takePathFlagOnce args "save-params"
+  let (loadParams?, args) ← TorchLean.CLI.takePathFlagOnce args "load-params"
+  let (saveParams?, args) ← TorchLean.CLI.takePathFlagOnce args "save-params"
   pure ({ loadParams? := loadParams?, saveParams? := saveParams? }, args)
 
 end CheckpointOptions
@@ -496,9 +496,9 @@ def parse
     (defaultBetaStart : Float := 1e-4)
     (defaultBetaEnd : Float := 0.12) :
     Except String (DiffusionScheduleFlags × List String) := do
-  let (T, args) ← CLI.takeNatFlagDefault args "T" defaultT
-  let (betaStart, args) ← CLI.takeFloatFlagDefault args "beta-start" defaultBetaStart
-  let (betaEnd, args) ← CLI.takeFloatFlagDefault args "beta-end" defaultBetaEnd
+  let (T, args) ← TorchLean.CLI.takeNatFlagDefault args "T" defaultT
+  let (betaStart, args) ← TorchLean.CLI.takeFloatFlagDefault args "beta-start" defaultBetaStart
+  let (betaEnd, args) ← TorchLean.CLI.takeFloatFlagDefault args "beta-end" defaultBetaEnd
   pure ({ T := T, betaStart := betaStart, betaEnd := betaEnd }, args)
 
 /-- Standard TrainLog metadata for a diffusion schedule. -/
@@ -530,11 +530,11 @@ This only parses artifact paths and the optional reconstruction timestep. The mo
 which images it can write.
 -/
 def parse (args : List String) : Except String (ImageArtifactFlags × List String) := do
-  let (reconstructStep?, args) ← CLI.takeNatFlagOnce args "reconstruct-step"
-  let (samplePpm?, args) ← CLI.takePathFlagOnce args "sample-ppm"
-  let (referencePpm?, args) ← CLI.takePathFlagOnce args "reference-ppm"
-  let (noisyPpm?, args) ← CLI.takePathFlagOnce args "noisy-ppm"
-  let (reconstructPpm?, args) ← CLI.takePathFlagOnce args "reconstruct-ppm"
+  let (reconstructStep?, args) ← TorchLean.CLI.takeNatFlagOnce args "reconstruct-step"
+  let (samplePpm?, args) ← TorchLean.CLI.takePathFlagOnce args "sample-ppm"
+  let (referencePpm?, args) ← TorchLean.CLI.takePathFlagOnce args "reference-ppm"
+  let (noisyPpm?, args) ← TorchLean.CLI.takePathFlagOnce args "noisy-ppm"
+  let (reconstructPpm?, args) ← TorchLean.CLI.takePathFlagOnce args "reconstruct-ppm"
   pure ({ reconstructStep? := reconstructStep?,
           samplePpm? := samplePpm?,
           referencePpm? := referencePpm?,
@@ -590,13 +590,13 @@ def parse
     (defaultTrainRows defaultTestRows : Nat)
     (defaultEvalRows : Nat := 16) :
     Except String (PairedNpyEvalFlags × List String) := do
-  let (trainRows, args) ← CLI.takeNatFlagDefault args "train-rows" defaultTrainRows
-  let (testRows, args) ← CLI.takeNatFlagDefault args "test-rows" defaultTestRows
-  let (evalRows, args) ← CLI.takeNatFlagDefault args "eval-rows" defaultEvalRows
-  let (trainX, args) ← CLI.takePathFlagDefault args "x" defaultTrainX
-  let (trainY, args) ← CLI.takePathFlagDefault args "y" defaultTrainY
-  let (testX, args) ← CLI.takePathFlagDefault args "test-x" defaultTestX
-  let (testY, args) ← CLI.takePathFlagDefault args "test-y" defaultTestY
+  let (trainRows, args) ← TorchLean.CLI.takeNatFlagDefault args "train-rows" defaultTrainRows
+  let (testRows, args) ← TorchLean.CLI.takeNatFlagDefault args "test-rows" defaultTestRows
+  let (evalRows, args) ← TorchLean.CLI.takeNatFlagDefault args "eval-rows" defaultEvalRows
+  let (trainX, args) ← TorchLean.CLI.takePathFlagDefault args "x" defaultTrainX
+  let (trainY, args) ← TorchLean.CLI.takePathFlagDefault args "y" defaultTrainY
+  let (testX, args) ← TorchLean.CLI.takePathFlagDefault args "test-x" defaultTestX
+  let (testY, args) ← TorchLean.CLI.takePathFlagDefault args "test-y" defaultTestY
   pure ({ trainRows := trainRows,
           testRows := testRows,
           evalRows := evalRows,
@@ -633,7 +633,7 @@ def parse
     (args : List String)
     (defaultPlotCsv : System.FilePath) :
     Except String (CsvArtifactFlags × List String) := do
-  let (plotCsv, args) ← CLI.takePathFlagDefault args "plot-csv" defaultPlotCsv
+  let (plotCsv, args) ← TorchLean.CLI.takePathFlagDefault args "plot-csv" defaultPlotCsv
   pure ({ plotCsv := plotCsv }, args)
 
 end CsvArtifactFlags
@@ -668,10 +668,10 @@ def parse
     (defaultX defaultY : System.FilePath)
     (defaultRows : Nat) :
     Except String (NpyDataFlags × List String) := do
-  let (seed, args) ← CLI.takeSeed args (default := 0)
-  let (nRows, args) ← CLI.takeNatFlagDefault args "n-total" defaultRows
-  let (xPath, args) ← CLI.takePathFlagDefault args "x" defaultX
-  let (yPath, args) ← CLI.takePathFlagDefault args "y" defaultY
+  let (seed, args) ← TorchLean.CLI.takeSeed args (default := 0)
+  let (nRows, args) ← TorchLean.CLI.takeNatFlagDefault args "n-total" defaultRows
+  let (xPath, args) ← TorchLean.CLI.takePathFlagDefault args "x" defaultX
+  let (yPath, args) ← TorchLean.CLI.takePathFlagDefault args "y" defaultY
   pure ({ xPath := xPath, yPath := yPath, nRows := nRows, seed := seed }, args)
 
 /-- Standard TrainLog metadata for an NPY-backed dataset branch. -/
@@ -692,9 +692,9 @@ namespace ImageDatasetChoice
 
 /-- Parse `--dataset`, `--cifar10`, and `--imagenet64`, rejecting ambiguous selectors. -/
 def parse (args : List String) : Except String (ImageDatasetChoice × List String) := do
-  let (dataset?, args) ← CLI.takeFlagValueOnce args "dataset"
-  let (cifarFlag, args) ← CLI.takeBoolFlagOnce args "cifar10"
-  let (imagenetFlag, args) ← CLI.takeBoolFlagOnce args "imagenet64"
+  let (dataset?, args) ← TorchLean.CLI.takeFlagValueOnce args "dataset"
+  let (cifarFlag, args) ← TorchLean.CLI.takeBoolFlagOnce args "cifar10"
+  let (imagenetFlag, args) ← TorchLean.CLI.takeBoolFlagOnce args "imagenet64"
   match dataset?, cifarFlag, imagenetFlag with
   | some _, true, _ | some _, _, true | none, true, true =>
       throw "choose only one dataset selector: --dataset, --cifar10, or --imagenet64"
@@ -756,7 +756,7 @@ def parseNpyLoggedTrainFlags
     Except String NpyLoggedTrainFlags := do
   let (data, rest) ← parseData args
   let (train, rest) ← parseLoggedTrainFlags exeName rest defaultLogPath defaultSteps
-  CLI.requireNoArgs rest
+  TorchLean.CLI.checkNoArgs rest
   pure { toLoggedTrainFlags := train, toNpyDataFlags := data }
 
 /-- Common arguments for a model-training command backed by supervised `.npy` arrays. -/
@@ -821,9 +821,9 @@ def parseCsvModelTrainFlags (exeName : String) (args : List String)
     (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
     (allowZeroSteps : Bool := false) :
     Except String (CsvModelTrainFlags × List String) := do
-  let (csv?, args) ← CLI.takePathFlagOnce args "csv"
+  let (csv?, args) ← TorchLean.CLI.takePathFlagOnce args "csv"
   let csvPath := csv?.getD defaultCsv
-  let (seed, args) ← CLI.takeSeed args 0
+  let (seed, args) ← TorchLean.CLI.takeSeed args 0
   let (train, args) ← parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
     allowZeroSteps
   pure ({ toModelTrainFlags := train, csvPath := csvPath, seed := seed }, args)
@@ -839,7 +839,7 @@ Fails if `xs.length ≠ numel(dims)`.
 -/
 def tensorF {α : Type} [Context α] (cast : Float → α) (dims : List Nat) (xs : List Float) :
     Except String (Spec.Tensor α (NN.Tensor.shapeOfDims dims)) := do
-  let tF ← NN.Tensor.tensorND (α := Float) dims xs
+  let tF ← NN.Tensor.ofList (α := Float) dims xs
   pure (Spec.mapTensor cast tF)
 
 /--
@@ -866,7 +866,7 @@ def tensorFGen! {α : Type} [Context α] (cast : Float → α) (dims : List Nat)
   have hLen : xs.length = NN.Tensor.numelDims dims := by
     simp [xs, listGen]
   let tF : Spec.Tensor Float (NN.Tensor.shapeOfDims dims) :=
-    NN.Tensor.tensorNDOfLenEq (α := Float) (dims := dims) (xs := xs) hLen
+    NN.Tensor.ofListOfLength (α := Float) (dims := dims) (xs := xs) hLen
   Spec.mapTensor cast tF
 
 /--

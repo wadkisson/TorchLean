@@ -165,12 +165,17 @@ Semantics:
   not contain a root, the exporter can infer the componentwise leaf envelope as a structural
   fallback, but that fallback is only the envelope of the represented leaves.
 - Each `leaf` is a sub-box of `root`.
+- The root and every leaf must contain finite coordinates ordered coordinatewise
+  (`lo[i] ≤ hi[i]`), and the leaf array must be nonempty.
 - `lb` and `threshold` are the lower bounds and thresholds reported by the external producer for
   that leaf at the moment it was pruned or verified.
 - A leaf is considered "verified" iff `∃ i, lb[i] > threshold[i]`.
   (This matches how `complete_verifier/input_split/branching_domains.py` filters out verified domains.)
 - `witness_idx` and `witness_margin` are a convenience witness for the check above:
   `witness_margin = lb[witness_idx] - threshold[witness_idx]`.
+  When `witness_idx` is present, the checker validates that exact coordinate rather than searching
+  for a different witness. When `witness_margin` is present, it must accompany the index and agree
+  with the recomputed margin up to the schema tolerance.
 
 The schema deliberately does not contain a neural-network graph, α slopes, β phases, or per-node
 affine forms. It is therefore a *leaf artifact*, not a full proof certificate.

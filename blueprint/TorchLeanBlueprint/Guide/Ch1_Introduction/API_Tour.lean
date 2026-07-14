@@ -23,9 +23,9 @@ A typical workflow looks like this:
 4. import or export a named artifact when Python belongs in the workflow,
 5. state a claim about the resulting model and check the artifact that supports it.
 
-The public entry point is `import NN`. The lower layer pages become relevant
-when a chapter asks a more precise question about tensors, runtime execution, import/export,
-floating point, or verification.
+The application entry point is `import NN.API`. The complete `NN` umbrella and the focused
+subsystem imports become relevant when a chapter asks a more precise question about runtime
+execution, graphs, floating point, proofs, or verification.
 
 The API is intentionally layered. Most users should start with the public names and only descend
 when the question demands it. A training tutorial can stay with `Tensor`, `nn`, `data`, `optim`, and
@@ -47,12 +47,12 @@ The public API prefers names that describe the ML task. The lower layers prefer 
 the semantic object being manipulated. Both are useful.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
 -- Public authoring layer: compact model construction.
-def publicMlp : nn.M (nn.Sequential (Shape.vec 8) (Shape.vec 3)) :=
+def publicMlp : nn.M (nn.Sequential (.dim 8 .scalar) (.dim 3 .scalar)) :=
   nn.Sequential![
     nn.Linear 8 16,
     nn.ReLU,
@@ -73,15 +73,15 @@ Lean type. A value of type `Tensor Float (shape![32, 1])` is not interchangeable
 type `Tensor Float (shape![32])`; a reshape, squeeze, or different loss must be named explicitly.
 
 ```
-import NN
+import NN.API
 
 open TorchLean
 
 def logits : Tensor.T Float (shape![32, 1]) :=
-  tensorND! [32, 1] (List.replicate 32 0.0)
+  tensorOfList! [32, 1] (List.replicate 32 0.0)
 
 def labels : Tensor.T Float (shape![32]) :=
-  tensorND! [32] (List.replicate 32 0.0)
+  tensorOfList! [32] (List.replicate 32 0.0)
 
 -- A loss expecting matching shapes cannot silently reinterpret `labels`.
 ```
@@ -95,7 +95,7 @@ The same shape discipline appears at the model level. A compact classifier state
 shapes before it ever runs:
 
 ```
-def classifier : nn.M (nn.Sequential (Shape.vec 16) (Shape.vec 4)) :=
+def classifier : nn.M (nn.Sequential (.dim 16 .scalar) (.dim 4 .scalar)) :=
   nn.Sequential![
     nn.Linear 16 32,
     nn.GELU,
@@ -103,8 +103,8 @@ def classifier : nn.M (nn.Sequential (Shape.vec 16) (Shape.vec 4)) :=
   ]
 ```
 
-Tensor constructors, literals, and model builders live under the root
-[`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean) umbrella.
+Tensor constructors, literals, and model builders are exported by
+[`NN.API`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API.lean).
 
 # Parameters Are Part Of The Interface
 
@@ -184,7 +184,7 @@ tools close to the training path:
 - logger hooks for training loops are defined by the
   [training logger API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train/Logging.lean);
 - widgets can display tensors, logs, execution traces, and IR graphs through the
-  [widget entrypoint](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/Widgets.lean).
+  [widget import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Widgets.lean).
 
 Logs and graphs are audit artifacts. A loss curve records which run was performed, while a lowered
 graph records which operations a verifier or compiler is about to interpret.
@@ -230,7 +230,7 @@ $$`\forall x\in B,\quad
 \operatorname{margin}(\operatorname{denote}(g,\theta,x)) > 0`
 
 A robustness certificate in TorchLean is a concrete claim about a graph, a parameter payload, an
-input region, a scalar semantics, and a checker result. The [verification entrypoint](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/Verification.lean)
+input region, a scalar semantics, and a checker result. The [verification import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean)
 collects the public verification API, while the [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean)
 shows the graph objects used by the bound propagation chapters.
 
@@ -258,7 +258,7 @@ these objects in the data path instead of leaving them implicit inside a module 
 
 Floating point semantics also need names. A real valued specification, the `FP32` proof model,
 the executable `IEEE32Exec` model, and native CUDA kernels are related but not identical. The
-[floating point entrypoint](https://github.com/lean-dojo/TorchLean/blob/main/NN/Entrypoint/Floats.lean) exists so a theorem, a verifier claim,
+[floating-point import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats.lean) exists so a theorem, a verifier claim,
 and a runtime run do not quietly use three different meanings of "float32."
 
 Fast kernels are boundaries too. For attention, the mathematical contract is ordinary scaled

@@ -62,8 +62,8 @@ def constGraph (s : Shape) : Graph :=
 theorem evalConst_eq_unflatten
     {α : Type} [Context α]
     (id : Nat) (s : Shape)
-    (v : Tensor α (.dim (Shape.size s) .scalar)) :
-    let c : ConstFlat α := { n := Shape.size s, v := v }
+    (v : Tensor α (.dim (Spec.Shape.size s) .scalar)) :
+    let c : ConstFlat α := { n := Spec.Shape.size s, v := v }
     Graph.evalConst (α := α) (payload := singletonConstPayload (α := α) id c) (id := id) (s := s)
       =
       Except.ok (Tensor.unflattenSpec (α := α) (s := s) v) := by
@@ -73,8 +73,8 @@ theorem evalConst_eq_unflatten
 theorem evalAt_const_eq_unflatten
     {α : Type} [Context α] [DecidableEq Shape]
     (s : Shape)
-    (v : Tensor α (.dim (Shape.size s) .scalar)) :
-    let c : ConstFlat α := { n := Shape.size s, v := v }
+    (v : Tensor α (.dim (Spec.Shape.size s) .scalar)) :
+    let c : ConstFlat α := { n := Spec.Shape.size s, v := v }
     Graph.evalAt (α := α) (g := constGraph s)
         (payload := singletonConstPayload (α := α) 0 c)
         (input := DVal.mk (α := α) s (Tensor.default (α := α) (s := s)))
@@ -169,16 +169,16 @@ theorem evalConv2D_eq_spec
       Except.ok
         (DVal.mk (α := α)
           (.dim cfg.outC
-            (.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-              (.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) .scalar)))
+            (.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+              (.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding) .scalar)))
           (Spec.conv2dSpec (α := α) (layer := cfg.spec) (input := x))) := by
   have hInfer :
       OpContracts.inferConv2dCHWOutShape cfg.inC cfg.outC cfg.kH cfg.kW cfg.stride
           cfg.padding (.dim cfg.inC (.dim cfg.inH (.dim cfg.inW .scalar))) =
         Except.ok
           (.dim cfg.outC
-            (.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-              (.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) .scalar))) := by
+            (.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+              (.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding) .scalar))) := by
     simp [OpContracts.inferConv2dCHWOutShape, OpContracts.checkPositive,
       OpContracts.conv2dCHWOutShape, OpContracts.slideOutPad, cfg.hIn, cfg.hKH,
       cfg.hKW, cfg.hStride, hHeight, hWidth, Bind.bind, Except.bind, Pure.pure,
@@ -195,8 +195,8 @@ theorem evalAt_conv2d_eq_spec
     (hWidth : OpContracts.checkWindowFits "conv2d" "width" cfg.inW cfg.kW cfg.padding = .ok ()) :
     let outShape : Shape :=
       .dim cfg.outC
-        (.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-          (.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) .scalar))
+        (.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+          (.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding) .scalar))
     Graph.evalAt (α := α)
         (g := unaryGraphOut (.conv2d cfg.inC cfg.outC cfg.kH cfg.kW cfg.stride cfg.padding)
           (.dim cfg.inC (.dim cfg.inH (.dim cfg.inW .scalar))) outShape)
@@ -213,8 +213,8 @@ theorem evalAt_conv2d_eq_spec
           cfg.padding (.dim cfg.inC (.dim cfg.inH (.dim cfg.inW .scalar))) =
         Except.ok
           (.dim cfg.outC
-            (.dim ((cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1)
-              (.dim ((cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1) .scalar))) := by
+            (.dim (Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding)
+              (.dim (Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding) .scalar))) := by
     simp [OpContracts.inferConv2dCHWOutShape, OpContracts.checkPositive,
       OpContracts.conv2dCHWOutShape, OpContracts.slideOutPad, cfg.hIn, cfg.hKH,
       cfg.hKW, cfg.hStride, hHeight, hWidth, Bind.bind, Except.bind, Pure.pure,

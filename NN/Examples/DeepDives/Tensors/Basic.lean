@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-import NN.Entrypoint.Widgets
+public import NN.Widgets
 public import NN.Spec.Core.TensorBridge
 meta import NN.Spec.Core.TensorBridge
 

@@ -8,7 +8,7 @@ module
 
 public import NN.Runtime.Autograd.Engine.Core
 public import NN.Runtime.Autograd.Engine.Cuda.Ops
-public import NN.Entrypoint.Tensor
+public import NN.Tensor
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -33,6 +33,9 @@ open Spec
 open Tensor
 open Runtime.Autograd
 
+-- Regression for output-size arithmetic with padding and a one-cell input.
+example : Spec.convTransposeOutDim 1 3 1 1 = 1 := by decide
+
 /-!
 ## 2D case (d = 2)
 -/
@@ -49,7 +52,7 @@ abbrev padding2 : Nat := 0
 abbrev inH2 : Nat := 3
 abbrev inW2 : Nat := 3
 
-def hInC2 : inC2 ≠ 0 := by decide
+theorem hInC2 : inC2 ≠ 0 := by decide
 
 def kernel2Dims : Vector Nat d2 :=
   #v[kH, kW]
@@ -63,7 +66,7 @@ def padding2Dims : Vector Nat d2 :=
 def inSpatial2Dims : Vector Nat d2 :=
   #v[inH2, inW2]
 
-def hKernel2 : ∀ i : Fin d2, kernel2Dims.get i ≠ 0 := by
+theorem hKernel2 : ∀ i : Fin d2, kernel2Dims.get i ≠ 0 := by
   intro i
   fin_cases i <;> simp [kernel2Dims, Vector.get]
 
@@ -80,16 +83,16 @@ def inputShape2 : Shape :=
   Shape.ofList (inC2 :: inSpatial2Dims.toList)
 
 def kernel2 : Tensor Float kernelShape2 :=
-  tensorND! [inC2, outC2, kH, kW] [
+  tensorOfList! [inC2, outC2, kH, kW] [
     0.2, -0.1,
     0.3, 0.4
   ]
 
 def bias2 : Tensor Float (shape![outC2]) :=
-  tensorND! [outC2] [0.05]
+  tensorOfList! [outC2] [0.05]
 
 def input2 : Tensor Float inputShape2 :=
-  tensorND! [inC2, inH2, inW2] [
+  tensorOfList! [inC2, inH2, inW2] [
     1.0, 2.0, 3.0,
     4.0, 5.0, 6.0,
     7.0, 8.0, 9.0
@@ -133,7 +136,7 @@ def runConvTranspose2 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := outShape2) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape2
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape2)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape2)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dKCuda ← Utils.cudaGrad (s := kernelShape2) gradsCuda kIdc
@@ -162,7 +165,7 @@ abbrev k0 : Nat := 2
 abbrev k1 : Nat := 2
 abbrev k2 : Nat := 2
 
-def hInC3 : inC3 ≠ 0 := by decide
+theorem hInC3 : inC3 ≠ 0 := by decide
 
 def kernel3Dims : Vector Nat d3 :=
   #v[k0, k1, k2]
@@ -176,7 +179,7 @@ def padding3Dims : Vector Nat d3 :=
 def inSpatial3Dims : Vector Nat d3 :=
   #v[inD0, inD1, inD2]
 
-def hKernel3 : ∀ i : Fin d3, kernel3Dims.get i ≠ 0 := by
+theorem hKernel3 : ∀ i : Fin d3, kernel3Dims.get i ≠ 0 := by
   intro i
   fin_cases i <;> simp [kernel3Dims, Vector.get]
 
@@ -193,7 +196,7 @@ def inputShape3 : Shape :=
   Shape.ofList (inC3 :: inSpatial3Dims.toList)
 
 def kernel3 : Tensor Float kernelShape3 :=
-  tensorND! [inC3, outC3, k0, k1, k2] [
+  tensorOfList! [inC3, outC3, k0, k1, k2] [
     0.2, -0.1,
     0.3, 0.4,
     -0.25, 0.15,
@@ -201,10 +204,10 @@ def kernel3 : Tensor Float kernelShape3 :=
   ]
 
 def bias3 : Tensor Float (shape![outC3]) :=
-  tensorND! [outC3] [0.01]
+  tensorOfList! [outC3] [0.01]
 
 def input3 : Tensor Float inputShape3 :=
-  tensorND! [inC3, inD0, inD1, inD2] [
+  tensorOfList! [inC3, inD0, inD1, inD2] [
     1.0, 2.0,
     3.0, 4.0,
 
@@ -250,7 +253,7 @@ def runConvTranspose3 : IO Unit := do
   let yCuda ← Utils.cudaValue (s := outShape3) t4c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape3
-      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Shape.size outShape3)) 1.0 }
+      buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape3)) 1.0 }
   let gradsCuda ← Utils.okOrThrow
     (Runtime.Autograd.Cuda.Tape.backwardDenseAll (t := t4c) yIdc seedCuda)
   let dKCuda ← Utils.cudaGrad (s := kernelShape3) gradsCuda kIdc

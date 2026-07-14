@@ -11,10 +11,6 @@ The examples cover typed tensors, training, autograd, graph checking, verificati
 contracts. Each group identifies where data enters, which artifact is produced, what is checked, and
 what a successful run establishes.
 
-For a first run, choose one row from the table below and keep the resulting artifact in view. A loss
-trace answers a different question from a graph, and an accepted certificate answers a different
-question from both.
-
 # The Examples At A Glance
 
 The tree is organized around questions:
@@ -157,8 +153,8 @@ of letting it disappear into the example.
 
 The same reading pattern applies outside attention:
 
-- FNO uses a dense DFT reference path and a cuFFT-backed CUDA path; the example demonstrates the
-  training/runtime boundary, while scientific claims about Burgers residuals belong to the
+- The generic FNO model uses a dense multidimensional real-split DFT. The Burgers trainer can replace
+  it with a cuFFT-backed CUDA capsule; scientific claims about Burgers residuals belong to the
   verification workflows.
 - Diffusion writes samples and logs; the executable demonstrates a denoising training path, while
   Gaussian forward-process and sampler-step facts live in the generative theory modules.
@@ -196,27 +192,6 @@ The examples are grouped so each subtree has a job:
 
 That structure helps the examples read as one system: tensors first, then runnable models, graph
 lowering, and checked properties.
-
-# A Good First Pass Through The Examples
-
-For one short pass that touches the main layers, use this order:
-
-1. Build once:
-   `lake build`
-2. Build the curated examples umbrella:
-   `lake build NN.Examples.Zoo`
-3. Typed tensor example:
-   `lake env lean --run NN/Examples/Quickstart/TensorBasics.lean`
-4. Float-backend comparison example:
-   `lake exe torchlean float32_modes`
-5. Widgets example, opened in the editor:
-   open the [widgets example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-6. Autograd example:
-   `lake env lean --run NN/Examples/Quickstart/AutogradBasics.lean -- --dtype float`
-7. Model training example:
-   `lake exe torchlean mlp --device cpu --steps 10`
-8. Small complete verification example:
-   `lake exe verify -- torchlean-ibp`
 
 # What Success Looks Like
 
@@ -444,9 +419,8 @@ Useful build target:
 lake build NN.Examples.BugZoo.All
 ```
 
-For readers coming from ML systems, BugZoo is often the most concrete entry point: a recognizable
-bug class, the exact object TorchLean uses as the contract, and the theorem or boundary that
-follows.
+Each BugZoo case begins with a recognizable implementation error, identifies the Lean object used
+as its contract, and ends with either a theorem or an explicit runtime boundary.
 
 # Verification Application Workflows
 
@@ -563,7 +537,7 @@ Checklist for adding a new example:
   [model runner API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean) and make sure `NN.Examples.Zoo`
   imports it.
 - Use the public API where appropriate:
-  `import NN`, `open TorchLean`, and stick to `nn`, `Data`, `Trainer`, and `optim` unless
+  `import NN.API`, `open TorchLean`, and stick to `nn`, `Data`, `Trainer`, and `optim` unless
   the example is explicitly about an internal subsystem.
 - Add a short module docstring at the top with:
   1. the mathematical or runtime object the example exposes, and

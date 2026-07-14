@@ -105,22 +105,22 @@ def uniformAt (seed idx : Nat) (lo hi : Float) : Float :=
 
 /-- Initialize a row-major parameter array with deterministic uniform samples. -/
 def initFloatArray (shape : Shape) (seed : Nat) (lo hi : Float) : FloatArray :=
-  FloatArray.mk <| Array.ofFn (n := Shape.size shape) (fun i =>
+  FloatArray.mk <| Array.ofFn (n := Spec.Shape.size shape) (fun i =>
     uniformAt seed i.val lo hi)
 
 /-- Initialize a trainable parameter and zero Adam moments. -/
 def initParam (shape : Shape) (seed : Nat) (lo hi : Float) : Param :=
   { shape := shape
     value := initFloatArray shape seed lo hi
-    m := zerosArray (Shape.size shape)
-    v := zerosArray (Shape.size shape) }
+    m := zerosArray (Spec.Shape.size shape)
+    v := zerosArray (Spec.Shape.size shape) }
 
 /-- Initialize a bias-like parameter at zero with zero Adam moments. -/
 def initBias (shape : Shape) : Param :=
   { shape := shape
-    value := zerosArray (Shape.size shape)
-    m := zerosArray (Shape.size shape)
-    v := zerosArray (Shape.size shape) }
+    value := zerosArray (Spec.Shape.size shape)
+    m := zerosArray (Spec.Shape.size shape)
+    v := zerosArray (Spec.Shape.size shape) }
 
 /--
 Initialize parameters for the fused FNO1D model:

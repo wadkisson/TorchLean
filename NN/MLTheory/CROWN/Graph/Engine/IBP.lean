@@ -110,7 +110,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
               let sFlat := Shape.dim Xin.dim Shape.scalar
               let outShape : Shape := Spec.pool2dMultiOutShape inC inH inW kH kW stride
               have hsize : sFlat.size = sIn.size := by
-                simp [sFlat, sIn, expectedInDim, Shape.size, hIn]
+                simp [sFlat, sIn, expectedInDim, Spec.Shape.size, hIn]
               let xLo := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
               let xHi := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
               let layer : Spec.MaxPool2DSpec kH kW stride hkH hkW hs := {}
@@ -147,7 +147,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
               let sFlat := Shape.dim Xin.dim Shape.scalar
               let outShape : Shape := Spec.pool2dMultiOutShapePad inC inH inW kH kW stride padding
               have hsize : sFlat.size = sIn.size := by
-                simp [sFlat, sIn, expectedInDim, Shape.size, hIn]
+                simp [sFlat, sIn, expectedInDim, Spec.Shape.size, hIn]
               let xLo := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
               let xHi := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
               let layer : Spec.MaxPool2DSpec kH kW stride hkH hkW hs := {}
@@ -184,7 +184,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
               let sFlat := Shape.dim Xin.dim Shape.scalar
               let outShape : Shape := Spec.pool2dMultiOutShape inC inH inW kH kW stride
               have hsize : sFlat.size = sIn.size := by
-                simp [sFlat, sIn, expectedInDim, Shape.size, hIn]
+                simp [sFlat, sIn, expectedInDim, Spec.Shape.size, hIn]
               let xLo := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
               let xHi := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
               let layer : Spec.AvgPool2DSpec kH kW stride hkH hkW hs := {}
@@ -221,7 +221,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
               let sFlat := Shape.dim Xin.dim Shape.scalar
               let outShape : Shape := Spec.pool2dMultiOutShapePad inC inH inW kH kW stride padding
               have hsize : sFlat.size = sIn.size := by
-                simp [sFlat, sIn, expectedInDim, Shape.size, hIn]
+                simp [sFlat, sIn, expectedInDim, Spec.Shape.size, hIn]
               let xLo := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
               let xHi := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
               let layer : Spec.AvgPool2DSpec kH kW stride hkH hkW hs := {}
@@ -414,7 +414,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
         if hdim : Xin.dim = sIn.size then
           let sFlat : Shape := .dim Xin.dim .scalar
           have hsize : sFlat.size = sIn.size := by
-            simp [sFlat, sIn, Shape.size, hdim]
+            simp [sFlat, sIn, Spec.Shape.size, hdim]
           let xLo : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
           let xHi : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
           let yLoT : Tensor α (.dim n (.dim m rest)) := Tensor.swapFirstTwoSpec (α:=α) xLo
@@ -436,7 +436,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
         if hdim : Xin.dim = sIn.size then
           let sFlat : Shape := .dim Xin.dim .scalar
           have hsize : sFlat.size = sIn.size := by
-            simp [sFlat, sIn, Shape.size, hdim]
+            simp [sFlat, sIn, Spec.Shape.size, hdim]
           let xLo : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
           let xHi : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
           let yLoT : Tensor α (.dim a (.dim c (.dim b .scalar))) :=
@@ -460,7 +460,7 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
       if hdim : Xin.dim = sIn.size then
         let sFlat : Shape := .dim Xin.dim .scalar
         have hsize : sFlat.size = sIn.size := by
-          simp [sFlat, sIn, Shape.size, hdim]
+          simp [sFlat, sIn, Spec.Shape.size, hdim]
         let xLo : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.lo hsize
         let xHi : Tensor α sIn := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=sIn) Xin.hi hsize
         match permuteDVal? (α := α) (v := ⟨sIn, xLo⟩) perm, permuteDVal? (α := α) (v := ⟨sIn, xHi⟩)
@@ -565,15 +565,18 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
     match node.parents with
     | p1 :: _ =>
       let Xin := get! p1
-      -- Ensure positivity on lower bound to avoid log of non-positive
       let flo := getDimScalarFn (α:=α) Xin.lo
-      let loSafe := Tensor.dim (fun i =>
-        match flo i with
-        | .scalar v => Tensor.scalar (if v > Numbers.epsilon then v else Numbers.epsilon))
-      let hiSafe := Xin.hi
-      let lo := Tensor.logSpec loSafe
-      let hi := Tensor.logSpec hiSafe
-      boxes.set! id (some { dim := Xin.dim, lo := lo, hi := hi })
+      -- Raw IR `log` rejects nonpositive values. An interval crossing that boundary therefore has
+      -- no valid transfer result; callers can use the explicitly totalized safe-log operator when
+      -- epsilon clamping is intended.
+      if (List.finRange Xin.dim).all (fun i =>
+          match flo i with
+          | .scalar v => decide (Numbers.zero < v)) then
+        let lo := Tensor.logSpec Xin.lo
+        let hi := Tensor.logSpec Xin.hi
+        boxes.set! id (some { dim := Xin.dim, lo := lo, hi := hi })
+      else
+        boxes
     | _ => boxes
   -- layernorm/concat handled in dedicated cases below
   | .concat _ =>
@@ -602,11 +605,11 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
     | p1 :: _ =>
       let Xin := get! p1
       let s := node.outShape
-      if axis = Shape.rank s - 1 then
+      if axis = Spec.Shape.rank s - 1 then
         if hdim : Xin.dim = s.size then
           let sFlat : Shape := .dim Xin.dim .scalar
           have hsize : sFlat.size = s.size := by
-            simp [sFlat, Shape.size, hdim]
+            simp [sFlat, Spec.Shape.size, hdim]
           let xLo : Tensor α s := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=s) Xin.lo hsize
           let xHi : Tensor α s := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=s) Xin.hi hsize
           let (yLoT, yHiT) := ibpLayernormLastTensor (α:=α) (s := s) xLo xHi
@@ -622,11 +625,11 @@ def propagateIBPNode (nodes : Array Node) (ps : ParamStore α) (boxes : Array (O
     | p1 :: _ =>
       let Xin := get! p1
       let s := node.outShape
-      if axis = Shape.rank s - 1 then
+      if axis = Spec.Shape.rank s - 1 then
         if hdim : Xin.dim = s.size then
           let sFlat : Shape := .dim Xin.dim .scalar
           have hsize : sFlat.size = s.size := by
-            simp [sFlat, Shape.size, hdim]
+            simp [sFlat, Spec.Shape.size, hdim]
           let xLo : Tensor α s := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=s) Xin.lo hsize
           let xHi : Tensor α s := Tensor.reshapeSpec (α:=α) (s₁:=sFlat) (s₂:=s) Xin.hi hsize
           let (yLoT, yHiT) := ibpSoftmaxLastTensor (α:=α) (s := s) xLo xHi

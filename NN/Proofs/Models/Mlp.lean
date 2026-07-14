@@ -13,8 +13,8 @@ public import NN.Spec.Models.Mlp
 # Closed MLP Model Facts
 
 Small rational MLP examples belong in the proof layer. The forward composition law is already
-proved generally by `Examples.mlp_spec_forward_eq`; the facts below keep the old deterministic
-backward check as coordinate-level Lean theorems.
+proved generally by `Examples.mlp_spec_forward_eq`; the facts below state a deterministic backward
+calculation as coordinate-level Lean theorems.
 -/
 
 open scoped NN.Spec.RationalAlgebraic

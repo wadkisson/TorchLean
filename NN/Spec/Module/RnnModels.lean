@@ -41,7 +41,7 @@ so the overall model maps:
 - input shape:  `[seqLen, inputSize]`
 - output shape: `[seqLen, outputSize]`
 
-PyTorch analogue: applying `nn.RNN` (or a custom recurrent cell) followed by a `nn.Linear` at each
+PyTorch analogue: applying `nn.RNN` (or a custom recurrent cell) followed by a `nn.linear` at each
 time step.
 -/
 def simpleRnnModelSpec
@@ -61,7 +61,7 @@ A many-to-one RNN classifier expressed as a `SpecChain`.
 This runs an RNN over the input sequence and then applies a linear classifier head to the final
 hidden state.
 
-PyTorch analogue: `nn.RNN` (or `nn.GRU`/`nn.LSTM`) feeding a `nn.Linear` head, taking the last
+PyTorch analogue: `nn.RNN` (or `nn.GRU`/`nn.LSTM`) feeding a `nn.linear` head, taking the last
 hidden/output.
 -/
 def rnnClassifierModelSpec
@@ -83,7 +83,7 @@ A bidirectional LSTM classifier expressed as a `SpecChain`.
 This uses a `BiLSTMModuleSpec` to combine forward/backward LSTM passes, concatenates the two
 hidden-state streams, and applies a linear classifier head.
 
-PyTorch analogue: `nn.LSTM(bidirectional=true)` followed by a `nn.Linear` classifier.
+PyTorch analogue: `nn.LSTM(bidirectional=true)` followed by a `nn.linear` classifier.
 -/
 def bilstmClassifierSpec
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]
@@ -125,7 +125,7 @@ A simple RNN language model spec: "embedding" linear map, RNN core, and output p
 This file treats embedding/projection as `LinearSpec`s. A common spec-level usage is that tokens
 are one-hot vectors of length `vocabSize`, so the embedding is just a matrix multiply.
 
-PyTorch analogue: `nn.Embedding` (conceptually) + `nn.RNN` + `nn.Linear` vocabulary projection.
+PyTorch analogue: `nn.Embedding` (conceptually) + `nn.RNN` + `nn.linear` vocabulary projection.
 -/
 def rnnLanguageModelSpec
   {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)]

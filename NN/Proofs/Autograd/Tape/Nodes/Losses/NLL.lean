@@ -38,23 +38,23 @@ This is the natural primitive loss that `cross_entropy` reduces to after `log_so
 def nllOneHotLast {Γ : List Shape} {m n : Nat}
     (logProbs target : Idx Γ (.dim m (.dim n .scalar))) : Node Γ Shape.scalar :=
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let c : ℝ := (1 : ℝ) / (m : ℝ)
   Node.ofVec (Γ := Γ) (τ := Shape.scalar)
     (f := fun xV =>
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let lpMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs xV)
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         (-c) * inner ℝ tMN lpMN)
     (jvp := fun xV dxV =>
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let dtMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target dxV)
       let lpMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs xV)
       let dlpMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs dxV)
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         (-c) * (inner ℝ tMN dlpMN + inner ℝ dtMN lpMN))
     (vjp := fun xV δV =>
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let lpMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logProbs xV)
@@ -67,9 +67,9 @@ def nllOneHotLast {Γ : List Shape} {m n : Nat}
       intro xV dxV δV
       classical
       let s : Shape := .dim m (.dim n .scalar)
-      let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+      let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
       let c : ℝ := (1 : ℝ) / (m : ℝ)
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let dtMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target dxV)
@@ -79,7 +79,7 @@ def nllOneHotLast {Γ : List Shape} {m n : Nat}
       let dLogProbs : Vec (m * n) := scale • tMN
       let dTarget : Vec (m * n) := scale • lpMN
       have hL :
-          inner ℝ (vecOfFun (n := Shape.size Shape.scalar)
+          inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar)
                 (fun _ => (-c) * (inner ℝ tMN dlpMN + inner ℝ dtMN lpMN))) δV
             =
           ((-c) * (inner ℝ tMN dlpMN + inner ℝ dtMN lpMN)) * δ0 := by
@@ -119,7 +119,7 @@ def nllOneHotLast {Γ : List Shape} {m n : Nat}
         simp [dTarget, scale, inner_smul_right]
       calc
         inner ℝ
-            (vecOfFun (n := Shape.size Shape.scalar)
+            (vecOfFun (n := Spec.Shape.size Shape.scalar)
               (fun _ => (-c) * (inner ℝ tMN dlpMN + inner ℝ dtMN lpMN)))
             δV
             =
@@ -149,7 +149,7 @@ def nllOneHotLastFderiv {Γ : List Shape} {m n : Nat}
     NodeFDerivCorrect (nllOneHotLast (Γ := Γ) (m := m) (n := n) logProbs target) := by
   classical
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let logpMN : CtxVec Γ → Vec (m * n) := fun xV => castVec hsz (CtxVec.get (Γ := Γ) (s := s)
     logProbs xV)
   let targetMN : CtxVec Γ → Vec (m * n) := fun xV => castVec hsz (CtxVec.get (Γ := Γ) (s := s)
@@ -223,7 +223,7 @@ def nllOneHotLastFderiv {Γ : List Shape} {m n : Nat}
             =
           (-c) * inner ℝ tMN lpMN := by
         simp [nllOneHotLast, Node.forwardVec_ofVec, tMN, lpMN, logpMN, targetMN, c,
-          s, Shape.size]
+          s, Spec.Shape.size]
       have hR :
           (vecScalarCLM ((-c) • inner ℝ tMN lpMN)).ofLp i = (-c) * inner ℝ tMN lpMN := by
         simp [smul_eq_mul]
@@ -241,7 +241,7 @@ def nllOneHotLastFderiv {Γ : List Shape} {m n : Nat}
           =
         (-c) * (inner ℝ tMN dlpMN + inner ℝ dtMN lpMN) := by
       simp [nllOneHotLast, Node.jvpVec_ofVec, tMN, dtMN, lpMN, dlpMN, logpMN, targetMN, c,
-        s, Shape.size]
+        s, Spec.Shape.size]
     let D : CtxVec Γ →L[ℝ] ℝ :=
       (-c) • (fderivInnerCLM ℝ (tMN, lpMN)).comp (targetMNCLM.prod logpMNCLM)
     have hD :

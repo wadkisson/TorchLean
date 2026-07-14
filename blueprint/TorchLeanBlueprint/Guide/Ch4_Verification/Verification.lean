@@ -356,7 +356,7 @@ open TorchLean
 open NN.MLTheory.CROWN.Graph
 open NN.MLTheory.CROWN
 
-def model : nn.Sequential (Shape.vec 2) (Shape.vec 1) :=
+def model : nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar) :=
   nn.blocks.mlp 2 1 { hidden := [3], activation := .relu, seedBase := 0 }
 
 def paramShapes : List Shape := nn.paramShapes model
@@ -365,21 +365,21 @@ def runOnce : IO Unit := do
   -- Parameters in the order expected by `paramShapes`.
   let params : TensorPack Float paramShapes :=
     tensorpack!
-      (tensorND! [3, 2] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
-      (tensorND! [3] [0.1, 0.2, 0.3]),
-      (tensorND! [1, 3] [0.7, 0.8, 0.9]),
-      (tensorND! [1] [0.4])
+      (tensorOfList! [3, 2] [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+      (tensorOfList! [3] [0.1, 0.2, 0.3]),
+      (tensorOfList! [1, 3] [0.7, 0.8, 0.9]),
+      (tensorOfList! [1] [0.4])
 
   let compiled ←
     match NN.Verification.TorchLean.compileForward
-          (α := Float) (paramShapes := paramShapes) (inShape := Shape.vec 2) (outShape := Shape.vec 1)
+          (α := Float) (paramShapes := paramShapes) (inShape := .dim 2 .scalar) (outShape := .dim 1 .scalar)
           (nn.program (model := model) (α := Float)) params with
     | .ok c => pure c
     | .error e => throw <| IO.userError e
 
   -- Seed an input box x in [x0 - eps, x0 + eps].
-  let x0 : Tensor Float (Shape.vec 2) := tensorND! [2] [0.5, 0.8]
-  let rad : Tensor Float (Shape.vec 2) := Spec.fill 0.1 (Shape.vec 2)
+  let x0 : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, 0.8]
+  let rad : Tensor Float (.dim 2 .scalar) := Spec.fill 0.1 (.dim 2 .scalar)
   let xB : FlatBox Float := { dim := 2, lo := Tensor.sub_spec x0 rad, hi := Tensor.add_spec x0 rad }
 
   -- Run IBP on the compiled IR + parameter store.
@@ -739,9 +739,7 @@ pass populated the expected state.
 ```
 #check NN.IR.Graph.checkWellFormed
 #check NN.IR.Graph.checkShapes
-#check NN.IR.Graph.checkInferredShapes
-#check NN.IR.Check.wellFormed_iff
-#check NN.IR.Check.wellShaped_iff
+#check NN.IR.Graph.checkShapes
 #check NN.Verification.TorchLean.Proved.compileForward_wellFormed
 #check NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward
 ```

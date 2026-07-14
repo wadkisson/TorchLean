@@ -16,7 +16,7 @@ understand when it appears next to the Lean code that produced it.
 Use the umbrella entrypoint for normal work:
 
 ```lean
-import NN.Entrypoint.Widgets
+import NN.Widgets
 ```
 
 Use direct imports when you only want one family:

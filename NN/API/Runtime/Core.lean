@@ -57,15 +57,16 @@ export _root_.Runtime.Autograd.TorchLean.CurriedRef (uncurry applyVarList)
 export _root_.Runtime.Autograd.TorchLean.RefList (append)
 export _root_.Runtime.Autograd.TorchLean
   (const add sub mul scale abs sqrt clamp max min
-   broadcastTo reshape transpose2d reduceSum reduceMean
+   broadcastTo reshape transpose2d swapAdjacentAtDepth reduceSum reduceMean
    gatherScalar gatherRow gatherScalarNat gatherVecNat gatherRowsNat scatterAddVec
      scatterAddRow
    matmul concatVectors
+   maxPool avgPool smoothMaxPool
    maxPool2d maxPool2dPad smoothMaxPool2d avgPool2d avgPool2dPad
    relu silu gelu sigmoid tanh softmax softplus exp log inv safeLog logSoftmax
-   globalAvgPool2dChw globalAvgPool2dNchw
    sum flatten
-   linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention conv2d)
+   linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention
+   conv convTranspose conv2d)
 export _root_.Runtime.Autograd.TorchLean
   (scalarOf tlistSingleton tlistPair tlistTriple tlistQuad trainCycleSGD trainCycleOptim meanLoss)
 
@@ -121,7 +122,7 @@ export _root_.Runtime.Autograd.TorchLean.F
   (square checkpoint
    addB mulB
    embedding embeddingRowsNat embeddingBatchSeqNat mean
-   detach stopGrad
+   detach
    dropoutSeeded)
 end F
 
@@ -236,7 +237,6 @@ objectives. -/
      bellmanPolicy bellmanOptimality)
   export _root_.Runtime.RL.Core
     (Transition IndexedTransition
-     oneHotAction
      discountedReturnsVecFrom discountedReturnsVec discountedReturnsVecDone
      generalizedAdvantageEstimationVec returnsFromAdvantagesVec
      squaredError huberLoss)
@@ -276,7 +276,7 @@ export _root_.Runtime.RL.Tabular
   end Autograd
   end RL
 
-namespace NN
+namespace LayerCore
 /- Neural-network layer constructors and sequential-model helpers. -/
 export _root_.Runtime.Autograd.TorchLean.NN
   (Mode LayerDef Seq
@@ -287,7 +287,6 @@ export _root_.Runtime.Autograd.TorchLean.NN
    instanceNorm2dNchw groupNorm2dNchw batchNorm2dNchw batchNorm2dNchwMode
    multiHeadAttention conv2d
    maxPool2d maxPool2dPad avgPool2d avgPool2dPad
-   globalAvgPool2dChw globalAvgPool2dNchw
    singleLayer)
 
 /-
@@ -341,7 +340,7 @@ export _root_.Runtime.Autograd.TorchLean.NN.Seq
    compileForwardWithMode compileForward
    forward predict forwardArtifact)
 end Seq
-end NN
+end LayerCore
 
 namespace Random
 /-!

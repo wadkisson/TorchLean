@@ -39,14 +39,14 @@ using `log_softmax` on logits (numerically stable vs `log(softmax)` for floats; 
 def crossEntropyOneHotLast {Γ : List Shape} {m n : Nat}
     (logits target : Idx Γ (.dim m (.dim n .scalar))) : Node Γ Shape.scalar :=
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let c : ℝ := (1 : ℝ) / (m : ℝ)
   Node.ofVec (Γ := Γ) (τ := Shape.scalar)
     (f := fun xV =>
       let xMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits xV)
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
       let logp : Vec (m * n) := LogSoftmaxLastAxis.forwardMN (m := m) (n := n) xMN
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         (-c) * inner ℝ tMN logp)
     (jvp := fun xV dxV =>
       let xMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits xV)
@@ -55,10 +55,10 @@ def crossEntropyOneHotLast {Γ : List Shape} {m n : Nat}
       let dtMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target dxV)
       let logp : Vec (m * n) := LogSoftmaxLastAxis.forwardMN (m := m) (n := n) xMN
       let dlogp : Vec (m * n) := LogSoftmaxLastAxis.jvpMN (m := m) (n := n) xMN dxMN
-      vecOfFun (n := Shape.size Shape.scalar) fun _ =>
+      vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ =>
         (-c) * (inner ℝ tMN dlogp + inner ℝ dtMN logp))
     (vjp := fun xV δV =>
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let xMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits xV)
       let tMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) target xV)
@@ -72,9 +72,9 @@ def crossEntropyOneHotLast {Γ : List Shape} {m n : Nat}
       intro xV dxV δV
       classical
       let s : Shape := .dim m (.dim n .scalar)
-      let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+      let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
       let c : ℝ := (1 : ℝ) / (m : ℝ)
-      let i0 : Fin (Shape.size Shape.scalar) := ⟨0, by simp [Shape.size]⟩
+      let i0 : Fin (Spec.Shape.size Shape.scalar) := ⟨0, by simp [Spec.Shape.size]⟩
       let δ0 : ℝ := δV i0
       let xMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits xV)
       let dxMN : Vec (m * n) := castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits dxV)
@@ -86,7 +86,7 @@ def crossEntropyOneHotLast {Γ : List Shape} {m n : Nat}
       let dLogits : Vec (m * n) := scale • LogSoftmaxLastAxis.vjpMN (m := m) (n := n) xMN tMN
       let dTarget : Vec (m * n) := scale • logp
       have hL :
-          inner ℝ (vecOfFun (n := Shape.size Shape.scalar) (fun _ => (-c) * (inner ℝ tMN dlogp +
+          inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ => (-c) * (inner ℝ tMN dlogp +
             inner ℝ dtMN logp))) δV
             =
           ((-c) * (inner ℝ tMN dlogp + inner ℝ dtMN logp)) * δ0 := by
@@ -137,7 +137,7 @@ def crossEntropyOneHotLast {Γ : List Shape} {m n : Nat}
       -- combine
       calc
         inner ℝ
-            (vecOfFun (n := Shape.size Shape.scalar) (fun _ => (-c) * (inner ℝ tMN dlogp + inner ℝ
+            (vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ => (-c) * (inner ℝ tMN dlogp + inner ℝ
               dtMN logp)))
             δV
             =
@@ -170,7 +170,7 @@ def crossEntropyOneHotLastFderiv {Γ : List Shape} {m n : Nat}
     NodeFDerivCorrect (crossEntropyOneHotLast (Γ := Γ) (m := m) (n := n) logits target) := by
   classical
   let s : Shape := .dim m (.dim n .scalar)
-  let hsz : Shape.size s = m * n := by simp [s, Shape.size]
+  let hsz : Spec.Shape.size s = m * n := by simp [s, Spec.Shape.size]
   let logitsMN : CtxVec Γ → Vec (m * n) :=
     fun xV => castVec hsz (CtxVec.get (Γ := Γ) (s := s) logits xV)
   let targetMN : CtxVec Γ → Vec (m * n) :=
@@ -267,7 +267,7 @@ def crossEntropyOneHotLastFderiv {Γ : List Shape} {m n : Nat}
           (-c) * inner ℝ tMN logp := by
         simp [crossEntropyOneHotLast, Node.forwardVec_ofVec, xMN, tMN, logp, logitsMN, targetMN,
           c,
-          s, Shape.size]
+          s, Spec.Shape.size]
       have hR :
           (vecScalarCLM ((-c) • inner ℝ tMN logp)).ofLp i = (-c) * inner ℝ tMN logp := by
         simp [smul_eq_mul]
@@ -298,7 +298,7 @@ def crossEntropyOneHotLastFderiv {Γ : List Shape} {m n : Nat}
           =
         (-c) * (inner ℝ tMN dlogp + inner ℝ dtMN logp) := by
       simp [crossEntropyOneHotLast, Node.jvpVec_ofVec, xMN, dxMN, tMN, dtMN, logp, dlogp,
-        logitsMN, targetMN, c, s, Shape.size]
+        logitsMN, targetMN, c, s, Spec.Shape.size]
     -- RHS: derivative CLM applied to `dxV` (scalar packaged into `Vec 1`)
     let logpDeriv : CtxVec Γ →L[ℝ] Vec (m * n) :=
       (LogSoftmaxLastAxis.derivMN (m := m) (n := n) xMN).comp logitsMNCLM

@@ -244,18 +244,8 @@ theorem toReal_sqrt_eq_fp32Round (x : IEEE32Exec) {dx : Dyadic}
       exact Option.some.inj this
     have hx0 : toReal x = 0 := by
       simp [toReal_eq, hx, dyadicToReal, hdx0]
-    have hfp0 : fp32Round 0 = 0 := by
-      have hne0 : TorchLean.Floats.neuralNearestEven 0 = 0 := by
-        simp [TorchLean.Floats.neuralNearestEven]
-      have : TorchLean.Floats.neuralNearestEven 0 = 0 ∨ TorchLean.Floats.neuralBpow binaryRadix
-        (-24) = 0 :=
-        Or.inl hne0
-      simpa [fp32Round, TorchLean.Floats.neuralRound, TorchLean.Floats.neuralToReal,
-        TorchLean.Floats.neuralScaledMantissa, TorchLean.Floats.neuralCexp,
-          TorchLean.Floats.neuralMagnitude,
-        TorchLean.Floats.fexp32, TorchLean.Floats.FLTExp, TorchLean.Floats.rnd32] using this
     rw [hsqrt, hx0]
-    simp [hfp0]
+    simp
   · have hz' : isZero x = false := by simpa using hz
     cases hs : signBit x with
     | true =>

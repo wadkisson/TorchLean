@@ -20,7 +20,7 @@ This file defines a small collection of common losses (and their gradients) in a
 
 In PyTorch you'll often see two layers:
 
-- a low-level, elementwise loss (e.g. `smooth_l1_loss` / "Huber"),
+- a low-level, elementwise loss (for example, Huber loss),
 - plus a reduction (`mean` or `sum`).
 
 TorchLean's spec layer mirrors that idea: most definitions are written as an elementwise formula
@@ -99,11 +99,30 @@ undefined; TorchLean's scalar-polymorphic spec layer is total, so it uses denomi
 empty sum contributes `0`.
 -/
 def meanDenom (s : Shape) : Nat :=
-  if Shape.size s = 0 then 1 else Shape.size s
+  if Spec.Shape.size s = 0 then 1 else Spec.Shape.size s
 
 /-- Mean of a scalar that conceptually came from a tensor with shape `s`. -/
 def meanOver {s : Shape} (x : α) : α :=
   x / (meanDenom s : α)
+
+/-- Number of independent last-axis slices in a tensor shape.
+
+Classification losses sum over the innermost class axis and apply `mean` over the remaining axes.
+Thus a class vector has one slice, a matrix of shape `(batch, classes)` has `batch` slices, and
+higher-rank inputs use the product of every axis except the last. Scalars are treated as one
+single-coordinate slice. -/
+def lastAxisSliceCount : Shape → Nat
+  | .scalar => 1
+  | .dim _ .scalar => 1
+  | .dim n inner => n * lastAxisSliceCount inner
+
+/-- Totalized denominator for a mean over last-axis slices. -/
+def lastAxisMeanDenom (s : Shape) : Nat :=
+  if lastAxisSliceCount s = 0 then 1 else lastAxisSliceCount s
+
+/-- Divide a last-axis-summed classification loss by its number of independent slices. -/
+def meanOverLastAxisSlices {s : Shape} (x : α) : α :=
+  x / (lastAxisMeanDenom s : α)
 
 /-- Mean squared error: average of `(predicted - target)^2`. -/
 def mseSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) : α :=
@@ -136,14 +155,17 @@ def maeDerivSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) : 
   scaleSpec grad (1 / (meanDenom s : α))
 
 /--
-Huber / SmoothL1 loss (PyTorch's `smooth_l1_loss`) with parameter `delta`.
+Huber loss with transition parameter `delta`.
 
 Elementwise, for residual `d = pred - target`:
 
-- if `|d| < delta`: `0.5 * d^2 / delta`
-- else:           `|d| - 0.5 * delta`
+- if `|d| < delta`: `0.5 * d^2`
+- else: `delta * (|d| - 0.5 * delta)`
 
 Then we take a mean over all elements.
+
+This is PyTorch's `HuberLoss` convention. It differs from `SmoothL1Loss` by a factor of `delta`.
+The Huber interpretation requires `delta > 0`.
 -/
 def huberSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) (delta : α := (1 : α)) : α
   :=
@@ -151,9 +173,9 @@ def huberSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) (delt
   let abs_diff := absSpec diff
   let per_elem := mapSpec (fun x =>
     if x < delta then
-      (x * x) / (Numbers.two * delta)
+      (x * x) / Numbers.two
     else
-      x - delta / Numbers.two) abs_diff
+      delta * (x - delta / Numbers.two)) abs_diff
   meanOver (s := s) (toScalarSpec per_elem)
 
 /-- Derivative of `huber_spec` w.r.t. `predicted`. -/
@@ -164,8 +186,10 @@ def huberDerivSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) 
   let grad :=
     mapSpec (fun d =>
       let ad := if d > (0 : α) then d else -d
-      if ad < delta then d / delta else if d > (0 : α) then (1 : α) else if d < (0 : α) then -(1 :
-        α) else (0 : α)
+      if ad < delta then d
+      else if d > (0 : α) then delta
+      else if d < (0 : α) then -delta
+      else (0 : α)
     ) diff
   scaleSpec grad (1 / (meanDenom s : α))
 
@@ -175,42 +199,49 @@ Cross-entropy between distributions (probabilities).
 This is closest to PyTorch when you already have probabilities `q` (e.g. after a softmax) and a
 probability target `p` (e.g. one-hot or label-smoothed), and you want:
 
-`CE(p, q) = -mean_i p_i * log(q_i)`.
+`CE(p, q) = -mean_r sum_c p[r,c] * log(q[r,c])`,
+
+where `c` is the last (class) axis and `r` ranges over all remaining axes. A lone class vector is
+one distribution and is not divided by its number of classes.
 
 PyTorch's `F.cross_entropy` typically takes logits and does `log_softmax + NLLLoss`; that is a
 different API surface than this "probabilities in, scalar out" spec.
 -/
 def crossEntropySpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) (epsilon : α :=
   Numbers.epsilon) : α :=
-  -- Standard cross-entropy between distributions:
-  --   CE(p, q) = - (1/N) * Σᵢ pᵢ log(qᵢ),
-  -- where `target` is `p` and `predicted` is `q` (typically softmax probabilities).
+  -- Standard cross-entropy between distributions: sum over each last-axis class distribution,
+  -- then average over the remaining sample/spatial axes.
   let clamp01 := fun x : α =>
     let x := if x > epsilon then x else epsilon
     if x < (1 : α) - epsilon then x else (1 : α) - epsilon
   let q := mapSpec clamp01 predicted
   let logq := logSpec q
   let total := sumSpec (mulSpec target logq)
-  meanOver (s := s) (-total)
+  meanOverLastAxisSlices (s := s) (-total)
 
 /-- Derivative of `cross_entropy_spec` w.r.t. `predicted`. -/
 def crossEntropyDerivSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s) (epsilon : α
   := Numbers.epsilon) :
     Tensor α s :=
-  -- d/dqᵢ [ -(1/N) * Σ pᵢ log(qᵢ) ] = -(1/N) * pᵢ / qᵢ
-  let clamp01 := fun x : α =>
-    let x := if x > epsilon then x else epsilon
-    if x < (1 : α) - epsilon then x else (1 : α) - epsilon
-  let q := mapSpec clamp01 predicted
-  let grad := divSpec (negSpec target) q
-  scaleSpec grad (1 / (meanDenom s : α))
+  -- The forward clamp is locally constant outside `(epsilon, 1 - epsilon)`, so its branch
+  -- derivative is zero there. At the two clipping kinks this definition selects the zero
+  -- subgradient. Inside the interval the derivative is the usual `-target / predicted`.
+  let grad := map2Spec (fun q p =>
+    if q > epsilon then
+      if q < (1 : α) - epsilon then -p / q else 0
+    else
+      0) predicted target
+  scaleSpec grad (1 / (lastAxisMeanDenom s : α))
 
 /--
 Cross-entropy on logits (stable log-softmax form).
 
 This matches the common PyTorch decomposition:
 
-`cross_entropy(logits, target) = -mean_i target_i * log_softmax(logits)_i`.
+`cross_entropy(logits, target) = -mean_r sum_c target[r,c] * log_softmax(logits)[r,c]`,
+
+where the last axis `c` contains classes and `r` ranges over the remaining axes. This is PyTorch's
+`reduction="mean"` convention for one-hot or soft distribution targets.
 
 Unlike `crossEntropySpec`, this takes *logits* and uses `Activation.logSoftmaxSpec` for
 numerical stability.
@@ -220,17 +251,17 @@ as in one-hot or label-smoothed targets. -/
 def crossEntropyLogitsSpec {s : Shape} (logits : Tensor α s) (target : Tensor α s) : α :=
   let logp := Activation.logSoftmaxSpec (α := α) (s := s) logits
   let total := sumSpec (mulSpec target logp)
-  meanOver (s := s) (-total)
+  meanOverLastAxisSlices (s := s) (-total)
 
 /-- Derivative of `cross_entropy_logits_spec` w.r.t. `logits`. -/
 def crossEntropyLogitsDerivSpec {s : Shape} (logits : Tensor α s) (target : Tensor α s) :
     Tensor α s :=
   -- When `target` is a distribution over the last axis, the gradient is the familiar:
   --   d/dlogits = softmax(logits) - target
-  -- followed by the global mean reduction.
+  -- followed by the mean over all non-class axes.
   let probs := Activation.softmaxSpec (α := α) (s := s) logits
   let grad := subSpec probs target
-  scaleSpec grad (1 / (meanDenom s : α))
+  scaleSpec grad (1 / (lastAxisMeanDenom s : α))
 
 /--
 Hinge loss (binary margin loss), elementwise then mean-reduced:
@@ -312,7 +343,13 @@ def cosineSimilarityDerivSpec {s : Shape}
   let pred_norm_safe := if pred_norm > epsilon then pred_norm else epsilon
   let target_norm_safe := if target_norm > epsilon then target_norm else epsilon
   let denom := pred_norm_safe * target_norm_safe
-  let c1 := dot_sum / (pred_norm_safe * pred_norm_safe * target_norm_safe)
+  -- When `pred_norm ≤ epsilon`, the denominator selected by the forward pass is locally constant
+  -- with respect to `predicted`; the radial derivative term is therefore zero on that branch.
+  let c1 :=
+    if pred_norm > epsilon then
+      dot_sum / (pred_norm_safe * pred_norm_safe * target_norm_safe)
+    else
+      0
   let term1 := scaleSpec predicted c1
   let term2 := scaleSpec target (1 / denom)
   subSpec term1 term2
@@ -347,13 +384,20 @@ def binaryCrossEntropySpec (predicted : α) (target : α) (epsilon : α := Numbe
   let t := target * log_p + ((1 : α) - target) * log_one_minus_p
   (0 : α) - t
 
-/-- Derivative of `binary_cross_entropy_spec` w.r.t. `predicted`. -/
+/-- Selected derivative of `binary_cross_entropy_spec` w.r.t. `predicted`.
+
+The clipped forward function is not differentiable at `epsilon` or `1 - epsilon`; this definition
+chooses zero at those two kinks and on the clipped exterior branches. -/
 def binaryCrossEntropyDerivSpec (predicted : α) (target : α) (epsilon : α := Numbers.epsilon) :
   α :=
-  let p := if predicted > epsilon then predicted else epsilon
-  let p := if p < (1 : α) - epsilon then p else (1 : α) - epsilon
-  -- d/dp BCE(p, y) = (p - y) / (p*(1-p))
-  (p - target) / (p * ((1 : α) - p))
+  -- As in `crossEntropyDerivSpec`, use the derivative of the selected clamp branch.
+  if predicted > epsilon then
+    if predicted < (1 : α) - epsilon then
+      (predicted - target) / (predicted * ((1 : α) - predicted))
+    else
+      0
+  else
+    0
 
 /-- Tensor BCE (probabilities), elementwise then mean-reduced. -/
 def binaryCrossEntropyTensorSpec {s : Shape} (predicted : Tensor α s) (target : Tensor α s)

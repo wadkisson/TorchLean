@@ -43,15 +43,14 @@ namespace Models
 /-!
 ## Model constructors (re-export)
 
-This namespace re-exports ready-made model constructors (MLP/CNN/ResNet18/etc.) for runnable
+This namespace re-exports ready-made model constructors for runnable
 examples and integration checks.
 
-For compositional building blocks, prefer `API.TorchLean.NN` and `API.TorchLean.Layers`.
+For compositional building blocks, prefer `API.TorchLean.LayerCore` and `API.TorchLean.LayerCore`.
 -/
 
 export _root_.NN.GraphSpec.Models.TorchLean
-  (mlp autoencoder twoConvCnn softmaxRegression mlpClassifier transformerBlock
-   resnet18Model resnet18Program resnet18InitParams)
+  (mlp autoencoder twoConvCnn softmaxRegression mlpClassifier transformerBlock)
 end Models
 
 namespace Module
@@ -76,8 +75,6 @@ export _root_.Runtime.Autograd.TorchLean.Module.ScalarModule
   (create forward backward step initOptim stepWith params setParams trainSGD trainWith meanLoss)
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef
   (instantiate instantiateFloatWithRuntimePlan instantiateFloatWithRuntimeInit)
-
-abbrev Device := _root_.Runtime.Autograd.Torch.Device
 
 /--
 Instantiate a `ScalarModuleDef` under explicit Torch options such as `backend` and `device`.
@@ -143,8 +140,8 @@ structure ExecConfig where
   dtype : DType := .float
   /-- Execution backend selection. -/
   backend : Backend := .eager
-  /-- Eager execution device selector. -/
-  device : Device := .auto
+  /-- Explicit eager execution device. -/
+  device : NN.Backend.Device := .cpu
   /-- Print each backend capsule when the eager runtime first executes it. -/
   showBackend : Bool := false
   deriving Repr, DecidableEq
@@ -160,9 +157,9 @@ def parseBackend (v : String) : Except String Backend := do
   else
     throw s!"unknown --backend {v} (supported: eager | compiled)"
 
-/-- Parse a device selector string into a runtime `Device`. -/
-def parseDevice (v : String) : Except String Device :=
-  _root_.Runtime.Autograd.Torch.Device.parse v
+/-- Parse a CLI device selector. `auto` currently resolves to the portable CPU runtime. -/
+def parseDevice (value : String) : Except String NN.Backend.Device :=
+  if value == "auto" then pure .cpu else NN.Backend.Device.parse value
 
 /-- Whether a raw CLI argument list explicitly requests CUDA. -/
 def requestsCuda : List String → Bool
@@ -198,9 +195,9 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
     Except String (ExecConfig × List String) := do
   let (dtype, args1) ← DType.parseAndStripWithDefault args defaultDType
   let (backend, args2) ←
-    CLI.takeParsedFlagDefault args1 "backend" "eager" parseBackend
-  let rec go (device : Device) (showBackend : Bool) (acc : List String) :
-      List String → Except String (Device × Bool × List String)
+    _root_.TorchLean.CLI.takeParsedFlagDefault args1 "backend" "eager" parseBackend
+  let rec go (device : NN.Backend.Device) (showBackend : Bool) (acc : List String) :
+      List String → Except String (NN.Backend.Device × Bool × List String)
     | [] => pure (device, showBackend, acc.reverse)
     | "--device" :: v :: as => do
         let d ← parseDevice v
@@ -215,7 +212,7 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
           go device true acc as
         else
           go device showBackend (a :: acc) as
-  let (device, showBackend, rest) ← go .auto false [] args2
+  let (device, showBackend, rest) ← go .cpu false [] args2
   pure ({
     dtype := dtype,
     backend := backend,
@@ -227,7 +224,7 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
 def toOptions (cfg : ExecConfig) (seed : Nat := 0) : Options :=
   { backend := cfg.backend
     seed := seed
-    requestedDevice := cfg.device
+    device := cfg.device
     showBackend := cfg.showBackend }
 
 /-- Parse CLI flags with the standard TorchLean default dtype policy. -/
@@ -440,7 +437,7 @@ def runUsage (exeName : String) : String :=
 CLI entrypoint helper for executable `main` functions.
 
 This parses:
-- `--seed N` (via `API.CLI.takeSeed`), and
+- `--seed N` (via `TorchLean.CLI.takeSeed`), and
 - runtime execution flags (`--dtype`, `--float32-mode`, `--backend`, `--device`,
   `--show-backend`),
 then executes the chosen `RunAction`.
@@ -455,12 +452,12 @@ def run
     (action : RunAction)
     (runOpts : RunOptions := {}) :
     IO UInt32 := do
-  let args := API.CLI.dropDashDash args
+  let args := TorchLean.CLI.dropDashDash args
   if args.contains "--help" || args.contains "-h" then
     IO.println (runUsage exeName)
     return 0
   let (seed, args) ←
-    match API.CLI.takeSeed args 0 with
+    match TorchLean.CLI.takeSeed args 0 with
     | .ok v => pure v
     | .error msg => throw <| IO.userError s!"{exeName}: {msg}"
 

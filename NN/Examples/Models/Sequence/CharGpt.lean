@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 
 /-!
@@ -170,12 +170,11 @@ def main (args : List String) : IO UInt32 := do
           layers := 1 }
       let mkModel : nn.M (nn.Sequential σ τ) :=
         if hSeq : seqLen = 0 then
-          nn.Linear vocab vocab (Shape.mat batch seqLen)
+          nn.linear vocab vocab (.dim batch (.dim seqLen .scalar))
         else
           have h_dModel : nn.models.CausalOneHotConfig.dModel cfg ≠ 0 := by
-            rw [nn.models.CausalOneHotConfig.dModel_eq]
-            simp [cfg]
-          nn.models.CausalTransformerOneHot cfg (h_seqLen := hSeq) (h_dModel := h_dModel)
+            simp [nn.models.CausalOneHotConfig.dModel, cfg]
+          nn.models.causalTransformerOneHot cfg (h_seqLen := hSeq) (h_dModel := h_dModel)
 
       let toksList := tok.encode corpus
       let toks := toksList.toArray

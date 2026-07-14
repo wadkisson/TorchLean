@@ -28,7 +28,7 @@ For Linux, macOS, Windows/WSL, CUDA, optional LibTorch support, and an explanati
 TorchLean's backend architecture, see the [Installation guide](https://lean-dojo.github.io/TorchLean/installation/).
 
 TorchLean is pinned by `lean-toolchain` and currently builds with
-`leanprover/lean4:v4.31.0`.
+`leanprover/lean4:v4.32.0`.
 
 ## Quickstart
 
@@ -50,7 +50,7 @@ statements that mention CUDA cite the native-runtime boundary in
 The public code shape is:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 
 def model :=
@@ -61,12 +61,12 @@ def model :=
   ]
 
 def xs : Tensor.T Float (shape![4, 2]) :=
-  tensorND! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+  tensorOfList! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
 
 def ys : Tensor.T Float (shape![4, 1]) :=
-  tensorND! [4, 1] [0.2, 1.0, 1.0, 1.8]
+  tensorOfList! [4, 1] [0.2, 1.0, 1.0, 1.8]
 
-def data : Trainer.Dataset (Shape.vec 2) (Shape.vec 1) :=
+def data : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   Data.tensorDataset xs ys
 
 def trainOnce : IO Unit := do
@@ -76,7 +76,7 @@ def trainOnce : IO Unit := do
         optimizer := optim.sgd { lr := 0.05 }
         backend := .compiled
         dtype := .float32 }
-  let initialPrediction ← trainer.predict (tensorND! [2] [0.5, -0.25])
+  let initialPrediction ← trainer.predict (tensorOfList! [2] [0.5, -0.25])
   IO.println s!"initial={Tensor.pretty initialPrediction}"
   let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
   trained.printSummary
@@ -124,14 +124,16 @@ lake exe cache get
 lake build
 ```
 
-Use `import NN` for model, data, training, verification, and proof workflows. Focused imports such
-as `NN.API.*`, `NN.GraphSpec.*`, `NN.Runtime.*`, or `NN.Proofs.*` are for files that deliberately
-work inside one subsystem.
+Use `import NN.API` for model, data, and training code. It provides the application-facing
+`TorchLean.nn`, `TorchLean.classical`, `TorchLean.Data`, `TorchLean.Trainer`, and
+`TorchLean.optim` namespaces. Use `import NN` when the same file also needs verification, proofs,
+or backend infrastructure; focused imports such as `NN.GraphSpec`, `NN.Runtime`, or `NN.Proofs`
+are available for subsystem work.
 
 Downstream model and training files should start from:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
 
@@ -145,7 +147,7 @@ require TorchLean from "../TorchLean"
 
 - `NN.lean`: canonical umbrella import for model, tensor, data, training, verification,
   and proof workflows.
-- `NN/API`: subsystem APIs behind `import NN`.
+- `NN/API`: the application facade exported by `import NN.API` and included by `import NN`.
 - `NN/Spec`: mathematical tensor, layer, model, and dynamical-system definitions.
 - `NN/Runtime`: executable autograd, optimizers, training loops, CUDA boundary,
   PyTorch import/export, and RL runtime support.
@@ -184,8 +186,9 @@ The same rule applies across the tree: name the object, name the artifact, and n
 - **ML theory.** The theory layer covers CROWN/LiRPA objects, optimizer laws, Muon
   orthogonalization certificates, learning-theory examples, generative objective identities,
   self-supervised-learning algebra, approximation theorems, and floating-point bridges. Optimizers
-  use a generic `TensorOptimizer`/`StepSpec` interface so new update rules can share stream laws
-  before proving optimizer-specific facts.
+  use a generic `TensorOptimizer` interface so new update rules share finite-stream laws. A
+  `StepSpec` is available when an independent mathematical recurrence must be related to the
+  executable update.
 - **Scientific ML.** The FNO Burgers and PINN/ODE paths show how numerical artifacts can be carried
   back into Lean checks. External simulators and optimizers remain named producers; Lean owns the
   artifact schemas, residual predicates, dataset checks, and certificate replay statements that sit
@@ -197,7 +200,7 @@ The same rule applies across the tree: name the object, name the artifact, and n
 | --- | --- |
 | "This model runs and trains" | `NN/Examples`, `NN/Runtime`, command output, and regression tests. |
 | "This graph has a checked bound/certificate" | `NN/Verification`, `NN/MLTheory/CROWN`, and the artifact schema named by the command. |
-| "This compilation/evaluation fragment preserves meaning" | `NN/Verification/TorchLean/Proved` and the theorem imported through `NN.Entrypoint.Verification`. |
+| "This compilation/evaluation fragment preserves meaning" | `NN/Verification/TorchLean/Proved` and the theorem imported through `NN.Verification`. |
 | "This optimizer update follows the intended equation" | `NN/Runtime/Optim` for executable equations and `NN/MLTheory/Optimization` for reusable laws. |
 | "This finite-precision statement has a formal model" | `NN/Floats`, `NN/Proofs/RuntimeApprox`, and the relevant bridge hypotheses. |
 | "This CUDA/PyTorch/ATen/Julia/Gymnasium path was used" | `TRUST_BOUNDARIES.md`, the runtime module docstring, and the command or artifact provenance. |

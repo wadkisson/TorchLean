@@ -18,7 +18,7 @@ runtime the source of truth.
 - `Activation.lean`: wrappers for ReLU, sigmoid, tanh, softmax, and related activations.
 - `Linear.lean`: linear layer wrappers and small sequence classifier helpers.
 - `Conv.lean`: convolution and transpose-convolution wrappers.
-- `Pooling.lean`, `GlobalPooling.lean`: pooling wrappers over image-like tensors.
+- `Pooling.lean`, `GlobalPooling.lean`: rank-generic pooling wrappers over channels-first tensors.
 - `Normalization.lean`: layer norm and related normalization wrappers.
 - `Attention.lean`: scaled dot-product self-attention wrapper.
 - `Embedding.lean`: one-hot/numeric embedding wrapper.
@@ -28,7 +28,7 @@ runtime the source of truth.
 - `Dropout.lean`: deterministic inference and explicit-mask dropout wrappers.
 - `Flatten.lean`: flattening wrappers used by CNN/model-zoo specs.
 - `Gnn.lean`: compact graph-convolution wrapper.
-- `Autoencoder.lean`, `Seq2seq.lean`, `Resnet.lean`: larger neural model wrappers.
+- `Autoencoder.lean`, `Seq2seq.lean`: larger neural model wrappers.
 - `LinearRegression.lean`, `LogisticRegression.lean`, `Svm.lean`, `DecisionTree.lean`,
   `GradientBoostedTrees.lean`, `Pca.lean`, `Gmm.lean`, `Hmm.lean`: classical ML and probabilistic
   model specs that share the same typed-tensor vocabulary.

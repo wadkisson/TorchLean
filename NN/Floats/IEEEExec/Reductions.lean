@@ -436,6 +436,16 @@ Every internal node uses `fp32Round (a+b)`. This is the usual floating-point mod
 def evalRealIEEE (t : SumTree IEEE32Exec) : ℝ :=
   evalRound (fun a b => fp32Round (a + b)) toReal t
 
+/-- Every internal rounded sum has the canonical effective mantissa/exponent representation. -/
+theorem evalRealIEEE_node_eq_computed (a b : SumTree IEEE32Exec) :
+    evalRealIEEE (.node a b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (evalRealIEEE a + evalRealIEEE b))
+        exponent := neuralCexp binaryRadix fexp32 (evalRealIEEE a + evalRealIEEE b) } := by
+  change fp32Round (evalRealIEEE a + evalRealIEEE b) = _
+  exact fp32Round_eq_computed (evalRealIEEE a + evalRealIEEE b)
+
 /-- Exact real sum of the decoded leaves. -/
 def exactSumIEEE (t : SumTree IEEE32Exec) : ℝ :=
   exactSum toReal t
@@ -592,6 +602,30 @@ This matches the standard floating-point model for accumulation, under `FiniteEv
 -/
 def evalRealDotIEEE (t : SumTree (IEEE32Exec × IEEE32Exec)) : ℝ :=
   evalRound (fun a b => fp32Round (a + b)) (fun p => toReal (mul p.1 p.2)) t
+
+/-- A finite executable dot-product leaf has the effective rounded-product representation. -/
+theorem evalRealDotIEEE_leaf_eq_computed (x y : IEEE32Exec)
+    (hfin : isFinite (mul x y) = true) :
+    evalRealDotIEEE (.leaf (x, y)) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32 (toReal x * toReal y))
+        exponent := neuralCexp binaryRadix fexp32 (toReal x * toReal y) } := by
+  change toReal (mul x y) = _
+  exact toReal_mul_eq_computed_of_isFinite x y hfin
+
+/-- Every dot-product accumulation node has the effective rounded-sum representation. -/
+theorem evalRealDotIEEE_node_eq_computed
+    (a b : SumTree (IEEE32Exec × IEEE32Exec)) :
+    evalRealDotIEEE (.node a b) =
+      neuralToReal (β := binaryRadix) {
+        mantissa := neuralNearestEvenMantissa
+          (neuralScaledMantissa binaryRadix fexp32
+            (evalRealDotIEEE a + evalRealDotIEEE b))
+        exponent := neuralCexp binaryRadix fexp32
+          (evalRealDotIEEE a + evalRealDotIEEE b) } := by
+  change fp32Round (evalRealDotIEEE a + evalRealDotIEEE b) = _
+  exact fp32Round_eq_computed (evalRealDotIEEE a + evalRealDotIEEE b)
 
 /--
 Exact real sum of the rounded leaf products.

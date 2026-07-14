@@ -3,45 +3,9 @@ title: Examples
 usemathjax: true
 ---
 
-The examples are the runnable side of TorchLean: training a model, computing gradients, loading data,
-exporting weights, sampling images or text, and checking the claims that sit next to those runs. The
-first-pass links give a short route through the project; the cards below jump directly to a model
-family or verification workflow.
-
-## First Pass
-
-<div class="workflow-list examples-start-list">
-  <a href="{{ '/blueprint/Examples-and-Applications/Model-Examples-Deep-Dive/' | relative_url }}">
-    <span>01</span>
-    <strong>Run a model</strong>
-    <em>MLP, CNN, text, diffusion, and RL examples with training loops and saved artifacts.</em>
-  </a>
-  <a href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Autograd-Walkthrough/' | relative_url }}">
-    <span>02</span>
-    <strong>Inspect autograd</strong>
-    <em>Small tensor programs where the tape, VJPs, and gradients are visible.</em>
-  </a>
-  <a href="{{ '/blueprint/Semantics-and-Graphs/Graphs-and-IR/' | relative_url }}">
-    <span>03</span>
-    <strong>Read the graph</strong>
-    <em>Lower models into TorchLean IR and check shapes, traces, and bound passes.</em>
-  </a>
-  <a href="{{ '/examples/verification/' | relative_url }}">
-    <span>04</span>
-    <strong>Check a certificate</strong>
-    <em>IBP, CROWN-style bounds, external verifier artifacts, and PINN example structure.</em>
-  </a>
-  <a href="{{ '/examples/bug-zoo/' | relative_url }}">
-    <span>05</span>
-    <strong>Study failure cases</strong>
-    <em>Masks, normalization, losses, KV caches, token ids, batching, and float boundaries.</em>
-  </a>
-  <a href="{{ '/blueprint/Verification-and-Certificates/Optimization-Theory/' | relative_url }}">
-    <span>06</span>
-    <strong>Study optimizer laws</strong>
-    <em>Muon certificates, orthogonalized update directions, and GaLore-style projected updates.</em>
-  </a>
-</div>
+TorchLean includes runnable training, autograd, data-loading, export, generation, and verification
+examples. Each page records the command, input data, produced artifact, and the claim checked by
+Lean.
 
 ## Featured Examples
 
@@ -170,5 +134,4 @@ lake exe torchlean --help
 lake exe verify --help
 ```
 
-Those commands are the live index of runnable entry points. The guide explains the ideas behind each
-path; the help output names the exact commands and flags.
+The help output is the authoritative list of runnable entry points and their current flags.

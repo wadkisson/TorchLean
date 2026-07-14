@@ -67,11 +67,11 @@ payload that will be executed, saved, lowered, or verified.
 
 ```
 -- TorchLean
-import NN
+import NN.API
 
 open TorchLean
 
-def model : nn.M (nn.Sequential (Shape.vec 10) (Shape.vec 5)) :=
+def model : nn.M (nn.Sequential (.dim 10 .scalar) (.dim 5 .scalar)) :=
   nn.Sequential![
     nn.Linear 10 32,
     nn.GELU,

@@ -99,21 +99,21 @@ here lets convolution share the same affine machinery as linear and matmul nodes
 Precondition: `cfg.stride ≠ 0`. Engine call sites check this before calling the converter.
 -/
 def affOfConv2d (cfg : Conv2DParams α) :
-  let outH := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-  let outW := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+  let outH := Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+  let outW := Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
   AffineVec α (cfg.inC * cfg.inH * cfg.inW) (cfg.outC * outH * outW) :=
-  let outH := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-  let outW := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+  let outH := Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+  let outW := Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
   let inShape := Shape.dim cfg.inC (Shape.dim cfg.inH (Shape.dim cfg.inW Shape.scalar))
   let outShape := Shape.dim cfg.outC (Shape.dim outH (Shape.dim outW Shape.scalar))
   let nIn := inShape.size
   let nOut := outShape.size
   have hIn' : nIn = cfg.inC * (cfg.inH * cfg.inW) := by
-    simp [nIn, inShape, Shape.size]
+    simp [nIn, inShape, Spec.Shape.size]
   have hIn : nIn = cfg.inC * cfg.inH * cfg.inW := by
     simpa [Nat.mul_assoc] using hIn'
   have hOut' : nOut = cfg.outC * (outH * outW) := by
-    simp [nOut, outShape, Shape.size, outH, outW]
+    simp [nOut, outShape, Spec.Shape.size, outH, outW]
   have hOut : nOut = cfg.outC * outH * outW := by
     simpa [Nat.mul_assoc] using hOut'
   let Wraw := NN.MLTheory.CROWN.conv2dLinearMatrix (α:=α)
@@ -351,8 +351,8 @@ def propagateAffineNode
         if _hs : cfg.stride = 0 then
           affs
         else if hdim : paff.outDim = convIn then
-          let outH := (cfg.inH + 2 * cfg.padding - cfg.kH) / cfg.stride + 1
-          let outW := (cfg.inW + 2 * cfg.padding - cfg.kW) / cfg.stride + 1
+          let outH := Spec.Shape.slidingWindowOutDim cfg.inH cfg.kH cfg.stride cfg.padding
+          let outW := Spec.Shape.slidingWindowOutDim cfg.inW cfg.kW cfg.stride cfg.padding
           let convAff0 := affOfConv2d (α:=α) cfg
           let convAff := castAffineIn (α:=α)
             (n:=convIn) (n':=paff.outDim) (m:=cfg.outC * outH * outW)
@@ -621,7 +621,7 @@ def propagateAffineNode
           let inDim := first.inDim
           if rest.all (fun a => a.inDim == inDim) then
             let totalOut := parentsAff.foldl (fun acc a => acc + a.outDim) 0
-            if Shape.size node.outShape = totalOut then
+            if Spec.Shape.size node.outShape = totalOut then
               let rec pick (k : Nat) (l : List (FlatAffine α)) : FlatAffine α × Nat :=
                 match l with
                 | [] => (first, 0)

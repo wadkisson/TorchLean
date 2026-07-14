@@ -536,31 +536,31 @@ theorem selfAttention_reindexOuter
             Spec.Tensor.scaleSpec
                 (permMatrix (α := ℝ) (n := Nat.succ n') σ
                   (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K)))
-                (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹
+                (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹
               =
             permMatrix (α := ℝ) (n := Nat.succ n') σ
               (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹) := by
+                (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹) := by
           simpa using
             (scale_spec_permMatrix (σ := σ)
               (A := matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-              (c := (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹))
+              (c := (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹))
 
         -- softmax commutes with `permMatrix`.
         have hWeights :
             Activation.softmaxSpec (α := ℝ) (s := .dim (Nat.succ n') (.dim (Nat.succ n') .scalar))
                 (permMatrix (α := ℝ) (n := Nat.succ n') σ
                   (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                    (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹))
+                    (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹))
               =
             permMatrix (α := ℝ) (n := Nat.succ n') σ
               (Activation.softmaxSpec (α := ℝ) (s := .dim (Nat.succ n') (.dim (Nat.succ n') .scalar))
                 (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                  (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹)) := by
+                  (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹)) := by
           simpa using
             (SoftmaxEquivariance.softmax_spec_permMatrix (n := n') (σ := σ)
               (A := Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹))
+                (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹))
 
         -- final matmul with `V` turns the conjugation into an outer reindexing.
         have hOut :
@@ -568,20 +568,20 @@ theorem selfAttention_reindexOuter
                 (permMatrix (α := ℝ) (n := Nat.succ n') σ
                   (Activation.softmaxSpec (α := ℝ) (s := .dim (Nat.succ n') (.dim (Nat.succ n') .scalar))
                     (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                      (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹)))
+                      (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹)))
                 (reindexOuter (α := ℝ) (n := Nat.succ n') (s := .dim projDim .scalar) σ V)
               =
             reindexOuter (α := ℝ) (n := Nat.succ n') (s := .dim projDim .scalar) σ
               (matMulSpec
                 (Activation.softmaxSpec (α := ℝ) (s := .dim (Nat.succ n') (.dim (Nat.succ n') .scalar))
                   (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                    (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹))
+                    (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹))
                 V) := by
           simpa using
             (mat_mul_permMatrix_reindexOuter (σ := σ)
               (A := Activation.softmaxSpec (α := ℝ) (s := .dim (Nat.succ n') (.dim (Nat.succ n') .scalar))
                 (Spec.Tensor.scaleSpec (matMulSpec Q (Spec.Tensor.matrixTransposeSpec K))
-                  (MathFunctions.sqrt (Coe.coe projDim : ℝ))⁻¹))
+                  (Spec.attentionScaleDenom (α := ℝ) projDim)⁻¹))
               (B := V))
 
         -- Put it all together by unfolding `scaledDotProductAttention` (mask = none).

@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.IEEEExec.Exec32
-public import NN.Floats.NeuralFloat.Core
+public import NN.Floats.NeuralFloat.Metadata
 public import NN.Spec.Core.Tensor.Core
 
 /-!
@@ -42,8 +42,9 @@ abbrev RuntimeScalar := TorchLean.Floats.IEEE754.IEEE32Exec
 /-- Runtime tensors are Float-typed tensors. -/
 abbrev RuntimeTensor (s : Spec.Shape) := Spec.Tensor RuntimeScalar s
 
-/-- NeuralFloat runtime scalar (precision-aware). -/
-abbrev RuntimeNeuralScalar (β : TorchLean.Floats.NeuralRadix) := TorchLean.Floats.NeuralFloat β
+/-- Annotated NeuralFloat runtime scalar with explicit precision and error metadata. -/
+abbrev RuntimeNeuralScalar (β : TorchLean.Floats.NeuralRadix) :=
+  TorchLean.Floats.AnnotatedNeuralFloat β
 
 /-- Runtime tensors backed by NeuralFloat. -/
 abbrev RuntimeNeuralTensor (β : TorchLean.Floats.NeuralRadix) (s : Spec.Shape) :=

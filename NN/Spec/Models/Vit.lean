@@ -46,11 +46,11 @@ variable {α : Type} [Context α] [DecidableRel ((· > ·) : α → α → Prop)
 
 /-- Output height of the patch-embedding convolution in ViT. -/
 abbrev ViTPatchOutH (inH patchH stride padding : Nat) : Nat :=
-  (inH + 2 * padding - patchH) / stride + 1
+  Shape.slidingWindowOutDim inH patchH stride padding
 
 /-- Output width of the patch-embedding convolution in ViT. -/
 abbrev ViTPatchOutW (inW patchW stride padding : Nat) : Nat :=
-  (inW + 2 * padding - patchW) / stride + 1
+  Shape.slidingWindowOutDim inW patchW stride padding
 
 /-- Number of patch tokens `T = outH*outW` produced by the patch embedding. -/
 abbrev ViTPatchCount (inH inW patchH patchW stride padding : Nat) : Nat :=
@@ -211,7 +211,7 @@ def ViTSpec.forward
       (Shape.dim cfg.embedDim (Shape.dim outH (Shape.dim outW Shape.scalar))).size
         =
       (Shape.dim cfg.embedDim (Shape.dim (outH * outW) Shape.scalar)).size := by
-    simp [Shape.size]
+    simp [Spec.Shape.size]
 
   let patchesFlat : Tensor α (.dim cfg.embedDim (.dim (outH * outW) .scalar)) :=
     reshapeSpec patches h_size
@@ -279,7 +279,7 @@ def ViTSpec.backward
       (Shape.dim cfg.embedDim (Shape.dim outH (Shape.dim outW Shape.scalar))).size
         =
       (Shape.dim cfg.embedDim (Shape.dim (outH * outW) Shape.scalar)).size := by
-    simp [Shape.size]
+    simp [Spec.Shape.size]
 
   let patchesFlat : Tensor α (.dim cfg.embedDim (.dim (outH * outW) .scalar)) :=
     reshapeSpec patches h_size
@@ -426,7 +426,7 @@ def ViTClsSpec.forward
       (Shape.dim cfg.embedDim (Shape.dim outH (Shape.dim outW Shape.scalar))).size
         =
       (Shape.dim cfg.embedDim (Shape.dim (outH * outW) Shape.scalar)).size := by
-    simp [Shape.size]
+    simp [Spec.Shape.size]
 
   let patchesFlat : Tensor α (.dim cfg.embedDim (.dim (outH * outW) .scalar)) :=
     reshapeSpec patches h_size
@@ -483,7 +483,7 @@ def ViTClsSpec.backward
       (Shape.dim cfg.embedDim (Shape.dim outH (Shape.dim outW Shape.scalar))).size
         =
       (Shape.dim cfg.embedDim (Shape.dim (outH * outW) Shape.scalar)).size := by
-    simp [Shape.size]
+    simp [Spec.Shape.size]
 
   let patchesFlat : Tensor α (.dim cfg.embedDim (.dim (outH * outW) .scalar)) :=
     reshapeSpec patches h_size

@@ -31,7 +31,7 @@ namespace IRStep
 theorem evalAt_reshape_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {inShape outShape : Shape} (x : Tensor α inShape)
-    (hsize : Shape.size inShape = Shape.size outShape) :
+    (hsize : Spec.Shape.size inShape = Spec.Shape.size outShape) :
     Graph.evalAt (α := α) (g := unaryGraphOut (.reshape inShape outShape) inShape outShape)
         (payload := {})
         (input := DVal.mk (α := α) inShape x)
@@ -47,13 +47,13 @@ theorem evalAt_reshape_eq
 theorem evalAt_flatten_eq
     {α : Type} [Context α] [DecidableEq Shape]
     {s : Shape} (x : Tensor α s) :
-    Graph.evalAt (α := α) (g := unaryGraphOut (.flatten s) s (.dim (Shape.size s) .scalar))
+    Graph.evalAt (α := α) (g := unaryGraphOut (.flatten s) s (.dim (Spec.Shape.size s) .scalar))
         (payload := {})
         (input := DVal.mk (α := α) s x)
         (vals := #[DVal.mk (α := α) s x]) (i := 1)
       =
       Except.ok
-        (DVal.mk (α := α) (.dim (Shape.size s) .scalar)
+        (DVal.mk (α := α) (.dim (Spec.Shape.size s) .scalar)
           (Tensor.flattenSpec (α := α) (s := s) x)) := by
   simp [Graph.evalAt, unaryGraphOut, unaryNodeOut, Graph.getNode, Graph.getNode?,
     Graph.expectShape, Bind.bind, Except.bind, Pure.pure, Except.pure]

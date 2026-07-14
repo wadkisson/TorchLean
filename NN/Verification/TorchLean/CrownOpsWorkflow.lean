@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.API.Public.Facade
+public import NN.API
 public import NN.Verification.TorchLean.Compile
 
 /-!
@@ -49,20 +49,20 @@ def softmaxInDim : Nat := 2
 def softmaxOutDim : Nat := 3
 
 /-- Input shape for the softmax workflow model. -/
-def softmaxXShape : Shape := .dim softmaxInDim .scalar
+def softmaxXShape : Spec.Shape := .dim softmaxInDim .scalar
 /-- Output shape for the softmax workflow model. -/
-def softmaxYShape : Shape := .dim softmaxOutDim .scalar
+def softmaxYShape : Spec.Shape := .dim softmaxOutDim .scalar
 
 /-- TorchLean model: `Linear -> Softmax`. -/
 def softmaxModel : nn.Sequential softmaxXShape softmaxYShape :=
   nn.run 0 <|
     nn.Sequential![
-      nn.Linear softmaxInDim softmaxOutDim,
-      nn.Softmax
+      nn.linear softmaxInDim softmaxOutDim,
+      nn.softmax
     ]
 
 /-- Parameter shapes for `softmaxModel`. -/
-def softmaxParamShapes : List Shape := nn.paramShapes softmaxModel
+def softmaxParamShapes : List Spec.Shape := nn.paramShapes softmaxModel
 
 /-- Example margin functional on softmax outputs (`lo0 - hi1`). -/
 def softmaxMargin {α : Type} [Context α]
@@ -76,19 +76,19 @@ Run the softmax workflow under a chosen scalar backend `α`.
 
 This compiles the TorchLean model to the verifier IR and prints IBP/CROWN bounds.
 -/
-def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] : IO Unit := do
   IO.println "== Workflow 1: linear -> softmax (vector) =="
   let cast : Float → α := Runtime.ofFloat
 
   let params : nn.ParamTensors α softmaxParamShapes :=
     nn.ParamTensors.pair
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3, 2]
+      (NN.Tensor.ofListOfLength (α := α) [3, 2]
         [ cast 1.0, cast (-0.5)
         , cast 0.2, cast 0.7
         , cast (-0.3), cast 0.1
         ] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [3] [cast 0.1, cast (-0.2), cast 0.0] (by rfl))
+      (NN.Tensor.ofListOfLength (α := α) [3] [cast 0.1, cast (-0.2), cast 0.0] (by rfl))
 
   let compiled ←
     match Verification.compileProgram
@@ -100,7 +100,7 @@ def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToSt
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α softmaxXShape :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.2, cast (-0.1)] (by rfl)
+    NN.Tensor.ofListOfLength (α := α) [2] [cast 0.2, cast (-0.1)] (by rfl)
   let eps : α := Runtime.ofFloat 0.05
   let xB : FlatBox α := Verification.lInfBall (α := α) x0 eps
   let ps : ParamStore α := compiled.seedInputBox xB
@@ -137,7 +137,7 @@ def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToSt
 
   -- Backward/dual CROWN for the margin objective: p0 - p1.
   let objV : Tensor α (.dim softmaxOutDim .scalar) :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [3] [cast 1.0, cast (-1.0), cast 0.0] (by rfl)
+    NN.Tensor.ofListOfLength (α := α) [3] [cast 1.0, cast (-1.0), cast 0.0] (by rfl)
   let obj : FlatVec α := { n := softmaxOutDim, v := objV }
   match compiled.backwardObjectiveBox? ps ibp xB obj with
   | .ok outC =>
@@ -154,19 +154,19 @@ def mseInDim : Nat := 2
 def mseOutDim : Nat := 2
 
 /-- Weight shape for the MSE-loss workflow's linear layer. -/
-def mseWShape : Shape := .dim mseOutDim (.dim mseInDim .scalar)
+def mseWShape : Spec.Shape := .dim mseOutDim (.dim mseInDim .scalar)
 /-- Bias shape for the MSE-loss workflow's linear layer. -/
-def mseBShape : Shape := .dim mseOutDim .scalar
+def mseBShape : Spec.Shape := .dim mseOutDim .scalar
 /-- Input shape for the MSE-loss workflow. -/
-def mseXShape : Shape := .dim mseInDim .scalar
+def mseXShape : Spec.Shape := .dim mseInDim .scalar
 /-- Output shape for the MSE-loss workflow. -/
-def mseYShape : Shape := .dim mseOutDim .scalar
+def mseYShape : Spec.Shape := .dim mseOutDim .scalar
 
 /-- Parameter shapes for the MSE-loss workflow forwardProgram (`[W,b,target]`). -/
-def mseParamShapes : List Shape := [mseWShape, mseBShape, mseYShape]
+def mseParamShapes : List Spec.Shape := [mseWShape, mseBShape, mseYShape]
 
 /-- TorchLean forwardProgram: `yhat = linear(x); mse_loss(yhat, target)` returning a scalar. -/
-def mseLossModel {α : Type} [Context α] [DecidableEq Shape] :
+def mseLossModel {α : Type} [Context α] [DecidableEq Spec.Shape] :
     _root_.Runtime.Autograd.TorchLean.Program α (mseParamShapes ++ [mseXShape])
       _root_.TorchLean.Shape.scalar :=
   fun {m} _ _ =>
@@ -182,17 +182,17 @@ Run the MSE-loss workflow under a chosen scalar backend `α`.
 This compiles the TorchLean forwardProgram to the verifier IR and prints IBP/CROWN bounds for the scalar
   loss.
 -/
-def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] : IO Unit := do
   IO.println "== Workflow 2: linear -> mse_loss (scalar) =="
   let cast : Float → α := Runtime.ofFloat
 
   let params : nn.ParamTensors α mseParamShapes :=
     nn.ParamTensors.triple
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2, 2]
+      (NN.Tensor.ofListOfLength (α := α) [2, 2]
         [cast 0.4, cast (-0.3), cast 1.2, cast 0.1] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.05, cast (-0.02)] (by rfl))
-      (NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.0, cast 1.0] (by rfl))
+      (NN.Tensor.ofListOfLength (α := α) [2] [cast 0.05, cast (-0.02)] (by rfl))
+      (NN.Tensor.ofListOfLength (α := α) [2] [cast 0.0, cast 1.0] (by rfl))
 
   let compiled ←
     match Verification.compileProgram
@@ -205,7 +205,7 @@ def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString
   IO.println s!"compiled IR nodes: {compiled.graph.nodes.size}"
 
   let x0 : Tensor α mseXShape :=
-    NN.Tensor.tensorNDOfLenEq (α := α) [2] [cast 0.3, cast (-0.4)] (by rfl)
+    NN.Tensor.ofListOfLength (α := α) [2] [cast 0.3, cast (-0.4)] (by rfl)
   let eps : α := Runtime.ofFloat 0.05
   let xB : FlatBox α := Verification.lInfBall (α := α) x0 eps
   let ps : ParamStore α := compiled.seedInputBox xB
@@ -237,7 +237,7 @@ def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString
       IO.println s!"[CROWN-backward] {msg}"
 
 /-- Run all CROWN-ops workflows (softmax + mse_loss) under a chosen scalar backend `α`. -/
-def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α]
+def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
     [Runtime.Scalar α] : IO Unit := do
   runSoftmax (α := α)
   IO.println ""

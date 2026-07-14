@@ -169,6 +169,10 @@ softmax numerator. The theorem `trueInfinityMask_future_attention_weight_zero` s
 future positions receive exactly zero attention mass under the causal mask. That property is the one
 needed when reasoning about autoregressive output causality.
 
+The spec also makes fully blocked rows total: if every mask entry in a row is `false`, the complete
+weight row is zero. This is distinct from first forming a vector of negative infinities and then
+applying an implementation whose normalization may produce `NaN` on that row.
+
 In formula form:
 
 $$`j>i \quad\Longrightarrow\quad

@@ -10,7 +10,7 @@ Run:
 
 module
 
-public import NN
+public import NN.API
 public import NN.Examples.Models.Common.RealData
 public import NN.Spec.Models.Gan
 public import NN.Spec.Layers.Loss
@@ -57,15 +57,15 @@ abbrev Z := nn.models.vectorLatentShape cfg
 abbrev X := nn.models.vectorDataShape cfg
 
 /-- Discriminator score shape: one scalar score per batch row. -/
-abbrev S := Shape.mat cfg.batch 1
+abbrev S : Shape := .dim cfg.batch (.dim 1 .scalar)
 
 /-- Generator network mapping latent vectors to flattened image vectors. -/
 def mkGenerator : nn.M (nn.Sequential Z X) :=
-  nn.models.VectorGANGenerator cfg
+  nn.models.vectorGanGenerator cfg
 
 /-- Discriminator network mapping flattened image vectors to scalar real/fake scores. -/
 def mkDiscriminator : nn.M (nn.Sequential X S) :=
-  nn.models.VectorGANDiscriminator cfg
+  nn.models.vectorGanDiscriminator cfg
 
 /-- Mean-squared error for one supervised sample evaluated through a public prediction closure. -/
 def sampleMse {σ τ : Shape}

@@ -61,20 +61,20 @@ open scoped BigOperators
     ((EuclideanSpace.equiv (𝕜 := ℝ) (ι := Fin n)).symm f).ofLp i = f i := by
   simp [EuclideanSpace.equiv]
 
-@[simp] lemma inner_scalarVec_left (a : ℝ) (δ : Vec (Shape.size Shape.scalar)) :
-    inner ℝ (vecOfFun (n := Shape.size Shape.scalar) fun _ => a) δ = a * δ.ofLp ⟨0, by simp
-      [Shape.size]⟩ := by
+@[simp] lemma inner_scalarVec_left (a : ℝ) (δ : Vec (Spec.Shape.size Shape.scalar)) :
+    inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ => a) δ = a * δ.ofLp ⟨0, by simp
+      [Spec.Shape.size]⟩ := by
   calc
-    inner ℝ (vecOfFun (n := Shape.size Shape.scalar) fun _ => a) δ
+    inner ℝ (vecOfFun (n := Spec.Shape.size Shape.scalar) fun _ => a) δ
         =
-      ∑ i : Fin (Shape.size Shape.scalar), (vecOfFun (n := Shape.size Shape.scalar) (fun _ =>
+      ∑ i : Fin (Spec.Shape.size Shape.scalar), (vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ =>
         a)).ofLp i * δ.ofLp i := by
           simpa using
             (inner_eq_sum_mul
-              (x := vecOfFun (n := Shape.size Shape.scalar) (fun _ => a))
+              (x := vecOfFun (n := Spec.Shape.size Shape.scalar) (fun _ => a))
               (y := δ))
-    _ = a * δ.ofLp ⟨0, by simp [Shape.size]⟩ := by
-          simp [Shape.size]
+    _ = a * δ.ofLp ⟨0, by simp [Spec.Shape.size]⟩ := by
+          simp [Spec.Shape.size]
 
 -- We use `inner_append` (proved once in `NN/Proofs/Autograd/Tape/Core/FDeriv.lean`) to split
 -- inner products on concatenated Euclidean vectors `appendVec a b`.
@@ -91,26 +91,26 @@ Raw projection from a vectorized context onto the `i`th block.
 This is the underlying block-splitting operation; `CtxVec.get` below wraps it with an `Idx Γ s`
 that also remembers the expected shape.
 -/
-def getRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ → Vec (Shape.size (Γ.get i))
+def getRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ → Vec (Spec.Shape.size (Γ.get i))
   | [], i, _ => nomatch i
-  | s :: ss, ⟨0, _⟩, v => vecOfFun (n := Shape.size s) fun j => v (Fin.castAdd (ctxSize ss) j)
+  | s :: ss, ⟨0, _⟩, v => vecOfFun (n := Spec.Shape.size s) fun j => v (Fin.castAdd (ctxSize ss) j)
   | s :: ss, ⟨Nat.succ k, hk⟩, v =>
       getRaw (Γ := ss) ⟨k, Nat.lt_of_succ_lt_succ hk⟩
-        (vecOfFun (n := ctxSize ss) fun j => v (Fin.natAdd (Shape.size s) j))
+        (vecOfFun (n := ctxSize ss) fun j => v (Fin.natAdd (Spec.Shape.size s) j))
 
 /--
 Raw injection into a vectorized context: place `v` into block `i`, fill others with zeros.
 
 This is the adjoint of `getRaw` with respect to the Euclidean inner product (proved below).
 -/
-def singleRaw : {Γ : List Shape} → (i : Fin Γ.length) → Vec (Shape.size (Γ.get i)) → CtxVec Γ
+def singleRaw : {Γ : List Shape} → (i : Fin Γ.length) → Vec (Spec.Shape.size (Γ.get i)) → CtxVec Γ
   | [], i, _ => nomatch i
   | s :: ss, ⟨0, _⟩, v =>
-      appendVec (m := Shape.size s) (n := ctxSize ss) v (vecOfFun (n := ctxSize ss) fun _ => (0 :
+      appendVec (m := Spec.Shape.size s) (n := ctxSize ss) v (vecOfFun (n := ctxSize ss) fun _ => (0 :
         ℝ))
   | s :: ss, ⟨Nat.succ k, hk⟩, v =>
-      appendVec (m := Shape.size s) (n := ctxSize ss)
-        (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ))
+      appendVec (m := Spec.Shape.size s) (n := ctxSize ss)
+        (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ))
         (singleRaw (Γ := ss) ⟨k, Nat.lt_of_succ_lt_succ hk⟩ v)
 
 /--
@@ -119,7 +119,7 @@ Adjointness of raw projection/injection: `⟪x, singleRaw i v⟫ = ⟪getRaw i x
 This is the vectorized counterpart of the “one-hot cotangent” principle used in tape soundness.
 -/
 theorem inner_getRaw_singleRaw :
-    ∀ {Γ : List Shape} (i : Fin Γ.length) (x : CtxVec Γ) (v : Vec (Shape.size (Γ.get i))),
+    ∀ {Γ : List Shape} (i : Fin Γ.length) (x : CtxVec Γ) (v : Vec (Spec.Shape.size (Γ.get i))),
       inner ℝ x (singleRaw (Γ := Γ) i v) = inner ℝ (getRaw (Γ := Γ) i x) v := by
   intro Γ
   induction Γ with
@@ -130,37 +130,37 @@ theorem inner_getRaw_singleRaw :
       intro i x v
       classical
       -- decompose `x` as `(head, tail)` and use `inner_append`
-      let head : Vec (Shape.size s) := vecOfFun (n := Shape.size s) fun j => x (Fin.castAdd (ctxSize
+      let head : Vec (Spec.Shape.size s) := vecOfFun (n := Spec.Shape.size s) fun j => x (Fin.castAdd (ctxSize
         ss) j)
-      let tail : Vec (ctxSize ss) := vecOfFun (n := ctxSize ss) fun j => x (Fin.natAdd (Shape.size
+      let tail : Vec (ctxSize ss) := vecOfFun (n := ctxSize ss) fun j => x (Fin.natAdd (Spec.Shape.size
         s) j)
-      have hx : appendVec (m := Shape.size s) (n := ctxSize ss) head tail = x := by
+      have hx : appendVec (m := Spec.Shape.size s) (n := ctxSize ss) head tail = x := by
         ext j
-        have := congrArg (fun f : Fin (Shape.size s + ctxSize ss) → ℝ => f j)
-          (Fin.append_castAdd_natAdd (f := x) (m := Shape.size s) (n := ctxSize ss))
+        have := congrArg (fun f : Fin (Spec.Shape.size s + ctxSize ss) → ℝ => f j)
+          (Fin.append_castAdd_natAdd (f := x) (m := Spec.Shape.size s) (n := ctxSize ss))
         change
           Fin.append
-              (fun j : Fin (Shape.size s) => x.ofLp (Fin.castAdd (ctxSize ss) j))
-              (fun j : Fin (ctxSize ss) => x.ofLp (Fin.natAdd (Shape.size s) j)) j =
+              (fun j : Fin (Spec.Shape.size s) => x.ofLp (Fin.castAdd (ctxSize ss) j))
+              (fun j : Fin (ctxSize ss) => x.ofLp (Fin.natAdd (Spec.Shape.size s) j)) j =
             x.ofLp j
         simpa using this
       cases i using Fin.cases with
       | zero =>
           have hinner :=
-            inner_append (m := Shape.size s) (n := ctxSize ss) (a := head) (b := tail)
+            inner_append (m := Spec.Shape.size s) (n := ctxSize ss) (a := head) (b := tail)
               (c := v) (d := vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ))
           have htail0 : inner ℝ tail (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ)) = 0 := by
             exact (inner_zero_right (𝕜 := ℝ) (x := tail))
-          have h' : inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss) v (vecOfFun (n :=
+          have h' : inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) v (vecOfFun (n :=
             ctxSize ss) fun _ => (0 : ℝ))) =
               inner ℝ head v := by
             -- rewrite `x` as an append and simplify away the tail/zero inner product
             calc
-              inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss) v
+              inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) v
                   (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ)))
                   =
-                inner ℝ (appendVec (m := Shape.size s) (n := ctxSize ss) head tail)
-                  (appendVec (m := Shape.size s) (n := ctxSize ss) v
+                inner ℝ (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) head tail)
+                  (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) v
                     (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ))) := by
                     rw [← hx]
                     rfl
@@ -169,60 +169,60 @@ theorem inner_getRaw_singleRaw :
               _ = inner ℝ head v := by
                     rw [htail0, add_zero]
           change
-            inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss) v
+            inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) v
               (vecOfFun (n := ctxSize ss) fun _ => (0 : ℝ))) =
               inner ℝ head v
           exact h'
       | succ k =>
           have hinner :=
-            inner_append (m := Shape.size s) (n := ctxSize ss)
-              (a := head) (b := tail) (c := vecOfFun (n := Shape.size s) fun _ => (0 : ℝ))
+            inner_append (m := Spec.Shape.size s) (n := ctxSize ss)
+              (a := head) (b := tail) (c := vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ))
               (d := singleRaw (Γ := ss) k v)
-          have hhead0 : inner ℝ head (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) = 0 := by
+          have hhead0 : inner ℝ head (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) = 0 := by
             exact (inner_zero_right (𝕜 := ℝ) (x := head))
           have htail := ih (i := k) (x := tail) (v := v)
           -- rewrite `x` as an append and use IH on the tail term
           have h' :
-              inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss)
-                (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v))
+              inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss)
+                (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v))
                 =
               inner ℝ (getRaw (Γ := ss) k tail) v := by
             -- start from `inner_append`, drop the head/zero term, then apply IH
             calc
-              inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss)
-                  (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v))
+              inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss)
+                  (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v))
                   =
-                inner ℝ (appendVec (m := Shape.size s) (n := ctxSize ss) head tail)
-                  (appendVec (m := Shape.size s) (n := ctxSize ss)
-                    (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) := by
+                inner ℝ (appendVec (m := Spec.Shape.size s) (n := ctxSize ss) head tail)
+                  (appendVec (m := Spec.Shape.size s) (n := ctxSize ss)
+                    (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) := by
                     rw [← hx]
                     rfl
-              _ = inner ℝ head (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) +
+              _ = inner ℝ head (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) +
                     inner ℝ tail (singleRaw (Γ := ss) k v) := hinner
               _ = inner ℝ (getRaw (Γ := ss) k tail) v := by
                     rw [hhead0, zero_add, htail]
           -- `getRaw`/`singleRaw` at `succ` are definitional on the tail
           change
-            inner ℝ x (appendVec (m := Shape.size s) (n := ctxSize ss)
-              (vecOfFun (n := Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) =
+            inner ℝ x (appendVec (m := Spec.Shape.size s) (n := ctxSize ss)
+              (vecOfFun (n := Spec.Shape.size s) fun _ => (0 : ℝ)) (singleRaw (Γ := ss) k v)) =
               inner ℝ (getRaw (Γ := ss) k tail) v
           exact h'
 
 /-- Project the block specified by `idx : Idx Γ s` out of a vectorized context. -/
-def get {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (x : CtxVec Γ) : Vec (Shape.size s) :=
-  castVec (congrArg Shape.size idx.h) (getRaw (Γ := Γ) idx.i x)
+def get {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (x : CtxVec Γ) : Vec (Spec.Shape.size s) :=
+  castVec (congrArg Spec.Shape.size idx.h) (getRaw (Γ := Γ) idx.i x)
 
 /-- Inject a block into a vectorized context at `idx`, filling other blocks with zeros. -/
-def single {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (v : Vec (Shape.size s)) : CtxVec Γ :=
-  singleRaw (Γ := Γ) idx.i (castVec (congrArg Shape.size idx.h).symm v)
+def single {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (v : Vec (Spec.Shape.size s)) : CtxVec Γ :=
+  singleRaw (Γ := Γ) idx.i (castVec (congrArg Spec.Shape.size idx.h).symm v)
 
 /-- Adjointness of `get`/`single`: `⟪x, single idx v⟫ = ⟪get idx x, v⟫`. -/
 theorem inner_get_single {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
-    (x : CtxVec Γ) (v : Vec (Shape.size s)) :
+    (x : CtxVec Γ) (v : Vec (Spec.Shape.size s)) :
     inner ℝ x (single (Γ := Γ) (s := s) idx v) = inner ℝ (get (Γ := Γ) (s := s) idx x) v := by
   classical
   -- unfold `get`/`single` and reduce to the raw statement + cast isometries
-  let hsz : Shape.size (Γ.get idx.i) = Shape.size s := congrArg Shape.size idx.h
+  let hsz : Spec.Shape.size (Γ.get idx.i) = Spec.Shape.size s := congrArg Spec.Shape.size idx.h
   -- use the raw lemma, then cancel the casts on both sides
   have hraw :=
     inner_getRaw_singleRaw (Γ := Γ) idx.i x (castVec hsz.symm v)
@@ -244,10 +244,10 @@ theorem inner_get_single {Γ : List Shape} {s : Shape} (idx : Idx Γ s)
   simpa [get, single, hcastR] using hraw
 
 /-- Continuous linear map extracting the head block of a nonempty vectorized context. -/
-def headCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] Vec (Shape.size s) := by
+def headCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] Vec (Spec.Shape.size s) := by
   classical
-  let fLin : CtxVec (s :: ss) →ₗ[ℝ] Vec (Shape.size s) :=
-    { toFun := fun x => vecOfFun (n := Shape.size s) fun j => x (Fin.castAdd (ctxSize ss) j)
+  let fLin : CtxVec (s :: ss) →ₗ[ℝ] Vec (Spec.Shape.size s) :=
+    { toFun := fun x => vecOfFun (n := Spec.Shape.size s) fun j => x (Fin.castAdd (ctxSize ss) j)
       map_add' := by
         intro x y
         ext j
@@ -260,7 +260,7 @@ def headCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] Vec (Shap
   exact LinearMap.continuous_of_finiteDimensional (f := fLin)
 
 @[simp] lemma headCLM_apply {s : Shape} {ss : List Shape} (x : CtxVec (s :: ss)) (j : Fin
-  (Shape.size s)) :
+  (Spec.Shape.size s)) :
     headCLM (s := s) (ss := ss) x j = x (Fin.castAdd (ctxSize ss) j) := by
   simp [headCLM]
 
@@ -268,7 +268,7 @@ def headCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] Vec (Shap
 def tailCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] CtxVec ss := by
   classical
   let fLin : CtxVec (s :: ss) →ₗ[ℝ] CtxVec ss :=
-    { toFun := fun x => vecOfFun (n := ctxSize ss) fun j => x (Fin.natAdd (Shape.size s) j)
+    { toFun := fun x => vecOfFun (n := ctxSize ss) fun j => x (Fin.natAdd (Spec.Shape.size s) j)
       map_add' := by
         intro x y
         ext j
@@ -282,12 +282,12 @@ def tailCLM {s : Shape} {ss : List Shape} : CtxVec (s :: ss) →L[ℝ] CtxVec ss
 
 @[simp] lemma tailCLM_apply {s : Shape} {ss : List Shape} (x : CtxVec (s :: ss)) (j : Fin (ctxSize
   ss)) :
-    tailCLM (s := s) (ss := ss) x j = x (Fin.natAdd (Shape.size s) j) := by
+    tailCLM (s := s) (ss := ss) x j = x (Fin.natAdd (Spec.Shape.size s) j) := by
   simp [tailCLM]
 
 /-- `getRaw` packaged as a continuous linear map (constructed by recursion with
   `headCLM`/`tailCLM`). -/
-def getCLMRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ →L[ℝ] Vec (Shape.size (Γ.get i))
+def getCLMRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ →L[ℝ] Vec (Spec.Shape.size (Γ.get i))
   | [], i => nomatch i
   | s :: ss, ⟨0, _⟩ => headCLM (s := s) (ss := ss)
   | s :: ss, ⟨Nat.succ k, hk⟩ =>
@@ -312,23 +312,23 @@ def getCLMRaw : {Γ : List Shape} → (i : Fin Γ.length) → CtxVec Γ →L[ℝ
               let iTail : Fin ss.length := ⟨k, Nat.lt_of_succ_lt_succ isLt⟩
               have hrec := ih (i := iTail) (x := tailCLM (s := s) (ss := ss) x)
               ext j
-              have := congrArg (fun v : Vec (Shape.size (ss.get iTail)) => v j) hrec
+              have := congrArg (fun v : Vec (Spec.Shape.size (ss.get iTail)) => v j) hrec
               change
                 ((getCLMRaw (Γ := ss) iTail)
                     (tailCLM (s := s) (ss := ss) x)).ofLp j =
                   (getRaw (Γ := ss) iTail
-                    (vecOfFun (n := ctxSize ss) fun j => x.ofLp (Fin.natAdd (Shape.size s) j))).ofLp j
+                    (vecOfFun (n := ctxSize ss) fun j => x.ofLp (Fin.natAdd (Spec.Shape.size s) j))).ofLp j
               simpa [getCLMRaw, getRaw, tailCLM, tailCLM_apply, iTail] using this
 
 /-- `get` packaged as a continuous linear map. -/
-def getCLM {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : CtxVec Γ →L[ℝ] Vec (Shape.size s) :=
-  (Graph.castCLM (h := congrArg Shape.size idx.h)).comp (getCLMRaw (Γ := Γ) idx.i)
+def getCLM {Γ : List Shape} {s : Shape} (idx : Idx Γ s) : CtxVec Γ →L[ℝ] Vec (Spec.Shape.size s) :=
+  (Graph.castCLM (h := congrArg Spec.Shape.size idx.h)).comp (getCLMRaw (Γ := Γ) idx.i)
 
 @[simp] lemma getCLM_apply {Γ : List Shape} {s : Shape} (idx : Idx Γ s) (x : CtxVec Γ) :
     getCLM (Γ := Γ) (s := s) idx x = get (Γ := Γ) (s := s) idx x := by
   -- unfold and reduce to the `getCLMRaw_apply` lemma under `castVec`
   simp [getCLM, get, Graph.castCLM]
-  exact congrArg (castVec (congrArg Shape.size idx.h)) (getCLMRaw_apply (Γ := Γ) (i := idx.i) (x :=
+  exact congrArg (castVec (congrArg Spec.Shape.size idx.h)) (getCLMRaw_apply (Γ := Γ) (i := idx.i) (x :=
     x))
 
 end CtxVec
@@ -354,11 +354,11 @@ The `correct_inner` field is exactly the local VJP/JVP law:
 `⟪jvp x dx, δ⟫ = ⟪dx, vjp x δ⟫`.
 -/
 def ofVec {Γ : List Shape} {τ : Shape}
-    (f : CtxVec Γ → Vec (Shape.size τ))
-    (jvp : CtxVec Γ → CtxVec Γ → Vec (Shape.size τ))
-    (vjp : CtxVec Γ → Vec (Shape.size τ) → CtxVec Γ)
+    (f : CtxVec Γ → Vec (Spec.Shape.size τ))
+    (jvp : CtxVec Γ → CtxVec Γ → Vec (Spec.Shape.size τ))
+    (vjp : CtxVec Γ → Vec (Spec.Shape.size τ) → CtxVec Γ)
     (correct_inner :
-      ∀ (x dx : CtxVec Γ) (δ : Vec (Shape.size τ)),
+      ∀ (x dx : CtxVec Γ) (δ : Vec (Spec.Shape.size τ)),
         inner ℝ (jvp x dx) δ = inner ℝ dx (vjp x δ)) :
     Node Γ τ :=
 { forward := fun ctx => ofVecT (s := τ) (f (flattenCtx (Γ := Γ) ctx))
@@ -368,7 +368,7 @@ def ofVec {Γ : List Shape} {τ : Shape}
     intro ctx dctx δ
     let xV : CtxVec Γ := flattenCtx (Γ := Γ) ctx
     let dxV : CtxVec Γ := flattenCtx (Γ := Γ) dctx
-    let δV : Vec (Shape.size τ) := toVecT (t := δ)
+    let δV : Vec (Spec.Shape.size τ) := toVecT (t := δ)
     have hL :
         dot (ofVecT (s := τ) (jvp xV dxV)) δ = inner ℝ (jvp xV dxV) δV := by
       simpa [δV] using (dot_eq_inner_toVecT (a := ofVecT (s := τ) (jvp xV dxV)) (b := δ))
@@ -415,8 +415,8 @@ open scoped BigOperators
 This is the analytic correctness lemma behind the tape node constructors: it identifies the JVP
 with the Fréchet derivative (a matrix multiplication) for `linear_spec`.
 
-PyTorch analogue: `torch.nn.Linear` forward map is affine, derivative is constant.
-https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+PyTorch analogue: `torch.nn.linear` forward map is affine, derivative is constant.
+https://pytorch.org/docs/stable/generated/torch.nn.linear.html
 -/
 def linear {inDim outDim : Nat} (m : Spec.LinearSpec ℝ inDim outDim) :
     OpSpecFDerivCorrect inDim outDim :=

@@ -138,7 +138,7 @@ theorem evalConcatLeadingAxisFold_pair_eq
         (DVal.mk (α := α) (.dim (n + m) rest)
           (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) lhs rhs)) := by
   simp [Graph.evalConcatLeadingAxisFold,
-    DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    DVal.mk, DVal.shape, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- The leading-axis concat fold agrees with two `Tensor.concatLeadingAxisSpec` steps for ternary concat. -/
 theorem evalConcatLeadingAxisFold_triple_eq
@@ -156,7 +156,7 @@ theorem evalConcatLeadingAxisFold_triple_eq
           (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
             (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z)) := by
   simp [Graph.evalConcatLeadingAxisFold,
-    DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    DVal.mk, DVal.shape, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- The leading-axis concat fold agrees with three `Tensor.concatLeadingAxisSpec` steps for four inputs. -/
 theorem evalConcatLeadingAxisFold_quad_eq
@@ -176,7 +176,7 @@ theorem evalConcatLeadingAxisFold_quad_eq
             (Tensor.concatLeadingAxisSpec (α := α) (n := n + m) (m := k) (s := rest)
               (Tensor.concatLeadingAxisSpec (α := α) (n := n) (m := m) (s := rest) x y) z) w)) := by
   simp [Graph.evalConcatLeadingAxisFold,
-    DVal.mk, DVal.shape, DVal.tensor, Bind.bind, Except.bind, Pure.pure, Except.pure]
+    DVal.mk, DVal.shape, Bind.bind, Except.bind, Pure.pure, Except.pure]
 
 /-- Shape inference for binary concat along axis 0. -/
 theorem inferConcatOutShape_leadingAxis_pair_eq
@@ -185,10 +185,10 @@ theorem inferConcatOutShape_leadingAxis_pair_eq
       .ok (.dim (n + m) rest) := by
   have hAxis : OpContracts.checkAxisValid 0 (.dim n rest) = .ok () := by
     unfold OpContracts.checkAxisValid
-    change (if 0 < 1 + Shape.rank rest then Except.ok () else
-      Except.error s!"invalid axis {0} for rank {Shape.rank (.dim n rest)}") = Except.ok ()
+    change (if 0 < 1 + Spec.Shape.rank rest then Except.ok () else
+      Except.error s!"invalid axis {0} for rank {Spec.Shape.rank (.dim n rest)}") = Except.ok ()
     simp
-  have hRank : Shape.rank (.dim m rest) = Shape.rank (.dim n rest) := rfl
+  have hRank : Spec.Shape.rank (.dim m rest) = Spec.Shape.rank (.dim n rest) := rfl
   have hTail : (rest != rest) = false := shapeBNe_refl rest
   simp [OpContracts.inferConcatOutShape, OpContracts.inferConcatOutShape.go,
     hAxis, hRank, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -200,11 +200,11 @@ theorem inferConcatOutShape_leadingAxis_triple_eq
       .ok (.dim (n + m + k) rest) := by
   have hAxis : OpContracts.checkAxisValid 0 (.dim n rest) = .ok () := by
     unfold OpContracts.checkAxisValid
-    change (if 0 < 1 + Shape.rank rest then Except.ok () else
-      Except.error s!"invalid axis {0} for rank {Shape.rank (.dim n rest)}") = Except.ok ()
+    change (if 0 < 1 + Spec.Shape.rank rest then Except.ok () else
+      Except.error s!"invalid axis {0} for rank {Spec.Shape.rank (.dim n rest)}") = Except.ok ()
     simp
-  have hRankM : Shape.rank (.dim m rest) = Shape.rank (.dim n rest) := rfl
-  have hRankK : Shape.rank (.dim k rest) = Shape.rank (.dim n rest) := rfl
+  have hRankM : Spec.Shape.rank (.dim m rest) = Spec.Shape.rank (.dim n rest) := rfl
+  have hRankK : Spec.Shape.rank (.dim k rest) = Spec.Shape.rank (.dim n rest) := rfl
   have hTail : (rest != rest) = false := shapeBNe_refl rest
   simp [OpContracts.inferConcatOutShape, OpContracts.inferConcatOutShape.go,
     hAxis, hRankM, hRankK, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
@@ -216,12 +216,12 @@ theorem inferConcatOutShape_leadingAxis_quad_eq
       .ok (.dim (n + m + k + l) rest) := by
   have hAxis : OpContracts.checkAxisValid 0 (.dim n rest) = .ok () := by
     unfold OpContracts.checkAxisValid
-    change (if 0 < 1 + Shape.rank rest then Except.ok () else
-      Except.error s!"invalid axis {0} for rank {Shape.rank (.dim n rest)}") = Except.ok ()
+    change (if 0 < 1 + Spec.Shape.rank rest then Except.ok () else
+      Except.error s!"invalid axis {0} for rank {Spec.Shape.rank (.dim n rest)}") = Except.ok ()
     simp
-  have hRankM : Shape.rank (.dim m rest) = Shape.rank (.dim n rest) := rfl
-  have hRankK : Shape.rank (.dim k rest) = Shape.rank (.dim n rest) := rfl
-  have hRankL : Shape.rank (.dim l rest) = Shape.rank (.dim n rest) := rfl
+  have hRankM : Spec.Shape.rank (.dim m rest) = Spec.Shape.rank (.dim n rest) := rfl
+  have hRankK : Spec.Shape.rank (.dim k rest) = Spec.Shape.rank (.dim n rest) := rfl
+  have hRankL : Spec.Shape.rank (.dim l rest) = Spec.Shape.rank (.dim n rest) := rfl
   have hTail : (rest != rest) = false := shapeBNe_refl rest
   simp [OpContracts.inferConcatOutShape, OpContracts.inferConcatOutShape.go,
     hAxis, hRankM, hRankK, hRankL, hTail, Bind.bind, Except.bind, Pure.pure, Except.pure]
