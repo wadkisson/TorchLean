@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include <stddef.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // Shared CUDA runtime bits.
@@ -14,7 +15,9 @@
 
 static inline void checkCuda(cudaError_t e, const char* msg) {
   if (e != cudaSuccess) {
-    lean_internal_panic(msg);
+    char detail[512];
+    snprintf(detail, sizeof(detail), "%s: %s (%d)", msg, cudaGetErrorString(e), (int)e);
+    lean_internal_panic(detail);
   }
 }
 

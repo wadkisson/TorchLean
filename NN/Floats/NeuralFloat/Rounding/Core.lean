@@ -86,6 +86,16 @@ This matches "round-to-nearest" style roundings (ties can be resolved arbitraril
 class NeuralValidRndToNearest (rnd : ℝ → ℤ) : Prop extends NeuralValidRnd rnd where
   abs_sub_le_half : ∀ x : ℝ, abs ((rnd x : ℝ) - x) ≤ (2⁻¹ : ℝ)
 
+/--
+Round `x` to the integer grid with spacing `step`.
+
+This fixed-scale operation is the common core of fixed-point arithmetic and affine
+quantization. Unlike `neuralRound`, the scale is supplied explicitly rather than chosen from the
+magnitude of `x` by an exponent format.
+-/
+noncomputable def neuralRoundAtScale (rnd : ℝ → ℤ) (step x : ℝ) : ℝ :=
+  (rnd (x / step) : ℝ) * step
+
 -- Instance for floor rounding
 /-- `neural_floor_round` is a valid rounding mode (monotone and fixes integers). -/
 instance : NeuralValidRnd neuralFloorRound where
@@ -591,5 +601,63 @@ theorem neural_error_bound_ulp (rnd : ℝ → ℤ) [NeuralValidRndToNearest rnd]
     have hbnonneg : 0 ≤ neuralBpow β e := le_of_lt hbpos
     have hmul := mul_le_mul_of_nonneg_right h hbnonneg
     simpa [div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm, mul_right_comm] using hmul
+
+/-! ## Named standard modes -/
+
+/-- The four standard rounding-direction attributes used by the generic float model. -/
+inductive NeuralRoundingMode where
+  /-- Round to the nearest representable value, resolving a tie toward an even mantissa. -/
+  | nearestEven
+  /-- Round toward zero. -/
+  | towardZero
+  /-- Round toward positive infinity. -/
+  | towardPositive
+  /-- Round toward negative infinity. -/
+  | towardNegative
+  deriving DecidableEq, Repr
+
+namespace NeuralRoundingMode
+
+/-- Interpret a named mode as the integer-rounding function used by `neuralRound`. -/
+noncomputable def roundingFunction : NeuralRoundingMode → ℝ → ℤ
+  | .nearestEven => neuralNearestEven
+  | .towardZero => neuralTruncRound
+  | .towardPositive => neuralCeilRound
+  | .towardNegative => neuralFloorRound
+
+/-- Every named standard mode satisfies the generic rounding-function laws. -/
+instance (mode : NeuralRoundingMode) : NeuralValidRnd mode.roundingFunction := by
+  cases mode with
+  | nearestEven => change NeuralValidRnd neuralNearestEven; infer_instance
+  | towardZero => change NeuralValidRnd neuralTruncRound; infer_instance
+  | towardPositive => change NeuralValidRnd neuralCeilRound; infer_instance
+  | towardNegative => change NeuralValidRnd neuralFloorRound; infer_instance
+
+/-- Round a real value into a generic format using a named standard mode. -/
+noncomputable def round (mode : NeuralRoundingMode) {β : NeuralRadix} {fexp : ℤ → ℤ}
+    [NeuralValidExp fexp] (x : ℝ) : ℝ :=
+  neuralRound (β := β) (fexp := fexp) mode.roundingFunction x
+
+/-- Package `round` as a mantissa/exponent value in the selected format. -/
+noncomputable def roundedFloat (mode : NeuralRoundingMode) {β : NeuralRadix} {fexp : ℤ → ℤ}
+    [NeuralValidExp fexp] (x : ℝ) : NeuralFloat β :=
+  { mantissa := mode.roundingFunction (neuralScaledMantissa β fexp x)
+    exponent := neuralCexp β fexp x }
+
+/-- `roundedFloat` represents exactly the value returned by `round`. -/
+@[simp] theorem toReal_roundedFloat (mode : NeuralRoundingMode) {β : NeuralRadix}
+    {fexp : ℤ → ℤ} [NeuralValidExp fexp] (x : ℝ) :
+    neuralToReal (mode.roundedFloat (β := β) (fexp := fexp) x) =
+      mode.round (β := β) (fexp := fexp) x := by
+  rfl
+
+/-- Every named standard mode fixes values already in the generic format. -/
+theorem round_eq_of_generic (mode : NeuralRoundingMode) {β : NeuralRadix}
+    {fexp : ℤ → ℤ} [NeuralValidExp fexp] {x : ℝ}
+    (hx : neuralGenericFormat (β := β) (fexp := fexp) x) :
+    mode.round (β := β) (fexp := fexp) x = x := by
+  exact neural_round_preserves_generic mode.roundingFunction x hx
+
+end NeuralRoundingMode
 
 end TorchLean.Floats

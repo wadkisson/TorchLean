@@ -14,8 +14,9 @@ public import NN.Spec.Models.CommonHelpers
 Principal Component Analysis is represented as a linear projection onto learned components,
 plus an explicit mean for centering.
 
-This file models only the *transform* (and inverse transform), not the procedure that learns
-principal components from data.
+The exact model operations are the transform and inverse transform. A separate reference helper
+below constructs a one-component approximation with power iteration; its name records that
+numerical limitation explicitly.
 
 PyTorch / ecosystem analogies:
 
@@ -56,7 +57,7 @@ structure PCASpec (α : Type) (inDim outDim : Nat) where
   /-- mean. -/
   mean : Tensor α (.dim inDim .scalar)                     -- Data mean for centering
   /-- explained variance. -/
-  explained_variance : Tensor α (.dim outDim .scalar)      -- Explained variance ratios
+  explained_variance : Tensor α (.dim outDim .scalar)      -- Selected covariance eigenvalues
 
 /-- Forward pass: center and project: `y = components · (x - mean)`. -/
 def pcaForwardSpec {inDim outDim : Nat}
@@ -128,26 +129,26 @@ def pcaBackwardSpec {inDim outDim : Nat}
   let d_input := pcaInputDerivSpec m grad_output
   (d_components, d_mean, d_input)
 
-/-- Fit PCA using the (scaled) covariance matrix and eigendecomposition.
+/-- Approximate the leading PCA component using the scaled covariance matrix and power iteration.
 
 Algorithm:
 
 1. compute the mean and center the data,
 2. form the covariance matrix `C = (1/(n-1)) Xᵀ X`,
-3. compute eigenpairs of `C`,
-4. take the top `nComponents` eigenvectors,
-5. orient eigenvectors deterministically (sign convention) so results are reproducible.
+3. run 20 power-iteration steps from the all-ones vector,
+4. orient the resulting vector deterministically so results are reproducible.
 
-Note: this is a spec/reference implementation. In numerical libraries, PCA is often implemented
-via SVD for stability and performance.
+The output has exactly one component. This is an executable approximation, not a theorem that the
+returned vector is the dominant eigenvector. Such a theorem would require spectral hypotheses and
+an error analysis. Numerical libraries generally use SVD or a convergent eigensolver for fitting.
 -/
-def pcaFitSpec {nSamples inDim : Nat}
+def pcaFitLeadingComponentApproxSpec {nSamples inDim : Nat}
   (data : Tensor α (.dim nSamples (.dim inDim .scalar)))
-  (nComponents : Nat) (h1 : 0 < nComponents) (h2 : nComponents ≤ inDim) (h3 : nSamples ≠ 0) :
-  PCASpec α inDim nComponents :=
+  (hSamples : nSamples ≠ 0) (hDim : 0 < inDim) :
+  PCASpec α inDim 1 :=
   -- Compute mean
   have inst : Shape.valid_axis_inst 0 (Shape.dim nSamples (Shape.dim inDim Shape.scalar)) := by
-    apply Shape.validAxisInstZeroAlt h3
+    apply Shape.validAxisInstZeroAlt hSamples
   let mean := reduceMeanAuto 0 inst data
 
   -- Center the data
@@ -159,35 +160,15 @@ def pcaFitSpec {nSamples inDim : Nat}
   let n_minus_1 := max 1 (nSamples - 1) -- Ensure we don't divide by zero
   let covariance_scaled := scaleSpec covariance (1 / (n_minus_1 : α))
 
-  -- Perform eigendecomposition of covariance matrix
-  -- eigendecomp returns (eigenvalues, eigenvectors) where eigenvectors are columns
-  let (eigenvalues, eigenvectors) := eigendecompSpec covariance_scaled
-
-  -- Sort eigenvalues and eigenvectors in descending order
-  let sorted_indices := argsortDescendingSpec eigenvalues
-  let sorted_eigenvalues := gatherSpec eigenvalues sorted_indices
-  let sorted_eigenvectors := gatherColumnsSpec eigenvectors sorted_indices
-
-  -- Take the first nComponents eigenvectors as principal components
-  -- These are the eigenvectors corresponding to the largest eigenvalues
-  let components := sliceColumnsSpec sorted_eigenvectors 0 nComponents h2
-  have h4 : Shape.dim inDim (Shape.dim (nComponents - 0) Shape.scalar) = Shape.dim inDim (Shape.dim
-    nComponents Shape.scalar) := by
-    simp
-  let components' := tensorCast (Shape.dim inDim (Shape.dim (nComponents) Shape.scalar)) h4
-    components
-
-  -- Extract the explained variance (eigenvalues) for the selected components
-  let explained_variance := sliceRangeSpec sorted_eigenvalues 0 nComponents h2
-
-  -- Ensure components are properly oriented (optional: enforce deterministic sign)
-  let components_oriented := orientComponentsSpec components' h1
-  let components_reshaped := matrixTransposeSpec components_oriented
+  let (eigenvalue, eigenvector) := leadingEigenpairPowerIterationApproxSpec covariance_scaled
+  let first := toScalar (get eigenvector ⟨0, hDim⟩)
+  let sign : α := if first < 0 then -1 else 1
+  let oriented := scaleSpec eigenvector sign
 
   {
-    components := components_reshaped,
+    components := Tensor.dim (fun _ => oriented),
     mean := mean,
-    explained_variance := explained_variance
+    explained_variance := Tensor.dim (fun _ => Tensor.scalar eigenvalue)
   }
 
 /-- Apply a fitted PCA transform to a batch of samples. -/
@@ -220,13 +201,13 @@ def pcaReconstructionErrorSpec {inDim outDim : Nat}
 If you want the *ratio* (normalized to sum to `1`), you need to divide by the total variance of the
 original data; this file keeps just the raw eigenvalues.
 -/
-def pcaExplainedVarianceRatioSpec {inDim outDim : Nat}
+def pcaExplainedVarianceSpec {inDim outDim : Nat}
   (m : PCASpec α inDim outDim) :
   Tensor α (.dim outDim .scalar) :=
   m.explained_variance
 
 /-- Cumulative explained variance (prefix sums of `explained_variance`). -/
-def pcaCumulativeVarianceSpec {α : Type} [Add α] [Zero α]
+def pcaCumulativeExplainedVarianceSpec {α : Type} [Add α] [Zero α]
     {inDim outDim : Nat} (m : PCASpec α inDim outDim) :
     Tensor α (.dim outDim .scalar) :=
   match m.explained_variance with

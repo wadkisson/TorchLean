@@ -139,7 +139,7 @@ private lemma signBit_neg_of_isNaN_eq_false (x : IEEE32Exec) (hnan : isNaN x = f
 
 /-! ## Negation / sign-bit flip helpers -/
 
--- The core bitfield lemmas about sign-bit flips live in `NN.Floats.IEEEExec.Negation`.
+-- The core bitfield lemmas about sign-bit flips live in `NN.Floats.IEEEExec.Encoding.Negation`.
 
 /-! ## Negation preserves “not NaN” -/
 
@@ -941,6 +941,333 @@ theorem toEReal_mulUp_ge (x y : IEEE32Exec) (hx : isFinite x = true) (hy : isFin
                 simpa [hprod] using hge
               rw [hmul']
               exact this
+
+/-! ## Fused multiply-add -/
+
+private theorem finite_fma_exact_dyadic
+    (x y z : IEEE32Exec) (hx : isFinite x = true) (hy : isFinite y = true)
+    (hz : isFinite z = true) :
+    ∃ dx dy dz : Dyadic,
+      toDyadic? x = some dx ∧
+      toDyadic? y = some dy ∧
+      toDyadic? z = some dz ∧
+      dyadicToReal
+          (addDyadic
+            { sign := Bool.xor dx.sign dy.sign
+              mant := dx.mant * dy.mant
+              exp := dx.exp + dy.exp }
+            dz) =
+        toReal x * toReal y + toReal z := by
+  cases hdx : toDyadic? x with
+  | none =>
+      have hfalse := isFinite_eq_false_of_toDyadic?_eq_none (x := x) hdx
+      simp [hx] at hfalse
+  | some dx =>
+      cases hdy : toDyadic? y with
+      | none =>
+          have hfalse := isFinite_eq_false_of_toDyadic?_eq_none (x := y) hdy
+          simp [hy] at hfalse
+      | some dy =>
+          cases hdz : toDyadic? z with
+          | none =>
+              have hfalse := isFinite_eq_false_of_toDyadic?_eq_none (x := z) hdz
+              simp [hz] at hfalse
+          | some dz =>
+              refine ⟨dx, dy, dz, rfl, rfl, rfl, ?_⟩
+              rw [dyadicToReal_addDyadic_exact, dyadicToReal_mul_exact]
+              simp [toReal_eq, hdx, hdy, hdz]
+
+/-- `fmaDown` is a lower bound for exact fused multiply-add on finite inputs. -/
+theorem toEReal_fmaDown_le (x y z : IEEE32Exec)
+    (hx : isFinite x = true) (hy : isFinite y = true) (hz : isFinite z = true) :
+    toEReal (fmaDown x y z) ≤ ((toReal x * toReal y + toReal z : ℝ) : EReal) := by
+  classical
+  obtain ⟨dx, dy, dz, hdx, hdy, hdz, hexact⟩ :=
+    finite_fma_exact_dyadic x y z hx hy hz
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hdx)
+  have hyNaN : isNaN y = false := isNaN_eq_false_of_toDyadic?_some (hx := hdy)
+  have hzNaN : isNaN z = false := isNaN_eq_false_of_toDyadic?_some (hx := hdz)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hdx)
+  have hyInf : isInf y = false := isInf_eq_false_of_toDyadic?_some (hx := hdy)
+  have hzInf : isInf z = false := isInf_eq_false_of_toDyadic?_some (hx := hdz)
+  have hchoose : chooseNaN3 x y z = none := by
+    simp [chooseNaN3, isSNaN, hxNaN, hyNaN, hzNaN]
+  let prod : Dyadic :=
+    { sign := Bool.xor dx.sign dy.sign
+      mant := dx.mant * dy.mant
+      exp := dx.exp + dy.exp }
+  have hfma : fmaDown x y z = roundDyadicDown (addDyadic prod dz) := by
+    simp [fmaDown, hchoose, hxInf, hyInf, hzInf, hdx, hdy, hdz, prod]
+  have hle := toEReal_roundDyadicDown_le (d := addDyadic prod dz)
+  have hexactE :
+      (dyadicToReal (addDyadic prod dz) : EReal) =
+        ((toReal x * toReal y + toReal z : ℝ) : EReal) := by
+    apply congrArg
+    simpa [prod] using hexact
+  simpa [hfma, hexactE] using hle
+
+/-- `fmaUp` is an upper bound for exact fused multiply-add on finite inputs. -/
+theorem toEReal_fmaUp_ge (x y z : IEEE32Exec)
+    (hx : isFinite x = true) (hy : isFinite y = true) (hz : isFinite z = true) :
+    ((toReal x * toReal y + toReal z : ℝ) : EReal) ≤ toEReal (fmaUp x y z) := by
+  classical
+  obtain ⟨dx, dy, dz, hdx, hdy, hdz, hexact⟩ :=
+    finite_fma_exact_dyadic x y z hx hy hz
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hdx)
+  have hyNaN : isNaN y = false := isNaN_eq_false_of_toDyadic?_some (hx := hdy)
+  have hzNaN : isNaN z = false := isNaN_eq_false_of_toDyadic?_some (hx := hdz)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hdx)
+  have hyInf : isInf y = false := isInf_eq_false_of_toDyadic?_some (hx := hdy)
+  have hzInf : isInf z = false := isInf_eq_false_of_toDyadic?_some (hx := hdz)
+  have hchoose : chooseNaN3 x y z = none := by
+    simp [chooseNaN3, isSNaN, hxNaN, hyNaN, hzNaN]
+  let prod : Dyadic :=
+    { sign := Bool.xor dx.sign dy.sign
+      mant := dx.mant * dy.mant
+      exp := dx.exp + dy.exp }
+  have hfma : fmaUp x y z = roundDyadicUp (addDyadic prod dz) := by
+    simp [fmaUp, hchoose, hxInf, hyInf, hzInf, hdx, hdy, hdz, prod]
+  have hge := toEReal_roundDyadicUp_ge (d := addDyadic prod dz)
+  have hexactE :
+      (dyadicToReal (addDyadic prod dz) : EReal) =
+        ((toReal x * toReal y + toReal z : ℝ) : EReal) := by
+    apply congrArg
+    simpa [prod] using hexact
+  simpa [hfma, hexactE] using hge
+
+/-! ## Square root -/
+
+private theorem natCast_sqrt_bounds (n : Nat) :
+    (Nat.sqrt n : ℝ) ≤ Real.sqrt (n : ℝ) ∧
+      Real.sqrt (n : ℝ) ≤ (Nat.sqrt n + 1 : Nat) := by
+  constructor
+  · apply (Real.le_sqrt (by positivity) (by positivity)).2
+    have h := Nat.sqrt_le n
+    simpa [pow_two] using
+      (show ((Nat.sqrt n * Nat.sqrt n : Nat) : ℝ) ≤ (n : ℝ) by exact_mod_cast h)
+  · apply Real.sqrt_le_iff.mpr
+    constructor
+    · positivity
+    · have h := (Nat.lt_succ_sqrt n).le
+      simpa [pow_two, Nat.succ_eq_add_one] using
+        (show (n : ℝ) ≤ (((Nat.sqrt n + 1) * (Nat.sqrt n + 1) : Nat) : ℝ) by
+          exact_mod_cast h)
+
+private theorem neuralBpow_ofNat (k : Nat) :
+    neuralBpow binaryRadix (Int.ofNat k) = (2 : ℝ) ^ k := by
+  simp [neuralBpow, binaryRadix, NeuralRadix.toReal]
+
+private theorem sqrtScale_cancel (e : Int) (p : Nat) :
+    (2 : ℝ) ^ (2 * p) * neuralBpow binaryRadix (e - Int.ofNat p) ^ 2 =
+      neuralBpow binaryRadix (e + e) := by
+  have hp : (2 : ℝ) ^ (2 * p) = neuralBpow binaryRadix (Int.ofNat (2 * p)) := by
+    rw [neuralBpow_ofNat]
+  have hs : neuralBpow binaryRadix (e - Int.ofNat p) ^ 2 =
+      neuralBpow binaryRadix ((e - Int.ofNat p) + (e - Int.ofNat p)) := by
+    simpa [pow_two] using
+      (neuralBpow.add_exp binaryRadix (e - Int.ofNat p) (e - Int.ofNat p)).symm
+  rw [hp, hs, ← neuralBpow.add_exp]
+  congr 1
+  have hcast : Int.ofNat (2 * p) = 2 * Int.ofNat p := by simp
+  rw [hcast]
+  ring
+
+private theorem sqrt_source_scaled (d : Dyadic) (hsign : d.sign = false) :
+    let expOdd : Bool := (d.exp % 2) != 0
+    let mant' : Nat := if expOdd then d.mant * 2 else d.mant
+    let expEven : Int := if expOdd then d.exp - 1 else d.exp
+    let expHalf : Int := expEven / 2
+    let t : Nat := Nat.log2 mant' / 2
+    let p : Nat := 23 - t
+    let n : Nat := Nat.shiftLeft mant' (2 * p)
+    dyadicToReal d = (n : ℝ) * neuralBpow binaryRadix (expHalf - Int.ofNat p) ^ 2 := by
+  dsimp only
+  let expOdd : Bool := (d.exp % 2) != 0
+  let mant' : Nat := if expOdd then d.mant * 2 else d.mant
+  let expEven : Int := if expOdd then d.exp - 1 else d.exp
+  let expHalf : Int := expEven / 2
+  let t : Nat := Nat.log2 mant' / 2
+  let p : Nat := 23 - t
+  let n : Nat := Nat.shiftLeft mant' (2 * p)
+  change dyadicToReal d = (n : ℝ) * neuralBpow binaryRadix (expHalf - Int.ofNat p) ^ 2
+  have heven : expEven = expHalf + expHalf := by
+    have hmod : expEven % 2 = 0 := by
+      cases hOdd : expOdd with
+      | false =>
+          have h : d.exp % 2 = 0 := by
+            have hb : (d.exp % 2 != 0) = false := by simpa [expOdd] using hOdd
+            exact (bne_eq_false_iff_eq).1 hb
+          simp [expEven, hOdd, h]
+      | true =>
+          have hne : d.exp % 2 ≠ 0 := by
+            intro hEq
+            have ht : (d.exp % 2 != 0) = true := by simpa [expOdd] using hOdd
+            simp [hEq] at ht
+          have h1 : d.exp % 2 = 1 := (Int.emod_two_eq_zero_or_one d.exp).resolve_left hne
+          simp [expEven, hOdd, Int.sub_emod, h1]
+    have hmul : expEven / 2 * 2 = expEven :=
+      Int.ediv_mul_cancel (Int.dvd_iff_emod_eq_zero.2 hmod)
+    simpa [expHalf, mul_two] using hmul.symm
+  have hsource : dyadicToReal d = (mant' : ℝ) * neuralBpow binaryRadix expEven := by
+    cases hOdd : expOdd with
+    | false =>
+        simp [dyadicToReal, hsign, mant', expEven, hOdd]
+    | true =>
+        have hb : neuralBpow binaryRadix d.exp =
+            neuralBpow binaryRadix (d.exp - 1) * neuralBpow binaryRadix 1 := by
+          simpa [Int.sub_add_cancel] using
+            (neuralBpow.add_exp binaryRadix (d.exp - 1) 1)
+        rw [dyadicToReal]
+        simp only [hsign, Bool.false_eq_true, if_false, one_mul]
+        rw [hb]
+        simp [mant', expEven, hOdd, neuralBpow, binaryRadix, NeuralRadix.toReal]
+        ring
+  have hn : (n : ℝ) = (mant' : ℝ) * (2 : ℝ) ^ (2 * p) := by
+    simp [n, Nat.shiftLeft_eq]
+  rw [hsource, hn, mul_assoc, sqrtScale_cancel]
+  rw [heven]
+
+/-- The dyadic endpoints computed by `sqrtDyadicBracket` enclose the exact square root. -/
+theorem sqrtDyadicBracket_sound (d : Dyadic) (hsign : d.sign = false) :
+    dyadicToReal (sqrtDyadicBracket d).lower ≤ Real.sqrt (dyadicToReal d) ∧
+      Real.sqrt (dyadicToReal d) ≤ dyadicToReal (sqrtDyadicBracket d).upper := by
+  let expOdd : Bool := (d.exp % 2) != 0
+  let mant' : Nat := if expOdd then d.mant * 2 else d.mant
+  let expEven : Int := if expOdd then d.exp - 1 else d.exp
+  let expHalf : Int := expEven / 2
+  let t : Nat := Nat.log2 mant' / 2
+  let p : Nat := 23 - t
+  let n : Nat := Nat.shiftLeft mant' (2 * p)
+  let q : Nat := Nat.sqrt n
+  let r : Nat := n - q * q
+  let u : Nat := if r == 0 then q else q + 1
+  let s : ℝ := neuralBpow binaryRadix (expHalf - Int.ofNat p)
+  simp only [sqrtDyadicBracket, dyadicToReal, Bool.false_eq_true, if_false, one_mul]
+  change (q : ℝ) * s ≤ Real.sqrt (dyadicToReal d) ∧
+    Real.sqrt (dyadicToReal d) ≤ (u : ℝ) * s
+  have hsource : dyadicToReal d = (n : ℝ) * s ^ 2 := by
+    simpa [expOdd, mant', expEven, expHalf, t, p, n, s] using sqrt_source_scaled d hsign
+  have hspos : 0 < s := neuralBpow.pos _ _
+  have hsqrtSource : Real.sqrt (dyadicToReal d) = Real.sqrt (n : ℝ) * s := by
+    rw [hsource, Real.sqrt_mul (by positivity), Real.sqrt_sq_eq_abs, abs_of_pos hspos]
+  have hnat := natCast_sqrt_bounds n
+  have hlo : (q : ℝ) ≤ Real.sqrt (n : ℝ) := by simpa [q] using hnat.1
+  have hu : Real.sqrt (n : ℝ) ≤ (u : ℝ) := by
+    by_cases hr0 : r = 0
+    · have hqle : q * q ≤ n := by simpa [q] using Nat.sqrt_le n
+      have hnle : n ≤ q * q := (Nat.sub_eq_zero_iff_le).mp (by simpa [r] using hr0)
+      have hn : n = q * q := le_antisymm hnle hqle
+      have hsqrt : Real.sqrt (n : ℝ) = (q : ℝ) := by
+        rw [hn]
+        norm_num [Nat.cast_mul, Real.sqrt_sq_eq_abs]
+      simp [u, hr0, hsqrt]
+    · simpa [u, hr0, q] using hnat.2
+  rw [hsqrtSource]
+  exact ⟨mul_le_mul_of_nonneg_right hlo hspos.le, mul_le_mul_of_nonneg_right hu hspos.le⟩
+
+private theorem dyadic_sign_eq_signBit (x : IEEE32Exec) {d : Dyadic}
+    (hd : toDyadic? x = some d) : d.sign = signBit x := by
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+  unfold toDyadic? at hd
+  simp only [hxNaN, hxInf, Bool.false_or, Bool.false_eq_true, if_false] at hd
+  split at hd
+  · split at hd
+    · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
+    · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
+  · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
+
+private theorem toEReal_sqrtDown_le_of_nonzero (x : IEEE32Exec) {d : Dyadic}
+    (hd : toDyadic? x = some d) (hxsign : signBit x = false) (hzero : isZero x = false) :
+    toEReal (sqrtDown x) ≤ ((Real.sqrt (toReal x) : ℝ) : EReal) := by
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+  have hchoose : chooseNaN1 x = none := by simp [chooseNaN1, hxNaN]
+  have hsqrt : sqrtDown x = roundDyadicDown (sqrtDyadicBracket d).lower := by
+    simp [sqrtDown, hchoose, hxInf, hzero, hxsign, hd]
+  have hround := toEReal_roundDyadicDown_le (d := (sqrtDyadicBracket d).lower)
+  have hsign : d.sign = false := (dyadic_sign_eq_signBit x hd).trans hxsign
+  have hbracket := sqrtDyadicBracket_sound d hsign
+  have hxReal : toReal x = dyadicToReal d := by simp [toReal_eq, hd]
+  rw [hsqrt]
+  calc
+    toEReal (roundDyadicDown (sqrtDyadicBracket d).lower) ≤
+        (dyadicToReal (sqrtDyadicBracket d).lower : EReal) := hround
+    _ ≤ (Real.sqrt (dyadicToReal d) : EReal) := EReal.coe_le_coe_iff.2 hbracket.1
+    _ = ((Real.sqrt (toReal x) : ℝ) : EReal) := by rw [hxReal]
+
+private theorem toEReal_sqrtUp_ge_of_nonzero (x : IEEE32Exec) {d : Dyadic}
+    (hd : toDyadic? x = some d) (hxsign : signBit x = false) (hzero : isZero x = false) :
+    ((Real.sqrt (toReal x) : ℝ) : EReal) ≤ toEReal (sqrtUp x) := by
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+  have hchoose : chooseNaN1 x = none := by simp [chooseNaN1, hxNaN]
+  have hsqrt : sqrtUp x = roundDyadicUp (sqrtDyadicBracket d).upper := by
+    simp [sqrtUp, hchoose, hxInf, hzero, hxsign, hd]
+  have hround := toEReal_roundDyadicUp_ge (d := (sqrtDyadicBracket d).upper)
+  have hsign : d.sign = false := (dyadic_sign_eq_signBit x hd).trans hxsign
+  have hbracket := sqrtDyadicBracket_sound d hsign
+  have hxReal : toReal x = dyadicToReal d := by simp [toReal_eq, hd]
+  rw [hsqrt]
+  calc
+    ((Real.sqrt (toReal x) : ℝ) : EReal) = (Real.sqrt (dyadicToReal d) : EReal) := by
+      rw [hxReal]
+    _ ≤ (dyadicToReal (sqrtDyadicBracket d).upper : EReal) := EReal.coe_le_coe_iff.2 hbracket.2
+    _ ≤ toEReal (roundDyadicUp (sqrtDyadicBracket d).upper) := hround
+
+private theorem toReal_eq_zero_of_isZero_sqrt (x : IEEE32Exec) {d : Dyadic}
+    (hd : toDyadic? x = some d) (hz : isZero x = true) : toReal x = 0 := by
+  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+  have hfields : (expField x == 0) = true ∧ (fracField x == 0) = true := by
+    simpa [isZero, Bool.and_eq_true] using hz
+  have hd0 : d = { sign := signBit x, mant := 0, exp := 0 } := by
+    unfold toDyadic? at hd
+    simp [hxNaN, hxInf, hfields.1, hfields.2] at hd
+    exact hd.symm
+  simp [toReal_eq, hd, dyadicToReal, hd0]
+
+/-- `sqrtDown` encloses the exact square root from below on finite nonnegative inputs. -/
+theorem toEReal_sqrtDown_le (x : IEEE32Exec)
+    (hfin : isFinite x = true) (hxsign : signBit x = false) :
+    toEReal (sqrtDown x) ≤ ((Real.sqrt (toReal x) : ℝ) : EReal) := by
+  cases hd : toDyadic? x with
+  | none =>
+      have hfalse := isFinite_eq_false_of_toDyadic?_eq_none (x := x) hd
+      simp [hfin] at hfalse
+  | some d =>
+      have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+      have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+      have hchoose : chooseNaN1 x = none := by simp [chooseNaN1, hxNaN]
+      cases hz : isZero x
+      · exact toEReal_sqrtDown_le_of_nonzero x hd hxsign hz
+      · have hx0 := toReal_eq_zero_of_isZero_sqrt x hd hz
+        have hsqrt : sqrtDown x = x := by simp [sqrtDown, hchoose, hxInf, hz]
+        have hxE : toEReal x = (toReal x : EReal) := by
+          apply toEReal_of_toEReal?
+          exact toEReal?_eq_some_toReal_of_isFinite_eq_true x hfin
+        simp [hsqrt, hxE, hx0]
+
+/-- `sqrtUp` encloses the exact square root from above on finite nonnegative inputs. -/
+theorem toEReal_sqrtUp_ge (x : IEEE32Exec)
+    (hfin : isFinite x = true) (hxsign : signBit x = false) :
+    ((Real.sqrt (toReal x) : ℝ) : EReal) ≤ toEReal (sqrtUp x) := by
+  cases hd : toDyadic? x with
+  | none =>
+      have hfalse := isFinite_eq_false_of_toDyadic?_eq_none (x := x) hd
+      simp [hfin] at hfalse
+  | some d =>
+      have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
+      have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
+      have hchoose : chooseNaN1 x = none := by simp [chooseNaN1, hxNaN]
+      cases hz : isZero x
+      · exact toEReal_sqrtUp_ge_of_nonzero x hd hxsign hz
+      · have hx0 := toReal_eq_zero_of_isZero_sqrt x hd hz
+        have hsqrt : sqrtUp x = x := by simp [sqrtUp, hchoose, hxInf, hz]
+        have hxE : toEReal x = (toReal x : EReal) := by
+          apply toEReal_of_toEReal?
+          exact toEReal?_eq_some_toReal_of_isFinite_eq_true x hfin
+        simp [hsqrt, hxE, hx0]
 
 end
 

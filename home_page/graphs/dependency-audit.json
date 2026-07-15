@@ -1,20 +1,20 @@
 {
   "code_stats": {
-    "blank_or_comment_lines": 106553,
-    "code_lines": 205029,
+    "blank_or_comment_lines": 106809,
+    "code_lines": 205918,
     "declaration_counts": {
       "abbrev": 864,
-      "axiom": 2,
+      "axiom": 1,
       "class": 28,
-      "def": 8513,
-      "inductive": 120,
-      "instance": 246,
-      "lemma": 638,
-      "opaque": 107,
-      "structure": 601,
-      "theorem": 1805
+      "def": 8526,
+      "inductive": 121,
+      "instance": 248,
+      "lemma": 641,
+      "opaque": 111,
+      "structure": 606,
+      "theorem": 1839
     },
-    "declarations": 12924,
+    "declarations": 12985,
     "layer_sizes": [
       {
         "files": 164,
@@ -24,22 +24,22 @@
       {
         "files": 203,
         "layer": "NN.Runtime",
-        "lines": 51512
+        "lines": 51539
       },
       {
         "files": 136,
         "layer": "NN.MLTheory",
-        "lines": 41124
+        "lines": 41128
       },
       {
-        "files": 118,
+        "files": 119,
         "layer": "NN.Floats",
-        "lines": 31358
+        "lines": 32403
       },
       {
         "files": 124,
         "layer": "NN.Spec",
-        "lines": 29876
+        "lines": 29732
       },
       {
         "files": 142,
@@ -54,17 +54,17 @@
       {
         "files": 52,
         "layer": "blueprint",
-        "lines": 16596
+        "lines": 16681
       },
       {
         "files": 112,
         "layer": "NN.Examples",
-        "lines": 16269
+        "lines": 16367
       },
       {
         "files": 39,
         "layer": "NN.Tests",
-        "lines": 7338
+        "lines": 7368
       },
       {
         "files": 18,
@@ -112,12 +112,12 @@
         "lines": 39
       }
     ],
-    "lean_files": 1259,
-    "theorem_like_declarations": 2443,
+    "lean_files": 1260,
+    "theorem_like_declarations": 2480,
     "top_level_files": [
       {
         "directory": "NN",
-        "files": 1204
+        "files": 1205
       },
       {
         "directory": "blueprint",
@@ -136,7 +136,7 @@
         "files": 1
       }
     ],
-    "total_lines": 311582
+    "total_lines": 312727
   },
   "edges": [
     {
@@ -3647,7 +3647,7 @@
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.Calc.Plus",
+      "dst": "NN.Floats.Calc.Arithmetic",
       "line": 15,
       "path": "NN/CI/Floats.lean",
       "public": true,
@@ -3710,56 +3710,56 @@
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeERealTotal",
+      "dst": "NN.Floats.IEEEExec.Bridge",
       "line": 24,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec.Bridge.ERealTotal",
       "line": 25,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Expr",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
       "line": 26,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.Expressions",
       "line": 27,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 28,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
       "line": 29,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness",
+      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
       "line": 30,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 31,
       "path": "NN/CI/Floats.lean",
       "public": true,
@@ -3773,21 +3773,21 @@
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MinMaxERealSoundness",
+      "dst": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness",
       "line": 33,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MkBitsToReal",
+      "dst": "NN.Floats.IEEEExec.Encoding.MkBitsToReal",
       "line": 34,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
       "line": 35,
       "path": "NN/CI/Floats.lean",
       "public": true,
@@ -3808,35 +3808,35 @@
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds",
       "line": 38,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundQuotEvenBounds",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundQuotEvenBounds",
       "line": 39,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundShiftRightEven",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven",
       "line": 40,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.SpecialRules",
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
       "line": 41,
       "path": "NN/CI/Floats.lean",
       "public": true,
       "src": "NN.CI.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.TranscendentalRules",
+      "dst": "NN.Floats.IEEEExec.Rules.TranscendentalRules",
       "line": 42,
       "path": "NN/CI/Floats.lean",
       "public": true,
@@ -6013,7 +6013,7 @@
       "src": "NN.Examples.BugZoo.ConstantNormalizationSlice"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
       "line": 9,
       "path": "NN/Examples/BugZoo/FloatBoundary.lean",
       "public": true,
@@ -6195,29 +6195,57 @@
       "src": "NN.Examples.DeepDives.Floats.ArbIEEEExecCompare"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 9,
       "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
       "public": true,
       "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
     },
     {
-      "dst": "NN.Floats.IEEEExec.Reductions",
+      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
       "line": 10,
       "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
       "public": true,
       "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
     },
     {
-      "dst": "NN.Spec.Core.Tensor",
+      "dst": "NN.Floats.IEEEExec.Reductions",
       "line": 11,
       "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
       "public": true,
       "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
     },
     {
-      "dst": "NN.Spec.Core.TensorOps",
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
       "line": 12,
+      "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
+    },
+    {
+      "dst": "NN.Floats.NeuralFloat.Rounding",
+      "line": 13,
+      "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
+    },
+    {
+      "dst": "NN.Floats.NeuralFloat.Scalar.Conversion",
+      "line": 14,
+      "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
+    },
+    {
+      "dst": "NN.Spec.Core.Tensor",
+      "line": 15,
+      "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
+      "public": true,
+      "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
+    },
+    {
+      "dst": "NN.Spec.Core.TensorOps",
+      "line": 16,
       "path": "NN/Examples/DeepDives/Floats/EffectiveRounding.lean",
       "public": true,
       "src": "NN.Examples.DeepDives.Floats.EffectiveRounding"
@@ -8148,6 +8176,20 @@
       "src": "NN.Floats.Arb"
     },
     {
+      "dst": "NN.Floats.Calc.Operations",
+      "line": 9,
+      "path": "NN/Floats/Calc/Arithmetic.lean",
+      "public": true,
+      "src": "NN.Floats.Calc.Arithmetic"
+    },
+    {
+      "dst": "NN.Floats.Calc.Round",
+      "line": 10,
+      "path": "NN/Floats/Calc/Arithmetic.lean",
+      "public": true,
+      "src": "NN.Floats.Calc.Arithmetic"
+    },
+    {
       "dst": "NN.Floats.NeuralFloat.Core",
       "line": 9,
       "path": "NN/Floats/Calc/Bracket.lean",
@@ -8160,20 +8202,6 @@
       "path": "NN/Floats/Calc/Operations.lean",
       "public": true,
       "src": "NN.Floats.Calc.Operations"
-    },
-    {
-      "dst": "NN.Floats.Calc.Operations",
-      "line": 9,
-      "path": "NN/Floats/Calc/Plus.lean",
-      "public": true,
-      "src": "NN.Floats.Calc.Plus"
-    },
-    {
-      "dst": "NN.Floats.Calc.Round",
-      "line": 10,
-      "path": "NN/Floats/Calc/Plus.lean",
-      "public": true,
-      "src": "NN.Floats.Calc.Plus"
     },
     {
       "dst": "NN.Floats.Calc.Bracket",
@@ -8211,14 +8239,14 @@
       "src": "NN.Floats.Calc"
     },
     {
-      "dst": "NN.Floats.Calc.Operations",
+      "dst": "NN.Floats.Calc.Arithmetic",
       "line": 10,
       "path": "NN/Floats/Calc.lean",
       "public": true,
       "src": "NN.Floats.Calc"
     },
     {
-      "dst": "NN.Floats.Calc.Plus",
+      "dst": "NN.Floats.Calc.Operations",
       "line": 11,
       "path": "NN/Floats/Calc.lean",
       "public": true,
@@ -8388,261 +8416,338 @@
     {
       "dst": "Mathlib.Data.EReal.Basic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeERealTotal.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/ERealTotal.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeERealTotal"
+      "src": "NN.Floats.IEEEExec.Bridge.ERealTotal"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeERealTotal.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/ERealTotal.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeERealTotal"
+      "src": "NN.Floats.IEEEExec.Bridge.ERealTotal"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.Ops",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Compare.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/Expressions.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Compare"
+      "src": "NN.Floats.IEEEExec.Bridge.Expressions"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.Ops",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Compare.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Compare"
     },
     {
       "dst": "Mathlib.Algebra.Order.Field.Basic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "Mathlib.Analysis.SpecialFunctions.Log.Base",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "Mathlib.Analysis.SpecialFunctions.Sqrt",
       "line": 11,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "Mathlib.Data.Nat.Bitwise",
       "line": 12,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "Mathlib.Data.Nat.Sqrt",
       "line": 13,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "Mathlib.Data.Rat.Floor",
       "line": 14,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "NN.Floats.FP32",
       "line": 15,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 16,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MkBitsToDyadic",
+      "dst": "NN.Floats.IEEEExec.Encoding.MkBitsToDyadic",
       "line": 17,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.RealSemantics",
       "line": 18,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.Negation",
+      "dst": "NN.Floats.IEEEExec.Encoding.Negation",
       "line": 19,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
       "line": 20,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundShiftRightEven",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven",
       "line": 21,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.Core",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.Core",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/DyadicRounding.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/DyadicRounding.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.DyadicRounding"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.DyadicRounding"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.DyadicRounding",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.DyadicRounding",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/NearestEven.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/NearestEven.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.NearestEven"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.NearestEven"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.RoundRat",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.RoundRat",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/Ops.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/Ops.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.Ops"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.Ops"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.NearestEven",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.NearestEven",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/RatBounds.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/RatBounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.RatBounds"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.RatBounds"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.RatBounds",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.RatBounds",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/RoundDyadic.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/RoundDyadic.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.RoundDyadic"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.RoundDyadic"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.RoundDyadic",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.RoundDyadic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32/RoundRat.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32/RoundRat.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32.RoundRat"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32.RoundRat"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32.Compare",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32.Compare",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Core",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Expr.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Arithmetic.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Expr"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Arithmetic"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Core",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Arithmetic.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Arithmetic"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Core.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Core"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.SpecialRules",
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Core.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Core.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Core"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Core"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Arithmetic",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Arithmetic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Effective.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Effective.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Effective"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Effective"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Order",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Order",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Effective.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Effective.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Effective"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Effective"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Effective",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Effective",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/MinMax.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/MinMax.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.MinMax"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.MinMax"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Core",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Core",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total/Order.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total/Order.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total.Order"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total.Order"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Arithmetic",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Arithmetic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Effective",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Effective",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.MinMax",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.MinMax",
       "line": 11,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total.Order",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total.Order",
       "line": 12,
-      "path": "NN/Floats/IEEEExec/BridgeFP32Total.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/FP32Total.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeFP32Total"
+      "src": "NN.Floats.IEEEExec.Bridge.FP32Total"
     },
     {
       "dst": "Init.Data.Float32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/BridgeInitFloat32.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/RuntimeFloat32.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeInitFloat32"
+      "src": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/BridgeInitFloat32.lean",
+      "path": "NN/Floats/IEEEExec/Bridge/RuntimeFloat32.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.BridgeInitFloat32"
+      "src": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.ERealTotal",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Bridge.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.Expressions",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Bridge.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
+      "line": 11,
+      "path": "NN/Floats/IEEEExec/Bridge.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 12,
+      "path": "NN/Floats/IEEEExec/Bridge.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
+      "line": 13,
+      "path": "NN/Floats/IEEEExec/Bridge.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Bridge"
+    },
+    {
+      "dst": "Mathlib.Data.Real.Basic",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rounding.RatScaling",
+      "line": 11,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness.SignedOps",
+      "line": 12,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness",
+      "line": 13,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
+      "line": 14,
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Division.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division"
     },
     {
       "dst": "Init.Data.Nat.Bitwise.Lemmas",
@@ -8659,28 +8764,28 @@
       "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 11,
       "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Positive.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MkBitsToReal",
+      "dst": "NN.Floats.IEEEExec.Encoding.MkBitsToReal",
       "line": 12,
       "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Positive.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive"
     },
     {
-      "dst": "NN.Floats.IEEEExec.Negation",
+      "dst": "NN.Floats.IEEEExec.Encoding.Negation",
       "line": 13,
       "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Positive.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive"
     },
     {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
       "line": 14,
       "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness/Positive.lean",
       "public": true,
@@ -8708,74 +8813,53 @@
       "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness"
     },
     {
-      "dst": "Mathlib.Data.Real.Basic",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.RatScaling",
+      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division",
       "line": 11,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
+      "path": "NN/Floats/IEEEExec/DirectedRoundingSoundness.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
+      "src": "NN.Floats.IEEEExec.DirectedRoundingSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
-      "line": 12,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.MinMaxERealSoundness",
-      "line": 13,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
-      "line": 14,
-      "path": "NN/Floats/IEEEExec/DivDirectedRoundingSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness"
-    },
-    {
-      "dst": "Mathlib.Data.EReal.Basic",
+      "dst": "Mathlib.Data.Nat.Bitwise",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/ERealSemantics.lean",
+      "path": "NN/Floats/IEEEExec/Encoding/MkBitsToDyadic.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.ERealSemantics"
+      "src": "NN.Floats.IEEEExec.Encoding.MkBitsToDyadic"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeERealTotal",
+      "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/ERealSemantics.lean",
+      "path": "NN/Floats/IEEEExec/Encoding/MkBitsToDyadic.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.ERealSemantics"
+      "src": "NN.Floats.IEEEExec.Encoding.MkBitsToDyadic"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Encoding.MkBitsToDyadic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/ErrorBounds.lean",
+      "path": "NN/Floats/IEEEExec/Encoding/MkBitsToReal.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.ErrorBounds"
+      "src": "NN.Floats.IEEEExec.Encoding.MkBitsToReal"
     },
     {
-      "dst": "NN.Floats.FP32.Error",
+      "dst": "NN.Floats.IEEEExec.Semantics.RealSemantics",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/ErrorBounds.lean",
+      "path": "NN/Floats/IEEEExec/Encoding/MkBitsToReal.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.ErrorBounds"
+      "src": "NN.Floats.IEEEExec.Encoding.MkBitsToReal"
+    },
+    {
+      "dst": "Mathlib.Data.Nat.Bitwise",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Encoding/Negation.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Encoding.Negation"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Encoding/Negation.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Encoding.Negation"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32.Dyadic",
@@ -8876,91 +8960,14 @@
       "src": "NN.Floats.IEEEExec.Exec32"
     },
     {
-      "dst": "Mathlib.Data.EReal.Basic",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/MinMaxERealSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MinMaxERealSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/MinMaxERealSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MinMaxERealSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
-      "line": 11,
-      "path": "NN/Floats/IEEEExec/MinMaxERealSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MinMaxERealSoundness"
-    },
-    {
-      "dst": "Mathlib.Data.Nat.Bitwise",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/MkBitsToDyadic.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MkBitsToDyadic"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/MkBitsToDyadic.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MkBitsToDyadic"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.MkBitsToDyadic",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/MkBitsToReal.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MkBitsToReal"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.RealSemantics",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/MkBitsToReal.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.MkBitsToReal"
-    },
-    {
-      "dst": "Mathlib.Data.Nat.Bitwise",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/NatLemmas.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.NatLemmas"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/NatLemmas.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.NatLemmas"
-    },
-    {
-      "dst": "Mathlib.Data.Nat.Bitwise",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/Negation.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.Negation"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/Negation.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.Negation"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
       "line": 9,
       "path": "NN/Floats/IEEEExec/Notation.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec.Notation"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 10,
       "path": "NN/Floats/IEEEExec/Notation.lean",
       "public": true,
@@ -8972,83 +8979,6 @@
       "path": "NN/Floats/IEEEExec/Notation.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec.Notation"
-    },
-    {
-      "dst": "Mathlib.Data.EReal.Basic",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
-      "line": 11,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
-      "line": 12,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds",
-      "line": 13,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.SpecialRules",
-      "line": 14,
-      "path": "NN/Floats/IEEEExec/OpSandwich.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.OpSandwich"
-    },
-    {
-      "dst": "Mathlib.Algebra.Order.Field.Basic",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/RatScaling.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.RatScaling"
-    },
-    {
-      "dst": "Mathlib.Data.Nat.Bitwise",
-      "line": 10,
-      "path": "NN/Floats/IEEEExec/RatScaling.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.RatScaling"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 11,
-      "path": "NN/Floats/IEEEExec/RatScaling.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.RatScaling"
-    },
-    {
-      "dst": "NN.Floats.NeuralFloat.Core",
-      "line": 12,
-      "path": "NN/Floats/IEEEExec/RatScaling.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.RatScaling"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.RatScaling",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/RealSemantics.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec.RealSemantics"
     },
     {
       "dst": "Mathlib.Algebra.Order.GroupWithZero.Basic",
@@ -9065,7 +8995,7 @@
       "src": "NN.Floats.IEEEExec.Reductions"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 11,
       "path": "NN/Floats/IEEEExec/Reductions.lean",
       "public": true,
@@ -9086,239 +9016,358 @@
       "src": "NN.Floats.IEEEExec.Reductions"
     },
     {
+      "dst": "Mathlib.Data.Nat.Bitwise",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Rounding/NatLemmas.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.NatLemmas"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Rounding/NatLemmas.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.NatLemmas"
+    },
+    {
+      "dst": "Mathlib.Algebra.Order.Field.Basic",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Rounding/RatScaling.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.RatScaling"
+    },
+    {
+      "dst": "Mathlib.Data.Nat.Bitwise",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Rounding/RatScaling.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.RatScaling"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32",
+      "line": 11,
+      "path": "NN/Floats/IEEEExec/Rounding/RatScaling.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.RatScaling"
+    },
+    {
+      "dst": "NN.Floats.NeuralFloat.Core",
+      "line": 12,
+      "path": "NN/Floats/IEEEExec/Rounding/RatScaling.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rounding.RatScaling"
+    },
+    {
       "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
       "line": 7,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 8,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MkBitsToReal",
+      "dst": "NN.Floats.IEEEExec.Encoding.MkBitsToReal",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundShiftRightEven",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven",
       "line": 11,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
       "dst": "Mathlib.Data.EReal.Basic",
       "line": 12,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
       "dst": "Mathlib.Data.Nat.Log",
       "line": 13,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
       "dst": "Mathlib.Data.Real.Basic",
       "line": 14,
-      "path": "NN/Floats/IEEEExec/RoundDyadicToIEEE32Bounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundDyadicToIEEE32Bounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/RoundQuotEvenBounds.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundQuotEvenBounds.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundQuotEvenBounds"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundQuotEvenBounds"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/RoundShiftRightEven.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundShiftRightEven.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundShiftRightEven"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven"
     },
     {
-      "dst": "NN.Floats.IEEEExec.NatLemmas",
+      "dst": "NN.Floats.IEEEExec.Rounding.NatLemmas",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/RoundShiftRightEven.lean",
+      "path": "NN/Floats/IEEEExec/Rounding/RoundShiftRightEven.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.RoundShiftRightEven"
+      "src": "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven"
     },
     {
       "dst": "Mathlib.Data.Nat.Bitwise",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/SpecialRules.lean",
+      "path": "NN/Floats/IEEEExec/Rules/SpecialRules.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.SpecialRules"
+      "src": "NN.Floats.IEEEExec.Rules.SpecialRules"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/SpecialRules.lean",
+      "path": "NN/Floats/IEEEExec/Rules/SpecialRules.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.SpecialRules"
+      "src": "NN.Floats.IEEEExec.Rules.SpecialRules"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/TranscendentalRules.lean",
+      "path": "NN/Floats/IEEEExec/Rules/TranscendentalRules.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.TranscendentalRules"
+      "src": "NN.Floats.IEEEExec.Rules.TranscendentalRules"
     },
     {
-      "dst": "NN.Floats.IEEEExec.TrigRules",
-      "line": 9,
-      "path": "NN/Floats/IEEEExec/TrigBounds.lean",
+      "dst": "NN.Floats.IEEEExec.Semantics.RealSemantics",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Rules/TranscendentalRules.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.TrigBounds"
+      "src": "NN.Floats.IEEEExec.Rules.TranscendentalRules"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rules.TrigRules",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Rules/TrigBounds.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Rules.TrigBounds"
     },
     {
       "dst": "Mathlib.Analysis.Complex.Trigonometric",
       "line": 10,
-      "path": "NN/Floats/IEEEExec/TrigBounds.lean",
+      "path": "NN/Floats/IEEEExec/Rules/TrigBounds.lean",
       "public": false,
-      "src": "NN.Floats.IEEEExec.TrigBounds"
+      "src": "NN.Floats.IEEEExec.Rules.TrigBounds"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
       "line": 9,
-      "path": "NN/Floats/IEEEExec/TrigRules.lean",
+      "path": "NN/Floats/IEEEExec/Rules/TrigRules.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec.TrigRules"
+      "src": "NN.Floats.IEEEExec.Rules.TrigRules"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeERealTotal",
+      "dst": "Mathlib.Data.EReal.Basic",
       "line": 9,
-      "path": "NN/Floats/IEEEExec.lean",
+      "path": "NN/Floats/IEEEExec/Semantics/ERealSemantics.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec"
+      "src": "NN.Floats.IEEEExec.Semantics.ERealSemantics"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec.Bridge.ERealTotal",
       "line": 10,
-      "path": "NN/Floats/IEEEExec.lean",
+      "path": "NN/Floats/IEEEExec/Semantics/ERealSemantics.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec"
+      "src": "NN.Floats.IEEEExec.Semantics.ERealSemantics"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Expr",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Semantics/ErrorBounds.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.ErrorBounds"
+    },
+    {
+      "dst": "NN.Floats.FP32.Error",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Semantics/ErrorBounds.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.ErrorBounds"
+    },
+    {
+      "dst": "Mathlib.Data.EReal.Basic",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Semantics/MinMaxERealSoundness.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Semantics/MinMaxERealSoundness.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 11,
-      "path": "NN/Floats/IEEEExec.lean",
+      "path": "NN/Floats/IEEEExec/Semantics/MinMaxERealSoundness.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec"
+      "src": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "Mathlib.Data.EReal.Basic",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Exec32",
+      "line": 10,
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 11,
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 12,
-      "path": "NN/Floats/IEEEExec.lean",
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
       "public": true,
-      "src": "NN.Floats.IEEEExec"
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds",
       "line": 13,
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
+      "line": 14,
+      "path": "NN/Floats/IEEEExec/Semantics/OpSandwich.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.OpSandwich"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rounding.RatScaling",
+      "line": 9,
+      "path": "NN/Floats/IEEEExec/Semantics/RealSemantics.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec.Semantics.RealSemantics"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge",
+      "line": 9,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
       "dst": "NN.Floats.IEEEExec.DirectedRoundingSoundness",
-      "line": 14,
+      "line": 10,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ErrorBounds",
-      "line": 15,
+      "dst": "NN.Floats.IEEEExec.Semantics.ErrorBounds",
+      "line": 11,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
-      "line": 16,
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
+      "line": 12,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 17,
+      "line": 13,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
       "dst": "NN.Floats.IEEEExec.Notation",
-      "line": 18,
+      "line": 14,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
-      "dst": "NN.Floats.IEEEExec.OpSandwich",
-      "line": 19,
+      "dst": "NN.Floats.IEEEExec.Semantics.OpSandwich",
+      "line": 15,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
       "dst": "NN.Floats.IEEEExec.Reductions",
+      "line": 16,
+      "path": "NN/Floats/IEEEExec.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rounding.RoundQuotEvenBounds",
+      "line": 17,
+      "path": "NN/Floats/IEEEExec.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
+      "line": 18,
+      "path": "NN/Floats/IEEEExec.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rules.TranscendentalRules",
+      "line": 19,
+      "path": "NN/Floats/IEEEExec.lean",
+      "public": true,
+      "src": "NN.Floats.IEEEExec"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Rules.TrigRules",
       "line": 20,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
     },
     {
-      "dst": "NN.Floats.IEEEExec.RoundQuotEvenBounds",
+      "dst": "NN.Floats.IEEEExec.Rules.TrigBounds",
       "line": 21,
-      "path": "NN/Floats/IEEEExec.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.SpecialRules",
-      "line": 22,
-      "path": "NN/Floats/IEEEExec.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.TranscendentalRules",
-      "line": 23,
-      "path": "NN/Floats/IEEEExec.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.TrigRules",
-      "line": 24,
-      "path": "NN/Floats/IEEEExec.lean",
-      "public": true,
-      "src": "NN.Floats.IEEEExec"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.TrigBounds",
-      "line": 25,
       "path": "NN/Floats/IEEEExec.lean",
       "public": true,
       "src": "NN.Floats.IEEEExec"
@@ -9408,7 +9457,7 @@
       "src": "NN.Floats.Interval.IEEEExec32AddSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 12,
       "path": "NN/Floats/Interval/IEEEExec32AddSoundness.lean",
       "public": true,
@@ -9478,49 +9527,42 @@
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.DivDirectedRoundingSoundness",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 14,
       "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
       "public": true,
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.Interval.ERealCoercions",
       "line": 15,
       "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
       "public": true,
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.Interval.ERealCoercions",
+      "dst": "NN.Floats.Interval.IEEEExec32",
       "line": 16,
       "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
       "public": true,
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.Interval.IEEEExec32",
+      "dst": "NN.Floats.Interval.IEEEExec32NoNaN",
       "line": 17,
       "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
       "public": true,
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.Interval.IEEEExec32NoNaN",
+      "dst": "NN.Floats.Interval.RealBounds",
       "line": 18,
       "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
       "public": true,
       "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
     },
     {
-      "dst": "NN.Floats.Interval.RealBounds",
-      "line": 19,
-      "path": "NN/Floats/Interval/IEEEExec32DivSoundness.lean",
-      "public": true,
-      "src": "NN.Floats.Interval.IEEEExec32DivSoundness"
-    },
-    {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 9,
       "path": "NN/Floats/Interval/IEEEExec32MinMaxSoundness.lean",
       "public": true,
@@ -9555,7 +9597,7 @@
       "src": "NN.Floats.Interval.IEEEExec32MulSoundness"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ERealSemantics",
+      "dst": "NN.Floats.IEEEExec.Semantics.ERealSemantics",
       "line": 12,
       "path": "NN/Floats/Interval/IEEEExec32MulSoundness.lean",
       "public": true,
@@ -9597,7 +9639,7 @@
       "src": "NN.Floats.Interval.IEEEExec32NoNaN"
     },
     {
-      "dst": "NN.Floats.IEEEExec.MinMaxERealSoundness",
+      "dst": "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness",
       "line": 10,
       "path": "NN/Floats/Interval/IEEEExec32NoNaN.lean",
       "public": true,
@@ -12817,7 +12859,7 @@
       "src": "NN.MLTheory.LearningTheory.Stability.Dynamics"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Expr",
+      "dst": "NN.Floats.IEEEExec.Bridge.Expressions",
       "line": 9,
       "path": "NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/IEEE32Exec/Core.lean",
       "public": true,
@@ -13188,7 +13230,7 @@
       "src": "NN.MLTheory.Proofs.Approximation.FloatInterval.ConstantTarget"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 11,
       "path": "NN/MLTheory/Proofs/Approximation/FloatInterval/ConstantTarget.lean",
       "public": true,
@@ -13244,7 +13286,7 @@
       "src": "NN.MLTheory.Proofs.Approximation.FloatInterval.Semantics"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeERealTotal",
+      "dst": "NN.Floats.IEEEExec.Bridge.ERealTotal",
       "line": 12,
       "path": "NN/MLTheory/Proofs/Approximation/FloatInterval/Semantics.lean",
       "public": true,
@@ -13279,7 +13321,7 @@
       "src": "NN.MLTheory.Proofs.Approximation.FloatInterval"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 9,
       "path": "NN/MLTheory/Proofs/Approximation/Universal/IEEE32ExecCore.lean",
       "public": true,
@@ -16219,7 +16261,7 @@
       "src": "NN.Proofs.RL.Floats.IEEE32Exec"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
       "line": 10,
       "path": "NN/Proofs/RL/Floats/IEEE32Exec.lean",
       "public": true,
@@ -17675,7 +17717,7 @@
       "src": "NN.Proofs.Verification.ODE.EnclosureBackends"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
       "line": 10,
       "path": "NN/Proofs/Verification/ODE/EnclosureBackends.lean",
       "public": true,
@@ -18711,14 +18753,14 @@
       "src": "NN.Runtime.Autograd.Engine.Cuda.Convert"
     },
     {
-      "dst": "NN.Floats.IEEEExec.ErrorBounds",
+      "dst": "NN.Floats.IEEEExec.Semantics.ErrorBounds",
       "line": 9,
       "path": "NN/Runtime/Autograd/Engine/Cuda/Float32Contract.lean",
       "public": true,
       "src": "NN.Runtime.Autograd.Engine.Cuda.Float32Contract"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
       "line": 10,
       "path": "NN/Runtime/Autograd/Engine/Cuda/Float32Contract.lean",
       "public": true,
@@ -27504,147 +27546,161 @@
     },
     {
       "dst": "NN.Floats.NeuralFloat.Rounding",
-      "line": 184,
+      "line": 188,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.NeuralFloat.Analysis",
-      "line": 185,
+      "line": 189,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.NeuralFloat.Error",
-      "line": 186,
+      "line": 190,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.NeuralFloat.Format",
-      "line": 305,
+      "line": 333,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.NeuralFloat.Rounding",
-      "line": 306,
+      "line": 334,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
+    },
+    {
+      "dst": "NN.Floats.NeuralFloat.Scalar.Conversion",
+      "line": 335,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.Interval.Quantized",
-      "line": 307,
+      "line": 336,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.Float32",
-      "line": 344,
+      "line": 378,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.FP32",
-      "line": 345,
+      "line": 379,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.Calc",
-      "line": 346,
+      "line": 380,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.IEEEExec",
-      "line": 347,
+      "line": 381,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
-      "line": 348,
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
+      "line": 382,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
-      "line": 349,
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 383,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
-      "line": 350,
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
+      "line": 384,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32",
-      "line": 405,
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32",
+      "line": 451,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeFP32Total",
-      "line": 406,
+      "dst": "NN.Floats.IEEEExec.Bridge.FP32Total",
+      "line": 452,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.FP32",
-      "line": 433,
+      "line": 479,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.Calc",
-      "line": 434,
+      "line": 480,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "dst": "NN.Floats.IEEEExec.BridgeInitFloat32",
-      "line": 581,
+      "dst": "NN.Floats.IEEEExec.Rules.SpecialRules",
+      "line": 622,
+      "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
+      "public": false,
+      "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
+    },
+    {
+      "dst": "NN.Floats.IEEEExec.Bridge.RuntimeFloat32",
+      "line": 666,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.Float32Contract",
-      "line": 600,
+      "line": 685,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.KernelSpec",
-      "line": 601,
+      "line": 686,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
       "dst": "NN.Floats.IEEEExec.Exec32",
-      "line": 622,
+      "line": 707,
       "path": "blueprint/TorchLeanBlueprint/Guide/Ch3_Backend/Floats.lean",
       "public": false,
       "src": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
@@ -28464,7 +28520,7 @@
       "src_layer": "NN.Spec"
     },
     {
-      "count": 271,
+      "count": 273,
       "dst_layer": "NN.Floats",
       "src_layer": "NN.Floats"
     },
@@ -28564,6 +28620,11 @@
       "src_layer": "NN.GraphSpec"
     },
     {
+      "count": 26,
+      "dst_layer": "NN.Floats",
+      "src_layer": "blueprint"
+    },
+    {
       "count": 25,
       "dst_layer": "NN.Verification",
       "src_layer": "NN.CI"
@@ -28576,11 +28637,6 @@
     {
       "count": 24,
       "dst_layer": "NN.API",
-      "src_layer": "blueprint"
-    },
-    {
-      "count": 24,
-      "dst_layer": "NN.Floats",
       "src_layer": "blueprint"
     },
     {
@@ -28629,6 +28685,11 @@
       "src_layer": "NN.MLTheory"
     },
     {
+      "count": 13,
+      "dst_layer": "NN.Floats",
+      "src_layer": "NN.Examples"
+    },
+    {
       "count": 12,
       "dst_layer": "NN.IR",
       "src_layer": "NN.IR"
@@ -28647,11 +28708,6 @@
       "count": 10,
       "dst_layer": "NN.Tests",
       "src_layer": "NN.CI"
-    },
-    {
-      "count": 9,
-      "dst_layer": "NN.Floats",
-      "src_layer": "NN.Examples"
     },
     {
       "count": 9,
@@ -30306,14 +30362,14 @@
       "TorchLean.Floats.Arb"
     ],
     "NN.Floats.Calc": [],
+    "NN.Floats.Calc.Arithmetic": [
+      "TorchLean.Floats",
+      "NeuralFloat"
+    ],
     "NN.Floats.Calc.Bracket": [
       "TorchLean.Floats"
     ],
     "NN.Floats.Calc.Operations": [
-      "TorchLean.Floats",
-      "NeuralFloat"
-    ],
-    "NN.Floats.Calc.Plus": [
       "TorchLean.Floats",
       "NeuralFloat"
     ],
@@ -30340,75 +30396,80 @@
       "TorchLean.Floats"
     ],
     "NN.Floats.IEEEExec": [],
-    "NN.Floats.IEEEExec.BridgeERealTotal": [
+    "NN.Floats.IEEEExec.Bridge": [],
+    "NN.Floats.IEEEExec.Bridge.ERealTotal": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32": [],
-    "NN.Floats.IEEEExec.BridgeFP32.Compare": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.Core": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.DyadicRounding": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.NearestEven": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.Ops": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.RatBounds": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.RoundDyadic": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32.RoundRat": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.BridgeFP32Expr": [
+    "NN.Floats.IEEEExec.Bridge.Expressions": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec",
       "FiniteEval"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32Total": [],
-    "NN.Floats.IEEEExec.BridgeFP32Total.Arithmetic": [
+    "NN.Floats.IEEEExec.Bridge.FP32": [],
+    "NN.Floats.IEEEExec.Bridge.FP32.Compare": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32Total.Core": [
+    "NN.Floats.IEEEExec.Bridge.FP32.Core": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32Total.Effective": [
+    "NN.Floats.IEEEExec.Bridge.FP32.DyadicRounding": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32Total.MinMax": [
+    "NN.Floats.IEEEExec.Bridge.FP32.NearestEven": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeFP32Total.Order": [
+    "NN.Floats.IEEEExec.Bridge.FP32.Ops": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.BridgeInitFloat32": [
+    "NN.Floats.IEEEExec.Bridge.FP32.RatBounds": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32.RoundDyadic": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32.RoundRat": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32Total": [],
+    "NN.Floats.IEEEExec.Bridge.FP32Total.Arithmetic": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32Total.Core": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32Total.Effective": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32Total.MinMax": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.FP32Total.Order": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Bridge.RuntimeFloat32": [
       "TorchLean.Floats.IEEE754",
       "Float32Bridge",
       "RuntimeFloat32MatchesIEEE32Exec"
     ],
     "NN.Floats.IEEEExec.DirectedRoundingSoundness": [],
+    "NN.Floats.IEEEExec.DirectedRoundingSoundness.Division": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
     "NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
@@ -30417,22 +30478,23 @@
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.DivDirectedRoundingSoundness": [
+    "NN.Floats.IEEEExec.Encoding.MkBitsToDyadic": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.ERealSemantics": [
+    "NN.Floats.IEEEExec.Encoding.MkBitsToReal": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.ErrorBounds": [
+    "NN.Floats.IEEEExec.Encoding.Negation": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
     "NN.Floats.IEEEExec.Exec32": [],
     "NN.Floats.IEEEExec.Exec32.Arithmetic": [
       "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
+      "IEEE32Exec",
+      "IEEEStatus"
     ],
     "NN.Floats.IEEEExec.Exec32.Compare": [
       "TorchLean.Floats.IEEE754",
@@ -30460,39 +30522,7 @@
       "Transcendentals",
       "Trig"
     ],
-    "NN.Floats.IEEEExec.MinMaxERealSoundness": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.MkBitsToDyadic": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.MkBitsToReal": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.NatLemmas": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.Negation": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
     "NN.Floats.IEEEExec.Notation": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.OpSandwich": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.RatScaling": [
-      "TorchLean.Floats.IEEE754",
-      "IEEE32Exec"
-    ],
-    "NN.Floats.IEEEExec.RealSemantics": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
@@ -30502,31 +30532,60 @@
       "ReductionBound",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.RoundDyadicToIEEE32Bounds": [
+    "NN.Floats.IEEEExec.Rounding.NatLemmas": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.RoundQuotEvenBounds": [
+    "NN.Floats.IEEEExec.Rounding.RatScaling": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.RoundShiftRightEven": [
+    "NN.Floats.IEEEExec.Rounding.RoundDyadicToIEEE32Bounds": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.SpecialRules": [
+    "NN.Floats.IEEEExec.Rounding.RoundQuotEvenBounds": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.TranscendentalRules": [
+    "NN.Floats.IEEEExec.Rounding.RoundShiftRightEven": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.TrigBounds": [
+    "NN.Floats.IEEEExec.Rules.SpecialRules": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
-    "NN.Floats.IEEEExec.TrigRules": [
+    "NN.Floats.IEEEExec.Rules.TranscendentalRules": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec",
+      "UnaryApproximationContract"
+    ],
+    "NN.Floats.IEEEExec.Rules.TrigBounds": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Rules.TrigRules": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Semantics.ERealSemantics": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Semantics.ErrorBounds": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Semantics.OpSandwich": [
+      "TorchLean.Floats.IEEE754",
+      "IEEE32Exec"
+    ],
+    "NN.Floats.IEEEExec.Semantics.RealSemantics": [
       "TorchLean.Floats.IEEE754",
       "IEEE32Exec"
     ],
@@ -30664,7 +30723,8 @@
       "TorchLean.Floats"
     ],
     "NN.Floats.NeuralFloat.Rounding.Core": [
-      "TorchLean.Floats"
+      "TorchLean.Floats",
+      "NeuralRoundingMode"
     ],
     "NN.Floats.NeuralFloat.Rounding.Double": [
       "TorchLean.Floats"
@@ -30690,7 +30750,8 @@
     "NN.Floats.NeuralFloat.Scalar": [],
     "NN.Floats.NeuralFloat.Scalar.Conversion": [
       "TorchLean.Floats.Conversion",
-      "NeuralConversionResult"
+      "NeuralConversionResult",
+      "AffineQuantizer"
     ],
     "NN.Floats.NeuralFloat.Scalar.NF": [
       "TorchLean.Floats",
@@ -34052,8 +34113,8 @@
     "critical_path_import_edges": 131,
     "errors": 0,
     "findings": 0,
-    "import_edges": 4043,
-    "internal_import_edges": 3502,
+    "import_edges": 4051,
+    "internal_import_edges": 3510,
     "layers": [
       "Backend",
       "NN",
@@ -34075,9 +34136,9 @@
       "lakefile",
       "scripts"
     ],
-    "modules": 1259,
-    "private_import_edges": 351,
-    "public_import_edges": 3692,
+    "modules": 1260,
+    "private_import_edges": 353,
+    "public_import_edges": 3698,
     "warnings": 0
   },
   "top_fan_in": [
@@ -34155,7 +34216,7 @@
     },
     {
       "count": 15,
-      "module": "NN.Floats.IEEEExec.BridgeFP32Total"
+      "module": "NN.Floats.IEEEExec.Bridge.FP32Total"
     },
     {
       "count": 15,
@@ -34196,12 +34257,12 @@
       "module": "NN.Spec.Models"
     },
     {
-      "count": 24,
-      "module": "NN.MLTheory.API"
+      "count": 25,
+      "module": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
     },
     {
-      "count": 23,
-      "module": "blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats"
+      "count": 24,
+      "module": "NN.MLTheory.API"
     },
     {
       "count": 20,
@@ -34214,10 +34275,6 @@
     {
       "count": 18,
       "module": "NN.Proofs.Autograd.Coverage"
-    },
-    {
-      "count": 17,
-      "module": "NN.Floats.IEEEExec"
     },
     {
       "count": 17,
@@ -34242,6 +34299,10 @@
     {
       "count": 16,
       "module": "NN.Tests.Runtime.Cuda.Suite"
+    },
+    {
+      "count": 15,
+      "module": "NN.API.Models"
     }
   ]
 }

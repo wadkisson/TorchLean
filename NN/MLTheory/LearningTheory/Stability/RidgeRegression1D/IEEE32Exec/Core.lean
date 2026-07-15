@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.IEEEExec.BridgeFP32Expr
+public import NN.Floats.IEEEExec.Bridge.Expressions
 public import NN.MLTheory.LearningTheory.Stability.Core
 
 /-!

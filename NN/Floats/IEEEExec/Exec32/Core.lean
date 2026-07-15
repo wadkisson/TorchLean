@@ -180,7 +180,7 @@ quiet signaling NaNs by setting the quiet bit.
     x
 
 /-- If `x` is a NaN, return it (quieted). -/
-def chooseNaN1 (x : IEEE32Exec) : Option IEEE32Exec :=
+@[inline] def chooseNaN1 (x : IEEE32Exec) : Option IEEE32Exec :=
   if isNaN x then some (quietNaN x) else none
 
 /--
@@ -192,7 +192,7 @@ This is the "NaN propagation" policy used by most binary ops in this file:
 - otherwise if any operand is a quiet NaN, return that operand, left-to-right,
 - otherwise return `none`.
 -/
-def chooseNaN2 (x y : IEEE32Exec) : Option IEEE32Exec :=
+@[inline] def chooseNaN2 (x y : IEEE32Exec) : Option IEEE32Exec :=
   -- Prefer signaling NaNs (quieted), then quiet NaNs; deterministic left-to-right choice.
   if isSNaN x then some (quietNaN x)
   else if isSNaN y then some (quietNaN y)
@@ -201,7 +201,7 @@ def chooseNaN2 (x y : IEEE32Exec) : Option IEEE32Exec :=
   else none
 
 /-- Like `chooseNaN2`, but for ternary ops (used for `fma`). -/
-def chooseNaN3 (x y z : IEEE32Exec) : Option IEEE32Exec :=
+@[inline] def chooseNaN3 (x y z : IEEE32Exec) : Option IEEE32Exec :=
   if isSNaN x then some (quietNaN x)
   else if isSNaN y then some (quietNaN y)
   else if isSNaN z then some (quietNaN z)

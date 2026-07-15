@@ -9,7 +9,7 @@ module
 public import Mathlib.Data.EReal.Basic
 public import Mathlib.Data.Fin.Tuple.Basic
 public import Mathlib.Data.Set.Image
-public import NN.Floats.IEEEExec.BridgeERealTotal
+public import NN.Floats.IEEEExec.Bridge.ERealTotal
 public import NN.Floats.IEEEExec.Exec32
 
 /-!

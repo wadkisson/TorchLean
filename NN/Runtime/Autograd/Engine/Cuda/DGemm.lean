@@ -36,7 +36,7 @@ namespace Autograd
 namespace Cuda
 
 @[extern "torchlean_dgemm_cuda"]
-opaque torchleanDgemmCuda (A : FloatArray) (B : FloatArray)
+opaque torchleanDgemmCuda (A : @& FloatArray) (B : @& FloatArray)
                           (m n p : UInt32) : FloatArray
 
 end Cuda

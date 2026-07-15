@@ -30,6 +30,26 @@ static std::atomic<uint64_t> g_torchlean_cuda_live_bytes{0u};
 static std::atomic<uint64_t> g_torchlean_cuda_peak_bytes{0u};
 static std::atomic<uint64_t> g_torchlean_cuda_alloc_count{0u};
 static std::atomic<uint64_t> g_torchlean_cuda_free_count{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_wrapper_live_count{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_wrapper_peak_count{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_wrapper_alloc_count{0u};
+static std::atomic<uint64_t> g_torchlean_cuda_wrapper_finalize_count{0u};
+
+static void torchlean_cuda_note_wrapper_alloc(void) {
+  g_torchlean_cuda_wrapper_alloc_count.fetch_add(1u, std::memory_order_relaxed);
+  const uint64_t live =
+      g_torchlean_cuda_wrapper_live_count.fetch_add(1u, std::memory_order_relaxed) + 1u;
+  uint64_t peak = g_torchlean_cuda_wrapper_peak_count.load(std::memory_order_relaxed);
+  while (live > peak &&
+         !g_torchlean_cuda_wrapper_peak_count.compare_exchange_weak(
+             peak, live, std::memory_order_relaxed, std::memory_order_relaxed)) {
+  }
+}
+
+static void torchlean_cuda_note_wrapper_finalize(void) {
+  g_torchlean_cuda_wrapper_finalize_count.fetch_add(1u, std::memory_order_relaxed);
+  g_torchlean_cuda_wrapper_live_count.fetch_sub(1u, std::memory_order_relaxed);
+}
 
 // 0 = CPU stub, 1 = native CUDA with a visible device, 2 = native CUDA without one.
 extern "C" LEAN_EXPORT uint32_t torchlean_cuda_runtime_status(uint32_t token) {
@@ -245,6 +265,7 @@ static void torchlean_cuda_buffer_finalize(void* ptr) {
   }
   (void)torchlean_cuda_buffer_release_data(b);
   free(b);
+  torchlean_cuda_note_wrapper_finalize();
 }
 
 // `torchlean_cuda_buffer` holds no Lean references.
@@ -272,7 +293,9 @@ extern "C" torchlean_cuda_buffer* torchlean_cuda_buffer_unbox(b_lean_obj_arg obj
 }
 
 extern "C" lean_obj_res torchlean_cuda_buffer_box(torchlean_cuda_buffer* b) {
-  return lean_alloc_external(torchlean_cuda_buffer_get_class(), b);
+  lean_obj_res boxed = lean_alloc_external(torchlean_cuda_buffer_get_class(), b);
+  torchlean_cuda_note_wrapper_alloc();
+  return boxed;
 }
 
 extern "C" void torchlean_cuda_buffer_drop_unboxed(torchlean_cuda_buffer* b) {
@@ -703,6 +726,26 @@ extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_alloc_count(uint32_t u)
 extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_free_count(uint32_t u) {
   (void)u;
   return g_torchlean_cuda_free_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_wrapper_live_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_live_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_wrapper_peak_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_peak_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_wrapper_alloc_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_alloc_count.load(std::memory_order_relaxed);
+}
+
+extern "C" LEAN_EXPORT uint64_t torchlean_cuda_wrapper_finalize_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_finalize_count.load(std::memory_order_relaxed);
 }
 
 extern "C" LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_free_bytes(uint32_t u) {

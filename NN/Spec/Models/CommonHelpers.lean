@@ -144,17 +144,16 @@ def inverseSpec {n : Nat}
     -- Scale by 1/det
     scaleSpec adjugate (1 / det)
 
--- Eigendecomposition using basic power iteration for the largest eigenvalue
 /--
-Reference eigendecomposition via power iteration (largest eigenpair only).
+Approximate the leading eigenpair by 20 steps of power iteration.
 
-This returns a pair `(eigenvalues, eigenvectors)` where only the first eigenvalue/eigenvector slot
-is populated (the rest are zeros). It is intended as simple, proof-friendly reference code rather
-than a full-featured numerical linear algebra routine.
+The scalar is the final Rayleigh quotient and the tensor is the corresponding normalized iterate.
+This definition does not claim to compute a full eigendecomposition. Convergence to a dominant
+eigenvector requires the usual spectral assumptions on `matrix` and a suitable initial vector.
 -/
-def eigendecompSpec {n : Nat}
+def leadingEigenpairPowerIterationApproxSpec {n : Nat}
   (matrix : Tensor α (.dim n (.dim n .scalar))) :
-  (Tensor α (.dim n .scalar) × Tensor α (.dim n (.dim n .scalar))) :=
+  (α × Tensor α (.dim n .scalar)) :=
   -- Power iteration: returns normalized eigenvector and its Rayleigh quotient
   let rec power_iteration (v : Tensor α (.dim n .scalar)) (iter : Nat) :
     (Tensor α (.dim n .scalar) × α) :=
@@ -173,20 +172,15 @@ def eigendecompSpec {n : Nat}
       else v
       power_iteration normalized (iter - 1)
 
-  -- Initialize vector with all ones
-  let initial_v := Tensor.dim (fun _ => Tensor.scalar 1)
+  -- Start from a normalized all-ones vector.  Normalizing before the first multiplication matters
+  -- for the zero matrix: every direction is then an eigenvector, and the fallback branch below
+  -- should still return a unit vector rather than the raw all-ones vector.
+  let initial_raw : Tensor α (.dim n .scalar) := Tensor.dim (fun _ => Tensor.scalar 1)
+  let initial_norm := MathFunctions.sqrt (sumSpec (squareSpec initial_raw))
+  let initial_v :=
+    if initial_norm > 0 then scaleSpec initial_raw (1 / initial_norm) else initial_raw
   let (eigenvector, eigenvalue) := power_iteration initial_v 20
-  -- more iterations for better approximation
-
-  -- Construct eigenvalues tensor (first eigenvalue filled, rest zeros)
-  let eigenvalues := Tensor.dim (fun i =>
-    if i.val = 0 then Tensor.scalar eigenvalue else Tensor.scalar 0)
-
-  -- Construct eigenvectors tensor (first column is eigenvector, rest zero vectors)
-  let eigenvectors := Tensor.dim (fun i =>
-    if i.val = 0 then eigenvector else Tensor.dim (fun _ => Tensor.scalar 0))
-
-  (eigenvalues, eigenvectors)
+  (eigenvalue, eigenvector)
 
 
 -- Distance functions used by nearest-neighbor, clustering, and metric-learning specs.
@@ -302,129 +296,4 @@ def normalizeZscoreSpec {n : Nat} (vector : Tensor α (.dim n .scalar)) :
   else
     centered
 
--- Sorting and indexing helpers for specs that manipulate explicit feature lists.
-
-/--
-Argsort in descending order (returns indices as a `Nat` tensor).
-
-PyTorch analogue: `torch.argsort(values, descending=True)`.
--/
-def argsortDescendingSpec {n : Nat}
-  (values : Tensor α (.dim n .scalar)) :
-  Tensor Nat (.dim n .scalar) :=
-  -- Work through a list of `(index, value)` pairs so the ordering rule is visible in the spec.
-  let indexed_values := (List.finRange n).map (fun i =>
-    match get values i with
-    | Tensor.scalar val => (i.val, val)
-  )
-  -- Sort by value in descending order, matching `torch.argsort(..., descending=True)`.
-  let sorted_indices := indexed_values.mergeSort (fun a b => a.2 > b.2)
-  -- Extract the ordered indices and rebuild the result as a tensor.
-  let indices := sorted_indices.map (fun (idx, _) => idx)
-  Tensor.dim (fun i => Tensor.scalar (indices.getD i.val 0))
-
-/--
-Gather elements from a 1-D tensor using a 1-D tensor of indices.
-
-Out-of-bounds indices produce `0`.
-
-PyTorch analogue: `values[indices]` (with an explicit out-of-bounds guard).
--/
-def gatherSpec {n : Nat}
-  (values : Tensor α (.dim n .scalar))
-  (indices : Tensor Nat (.dim n .scalar)) :
-  Tensor α (.dim n .scalar) :=
-  Tensor.dim (fun i =>
-    match get indices i with
-    | Tensor.scalar idx =>
-      if h : idx < n then
-        get values ⟨idx, h⟩
-      else
-        Tensor.scalar (0 : α)
-  )
-
-/--
-Gather columns of an `m × n` matrix using a length-`n` index vector.
-
-Out-of-bounds indices produce `0` entries.
--/
-def gatherColumnsSpec {m n : Nat}
-  (matrix : Tensor α (.dim m (.dim n .scalar)))
-  (indices : Tensor Nat (.dim n .scalar)) :
-  Tensor α (.dim m (.dim n .scalar)) :=
-  Tensor.dim (fun i =>
-    Tensor.dim (fun j =>
-      match get indices j with
-      | Tensor.scalar idx =>
-        if h : idx < n then
-          match get matrix i with
-          | Tensor.dim row => row ⟨idx, h⟩
-        else
-          Tensor.scalar (0 : α)
-    )
-  )
-
--- Slice columns from start to end
-/--
-Slice a contiguous block of columns from an `m × n` matrix.
-
-The resulting matrix has `end_p - start` columns. Entries outside the `[start, end_p)` range are
-filled with `0` (this matches the "safe default" style used by other helpers in this file).
--/
-def sliceColumnsSpec {m n : Nat}
-  (matrix : Tensor α (.dim m (.dim n .scalar)))
-  (start end_p : Nat) (h : end_p ≤ n) :
-  Tensor α (.dim m (.dim (end_p - start) .scalar)) :=
-  Tensor.dim (fun i =>
-    Tensor.dim (fun j =>
-      let col_idx := start + j.val
-      if h_col : col_idx < end_p then
-        match get matrix i with
-        | Tensor.dim row => row ⟨col_idx, Nat.lt_of_lt_of_le h_col h⟩
-      else
-        Tensor.scalar (0 : α)
-    )
-  )
-
--- Slice values from start to end
-/--
-Slice a contiguous subvector from `values`, returning length `end_p - start`.
-
-Entries outside the `[start, end_p)` range are filled with `0`.
--/
-def sliceValuesSpec {n : Nat}
-  (values : Tensor α (.dim n .scalar))
-  (start end_p : Nat) (h : end_p ≤ n) :
-  Tensor α (.dim (end_p - start) .scalar) :=
-  Tensor.dim (fun i =>
-    let idx := start + i.val
-    if h_idx : idx < end_p then
-      get values ⟨idx, Nat.lt_of_lt_of_le h_idx h⟩
-    else
-      Tensor.scalar (0 : α)
-  )
-
--- Orient components (ensure deterministic sign)
-/--
-Orient component vectors to have a deterministic sign.
-
-Many decompositions (PCA, ICA, eigenvectors) are sign-ambiguous: both `v` and `-v` are valid.
-This helper flips each component so its first entry is nonnegative, making the result stable for
-display/comparison in small specs.
--/
-def orientComponentsSpec {m n : Nat}
-  (components : Tensor α (.dim m (.dim n .scalar))) (h : 0 < n) :
-  Tensor α (.dim m (.dim n .scalar)) :=
-  Tensor.dim (fun i =>
-    match get components i with
-    | Tensor.dim component =>
-      -- check first element
-      match component (Fin.mk 0 h) with
-      | Tensor.scalar first_val =>
-        let sign := if first_val < 0 then -1 else 1
-        Tensor.dim (fun j =>
-          match component j with
-          | Tensor.scalar val => Tensor.scalar (sign * val)
-        )
-  )
 end Spec

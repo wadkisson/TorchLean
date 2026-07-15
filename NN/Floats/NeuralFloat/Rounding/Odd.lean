@@ -239,6 +239,35 @@ theorem neuralNearestEven_roundOdd_binary_extra (extra : ℕ) (x : ℝ) :
           (by simpa [hyFloor] using hyEq) (by simpa [hyFloor] using hnEven)]
         rw [hyFloor]
 
+/--
+Round-to-odd on a finer binary grid prevents nearest-even double rounding on a coarser grid.
+
+The coarse grid has spacing `step`; the intermediate grid is finer by `extra + 2` binary digits.
+The theorem is independent of any particular floating-point exponent format, so it also applies to
+fixed-point and affine-quantization grids. The nonzero hypothesis excludes the degenerate grid with
+spacing zero.
+-/
+theorem neuralRoundAtScale_nearestEven_after_odd_binary_extra
+    (extra : ℕ) (step x : ℝ) (hstep : step ≠ 0) :
+    neuralRoundAtScale neuralNearestEven step
+        (neuralRoundAtScale neuralOddRound
+          (step / (2 : ℝ) ^ (extra + 2)) x) =
+      neuralRoundAtScale neuralNearestEven step x := by
+  let K : ℝ := (2 : ℝ) ^ (extra + 2)
+  have hK : K ≠ 0 := by
+    dsimp [K]
+    positivity
+  have hinput : x / (step / K) = (x / step) * K := by
+    field_simp
+  have hnormalize :
+      (neuralOddRound (x / (step / K)) : ℝ) * (step / K) / step =
+        (neuralOddRound ((x / step) * K) : ℝ) / K := by
+    rw [hinput]
+    field_simp
+  unfold neuralRoundAtScale
+  rw [show (2 : ℝ) ^ (extra + 2) = K by rfl]
+  rw [hnormalize, neuralNearestEven_roundOdd_binary_extra extra (x / step)]
+
 /-- If `x` is not representable, round-to-odd selects an odd scaled integer mantissa. -/
 theorem neuralOddRound_scaled_mantissa_odd_of_not_generic
     {β : NeuralRadix} {fexp : ℤ → ℤ} [NeuralValidExp fexp] {x : ℝ}

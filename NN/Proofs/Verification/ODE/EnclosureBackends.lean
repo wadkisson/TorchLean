@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.FP32
-public import NN.Floats.IEEEExec.BridgeFP32
+public import NN.Floats.IEEEExec.Bridge.FP32
 public import NN.Proofs.Verification.ODE.Enclosure
 
 /-!

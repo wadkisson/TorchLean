@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness
-public import NN.Floats.IEEEExec.MinMaxERealSoundness
+public import NN.Floats.IEEEExec.Semantics.MinMaxERealSoundness
 public import NN.Floats.Interval.IEEEExec32
 
 /-!
@@ -89,7 +89,7 @@ theorem isNaN_roundDyadicUp_eq_false (d : Dyadic) :
 ## `minimum` / `maximum` are non-NaN on non-NaN inputs
 
 These facts allow us to apply `toEReal_minimum_eq_min` / `toEReal_maximum_eq_max` from
-`NN/Floats/IEEEExec/MinMaxERealSoundness.lean` without threading through a large amount of
+`NN/Floats/IEEEExec/Semantics/MinMaxERealSoundness.lean` without threading through a large amount of
 comparison lemmas.
 -/
 

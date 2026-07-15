@@ -6,34 +6,26 @@ bridge theorems that connect runtime execution to proof oriented rounding models
 ## What Lives Here
 
 - `Exec32.lean` and `Exec32/`: the executable kernel (`IEEE32Exec`), bit layout, arithmetic,
-  comparison, directed rounding, dyadic conversion, instances, and deterministic transcendental
-  wrappers.
-- `ERealSemantics.lean`: small shared helpers for interpreting `IEEE32Exec` values in `EReal`
-  (including a total `toEReal` used in endpoint/enclosure proofs).
-- `RealSemantics.lean`, `MkBitsToReal.lean`, `MkBitsToDyadic.lean`: interpretation of bit patterns
-  as real/dyadic values.
-- `SpecialRules.lean`: proved rewrite rules for NaN/Inf/±0 propagation, so proofs do not need to
-  repeatedly unfold the executable definitions.
-- `TranscendentalRules.lean`: deterministic, non IEEE specified transcendental functions
-  (`exp`, `log`, `tanh`, …) and their special-value rules.
-- `TrigRules.lean`, `TrigBounds.lean`: deterministic trigonometric rules and bounds used by
-  examples and interval-facing code.
+  comparison, directed rounding, dyadic conversion, exception-status outcomes, instances, and
+  deterministic transcendental wrappers.
+- `Encoding/`: interpretation of bit patterns as exact dyadics and reals, together with sign-bit
+  facts.
+- `Rounding/`: integer and rational lemmas used to prove the executable rounding algorithms.
+- `Semantics/`: real and `EReal` interpretations, error bounds, and operation sandwiches.
+- `Rules/`: proved rules for special values and the deterministic transcendental wrappers.
 - `Reductions.lean`: reduction semantics for sums/dot products.
-- `ErrorBounds.lean`, `OpSandwich.lean`: reusable executable error/enclosure facts.
-- `RoundShiftRightEven.lean`, `RoundDyadicToIEEE32Bounds.lean`, `RoundQuotEvenBounds.lean`,
-  `RatScaling.lean`, `NatLemmas.lean`: rounding and arithmetic lemmas used by bridge and interval
-  proofs.
+- `Bridge/`: refinement from executable bits to rounded-real, extended-real, expression, and
+  runtime models.
 
 ## Interval / Directed Rounding Semantics
 
 If your goal is interval arithmetic over float32, this folder provides the directed rounding
 kernels and their soundness proofs:
 
-- `DirectedRoundingSoundness.lean`: soundness of `roundDyadicDown/Up` and endpoint ops
-  (`addDown/addUp/mulDown/mulUp`) in `EReal` (so overflow to `±∞` is handled cleanly).
-- `DivDirectedRoundingSoundness.lean`: analogous soundness for rational rounding and
-  `divDown/divUp` (finite / nonzero-divisor regime).
-- `MinMaxERealSoundness.lean`: basic order lemmas used by endpoint min/max rules.
+- `DirectedRoundingSoundness/`: soundness of directed dyadic and rational rounding and the
+  endpoint operations for addition, multiplication, fused multiply-add, division, and square
+  root. The statements use `EReal`, so endpoint overflow to `±∞` remains a valid enclosure.
+- `Semantics/MinMaxERealSoundness.lean`: order lemmas used by endpoint min/max rules.
 
 The interval *API layer* that uses these results lives in `NN/Floats/Interval/`.
 
@@ -46,12 +38,14 @@ TorchLean keeps two float32 views:
 
 Bridge files connect these on the finite, no overflow path:
 
-- `BridgeFP32.lean` and `BridgeFP32/`: per-operation refinement lemmas on the finite branch,
+- `Bridge/FP32.lean` and `Bridge/FP32/`: per-operation refinement lemmas on the finite branch,
   including dyadic/rational rounding infrastructure.
-- `BridgeFP32Expr.lean`: expression-level refinement (compose op lemmas once).
-- `BridgeFP32Total.lean`: packages finite refinement + proved special-value rules using `toReal?`.
-- `BridgeERealTotal.lean`: a slightly richer `EReal` interpretation (`+∞` vs `-∞`, NaN as `none`).
-- `BridgeInitFloat32.lean`: an assumption based interface relating Lean runtime `Float32` to
+- `Bridge/Expressions.lean`: expression-level refinement that composes operation lemmas once.
+- `Bridge/FP32Total.lean`: packages finite refinement and proved special-value rules using
+  `toReal?`.
+- `Bridge/ERealTotal.lean`: an `EReal` interpretation that distinguishes `+∞` and `-∞` while
+  representing NaN as `none`.
+- `Bridge/RuntimeFloat32.lean`: an assumption-based interface relating Lean runtime `Float32` to
   `IEEE32Exec`. The runtime is opaque to the kernel, so this cannot be proved internally.
 
 ## How To Use It
@@ -59,6 +53,13 @@ Bridge files connect these on the finite, no overflow path:
 Use `IEEE32Exec` when the object you need is executable binary32 inside Lean. Use `FP32` when the
 theorem should be a rounded-real error statement. Use runtime `Float32` or CUDA only with an
 explicit bridge or trust-boundary statement.
+
+The value-only operations (`add`, `mul`, `div`, `fma`, and `sqrt`) are accompanied by
+status-bearing operations (`addWithStatus`, `mulWithStatus`, `divWithStatus`, `fmaWithStatus`, and
+`sqrtWithStatus`). An `IEEEOutcome` contains the computed bits and an `IEEEStatus` containing the
+invalid, divide-by-zero, overflow, underflow, and inexact indicators. Tininess is detected after
+rounding, and underflow implies inexactness by theorem. `Rules/SpecialRules.lean` proves the main
+special-value status cases.
 
 The useful proof shape is:
 
@@ -77,3 +78,8 @@ libm implementations can differ. TorchLean therefore treats:
 - core arithmetic (add/mul/div/sqrt, specials) as the proved executable kernel, and
 - transcendentals as deterministic but not IEEE specified unless you use a separate rigorous
   backend (e.g. the Arb oracle under `NN/Floats/Arb/` and the interval glue in `NN/Floats/Interval/`).
+
+`Rules/TranscendentalRules.lean` defines `UnaryApproximationContract` for connecting a finite
+executable implementation to a real function on a stated domain with a stated error tolerance.
+This contract does not assert that the current deterministic wrappers satisfy a particular
+accuracy bound; such a theorem needs evidence for the chosen implementation.

@@ -24,6 +24,10 @@ static uint64_t g_torchlean_cuda_live_bytes = 0u;
 static uint64_t g_torchlean_cuda_peak_bytes = 0u;
 static uint64_t g_torchlean_cuda_alloc_count = 0u;
 static uint64_t g_torchlean_cuda_free_count = 0u;
+static uint64_t g_torchlean_cuda_wrapper_live_count = 0u;
+static uint64_t g_torchlean_cuda_wrapper_peak_count = 0u;
+static uint64_t g_torchlean_cuda_wrapper_alloc_count = 0u;
+static uint64_t g_torchlean_cuda_wrapper_finalize_count = 0u;
 
 // 0 = CPU stub, 1 = native CUDA with a visible device, 2 = native CUDA without one.
 LEAN_EXPORT uint32_t torchlean_cuda_runtime_status(uint32_t token) {
@@ -88,6 +92,10 @@ static void torchlean_cuda_buffer_finalize(void* ptr) {
   }
   (void)torchlean_cuda_buffer_release_data(b);
   free(b);
+  g_torchlean_cuda_wrapper_finalize_count++;
+  if (g_torchlean_cuda_wrapper_live_count > 0u) {
+    g_torchlean_cuda_wrapper_live_count--;
+  }
 }
 
 // `torchlean_cuda_buffer` holds no Lean references.
@@ -115,7 +123,13 @@ torchlean_cuda_buffer* torchlean_cuda_buffer_unbox(b_lean_obj_arg obj) {
 }
 
 lean_obj_res torchlean_cuda_buffer_box(torchlean_cuda_buffer* b) {
-  return lean_alloc_external(torchlean_cuda_buffer_get_class(), b);
+  lean_obj_res boxed = lean_alloc_external(torchlean_cuda_buffer_get_class(), b);
+  g_torchlean_cuda_wrapper_alloc_count++;
+  g_torchlean_cuda_wrapper_live_count++;
+  if (g_torchlean_cuda_wrapper_live_count > g_torchlean_cuda_wrapper_peak_count) {
+    g_torchlean_cuda_wrapper_peak_count = g_torchlean_cuda_wrapper_live_count;
+  }
+  return boxed;
 }
 
 void torchlean_cuda_buffer_drop_unboxed(torchlean_cuda_buffer* b) {
@@ -164,6 +178,26 @@ LEAN_EXPORT uint64_t torchlean_cuda_allocator_alloc_count(uint32_t u) {
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_free_count(uint32_t u) {
   (void)u;
   return g_torchlean_cuda_free_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_live_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_live_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_peak_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_peak_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_alloc_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_alloc_count;
+}
+
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_finalize_count(uint32_t u) {
+  (void)u;
+  return g_torchlean_cuda_wrapper_finalize_count;
 }
 
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_free_bytes(uint32_t u) {

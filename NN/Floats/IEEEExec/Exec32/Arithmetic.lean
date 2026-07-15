@@ -22,85 +22,83 @@ namespace TorchLean.Floats.IEEE754
 namespace IEEE32Exec
 
 /-- IEEE754 addition (round-to-nearest, ties-to-even), with NaN/Inf rules. -/
-def add (x y : IEEE32Exec) : IEEE32Exec :=
-  match chooseNaN2 x y with
-  | some nan => nan
-  | none =>
-      if isInf x then
-        if isInf y then
-          if signBit x == signBit y then x else canonicalNaN
-        else
-          x
-      else if isInf y then
-        y
-      else
-        match toDyadic? x, toDyadic? y with
-        | some dx, some dy => roundDyadicToIEEE32 (addDyadic dx dy)
-        | _, _ => canonicalNaN
+@[inline] def add (x y : IEEE32Exec) : IEEE32Exec :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy => roundDyadicToIEEE32 (addDyadic dx dy)
+  | _, _ =>
+      match chooseNaN2 x y with
+      | some nan => nan
+      | none =>
+          if isInf x then
+            if isInf y then
+              if signBit x == signBit y then x else canonicalNaN
+            else
+              x
+          else if isInf y then
+            y
+          else
+            canonicalNaN
 
 /-- IEEE754 subtraction (defined as addition with sign-flip). -/
 @[inline] def sub (x y : IEEE32Exec) : IEEE32Exec :=
   add x (neg y)
 
 /-- IEEE754 multiplication (round-to-nearest, ties-to-even), with NaN/Inf rules. -/
-def mul (x y : IEEE32Exec) : IEEE32Exec :=
-  match chooseNaN2 x y with
-  | some nan => nan
-  | none =>
-      if isInf x then
-        if isZero y then canonicalNaN
-        else
-          if signBit x != signBit y then negInf else posInf
-      else if isInf y then
-        if isZero x then canonicalNaN
-        else
-          if signBit x != signBit y then negInf else posInf
+@[inline] def mul (x y : IEEE32Exec) : IEEE32Exec :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy =>
+      let s := Bool.xor dx.sign dy.sign
+      if dx.mant == 0 || dy.mant == 0 then
+        if s then negZero else posZero
       else
-        match toDyadic? x, toDyadic? y with
-        | some dx, some dy =>
-            let s := Bool.xor dx.sign dy.sign
-            if dx.mant == 0 || dy.mant == 0 then
-              if s then negZero else posZero
+        roundDyadicToIEEE32 { sign := s, mant := dx.mant * dy.mant, exp := dx.exp + dy.exp }
+  | _, _ =>
+      match chooseNaN2 x y with
+      | some nan => nan
+      | none =>
+          if isInf x then
+            if isZero y then canonicalNaN
             else
-              roundDyadicToIEEE32 { sign := s, mant := dx.mant * dy.mant, exp := dx.exp + dy.exp }
-        | _, _ => canonicalNaN
+              if signBit x != signBit y then negInf else posInf
+          else if isInf y then
+            if isZero x then canonicalNaN
+            else
+              if signBit x != signBit y then negInf else posInf
+          else
+            canonicalNaN
 
 /-- IEEE754 division (round-to-nearest, ties-to-even), with NaN/Inf rules. -/
-def div (x y : IEEE32Exec) : IEEE32Exec :=
-  match chooseNaN2 x y with
-  | some nan => nan
-  | none =>
-      if isInf x then
-        if isInf y then canonicalNaN
-        else
-          -- ±Inf / finite (including ±0) = ±Inf
-          if signBit x != signBit y then negInf else posInf
-      else if isInf y then
-        -- finite / ±Inf = signed zero
-        if signBit x != signBit y then negZero else posZero
-      else if isZero y then
-        if isZero x then canonicalNaN
-        else
-          -- finite nonzero / ±0 = ±Inf
-          if signBit x != signBit y then negInf else posInf
+@[inline] def div (x y : IEEE32Exec) : IEEE32Exec :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy =>
+      let sign := Bool.xor dx.sign dy.sign
+      if dy.mant == 0 then
+        if dx.mant == 0 then canonicalNaN
+        else if sign then negInf else posInf
+      else if dx.mant == 0 then
+        if sign then negZero else posZero
       else
-        match toDyadic? x, toDyadic? y with
-        | some dx, some dy =>
-            -- Exact quotient: (mx * 2^ex) / (my * 2^ey) = (mx/my) * 2^(ex-ey).
-            let sign := Bool.xor dx.sign dy.sign
-            if dx.mant == 0 then
-              if sign then negZero else posZero
-            else
-              let eDiff : Int := dx.exp - dy.exp
-              let (num, den) :=
-                match eDiff with
-                | .ofNat sh => (Nat.shiftLeft dx.mant sh, dy.mant)
-                | .negSucc sh => (dx.mant, Nat.shiftLeft dy.mant (sh + 1))
-              roundRatToIEEE32 sign num den
-        | _, _ => canonicalNaN
+        -- Exact quotient: (mx * 2^ex) / (my * 2^ey) = (mx/my) * 2^(ex-ey).
+        let eDiff : Int := dx.exp - dy.exp
+        let (num, den) :=
+          match eDiff with
+          | .ofNat sh => (Nat.shiftLeft dx.mant sh, dy.mant)
+          | .negSucc sh => (dx.mant, Nat.shiftLeft dy.mant (sh + 1))
+        roundRatToIEEE32 sign num den
+  | _, _ =>
+      match chooseNaN2 x y with
+      | some nan => nan
+      | none =>
+          if isInf x then
+            if isInf y then canonicalNaN
+            else if signBit x != signBit y then negInf else posInf
+          else if isInf y then
+            if signBit x != signBit y then negZero else posZero
+          else
+            canonicalNaN
 
 /-- IEEE754 fused multiply-add: compute `x*y+z` and round once (ties-to-even). -/
-def fma (x y z : IEEE32Exec) : IEEE32Exec :=
+@[inline] def fma (x y z : IEEE32Exec) : IEEE32Exec :=
   match chooseNaN3 x y z with
   | some nan => nan
   | none =>
@@ -136,13 +134,7 @@ theorem add_eq_roundDyadicToIEEE32_of_toDyadic? {x y : IEEE32Exec} {dx dy : Dyad
     (hx : toDyadic? x = some dx) (hy : toDyadic? y = some dy) :
     add x y = roundDyadicToIEEE32 (addDyadic dx dy) := by
   unfold add
-  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hx)
-  have hyNaN : isNaN y = false := isNaN_eq_false_of_toDyadic?_some (hx := hy)
-  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hx)
-  have hyInf : isInf y = false := isInf_eq_false_of_toDyadic?_some (hx := hy)
-  have hchoose : chooseNaN2 x y = none := by
-    simp [chooseNaN2, isSNaN, hxNaN, hyNaN]
-  simp [hchoose, hxInf, hyInf, hx, hy]
+  simp [hx, hy]
 
 /--
 If both inputs decode to dyadics, `mul` is “exact dyadic multiply, then round once”.
@@ -157,13 +149,7 @@ theorem mul_eq_roundDyadicToIEEE32_of_toDyadic? {x y : IEEE32Exec} {dx dy : Dyad
         { sign := Bool.xor dx.sign dy.sign, mant := dx.mant * dy.mant, exp := dx.exp + dy.exp } :=
           by
   unfold mul
-  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hx)
-  have hyNaN : isNaN y = false := isNaN_eq_false_of_toDyadic?_some (hx := hy)
-  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hx)
-  have hyInf : isInf y = false := isInf_eq_false_of_toDyadic?_some (hx := hy)
-  have hchoose : chooseNaN2 x y = none := by
-    simp [chooseNaN2, isSNaN, hxNaN, hyNaN]
-  simp (config := { zeta := true }) [hchoose, hxInf, hyInf, hx, hy]
+  simp (config := { zeta := true }) [hx, hy]
   -- Remaining goal: the explicit zero short-circuit agrees with rounding a dyadic with mantissa 0.
   cases h0 : (dx.mant == 0 || dy.mant == 0)
   · -- Nonzero mantissas: the implication premise is impossible.
@@ -238,45 +224,15 @@ theorem div_eq_roundRatToIEEE32_of_toDyadic? {x y : IEEE32Exec} {dx dy : Dyadic}
         | .ofNat sh => (Nat.shiftLeft dx.mant sh, dy.mant)
         | .negSucc sh => (dx.mant, Nat.shiftLeft dy.mant (sh + 1))
       roundRatToIEEE32 sign num den := by
-  classical
   unfold div
-  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hx)
-  have hyNaN : isNaN y = false := isNaN_eq_false_of_toDyadic?_some (hx := hy)
-  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hx)
-  have hyInf : isInf y = false := isInf_eq_false_of_toDyadic?_some (hx := hy)
-  have hchoose : chooseNaN2 x y = none := by
-    simp [chooseNaN2, isSNaN, hxNaN, hyNaN]
-
-  have hyZero : isZero y = false := by
-    cases hzy : isZero y with
-    | false => rfl
-    | true =>
-        unfold isZero at hzy
-        have hfields : (expField y == 0) = true ∧ (fracField y == 0) = true := by
-          simpa [Bool.and_eq_true] using hzy
-        have hdy :
-            { sign := signBit y, mant := 0, exp := 0 } = dy := by
-          -- In the `isZero` case, `toDyadic?` returns the canonical dyadic `0`.
-          unfold toDyadic? at hy
-          have hnaninf : (isNaN y || isInf y) = false := by
-            simp [hyNaN, hyInf]
-          -- Reduce the nested `if` using the extracted bitfield facts.
-          simp (config := { zeta := true }) [hnaninf, hfields.1, hfields.2] at hy
-          simpa using hy
-        have : dy.mant = 0 := by simp [hdy.symm]
-        exact (hy0 this).elim
-
-  -- Reduce to the dyadic branch (finite, nonzero divisor).
-  simp (config := { zeta := true }) [hchoose, hxInf, hyInf, hyZero, hx, hy]
-  -- The explicit `dx.mant == 0` short-circuit agrees with `roundRatToIEEE32`'s `num == 0` branch.
-  cases hx0 : (dx.mant == 0) with
-  | true =>
-      have hx0' : dx.mant = 0 := (beq_iff_eq).1 hx0
-      cases hE : dx.exp - dy.exp <;> simp [hx0', roundRatToIEEE32]
-  | false =>
-      intro h
-      have hx0' : dx.mant ≠ 0 := (beq_eq_false_iff_ne (a := dx.mant) (b := 0)).1 hx0
-      exact (hx0' h).elim
+  simp only [hx, hy]
+  split <;> rename_i hden
+  · exact (hy0 ((beq_iff_eq).1 hden)).elim
+  · split <;> rename_i hnum
+    · have hnum' : dx.mant = 0 := (beq_iff_eq).1 hnum
+      rw [hnum']
+      cases dx.exp - dy.exp <;> simp [roundRatToIEEE32]
+    · rfl
 
 /-- IEEE754 square root (ties-to-even). -/
 def sqrt (x : IEEE32Exec) : IEEE32Exec :=
@@ -337,6 +293,217 @@ def cmpDyadic (a b : Dyadic) : Ordering :=
     let aInt : Int := if a.sign then -(Int.ofNat aNat) else Int.ofNat aNat
     let bInt : Int := if b.sign then -(Int.ofNat bNat) else Int.ofNat bNat
     compare aInt bInt
+
+/-!
+## IEEE exception status
+
+The value-only operations above remain the basic executable API. The wrappers below return the
+same value together with the five exception indicators defined by IEEE 754. Tininess is detected
+after rounding, and underflow is reported only when the rounded result is both tiny and inexact.
+
+The status is computed from the exact dyadic or rational intermediate already used by each
+operation. No host floating-point operation or numerical tolerance enters this classification.
+-/
+
+/-- The five exception indicators associated with an IEEE-754 operation. -/
+structure IEEEStatus where
+  invalid : Bool := false
+  divideByZero : Bool := false
+  overflow : Bool := false
+  underflow : Bool := false
+  inexact : Bool := false
+  deriving Repr, DecidableEq, Inhabited
+
+namespace IEEEStatus
+
+/-- No exception was raised. -/
+def clear : IEEEStatus := {}
+
+/-- Accumulate exception indicators from two operations. -/
+def union (a b : IEEEStatus) : IEEEStatus where
+  invalid := a.invalid || b.invalid
+  divideByZero := a.divideByZero || b.divideByZero
+  overflow := a.overflow || b.overflow
+  underflow := a.underflow || b.underflow
+  inexact := a.inexact || b.inexact
+
+end IEEEStatus
+
+/-- An executable binary32 value paired with the exception status produced while computing it. -/
+structure IEEEOutcome where
+  value : IEEE32Exec
+  status : IEEEStatus
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Whether a finite binary32 result is zero or subnormal. -/
+def isTinyAfterRounding (x : IEEE32Exec) : Bool :=
+  isFinite x && expField x == 0
+
+/-- Classify rounding an exact dyadic to the supplied binary32 result. -/
+def dyadicRoundingStatus (exact : Dyadic) (rounded : IEEE32Exec) : IEEEStatus :=
+  if isInf rounded then
+    { overflow := true, inexact := true }
+  else
+    match toDyadic? rounded with
+    | none => .clear
+    | some actual =>
+        let inexact := cmpDyadic exact actual != .eq
+        { underflow := isTinyAfterRounding rounded && inexact
+          inexact := inexact }
+
+/-- Exact equality between `num / den` and a dyadic magnitude, including the result sign. -/
+def rationalEqualsDyadic (sign : Bool) (num den : Nat) (d : Dyadic) : Bool :=
+  if num == 0 then
+    d.mant == 0
+  else if d.mant == 0 || sign != d.sign then
+    false
+  else
+    match d.exp with
+    | .ofNat e => num == den * Nat.shiftLeft d.mant e
+    | .negSucc e => Nat.shiftLeft num (e + 1) == den * d.mant
+
+/-- Classify rounding an exact signed rational to the supplied binary32 result. -/
+def rationalRoundingStatus (sign : Bool) (num den : Nat)
+    (rounded : IEEE32Exec) : IEEEStatus :=
+  if isInf rounded then
+    { overflow := true, inexact := true }
+  else
+    match toDyadic? rounded with
+    | none => .clear
+    | some actual =>
+        let inexact := !(rationalEqualsDyadic sign num den actual)
+        { underflow := isTinyAfterRounding rounded && inexact
+          inexact := inexact }
+
+/-- Binary32 addition with IEEE exception status. -/
+def addWithStatus (x y : IEEE32Exec) : IEEEOutcome :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy =>
+      let exact := addDyadic dx dy
+      let value := roundDyadicToIEEE32 exact
+      { value, status := dyadicRoundingStatus exact value }
+  | _, _ =>
+      let value := add x y
+      let hasNaN := isNaN x || isNaN y
+      let generatedInvalid := isInf x && isInf y && signBit x != signBit y
+      let invalid := isSNaN x || isSNaN y || (!hasNaN && generatedInvalid)
+      if invalid then
+        { value, status := { invalid := true } }
+      else
+        { value, status := .clear }
+
+/-- Binary32 subtraction with IEEE exception status. -/
+def subWithStatus (x y : IEEE32Exec) : IEEEOutcome :=
+  addWithStatus x (neg y)
+
+/-- Binary32 multiplication with IEEE exception status. -/
+def mulWithStatus (x y : IEEE32Exec) : IEEEOutcome :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy =>
+      let exact : Dyadic :=
+        { sign := Bool.xor dx.sign dy.sign
+          mant := dx.mant * dy.mant
+          exp := dx.exp + dy.exp }
+      let value := roundDyadicToIEEE32 exact
+      { value, status := dyadicRoundingStatus exact value }
+  | _, _ =>
+      let value := mul x y
+      let hasNaN := isNaN x || isNaN y
+      let generatedInvalid := (isInf x && isZero y) || (isInf y && isZero x)
+      let invalid := isSNaN x || isSNaN y || (!hasNaN && generatedInvalid)
+      if invalid then
+        { value, status := { invalid := true } }
+      else
+        { value, status := .clear }
+
+/-- Binary32 division with IEEE exception status. -/
+def divWithStatus (x y : IEEE32Exec) : IEEEOutcome :=
+  match toDyadic? x, toDyadic? y with
+  | some dx, some dy =>
+      let sign := Bool.xor dx.sign dy.sign
+      if dy.mant == 0 then
+        if dx.mant == 0 then
+          { value := canonicalNaN, status := { invalid := true } }
+        else
+          { value := if sign then negInf else posInf, status := { divideByZero := true } }
+      else if dx.mant == 0 then
+        { value := if sign then negZero else posZero, status := .clear }
+      else
+        let eDiff := dx.exp - dy.exp
+        let (num, den) :=
+          match eDiff with
+          | .ofNat sh => (Nat.shiftLeft dx.mant sh, dy.mant)
+          | .negSucc sh => (dx.mant, Nat.shiftLeft dy.mant (sh + 1))
+        let value := roundRatToIEEE32 sign num den
+        { value, status := rationalRoundingStatus sign num den value }
+  | _, _ =>
+      let value := div x y
+      let hasNaN := isNaN x || isNaN y
+      let generatedInvalid := isInf x && isInf y
+      let invalid := isSNaN x || isSNaN y || (!hasNaN && generatedInvalid)
+      if invalid then
+        { value, status := { invalid := true } }
+      else
+        { value, status := .clear }
+
+/-- Fused multiply-add with IEEE exception status. -/
+def fmaWithStatus (x y z : IEEE32Exec) : IEEEOutcome :=
+  match toDyadic? x, toDyadic? y, toDyadic? z with
+  | some dx, some dy, some dz =>
+      let product : Dyadic :=
+        { sign := Bool.xor dx.sign dy.sign
+          mant := dx.mant * dy.mant
+          exp := dx.exp + dy.exp }
+      let exact := addDyadic product dz
+      let value := roundDyadicToIEEE32 exact
+      { value, status := dyadicRoundingStatus exact value }
+  | _, _, _ =>
+      let value := fma x y z
+      let hasNaN := isNaN x || isNaN y || isNaN z
+      let invalidProduct := (isInf x || isInf y) && (isZero x || isZero y)
+      let productIsInf := (isInf x || isInf y) && !(isZero x || isZero y)
+      let oppositeInfiniteAddend :=
+        productIsInf && isInf z && signBit z != Bool.xor (signBit x) (signBit y)
+      let generatedInvalid := invalidProduct || oppositeInfiniteAddend
+      let invalid := isSNaN x || isSNaN y || isSNaN z || (!hasNaN && generatedInvalid)
+      if invalid then
+        { value, status := { invalid := true } }
+      else
+        { value, status := .clear }
+
+/-- Binary32 square root with IEEE exception status. -/
+def sqrtWithStatus (x : IEEE32Exec) : IEEEOutcome :=
+  let value := sqrt x
+  let generatedInvalid := !isNaN x && signBit x && !isZero x
+  let invalid := isSNaN x || generatedInvalid
+  if invalid then
+    { value, status := { invalid := true } }
+  else
+    match toDyadic? x, toDyadic? value with
+    | some exact, some root =>
+        let squared : Dyadic :=
+          { sign := false, mant := root.mant * root.mant, exp := root.exp + root.exp }
+        { value, status := { inexact := cmpDyadic squared exact != .eq } }
+    | _, _ => { value, status := .clear }
+
+/-- After-rounding dyadic underflow is reported only for an inexact result. -/
+theorem dyadicRoundingStatus_inexact_of_underflow {exact : Dyadic} {rounded : IEEE32Exec}
+    (h : (dyadicRoundingStatus exact rounded).underflow = true) :
+    (dyadicRoundingStatus exact rounded).inexact = true := by
+  unfold dyadicRoundingStatus at h ⊢
+  split
+  · simp
+  · split <;> simp_all [IEEEStatus.clear]
+
+/-- After-rounding rational underflow is reported only for an inexact result. -/
+theorem rationalRoundingStatus_inexact_of_underflow {sign : Bool} {num den : Nat}
+    {rounded : IEEE32Exec}
+    (h : (rationalRoundingStatus sign num den rounded).underflow = true) :
+    (rationalRoundingStatus sign num den rounded).inexact = true := by
+  unfold rationalRoundingStatus at h ⊢
+  split
+  · simp
+  · split <;> simp_all [IEEEStatus.clear]
 
 /-
 Outward-rounded arithmetic (interval-friendly)

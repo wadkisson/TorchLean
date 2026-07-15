@@ -156,6 +156,10 @@ This is the definition of `neuralRound`. Floor and ceiling give directed roundin
 rounding toward zero; `neuralNearestEven` gives round-to-nearest with ties resolved toward an even
 mantissa.
 
+Applications can select these four policies through `NeuralRoundingMode` rather than passing a raw
+function. The function-valued interface remains available for proof tools such as round-to-odd and
+for experiments with nonstandard rounding rules.
+
 The validity classes state the properties needed by later proofs. `NeuralValidRnd` requires the
 integer rounding function to be monotone and to fix integers. `NeuralValidRndToNearest` adds the
 nearest-integer half-unit bound. Once the scaled bound is multiplied by the positive radix power,
@@ -188,11 +192,30 @@ import NN.Floats.NeuralFloat.Error
 open TorchLean.Floats
 
 #check neuralRound
+#check NeuralRoundingMode
+#check NeuralRoundingMode.round
 #check neural_error_bound_ulp
 #check neuralUlp
 #check neuralRoundDownPoint
 #check neuralRoundNearestPoint
 ```
+
+Fixed-point and quantized formats often provide their spacing directly rather than deriving it from
+a magnitude-dependent exponent. For these cases, `neuralRoundAtScale rnd step x` computes
+
+$$`
+  r(x/s)s,
+`
+
+where `s` is the grid spacing. It uses the same integer rounding rules and validity classes as
+`neuralRound`; it is not a second rounding theory.
+
+Round-to-odd is useful when a result must pass through an intermediate grid. If that intermediate
+grid has at least two additional binary digits, the theorem
+`neuralRoundAtScale_nearestEven_after_odd_binary_extra` proves that nearest-even rounding on the
+final grid gives exactly the same answer as direct rounding. This is a format-independent
+double-rounding result and applies to fixed-point and affine-quantization grids as well as floating
+formats.
 
 # Three Representations Of A Finite Value
 
@@ -295,15 +318,21 @@ Arbitrary floating-point quantization needs a richer format descriptor but follo
 - encoding maps the mathematical representation to bits or integer codes;
 - decoding maps those codes back to the semantic value used in the theorem.
 
-TorchLean already supplies the generic grid, rounding, FTZ, interval, and FP32 bridge components.
-The remaining quantization layer should add code ranges, scale and zero-point parameters,
-per-tensor and per-channel indexing, and proofs of encode/decode and tensor-error properties. It
-should reuse `Format`, `Rounding`, and `Interval.Quantized` rather than define another arithmetic
-semantics.
+`AffineQuantizer` packages the positive scale, zero point, and integer code interval. Its
+`quantize` operation rounds and then saturates; `dequantize` maps a code back to its real grid value.
+The accompanying theorems prove that quantized codes stay in range, quantization is monotone, every
+in-range code survives a dequantize/quantize round trip, and nearest reconstruction error is at most
+half a step whenever saturation is inactive. The definition is independent of storage width and
+tensor layout: signed int8, uint8, int4, and custom code sets differ only in their integer bounds.
+
+Tensor-level quantization can apply this scalar object pointwise or select different quantizers by
+an explicit tensor index. Keeping indexing outside the scalar definition avoids building image,
+channel, or batching conventions into the arithmetic itself.
 
 ```
 import NN.Floats.NeuralFloat.Format
 import NN.Floats.NeuralFloat.Rounding
+import NN.Floats.NeuralFloat.Scalar.Conversion
 import NN.Floats.Interval.Quantized
 
 open TorchLean.Floats
@@ -311,6 +340,11 @@ open TorchLean.Floats
 -- Fixed grids provide the semantic basis for uniform quantization.
 #check FIXExp
 #check FIXFormat
+#check Conversion.AffineQuantizer
+#check Conversion.AffineQuantizer.quantize
+#check Conversion.AffineQuantizer.dequantize
+#check Conversion.AffineQuantizer.quantize_dequantize
+#check Conversion.AffineQuantizer.dequantize_quantize_error_le
 
 -- Outward rounders lift a discrete grid to sound interval propagation.
 #check TorchLean.Floats.Interval.Rounder
@@ -345,9 +379,9 @@ import NN.Floats.Float32
 import NN.Floats.FP32
 import NN.Floats.Calc
 import NN.Floats.IEEEExec
-import NN.Floats.IEEEExec.BridgeFP32
-import NN.Floats.IEEEExec.BridgeFP32Total
-import NN.Floats.IEEEExec.BridgeInitFloat32
+import NN.Floats.IEEEExec.Bridge.FP32
+import NN.Floats.IEEEExec.Bridge.FP32Total
+import NN.Floats.IEEEExec.Bridge.RuntimeFloat32
 
 open TorchLean.Floats
 open TorchLean.Floats.IEEE754
@@ -365,6 +399,8 @@ open TorchLean.Floats.IEEE754
 -- Constructive rounding machinery.
 #check TorchLean.Floats.NeuralLocation
 #check TorchLean.Floats.neuralRoundedFloat
+#check TorchLean.Floats.NeuralFloat.divRounded
+#check TorchLean.Floats.NeuralFloat.sqrtRounded
 #check TorchLean.Floats.FP32.round_eq_computed
 
 -- Executable bit-level model: raw UInt32 binary32 values.
@@ -378,15 +414,25 @@ open TorchLean.Floats.IEEE754
 #check IEEE32Exec.toReal_add_eq_fp32Round
 #check IEEE32Exec.toReal_add_eq_computed_of_isFinite
 #check IEEE32Exec.toReal?_add_eq_ite
+#check IEEE32Exec.toEReal_fmaDown_le
+#check IEEE32Exec.toEReal_fmaUp_ge
+#check IEEE32Exec.toEReal_sqrtDown_le
+#check IEEE32Exec.toEReal_sqrtUp_ge
+
+-- Executable value together with IEEE exception indicators.
+#check IEEE32Exec.IEEEStatus
+#check IEEE32Exec.IEEEOutcome
+#check IEEE32Exec.divWithStatus
+#check IEEE32Exec.dyadicRoundingStatus_inexact_of_underflow
 
 -- Runtime Float32 remains a named assumption boundary.
 #check Float32Bridge.RuntimeFloat32MatchesIEEE32Exec
 ```
 
-Read these names as the dependency graph. `F32` selects the scalar. `FP32` is the scalar used in proofs.
-`IEEE32Exec` is the executable scalar. `BridgeFP32` and `BridgeFP32Total` say how executable bits
-become rounded reals in the proof model. `BridgeInitFloat32` names what remains if a claim uses Lean's
-runtime `Float32`.
+`F32` selects the scalar. `FP32` is the rounded-real scalar used in proofs, and `IEEE32Exec` is the
+executable bit-level scalar. The modules under `IEEEExec.Bridge` connect executable bits to rounded
+reals. `RuntimeFloat32MatchesIEEE32Exec` names the additional assumption required when a claim uses
+Lean's runtime `Float32` rather than the executable reference model.
 
 # A Single Addition At Four Levels
 
@@ -402,8 +448,8 @@ The finite bridge theorem says the `IEEE32Exec` result agrees with the `FP32` ro
 when the finite hypotheses hold:
 
 ```
-import NN.Floats.IEEEExec.BridgeFP32
-import NN.Floats.IEEEExec.BridgeFP32Total
+import NN.Floats.IEEEExec.Bridge.FP32
+import NN.Floats.IEEEExec.Bridge.FP32Total
 
 open TorchLean.Floats.IEEE754
 
@@ -533,13 +579,13 @@ Examples:
 
 The bridge files reflect this split:
 
-- [BridgeFP32 API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/BridgeFP32.lean) proves finite refinements such as
+- [The finite FP32 bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Bridge/FP32.lean) proves refinements such as
   `toReal_add_eq_fp32Round`, `toReal_mul_eq_fp32Round`, `toReal_div_eq_fp32Round`,
   `toReal_fma_eq_fp32Round`, and `toReal_sqrt_eq_fp32Round`.
-- [BridgeFP32Total API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/BridgeFP32Total.lean) packages total statements
+- [The total FP32 bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Bridge/FP32Total.lean) packages statements
   through `toReal?`, with theorem names such as `toReal?_add_eq_ite`,
   `toReal?_mul_eq_ite`, `toReal?_div_eq_ite`, and `toReal?_sqrt_eq_ite`.
-- [SpecialRules API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/SpecialRules.lean) records NaN, infinity,
+- [SpecialRules API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Rules/SpecialRules.lean) records NaN, infinity,
   signed-zero, and special-case behavior for the executable kernel itself.
 
 The informal theorem shape is:
@@ -550,6 +596,39 @@ The informal theorem shape is:
   rounding that result with `FP32.fp32Round`.
 
 This reading is valid under the stated finite and operation specific hypotheses.
+
+# Exception Status
+
+The value of an IEEE operation and the status it raises are related but distinct outputs. The
+value-only operations remain convenient when a proof only needs the resulting bits. Their
+status-bearing counterparts return an `IEEEOutcome`, which contains the same value together with an
+`IEEEStatus`:
+
+- `invalid` for operations such as `0/0`, opposite signed infinities added together, or square root
+  of a negative nonzero value;
+- `divideByZero` for a finite nonzero dividend divided by zero;
+- `overflow` when a finite exact result rounds to infinity;
+- `underflow` when an inexact result is tiny after rounding;
+- `inexact` when the rounded finite result differs from the exact dyadic or rational intermediate.
+
+The underflow convention is explicit: TorchLean detects tininess after rounding and raises
+underflow only when the result is also inexact. The theorems
+`dyadicRoundingStatus_inexact_of_underflow` and
+`rationalRoundingStatus_inexact_of_underflow` record the corresponding implication. Special-value
+theorems prove, for example, that finite nonzero division by zero raises `divideByZero` but not
+`invalid`.
+
+```
+import NN.Floats.IEEEExec.Rules.SpecialRules
+
+open TorchLean.Floats.IEEE754
+
+#check IEEE32Exec.addWithStatus
+#check IEEE32Exec.divWithStatus
+#check IEEE32Exec.fmaWithStatus
+#check IEEE32Exec.sqrtWithStatus
+#check IEEE32Exec.divWithStatus_divideByZero_of_finite_nonzero
+```
 
 # Transcendentals And Library Boundaries
 
@@ -565,6 +644,12 @@ therefore keeps transcendental claims explicit:
 - use `IEEE32Exec` for deterministic executable behavior where the operation is defined in Lean;
 - use a runtime or CUDA contract when an external library computes the value.
 
+`UnaryApproximationContract` is the Lean interface for such an accuracy statement. Given an
+executable unary operation, a real specification, a domain, and a nonnegative tolerance, it requires
+every finite input in the domain to produce a finite output within that tolerance. The contract does
+not claim that a particular `libm` or device routine satisfies the bound. That requires a proof,
+certified enclosure, or a named external assumption for that implementation.
+
 The floating point verification literature makes the same point: compiler, library, and hardware
 choices are part of the semantics unless they are isolated behind a proof or contract.
 
@@ -578,7 +663,7 @@ semantics through explicit agreement assumptions.
 TorchLean names that assumption explicitly:
 
 ```
-import NN.Floats.IEEEExec.BridgeInitFloat32
+import NN.Floats.IEEEExec.Bridge.RuntimeFloat32
 
 open TorchLean.Floats.IEEE754
 open TorchLean.Floats.IEEE754.Float32Bridge
@@ -652,7 +737,7 @@ Runtime agreement paths:
 - CUDA primitive and kernel agreement with the Lean contracts;
 - cuBLAS, cuFFT, libdevice, compiler, driver, and GPU behavior;
 - correctly-rounded claims for external transcendental libraries;
-- alternative rounding modes and exception flags not modeled by the current theorem path.
+- correspondence between host or device exception state and `IEEEStatus`.
 
 That split is the claim. Native execution is part of the workflow, and TorchLean makes the agreement
 with Lean side semantics small, named, and testable.

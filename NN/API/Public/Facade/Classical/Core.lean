@@ -210,8 +210,8 @@ end gmm
 /-!
 ## Principal component analysis
 
-Provides projection, inverse projection, fitting, reconstruction error, and explained-variance
-statistics for PCA models.
+Provides projection, inverse projection, a one-component power-iteration approximation,
+reconstruction error, and explained-variance statistics for PCA models.
 -/
 namespace pca
 
@@ -225,16 +225,16 @@ abbrev batchForward := @Spec.pcaBatchedForwardSpec
 abbrev inverse := @Spec.pcaInverseSpec
 @[inherit_doc Spec.pcaBackwardSpec]
 abbrev backward := @Spec.pcaBackwardSpec
-@[inherit_doc Spec.pcaFitSpec]
-abbrev fit := @Spec.pcaFitSpec
+@[inherit_doc Spec.pcaFitLeadingComponentApproxSpec]
+abbrev fitLeadingComponentApprox := @Spec.pcaFitLeadingComponentApproxSpec
 @[inherit_doc Spec.pcaTransformSpec]
 abbrev transform := @Spec.pcaTransformSpec
 @[inherit_doc Spec.pcaReconstructionErrorSpec]
 abbrev reconstructionError := @Spec.pcaReconstructionErrorSpec
-@[inherit_doc Spec.pcaExplainedVarianceRatioSpec]
-abbrev explainedVarianceRatio := @Spec.pcaExplainedVarianceRatioSpec
-@[inherit_doc Spec.pcaCumulativeVarianceSpec]
-abbrev cumulativeVariance := @Spec.pcaCumulativeVarianceSpec
+@[inherit_doc Spec.pcaExplainedVarianceSpec]
+abbrev explainedVariance := @Spec.pcaExplainedVarianceSpec
+@[inherit_doc Spec.pcaCumulativeExplainedVarianceSpec]
+abbrev cumulativeExplainedVariance := @Spec.pcaCumulativeExplainedVarianceSpec
 
 end pca
 

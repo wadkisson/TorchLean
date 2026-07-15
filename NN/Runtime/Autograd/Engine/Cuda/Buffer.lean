@@ -114,6 +114,18 @@ opaque allocatorAllocCountRaw (u : UInt32) : UInt64
 @[extern "torchlean_cuda_allocator_free_count"]
 opaque allocatorFreeCountRaw (u : UInt32) : UInt64
 
+@[extern "torchlean_cuda_wrapper_live_count"]
+opaque wrapperLiveCountRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_wrapper_peak_count"]
+opaque wrapperPeakCountRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_wrapper_alloc_count"]
+opaque wrapperAllocCountRaw (u : UInt32) : UInt64
+
+@[extern "torchlean_cuda_wrapper_finalize_count"]
+opaque wrapperFinalizeCountRaw (u : UInt32) : UInt64
+
 @[extern "torchlean_cuda_allocator_device_free_bytes"]
 opaque allocatorDeviceFreeBytesRaw (u : UInt32) : UInt64
 
@@ -123,16 +135,22 @@ opaque allocatorDeviceTotalBytesRaw (u : UInt32) : UInt64
 /--
 Snapshot of the CUDA buffer allocator.
 
-`liveBytes`/`peakBytes` count TorchLean buffers created by this runtime layer. `deviceFreeBytes`
-and `deviceTotalBytes` come from `cudaMemGetInfo` in the CUDA build and are `0` in the CPU stub.
-Together they let long-running examples distinguish a TorchLean lifetime leak from broader CUDA
-memory pressure or fragmentation.
+`liveBytes`/`peakBytes` count device or stub payloads allocated by this runtime layer. The wrapper
+counters track the Lean external objects that own those payloads; in a steady workload,
+`wrapperAllocCount - wrapperFinalizeCount` should remain bounded. `deviceFreeBytes` and
+`deviceTotalBytes` come from `cudaMemGetInfo` in the CUDA build and are `0` in the CPU stub.
+Together these fields distinguish payload leaks, wrapper-lifetime leaks, and broader CUDA memory
+pressure or fragmentation.
 -/
 structure AllocatorStats where
   liveBytes : UInt64
   peakBytes : UInt64
   allocCount : UInt64
   freeCount : UInt64
+  wrapperLiveCount : UInt64
+  wrapperPeakCount : UInt64
+  wrapperAllocCount : UInt64
+  wrapperFinalizeCount : UInt64
   deviceFreeBytes : UInt64
   deviceTotalBytes : UInt64
 deriving Repr
@@ -150,6 +168,10 @@ def allocatorStatsWithToken (token : UInt32) : IO AllocatorStats := do
       peakBytes := allocatorPeakBytesRaw token
       allocCount := allocatorAllocCountRaw token
       freeCount := allocatorFreeCountRaw token
+      wrapperLiveCount := wrapperLiveCountRaw token
+      wrapperPeakCount := wrapperPeakCountRaw token
+      wrapperAllocCount := wrapperAllocCountRaw token
+      wrapperFinalizeCount := wrapperFinalizeCountRaw token
       deviceFreeBytes := allocatorDeviceFreeBytesRaw token
       deviceTotalBytes := allocatorDeviceTotalBytesRaw token }
 
@@ -168,6 +190,10 @@ def AllocatorStats.format (s : AllocatorStats) : String :=
   " peak=" ++ mibString s.peakBytes ++
   " allocs=" ++ toString s.allocCount ++
   " frees=" ++ toString s.freeCount ++
+  " wrappers_live=" ++ toString s.wrapperLiveCount ++
+  " wrappers_peak=" ++ toString s.wrapperPeakCount ++
+  " wrappers_alloc=" ++ toString s.wrapperAllocCount ++
+  " wrappers_finalized=" ++ toString s.wrapperFinalizeCount ++
   " cuda_free=" ++ mibString s.deviceFreeBytes ++
   " cuda_total=" ++ mibString s.deviceTotalBytes
 
@@ -179,10 +205,10 @@ Runtime code that repeatedly uploads the same host value should prefer `ofFloatA
 an IO token so two uploads cannot be collapsed into the same external object after one is released.
 -/
 @[extern "torchlean_cuda_buffer_of_float_array"]
-opaque ofFloatArray (a : FloatArray) : Buffer
+opaque ofFloatArray (a : @& FloatArray) : Buffer
 
 @[extern "torchlean_cuda_buffer_of_float_array_with_token"]
-opaque ofFloatArrayWithToken (a : FloatArray) (token : UInt32) : Buffer
+opaque ofFloatArrayWithToken (a : @& FloatArray) (token : UInt32) : Buffer
 
 /--
 Effectful host-to-device upload.
@@ -191,26 +217,26 @@ The token is ignored by C/CUDA. Its purpose is semantic: repeated uploads of the
 must still allocate distinct device buffers. Without a changing token, Lean can treat the extern as
 a pure expression, which is not the ownership model we want for long eager CUDA training loops.
 -/
-def ofFloatArrayIO (a : FloatArray) : IO Buffer := do
+def ofFloatArrayIO (a : @& FloatArray) : IO Buffer := do
   let t ← IO.monoNanosNow
   pure <| ofFloatArrayWithToken a (UInt32.ofNat t)
 
 /-- Copy a buffer back to a host `FloatArray` (casts float32 elements to `Float`). -/
 @[extern "torchlean_cuda_buffer_to_float_array"]
-opaque toFloatArray (b : Buffer) : FloatArray
+opaque toFloatArray (b : @& Buffer) : FloatArray
 
 @[extern "torchlean_cuda_buffer_to_float_array_io"]
-opaque toFloatArrayIO (b : Buffer) : IO FloatArray
+opaque toFloatArrayIO (b : @& Buffer) : IO FloatArray
 
 /-- Number of float32 elements in the buffer. -/
 @[extern "torchlean_cuda_buffer_size"]
-opaque size (b : Buffer) : UInt32
+opaque size (b : @& Buffer) : UInt32
 
 @[extern "torchlean_cuda_buffer_size_with_token"]
-opaque sizeWithToken (b : Buffer) (token : UInt32) : UInt32
+opaque sizeWithToken (b : @& Buffer) (token : UInt32) : UInt32
 
 /-- Read a buffer size at a specific point in an `IO` ownership sequence. -/
-def sizeIO (b : Buffer) : IO UInt32 := do
+def sizeIO (b : @& Buffer) : IO UInt32 := do
   let token ← IO.monoNanosNow
   pure <| sizeWithToken b (UInt32.ofNat token)
 
@@ -221,10 +247,10 @@ This is a runtime pressure valve for eager training loops that create many short
 The C finalizer is still safe after an explicit release because the pointer is nulled out.
 -/
 @[extern "torchlean_cuda_buffer_release"]
-opaque release (b : Buffer) : UInt32
+opaque release (b : @& Buffer) : UInt32
 
 @[extern "torchlean_cuda_buffer_release_with_token"]
-opaque releaseWithToken (b : Buffer) (token : UInt32) : UInt32
+opaque releaseWithToken (b : @& Buffer) (token : UInt32) : UInt32
 
 /--
 Effectfully release a device allocation owned by a completed runtime scope.
@@ -234,7 +260,7 @@ ownership boundaries; the pure `release` primitive is reserved for expressions t
 result into another native buffer operation. Every alias becomes invalid, so callers must own the
 complete tape or workspace containing the buffer.
 -/
-def releaseIO (b : Buffer) : IO UInt32 := do
+def releaseIO (b : @& Buffer) : IO UInt32 := do
   let token ← IO.monoNanosNow
   pure <| releaseWithToken b (UInt32.ofNat token)
 
@@ -245,7 +271,7 @@ This exists for pure CUDA tape code: because the returned buffer is used downstr
 erase the native release call as dead code.
 -/
 @[extern "torchlean_cuda_buffer_release_then"]
-opaque releaseThen (workspace keep : Buffer) : Buffer
+opaque releaseThen (workspace keep : @& Buffer) : Buffer
 
 /--
 Release a collection of workspace buffers and return `keep`.
@@ -254,7 +280,7 @@ Many CUDA tape formulas create a group of intermediate buffers, then continue wi
 buffer. Threading cleanup through the result keeps ownership local to the formula and avoids waiting
 for external-object finalizers in long training loops.
 -/
-def releaseManyThen (workspace : List Buffer) (keep : Buffer) : Buffer :=
+def releaseManyThen (workspace : List Buffer) (keep : @& Buffer) : Buffer :=
   workspace.foldr (fun b acc => releaseThen b acc) keep
 
 /--
@@ -272,11 +298,11 @@ structure WithWorkspace where
 namespace WithWorkspace
 
 /-- Return `keep` after releasing all workspace buffers owned by this result. -/
-def releaseWorkspaceThen (r : WithWorkspace) (keep : Buffer) : Buffer :=
+def releaseWorkspaceThen (r : WithWorkspace) (keep : @& Buffer) : Buffer :=
   releaseManyThen r.workspace keep
 
 /-- Return `keep` after releasing both the result buffer and its workspace buffers. -/
-def releaseAllThen (r : WithWorkspace) (keep : Buffer) : Buffer :=
+def releaseAllThen (r : WithWorkspace) (keep : @& Buffer) : Buffer :=
   releaseThen r.value <| releaseManyThen r.workspace keep
 
 end WithWorkspace
@@ -334,14 +360,14 @@ opaque bernoulliMask (n : UInt32) (keepProb : Float) (key : UInt64) : Buffer
 
 /-- Absolute value applied pointwise to a CUDA buffer. -/
 @[extern "torchlean_cuda_buffer_abs"]
-opaque abs (b : Buffer) : Buffer
+opaque abs (b : @& Buffer) : Buffer
 
 /-- Backward for `abs`: `dx = sign(x) * dLdy` (with `sign(0)=0`). -/
 @[extern "torchlean_cuda_buffer_abs_bwd"]
-opaque absBwd (x dLdy : Buffer) : Buffer
+opaque absBwd (x dLdy : @& Buffer) : Buffer
 
 @[extern "torchlean_cuda_buffer_sqrt"]
-opaque sqrt (b : Buffer) : Buffer
+opaque sqrt (b : @& Buffer) : Buffer
 
 /--
 Backward for `sqrt`.
@@ -349,21 +375,21 @@ Backward for `sqrt`.
 Uses the TorchLean convention: `dx = dLdy * (1 / (2*sqrt(x)))` for `x > 0`, else `0`.
 -/
 @[extern "torchlean_cuda_buffer_sqrt_bwd"]
-opaque sqrtBwd (x dLdy : Buffer) : Buffer
+opaque sqrtBwd (x dLdy : @& Buffer) : Buffer
 
 @[extern "torchlean_cuda_buffer_exp"]
-opaque exp (b : Buffer) : Buffer
+opaque exp (b : @& Buffer) : Buffer
 
 @[extern "torchlean_cuda_buffer_log"]
-opaque log (b : Buffer) : Buffer
+opaque log (b : @& Buffer) : Buffer
 
 /-- Reciprocal: `1/x`. -/
 @[extern "torchlean_cuda_buffer_inv"]
-opaque inv (b : Buffer) : Buffer
+opaque inv (b : @& Buffer) : Buffer
 
 /-- Clamp each element to `[lo, hi]` (bounds are host `Float`s). -/
 @[extern "torchlean_cuda_buffer_clamp"]
-opaque clamp (b : Buffer) (lo hi : Float) : Buffer
+opaque clamp (b : @& Buffer) (lo hi : Float) : Buffer
 
 /--
 Backward for `clamp`.
@@ -371,11 +397,11 @@ Backward for `clamp`.
 Uses the TorchLean convention: derivative is `1` strictly inside `(lo, hi)`, else `0`.
 -/
 @[extern "torchlean_cuda_buffer_clamp_bwd"]
-opaque clampBwd (x dLdy : Buffer) (lo hi : Float) : Buffer
+opaque clampBwd (x dLdy : @& Buffer) (lo hi : Float) : Buffer
 
 /-- Pointwise maximum of two equal-length CUDA buffers. -/
 @[extern "torchlean_cuda_buffer_max"]
-opaque max (a b : Buffer) : Buffer
+opaque max (a b : @& Buffer) : Buffer
 
 /--
 Backward for `max`, returning `(dA, dB)`.
@@ -383,10 +409,10 @@ Backward for `max`, returning `(dA, dB)`.
 Tie-breaking follows the spec: when `a = b`, split upstream gradient evenly (`0.5`) between both.
 -/
 @[extern "torchlean_cuda_buffer_max_bwd"]
-opaque maxBwd (a b dLdy : Buffer) : Buffer × Buffer
+opaque maxBwd (a b dLdy : @& Buffer) : Buffer × Buffer
 
 @[extern "torchlean_cuda_buffer_min"]
-opaque min (a b : Buffer) : Buffer
+opaque min (a b : @& Buffer) : Buffer
 
 /--
 Backward for `min`, returning `(dA, dB)`.
@@ -394,31 +420,31 @@ Backward for `min`, returning `(dA, dB)`.
 Tie-breaking follows the spec: when `a = b`, split upstream gradient evenly (`0.5`) between both.
 -/
 @[extern "torchlean_cuda_buffer_min_bwd"]
-opaque minBwd (a b dLdy : Buffer) : Buffer × Buffer
+opaque minBwd (a b dLdy : @& Buffer) : Buffer × Buffer
 
 /-- Pointwise division of two equal-length CUDA buffers. -/
 @[extern "torchlean_cuda_buffer_div"]
-opaque div (a b : Buffer) : Buffer
+opaque div (a b : @& Buffer) : Buffer
 
 /-- Pointwise ReLU activation on a CUDA buffer. -/
 @[extern "torchlean_cuda_buffer_relu"]
-opaque relu (b : Buffer) : Buffer
+opaque relu (b : @& Buffer) : Buffer
 
 /-- Backward for `relu`: `dx = dLdy` where `x > 0`, else `0`. -/
 @[extern "torchlean_cuda_buffer_relu_bwd"]
-opaque reluBwd (x dLdy : Buffer) : Buffer
+opaque reluBwd (x dLdy : @& Buffer) : Buffer
 
 /-- Elementwise addition (sizes must match). -/
 @[extern "torchlean_cuda_buffer_add"]
-opaque add (a b : Buffer) : Buffer
+opaque add (a b : @& Buffer) : Buffer
 
 /-- Elementwise subtraction (sizes must match). -/
 @[extern "torchlean_cuda_buffer_sub"]
-opaque sub (a b : Buffer) : Buffer
+opaque sub (a b : @& Buffer) : Buffer
 
 /-- Elementwise multiplication (sizes must match). -/
 @[extern "torchlean_cuda_buffer_mul"]
-opaque mul (a b : Buffer) : Buffer
+opaque mul (a b : @& Buffer) : Buffer
 
 /--
 Multiply each element by a scalar `c` (host `Float`, cast to float32).
@@ -426,10 +452,10 @@ Multiply each element by a scalar `c` (host `Float`, cast to float32).
 This is a primitive building block for many ops (e.g. scaling gradients).
 -/
 @[extern "torchlean_cuda_buffer_scale"]
-opaque scale (b : Buffer) (c : Float) : Buffer
+opaque scale (b : @& Buffer) (c : Float) : Buffer
 
 /-- Device-to-device copy, implemented as a scale-by-one kernel. -/
-def copy (b : Buffer) : Buffer :=
+def copy (b : @& Buffer) : Buffer :=
   scale b 1.0
 
 /--
@@ -439,7 +465,7 @@ The native operation creates the destination before it retires the source, so th
 reorder the two lifetime events. Use this at ownership-transfer boundaries in the sparse CUDA tape.
 -/
 @[extern "torchlean_cuda_buffer_copy_and_release"]
-opaque copyAndRelease (b : Buffer) : Buffer
+opaque copyAndRelease (b : @& Buffer) : Buffer
 
 /--
 Fused multiply-add: `a + c * b` (sizes must match; `c` is a host `Float`, cast to float32).
@@ -447,14 +473,14 @@ Fused multiply-add: `a + c * b` (sizes must match; `c` is a host `Float`, cast t
 This is the classic BLAS-style `axpy` primitive and is useful for optimizers and bias-like updates.
 -/
 @[extern "torchlean_cuda_buffer_axpy"]
-opaque axpy (a b : Buffer) (c : Float) : Buffer
+opaque axpy (a b : @& Buffer) (c : Float) : Buffer
 
 /-- Reductions (return a length-1 buffer). -/
 @[extern "torchlean_cuda_buffer_reduce_sum"]
-opaque reduceSum (b : Buffer) : Buffer
+opaque reduceSum (b : @& Buffer) : Buffer
 
 @[extern "torchlean_cuda_buffer_reduce_mean"]
-opaque reduceMean (b : Buffer) : Buffer
+opaque reduceMean (b : @& Buffer) : Buffer
 
 end Buffer
 

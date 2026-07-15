@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Spec.RL.Core
-public import NN.Floats.IEEEExec.BridgeFP32Total
+public import NN.Floats.IEEEExec.Bridge.FP32Total
 public import NN.Proofs.RL.Tactics
 
 /-!

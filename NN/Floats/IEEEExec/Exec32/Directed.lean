@@ -206,6 +206,138 @@ def mulUp (x y : IEEE32Exec) : IEEE32Exec :=
               roundDyadicUp { sign := s, mant := dx.mant * dy.mant, exp := dx.exp + dy.exp }
         | _, _ => canonicalNaN
 
+/--
+`fmaDown x y z` computes the exact value `x * y + z` and rounds once toward `-∞`.
+
+This is a directed fused multiply-add: the product is not rounded before the addition.  The
+special-value cases agree with `fma`; finite inputs are converted to exact dyadics and passed to
+`roundDyadicDown` only after the product and sum have been formed.
+-/
+def fmaDown (x y z : IEEE32Exec) : IEEE32Exec :=
+  match chooseNaN3 x y z with
+  | some nan => nan
+  | none =>
+      if isInf x || isInf y then
+        if isZero x || isZero y then
+          canonicalNaN
+        else
+          let prodSign := Bool.xor (signBit x) (signBit y)
+          let prodInf := if prodSign then negInf else posInf
+          if isInf z then
+            if signBit z != prodSign then canonicalNaN else prodInf
+          else
+            prodInf
+      else if isInf z then
+        z
+      else
+        match toDyadic? x, toDyadic? y, toDyadic? z with
+        | some dx, some dy, some dz =>
+            let prod : Dyadic :=
+              { sign := Bool.xor dx.sign dy.sign
+                mant := dx.mant * dy.mant
+                exp := dx.exp + dy.exp }
+            roundDyadicDown (addDyadic prod dz)
+        | _, _, _ => canonicalNaN
+
+/--
+`fmaUp x y z` computes the exact value `x * y + z` and rounds once toward `+∞`.
+
+As with `fmaDown`, no intermediate product rounding occurs.  Keeping both operations in terms of
+the same exact dyadic expression makes their enclosure theorems share one semantic statement.
+-/
+def fmaUp (x y z : IEEE32Exec) : IEEE32Exec :=
+  match chooseNaN3 x y z with
+  | some nan => nan
+  | none =>
+      if isInf x || isInf y then
+        if isZero x || isZero y then
+          canonicalNaN
+        else
+          let prodSign := Bool.xor (signBit x) (signBit y)
+          let prodInf := if prodSign then negInf else posInf
+          if isInf z then
+            if signBit z != prodSign then canonicalNaN else prodInf
+          else
+            prodInf
+      else if isInf z then
+        z
+      else
+        match toDyadic? x, toDyadic? y, toDyadic? z with
+        | some dx, some dy, some dz =>
+            let prod : Dyadic :=
+              { sign := Bool.xor dx.sign dy.sign
+                mant := dx.mant * dy.mant
+                exp := dx.exp + dy.exp }
+            roundDyadicUp (addDyadic prod dz)
+        | _, _, _ => canonicalNaN
+
+/-!
+## Directed square root
+
+For a positive dyadic `mant * 2^exp`, parity normalization rewrites the radicand as
+`mant' * 2^(2 * expHalf)`.  After scaling `mant'` by an even power of two, `Nat.sqrt` gives the
+lower integer endpoint and its remainder tells us whether the upper endpoint is distinct.  The
+resulting dyadics enclose the exact square root before they are rounded to binary32.
+-/
+
+/-- Dyadic lower and upper endpoints for a nonnegative square root. -/
+structure SqrtDyadicBracket where
+  /-- Lower endpoint. -/
+  lower : Dyadic
+  /-- Upper endpoint. -/
+  upper : Dyadic
+
+/-- Compute both square-root endpoints from one parity normalization and integer square root. -/
+def sqrtDyadicBracket (d : Dyadic) : SqrtDyadicBracket :=
+  let expOdd : Bool := (d.exp % 2) != 0
+  let mant' : Nat := if expOdd then d.mant * 2 else d.mant
+  let expEven : Int := if expOdd then d.exp - 1 else d.exp
+  let expHalf : Int := expEven / 2
+  let l : Nat := Nat.log2 mant'
+  let t : Nat := l / 2
+  let p : Nat := 23 - t
+  let n : Nat := Nat.shiftLeft mant' (2 * p)
+  let q : Nat := Nat.sqrt n
+  let r : Nat := n - q * q
+  let endpointExp := expHalf - Int.ofNat p
+  { lower := { sign := false, mant := q, exp := endpointExp }
+    upper :=
+      { sign := false
+        mant := if r == 0 then q else q + 1
+        exp := endpointExp } }
+
+/-- Square root rounded toward `-∞`; negative finite inputs produce NaN. -/
+def sqrtDown (x : IEEE32Exec) : IEEE32Exec :=
+  match chooseNaN1 x with
+  | some nan => nan
+  | none =>
+      if isInf x then
+        if signBit x then canonicalNaN else posInf
+      else if isZero x then
+        x
+      else if signBit x then
+        canonicalNaN
+      else
+        match toDyadic? x with
+        | some d => roundDyadicDown (sqrtDyadicBracket d).lower
+        | none => canonicalNaN
+
+/-- Square root rounded toward `+∞`; negative finite inputs produce NaN. -/
+def sqrtUp (x : IEEE32Exec) : IEEE32Exec :=
+  match chooseNaN1 x with
+  | some nan => nan
+  | none =>
+      if isInf x then
+        if signBit x then canonicalNaN else posInf
+      else if isZero x then
+        x
+      else if signBit x then
+        canonicalNaN
+      else
+        match toDyadic? x with
+        | some d => roundDyadicUp (sqrtDyadicBracket d).upper
+        | none => canonicalNaN
+
 /-!
 ## Directed rounding for exact rationals (division-friendly)
 

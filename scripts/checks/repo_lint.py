@@ -68,7 +68,7 @@ DOCUMENTED_ENV_VAR_IMPLEMENTATIONS = {
 
 TRUST_BOUNDARY_DECL_REFS = {
     "TorchLean.Floats.IEEE754.Float32Bridge.RuntimeFloat32MatchesIEEE32Exec": (
-        "NN/Floats/IEEEExec/BridgeInitFloat32.lean",
+        "NN/Floats/IEEEExec/Bridge/RuntimeFloat32.lean",
         re.compile(r"\bclass\s+RuntimeFloat32MatchesIEEE32Exec\b"),
     ),
     "NN.MLTheory.CROWN.Graph.CrownCertSoundness.CrownTransferSound": (

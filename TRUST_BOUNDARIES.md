@@ -87,6 +87,10 @@ Important examples include:
   memory safety, launch behavior, and numerical behavior are outside Lean's proof kernel.
 - `csrc/cuda/tensor/torchlean_cuda_tensor.cu` stores CUDA buffers as float32 and converts Lean `Float`
   values to/from float32 at the buffer boundary.
+- CUDA externs borrow Lean buffers, arrays, and float arrays passed as inputs. Their Lean
+  declarations use `@&` for that calling convention; the native functions must neither retain nor
+  decrement those borrowed objects. The CUDA stress suite creates thousands of short-lived
+  wrappers and checks that every wrapper created in the loop is finalized.
 - CUDA buffer finalizers free device memory through `cudaFree`. This is safe for TorchLean's current
   default-stream runtime, where launches and host copies are ordered through the default stream. If
   future backends introduce user streams or asynchronous graph replay, finalizer/free ordering must

@@ -8,17 +8,17 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 
 ## Summary
 
-- Modules: `1259`
-- Import edges: `4043`
-- Internal import edges: `3502`
-- Public imports: `3692`
-- Private imports: `351`
+- Modules: `1260`
+- Import edges: `4051`
+- Internal import edges: `3510`
+- Public imports: `3698`
+- Private imports: `353`
 - Critical-path length over internal imports: `131`
 - Findings: `0` (`0` errors, `0` warnings)
-- Lean files: `1259`
-- Lean source lines: `311582`
-- Declaration headers: `12924`
-- Theorem/lemma headers: `2443`
+- Lean files: `1260`
+- Lean source lines: `312727`
+- Declaration headers: `12985`
+- Theorem/lemma headers: `2480`
 
 ## Top Fan-In Modules
 
@@ -43,8 +43,8 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 - `NN.Spec.Module`: `26` imports
 - `NN.CI.Verification`: `25` imports
 - `NN.Spec.Models`: `25` imports
+- `blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats`: `25` imports
 - `NN.MLTheory.API`: `24` imports
-- `blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats`: `23` imports
 
 ## Layer Edges
 
@@ -52,7 +52,7 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 - `NN.Proofs` -> `NN.Proofs`: `328`
 - `NN.API` -> `NN.API`: `323`
 - `NN.Spec` -> `NN.Spec`: `309`
-- `NN.Floats` -> `NN.Floats`: `271`
+- `NN.Floats` -> `NN.Floats`: `273`
 - `NN.MLTheory` -> `NN.MLTheory`: `229`
 - `NN.Verification` -> `NN.Verification`: `176`
 - `NN.Examples` -> `NN.Examples`: `157`

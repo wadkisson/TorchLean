@@ -8,7 +8,7 @@ module
 
 public import Mathlib.Data.Fin.Tuple.Basic
 public import Mathlib.Data.Set.Image
-public import NN.Floats.IEEEExec.BridgeFP32Total
+public import NN.Floats.IEEEExec.Bridge.FP32Total
 public import NN.Floats.Interval.IEEEExec32
 
 /-!

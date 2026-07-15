@@ -20,6 +20,7 @@ Low-level stress coverage that goes beyond the small eager-tape tests:
 
 - exact/deterministic RNG behavior for `randUniform` and `bernoulliMask`,
 - explicit `Buffer.release` lifecycle semantics,
+- finalization of short-lived external buffer wrappers,
 - large-buffer elementwise/reduction checks on direct `Cuda.Buffer` ops,
 - extra cuBLAS matmul parity checks on rectangular inputs.
 
@@ -118,6 +119,34 @@ def runReleaseStress : IO Unit := do
     throw <| IO.userError s!"release first call: expected 1, got {r1}"
   if Buffer.size b != 0 then
     throw <| IO.userError s!"release size reset: expected 0, got {Buffer.size b}"
+
+@[noinline] def runWrapperLifetimeIteration (i : Nat) : IO Unit := do
+  let host := FloatArray.mk #[i.toFloat, 2.0, -3.0, 4.0]
+  let a ← Buffer.ofFloatArrayIO host
+  let doubled := Buffer.add a a
+  let got ← Buffer.toFloatArrayIO doubled
+  Utils.assertApprox "wrapper lifetime result" (got.get! 0) (2.0 * i.toFloat)
+
+def runWrapperLifetimeStress : IO Unit := do
+  IO.println "== external buffer wrapper lifetime =="
+
+  let before ← Buffer.allocatorStatsWithToken 110
+  for i in [0:4096] do
+    runWrapperLifetimeIteration i
+  let after ← Buffer.allocatorStatsWithToken 111
+
+  let allocated := after.wrapperAllocCount - before.wrapperAllocCount
+  let finalized := after.wrapperFinalizeCount - before.wrapperFinalizeCount
+  if allocated < 8192 then
+    throw <| IO.userError
+      s!"wrapper lifetime: expected at least 8192 allocations, observed {allocated}"
+  if finalized != allocated then
+    throw <| IO.userError
+      s!"wrapper lifetime: allocated {allocated} wrappers but finalized {finalized}"
+  if after.wrapperLiveCount != before.wrapperLiveCount then
+    throw <| IO.userError <|
+      s!"wrapper lifetime: live wrappers changed from {before.wrapperLiveCount} to " ++
+      s!"{after.wrapperLiveCount}"
 
 def runGradientAliasingStress : IO Unit := do
   IO.println "== CUDA tape gradient aliasing regression =="
@@ -268,6 +297,7 @@ def run : IO Unit := do
   IO.println "=== CUDA runtime stress suite ==="
   runRngStress
   runReleaseStress
+  runWrapperLifetimeStress
   runGradientAliasingStress
   runSparseLifetimeStress
   runLargeBufferStress

@@ -245,7 +245,13 @@ def fitLinearSVM {n p : ℕ} (X : Tensor α (.dim n (.dim p .scalar))) (y : Tens
     | Nat.succ k =>
         let m : LinearSVM p α := { w := weights, b := bias }
         let (grad_w, grad_b, _dX) := LinearSVM.backward (n := n) (p := p) (lambda := C) m X y
-        let new_weights := subSpec weights (scaleSpec grad_w learning_rate)
+        -- `Spec.Tensor` is functional.  Without materialization, every step leaves `new_weights`
+        -- as a closure over the entire preceding optimization history; the next batch pass then
+        -- replays that history for every coordinate and example.  Materialization is
+        -- extensionally the identity, but gives the iterative solver an array-backed state at
+        -- each optimizer boundary.
+        let new_weights :=
+          Tensor.materialize (subSpec weights (scaleSpec grad_w learning_rate))
         let new_bias := bias - learning_rate * grad_b
         gradient_descent k new_weights new_bias
 

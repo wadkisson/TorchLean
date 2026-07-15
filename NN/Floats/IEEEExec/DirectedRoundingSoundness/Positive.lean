@@ -8,10 +8,10 @@ module
 
 public import Init.Data.Nat.Bitwise.Lemmas
 public import Mathlib.Data.Nat.Log
-public import NN.Floats.IEEEExec.ERealSemantics
-public import NN.Floats.IEEEExec.MkBitsToReal
-public import NN.Floats.IEEEExec.Negation
-public import NN.Floats.IEEEExec.NatLemmas
+public import NN.Floats.IEEEExec.Semantics.ERealSemantics
+public import NN.Floats.IEEEExec.Encoding.MkBitsToReal
+public import NN.Floats.IEEEExec.Encoding.Negation
+public import NN.Floats.IEEEExec.Rounding.NatLemmas
 
 /-!
 # Directed rounding soundness for `IEEE32Exec`

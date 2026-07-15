@@ -138,6 +138,16 @@ requested provider is unavailable, TorchLean reports that fact instead of silent
       at the boundary where external artifacts become Lean objects.
     </p>
   </section>
+  <section>
+    <h3>Classical models</h3>
+    <p>
+      The PCA reference fitter now says exactly what it computes: one approximate leading
+      component from power iteration, with a normalized fallback for constant data. Raw covariance
+      eigenvalues are called explained variance rather than explained-variance ratios. The linear
+      SVM trainer materializes its weight vector after each update, preventing a lazy closure chain
+      from replaying the full optimization history.
+    </p>
+  </section>
 </div>
 
 The graph evaluator and verifier compiler are now split by operation. Their coverage theorems still
@@ -168,6 +178,12 @@ boundary now come from an effectful constructor, and transfers between gradient 
 copy-and-release operations. A stress test repeats this path and fails if live CUDA allocation
 grows or a supposedly fresh seed is reused.
 
+A second lifetime problem was in the FFI signatures themselves. Buffer and array inputs were being
+passed as owned Lean objects to native functions that treated them as borrowed, so neither side
+released the wrapper reference. The declarations now mark those inputs as borrowed. Separate
+payload and wrapper counters make the distinction visible, and the stress suite checks thousands
+of allocations for matching finalization counts.
+
 We exercised 21 CPU workflows and 24 CUDA workflows, including dense, convolutional, attention,
 recurrent, operator-learning, generative, and reinforcement-learning models. On the machine used
 for this release, a roughly 100-million-parameter MLP completed ten CUDA optimizer steps in about
@@ -195,6 +211,7 @@ now build `NN` directly rather than passing through the deleted `NN.Library` she
 - sustained 20-update CPU runs across 21 model workflows
 - sustained 100-update CUDA runs across 24 model workflows
 - repeated sparse-backward ownership and allocator-drift regression
+- external-wrapper allocation/finalization regression on both the CUDA and CPU-stub builds
 - NVIDIA Compute Sanitizer memcheck (`ERROR SUMMARY: 0 errors`)
 - DocGen API generation
 - Verso Guide generation

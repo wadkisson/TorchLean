@@ -31,7 +31,7 @@ structure Dyadic where
   deriving Repr, DecidableEq
 
 /-- `2^k` as a natural number. -/
-def pow2 (k : Nat) : Nat :=
+@[inline] def pow2 (k : Nat) : Nat :=
   Nat.shiftLeft 1 k
 
 /--
@@ -40,7 +40,7 @@ Round `n / 2^shift` to nearest, ties-to-even.
 This is the primitive "shift + rounding" operation we use when shrinking a mantissa back down to a
 fixed bit width. It is the same tie-breaking policy as IEEE round-to-nearest-even.
 -/
-def roundShiftRightEven (n : Nat) (shift : Nat) : Nat :=
+@[inline] def roundShiftRightEven (n : Nat) (shift : Nat) : Nat :=
   if shift == 0 then
     n
   else
@@ -59,7 +59,7 @@ Construct a raw binary32 bit-pattern from fields.
 - `exp` in bits 30..23 (8 bits),
 - `frac` in bits 22..0 (masked to 23 bits).
 -/
-def mkBits (sign : Bool) (exp : Nat) (frac : Nat) : UInt32 :=
+@[inline] def mkBits (sign : Bool) (exp : Nat) (frac : Nat) : UInt32 :=
   let s : UInt32 := if sign then (1 : UInt32) <<< 31 else 0
   let e : UInt32 := (UInt32.ofNat exp) <<< 23
   let f : UInt32 := (UInt32.ofNat frac) &&& fracMask
@@ -70,7 +70,7 @@ Decode a finite binary32 into an exact dyadic value.
 
 Returns `none` for NaN/Inf.
 -/
-def toDyadic? (x : IEEE32Exec) : Option Dyadic :=
+@[inline] def toDyadic? (x : IEEE32Exec) : Option Dyadic :=
   if isNaN x || isInf x then
     none
   else
@@ -96,15 +96,9 @@ Informal: `toDyadic?` only returns `some _` for finite floats; NaNs map to `none
 -/
 lemma isNaN_eq_false_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
     (hx : toDyadic? x = some d) : isNaN x = false := by
-  cases hnan : isNaN x
+  cases h : isNaN x
   · rfl
-  · -- `isNaN x = true` forces `toDyadic? x = none`.
-    unfold toDyadic? at hx
-    have hcond : (isNaN x || isInf x) = true := by
-      simp [hnan]
-    have : (none : Option Dyadic) = some d := by
-      simp [hcond] at hx
-    cases this
+  · simp [toDyadic?, h] at hx
 
 /--
 If `toDyadic? x = some d` then `x` is not an infinity.
@@ -113,15 +107,84 @@ Informal: `toDyadic?` only returns `some _` for finite floats; infinities map to
 -/
 lemma isInf_eq_false_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
     (hx : toDyadic? x = some d) : isInf x = false := by
-  cases hinf : isInf x
+  cases h : isInf x
   · rfl
-  · -- `isInf x = true` forces `toDyadic? x = none`.
-    unfold toDyadic? at hx
-    have hcond : (isNaN x || isInf x) = true := by
-      simp [hinf]
-    have : (none : Option Dyadic) = some d := by
-      simp [hcond] at hx
-    cases this
+  · simp [toDyadic?, h] at hx
+
+/-- NaNs have no finite dyadic decoding. -/
+@[simp] lemma toDyadic?_eq_none_of_isNaN {x : IEEE32Exec} (hx : isNaN x = true) :
+    toDyadic? x = none := by
+  simp [toDyadic?, hx]
+
+/-- Infinities have no finite dyadic decoding. -/
+@[simp] lemma toDyadic?_eq_none_of_isInf {x : IEEE32Exec} (hx : isInf x = true) :
+    toDyadic? x = none := by
+  simp [toDyadic?, hx]
+
+/-- A value that is neither NaN nor infinity has an exact dyadic decoding. -/
+lemma exists_toDyadic?_of_not_isNaN_not_isInf {x : IEEE32Exec}
+    (hnan : isNaN x = false) (hinf : isInf x = false) :
+    ∃ d, toDyadic? x = some d := by
+  by_cases he : expField x = 0
+  · by_cases hf : fracField x = 0
+    · exact ⟨Dyadic.mk (signBit x) 0 0, by simp [toDyadic?, hnan, hinf, he, hf]⟩
+    · exact ⟨Dyadic.mk (signBit x) (fracField x).toNat (-149),
+        by simp [toDyadic?, hnan, hinf, he, hf]⟩
+  · exact ⟨Dyadic.mk (signBit x) (pow2 23 + (fracField x).toNat)
+        (Int.ofNat (expField x).toNat - 150), by simp [toDyadic?, hnan, hinf, he]⟩
+
+/-- Every finite binary32 value has an exact dyadic decoding. -/
+lemma exists_toDyadic?_of_isFinite {x : IEEE32Exec} (hx : isFinite x = true) :
+    ∃ d, toDyadic? x = some d := by
+  have hexp : expField x ≠ expAllOnes := (bne_iff_ne).mp hx
+  have hnan : isNaN x = false := by simp [isNaN, hexp]
+  have hinf : isInf x = false := by simp [isInf, hexp]
+  exact exists_toDyadic?_of_not_isNaN_not_isInf hnan hinf
+
+/-- Both signed zeros decode to the zero dyadic while retaining their sign bit. -/
+@[simp] lemma toDyadic?_eq_zero_of_isZero {x : IEEE32Exec} (hx : isZero x = true) :
+    toDyadic? x = some { sign := signBit x, mant := 0, exp := 0 } := by
+  have hfields : (expField x == 0) = true ∧ (fracField x == 0) = true := by
+    simpa [isZero, Bool.and_eq_true] using hx
+  have hnan : isNaN x = false := by
+    simp [isNaN, (beq_iff_eq).1 hfields.1, expAllOnes]
+  have hinf : isInf x = false := by
+    simp [isInf, (beq_iff_eq).1 hfields.1, expAllOnes]
+  simp [toDyadic?, hnan, hinf, hfields.1, hfields.2]
+
+/-- A decoded dyadic has zero mantissa only when the source bit pattern is a signed zero. -/
+lemma isZero_eq_true_of_toDyadic?_some_of_mant_eq_zero {x : IEEE32Exec} {d : Dyadic}
+    (hx : toDyadic? x = some d) (hm : d.mant = 0) : isZero x = true := by
+  unfold toDyadic? at hx
+  have hcond : (isNaN x || isInf x) = false := by
+    cases h : (isNaN x || isInf x) <;> simp [h] at hx
+    exact rfl
+  set e : UInt32 := expField x
+  set f : UInt32 := fracField x
+  cases he : (e == 0) with
+  | true =>
+      cases hf : (f == 0) with
+      | true => simp [isZero, e, f, he, hf]
+      | false =>
+          have hto : some (Dyadic.mk (signBit x) f.toNat (-149)) = some d := by
+            simpa [hcond, e, f, he, hf] using hx
+          have hmant : d.mant = f.toNat := by
+            simpa using (congrArg Dyadic.mant (Option.some.inj hto)).symm
+          have hfne : f ≠ 0 := (beq_eq_false_iff_ne).1 hf
+          have htoNat : f.toNat ≠ 0 := by
+            intro h0
+            exact hfne ((UInt32.toNat_inj).1 (by simp [h0]))
+          exact (htoNat (by simpa [hmant] using hm)).elim
+  | false =>
+      have hto : some (Dyadic.mk (signBit x) (pow2 23 + f.toNat)
+          (Int.ofNat e.toNat - 150)) = some d := by
+        simpa [hcond, e, f, he] using hx
+      have hmant : d.mant = pow2 23 + f.toNat := by
+        simpa using (congrArg Dyadic.mant (Option.some.inj hto)).symm
+      have hpos : 0 < d.mant := by
+        rw [hmant]
+        exact lt_of_lt_of_le (by decide : 0 < pow2 23) (Nat.le_add_right (pow2 23) f.toNat)
+      exact (Nat.ne_of_gt hpos hm).elim
 
 /-!
 ## Rounding back to binary32
@@ -144,7 +207,7 @@ This function implements:
 - underflow-to-zero below `2^-150` (half the minimum subnormal, where ties-to-even chooses 0),
 - mantissa rounding to the 24-bit precision of binary32 normal numbers.
 -/
-def roundDyadicToIEEE32 (d : Dyadic) : IEEE32Exec :=
+@[inline] def roundDyadicToIEEE32 (d : Dyadic) : IEEE32Exec :=
   -- Exact 0 becomes signed 0.
   if d.mant == 0 then
     if d.sign then negZero else posZero
@@ -202,7 +265,7 @@ Exact dyadic addition.
 We align exponents by shifting the mantissa of the operand with the larger exponent, add signed
 integers, and then return an exact dyadic (no rounding yet).
 -/
-def addDyadic (a b : Dyadic) : Dyadic :=
+@[inline] def addDyadic (a b : Dyadic) : Dyadic :=
   if a.exp ≤ b.exp then
     let sh : Nat := Int.toNat (b.exp - a.exp)
     let m1 : Int := if a.sign then -(Int.ofNat a.mant) else (Int.ofNat a.mant)
@@ -232,7 +295,7 @@ using round-to-nearest, ties-to-even.
 -/
 
 /-- Round `num/den` to nearest, ties-to-even (assumes `den > 0`). -/
-def roundQuotEven (num den : Nat) : Nat :=
+@[inline] def roundQuotEven (num den : Nat) : Nat :=
   let q := num / den
   let r := num % den
   let twice := 2 * r
@@ -241,13 +304,13 @@ def roundQuotEven (num den : Nat) : Nat :=
   else if q % 2 == 0 then q else q + 1
 
 /-- Test whether `num/den < 2^k` without converting to reals. -/
-def ratLtPow2 (num den : Nat) (k : Int) : Bool :=
+@[inline] def ratLtPow2 (num den : Nat) (k : Int) : Bool :=
   match k with
   | .ofNat kn => num < Nat.shiftLeft den kn
   | .negSucc kn => Nat.shiftLeft num (kn + 1) < den
 
 /-- Test whether `num/den ≥ 2^k` without converting to reals. -/
-def ratGePow2 (num den : Nat) (k : Int) : Bool :=
+@[inline] def ratGePow2 (num den : Nat) (k : Int) : Bool :=
   match k with
   | .ofNat kn => num ≥ Nat.shiftLeft den kn
   | .negSucc kn => Nat.shiftLeft num (kn + 1) ≥ den
@@ -258,7 +321,7 @@ Compute `⌊log₂(num/den)⌋` as an `Int` (assumes `num > 0` and `den > 0`).
 We start from the initial estimate `log2(num) - log2(den)` and then adjust by checking against
 powers of two.
 -/
-def floorLog2Rat (num den : Nat) : Int :=
+@[inline] def floorLog2Rat (num den : Nat) : Int :=
   -- num > 0, den > 0
   let k0 : Int := (Int.ofNat (Nat.log2 num)) - (Int.ofNat (Nat.log2 den))
   let k1 : Int := if ratLtPow2 num den k0 then k0 - 1 else k0
@@ -270,7 +333,7 @@ Round an exact rational `num/den` to binary32 (ties-to-even).
 This is the division analogue of `roundDyadicToIEEE32`: it uses the same exponent thresholds and
 the same final mantissa rounding policy.
 -/
-def roundRatToIEEE32 (sign : Bool) (num den : Nat) : IEEE32Exec :=
+@[inline] def roundRatToIEEE32 (sign : Bool) (num den : Nat) : IEEE32Exec :=
   if num == 0 then
     if sign then negZero else posZero
   else

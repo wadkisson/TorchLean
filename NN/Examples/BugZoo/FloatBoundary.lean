@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.IEEEExec.BridgeInitFloat32
+public import NN.Floats.IEEEExec.Bridge.RuntimeFloat32
 
 /-!
 # BugZoo: floating-point trust boundaries

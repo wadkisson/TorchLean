@@ -117,12 +117,17 @@ LEAN_EXPORT uint32_t torchlean_cuda_get_deterministic_reductions_u(uint32_t u);
 // Wrapper used by the Lean binding: sets the flag and returns the observed value.
 LEAN_EXPORT uint32_t torchlean_cuda_set_deterministic_reductions_checked(uint32_t on);
 
-// Allocator telemetry.  These counters are diagnostic only: they track buffers created through
-// `torchlean_cuda_buffer_alloc` and explicitly/finalizer-released through this runtime layer.
+// Allocator telemetry. These counters are diagnostic only. The allocator counters track payloads
+// created through `torchlean_cuda_buffer_alloc`; the wrapper counters track Lean external objects
+// from boxing through finalization.
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_live_bytes(uint32_t u);
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_peak_bytes(uint32_t u);
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_alloc_count(uint32_t u);
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_free_count(uint32_t u);
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_live_count(uint32_t u);
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_peak_count(uint32_t u);
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_alloc_count(uint32_t u);
+LEAN_EXPORT uint64_t torchlean_cuda_wrapper_finalize_count(uint32_t u);
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_free_bytes(uint32_t u);
 LEAN_EXPORT uint64_t torchlean_cuda_allocator_device_total_bytes(uint32_t u);
 

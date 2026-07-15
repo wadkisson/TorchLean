@@ -6,8 +6,8 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.IEEEExec.BridgeFP32
-public import NN.Floats.IEEEExec.ERealSemantics
+public import NN.Floats.IEEEExec.Bridge.FP32
+public import NN.Floats.IEEEExec.Semantics.ERealSemantics
 public import NN.Floats.IEEEExec.Exec32
 
 /-!

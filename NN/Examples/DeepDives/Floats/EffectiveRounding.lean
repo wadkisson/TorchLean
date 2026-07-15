@@ -6,8 +6,12 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.IEEEExec.BridgeFP32Total
+public import NN.Floats.IEEEExec.Bridge.FP32Total
+public import NN.Floats.IEEEExec.DirectedRoundingSoundness
 public import NN.Floats.IEEEExec.Reductions
+public import NN.Floats.IEEEExec.Rules.SpecialRules
+public import NN.Floats.NeuralFloat.Rounding
+public import NN.Floats.NeuralFloat.Scalar.Conversion
 public import NN.Spec.Core.Tensor
 public import NN.Spec.Core.TensorOps
 
@@ -83,6 +87,100 @@ theorem runtimeSum_entry_computed (i : Fin width) :
           (toReal posOne + toReal (ofBits 0x40000000)) } := by
   change toReal (add posOne (ofBits 0x40000000)) = _
   exact toReal_add_eq_computed_of_isFinite posOne (ofBits 0x40000000) (by decide)
+
+/-! ## Named rounding modes and fused enclosures -/
+
+/-- The public mode API avoids passing a raw integer-rounding function at each call site. -/
+noncomputable def oneThirdDown : ℝ :=
+  NeuralRoundingMode.towardNegative.round
+    (β := binaryRadix) (fexp := fexp32) (1 / 3)
+
+/-- Directed rounding gives a certified lower endpoint, not merely a differently named value. -/
+theorem oneThirdDown_le : oneThirdDown ≤ 1 / 3 := by
+  simpa [oneThirdDown, NeuralRoundingMode.round, NeuralRoundingMode.roundingFunction] using
+    (neural_round_floor_le (β := binaryRadix) (fexp := fexp32) (1 / 3))
+
+/-- A concrete fused multiply-add lower endpoint, computed directly from binary32 inputs. -/
+def fusedLower : IEEE32Exec :=
+  fmaDown posOne (ofBits 0x40000000) (ofBits 0x3e800000)
+
+/-- The corresponding upper endpoint. -/
+def fusedUpper : IEEE32Exec :=
+  fmaUp posOne (ofBits 0x40000000) (ofBits 0x3e800000)
+
+/-- The executable directed FMA endpoints enclose the exact single-rounding expression. -/
+theorem fused_enclosure :
+    toEReal fusedLower ≤
+        ((toReal posOne * toReal (ofBits 0x40000000) + toReal (ofBits 0x3e800000) : ℝ) : EReal) ∧
+      ((toReal posOne * toReal (ofBits 0x40000000) + toReal (ofBits 0x3e800000) : ℝ) : EReal) ≤
+        toEReal fusedUpper := by
+  constructor
+  · exact toEReal_fmaDown_le _ _ _ (by decide) (by decide) (by decide)
+  · exact toEReal_fmaUp_ge _ _ _ (by decide) (by decide) (by decide)
+
+/-- Directed binary32 square-root endpoints for the exact input `2`. -/
+def sqrtLower : IEEE32Exec :=
+  sqrtDown (ofBits 0x40000000)
+
+def sqrtUpper : IEEE32Exec :=
+  sqrtUp (ofBits 0x40000000)
+
+/-- The executable endpoints enclose the exact real value `sqrt 2`. -/
+theorem sqrt_enclosure :
+    toEReal sqrtLower ≤ (Real.sqrt (toReal (ofBits 0x40000000)) : EReal) ∧
+      (Real.sqrt (toReal (ofBits 0x40000000)) : EReal) ≤ toEReal sqrtUpper := by
+  constructor
+  · exact toEReal_sqrtDown_le _ (by decide) (by decide)
+  · exact toEReal_sqrtUp_ge _ (by decide) (by decide)
+
+/-! ## Fixed grids, quantization, and double rounding -/
+
+/-- A signed affine code set with quarter-unit spacing. The construction is not tied to a tensor
+layout or storage width; those choices only determine the integer code bounds. -/
+noncomputable def signedQuarterQuantizer : Conversion.AffineQuantizer where
+  scale := 1 / 4
+  zeroPoint := 0
+  qmin := -128
+  qmax := 127
+  scale_pos := by norm_num
+  codeRange := by norm_num
+
+/-- Every in-range code is recovered exactly after dequantization and requantization. -/
+theorem signedQuarterQuantizer_roundtrip {code : ℤ}
+    (hlo : -128 ≤ code) (hhi : code ≤ 127) :
+    signedQuarterQuantizer.quantize neuralNearestEven
+        (signedQuarterQuantizer.dequantize code) = code := by
+  exact signedQuarterQuantizer.quantize_dequantize neuralNearestEven hlo hhi
+
+/-- When saturation is inactive, nearest-even reconstruction is within half a quantization step. -/
+theorem signedQuarterQuantizer_error (x : ℝ)
+    (hlo : signedQuarterQuantizer.qmin ≤
+      signedQuarterQuantizer.rawCode neuralNearestEven x)
+    (hhi : signedQuarterQuantizer.rawCode neuralNearestEven x ≤
+      signedQuarterQuantizer.qmax) :
+    abs (signedQuarterQuantizer.dequantize
+      (signedQuarterQuantizer.quantize neuralNearestEven x) - x) ≤ 1 / 8 := by
+  have h :=
+    signedQuarterQuantizer.dequantize_quantize_error_le neuralNearestEven x hlo hhi
+  convert h using 1
+  all_goals norm_num [signedQuarterQuantizer]
+
+/-- Round-to-odd on a sufficiently fine binary grid prevents double rounding on the quarter grid. -/
+theorem quarterGrid_doubleRounding_safe (extra : ℕ) (x : ℝ) :
+    neuralRoundAtScale neuralNearestEven (1 / 4)
+        (neuralRoundAtScale neuralOddRound
+          ((1 / 4) / (2 : ℝ) ^ (extra + 2)) x) =
+      neuralRoundAtScale neuralNearestEven (1 / 4) x := by
+  exact neuralRoundAtScale_nearestEven_after_odd_binary_extra extra (1 / 4) x (by norm_num)
+
+/-! ## IEEE exception status -/
+
+/-- The status-bearing API records division by zero separately from invalid operation. -/
+theorem one_div_zero_status :
+    (divWithStatus posOne posZero).status.divideByZero = true ∧
+      (divWithStatus posOne posZero).status.invalid = false := by
+  exact divWithStatus_divideByZero_of_finite_nonzero posOne posZero
+    (by decide) (by decide) (by decide)
 
 /-! ## A training-shaped reduction -/
 

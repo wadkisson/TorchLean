@@ -11,8 +11,7 @@ public import Mathlib.Data.Bool.Basic
 public import Mathlib.Data.EReal.Basic
 public import Mathlib.Data.Real.Basic
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness
-public import NN.Floats.IEEEExec.DivDirectedRoundingSoundness
-public import NN.Floats.IEEEExec.ERealSemantics
+public import NN.Floats.IEEEExec.Semantics.ERealSemantics
 public import NN.Floats.Interval.ERealCoercions
 public import NN.Floats.Interval.IEEEExec32
 public import NN.Floats.Interval.IEEEExec32NoNaN

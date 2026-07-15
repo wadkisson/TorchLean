@@ -2,7 +2,8 @@
 
 This folder defines how an exact real value is selected onto a representable grid.
 
-- `Core.lean` contains floor, ceiling, truncation, and nearest-even integer rounding.
+- `Core.lean` contains floor, ceiling, truncation, and nearest-even integer rounding, together with
+  the named interface for selecting those four standard choices.
 - `Predicates.lean` states validity conditions for rounding functions.
 - `Properties.lean` proves the basic directed and nearest-mode laws.
 - `Generic.lean` lifts integer rounding to a generic floating-point format.

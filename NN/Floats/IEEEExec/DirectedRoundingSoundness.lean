@@ -8,6 +8,7 @@ module
 
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness.Positive
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness.SignedOps
+public import NN.Floats.IEEEExec.DirectedRoundingSoundness.Division
 
 /-!
 Directed-rounding soundness entry point.

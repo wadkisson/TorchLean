@@ -38,17 +38,18 @@ Implementation:
 - CUDA: `csrc/cuda/tensor/torchlean_cuda_tensor.cu`
 - CPU stub (default `lake build`): `csrc/cuda/tensor/torchlean_cuda_tensor_stub.c`
 -/
-opaque Buffer : Type
+opaque BufferImpl : NonemptyType.{0}
 
 /--
-Lean requires a nonempty result type for opaque extern declarations such as
-`Buffer.zeros : UInt32 -> Buffer`.
+Runtime representation used for native CUDA buffer handles.
 
-This witness is part of the FFI trust boundary. It does not allocate a runtime buffer; real CUDA
-buffers still come only from explicit native constructors/copy operations.
+The `NonemptyType` wrapper is Lean's standard representation for external resources: it gives
+extern declarations a nonempty result type while preserving reference-counting information in
+compiled code. The underlying value is still created only by the native buffer constructors.
 -/
-axiom instNonemptyBuffer : Nonempty Buffer
-attribute [instance] instNonemptyBuffer
+def Buffer : Type := BufferImpl.val
+
+instance : Nonempty Buffer := BufferImpl.property
 
 end Cuda
 end Autograd

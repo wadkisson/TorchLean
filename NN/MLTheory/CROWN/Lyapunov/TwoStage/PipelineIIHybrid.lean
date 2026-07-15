@@ -205,6 +205,8 @@ def pgdStepCompiled
   let x' := Tensor.addSpec x (Tensor.scaleSpec g pgdStepSize)
   clampStateVector (-rad) rad x'
 
+-- Lean 4.32's native-code optimizer needs more than the default budget for this compiled graph.
+set_option maxHeartbeats 1000000 in
 /--
 Final post-check: compile the TorchLean loss to the shared verifier IR, then run IBP and CROWN
 over a small box around the origin.

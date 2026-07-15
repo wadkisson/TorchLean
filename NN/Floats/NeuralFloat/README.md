@@ -37,6 +37,8 @@ canonical truncation, and representation-level arithmetic used by the rounded-re
 - `Format/` defines magnitudes, digit counts, exponent functions, and representable grids.
 - `Rounding/` defines rounding modes and proves their order and double-rounding properties.
 - `Scalar/` packages rounded-real semantics as `NF` and supplies neural-network scalar operations.
+  Its conversion module also defines storage-width-independent affine quantization and proves code
+  range, monotonicity, in-range round-trip, and nearest reconstruction-error results.
 - `Analysis/` studies ULP spacing, neighboring values, and exact subtraction.
 - `Error/` proves absolute, relative, directed, and exact-residual results.
 - `Special/` contains execution policies such as flush-to-zero that intentionally differ from the
@@ -59,6 +61,12 @@ A useful mental model is:
 - `IEEE32Exec`: executable IEEE-754-style behavior, including finite/special-value cases.
 - runtime floats: what the backend actually computed, subject to the runtime boundary documented in
   `TRUST_BOUNDARIES.md`.
+
+For a fixed grid with spacing `step`, `neuralRoundAtScale` applies any valid integer rounding rule
+without introducing a second format semantics. `AffineQuantizer` uses that same rounding theory
+with a positive scale, zero point, and bounded integer code interval. The theorem
+`neuralRoundAtScale_nearestEven_after_odd_binary_extra` proves that round-to-odd on a sufficiently
+fine binary intermediate avoids nearest-even double rounding on the final grid.
 
 `NF` deliberately permits direct construction from a real because comparison and approximation
 proofs sometimes need values that are not on the grid. Use `NF.ofReal` for rounded values and carry

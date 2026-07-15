@@ -19,7 +19,7 @@ endpoint arithmetic (`addDown/addUp/mulDown/mulUp`).
 
 Soundness theorems (enclosure proofs) are not bundled here; they are best stated
 relative to a chosen real/extended-real interpretation (see
-  `NN/Floats/IEEEExec/BridgeERealTotal.lean`).
+  `NN/Floats/IEEEExec/Bridge/ERealTotal.lean`).
 -/
 
 @[expose] public section

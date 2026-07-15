@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Floats.IEEEExec.BridgeFP32Total
+public import NN.Floats.IEEEExec.Bridge.FP32Total
 public import NN.MLTheory.Proofs.ReLU.Bridge.ReLUMlpBridge
 
 /-!
