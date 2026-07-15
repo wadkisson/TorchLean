@@ -729,11 +729,23 @@ extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_size(b_lean_obj_arg BObj) 
   return (uint32_t)b->size;
 }
 
+extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_size_with_token(
+    b_lean_obj_arg BObj, uint32_t token) {
+  (void)token;
+  return torchlean_cuda_buffer_size(BObj);
+}
+
 extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_release(b_lean_obj_arg BObj) {
   torchlean_cuda_buffer* b = torchlean_cuda_buffer_unbox(BObj);
   // Explicit release is an eager-runtime lifetime hint. We mark the handle as empty so accidental
   // reuse fails by size checks instead of touching freed device memory.
   return torchlean_cuda_buffer_release_data(b) ? 1 : 0;
+}
+
+extern "C" LEAN_EXPORT uint32_t torchlean_cuda_buffer_release_with_token(
+    b_lean_obj_arg BObj, uint32_t token) {
+  (void)token;
+  return torchlean_cuda_buffer_release(BObj);
 }
 
 extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_release_then(
@@ -777,6 +789,12 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_full(uint32_t n, doubl
   torchlean_fill_f32<<<blocks, threads>>>(out->data, (size_t)n, (float)v);
   checkCuda(cudaGetLastError(), "cuda full kernel launch failed");
   return torchlean_cuda_buffer_box(out);
+}
+
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_full_with_token(
+    uint32_t n, double v, uint32_t token) {
+  (void)token;
+  return torchlean_cuda_buffer_full(n, v);
 }
 
 extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_rand_uniform(uint32_t n, uint64_t key) {
@@ -863,6 +881,11 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_to_float_array(b_lean_
   }
   free(tmp);
   return out;
+}
+
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_to_float_array_io(
+    b_lean_obj_arg BObj) {
+  return lean_io_result_mk_ok(torchlean_cuda_buffer_to_float_array(BObj));
 }
 
 #define TORCHLEAN_DEFINE_UNARY_BUFFER_EXPORT(EXPORT_NAME, KERNEL, LABEL)                         \
@@ -1078,6 +1101,13 @@ TORCHLEAN_DEFINE_BINARY_BUFFER_EXPORT(torchlean_cuda_buffer_mul, torchlean_mul_f
 
 TORCHLEAN_DEFINE_UNARY_SCALAR_BUFFER_EXPORT(torchlean_cuda_buffer_scale, torchlean_scale_f32,
                                             "scale")
+
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_copy_and_release(
+    b_lean_obj_arg BObj) {
+  lean_obj_res out = torchlean_cuda_buffer_scale(BObj, 1.0);
+  (void)torchlean_cuda_buffer_release_data(torchlean_cuda_buffer_unbox(BObj));
+  return out;
+}
 
 TORCHLEAN_DEFINE_BINARY_SCALAR_BUFFER_EXPORT(torchlean_cuda_buffer_axpy, torchlean_axpy_f32,
                                              "axpy")

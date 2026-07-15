@@ -41,6 +41,13 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
     IO (TrainReport α) := do
   trainMode runner
   let before ← meanLoss runner samples
+  let watchEvery := effectiveCudaMemWatch runner.module.opts cfg.steps cfg.cudaMemWatch
+  let memWatchRef ← IO.mkRef (none : Option CudaMemWatchState)
+  let watchMemory (done : Nat) : IO Unit := do
+    let state ← memWatchRef.get
+    let state ← reportCudaMemWatch runner.module.opts watchEvery cfg.steps done state
+    memWatchRef.set state
+  watchMemory 0
   unless samples.isEmpty do
     let batchSize := effectiveTrainBatchSize cfg.batchSize
     let restRef ← IO.mkRef samples
@@ -61,6 +68,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
               updateRunnerBuffers runner sample
               API.TorchLean.Module.step runner.module lrα sample
             logBatchLoss stepIdx batch
+            watchMemory (stepIdx + 1)
         else
           let opt := API.TorchLean.Optim.momentumSGD
             (α := α) (paramShapes := paramShapes task)
@@ -77,6 +85,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
               updateRunnerBuffers runner sample
               st ← API.TorchLean.Module.stepWith runner.module opt st sample
             logBatchLoss stepIdx batch
+            watchMemory (stepIdx + 1)
     | .adagrad lr epsilon =>
         let opt := API.TorchLean.Optim.adagrad
           (α := α) (paramShapes := paramShapes task)
@@ -93,6 +102,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
             updateRunnerBuffers runner sample
             st ← API.TorchLean.Module.stepWith runner.module opt st sample
           logBatchLoss stepIdx batch
+          watchMemory (stepIdx + 1)
     | .rmsprop lr decay epsilon =>
         let opt := API.TorchLean.Optim.rmsprop
           (α := α) (paramShapes := paramShapes task)
@@ -110,6 +120,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
             updateRunnerBuffers runner sample
             st ← API.TorchLean.Module.stepWith runner.module opt st sample
           logBatchLoss stepIdx batch
+          watchMemory (stepIdx + 1)
     | .adam lr beta1 beta2 epsilon =>
         let opt := API.TorchLean.Optim.adam
           (α := α) (paramShapes := paramShapes task)
@@ -128,6 +139,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
             updateRunnerBuffers runner sample
             st ← API.TorchLean.Module.stepWith runner.module opt st sample
           logBatchLoss stepIdx batch
+          watchMemory (stepIdx + 1)
     | .adamw lr weightDecay beta1 beta2 epsilon =>
         let opt := API.TorchLean.Optim.adamw
           (α := α) (paramShapes := paramShapes task)
@@ -146,6 +158,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
             updateRunnerBuffers runner sample
             st ← API.TorchLean.Module.stepWith runner.module opt st sample
           logBatchLoss stepIdx batch
+          watchMemory (stepIdx + 1)
     | .adadelta lr rho epsilon =>
         let opt := API.TorchLean.Optim.adadelta
           (α := α) (paramShapes := paramShapes task)
@@ -163,6 +176,7 @@ def trainSamples {σ τ : Spec.Shape} {task : SeqTask σ τ}
             updateRunnerBuffers runner sample
             st ← API.TorchLean.Module.stepWith runner.module opt st sample
           logBatchLoss stepIdx batch
+          watchMemory (stepIdx + 1)
   let after ← meanLoss runner samples
   pure { before := before, after := after }
 

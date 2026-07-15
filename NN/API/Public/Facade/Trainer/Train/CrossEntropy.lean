@@ -101,13 +101,18 @@ def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
   if opts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.trainSelectedCrossEntropy: CUDA execution currently requires dtype Float"
-  match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ => do
-      let runner ←
-        NN.API.TorchLean.Trainer.instantiateConfigured
-          (task := trainer.task) (α := α) (opts := opts)
-      k (α := α) runner)) with
-  | .ok out => pure out
-  | .error msg => throw <| IO.userError msg
+  match run.dtype with
+  | .float =>
+      let runner ← NN.API.TorchLean.Trainer.instantiateConfiguredFloat trainer.task opts
+      k (α := Float) runner
+  | dtype =>
+      match (← Trainer.Implementation.withReadableRuntime dtype (fun {α} _ _ _ _ _ => do
+          let runner ←
+            NN.API.TorchLean.Trainer.instantiateConfigured
+              (task := trainer.task) (α := α) (opts := opts)
+          k (α := α) runner)) with
+      | .ok out => pure out
+      | .error msg => throw <| IO.userError msg
 
 /--
 Shared cross-entropy training core for already-parsed public runtime settings.

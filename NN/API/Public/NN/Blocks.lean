@@ -164,6 +164,7 @@ def residualLayer {s : Spec.Shape} (inner : Sequential s s) : LayerDef s s :=
   { kind := "Residual"
     paramShapes := ps
     initParams := TorchLean.LayerCore.Seq.initParams inner
+    runtimeInit := TorchLean.LayerCore.Seq.runtimeInit? inner
     paramRequiresGrad := TorchLean.LayerCore.Seq.paramRequiresGrad inner
     updateBuffers := some (fun mode {α} _ _ ps x =>
       TorchLean.LayerCore.Seq.updateBuffers (α := α) (model := inner) mode ps x)
@@ -215,6 +216,10 @@ def addBranchesLayer {σ τ : Spec.Shape} (f g : Sequential σ τ) : LayerDef σ
     initParams :=
       NN.API.tensorpack.append (α := Float) (ss₁ := psF) (ss₂ := psG)
         (TorchLean.LayerCore.Seq.initParams f) (TorchLean.LayerCore.Seq.initParams g)
+    runtimeInit :=
+      match TorchLean.LayerCore.Seq.runtimeInit? f, TorchLean.LayerCore.Seq.runtimeInit? g with
+      | some fPlan, some gPlan => some (fPlan.append gPlan)
+      | _, _ => none
     paramRequiresGrad := TorchLean.LayerCore.Seq.paramRequiresGrad f ++ TorchLean.LayerCore.Seq.paramRequiresGrad
       g
     updateBuffers := some (fun mode {α} _ _ ps x => do

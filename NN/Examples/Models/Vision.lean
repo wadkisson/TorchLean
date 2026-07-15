@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Examples.Models.Vision.Cnn
+public import NN.Examples.Models.Vision.ResNet
 public import NN.Examples.Models.Vision.Vit
 
 /-!

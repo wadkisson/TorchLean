@@ -1,20 +1,20 @@
 {
   "code_stats": {
-    "blank_or_comment_lines": 106350,
-    "code_lines": 204478,
+    "blank_or_comment_lines": 106553,
+    "code_lines": 205029,
     "declaration_counts": {
-      "abbrev": 861,
+      "abbrev": 864,
       "axiom": 2,
       "class": 28,
-      "def": 8476,
+      "def": 8513,
       "inductive": 120,
       "instance": 246,
       "lemma": 638,
-      "opaque": 102,
+      "opaque": 107,
       "structure": 601,
       "theorem": 1805
     },
-    "declarations": 12879,
+    "declarations": 12924,
     "layer_sizes": [
       {
         "files": 164,
@@ -24,12 +24,12 @@
       {
         "files": 203,
         "layer": "NN.Runtime",
-        "lines": 51091
+        "lines": 51512
       },
       {
         "files": 136,
         "layer": "NN.MLTheory",
-        "lines": 41127
+        "lines": 41124
       },
       {
         "files": 118,
@@ -39,17 +39,17 @@
       {
         "files": 124,
         "layer": "NN.Spec",
-        "lines": 29882
+        "lines": 29876
       },
       {
         "files": 142,
         "layer": "NN.API",
-        "lines": 23782
+        "lines": 23977
       },
       {
         "files": 90,
         "layer": "NN.Verification",
-        "lines": 18190
+        "lines": 18189
       },
       {
         "files": 52,
@@ -57,14 +57,14 @@
         "lines": 16596
       },
       {
-        "files": 110,
+        "files": 112,
         "layer": "NN.Examples",
-        "lines": 16132
+        "lines": 16269
       },
       {
         "files": 39,
         "layer": "NN.Tests",
-        "lines": 7306
+        "lines": 7338
       },
       {
         "files": 18,
@@ -89,7 +89,7 @@
       {
         "files": 2,
         "layer": "NN.Tensor",
-        "lines": 639
+        "lines": 618
       },
       {
         "files": 10,
@@ -112,12 +112,12 @@
         "lines": 39
       }
     ],
-    "lean_files": 1257,
+    "lean_files": 1259,
     "theorem_like_declarations": 2443,
     "top_level_files": [
       {
         "directory": "NN",
-        "files": 1202
+        "files": 1204
       },
       {
         "directory": "blueprint",
@@ -136,7 +136,7 @@
         "files": 1
       }
     ],
-    "total_lines": 310828
+    "total_lines": 311582
   },
   "edges": [
     {
@@ -7217,6 +7217,13 @@
       "src": "NN.Examples.Models.Runner"
     },
     {
+      "dst": "NN.Examples.Models.Runner",
+      "line": 9,
+      "path": "NN/Examples/Models/RunnerMain.lean",
+      "public": true,
+      "src": "NN.Examples.Models.RunnerMain"
+    },
+    {
       "dst": "NN.API",
       "line": 9,
       "path": "NN/Examples/Models/Sequence/CharGpt.lean",
@@ -7491,6 +7498,20 @@
     },
     {
       "dst": "NN.API",
+      "line": 13,
+      "path": "NN/Examples/Models/Vision/ResNet.lean",
+      "public": true,
+      "src": "NN.Examples.Models.Vision.ResNet"
+    },
+    {
+      "dst": "NN.Examples.Models.Common.RealData",
+      "line": 14,
+      "path": "NN/Examples/Models/Vision/ResNet.lean",
+      "public": true,
+      "src": "NN.Examples.Models.Vision.ResNet"
+    },
+    {
+      "dst": "NN.API",
       "line": 20,
       "path": "NN/Examples/Models/Vision/Vit.lean",
       "public": true,
@@ -7511,8 +7532,15 @@
       "src": "NN.Examples.Models.Vision"
     },
     {
-      "dst": "NN.Examples.Models.Vision.Vit",
+      "dst": "NN.Examples.Models.Vision.ResNet",
       "line": 10,
+      "path": "NN/Examples/Models/Vision.lean",
+      "public": true,
+      "src": "NN.Examples.Models.Vision"
+    },
+    {
+      "dst": "NN.Examples.Models.Vision.Vit",
+      "line": 11,
       "path": "NN/Examples/Models/Vision.lean",
       "public": true,
       "src": "NN.Examples.Models.Vision"
@@ -18922,14 +18950,14 @@
     },
     {
       "dst": "NN.Runtime.Context",
-      "line": 22,
+      "line": 23,
       "path": "NN/Runtime/Autograd/Engine/Cuda/Tape.lean",
       "public": true,
       "src": "NN.Runtime.Autograd.Engine.Cuda.Tape"
     },
     {
       "dst": "NN.Runtime.Autograd.Engine.Cuda.Buffer",
-      "line": 23,
+      "line": 24,
       "path": "NN/Runtime/Autograd/Engine/Cuda/Tape.lean",
       "public": true,
       "src": "NN.Runtime.Autograd.Engine.Cuda.Tape"
@@ -28451,7 +28479,7 @@
       "src_layer": "NN.Verification"
     },
     {
-      "count": 154,
+      "count": 157,
       "dst_layer": "NN.Examples",
       "src_layer": "NN.Examples"
     },
@@ -28486,7 +28514,7 @@
       "src_layer": "NN.CI"
     },
     {
-      "count": 54,
+      "count": 55,
       "dst_layer": "NN.API",
       "src_layer": "NN.Examples"
     },
@@ -30173,6 +30201,7 @@
     "NN.Examples.Models.Runner": [
       "NN.Examples.Models.Runner"
     ],
+    "NN.Examples.Models.RunnerMain": [],
     "NN.Examples.Models.Sequence": [],
     "NN.Examples.Models.Sequence.CharGpt": [
       "NN.Examples.Models.Sequence.CharGpt"
@@ -30218,6 +30247,9 @@
     "NN.Examples.Models.Vision": [],
     "NN.Examples.Models.Vision.Cnn": [
       "NN.Examples.Models.Vision.Cnn"
+    ],
+    "NN.Examples.Models.Vision.ResNet": [
+      "NN.Examples.Models.Vision.ResNet"
     ],
     "NN.Examples.Models.Vision.Vit": [
       "NN.Examples.Models.Vision.Vit"
@@ -32174,7 +32206,8 @@
       "Runtime",
       "Autograd",
       "Cuda",
-      "Fno1dRfftFused"
+      "Fno1dRfftFused",
+      "Forward"
     ],
     "NN.Runtime.Autograd.Engine.Cuda.KernelSpec": [
       "Runtime",
@@ -33360,7 +33393,6 @@
     "NN.Tensor": [],
     "NN.Tensor.API": [
       "NN.Tensor",
-      "Tensor",
       "TensorLit"
     ],
     "NN.Tests.API.SelfSupervised.BlockMask": [
@@ -34017,11 +34049,11 @@
       "NN.Tests.Suite",
       "NN.Verification.CLI"
     ],
-    "critical_path_import_edges": 130,
+    "critical_path_import_edges": 131,
     "errors": 0,
     "findings": 0,
-    "import_edges": 4039,
-    "internal_import_edges": 3498,
+    "import_edges": 4043,
+    "internal_import_edges": 3502,
     "layers": [
       "Backend",
       "NN",
@@ -34043,14 +34075,14 @@
       "lakefile",
       "scripts"
     ],
-    "modules": 1257,
+    "modules": 1259,
     "private_import_edges": 351,
-    "public_import_edges": 3688,
+    "public_import_edges": 3692,
     "warnings": 0
   },
   "top_fan_in": [
     {
-      "count": 79,
+      "count": 80,
       "module": "NN.API"
     },
     {
@@ -34110,12 +34142,12 @@
       "module": "NN.Verification.TorchLean.Compile"
     },
     {
-      "count": 16,
-      "module": "NN.API.Public"
+      "count": 17,
+      "module": "NN.Examples.Models.Common.RealData"
     },
     {
       "count": 16,
-      "module": "NN.Examples.Models.Common.RealData"
+      "module": "NN.API.Public"
     },
     {
       "count": 16,

@@ -355,24 +355,24 @@ the local VJP rules call CUDA kernels.
 CUDA remains an eager runtime backend. Verification passes consume the shared IR described in
 *Graphs and IR*; they are not proofs of a particular GPU schedule.
 
-The runtime is explicit about CUDA buffer ownership. During eager training, each forward/backward
-step creates tape values, gradient buffers, and local scratch buffers for kernels such as matmul,
-convolution, normalization, attention, and FNO spectral convolution. The values returned to the
-caller are kept; transient buffers are released after their contribution has been consumed. The
-examples include allocator telemetry for a practical reason: if a future kernel holds on to
-scratch state across steps, the terminal should show the trend before it becomes an allocation
-failure. The same ownership rule is used by the public runners, so a long command does not retain
-old step tensors after the loader loop has moved on.
+CUDA buffers do not have Lean's ordinary value semantics. A forward and backward step creates tape
+values, gradient storage, and scratch buffers for matmul, convolution, normalization, attention,
+and spectral convolution. Returned tensors stay alive; scratch storage is released once the kernel
+has finished with it. The public runners report allocator counts during long jobs so that a leak
+appears as a trend in the terminal instead of, much later, as an unexplained allocation failure.
 
-In practice this gives TorchLean three related but distinct CUDA layers:
+A bug found during FNO testing shows why this distinction matters. Reverse mode begins with a
+one-element seed. When that seed was created by a pure allocation expression, Lean was free to
+share it, even though the CUDA tape consumed and released the native buffer. A later backward pass
+could therefore reuse dead storage. `Cuda.Buffer.fullIO` makes allocation effectful and guarantees
+a fresh seed; sparse backward also uses copy-and-release operations when ownership moves between
+gradient maps.
 
-- *training layer*: run larger examples in Lean without waiting forever;
-- *testing layer*: compare CUDA kernels against CPU stubs and reference cases;
-- *proof layer*: state assumptions under which native float32 results can be transported back to the
-  `IEEE32Exec` and `FP32` semantics defined in Lean.
-
-Keeping those three layers separate prevents a common mistake: treating "the CUDA example trained" as
-"the CUDA implementation has been verified."
+The stress suite repeats this path and rejects growth in live allocations. CPU parity tests check
+the numerical results of selected kernels, and NVIDIA Compute Sanitizer looks for invalid native
+accesses and leaks. Separately, Lean theorems describe the `IEEE32Exec` and `FP32` semantics to which
+native results are related. Each check answers a different question. A successful training run is
+useful evidence about the runtime, but it is not a proof of the compiled CUDA kernel.
 
 # Runtime Initialization
 

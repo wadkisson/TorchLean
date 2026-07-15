@@ -332,7 +332,7 @@ def compAny {σ τ υ : Spec.Shape}
 
 namespace Seq
 export _root_.Runtime.Autograd.TorchLean.NN.Seq
-  (paramShapes paramRequiresGrad initParams comp updateBuffers
+  (paramShapes paramRequiresGrad initParams runtimeInit? hasBufferUpdates comp updateBuffers
    programWithMode forwardProgram
    scalarModuleDefWithMode scalarModuleDef
    mseScalarModuleDefWithMode mseScalarModuleDef

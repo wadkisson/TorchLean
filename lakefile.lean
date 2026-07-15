@@ -268,7 +268,7 @@ lean_exe torchlean_lint where
 --
 -- CUDA build: `lake build -R -K cuda=true`
 lean_exe torchlean where
-  root := `NN.Examples.Models.Runner
+  root := `NN.Examples.Models.RunnerMain
 
 -- Self-checking positive/negative example for the functional transcendental +
 -- scalar-affine ops (`nn.functional.{exp,log,scale,shift,affine}`). Runs the

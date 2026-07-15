@@ -74,7 +74,7 @@ end RuntimeInit
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModule
   (create forward backward step initOptim stepWith params setParams trainSGD trainWith meanLoss)
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef
-  (instantiate instantiateFloatWithRuntimePlan instantiateFloatWithRuntimeInit)
+  (instantiate instantiateFloat instantiateFloatWithRuntimePlan instantiateFloatWithRuntimeInit)
 
 /--
 Instantiate a `ScalarModuleDef` under explicit Torch options such as `backend` and `device`.
@@ -298,8 +298,8 @@ def withModule
       -- `DType.withExec` continuation, Lean can elaborate module construction with the generic
       -- fallback CUDA converter instead of the real Float upload bridge. That still compiles, but
       -- a CUDA training step later fails when it tries to upload a Float tensor.
-      let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateWith
-        (α := Float) (paramShapes := paramShapes) (inputShapes := inputShapes) defn id opts
+      let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateFloat
+        (paramShapes := paramShapes) (inputShapes := inputShapes) defn opts
       k (α := Float) id m rest
   | _ =>
       if (cfg.device == .cuda) then
@@ -337,8 +337,8 @@ def withModuleRuntime
       -- Same reason as `withModule`: CUDA module construction should see `α = Float` directly, so
       -- the Float-specific `TensorConv` instance is selected before the runner is handed to user
       -- code.
-      let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateWith
-        (α := Float) (paramShapes := paramShapes) (inputShapes := inputShapes) defn id opts
+      let m ← _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef.instantiateFloat
+        (paramShapes := paramShapes) (inputShapes := inputShapes) defn opts
       k (α := Float) m rest
   | _ =>
       if (cfg.device == .cuda) then

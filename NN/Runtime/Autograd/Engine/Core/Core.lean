@@ -89,6 +89,22 @@ def mk {α : Type} {s : Shape} (t : Tensor α s) : Runtime.AnyTensor α :=
   { s := s, t := t }
 
 /--
+Materialize the tensor payload while preserving its runtime shape.
+
+The specification tensor is functional, so an eager computation can otherwise retain a chain of
+closures representing the whole expression that produced a node. Materialization evaluates that
+expression once and stores an array-backed tensor. By `Tensor.materialize_eq`, this changes only
+the runtime representation, not the tensor denotation.
+-/
+def materialize {α : Type} (t : Runtime.AnyTensor α) : Runtime.AnyTensor α :=
+  { s := t.s, t := Tensor.materialize t.t }
+
+/-- Materializing a shape-erased tensor preserves it extensionally. -/
+@[simp] theorem materialize_eq {α : Type} (t : Runtime.AnyTensor α) : materialize t = t := by
+  cases t
+  simp [materialize]
+
+/--
 Cast an `AnyTensor` to a specific shape, given an equality proof.
 
 This is used after dynamic shape checks (e.g. `Tape.requireValue`).
@@ -106,7 +122,7 @@ def add {α : Type} [Add α] [DecidableEq Shape]
   (a b : Runtime.AnyTensor α) : Result (Runtime.AnyTensor α) := by
   if h : a.s = b.s then
     let b' : Tensor α a.s := Tensor.castShape b.t h.symm
-    exact .ok { s := a.s, t := addSpec a.t b' }
+    exact .ok (materialize { s := a.s, t := addSpec a.t b' })
   else
     exact .error "autograd: gradient shape mismatch during accumulation"
 
@@ -194,7 +210,8 @@ Invariant: the returned id is `t.size`, the pre-append size of the tape.
 -/
 def addNode (t : Tape α) (node : Node α) : Tape α × Nat :=
   let id := t.nodes.size
-  ({ nodes := t.nodes.push node }, id)
+  let node' := { node with value := AnyTensor.materialize node.value }
+  ({ nodes := t.nodes.push node' }, id)
 
 /-- `addNode` returns the current tape size as the fresh node id. -/
 @[simp] theorem addNode_id (t : Tape α) (node : Node α) :

@@ -64,35 +64,23 @@ inductive Scheme where
 
 namespace Internal
 
-/--
-Next state of a simple 32-bit linear congruential generator (LCG).
-
-This exists to make examples deterministic and reproducible; it is not statistically strong and it
-is not cryptographically secure.
--/
-def lcgNext (s : Nat) : Nat :=
-  -- classic LCG parameters (same as many stdlib examples)
-  let a := 1664525
-  let c := 1013904223
-  let m := 4294967296  -- 2^32
-  (a * s + c) % m
-
-/-- Interpret the 32-bit LCG state as a `Float` in `[0, 1)`. -/
-def lcg01 (s : Nat) : Float :=
-  let m : Float := 4294967296.0
-  (Float.ofNat s) / m
+/-- SplitMix64 mixing used by indexed parameter initialization. -/
+def splitmix64 (x : UInt64) : UInt64 :=
+  let z1 := x + 0x9e3779b97f4a7c15
+  let z2 := (z1 ^^^ (z1 >>> 30)) * 0xbf58476d1ce4e5b9
+  let z3 := (z2 ^^^ (z2 >>> 27)) * 0x94d049bb133111eb
+  z3 ^^^ (z3 >>> 31)
 
 /--
-Deterministic `U[0,1)` sampler derived from a seed and scalar index.
+Deterministic `U[0,1)` sampler derived independently from a seed and scalar index.
 
-Implementation note: this is the LCG iterated `idx+1` times, then normalized to `[0,1)`.
+Indexing is constant-time, so constructing an `n`-element tensor takes `O(n)` sampler work. The
+same key/index formula is used by TorchLean's storage-first runtime initializer.
 -/
 def rand01 (seed idx : Nat) : Float :=
-  -- Deterministic sampler: apply the LCG `idx+1` times.
-  let rec go : Nat → Nat → Nat
-    | 0, s => lcgNext s
-    | Nat.succ n, s => go n (lcgNext s)
-  lcg01 (go idx seed)
+  let key := splitmix64 (UInt64.ofNat seed)
+  let z := splitmix64 (key + UInt64.ofNat idx)
+  (Float.ofNat z.toUInt32.toNat) / 4294967296.0
 
 /--
 Sample the `idx`-th scalar of a tensor initialized using `Scheme`.

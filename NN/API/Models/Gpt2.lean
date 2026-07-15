@@ -137,6 +137,10 @@ def causalTransformerTokenScalarModuleDefWithMode
       ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body) [] :=
   { initParams :=
       .cons (Spec.zeros Float (.dim cfg.vocab (.dim cfg.dModel .scalar))) (initParams body)
+    runtimeInit :=
+      match _root_.Runtime.Autograd.TorchLean.NN.Seq.runtimeInit? body with
+      | some bodyPlan => some (.cons .zeros bodyPlan)
+      | none => none
     initRequiresGrad := List.replicate (((.dim cfg.vocab (.dim cfg.dModel .scalar)) ::
       paramShapes body).length) true
     loss := fun {α} => by

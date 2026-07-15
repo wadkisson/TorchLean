@@ -131,7 +131,11 @@ def multiHeadAttention
         let dOutHeads := Buffer.swapAdjacentAtDepth dSwapped dimsView depth0 -- (numHeads,n,headDim)
         let (dQh, dKh, dVh) ←
           if useFlash then
-            pure <| Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+            let (dQh, dKh, dVh) :=
+              Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+            -- The fused VJP reads `dOutHeads` but returns three fresh gradient buffers. Thread the
+            -- release through one returned buffer so every attention step retires this activation.
+            pure (Buffer.releaseThen dOutHeads dQh, dKh, dVh)
           else
             let dimsAttn : Array Nat := #[numHeads, n, n]
             let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1

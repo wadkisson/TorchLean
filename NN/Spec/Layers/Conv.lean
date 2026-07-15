@@ -297,8 +297,6 @@ def convInputDerivSpec
         (Shape.ofList (outC :: (convOutSpatial inSpatial kernel stride padding).toList)))
     : Tensor α (Shape.ofList (inC :: inSpatial.toList)) :=
 
-  let outSpatial := convOutSpatial inSpatial kernel stride padding
-  let outDims : List Nat := outSpatial.toList
   let kDims : List Nat := kernel.toList
   let strideDims : List Nat := stride.toList
   let padDims : List Nat := padding.toList
@@ -308,17 +306,15 @@ def convInputDerivSpec
     Private.tensorOfFnList inDims (fun inIdx =>
       let total_sum : α :=
         (List.finRange outC).foldl (fun acc out_ch =>
-          Private.foldlIndices outDims acc (fun acc outIdx =>
-            Private.foldlIndices kDims acc (fun acc kIdx =>
-              let contrib : α :=
-                if Private.matchesInputPos outIdx kIdx strideDims padDims inIdx then
+          Private.foldlIndices kDims acc (fun acc kIdx =>
+            let contrib : α :=
+              match Private.mkTransposeInputIdx? inIdx kIdx strideDims padDims with
+              | none => 0
+              | some outIdx =>
                   let grad_val := getAtOrZero grad_output (out_ch.val :: outIdx)
                   let kernel_val := getAtOrZero layer.kernel (out_ch.val :: in_ch.val :: kIdx)
                   grad_val * kernel_val
-                else
-                  0
-              acc + contrib
-            )
+            acc + contrib
           )
         ) 0
       total_sum

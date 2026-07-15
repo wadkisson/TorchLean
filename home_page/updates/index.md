@@ -20,95 +20,96 @@ usemathjax: true
   <div class="update-date">July 2026</div>
   <div class="update-body" markdown="1">
 
-## A Smaller Core and Explicit Runtime Boundaries
+## Lean 4.32 and a Leaner TorchLean
 
-<p class="update-kicker">Public API, tensor semantics, floating point, backends, verification</p>
+<p class="update-kicker">A smaller API, stronger numerical foundations, and harder runtime tests</p>
 <p class="update-summary">
-TorchLean now has a clearer library root, a more general tensor-facing API, and one vocabulary for
-describing where an operation runs and what is trusted. At the same time, the numerical and
-verification layers were tightened where executable behavior had drifted from the intended
-mathematics.
+This release began as a cleanup and grew into a fairly thorough pass over the library. We removed
+duplicate entry points, made tensor operations less image-specific, brought the floating-point
+work into one coherent hierarchy, and tested the training runtime on models large enough to expose
+bugs that the small examples never reached.
 </p>
 
 ### One Public Library
 
-`import NN` is the ordinary entry point for model code. The old `NN.Library` and `NN.Entrypoint.*`
-shells were removed, and the focused roots `NN.API`, `NN.Spec`, `NN.Runtime`, `NN.Floats`,
-`NN.GraphSpec`, `NN.IR`, `NN.MLTheory`, `NN.Proofs`, `NN.Verification`, and `NN.Widgets` now import
-their own canonical modules directly. Model implementations remain part of TorchLean, but the old
-forwarding model-zoo facades and duplicate optimizer namespaces no longer define a second API.
+Model code now starts with `import NN`. There is no second convenience namespace sitting in front
+of the real library: the old `NN.Library` and `NN.Entrypoint.*` shells are gone, and focused imports
+such as `NN.Spec`, `NN.Runtime`, `NN.Floats`, and `NN.Verification` lead directly to the modules that
+own those declarations. The model zoo is still part of TorchLean; only its forwarding facades were
+removed.
 
-Large implementation files were split without changing their ownership. Training, text utilities,
-data handling, schedulers, CROWN propagation, graph compilation, runtime operations, normalization,
-Muon, and floating-point semantics now live in smaller modules with narrow imports. After counting
-the new split modules as well as the deleted forwarding layers, the `NN` Lean source tree is about
-1,500 lines smaller than before.
+We also broke up several files that had become difficult to navigate. Training, data handling,
+schedulers, CROWN propagation, graph compilation, runtime operations, normalization, Muon, and
+floating-point semantics now live in smaller modules with narrower imports. Even after accounting
+for those new files, the `NN` source tree is about 1,500 lines smaller.
 
 <div class="update-grid">
   <section>
     <h3>General tensors</h3>
     <p>
-      Batching and layout are expressed through tensor shapes and axes rather than separate image
-      tensor types. Generic permutation, reduction, reshape, and global-average-pooling operations
-      replace public CHW/NCHW and rank-specific convenience layers. Layout names remain only where
-      an operation, such as channel-first batch normalization, genuinely depends on that layout.
+      A batch is now an axis of a tensor, not a separate kind of object. Generic permutation,
+      reduction, reshape, and global-average-pooling operations replace the old public CHW/NCHW
+      helpers. We keep layout names only where the operation itself depends on a layout, as
+      channel-first batch normalization does.
     </p>
   </section>
   <section>
     <h3>Models</h3>
     <p>
-      CNN, ResNet, ViT, FNO, transformer, GPT, Mamba, recurrent, generative, reinforcement-learning,
-      and self-supervised models remain available. Their definitions now use the shared tensor and
-      layer surface instead of model-specific forwarding stacks.
+      CNNs, ResNets, ViTs, FNOs, transformers, GPT, Mamba, recurrent models, generative models,
+      reinforcement learning, and self-supervised examples all remain available. They now use the
+      same tensor and layer API instead of carrying model-specific forwarding stacks.
     </p>
   </section>
   <section>
     <h3>Training</h3>
     <p>
-      Optimizers share one stateful tensor-optimizer interface. The retained laws describe stream
-      composition and meaningful relations between update rules; generated certificate tables and
-      definitional restatements that added no proof content were removed.
+      Optimizers now share one stateful tensor interface. We kept laws that say something useful
+      about update rules and stream composition, and removed generated tables and `rfl` theorems
+      that only repeated a definition.
     </p>
   </section>
 </div>
 
 ### Floating-Point Semantics
 
-The rounded-real development under `NN.Floats.NeuralFloat` is now organized by format, rounding,
-scalar operations, analysis, error bounds, and special execution policies. It includes radix and
-exponent formats, directed and nearest rounding, round-to-odd, ULP and neighboring-value results,
-double-rounding facts, Sterbenz subtraction, and absolute and relative error bounds. This is a
-native Lean development influenced by Flocq's mathematical organization, not a claim to reproduce
-the whole Coq library.
+The floating-point work had grown in several directions at once. It now sits under
+`NN.Floats.NeuralFloat`, organized by format, rounding, scalar operations, analysis, error bounds,
+and execution policy. The library covers radix and exponent formats, directed and nearest
+rounding, round-to-odd, ULPs and neighboring values, double rounding, Sterbenz subtraction, and
+absolute and relative error bounds. Flocq influenced this organization, but this is a native Lean
+development rather than a port of the whole Coq library.
 
-The layers now have distinct jobs:
+We use the following distinction throughout TorchLean:
 
 - `NeuralFloat` and `NF` describe configurable rounded-real arithmetic used in proofs;
 - `FP32` specializes the rounded-real model to binary32-sized parameters;
 - `IEEE32Exec` models executable IEEE-754-style binary32 behavior, including special values;
 - runtime bridges state how native values are interpreted by those models.
 
-The new effective-rounding example follows a rounded value from its format and mode to an explicit
-error statement. Runtime approximation documentation now begins from the ideal autograd theorems
-and states the additional hypotheses required to bound an executable or rounded path.
+The effective-rounding example shows the whole argument on one value: choose a format and rounding
+mode, perform the rounding, and derive the resulting error bound. The runtime-approximation proofs
+then start from the ideal autograd theorems and make every extra hypothesis about rounded execution
+explicit.
 
 ### Backend Contracts
 
-TorchLean now uses one backend vocabulary across planning, diagnostics, and documentation. A
-`Device` says where work runs, a `Provider` names the implementation family, and a `BackendOp`
-identifies the requested operation. A kernel capsule then records the operation, device, provider,
-forward support, VJP ownership, shape and layout contracts, value contract, and trust level.
+A user should be able to choose where a model runs without learning a pile of unrelated switches.
+The backend API therefore separates three questions. `Device` says where the work runs, `Provider`
+says whose implementation performs it, and `BackendOp` names the operation being requested. For
+each available implementation, a kernel capsule records its shape and layout requirements, whether
+it supplies forward and backward computation, and what evidence supports its numerical contract.
 
-Named profiles keep choices that must agree in one object. The checked CPU and native-CUDA profiles
-retain TorchLean tape ownership. The LibTorch-forward profile permits a registered external forward
-provider while retaining the TorchLean graph and tape; the explicit LibTorch-autograd profile names
-external backward ownership as a trusted boundary. The current LibTorch implementation remains the
-optional scaled-dot-product-attention bridge, not a general PyTorch dispatcher.
+Named profiles bundle choices that must agree. The checked CPU and native CUDA profiles keep the
+TorchLean tape and backward rules. The LibTorch-forward profile may use an external forward kernel
+while TorchLean still records the graph and performs backward. A separate LibTorch-autograd profile
+hands backward to LibTorch and says so plainly in the audit report. At present, the LibTorch bridge
+is for scaled dot-product attention; it is not a general PyTorch dispatcher.
 
-macOS CPU is supported, Linux CPU and native CUDA are supported, and WSL2 is the recommended Windows
-route. Metal, ROCm, WebGPU, TPU, Trainium, native Windows, and custom accelerators are represented as
-targets for future capsules. Selecting an unavailable target fails with a diagnostic instead of
-silently running on another device.
+TorchLean runs on macOS CPU and on Linux CPU or native CUDA. For Windows, WSL2 is currently the
+documented route. The type system already has room for Metal, ROCm, WebGPU, TPU, Trainium, native
+Windows, and custom accelerators, but naming a target is not the same as implementing it. If a
+requested provider is unavailable, TorchLean reports that fact instead of silently falling back.
 
 ### Mathematical and Verification Corrections
 
@@ -139,49 +140,71 @@ silently running on another device.
   </section>
 </div>
 
-The graph evaluator and verifier compiler were split into operation-level modules, while coverage
-theorems continue to quantify over the operation vocabulary. Brittle theorems asserting a current
-list length or merely restating a definition were removed. Definitional bridge lemmas remain where
-later correctness proofs use them to avoid unfolding implementation details.
+The graph evaluator and verifier compiler are now split by operation. Their coverage theorems still
+range over the full operation vocabulary, so adding a new file does not weaken the statement being
+proved. We removed theorems tied to incidental list lengths and retained small definitional lemmas
+only when later correctness proofs actually use them.
 
 ### Lean 4.32
 
-TorchLean now builds with Lean 4.32, mathlib 4.32, DocGen 4.32, and Verso 4.32. The migration also
-removed the deprecated `Lean.RBMap` dependency in favor of `Std.TreeMap`, adopted the stronger sine
-remainder estimate now exposed by mathlib, and made several dependent eliminations explicit where
-Lean 4.32 no longer inferred the required casts. Proof-valued runtime helpers are now declared as
-theorems when they are opaque evidence; proof constructors that must compute remain reducible
-`abbrev`s. The migration does not suppress the proposition or duplicate-namespace linters.
+TorchLean now builds with Lean, mathlib, DocGen, and Verso 4.32. During the upgrade we replaced the
+deprecated `Lean.RBMap` with `Std.TreeMap`, used mathlib's stronger sine remainder estimate, and made
+several dependent casts explicit. Proof-valued runtime helpers are theorems when they serve as
+opaque evidence; constructors that must compute remain reducible `abbrev`s. We fixed the new
+linters rather than suppressing them.
+
+### Runtime Scaling and CUDA Ownership
+
+The small examples had hidden an expensive habit: large parameters were first expanded into nested
+Lean values and only then copied into the execution engine. Parameters and gradients are now
+materialized directly where they will run. We also stopped generic convolution backward from
+rebuilding the same derivative structure, and taught CUDA attention and fused FNO paths to release
+temporary buffers as soon as their contribution is consumed.
+
+The most useful failure came from sparse reverse mode. A pure expression allocating a one-element
+CUDA seed could be shared by Lean, even though backward consumed and released the native buffer.
+The next use then referred to storage that was no longer alive. Seeds that cross an ownership
+boundary now come from an effectful constructor, and transfers between gradient maps use explicit
+copy-and-release operations. A stress test repeats this path and fails if live CUDA allocation
+grows or a supposedly fresh seed is reused.
+
+We exercised 21 CPU workflows and 24 CUDA workflows, including dense, convolutional, attention,
+recurrent, operator-learning, generative, and reinforcement-learning models. On the machine used
+for this release, a roughly 100-million-parameter MLP completed ten CUDA optimizer steps in about
+15.2 seconds. The fused Burgers FNO ran for 100 steps with no growth in live buffers; training MSE
+fell from 0.3260 to 0.0172 and test MSE ended at 0.0220. These numbers record what we tested on one
+machine. They are not a general performance promise.
 
 ### Documentation and Validation
 
-The Guide was rewritten around the mathematical objects used by the library: typed tensors,
-autograd maps, graph denotations, rounded execution, kernel contracts, and checked certificates.
-The installation page now gives separate Linux, macOS, WSL2, native-Windows, CUDA, and optional
-LibTorch instructions. The API reference, module graph, examples, and site navigation were rebuilt
-for the new module roots. Repository checks now build `NN` directly rather than the deleted
-`NN.Library` shell.
+The Guide and API reference now follow the new module layout. Installation has separate notes for
+Linux, macOS, WSL2, native Windows, CUDA, and optional LibTorch support, and the floating-point and
+backend chapters explain where a theorem ends and a runtime assumption begins. Repository checks
+now build `NN` directly rather than passing through the deleted `NN.Library` shell.
 
 <div class="validation-list" markdown="1">
   <h3>Validation</h3>
 
 - `lake lint`
-- `lake build` (4,269 build jobs)
+- `lake build` (4,271 build jobs)
 - `lake build NN NN.CI.All` (4,308 build jobs)
 - `lake exe nn_tests_suite`
 - `lake -R -K cuda=true exe nn_tests_suite`
-- `scripts/checks/example_regression.sh` across 41 CLI/help paths and the default runtime examples
+- `scripts/checks/example_regression.sh` across 42 registered commands and examples
 - `scripts/checks/example_regression.sh --cuda --extended-cuda --skip-help --skip-default`
+- sustained 20-update CPU runs across 21 model workflows
+- sustained 100-update CUDA runs across 24 model workflows
+- repeated sparse-backward ownership and allocator-drift regression
+- NVIDIA Compute Sanitizer memcheck (`ERROR SUMMARY: 0 errors`)
 - DocGen API generation
 - Verso Guide generation
 - dependency audit and interactive import-graph generation
 - Jekyll production build
 - `git diff --check`
 
-The CPU and CUDA suites passed on the exercised Linux machine. The documentation builds completed,
-and the repository linter reported no errors. These checks do not turn native CUDA, LibTorch, or
-future accelerator implementations into Lean proofs; their trust and evidence levels remain visible
-through the backend contracts and `TRUST_BOUNDARIES.md`.
+All of these checks passed on the Linux machine used for the release. That gives us evidence for the
+paths we exercised, but it does not turn CUDA machine code or LibTorch into Lean proofs. Their trust
+levels remain explicit in the backend contracts and in `TRUST_BOUNDARIES.md`.
 </div>
 
   </div>

@@ -284,6 +284,7 @@ def unitTrainStepsFloat (opts : Options) (input : String)
   let trained ← trainer.train
     (Data.floatSampleArray samples)
     { steps := train.steps
+      cudaMemWatch := train.cudaMemWatch
       log := .disabled
       loadParams? := train.loadParams?
       saveParams? := train.saveParams? }

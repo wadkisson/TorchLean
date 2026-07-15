@@ -55,6 +55,10 @@ def multiHeadAttention
   { kind := s!"MultiHeadAttention(heads={numHeads}, headDim={headDim})"
     paramShapes := [wProjShape, wProjShape, wProjShape, wOShape]
     initParams := Torch.tlistQuad wq0 wk0 wv0 wo0
+    runtimeInit := some <| .cons (.xavierUniform projDim dModel (seedW + 0)) <|
+      .cons (.xavierUniform projDim dModel (seedW + 1)) <|
+      .cons (.xavierUniform projDim dModel (seedW + 2)) <|
+      .cons (.xavierUniform dModel projDim (seedW + 3)) .nil
     paramRequiresGrad := [true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

@@ -46,6 +46,7 @@ def layerNorm
   { kind := "LayerNorm"
     paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlistPair gamma0 beta0
+    runtimeInit := some (.cons .ones (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -76,6 +77,7 @@ def rmsNorm
   { kind := "RMSNorm"
     paramShapes := [gammaShape]
     initParams := Torch.tlistSingleton gamma0
+    runtimeInit := some (.cons .ones .nil)
     paramRequiresGrad := [true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -109,6 +111,7 @@ def batchnormChannelFirst
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlistPair gamma0 beta0
+    runtimeInit := some (.cons .ones (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -147,6 +150,7 @@ def batchnormChannelFirstEval
   { kind := "BatchNorm2d(eval)"
     paramShapes := [gammaShape, betaShape, meanShape, varShape]
     initParams := Torch.tlistQuad gamma0 beta0 mean0 var0
+    runtimeInit := some (.cons .ones (.cons .zeros (.cons .zeros (.cons .ones .nil))))
     paramRequiresGrad := [true, true, false, false]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -190,6 +194,8 @@ def batchnormChannelFirstMode
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
     initParams := .cons gamma0 (.cons beta0 (.cons mean0 (.cons var0 (.cons momentum0 .nil))))
+    runtimeInit := some (.cons .ones (.cons .zeros (.cons .zeros (.cons .ones
+      (.cons (.flat (FloatArray.mk #[momentum])) .nil)))))
     paramRequiresGrad := [true, true, false, false, false]
     updateBuffers := some (fun mode {_α} _ _ ps x => do
       match mode, ps with
@@ -238,6 +244,7 @@ def instanceNorm2dNchw
   { kind := "InstanceNorm2d"
     paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlistPair gamma0 beta0
+    runtimeInit := some (.cons .ones (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -271,6 +278,7 @@ def groupNorm2dNchw
   { kind := s!"GroupNorm2d(groups={groups})"
     paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlistPair gamma0 beta0
+    runtimeInit := some (.cons .ones (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -303,6 +311,7 @@ def batchNorm2dNchw
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape]
     initParams := Torch.tlistPair gamma0 beta0
+    runtimeInit := some (.cons .ones (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -345,6 +354,8 @@ def batchNorm2dNchwMode
   { kind := "BatchNorm2d"
     paramShapes := [gammaShape, betaShape, meanShape, varShape, momentumShape]
     initParams := .cons gamma0 (.cons beta0 (.cons mean0 (.cons var0 (.cons momentum0 .nil))))
+    runtimeInit := some (.cons .ones (.cons .zeros (.cons .zeros (.cons .ones
+      (.cons (.flat (FloatArray.mk #[momentum])) .nil)))))
     paramRequiresGrad := [true, true, false, false, false]
     updateBuffers := some (fun mode {_α} _ _ ps x => do
       match mode, ps with

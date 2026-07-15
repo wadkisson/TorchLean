@@ -199,6 +199,7 @@ def main (args : List String) : IO UInt32 := do
       let trained ← trainer.train
         (Data.floatSamples samples)
         { steps := train.steps
+          cudaMemWatch := train.cudaMemWatch
           log := .disabled
           loadParams? := train.loadParams?
           saveParams? := train.saveParams? }

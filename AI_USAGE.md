@@ -17,6 +17,10 @@ oracle and not as a replacement for manual formalization.
   boundaries: reading error logs, thinking through FFI and memory ownership
   issues, checking documentation language, and helping us separate what Lean
   proves from what the CUDA/cuBLAS runtime must be trusted to do.
+- More recently, OpenAI Codex has helped with repository-wide cleanup, API and
+  module organization, upgrades to newer Lean releases, and the build, test,
+  and documentation checks that accompany those changes. The maintainers
+  reviewed the resulting code and decided which changes belonged in TorchLean.
 - Harmonic was used in a narrower exploratory role for a small amount of
   definition design and mathematical organization, especially before committing
   some concepts to Lean.
@@ -54,6 +58,6 @@ For the release:
 - CUDA, Python, Julia, external solvers, native libraries, and finite precision
   behavior remain behind the explicit trust boundaries documented in
   `TRUST_BOUNDARIES.md`.
-- Any code, proof idea, or prose suggested by an AI tool was manually reviewed, edited, and
-  either checked by the repository tooling or left visible as an assumption,
-  limitation, or external trust boundary.
+- Any code, proof idea, or prose suggested by an AI tool was manually reviewed,
+  edited, and either checked by the repository tooling or left visible as an
+  assumption, limitation, or external trust boundary.

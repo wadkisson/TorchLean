@@ -105,6 +105,7 @@ def matAffine
     Torch.Init.tensor (s := bShape) (sch := .zeros) (seed := seedB)
   { paramShapes := [WShape, bShape]
     initParams := Torch.tlistPair w0 b0
+    runtimeInit := some (.cons (.uniform (-0.1) 0.1 seedW) (.cons .zeros .nil))
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
         fun w b x =>
@@ -190,6 +191,9 @@ def block
 
   { paramShapes := [wLowShape, wHighShape, wSkipShape, bSkipShape]
     initParams := Torch.tlistQuad wLow0 wHigh0 wSkip0 bSkip0
+    runtimeInit := some <| .cons (.uniform (-0.05) 0.05 seed) <|
+      .cons (.uniform (-0.05) 0.05 (seed + 1)) <|
+      .cons (.uniform (-0.05) 0.05 (seed + 2)) <| .cons .zeros .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
         fun wLow wHigh wSkip bSkip x =>
@@ -458,6 +462,11 @@ def block
     initParams :=
       .cons (w0 0) <| .cons (w0 1) <| .cons (w0 2) <| .cons (w0 3) <|
         .cons wSkip0 <| .cons bSkip0 .nil
+    runtimeInit := some <| .cons (.uniform (-0.04) 0.04 (seed + 0)) <|
+      .cons (.uniform (-0.04) 0.04 (seed + 1)) <|
+      .cons (.uniform (-0.04) 0.04 (seed + 2)) <|
+      .cons (.uniform (-0.04) 0.04 (seed + 3)) <|
+      .cons (.uniform (-0.04) 0.04 (seed + 20)) <| .cons .zeros .nil
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
         fun wLowRe wLowIm wHighRe wHighIm wSkip bSkip x =>

@@ -45,12 +45,20 @@ abbrev Runner := Supervised.Runner
 abbrev Optimizer := Supervised.OptimizerConfig
 @[inherit_doc Supervised.TrainConfig]
 abbrev TrainConfig := Supervised.TrainConfig
+@[inherit_doc Supervised.CudaMemWatchState]
+abbrev CudaMemWatchState := Supervised.CudaMemWatchState
 @[inherit_doc Supervised.LoaderTrainConfig]
 abbrev LoaderTrainConfig := Supervised.LoaderTrainConfig
 @[inherit_doc Supervised.TrainReport]
 abbrev TrainReport := Supervised.TrainReport
 @[inherit_doc Supervised.Stepper]
 abbrev Stepper := Supervised.Stepper
+
+@[inherit_doc Supervised.effectiveCudaMemWatch]
+abbrev effectiveCudaMemWatch := Supervised.effectiveCudaMemWatch
+
+@[inherit_doc Supervised.reportCudaMemWatch]
+abbrev reportCudaMemWatch := Supervised.reportCudaMemWatch
 
 /-- Lower-runtime regression task with mean-squared error loss by default. -/
 def runtimeRegressionTask {σ τ : Spec.Shape} (model : API.TorchLean.LayerCore.Seq σ τ)
@@ -235,6 +243,11 @@ def instantiateConfigured {σ τ : Spec.Shape} (task : Task σ τ)
     (opts : API.TorchLean.Options := {}) :
     IO (Runner α task) :=
   Supervised.instantiateWithRuntimeOptions (task := task) (α := α) opts
+
+/-- Instantiate a `Float` runner with storage-first parameter initialization when available. -/
+def instantiateConfiguredFloat {σ τ : Spec.Shape} (task : Task σ τ)
+    (opts : API.TorchLean.Options := {}) : IO (Runner Float task) :=
+  Supervised.instantiateConfiguredFloat task opts
 
 /--
 Instantiate a runner (parameters + buffers + backend state) for the given task.

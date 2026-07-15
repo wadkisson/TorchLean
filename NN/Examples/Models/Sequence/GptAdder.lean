@@ -575,6 +575,7 @@ def trainAdderFloat (opts : Options) (trainOpts : AdderOptions) :
     { steps := trainOpts.steps
       log := trainOpts.toInteractiveTrainOptions.toModelTrainFlags.log
       logEvery := Nat.max 1 (trainOpts.steps / 10)
+      cudaMemWatch := trainOpts.cudaMemWatch
       title := "GPT adder training"
       notes := trainOpts.logNotes opts }
   trained.printSummary

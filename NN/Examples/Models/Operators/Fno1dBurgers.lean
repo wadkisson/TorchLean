@@ -268,10 +268,11 @@ abbrev Param := _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.Param
 
 /-- Mean MSE over a finite evaluation prefix using the fused CUDA FNO implementation. -/
 def meanLoss (ps : Array Param) (samples : List (Tensor Float σ × Tensor Float τ)) :
-    IO Float :=
-  _root_.Runtime.Autograd.okOrThrow <|
+    IO Float := do
+  let result ←
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.meanLoss
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) ps samples
+  _root_.Runtime.Autograd.okOrThrow result
 
 /-- Train/test MSE pair for the current fused CUDA parameters. -/
 def evalLosses (trainEval testEval : List (Tensor Float σ × Tensor Float τ))
@@ -289,11 +290,14 @@ def recordEval (trainEval testEval : List (Tensor Float σ × Tensor Float τ))
 
 /-- Predict one Burgers terminal field through the fused CUDA spectral path. -/
 def predict (ps : Array Param) (x : Tensor Float σ) : IO (Tensor Float τ) := do
-  let fw ← _root_.Runtime.Autograd.okOrThrow <|
+  let result ←
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.forward
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) ps x none
-  _root_.Runtime.Autograd.okOrThrow <|
+  let fw ← _root_.Runtime.Autograd.okOrThrow result
+  let predictionResult ←
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.predFromTape (grid := grid) fw.tape fw.predId
+  fw.dispose
+  _root_.Runtime.Autograd.okOrThrow predictionResult
 
 /-- One fused CUDA Adam update on a single Burgers sample. -/
 def trainStep (lr : Float)
@@ -302,11 +306,13 @@ def trainStep (lr : Float)
     (sample : Tensor Float σ × Tensor Float τ) :
     IO (Array Param × _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.AdamState) := do
   let (x, y) := sample
-  let fw ← _root_.Runtime.Autograd.okOrThrow <|
+  let forwardResult ←
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.forward
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) ps x (some y)
-  _root_.Runtime.Autograd.okOrThrow <|
+  let fw ← _root_.Runtime.Autograd.okOrThrow forwardResult
+  let result ←
     _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.updateParamsAdam ps fw lr adamSt
+  _root_.Runtime.Autograd.okOrThrow result
 
 /-- Run the fused cuFFT/RFFT training path and emit its training and prediction artifacts. -/
 def run (cfg : BurgersOptions) : IO Unit := do

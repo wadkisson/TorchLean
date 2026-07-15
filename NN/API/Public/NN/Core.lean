@@ -49,7 +49,7 @@ The names mirror the TorchLean runtime layer so users can move between the publi
 runtime layer code without learning a second vocabulary.
 -/
 export TorchLean.LayerCore.Seq
-  (paramShapes paramRequiresGrad initParams updateBuffers
+  (paramShapes paramRequiresGrad initParams runtimeInit? hasBufferUpdates updateBuffers
    programWithMode forwardProgram
    scalarModuleDefWithMode scalarModuleDef
    mseScalarModuleDefWithMode mseScalarModuleDef
@@ -98,6 +98,8 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
     { kind := s!"Linear({inDim}, {outDim})"
       paramShapes := [WShape, bShape]
       initParams := tensorpack! w0, b0
+      runtimeInit := some (.cons (.xavierUniform inDim outDim seedW)
+        (.cons .zeros .nil))
       paramRequiresGrad := [true, true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -225,6 +227,13 @@ def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape :
     { kind := s!"Embedding({vocab}, {embedDim})"
       paramShapes := [WShape]
       initParams := tensorpack! w0
+      runtimeInit := some (.cons
+        (match cfg.wInit with
+         | .zeros => .zeros
+         | .ones => .ones
+         | .uniform lo hi => .uniform lo hi cfg.seedW
+         | .xavierUniform fanIn fanOut => .xavierUniform fanIn fanOut cfg.seedW
+         | .kaimingUniform fanIn => .kaimingUniform fanIn cfg.seedW) .nil)
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -281,6 +290,13 @@ def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPosit
     { kind := "LearnedPositionalEmbedding"
       paramShapes := [posShape]
       initParams := tensorpack! pos0
+      runtimeInit := some (.cons
+        (match cfg.posInit with
+         | .zeros => .zeros
+         | .ones => .ones
+         | .uniform lo hi => .uniform lo hi cfg.seedPos
+         | .xavierUniform fanIn fanOut => .xavierUniform fanIn fanOut cfg.seedPos
+         | .kaimingUniform fanIn => .kaimingUniform fanIn cfg.seedPos) .nil)
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>

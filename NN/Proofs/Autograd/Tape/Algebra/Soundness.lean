@@ -411,7 +411,7 @@ def eval {ss : List Shape} (g : GraphData α Δ Γ ss) (x : TList α Γ) (d : Δ
   | .nil => TList.cast (α := α) (h := (List.append_nil Γ).symm) x
   | .snoc (ss := ss) (τ := τ) g node =>
       let ctx := eval (ss := ss) g x d
-      let y := node.forward ctx d
+      let y := Tensor.materialize (node.forward ctx d)
       TList.cast (α := α) (h := List.append_assoc Γ ss [τ]) (TList.snoc (α := α) (ss := Γ ++ ss) (τ
         := τ) ctx y)
 
@@ -423,7 +423,7 @@ def jvpCtx {ss : List Shape} (g : GraphData α Δ Γ ss) (x : TList α Γ) (dx :
   | .snoc (ss := ss) (τ := τ) g node =>
       let ctx := eval (ss := ss) g x d
       let dctx := jvpCtx (ss := ss) g x dx d
-      let dy := node.jvp ctx dctx d
+      let dy := Tensor.materialize (node.jvp ctx dctx d)
       TList.cast (α := α) (h := List.append_assoc Γ ss [τ]) (TList.snoc (α := α) (ss := Γ ++ ss) (τ
         := τ) dctx dy)
 

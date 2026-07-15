@@ -69,9 +69,15 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
           IO.println s!"dataset size = {dataset.size}"
           let before ← meanModuleLoss model m samples
           let stepSample ← Module.optimizerStep m run.optimizer
+          let watchEvery := NN.API.Common.effectiveCudaMemWatch runtimeOpts trainOpts.steps
+            trainOpts.cudaMemWatch
+          let mut memWatch? ← NN.API.Common.reportCudaMemWatch runtimeOpts watchEvery
+            trainOpts.steps 0 none
           for stepIdx in [0:trainOpts.steps] do
             for sample in samples do
               stepSample sample
+            memWatch? ← NN.API.Common.reportCudaMemWatch runtimeOpts watchEvery
+              trainOpts.steps (stepIdx + 1) memWatch?
             if trainOpts.logEvery > 0 && stepIdx % trainOpts.logEvery = 0 then
               let loss ← meanModuleLoss model m samples
               IO.println s!"step {stepIdx}: loss={loss}"
@@ -92,13 +98,49 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
               predictBatch := predictBatch }
           let extra ← afterTrain (α := α) model m
           pure (result, extra))
+  let runForFloat : IO (Custom.TrainResult σ τ × β) := do
+    Module.withScalarLossModelFloat
+        (mkModel := pure trainer.model) (opts := runtimeOpts) (loss := trainer.loss)
+        (k := fun model m => do
+          let dataset ← data.build (α := Float)
+          let samples := dataset.toList
+          IO.println s!"dataset size = {dataset.size}"
+          let before ← meanModuleLoss model m samples
+          let stepSample ← Module.optimizerStep m run.optimizer
+          let watchEvery := NN.API.Common.effectiveCudaMemWatch runtimeOpts trainOpts.steps
+            trainOpts.cudaMemWatch
+          let mut memWatch? ← NN.API.Common.reportCudaMemWatch runtimeOpts watchEvery
+            trainOpts.steps 0 none
+          for stepIdx in [0:trainOpts.steps] do
+            for sample in samples do
+              stepSample sample
+            memWatch? ← NN.API.Common.reportCudaMemWatch runtimeOpts watchEvery
+              trainOpts.steps (stepIdx + 1) memWatch?
+            if trainOpts.logEvery > 0 && stepIdx % trainOpts.logEvery = 0 then
+              let loss ← meanModuleLoss model m samples
+              IO.println s!"step {stepIdx}: loss={loss}"
+          let after ← meanModuleLoss model m samples
+          let predict := fun (x : Tensor.T Float σ) => Module.predict runtimeOpts model m x
+          let predictBatch := fun (xs : List (Tensor.T Float σ)) => xs.mapM predict
+          let result : Custom.TrainResult σ τ :=
+            { report :=
+                { steps := trainOpts.steps
+                  before := toString before
+                  after := toString after }
+              predict := predict
+              predictBatch := predictBatch }
+          let extra ← afterTrain (α := Float) model m
+          pure (result, extra))
   if runtimeOpts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
-  match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ =>
-      runFor (α := α))) with
-  | .ok out => pure out
-  | .error msg => throw <| IO.userError msg
+  match run.dtype with
+  | .float => runForFloat
+  | dtype =>
+      match (← Trainer.Implementation.withReadableRuntime dtype (fun {α} _ _ _ _ _ =>
+          runFor (α := α))) with
+      | .ok out => pure out
+      | .error msg => throw <| IO.userError msg
 
 end Internal
 

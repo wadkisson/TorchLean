@@ -67,6 +67,7 @@ def trainOptions (flags : ModelZoo.LoggedTrainFlags)
     batchSize := flags.batchSize
     log := if enableLog then flags.log else .disabled
     logEvery := logEvery
+    cudaMemWatch := flags.cudaMemWatch
     title := title
     notes := notes }
 
@@ -108,6 +109,7 @@ def trainOptions (flags : ModelZoo.TrainFlags)
     batchSize := base.batchSize
     log := base.log
     logEvery := logEvery
+    cudaMemWatch := base.cudaMemWatch
     title := title
     notes := notes }
 

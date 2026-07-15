@@ -68,8 +68,11 @@ def adaptFlatBatch (leading : Spec.Shape) {σ τ : Spec.Shape}
   { kind := l.kind
     paramShapes := l.paramShapes
     initParams := l.initParams
+    runtimeInit := l.runtimeInit
     paramRequiresGrad := l.paramRequiresGrad
-    updateBuffers := none
+    updateBuffers := l.updateBuffers.map fun update mode {α} _ _ ps x =>
+      update mode ps <| Spec.Tensor.reshapeSpec x (by
+        simp [Spec.Shape.size_concat, Spec.Shape.size])
     forward := fun mode {α} _ _ =>
       fun {m} _ _ =>
         _root_.Runtime.Autograd.Torch.CurriedRef.curry
@@ -111,8 +114,12 @@ def mapLayerOverAxis (n : Nat) {σ τ : Spec.Shape} (l : LayerDef σ τ) :
   { kind := l.kind
     paramShapes := l.paramShapes
     initParams := l.initParams
+    runtimeInit := l.runtimeInit
     paramRequiresGrad := l.paramRequiresGrad
-    updateBuffers := none
+    updateBuffers := l.updateBuffers.map fun update mode {_α} _ _ ps x =>
+      match x with
+      | Spec.Tensor.dim rows =>
+          (List.finRange n).foldlM (init := ps) fun state i => update mode state (rows i)
     forward := fun mode {α} _ _ =>
       fun {m} _ _ =>
         _root_.Runtime.Autograd.Torch.CurriedRef.curry

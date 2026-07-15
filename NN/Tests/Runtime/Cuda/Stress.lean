@@ -137,6 +137,37 @@ def runGradientAliasingStress : IO Unit := do
   let expected : Tensor Float s := tensorOfList! [4] [2.0, 2.0, 2.0, 2.0]
   Utils.assertTensorApprox (s := s) "add backward duplicate-parent gradient" dx expected
 
+def runSparseLifetimeStress : IO Unit := do
+  IO.println "== repeated sparse-backward ownership =="
+
+  let before ← Buffer.allocatorStatsWithToken 100
+  let s : Shape := shape![4]
+  let x : Tensor Float s := tensorOfList! [4] [0.25, -0.50, 0.75, -1.00]
+  let t0 : Cuda.Tape := Cuda.Tape.empty
+  let (t1, xId) := Cuda.Tape.leaf (t := t0) (Utils.tensorToAnyBuffer x) (name := some "x")
+  let (t2, outId) ← Utils.okOrThrow (Cuda.Tape.sum (t := t1) (s := s) xId)
+
+  -- The output cotangent must be allocated afresh on every pass. A pure constant allocation can
+  -- be hoisted by Lean and then reused after sparse backward has retired its native storage.
+  for pass in [0:8] do
+    let seed : Cuda.AnyBuffer := { s := Shape.scalar, buf := ← Buffer.fullIO 1 1.0 }
+    let grads ← Cuda.Tape.backwardSparse (t := t2) outId seed (fun id => id == xId)
+    let dx ← match grads.get? xId with
+      | some dx => pure dx
+      | none => throw <| IO.userError s!"sparse backward pass {pass}: missing leaf gradient"
+    let dx ← Utils.anyBufferToTensor (s := s) dx
+    let expected : Tensor Float s := tensorOfList! [4] [1.0, 1.0, 1.0, 1.0]
+    Utils.assertTensorApprox (s := s) s!"sparse backward pass {pass}" dx expected
+    Cuda.Tape.releaseSparseGrads grads
+
+  -- This test owns the tape and therefore retires its persistent forward values explicitly.
+  for node in t2.nodes do
+    discard <| Buffer.releaseIO node.value.buf
+  let after ← Buffer.allocatorStatsWithToken 101
+  if after.liveBytes > before.liveBytes then
+    throw <| IO.userError
+      s!"sparse backward ownership: live bytes grew from {before.liveBytes} to {after.liveBytes}"
+
 def runLargeBufferStress : IO Unit := do
   IO.println "== large buffer elementwise/reduction stress =="
 
@@ -238,6 +269,7 @@ def run : IO Unit := do
   runRngStress
   runReleaseStress
   runGradientAliasingStress
+  runSparseLifetimeStress
   runLargeBufferStress
   runMatmulStress
 

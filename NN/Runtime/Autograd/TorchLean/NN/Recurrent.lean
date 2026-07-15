@@ -45,6 +45,7 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0) :
   { kind := s!"Linear({inDim}, {outDim})"
     paramShapes := [WShape, bShape]
     initParams := Torch.tlistPair w0 b0
+    runtimeInit := some (.cons (.xavierUniform inDim outDim seedW) (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -69,6 +70,7 @@ def linear2d (batch inDim outDim : Nat) (seedW seedB : Nat := 0) :
   { kind := s!"Linear2d({inDim}, {outDim})"
     paramShapes := [WShape, bShape]
     initParams := Torch.tlistPair w0 b0
+    runtimeInit := some (.cons (.xavierUniform inDim outDim seedW) (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -101,6 +103,8 @@ def rnn (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
   { kind := s!"RNN({inputSize}, {hiddenSize})"
     paramShapes := [WShape, bShape]
     initParams := Torch.tlistPair w0 b0
+    runtimeInit := some (.cons (.xavierUniform (inputSize + hiddenSize) hiddenSize seedW)
+      (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -156,6 +160,10 @@ def gru (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
   { kind := s!"GRU({inputSize}, {hiddenSize})"
     paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape]
     initParams := .cons wReset0 (.cons bReset0 (.cons wUpdate0 (.cons bUpdate0 (.cons wNew0 (.cons bNew0 .nil)))))
+    runtimeInit := some <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 0)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 1)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 2)) <|
+      .cons .zeros .nil
     paramRequiresGrad := [true, true, true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -241,6 +249,10 @@ def mamba (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     paramShapes := [WInShape, bShape, WDeltaShape, bShape, WInShape, bShape]
     initParams := .cons wIn0 (.cons bIn0 (.cons wDelta0 (.cons bDelta0
       (.cons wGate0 (.cons bGate0 .nil)))))
+    runtimeInit := some <| .cons (.xavierUniform inputSize hiddenSize (seedW + 0)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 1)) <|
+      .cons .zeros <| .cons (.xavierUniform inputSize hiddenSize (seedW + 2)) <|
+      .cons .zeros .nil
     paramRequiresGrad := [true, true, true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -318,6 +330,11 @@ def lstm (seqLen inputSize hiddenSize : Nat) (seedW seedB : Nat := 0) :
     paramShapes := [WShape, bShape, WShape, bShape, WShape, bShape, WShape, bShape]
     initParams :=
       .cons wF0 (.cons bF0 (.cons wI0 (.cons bI0 (.cons wC0 (.cons bC0 (.cons wO0 (.cons bO0 .nil)))))))
+    runtimeInit := some <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 0)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 1)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 2)) <|
+      .cons .zeros <| .cons (.xavierUniform (inputSize + hiddenSize) hiddenSize (seedW + 3)) <|
+      .cons .zeros .nil
     paramRequiresGrad := [true, true, true, true, true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

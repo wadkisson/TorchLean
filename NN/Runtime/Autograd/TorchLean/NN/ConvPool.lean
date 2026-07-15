@@ -53,6 +53,8 @@ def conv
   { kind := s!"Conv{d}d({inC}, {outC})"
     paramShapes := [KShape, bShape]
     initParams := Torch.tlistPair k0 b0
+    runtimeInit := some (.cons (TorchLean.Module.RuntimeInit.FloatInit.ofScheme kInit seedK)
+      (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -94,6 +96,8 @@ def convTranspose
   { kind := s!"ConvTranspose{d}d({inC}, {outC})"
     paramShapes := [KShape, bShape]
     initParams := Torch.tlistPair k0 b0
+    runtimeInit := some (.cons (TorchLean.Module.RuntimeInit.FloatInit.ofScheme kInit seedK)
+      (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -188,6 +192,8 @@ def conv2d
   { kind := s!"Conv2d({inC}, {outC}, {kH}x{kW})"
     paramShapes := [KShape, bShape]
     initParams := Torch.tlistPair k0 b0
+    runtimeInit := some (.cons (TorchLean.Module.RuntimeInit.FloatInit.ofScheme kInit seedK)
+      (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -224,6 +230,8 @@ def convTranspose2d
   { kind := s!"ConvTranspose2d({inC}, {outC}, {kH}x{kW})"
     paramShapes := [KShape, bShape]
     initParams := Torch.tlistPair k0 b0
+    runtimeInit := some (.cons (TorchLean.Module.RuntimeInit.FloatInit.ofScheme kInit seedK)
+      (.cons .zeros .nil))
     paramRequiresGrad := [true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>

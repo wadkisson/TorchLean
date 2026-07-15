@@ -108,6 +108,16 @@ def instantiateModuleDefModel
     IO (ScalarModule α (nn.paramShapes model) [σ, τ]) :=
   instantiate (α := α) opts (moduleDefOf model) cast
 
+/-- Float specialization of `instantiateModuleDefModel` with storage-first initialization. -/
+def instantiateModuleDefModelFloat
+    {σ τ : Shape}
+    (opts : Options)
+    (model : TorchLean.nn.Sequential σ τ)
+    (moduleDefOf : (model : TorchLean.nn.Sequential σ τ) →
+      ScalarModuleDef (nn.paramShapes model) [σ, τ]) :
+    IO (ScalarModule Float (nn.paramShapes model) [σ, τ]) :=
+  NN.API.TorchLean.Module.instantiateFloat (moduleDefOf model) opts
+
 /--
 Instantiate the standard PPO actor-critic supervised runtime module from rollout-shaped actor and
 critic networks.
@@ -216,6 +226,20 @@ def withScalarLossModel
     (α := α) (mkModel := mkModel) (opts := opts)
     (moduleDefOf := fun model => nn.scalarModuleDef model (loss := loss))
     (cast := cast) k
+
+/-- Float specialization of `withScalarLossModel` with storage-first parameter initialization. -/
+def withScalarLossModelFloat
+    {σ τ : Shape} {β : Type}
+    (mkModel : TorchLean.nn.M (TorchLean.nn.Sequential σ τ))
+    (opts : Options)
+    (loss : ∀ {α : Type}, [Runtime.TensorScalar α] → [DecidableEq Shape] →
+      _root_.Runtime.Autograd.TorchLean.Program α [τ, τ] Shape.scalar)
+    (k : (model : TorchLean.nn.Sequential σ τ) →
+      ScalarModule Float (nn.paramShapes model) [σ, τ] → IO β) : IO β :=
+  nn.withModel mkModel fun model => do
+    let m ← instantiateModuleDefModelFloat opts model
+      (fun current => nn.scalarModuleDef current (loss := loss))
+    k model m
 
 /--
 Evaluate one supervised sample through a runtime module and return the scalar loss value.

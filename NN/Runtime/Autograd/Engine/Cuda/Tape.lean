@@ -11,7 +11,8 @@ This is the GPU/runtime analogue of `NN.Runtime.Autograd.Engine.Core`, but speci
 Notes:
 - The tape is pure: we use `Except String` for errors (no `IO` exceptions).
 - Buffers are assumed to be contiguous float32 arrays of length `Spec.Shape.size s`.
-- Backprop here is "dense": it returns a gradient buffer for every node id (zeros for unused).
+- Backprop supports both a dense result for diagnostics and a sparse, explicitly owned result for
+  training paths that only retain parameter gradients.
 - This module contains tape machinery; differentiable CUDA ops live in
   `NN.Runtime.Autograd.Engine.Cuda.Ops`.
 -/
@@ -27,7 +28,7 @@ public import NN.Runtime.Autograd.Engine.Cuda.Buffer
 
 Shape-erased CUDA tape machinery for float32 `Cuda.Buffer` values. This is the GPU/runtime analogue
 of the CPU autograd tape: it records node ids, runtime shapes, parent links, and backward callbacks,
-then performs dense reverse-mode accumulation over buffers.
+then performs reverse-mode accumulation over buffers.
 -/
 
 @[expose] public section
@@ -416,6 +417,135 @@ def backwardDenseAll (t : Tape) (outId : Nat) (seed : AnyBuffer) : Result (Array
     backwardDenseFrom (t := t) grads
   else
     throw "autograd: seed gradient shape mismatch for output"
+
+/-!
+Sparse gradients
+
+Training only needs cotangents for parameter leaves. The sparse traversal below releases each
+activation cotangent immediately after its local VJP has propagated it and retains owned copies
+only for node ids selected by the caller.
+-/
+
+/-- Device gradients retained for selected tape node ids. -/
+abbrev SparseGradMap := Std.HashMap Nat AnyBuffer
+
+/-- Sequence a native buffer release inside `IO`. -/
+def releaseSparseBuffer (b : Buffer) : IO Unit := do
+  discard <| Buffer.releaseIO b
+
+/-- Release every buffer owned by a sparse gradient map. -/
+def releaseSparseGrads (grads : SparseGradMap) : IO Unit := do
+  for (_id, grad) in grads.toList do
+    releaseSparseBuffer grad.buf
+
+/--
+Insert or accumulate an owned VJP contribution into the sparse gradient map.
+
+CUDA backward rules return fresh contribution buffers. The sparse map copies a first contribution
+so its retained values have uniform ownership, then retires the consumed contribution immediately.
+-/
+def addSparseGrad (t : Tape) (gradsRef : IO.Ref SparseGradMap)
+    (id : Nat) (g : AnyBuffer) : IO Unit := do
+  let node ← match t.getNode? id with
+    | some node => pure node
+    | none =>
+        releaseSparseBuffer g.buf
+        throw <| IO.userError "autograd: invalid parent id during sparse CUDA backward"
+  if !node.requires_grad then
+    releaseSparseBuffer g.buf
+  else if _h : g.s = node.value.s then
+    let contribution : AnyBuffer := { s := node.value.s, buf := g.buf }
+    let grads ← gradsRef.get
+    match grads.get? id with
+    | none =>
+        -- VJP rules may pass through an upstream handle. Copy-on-insert gives the map an
+        -- unambiguous owner independently of local aliasing inside a backward rule.
+        let owned : AnyBuffer := {
+          s := contribution.s
+          buf := Buffer.copyAndRelease contribution.buf }
+        gradsRef.set (grads.insert id owned)
+    | some old =>
+        if _hOld : old.s = node.value.s then
+          let old' : AnyBuffer := { s := node.value.s, buf := old.buf }
+          let summed ← match AnyBuffer.add old' contribution with
+            | .ok summed => pure summed
+            | .error msg =>
+                releaseSparseBuffer contribution.buf
+                throw <| IO.userError msg
+          releaseSparseBuffer old'.buf
+          gradsRef.set (grads.insert id summed)
+          releaseSparseBuffer contribution.buf
+        else
+          releaseSparseBuffer contribution.buf
+          throw <| IO.userError "autograd: sparse CUDA gradient shape mismatch"
+  else
+    releaseSparseBuffer g.buf
+    throw <| IO.userError "autograd: sparse CUDA gradient contribution has wrong shape"
+
+/--
+Run reverse mode while retaining gradients only for node ids accepted by `retain`.
+
+This function consumes `seed`. The returned buffers are owned by the map and must be released with
+`releaseSparseGrads` after the optimizer has consumed them. All other activation gradients are
+retired during the traversal.
+-/
+def backwardSparse (t : Tape) (outId : Nat) (seed : AnyBuffer)
+    (retain : Nat → Bool) : IO SparseGradMap := do
+  let outNode ← match t.getNode? outId with
+    | some node => pure node
+    | none =>
+        releaseSparseBuffer seed.buf
+        throw <| IO.userError "autograd: invalid output id"
+  if _h : seed.s = outNode.value.s then
+    let seedOwned : AnyBuffer := {
+      s := outNode.value.s
+      buf := Buffer.copyAndRelease seed.buf }
+    let gradsRef ← IO.mkRef
+      ((Std.HashMap.emptyWithCapacity).insert outId seedOwned : SparseGradMap)
+    try
+      for offset in [0:t.nodes.size] do
+        let id := t.nodes.size - 1 - offset
+        let grads ← gradsRef.get
+        match grads.get? id with
+        | none => pure ()
+        | some upstream =>
+            let node ← match t.getNode? id with
+              | some node => pure node
+              | none => throw <| IO.userError "autograd: internal sparse CUDA node missing"
+            if node.requires_grad then
+              let expectedSize := Spec.Shape.size node.value.s
+              let actualSize := (← Buffer.sizeIO upstream.buf).toNat
+              if actualSize != expectedSize then
+                let nodeName := node.name.getD "<unnamed>"
+                throw <| IO.userError
+                  s!"autograd: sparse CUDA gradient buffer size mismatch at node {id} ({nodeName}): \
+                     expected {expectedSize}, got {actualSize}"
+              let contributions ← match node.backward upstream with
+                | .ok contributions => pure contributions
+                | .error msg => throw <| IO.userError msg
+              try
+                for (parentId, contribution) in contributions do
+                  addSparseGrad t gradsRef parentId contribution
+              catch e =>
+                -- Contributions already consumed by `addSparseGrad` have null native handles, so
+                -- releasing the whole list is idempotent and also retires every unvisited tail.
+                for (_parentId, contribution) in contributions do
+                  releaseSparseBuffer contribution.buf
+                throw e
+            if !retain id then
+              let current ← gradsRef.get
+              match current.get? id with
+              | none => pure ()
+              | some stale =>
+                  releaseSparseBuffer stale.buf
+                  gradsRef.set (current.erase id)
+      gradsRef.get
+    catch e =>
+      releaseSparseGrads (← gradsRef.get)
+      throw e
+  else
+    releaseSparseBuffer seed.buf
+    throw <| IO.userError "autograd: seed gradient shape mismatch for sparse output"
 
 end Tape
 

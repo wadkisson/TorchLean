@@ -42,12 +42,28 @@ def decodeWindow (t : Tokenizer) (n : Nat) (input : String) (offset : Nat := 0)
 /--
 Escape a short text fragment for one-line terminal output.
 
-Display-only: this does not change tokenizer semantics. It keeps examples readable when a predicted
-byte sequence contains quotes, backslashes, tabs, or newlines.
+Display-only: this does not change tokenizer semantics. Quotes and backslashes use their usual
+escapes, common whitespace controls use `\\n`, `\\r`, and `\\t`, and every other ASCII control
+character is written as `\\xNN`. Thus byte-token predictions cannot turn a log into a binary file.
 -/
 def escapeForDisplay (s : String) : String :=
-  "\"" ++ (s.replace "\\" "\\\\" |>.replace "\"" "\\\"" |>.replace "\n" "\\n"
-    |>.replace "\t" "\\t") ++ "\""
+  let hexDigit := fun n =>
+    (#['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f']).getD
+      (n % 16) '0'
+  let escapeChar := fun c =>
+    match c with
+    | '\\' => "\\\\"
+    | '"' => "\\\""
+    | '\n' => "\\n"
+    | '\r' => "\\r"
+    | '\t' => "\\t"
+    | _ =>
+        let n := c.toNat
+        if n < 32 || n = 127 then
+          "\\x" ++ String.singleton (hexDigit (n / 16)) ++ String.singleton (hexDigit n)
+        else
+          String.singleton c
+  "\"" ++ String.join (s.toList.map escapeChar) ++ "\""
 
 /-! ## Sampling Helpers (Top-k) -/
 

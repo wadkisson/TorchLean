@@ -103,6 +103,15 @@ structure LayerDef (σ τ : Shape) where
   /-- Initial parameter values (stored as `Float` tensors for convenient seeding/init schemes). -/
   initParams : Torch.TList Float paramShapes
   /--
+  Optional storage-first initialization plan for executable `Float` backends.
+
+  This does not replace `initParams`: the tensor-valued initializers remain available to the
+  specification and proof layers. The plan lets a runtime create equivalent parameter storage
+  without first enumerating those tensors on the host.
+  -/
+  runtimeInit : Option (TorchLean.Module.RuntimeInit.Plan paramShapes) :=
+    if h : paramShapes = [] then some (h ▸ .nil) else none
+  /--
   Per-parameter `requires_grad` flags (defaults to all `true`).
 
   PyTorch analogy: `tensor.requires_grad_(...)` on parameters/buffers.

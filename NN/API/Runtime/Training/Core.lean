@@ -155,7 +155,61 @@ structure TrainConfig where
   scheduler : Option API.TorchLean.Schedulers.Config := none
   /-- Log once every this many steps. -/
   logEvery : Nat := 1
+  /-- Sample CUDA allocator state every this many completed steps; `0` disables sampling. -/
+  cudaMemWatch : Nat := 0
   deriving Repr
+
+/-- State carried by the CUDA-memory drift detector used by sustained training runs. -/
+structure CudaMemWatchState where
+  firstStep : Nat
+  firstFreeBytes : Nat
+  warned : Bool
+deriving Repr
+
+/-- Resolve an explicit CUDA-memory cadence, or enable periodic sampling for very long runs. -/
+def effectiveCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
+    (steps requested : Nat) : Nat :=
+  if requested != 0 then
+    requested
+  else if opts.usesCuda && steps >= 1000 then
+    Nat.max 1 (steps / 10)
+  else
+    0
+
+/--
+Sample the CUDA allocator and warn when sustained free-memory loss projects exhaustion before the
+requested run completes.
+-/
+def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
+    (watchEvery totalSteps done : Nat) (state? : Option CudaMemWatchState) :
+    IO (Option CudaMemWatchState) := do
+  if !opts.usesCuda || watchEvery = 0 || (done != 0 && done % watchEvery != 0) then
+    pure state?
+  else
+    let stats ← _root_.Runtime.Autograd.Cuda.Buffer.allocatorStatsWithToken (UInt32.ofNat done)
+    IO.println s!"  cuda_mem step={done}: {stats.format}"
+    let freeNow := stats.deviceFreeBytes.toNat
+    match state? with
+    | none =>
+        pure (some { firstStep := done, firstFreeBytes := freeNow, warned := false })
+    | some st =>
+        if st.warned || done <= st.firstStep || st.firstFreeBytes <= freeNow then
+          pure (some st)
+        else
+          let span := done - st.firstStep
+          let drop := st.firstFreeBytes - freeNow
+          let dropPerStep := drop / Nat.max 1 span
+          if dropPerStep = 0 then
+            pure (some st)
+          else
+            let projectedFailure := done + freeNow / dropPerStep
+            if projectedFailure < totalSteps then
+              IO.println <|
+                s!"  cuda_mem warning: free device memory is dropping by ~{dropPerStep} bytes/step; " ++
+                  s!"projected allocation failure before requested step count (around step {projectedFailure})."
+              pure (some { st with warned := true })
+            else
+              pure (some st)
 
 /--
 Small summary returned by lower training helpers.
@@ -282,6 +336,22 @@ structure Runner (α : Type) [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
   /-- Mutable mode flag (`.train` / `.eval`) used by stateful layers (e.g. dropout/batchnorm). -/
   mode : IO.Ref API.TorchLean.LayerCore.Mode
 
+/-- Finish runner construction once parameter storage has been instantiated. -/
+def runnerOfModule {σ τ : Spec.Shape} (task : SeqTask σ τ)
+    {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
+    (module : API.TorchLean.Module.ScalarModule α (paramShapes task) [σ, τ]) :
+    IO (Runner α task) := do
+  let predictorTrain ← API.TorchLean.LayerCore.Seq.compileForwardWithMode .train (α := α) task.model
+  let predictorEval ← API.TorchLean.LayerCore.Seq.compileForwardWithMode .eval (α := α) task.model
+  let lossTrain ← API.TorchLean.Autodiff.compileLoss (α := α)
+    (paramShapes := paramShapes task) (inputShapes := [σ, τ])
+    (task.moduleDefWithMode .train).loss
+  let lossEval ← API.TorchLean.Autodiff.compileLoss (α := α)
+    (paramShapes := paramShapes task) (inputShapes := [σ, τ])
+    (task.moduleDefWithMode .eval).loss
+  let mode : IO.Ref API.TorchLean.LayerCore.Mode ← IO.mkRef .eval
+  pure { module, predictorTrain, predictorEval, lossTrain, lossEval, mode }
+
 /--
 Instantiate a `Runner` by explicitly providing a `Float → α` cast and backend.
 
@@ -294,23 +364,16 @@ def instantiateConfigured {σ τ : Spec.Shape} (task : SeqTask σ τ)
     (cast : Float → α) (opts : API.TorchLean.Options := {}) :
     IO (Runner α task) := do
   let module ← API.TorchLean.Module.instantiateConfigured (α := α) task.moduleDef cast opts
-  let predictorTrain ← API.TorchLean.LayerCore.Seq.compileForwardWithMode .train (α := α) task.model
-  let predictorEval ← API.TorchLean.LayerCore.Seq.compileForwardWithMode .eval (α := α) task.model
-  let lossTrain ← API.TorchLean.Autodiff.compileLoss (α := α)
-    (paramShapes := paramShapes task) (inputShapes := [σ, τ])
-    (task.moduleDefWithMode .train).loss
-  let lossEval ← API.TorchLean.Autodiff.compileLoss (α := α)
-    (paramShapes := paramShapes task) (inputShapes := [σ, τ])
-    (task.moduleDefWithMode .eval).loss
-  let mode : IO.Ref API.TorchLean.LayerCore.Mode ← IO.mkRef .eval
-  pure {
-    module := module
-    predictorTrain := predictorTrain
-    predictorEval := predictorEval
-    lossTrain := lossTrain
-    lossEval := lossEval
-    mode := mode
-  }
+  runnerOfModule task module
+
+/--
+Instantiate a `Float` runner using storage-first parameter initialization when the model provides
+it. Models without a runtime plan automatically retain the ordinary tensor initializer path.
+-/
+def instantiateConfiguredFloat {σ τ : Spec.Shape} (task : SeqTask σ τ)
+    (opts : API.TorchLean.Options := {}) : IO (Runner Float task) := do
+  let module ← API.TorchLean.Module.instantiateFloat task.moduleDef opts
+  runnerOfModule task module
 
 /--
 Instantiate a `Runner` by explicitly providing a `Float → α` cast and a backend selector.
@@ -448,7 +511,7 @@ def updateRunnerBuffers {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     (runner : Runner α task) (sample : API.TorchLean.TensorPack α [σ, τ]) : IO Unit := do
   let currentMode ← mode runner
-  if currentMode == .train then
+  if currentMode == .train && API.TorchLean.LayerCore.Seq.hasBufferUpdates task.model then
     match sample with
     | .cons x (.cons _y .nil) => do
         let ps ← params runner
@@ -476,18 +539,21 @@ def predict {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     (runner : Runner α task) (x : Spec.Tensor α σ) :
     IO (Spec.Tensor α τ) := do
-  let ps ← params runner
-  let predictor ← activePredictor runner
-  pure (API.TorchLean.LayerCore.Seq.forwardArtifact task.model predictor ps x)
+  if runner.module.opts.usesCuda then
+    let currentMode ← mode runner
+    API.TorchLean.LayerCore.Seq.forward (α := α) (tensorConv := runner.module.tensorConv)
+      runner.module.opts currentMode task.model runner.module.trainer.params x
+  else
+    let ps ← params runner
+    let predictor ← activePredictor runner
+    pure (API.TorchLean.LayerCore.Seq.forwardArtifact task.model predictor ps x)
 
 /-- Predict on a list of inputs by repeatedly calling `predict`. -/
 def predictBatch {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape]
     (runner : Runner α task) (xs : List (Spec.Tensor α σ)) :
-    IO (List (Spec.Tensor α τ)) := do
-  let ps ← params runner
-  let predictor ← activePredictor runner
-  pure <| xs.map (API.TorchLean.LayerCore.Seq.forwardArtifact task.model predictor ps)
+    IO (List (Spec.Tensor α τ)) :=
+  xs.mapM (predict runner)
 
 /-- For classification heads: run `predict`, then take `argmax` over the logits (if defined). -/
 def predictClass? {σ : Spec.Shape} {n : Nat} {task : SeqTask σ (.dim n .scalar)}
@@ -520,14 +586,20 @@ def meanLoss {σ τ : Spec.Shape} {task : SeqTask σ τ}
     {α : Type} [API.Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α]
     (runner : Runner α task) (samples : List (API.TorchLean.TensorPack α [σ, τ])) :
     IO α := do
-  let compiled ← activeLoss runner
-  let ps ← params runner
-  let values ← samples.mapM (fun sample => do
-    let args : API.TorchLean.TensorPack α (paramShapes task ++ [σ, τ]) :=
-      _root_.Proofs.Autograd.Algebra.TList.append
-        (α := α) (ss₁ := paramShapes task) (ss₂ := [σ, τ]) ps sample
-    pure (Spec.Tensor.toScalar <| _root_.Runtime.Autograd.Torch.CompiledScalar.forward compiled
-      args))
+  let values ←
+    if runner.module.opts.usesCuda then
+      samples.mapM (fun sample => do
+        let loss ← API.TorchLean.Module.forward runner.module sample
+        pure (Spec.Tensor.toScalar loss))
+    else do
+      let compiled ← activeLoss runner
+      let ps ← params runner
+      samples.mapM (fun sample => do
+        let args : API.TorchLean.TensorPack α (paramShapes task ++ [σ, τ]) :=
+          _root_.Proofs.Autograd.Algebra.TList.append
+            (α := α) (ss₁ := paramShapes task) (ss₂ := [σ, τ]) ps sample
+        pure (Spec.Tensor.toScalar <| _root_.Runtime.Autograd.Torch.CompiledScalar.forward compiled
+          args))
   match values with
   | [] => pure 0
   | xs => pure (xs.foldl (· + ·) 0 / (xs.length : α))

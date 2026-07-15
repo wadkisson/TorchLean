@@ -383,7 +383,8 @@ def trainCorpusFloat (opts : Options)
     (Data.floatSamples trainSamples)
     { steps := totalSteps
       log := .disabled
-      logEvery := Nat.max 1 (totalSteps / 10) }
+      logEvery := Nat.max 1 (totalSteps / 10)
+      cudaMemWatch := trainOpts.cudaMemWatch }
   let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some totalSteps)
@@ -450,7 +451,8 @@ def trainBpeCorpusFloat (opts : Options)
     (Data.floatSamples samples)
     { steps := trainOpts.steps
       log := .disabled
-      logEvery := Nat.max 1 (trainOpts.steps / 10) }
+      logEvery := Nat.max 1 (trainOpts.steps / 10)
+      cudaMemWatch := trainOpts.cudaMemWatch }
   let (beforeLoss, afterLoss) ←
     Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
       (steps? := some trainOpts.steps)

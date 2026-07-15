@@ -91,6 +91,12 @@ Important examples include:
   default-stream runtime, where launches and host copies are ordered through the default stream. If
   future backends introduce user streams or asynchronous graph replay, finalizer/free ordering must
   be revisited explicitly.
+- Sparse backward consumes some native gradient buffers. Seeds entering that path therefore come
+  from effectful constructors, which guarantee a fresh allocation, and ownership transfers use
+  copy-and-release operations. Repeated-backward tests check that seeds remain usable and that live
+  allocation stays flat; NVIDIA Compute Sanitizer checks the exercised path for native memory
+  errors. These checks can catch bad lifetime handling, but Lean does not prove `cudaMalloc`,
+  `cudaMemcpy`, or `cudaFree`.
 - GPU matmul supports two explicit precision paths:
   - FP32: `NN/Runtime/Autograd/Engine/Cuda/Kernels.lean` uses `Cuda.Buffer.bmm`, backed by
     `cublasSgemmStridedBatched` in `csrc/cuda/kernels/torchlean_cuda_kernels.cu`.

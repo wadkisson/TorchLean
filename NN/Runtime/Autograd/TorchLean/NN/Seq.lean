@@ -71,6 +71,25 @@ def initParams : {σ τ : Shape} → (m : Seq σ τ) → Torch.TList Float (para
         (ss₁ := l.paramShapes) (ss₂ := paramShapes rest) xs ys
 
 /--
+Collect a storage-first initializer plan when every parameterized layer supplies one.
+
+Parameter-free layers need no annotation and contribute the empty plan. If any parameterized layer
+has only tensor-valued initializers, the whole model falls back to the ordinary initialization path.
+-/
+def runtimeInit? : {σ τ : Shape} → (m : Seq σ τ) →
+    Option (TorchLean.Module.RuntimeInit.Plan (paramShapes m))
+  | _, _, .id _ => some .nil
+  | _, _, .cons l rest =>
+      match l.runtimeInit, runtimeInit? rest with
+      | some xs, some ys => some (TorchLean.Module.RuntimeInit.Plan.append xs ys)
+      | _, _ => none
+
+/-- Whether any layer in the sequence owns mode-dependent mutable buffers. -/
+def hasBufferUpdates : {σ τ : Shape} → Seq σ τ → Bool
+  | _, _, .id _ => false
+  | _, _, .cons l rest => l.updateBuffers.isSome || hasBufferUpdates rest
+
+/--
 Sequential composition for `Seq` models.
 
 `comp f g` runs `f` then `g`. We also provide the infix `>>>` operator.
@@ -163,7 +182,7 @@ def programWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
       (mode : Mode)
       (model : Seq σ τ)
       {α : Type} [Context α] [DecidableEq Shape]
-      [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
+      [tensorConv : _root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
       (params : _root_.Runtime.Autograd.Torch.ParamList α (paramShapes model))
       (x : Spec.Tensor α σ) : IO (Spec.Tensor α τ) := do
     -- `Seq.forward` is an inference helper. It still uses the eager session machinery to run the
@@ -203,10 +222,10 @@ def programWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
       (opts : _root_.Runtime.Autograd.Torch.Options)
       (model : Seq σ τ)
       {α : Type} [Context α] [DecidableEq Shape]
-      [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
+      [tensorConv : _root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
       (params : _root_.Runtime.Autograd.Torch.ParamList α (paramShapes model))
       (x : Spec.Tensor α σ) : IO (Spec.Tensor α τ) :=
-    forward (α := α) opts .eval model params x
+    forward (α := α) (tensorConv := tensorConv) opts .eval model params x
 
   /--
   Compile a sequential model into a reusable `CompiledGraph`.
@@ -292,6 +311,7 @@ def scalarModuleDefWithMode {σ τ : Shape} (mode : Mode) (model : Seq σ τ)
       Shape.scalar) :
     TorchLean.Module.ScalarModuleDef (paramShapes model) [σ, τ] :=
   { initParams := initParams model
+    runtimeInit := runtimeInit? model
     initRequiresGrad := paramRequiresGrad model
     loss := fun {α} => by
       intro _ _; exact

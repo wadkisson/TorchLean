@@ -8,21 +8,21 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 
 ## Summary
 
-- Modules: `1257`
-- Import edges: `4039`
-- Internal import edges: `3498`
-- Public imports: `3688`
+- Modules: `1259`
+- Import edges: `4043`
+- Internal import edges: `3502`
+- Public imports: `3692`
 - Private imports: `351`
-- Critical-path length over internal imports: `130`
+- Critical-path length over internal imports: `131`
 - Findings: `0` (`0` errors, `0` warnings)
-- Lean files: `1257`
-- Lean source lines: `310828`
-- Declaration headers: `12879`
+- Lean files: `1259`
+- Lean source lines: `311582`
+- Declaration headers: `12924`
 - Theorem/lemma headers: `2443`
 
 ## Top Fan-In Modules
 
-- `NN.API`: `79` incoming imports
+- `NN.API`: `80` incoming imports
 - `NN.Spec.Core.Tensor`: `33` incoming imports
 - `NN.Spec.Core.TensorOps`: `32` incoming imports
 - `NN.Spec.Core.TensorReductionShape`: `30` incoming imports
@@ -55,14 +55,14 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 - `NN.Floats` -> `NN.Floats`: `271`
 - `NN.MLTheory` -> `NN.MLTheory`: `229`
 - `NN.Verification` -> `NN.Verification`: `176`
-- `NN.Examples` -> `NN.Examples`: `154`
+- `NN.Examples` -> `NN.Examples`: `157`
 - `NN.CI` -> `NN.Spec`: `85`
 - `NN.MLTheory` -> `NN.Spec`: `71`
 - `NN.CI` -> `NN.MLTheory`: `68`
 - `NN.Proofs` -> `NN.Spec`: `62`
 - `NN.Tests` -> `NN.Tests`: `59`
 - `NN.CI` -> `NN.Floats`: `55`
-- `NN.Examples` -> `NN.API`: `54`
+- `NN.Examples` -> `NN.API`: `55`
 - `NN.Tests` -> `NN.Runtime`: `54`
 - `Backend` -> `Backend`: `42`
 - `NN.API` -> `NN.Spec`: `42`

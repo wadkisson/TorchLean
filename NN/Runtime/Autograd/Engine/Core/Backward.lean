@@ -44,7 +44,8 @@ def addGradDense
   if node.requires_grad = false then
     pure grads
   else if h : g.s = node.value.s then
-    let g' : Runtime.AnyTensor α := { s := node.value.s, t := Tensor.castShape g.t h }
+    let g' : Runtime.AnyTensor α := AnyTensor.materialize
+      { s := node.value.s, t := Tensor.castShape g.t h }
     if hid : id < grads.size then
       match grads[id]'hid with
       | none =>
@@ -78,7 +79,8 @@ def backwardDense {α : Type} [Add α] [DecidableEq Shape]
     | some n => pure n
     | none => throw "autograd: invalid output id"
   if h : seed.s = outNode.value.s then
-    let seed' : Runtime.AnyTensor α := { s := outNode.value.s, t := Tensor.castShape seed.t h }
+    let seed' : Runtime.AnyTensor α := AnyTensor.materialize
+      { s := outNode.value.s, t := Tensor.castShape seed.t h }
     let mut grads : Array (Option (Runtime.AnyTensor α)) := Array.replicate t.nodes.size none
     if hout : outId < grads.size then
       grads := grads.set outId (some seed') (h := hout)
@@ -118,7 +120,8 @@ def addGradAll
   if node.requires_grad = false then
     pure grads
   else if h : g.s = node.value.s then
-    let g' : Runtime.AnyTensor α := { s := node.value.s, t := Tensor.castShape g.t h }
+    let g' : Runtime.AnyTensor α := AnyTensor.materialize
+      { s := node.value.s, t := Tensor.castShape g.t h }
     match grads[id]? with
     | none => throw "autograd: internal error (gradient array out of bounds)"
       | some existing =>
@@ -203,7 +206,8 @@ def backwardDenseAll {α : Type} [Add α] [Zero α] [DecidableEq Shape]
     | some n => pure n
     | none => throw "autograd: invalid output id"
   if h : seed.s = outNode.value.s then
-    let seed' : Runtime.AnyTensor α := { s := outNode.value.s, t := Tensor.castShape seed.t h }
+    let seed' : Runtime.AnyTensor α := AnyTensor.materialize
+      { s := outNode.value.s, t := Tensor.castShape seed.t h }
     let mut grads : Array (Runtime.AnyTensor α) :=
       t.nodes.map (fun node => AnyTensor.mk (fill (0 : α) node.value.s))
     if hout : outId < grads.size then

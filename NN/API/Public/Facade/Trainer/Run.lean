@@ -269,6 +269,8 @@ structure TrainOptions where
   batchSize : Nat := 1
   /-- Print step losses every `logEvery` updates; `0` disables stdout step logging. -/
   logEvery : Nat := 0
+  /-- Sample CUDA allocator state every this many completed updates; `0` disables sampling. -/
+  cudaMemWatch : Nat := 0
   /-- Optional TrainLog artifact destination. Use `.disabled` for stdout-only runs. -/
   log : Training.LogDestination := .disabled
   /-- Title used when writing a TrainLog artifact. -/
@@ -289,6 +291,10 @@ def forSteps (count : Nat) : TrainOptions :=
 /-- Override stdout step logging cadence. -/
 def withLogEvery (opts : TrainOptions) (logEvery : Nat) : TrainOptions :=
   { opts with logEvery := logEvery }
+
+/-- Override the CUDA allocator sampling cadence. -/
+def withCudaMemWatch (opts : TrainOptions) (cudaMemWatch : Nat) : TrainOptions :=
+  { opts with cudaMemWatch := cudaMemWatch }
 
 /-- Override the requested minibatch size. -/
 def withBatchSize (opts : TrainOptions) (batchSize : Nat) : TrainOptions :=
@@ -324,7 +330,8 @@ def toTrainConfig (opts : TrainOptions) (optimizer : optim.Optimizer) :
   { steps := opts.steps
     batchSize := opts.batchSize
     optimizer := optimizer
-    logEvery := opts.logEvery }
+    logEvery := opts.logEvery
+    cudaMemWatch := opts.cudaMemWatch }
 
 end TrainOptions
 

@@ -222,6 +222,9 @@ def block {d : Nat} (spatial modes : Vector Nat d) (width : Nat)
   { kind := "FNOBlock"
     paramShapes := [spectralShape, spectralShape, skipShape, biasShape]
     initParams := Torch.tlistQuad spectralReal0 spectralImag0 skip0 bias0
+    runtimeInit := some <| .cons (.uniform (-0.05) 0.05 seed) <|
+      .cons (.uniform (-0.05) 0.05 (seed + 1)) <|
+      .cons (.uniform (-0.05) 0.05 (seed + 2)) <| .cons .zeros .nil
     paramRequiresGrad := [true, true, true, true]
     forward := fun mode {α} _ _ => fun {m} _ _ => fun spectralReal spectralImag skip bias x =>
       (show m (RefTy (m := m) (α := α) field) from do

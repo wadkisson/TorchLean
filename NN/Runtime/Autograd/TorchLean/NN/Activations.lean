@@ -184,6 +184,7 @@ def dropout {s : Shape} (p : Float) (seed : Nat := 0) : LayerDef s s :=
   { kind := s!"Dropout(p={p})"
     paramShapes := [pShape]
     initParams := Torch.tlistSingleton p0
+    runtimeInit := some (.cons (.flat (FloatArray.mk #[p])) .nil)
     paramRequiresGrad := [false]
     forward := fun mode {α} _ _ =>
       fun {m} _ _ =>

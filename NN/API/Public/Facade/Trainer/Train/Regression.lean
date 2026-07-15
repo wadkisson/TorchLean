@@ -52,13 +52,18 @@ def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
   if opts.usesCuda && run.dtype != .float then
     throw <| IO.userError
       "TorchLean.Trainer.train: CUDA execution currently requires dtype Float"
-  match (← Trainer.Implementation.withReadableRuntime run.dtype (fun {α} _ _ _ _ _ => do
-      let runner ←
-        NN.API.TorchLean.Trainer.instantiateConfigured
-          (task := trainer.task) (α := α) (opts := opts)
-      k (α := α) runner)) with
-  | .ok out => pure out
-  | .error msg => throw <| IO.userError msg
+  match run.dtype with
+  | .float =>
+      let runner ← NN.API.TorchLean.Trainer.instantiateConfiguredFloat trainer.task opts
+      k (α := Float) runner
+  | dtype =>
+      match (← Trainer.Implementation.withReadableRuntime dtype (fun {α} _ _ _ _ _ => do
+          let runner ←
+            NN.API.TorchLean.Trainer.instantiateConfigured
+              (task := trainer.task) (α := α) (opts := opts)
+          k (α := α) runner)) with
+      | .ok out => pure out
+      | .error msg => throw <| IO.userError msg
 
 /--
 Build the public trained regression result from an already-trained runner.
@@ -137,6 +142,8 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
   withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ runner => do
     let dataset ← data.build (α := α)
     IO.println s!"dataset size = {dataset.size}"
+
+    Manual.trainMode (task := trainer.task) runner
 
     let reportProbes := fun (title : String) => do
       unless probes.isEmpty do

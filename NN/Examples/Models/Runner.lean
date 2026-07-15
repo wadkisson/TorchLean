@@ -50,7 +50,7 @@ def usage : String :=
     , ""
     , "Common examples:"
     , "  quickstart_tensors | quickstart_autograd | quickstart_mlp | quickstart_minibatch_mlp | quickstart_cnn"
-    , "  mlp | cnn | transformer | gpt2 | text_gpt2 | mamba | fno1d_burgers"
+    , "  mlp | cnn | resnet | transformer | gpt2 | text_gpt2 | mamba | fno1d_burgers"
     , "  autoencoder | vae | gan | diffusion | ppo_cartpole | dqn_replay"
     , "  pytorch_roundtrip | pytorch_export_check"
     , "  data_csv | data_npy | data_cifar10"
@@ -201,6 +201,7 @@ def runCmd (cmd : String) (args : List String) : IO UInt32 := do
   | "mlp" => NN.Examples.Models.Supervised.Mlp.main args
   | "kan" => NN.Examples.Models.Supervised.Kan.main args
   | "cnn" => NN.Examples.Models.Vision.Cnn.main args
+  | "resnet" => NN.Examples.Models.Vision.ResNet.main args
   | "diffusion" => NN.Examples.Models.Generative.Diffusion.main args
   | "fno1d_burgers" => NN.Examples.Models.Operators.Fno1dBurgers.main args
   | "autoencoder" => NN.Examples.Models.Generative.Autoencoder.main args
@@ -258,8 +259,6 @@ def runCmd (cmd : String) (args : List String) : IO UInt32 := do
       IO.eprintln usage
       pure 1
 
-end NN.Examples.Models.Runner
-
 def main (args : List String) : IO UInt32 := do
   let args := CLI.dropDashDash args
   match args with
@@ -286,4 +285,6 @@ def main (args : List String) : IO UInt32 := do
             IO.println NN.Examples.Models.Runner.usage
             pure 0
           else
-            NN.Examples.Models.Runner.runCmd cmd (pref ++ commandArgs)
+            runCmd cmd (pref ++ commandArgs)
+
+end NN.Examples.Models.Runner

@@ -305,12 +305,7 @@ quiet by default, so the examples do not print allocator telemetry unless it is 
 -/
 def effectiveCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
     (steps requested : Nat) : Nat :=
-  if requested != 0 then
-    requested
-  else if opts.usesCuda && steps >= 1000 then
-    Nat.max 1 (steps / 10)
-  else
-    0
+  API.TorchLean.Trainer.effectiveCudaMemWatch opts steps requested
 
 /-- Standard TrainLog note for the effective CUDA memory-watch cadence. -/
 def cudaMemWatchNote (opts : _root_.Runtime.Autograd.Torch.Options)
@@ -324,11 +319,7 @@ The first reported sample becomes the baseline.  Later samples compare current C
 against that baseline and warn once if the observed per-step drop projects failure before the
 requested run length.
 -/
-structure CudaMemWatchState where
-  firstStep : Nat
-  firstFreeBytes : Nat
-  warned : Bool
-deriving Repr
+abbrev CudaMemWatchState := API.TorchLean.Trainer.CudaMemWatchState
 
 /--
 Maybe print a one-line CUDA allocator report.
@@ -338,34 +329,8 @@ slope would cross zero before the requested training horizon.
 -/
 def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
     (watchEvery totalSteps done : Nat) (state? : Option CudaMemWatchState) :
-    IO (Option CudaMemWatchState) := do
-  if !opts.usesCuda || watchEvery = 0 || (done != 0 && done % watchEvery != 0) then
-    pure state?
-  else
-    let stats ← _root_.Runtime.Autograd.Cuda.Buffer.allocatorStatsWithToken (UInt32.ofNat done)
-    IO.println s!"  cuda_mem step={done}: {stats.format}"
-    let freeNow := stats.deviceFreeBytes.toNat
-    match state? with
-    | none =>
-        pure (some { firstStep := done, firstFreeBytes := freeNow, warned := false })
-    | some st =>
-        if st.warned || done <= st.firstStep || st.firstFreeBytes <= freeNow then
-          pure (some st)
-        else
-          let span := done - st.firstStep
-          let drop := st.firstFreeBytes - freeNow
-          let dropPerStep := drop / Nat.max 1 span
-          if dropPerStep = 0 then
-            pure (some st)
-          else
-            let projectedFailure := done + freeNow / dropPerStep
-            if projectedFailure < totalSteps then
-              IO.println <|
-                s!"  cuda_mem warning: free device memory is dropping by ~{dropPerStep} bytes/step; " ++
-                  s!"projected allocation failure before requested step count (around step {projectedFailure})."
-              pure (some { st with warned := true })
-            else
-              pure (some st)
+    IO (Option CudaMemWatchState) :=
+  API.TorchLean.Trainer.reportCudaMemWatch opts watchEvery totalSteps done state?
 
 /--
 Default Adam optimizer constructor used by supervised and vision examples.

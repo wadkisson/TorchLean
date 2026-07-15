@@ -199,9 +199,20 @@ def ofFloatArrayIO (a : FloatArray) : IO Buffer := do
 @[extern "torchlean_cuda_buffer_to_float_array"]
 opaque toFloatArray (b : Buffer) : FloatArray
 
+@[extern "torchlean_cuda_buffer_to_float_array_io"]
+opaque toFloatArrayIO (b : Buffer) : IO FloatArray
+
 /-- Number of float32 elements in the buffer. -/
 @[extern "torchlean_cuda_buffer_size"]
 opaque size (b : Buffer) : UInt32
+
+@[extern "torchlean_cuda_buffer_size_with_token"]
+opaque sizeWithToken (b : Buffer) (token : UInt32) : UInt32
+
+/-- Read a buffer size at a specific point in an `IO` ownership sequence. -/
+def sizeIO (b : Buffer) : IO UInt32 := do
+  let token ← IO.monoNanosNow
+  pure <| sizeWithToken b (UInt32.ofNat token)
 
 /--
 Release the device allocation held by a buffer, returning `1` when a live allocation was released.
@@ -211,6 +222,21 @@ The C finalizer is still safe after an explicit release because the pointer is n
 -/
 @[extern "torchlean_cuda_buffer_release"]
 opaque release (b : Buffer) : UInt32
+
+@[extern "torchlean_cuda_buffer_release_with_token"]
+opaque releaseWithToken (b : Buffer) (token : UInt32) : UInt32
+
+/--
+Effectfully release a device allocation owned by a completed runtime scope.
+
+The changing token makes the release depend on the surrounding `IO` sequence. Use this form at
+ownership boundaries; the pure `release` primitive is reserved for expressions that thread its
+result into another native buffer operation. Every alias becomes invalid, so callers must own the
+complete tape or workspace containing the buffer.
+-/
+def releaseIO (b : Buffer) : IO UInt32 := do
+  let token ← IO.monoNanosNow
+  pure <| releaseWithToken b (UInt32.ofNat token)
 
 /--
 Release `workspace` and return `keep`.
@@ -279,6 +305,14 @@ opaque zeros (n : UInt32) : Buffer
 /-- Allocate a length-`n` buffer filled with `v` (host `Float`, cast to float32). -/
 @[extern "torchlean_cuda_buffer_full"]
 opaque full (n : UInt32) (v : Float) : Buffer
+
+@[extern "torchlean_cuda_buffer_full_with_token"]
+opaque fullWithToken (n : UInt32) (v : Float) (token : UInt32) : Buffer
+
+/-- Allocate a fresh filled buffer inside a repeated runtime loop. -/
+def fullIO (n : UInt32) (v : Float) : IO Buffer := do
+  let token ← IO.monoNanosNow
+  pure <| fullWithToken n v (UInt32.ofNat token)
 
 /-!
 ### Deterministic RNG (device-side)
@@ -397,6 +431,15 @@ opaque scale (b : Buffer) (c : Float) : Buffer
 /-- Device-to-device copy, implemented as a scale-by-one kernel. -/
 def copy (b : Buffer) : Buffer :=
   scale b 1.0
+
+/--
+Copy a buffer and release the source after the copy has been produced.
+
+The native operation creates the destination before it retires the source, so the compiler cannot
+reorder the two lifetime events. Use this at ownership-transfer boundaries in the sparse CUDA tape.
+-/
+@[extern "torchlean_cuda_buffer_copy_and_release"]
+opaque copyAndRelease (b : Buffer) : Buffer
 
 /--
 Fused multiply-add: `a + c * b` (sizes must match; `c` is a host `Float`, cast to float32).
