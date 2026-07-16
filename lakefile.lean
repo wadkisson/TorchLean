@@ -277,6 +277,17 @@ lean_exe torchlean where
 lean_exe transcendentals_check where
   root := `NN.Examples.Functional.Transcendentals
 
+-- GPT-2 (~500M) lab harness twin of `benchmark/train_gpt2.py`.
+--   lake -R -K cuda=true exe benchmark_gpt2 --device cuda
+lean_exe benchmark_gpt2 where
+  srcDir := "benchmark"
+  root := `TrainGpt2
+
+-- Host-side runtime profiler for benchmark_gpt2 (LEAN_PROFILE=1).
+--   https://github.com/wadkisson/LeanProfiler
+require LeanProfiler from git
+  "https://github.com/wadkisson/LeanProfiler" @ "main"
+
 -- API documentation (HTML) via `lake build NN:docs`.
 require «doc-gen4» from git
   "https://github.com/leanprover/doc-gen4" @ "v4.32.0"
