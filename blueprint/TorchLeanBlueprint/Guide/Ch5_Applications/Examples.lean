@@ -72,15 +72,11 @@ lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
 
 ## 2. A graph is checked
 
-The verification examples start from the shared IR. A compact model is lowered into `NN.IR.Graph`, a
-payload supplies parameters, and a verifier pass computes a bound or checks a certificate.
-
 ```
 lake exe verify -- torchlean-ibp
 ```
 
-The verifier does not guess which Python object was meant; it consumes an `NN.IR.Graph` with named
-operations and an explicit payload.
+Consumes an `NN.IR.Graph` plus payload; see *Verification* for the checker story.
 
 ## 3. A real ML failure mode becomes a tiny Lean case study
 

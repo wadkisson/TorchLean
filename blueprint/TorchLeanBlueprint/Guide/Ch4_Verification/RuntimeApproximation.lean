@@ -26,28 +26,12 @@ may differ from that ideal, and how we keep that difference explicit.
 
 # Why Real Proofs Are Not Float Proofs
 
-It is tempting to prove a property over real numbers and then deploy float32 code with the same
-sentence in mind. TorchLean does not allow that step to be implicit: a real valued safety theorem
-does not become a float32 safety theorem unless there is a bridge theorem that relates the runtime
-path to the real specification.
-
-That implication is not free. It needs a bridge theorem. Rounding, cancellation, overflow,
-different reduction orders, fused kernels, and domain guards can all change the behavior. A
-mathematical softmax is smooth; an implementation may use max-subtraction, exponent approximations,
-finite accumulators, and library calls specific to a backend. A real convolution is a sum; a GPU
-convolution may choose a different accumulation order or fused algorithm.
-
-TorchLean's answer is to name the bridge:
-
-1. prove the claim over the reals or over the spec;
-2. prove an approximation relation between runtime tensors and spec tensors;
-3. inflate margins, enclosures, or certificates by the approximation budget;
-4. leave native hardware assumptions explicit when they are outside Lean.
-
-This matches standard numerical analysis practice; see Higham's *Accuracy and Stability of
-Numerical Algorithms* (https://epubs.siam.org/doi/book/10.1137/1.9780898718027) for the classical
-background. It also matches the caution needed in neural network verification, where a tiny
-rounding gap can matter if the verified margin is tiny.
+A real safety theorem is not a float32 theorem without a bridge (rounding, reduction order, fused
+kernels, overflow). Prove the spec claim, prove a tolerance to the runtime path, inflate margins by
+that budget, and leave native assumptions explicit. Classical background: Higham,
+*Accuracy and Stability of Numerical Algorithms*
+(https://epubs.siam.org/doi/book/10.1137/1.9780898718027). Numeric layer names live in
+*Floating Point and Native Boundaries*; this chapter develops the tolerance calculus.
 
 # The Core Relation: Spec Tensors And Tolerances
 

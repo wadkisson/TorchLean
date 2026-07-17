@@ -7,64 +7,14 @@ open Verso.Genre Manual
 tag := "conclusion"
 %%%
 
-TorchLean is a research system for a practical problem: modern ML work mixes learned parameters,
-generated code, numerical kernels, exported graphs, verifier artifacts, and scientific claims. A
-successful run answers whether those pieces execute together. It does not, by itself, explain what
-was computed or justify the claim made from the result.
-
-One design principle runs through the project:
-
-> a model should be runnable as ML code, inspectable as an artifact, and connected to named
-> semantics whenever a correctness, gradient, bound, or certificate claim is made.
-
-The same thread runs through the tensor API, runtime, graph IR, floating point models,
-verification checkers, examples, and widgets.
-
-The long-term value is especially clear in scientific computing. Neural operators, PINNs,
-controllers, 3D perception systems, and RL agents are not isolated classifiers. They sit inside
-larger mathematical and engineering arguments. A verified ML system should help those arguments name
-their assumptions, check their artifacts, and preserve meaning across runtimes.
-
-The repository therefore contains more than theorem statements or training examples in isolation.
-Its scientific ML workflows, Bug Zoo cases, RL environments, generative objectives, widgets, and
-command-line tools expose the artifacts on which later claims depend. Each one should state whether
-its support comes from execution, a checker, a theorem, or an external assumption.
-
-# The Working Pattern
-
-The main workflow has five steps.
-
-1. Write the model or artifact in a typed form: tensors, parameters, graph nodes, certificates,
-   datasets, or runtime logs.
-2. Choose the semantics relevant to the question: real tensors, `FP32`, `IEEE32Exec`, graph
-   denotation, autograd tapes, verifier domains, or external artifact formats.
-3. Run the computation or importer: training loop, CUDA path, PyTorch bridge, graph compiler,
-   verifier pass, or external producer.
-4. Inspect the result with ordinary outputs, widgets, logs, graph views, or certificate reports.
-5. Cite the strongest available support: executable run, Lean checker, theorem, or explicit
-  assumption.
-
-TorchLean is organized as a framework rather than a collection of isolated examples because those
-views need to meet. The same model may appear as API code, an eager runtime computation, a graph
-artifact, a verification input, and a theorem target.
+TorchLean keeps ML code runnable and claims about it tied to named objects, checkers, theorems, or
+external assumptions—especially important for scientific ML, controllers, perception, and RL, where
+models sit inside larger arguments. Claim vocabulary is defined in *What TorchLean Is*.
 
 # Levels Of Support
 
-TorchLean uses different words for different levels of support:
-
-- *Execution*: a command runs and produces concrete tensors, logs, samples, bounds, or reports.
-- *Inspection*: the produced object is visible enough to debug, through printed output, widgets,
-  graph views, training curves, or certificate diagnostics.
-- *Checking*: Lean parses or recomputes an artifact and accepts or rejects a stated contract.
-- *Theorem support*: a Lean theorem connects the checked contract to the intended semantic claim.
-- *External assumption*: a Python exporter, CUDA kernel, dataset converter, solver, or native
-  library remains outside the proved fragment and is named as part of the claim.
-
-This distinction is practical. A loss curve can show that a run behaved sensibly. A certificate
-checker can validate a bound artifact. A theorem can state why an accepted artifact implies a
-semantic property. These are related, but they are not interchangeable.
-
-The levels often stack:
+Use the Introduction's ladder (run → inspect → check → theorem → named external assumption). The
+levels often stack on one workflow:
 
 ```
 command output
@@ -75,16 +25,13 @@ command output
   -> named external assumptions
 ```
 
-For example, a PPO CartPole run may produce a reward log and checked transition records. The log is
-evidence that the command ran and trained through the selected runtime path. The boundary records
-are evidence that observations, actions, rewards, and done flags had the declared shape/range when
-they entered Lean. They are not a proof of Gymnasium's implementation, nor a proof that PPO
-converges. That difference is exactly what TorchLean should help readers keep straight.
+Example: a PPO CartPole run may produce a reward log and checked transition records. The log shows
+the command ran; the boundary records show observations/actions/rewards/done flags had the declared
+shape/range when they entered Lean. Neither proves Gymnasium's implementation nor PPO convergence.
 
-Similarly, a diffusion run may write a PPM sample and a train log. The generative theory layer may
-prove that a formal forward Gaussian law is Gaussian, or that a sampler step is Lipschitz under
-hypotheses. Those are valuable local facts. They do not by themselves prove image quality, FID,
-dataset coverage, or equivalence of every native kernel.
+A diffusion run may write a PPM sample and train log while theory proves a formal forward-Gaussian
+fact or a Lipschitz sampler step. Those local facts do not prove image quality, FID, or native-kernel
+equivalence.
 
 # How To State A TorchLean Result
 
@@ -189,15 +136,7 @@ theorems; they do not need to be hidden behind one monolithic claim about all of
 
 # Closing
 
-TorchLean keeps two activities connected: building neural network systems and stating mathematical
-claims about them. The code can still look like ML code. The examples can still
-train, log, save, load, and call native or external tools. The difference is that the central objects
-have names in Lean, and claims about those objects can be tied to checkers, theorems, or
-explicit assumptions.
-
-The standard the project should preserve is simple: identify the object, identify the semantics,
-and say what has been run, checked, proved, or assumed. If TorchLean makes that habit easier for
-neural networks, then it has met its purpose.
+Identify the object, identify the semantics, and say what has been run, checked, proved, or assumed.
 
 # References And Anchors
 

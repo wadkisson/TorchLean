@@ -603,12 +603,5 @@ The example shows the same ideas with short inline explanations around each exam
 
 # Widget Claim Discipline
 
-Use widgets for inspection claims:
-
-- "the widget renders the tensor values";
-- "the graph view shows the declared and inferred shapes";
-- "the RL boundary view reports which transition fields failed";
-- "the train log view displays the metrics written by the command."
-
-Do not use widget output alone as proof of a semantic theorem. The proof target is the Lean
-definition or theorem behind the object being rendered.
+Widgets support inspection claims only. Semantic theorems live in the Lean definition or checker
+behind the rendered object (see *What TorchLean Is*).

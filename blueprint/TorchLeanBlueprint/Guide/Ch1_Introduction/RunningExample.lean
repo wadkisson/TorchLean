@@ -7,17 +7,10 @@ open Verso.Genre Manual
 tag := "running-example"
 %%%
 
-We begin with a two-layer classifier from four input features to two output logits. The model is
-small enough that its architecture, parameters, lowered graph, numerical execution, and verification
-problem can all be written down explicitly. Larger models add operators and state, but they cross
-the same boundaries.
+A two-layer classifier from four features to two logits, small enough to write architecture,
+payload, graph, float32 execution, and a verification claim side by side.
 
-At each boundary we will identify the model's input shape, parameter payload, graph, scalar
-semantics, and checked claim. These objects are related, but they are not interchangeable: a graph
-does not contain a robustness theorem, and a successful runtime execution is not by itself a proof
-about every input in a region.
-
-The path looks like this:
+Path:
 
 ```
 tinyClassifier
@@ -115,8 +108,9 @@ or normalized features:
 
 $$`x_i \in [c_i-\varepsilon_i, c_i+\varepsilon_i]`
 
-Changing that convention changes the verification problem even when the tensor shape stays
-`.dim 4 .scalar`.
+where `x_i` is coordinate `i` of the input, `c_i` is the center of the box on that coordinate, and
+`ε_i` is the allowed half-width. Changing that convention changes the verification problem even when
+the tensor shape stays `.dim 4 .scalar`.
 
 # The Same Model As A Graph
 
@@ -138,9 +132,10 @@ For a lowered graph, the semantic question becomes:
 
 $$`\operatorname{NN.IR.Graph.denoteAll}(g,payload,input)`
 
-That expression is the reference meaning that a compiler pass, widget, verifier, or runtime bridge
-has to respect. If a pass fuses two operations, changes a layout, or exports a certificate, the
-claim is always about preserving or soundly approximating this denotation.
+where `g` is the IR graph, `payload` is its parameter data, and `input` is the tensor fed to the
+graph. That expression is the reference meaning that a compiler pass, widget, verifier, or runtime
+bridge has to respect. If a pass fuses two operations, changes a layout, or exports a certificate,
+the claim is always about preserving or soundly approximating this denotation.
 
 # The Same Model As A Payload Contract
 
@@ -162,24 +157,16 @@ A theorem about the graph should not silently use a different set of weights.
 
 # The Same Model Under Float32
 
-A theorem over real numbers and a float32 execution are not the same statement. TorchLean keeps the
-scalar semantics visible:
-
-- `ℝ` is the clean mathematical target;
-- `FP32` is the proof friendly model based on rounded reals;
-- `IEEE32Exec` is the executable IEEE-754 binary32 model;
-- native CUDA kernels are accelerated external code behind an explicit boundary.
-
-The Float32 chapters explain how those views are connected, and where a theorem still depends on an
-assumption about the external runtime.
-
-For the tiny classifier, a real-valued statement might say:
+Real specs, `FP32`, `IEEE32Exec`, and native CUDA kernels are different numeric layers (see
+*Floating Point and Native Boundaries*). For the tiny classifier, a real-valued statement might say:
 
 $$`\forall x\in B,\;
 \operatorname{logit}_0(\operatorname{denote}_{\mathbb R}(g,\theta,x))
 >
 \operatorname{logit}_1(\operatorname{denote}_{\mathbb R}(g,\theta,x))`
 
+where `g` is the graph, `θ` is the parameter payload, `x` ranges over the input box `B`,
+`denote_ℝ` is the real-valued network output, and `logit_0` / `logit_1` are the two class scores.
 A float32 statement is not the same sentence with a different font. It has to say whether the
 operations are modeled as rounded real operations, executable `IEEE32Exec`, or a native backend. If
 the theorem is real-valued and the deployment path is CUDA float32, a bridge or an explicit
@@ -216,10 +203,11 @@ $$`\operatorname{marginCertificateOK}(\ell_0,u_1)=\mathrm{true}
 \;\Longrightarrow\;
 \forall x\in B,\; f_0(x)>f_1(x)`
 
-To prove that implication, the checker needs hypotheses saying that `ℓ₀` is a valid lower bound on
-logit `0`, that `u₁` is a valid upper bound on logit `1`, and that both bounds apply to the same
-graph, payload, input box, and scalar semantics. The tiny Boolean is the final comparison; the
-soundness theorem is about why that comparison is allowed to stand for all inputs in the box.
+Here `ℓ₀` is a lower bound on logit `0`, `u₁` is an upper bound on logit `1`, `B` is the input box,
+and `f_0` / `f_1` are the two logit functions of the checked model. To prove that implication, the
+checker needs hypotheses saying that `ℓ₀` and `u₁` are valid for the same graph, payload, input box,
+and scalar semantics. The tiny Boolean is the final comparison; the soundness theorem is about why
+that comparison is allowed to stand for all inputs in the box.
 
 # A Tiny Checked Shape Example
 
@@ -251,35 +239,12 @@ That tiny example is the design in miniature. TorchLean does not try to guess wh
 reshape, or deployment convention you meant. A real convention should appear as a named operation in
 the code, so the model author, exporter, and checker all see the same transformation.
 
-# What To Watch For
+# Artifacts From This Example
 
-As the examples get larger, keep track of where each object lives:
-
-- *Spec*: the mathematical meaning of tensors, layers, and losses.
-- *Runtime*: eager or compiled execution, gradients, optimizers, logging, and devices.
-- *IR*: a graph with named operations that can be inspected and verified.
-- *Proofs*: theorems about the spec, the graph, or the verifier output.
-- *Trust boundaries*: CUDA kernels, PyTorch exporters, external certificate producers, and datasets.
-
-Is this a tensor in the spec layer? A runtime value? A graph node? A theorem about graph denotation?
-A certificate imported from outside Lean? Most TorchLean mistakes become easier to diagnose once
-that question is clear.
-
-# The Paper Trail For This Example
-
-The same classifier produces several artifacts, and each artifact supports a different kind of
-sentence.
-
-- Model source: "this is a two-layer classifier from `.dim 4 .scalar` to `.dim 2 .scalar`."
-- Parameter payload: "these tensors instantiate that architecture."
-- Runtime output: "this backend produced these logits on this input."
-- Lowered graph: "these named operations are the graph view of the model."
-- Shape check: "the payload and graph agree on dimensions."
-- Bound artifact: "these intervals or affine bounds were produced for this graph and input box."
-- Lean theorem: "under the theorem hypotheses, accepted bounds imply the stated semantic property."
-
-Not every line above is automatically proved. Keeping the artifacts together makes it possible to
-see which object supports each claim and where an additional proof obligation remains.
+This classifier produces model source, a parameter payload, runtime logits, a lowered graph, shape
+checks, bound artifacts, and (when available) Lean theorems. Use the claim vocabulary from *What
+TorchLean Is*: each artifact supports a different sentence, and not every line is automatically
+proved.
 
 # References
 
