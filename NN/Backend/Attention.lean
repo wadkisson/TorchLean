@@ -197,18 +197,6 @@ def cudaAttentionImpl (c : KernelCapsule) : Except String CudaAttentionImpl :=
     | p =>
         .error s!"backend provider {reprStr p} is not wired for CUDA attention execution"
 
-/--
-Legacy selector: `true` means native fused flash kernels; `false` means composed TorchLean.
-
-LibTorch capsules are not represented by this Bool API — use `cudaAttentionImpl`.
--/
-def cudaUsesNativeFlash (c : KernelCapsule) : Except String Bool := do
-  match ← cudaAttentionImpl c with
-  | .nativeFlash => pure true
-  | .composed => pure false
-  | .libTorchAutograd | .libTorchForward =>
-      .error s!"LibTorch SDPA capsule `{c.name}` requires `cudaAttentionImpl` (not Bool flash selector)"
-
 end Attention
 end Backend
 end NN

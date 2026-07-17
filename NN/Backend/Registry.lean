@@ -11,7 +11,6 @@ public import NN.Backend.Target
 public import NN.Backend.Attention
 public import NN.Backend.NativeCUDA
 public import NN.Backend.Reference
-public import NN.Backend.LibTorch
 
 /-!
 # Backend Registry
@@ -36,10 +35,6 @@ def defaultCapsules : List KernelCapsule :=
 /-- Default capsules plus optional LibTorch providers. -/
 def withLibTorchCapsules : List KernelCapsule :=
   Attention.cudaCandidatesWithLibTorch ++ NativeCUDA.capsules ++ Reference.capsules
-
-/-- Select the registry used by an execution configuration. -/
-def capsules (enableLibTorch : Bool := false) : List KernelCapsule :=
-  if enableLibTorch then withLibTorchCapsules else defaultCapsules
 
 end Registry
 end Backend

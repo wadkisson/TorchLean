@@ -161,24 +161,6 @@ def parseArgs (args : List String) (defaultDType : DType := .float) :
     NN.API.TorchLean.Module.ExecConfig.parseAndStripWithDefaultDType args defaultDType
   pure (NN.API.TorchLean.Module.ExecConfig.toOptions cfg, rest)
 
-namespace BackendContracts
-
-/-- Backend-contract profile corresponding to the selected runtime options. -/
-def profileForOptions (opts : Options) : NN.Backend.BackendProfile :=
-  opts.backendProfile
-
-/-- Plan operations under the runtime-selected backend-contract profile. -/
-def planReport (opts : Options) (ops : List NN.Backend.BackendOp) : Except String String :=
-  (profileForOptions opts).planReport ops
-
-/-- Print the selected backend capsules for operations. -/
-def printPlan (opts : Options) (ops : List NN.Backend.BackendOp) : IO Unit := do
-  match planReport opts ops with
-  | .ok report => IO.println report
-  | .error msg => IO.println s!"backend plan unavailable: {msg}"
-
-end BackendContracts
-
 /--
 Run an example under the selected runtime and pass through the parsed runtime options.
 

@@ -36,21 +36,9 @@ instance : Repr AcceptedGraphPlan where
 
 namespace AcceptedGraphPlan
 
-/-- Source IR node ids covered by the accepted lowering. -/
-def nodeIds (p : AcceptedGraphPlan) : List Nat :=
-  p.loweringPlan.nodeIds
-
 /-- Selected capsule names in accepted lowering order. -/
 def capsuleNames (p : AcceptedGraphPlan) : List String :=
   p.loweringPlan.capsuleNames
-
-/-- Audit for the accepted lowering. -/
-def audit (p : AcceptedGraphPlan) : ExecutionAudit :=
-  p.loweringPlan.audit
-
-/-- Recheck reports for the accepted lowering. -/
-def obligationReports (p : AcceptedGraphPlan) : List ObligationReport :=
-  p.audit.obligationReports
 
 end AcceptedGraphPlan
 
@@ -59,20 +47,6 @@ inductive AcceptedPlanResult where
   | accepted (plan : AcceptedGraphPlan)
   | rejected (loweringPlan : GraphLoweringPlan) (failures : List GateFailure)
   deriving Repr
-
-namespace AcceptedPlanResult
-
-/-- Whether the pipeline returned an accepted plan. -/
-def isAccepted : AcceptedPlanResult → Bool
-  | .accepted _ => true
-  | .rejected .. => false
-
-/-- Gate failures when the pipeline rejected the plan. -/
-def failures : AcceptedPlanResult → List GateFailure
-  | .accepted _ => []
-  | .rejected _ failures => failures
-
-end AcceptedPlanResult
 
 /-- Gate a graph lowering and expose an accepted plan only when every obligation passes policy. -/
 def acceptGraphPlan (graphPlan : IR.GraphExecutionPlan) (loweringPlan : GraphLoweringPlan)

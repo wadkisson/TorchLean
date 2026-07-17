@@ -53,16 +53,6 @@ def cpu : Availability :=
   { devices := [.cpu]
     providers := [.reference, .torchLean] }
 
-/-- CUDA availability without optional external providers. -/
-def cudaNative : Availability :=
-  { devices := [.cpu, .cuda]
-    providers := [.reference, .torchLean, .nativeCuda, .cuBLAS, .cuFFT] }
-
-/-- CUDA availability with optional LibTorch enabled and installed. -/
-def cudaWithLibTorch : Availability :=
-  { devices := [.cpu, .cuda]
-    providers := [.reference, .torchLean, .nativeCuda, .cuBLAS, .cuFFT, .libTorch] }
-
 end Availability
 
 end Backend

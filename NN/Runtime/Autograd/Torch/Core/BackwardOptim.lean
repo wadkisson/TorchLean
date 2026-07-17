@@ -104,37 +104,6 @@ def addCudaGradToTable (t : Runtime.Autograd.Cuda.Tape)
     releaseCudaAnyBuffer g
     throw <| IO.userError "torch: CUDA gradient contribution has wrong shape for parent"
 
-/-- Legacy HashMap accumulator kept for non-training call sites / tests. -/
-def addCudaGradToMap (t : Runtime.Autograd.Cuda.Tape)
-    (gradsRef : IO.Ref CudaGradMap) (id : Nat)
-    (g : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit := do
-  let node ← match t.getNode? id with
-    | some n => pure n
-    | none => throw <| IO.userError "torch: invalid parent id during CUDA backward"
-  if node.requires_grad = false then
-    releaseCudaAnyBuffer g
-  else if _h : g.s = node.value.s then
-    let g' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := g.buf }
-    let grads ← gradsRef.get
-    match grads.get? id with
-    | none =>
-        let owned ← ownedCudaAnyBuffer s!"owned gradient for node {id} ({node.name})" g'
-        releaseCudaAnyBuffer g'
-        gradsRef.set (grads.insert id owned)
-    | some old =>
-        if _hold : old.s = node.value.s then
-          let old' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := old.buf }
-          let summed ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.add old' g'
-          releaseCudaAnyBuffer old'
-          releaseCudaAnyBuffer g'
-          gradsRef.set (grads.insert id summed)
-        else
-          releaseCudaAnyBuffer g'
-          throw <| IO.userError "torch: CUDA gradient map has wrong shape for node"
-  else
-    releaseCudaAnyBuffer g
-    throw <| IO.userError "torch: CUDA gradient contribution has wrong shape for parent"
-
 /--
 Run scalar-loss CUDA backprop and return gradients only for trainable parameter leaves.
 

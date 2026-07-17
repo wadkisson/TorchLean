@@ -37,15 +37,6 @@ def natFlag? (exeName : String) (args : List String) (name : String) :
     IO (Option Nat × List String) :=
   NN.API.Common.orThrow exeName <| TorchLean.CLI.takeNatFlagOnce args name
 
-/-- Parse an optional natural-number flag and fall back to a default. -/
-def natFlagDefault
-    (exeName : String)
-    (args : List String)
-    (name : String)
-    (default : Nat) :
-    IO (Nat × List String) :=
-  NN.API.Common.orThrow exeName <| TorchLean.CLI.takeNatFlagDefault args name default
-
 /--
 Parse an optional natural-number flag, fall back to a default, and require that the selected value
 is strictly positive.
@@ -63,15 +54,6 @@ def pathFlag? (exeName : String) (args : List String) (name : String) :
     IO (Option System.FilePath × List String) :=
   NN.API.Common.orThrow exeName <| TorchLean.CLI.takePathFlagOnce args name
 
-/-- Parse an optional float flag and fall back to a default. -/
-def floatFlagDefault
-    (exeName : String)
-    (args : List String)
-    (name : String)
-    (default : Float) :
-    IO (Float × List String) :=
-  NN.API.Common.orThrow exeName <| TorchLean.CLI.takeFloatFlagDefault args name default
-
 /-- Parse an optional path flag and fall back to a default path. -/
 def pathFlagDefault
     (exeName : String)
@@ -80,15 +62,6 @@ def pathFlagDefault
     (default : System.FilePath) :
     IO (System.FilePath × List String) :=
   NN.API.Common.orThrow exeName <| TorchLean.CLI.takePathFlagDefault args name default
-
-/--
-Parse the `--epochs E --batch N` pair used by the small epoch-oriented tutorial commands.
-
-Step-based model-zoo training commands use the `ModelZoo` / `Trainer.TrainOptions` path instead.
--/
-def epochBatch (exeName : String) (args : List String) (defaultEpochs defaultBatch : Nat) :
-    IO (TorchLean.CLI.EpochBatch × List String) :=
-  NN.API.Common.orThrow exeName <| TorchLean.CLI.takeEpochBatch args defaultEpochs defaultBatch
 
 /-- Convert an `Except String α` into `IO α` with a shared executable name. -/
 def orThrow {α : Type} (exeName : String) (result : Except String α) : IO α :=

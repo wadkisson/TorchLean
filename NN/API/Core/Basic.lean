@@ -155,15 +155,6 @@ inductive DType where
 
 namespace DType
 
-/-- Whether this dtype can be used in an executable (`IO`/`#eval`) context. -/
-def isExecutable : DType → Bool
-  | .float => true
-  | .real => false
-  | .float32 { mode := .fp32 } => false
-  | .float32 _ => true
-  | .complex { mode := .fp32 } => false
-  | .complex _ => true
-
 /-- Log a short description of the chosen dtype to stdout. -/
 def log : DType → IO Unit
   | .float =>

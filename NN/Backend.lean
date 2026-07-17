@@ -16,7 +16,6 @@ public import NN.Backend.Recheck
 public import NN.Backend.Attention
 public import NN.Backend.NativeCUDA
 public import NN.Backend.Reference
-public import NN.Backend.LibTorch
 public import NN.Backend.Registry
 public import NN.Backend.IR
 public import NN.Backend.Lowering

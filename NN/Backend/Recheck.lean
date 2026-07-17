@@ -56,14 +56,6 @@ def disposition (e : ContractEvidence) : EvidenceDisposition :=
   | .trustedBoundary _ => .trusted
   | .notProvided => .missing
 
-/-- Whether this evidence gives any non-missing justification. -/
-def isProvided (e : ContractEvidence) : Bool :=
-  e.disposition != .missing
-
-/-- Whether this evidence crosses a trusted boundary. -/
-def isTrustedBoundary (e : ContractEvidence) : Bool :=
-  e.disposition == .trusted
-
 end ContractEvidence
 
 /-- Recheck row for one obligation of one selected backend kernel. -/
@@ -116,14 +108,6 @@ def obligationReports (a : KernelAudit) : List ObligationReport :=
       claim := a.vjpContract.claim
       evidence := a.vjpContract.evidence
       disposition := a.vjpContract.evidence.disposition } ]
-
-/-- Obligations without any recorded evidence. -/
-def missingObligations (a : KernelAudit) : List ContractObligation :=
-  (a.obligationReports.filter ObligationReport.isMissing).map (·.obligation)
-
-/-- Obligations discharged by a trusted boundary. -/
-def trustedBoundaryObligations (a : KernelAudit) : List ContractObligation :=
-  (a.obligationReports.filter ObligationReport.isTrusted).map (·.obligation)
 
 end KernelAudit
 

@@ -73,11 +73,6 @@ def registry (p : BackendProfile) : List KernelCapsule :=
 def planOps (p : BackendProfile) (ops : List BackendOp) : Except String ExecutionPlan :=
   NN.Backend.planOpsAvailable p.config p.availability p.registry ops
 
-/-- Gate a planned operation sequence under the profile's acceptance policy. -/
-def gateOps (p : BackendProfile) (ops : List BackendOp) : Except String GateResult := do
-  let plan ← p.planOps ops
-  pure <| plan.gate p.acceptancePolicy
-
 /-- Plan runtime-relevant IR nodes using the profile registry, target, and execution config. -/
 def planGraphNodes (p : BackendProfile) (g : NN.IR.Graph) :
     Except String NN.Backend.IR.GraphExecutionPlan :=

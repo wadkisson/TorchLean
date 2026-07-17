@@ -376,8 +376,8 @@ PUBLIC_EXAMPLE_BANNED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         "shared sequence-model code should expose one executable entrypoint, not nested `*.main` actions.",
     ),
     (
-        re.compile(r"\.verify\s*\(\s*Trainer\.Verify\.lInfIBP\b"),
-        "public examples should prefer `trained.verifyRobustLInf x eps` over manually building a `Trainer.Verify.lInfIBP` request.",
+        re.compile(r"\.verify\s*\(\s*\{\s*center\s*:="),
+        "public examples should prefer `trained.verifyRobustLInf x eps` over manually building an IBP request record.",
     ),
     (
         re.compile(r"\bTrainer\.(FitOptions|TrainOptions)\.forSteps\b"),
@@ -1115,8 +1115,8 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
             "old trainer result names are removed; use `TrainResult`, `StreamTrainResult`, and `PairStreamTrainResult`.",
         ),
         (
-            re.compile(r"\bverifyLInfIBP\b|\b(Trainer\.)?Verify\.robustLInf\b"),
-            "duplicate verification helper names are removed; use `verifyRobustLInf` on trained results or `Trainer.Verify.lInfIBP` for requests.",
+            re.compile(r"\bverifyLInfIBP\b|\b(Trainer\.)?Verify\.(robustLInf|lInfIBP)\b"),
+            "duplicate verification helper names are removed; use `verifyRobustLInf` on trained results.",
         ),
         (
             re.compile(

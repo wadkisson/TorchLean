@@ -136,30 +136,9 @@ def portableCpu (os : OperatingSystem := .unknown)
     (arch : Architecture := .unknown) : Target :=
   { os, arch, accelerator := .none, features := [] }
 
-/-- Linux CPU/reference target. -/
-def linuxCpu (arch : Architecture := .x86_64) : Target :=
-  portableCpu .linux arch
-
-/-- macOS CPU/reference target. -/
-def macOSCpu (arch : Architecture := .aarch64) : Target :=
-  portableCpu .macOS arch
-
-/-- Windows CPU/reference target. -/
-def windowsCpu (arch : Architecture := .x86_64) : Target :=
-  portableCpu .windows arch
-
 /-- Linux CUDA target with native CUDA provider features. -/
 def linuxCuda (enableLibTorch : Bool := false) : Target :=
   { os := .linux
-    arch := .x86_64
-    accelerator := .cuda
-    features :=
-      [.nativeCuda, .cuBLAS, .cuFFT] ++
-        (if enableLibTorch then [.libTorch] else []) }
-
-/-- Windows CUDA target shape. Native support depends on the future Windows build/test pass. -/
-def windowsCuda (enableLibTorch : Bool := false) : Target :=
-  { os := .windows
     arch := .x86_64
     accelerator := .cuda
     features :=

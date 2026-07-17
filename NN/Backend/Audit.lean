@@ -77,14 +77,6 @@ structure ExecutionAudit where
 
 namespace ExecutionAudit
 
-/-- Trust levels selected by the plan, in plan order. -/
-def trustLevels (a : ExecutionAudit) : List TrustLevel :=
-  a.kernels.map (·.trustLevel)
-
-/-- Capsule names selected by the plan, in plan order. -/
-def capsuleNames (a : ExecutionAudit) : List String :=
-  a.kernels.map (·.capsuleName)
-
 /-- Operation names whose selected capsule is trusted external. -/
 def trustedExternalOps (a : ExecutionAudit) : List String :=
   (a.kernels.filter KernelAudit.isTrustedExternal).map (·.op.name)
