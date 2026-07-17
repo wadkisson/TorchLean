@@ -51,16 +51,24 @@ static inline void torchlean_cuda_unlock(pthread_mutex_t* mutex, const char* msg
   }
 }
 
+// Stream-ordered scratch freelist (per translation unit that includes this header).
+//
+// Same rationale as the Buffer pool: eager TorchLean uses the default stream, so reuse after free
+// is ordered without CUDA events. Exact-size matching only — callers pass the request size on free,
+// so we cannot safely oversize-bucket without a side table.
 struct torchlean_cuda_scratch_block {
   size_t bytes;
   void* ptr;
-  cudaEvent_t ready;
 };
 
 static pthread_mutex_t g_torchlean_cuda_scratch_mutex = PTHREAD_MUTEX_INITIALIZER;
 static torchlean_cuda_scratch_block* g_torchlean_cuda_scratch_cache = nullptr;
 static size_t g_torchlean_cuda_scratch_count = 0;
 static size_t g_torchlean_cuda_scratch_cap = 0;
+static size_t g_torchlean_cuda_scratch_bytes = 0;
+
+static constexpr size_t kTorchleanCudaScratchMaxBlocks = 1024;
+static constexpr size_t kTorchleanCudaScratchMaxBytes = 1ull << 30;  // 1 GiB per TU
 
 static inline void torchlean_cuda_scratch_push(torchlean_cuda_scratch_block block) {
   if (g_torchlean_cuda_scratch_count == g_torchlean_cuda_scratch_cap) {
@@ -68,11 +76,10 @@ static inline void torchlean_cuda_scratch_push(torchlean_cuda_scratch_block bloc
     if (new_cap < g_torchlean_cuda_scratch_cap) {
       lean_internal_panic("torchlean_cuda_scratch_push: capacity overflow");
     }
-    const size_t bytes = checked_bytes_size(
+    const size_t alloc_bytes = checked_bytes_size(
         new_cap, sizeof(torchlean_cuda_scratch_block),
         "torchlean_cuda_scratch_push: cache byte size overflow");
-    void* next = realloc(g_torchlean_cuda_scratch_cache,
-                         bytes);
+    void* next = realloc(g_torchlean_cuda_scratch_cache, alloc_bytes);
     if (!next) {
       lean_internal_panic_out_of_memory();
     }
@@ -80,6 +87,7 @@ static inline void torchlean_cuda_scratch_push(torchlean_cuda_scratch_block bloc
     g_torchlean_cuda_scratch_cap = new_cap;
   }
   g_torchlean_cuda_scratch_cache[g_torchlean_cuda_scratch_count++] = block;
+  g_torchlean_cuda_scratch_bytes += block.bytes;
 }
 
 static inline void torchlean_cuda_scratch_flush(void) {
@@ -89,15 +97,11 @@ static inline void torchlean_cuda_scratch_flush(void) {
   g_torchlean_cuda_scratch_cache = nullptr;
   g_torchlean_cuda_scratch_count = 0;
   g_torchlean_cuda_scratch_cap = 0;
+  g_torchlean_cuda_scratch_bytes = 0;
   torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex, "pthread_mutex_unlock scratch flush failed");
 
   for (size_t i = 0; i < count; ++i) {
-    torchlean_cuda_scratch_block block = blocks[i];
-    if (block.ready) {
-      checkCuda(cudaEventSynchronize(block.ready), "cudaEventSynchronize cached scratch block failed");
-      checkCuda(cudaEventDestroy(block.ready), "cudaEventDestroy cached scratch block failed");
-    }
-    torchlean_cuda_free_checked(&block.ptr, "cudaFree cached scratch block failed");
+    torchlean_cuda_free_checked(&blocks[i].ptr, "cudaFree cached scratch block failed");
   }
   free(blocks);
 }
@@ -107,29 +111,22 @@ static inline void* torchlean_cuda_scratch_alloc_bytes(size_t bytes, const char*
     return nullptr;
   }
   torchlean_cuda_lock(&g_torchlean_cuda_scratch_mutex, "pthread_mutex_lock scratch alloc failed");
-  for (size_t i = 0; i < g_torchlean_cuda_scratch_count; ++i) {
-    if (g_torchlean_cuda_scratch_cache[i].bytes != bytes) {
+  for (size_t i = g_torchlean_cuda_scratch_count; i > 0; --i) {
+    const size_t idx = i - 1;
+    if (g_torchlean_cuda_scratch_cache[idx].bytes != bytes) {
       continue;
     }
-    cudaError_t ready = cudaEventQuery(g_torchlean_cuda_scratch_cache[i].ready);
-    if (ready == cudaSuccess) {
-      void* ptr = g_torchlean_cuda_scratch_cache[i].ptr;
-      checkCuda(cudaEventDestroy(g_torchlean_cuda_scratch_cache[i].ready),
-                "cudaEventDestroy scratch reuse event failed");
-      g_torchlean_cuda_scratch_cache[i] =
+    void* ptr = g_torchlean_cuda_scratch_cache[idx].ptr;
+    g_torchlean_cuda_scratch_bytes -= g_torchlean_cuda_scratch_cache[idx].bytes;
+    g_torchlean_cuda_scratch_cache[idx] =
         g_torchlean_cuda_scratch_cache[g_torchlean_cuda_scratch_count - 1];
-      g_torchlean_cuda_scratch_count--;
-      torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex,
-                            "pthread_mutex_unlock scratch alloc failed");
-      return ptr;
-    }
-    if (ready != cudaErrorNotReady) {
-      torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex,
-                            "pthread_mutex_unlock scratch alloc error failed");
-      checkCuda(ready, "cudaEventQuery scratch reuse event failed");
-    }
+    g_torchlean_cuda_scratch_count--;
+    torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex,
+                          "pthread_mutex_unlock scratch alloc failed");
+    return ptr;
   }
   torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex, "pthread_mutex_unlock scratch alloc failed");
+
   void* ptr = nullptr;
   cudaError_t err = cudaMalloc(&ptr, bytes);
   if (err != cudaSuccess) {
@@ -149,12 +146,16 @@ static inline void torchlean_cuda_scratch_free_bytes(void** ptr, size_t bytes, c
     torchlean_cuda_free_checked(ptr, msg);
     return;
   }
-  cudaEvent_t ready = nullptr;
-  checkCuda(cudaEventCreateWithFlags(&ready, cudaEventDisableTiming),
-            "cudaEventCreate cached scratch block failed");
-  checkCuda(cudaEventRecord(ready, 0), "cudaEventRecord cached scratch block failed");
   torchlean_cuda_lock(&g_torchlean_cuda_scratch_mutex, "pthread_mutex_lock scratch free failed");
-  torchlean_cuda_scratch_push({bytes, *ptr, ready});
+  const bool over_cap = g_torchlean_cuda_scratch_count >= kTorchleanCudaScratchMaxBlocks ||
+                        g_torchlean_cuda_scratch_bytes + bytes > kTorchleanCudaScratchMaxBytes;
+  if (over_cap) {
+    torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex,
+                          "pthread_mutex_unlock scratch free failed");
+    torchlean_cuda_free_checked(ptr, "cudaFree scratch over cache cap failed");
+    return;
+  }
+  torchlean_cuda_scratch_push({bytes, *ptr});
   torchlean_cuda_unlock(&g_torchlean_cuda_scratch_mutex, "pthread_mutex_unlock scratch free failed");
   *ptr = nullptr;
 }
