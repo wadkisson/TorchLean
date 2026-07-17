@@ -68,24 +68,47 @@ extern "C" void torchlean_cuda_kernels_flush_scratch_cache(void);
 extern "C" void torchlean_cuda_conv_pool_flush_scratch_cache(void);
 extern "C" void torchlean_cuda_blas_flush_scratch_cache(void);
 
+// Stream-ordered device buffer pool.
+//
+// Eager TorchLean launches on the default stream. Returning a block to the freelist and later
+// reallocating it for a newer kernel is therefore safe without CUDA events: stream ordering
+// guarantees the earlier consumer finished before the later producer runs.
+//
+// The previous event-gated cache created/query/destroyed an event on every free/alloc. On GPT-2
+// that produced ~150k cudaEventQuery calls / 3 steps while still missing the cache (not-ready),
+// so the runtime kept calling cudaMalloc. Drop the events; bucket by capacity for reuse.
 struct torchlean_cuda_cached_block {
-  size_t size;
+  size_t capacity;  // allocated float32 elements
   float* data;
-  cudaEvent_t ready;
 };
 
 static void torchlean_cuda_free_best_effort(void* ptr, const char* what);
-static void torchlean_cuda_destroy_event_best_effort(cudaEvent_t event, const char* what);
-static void torchlean_cuda_synchronize_event_best_effort(cudaEvent_t event, const char* what);
 
 static pthread_mutex_t g_torchlean_cuda_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 static torchlean_cuda_cached_block* g_torchlean_cuda_cache = nullptr;
 static size_t g_torchlean_cuda_cache_count = 0;
 static size_t g_torchlean_cuda_cache_cap = 0;
+static size_t g_torchlean_cuda_cache_bytes = 0;
 
-// Reuse exact-size buffers only after CUDA has recorded that all earlier work using the block has
-// completed. This lowers allocator pressure during long training loops without forcing a global
-// device synchronization on every free.
+// Soft caps so the freelist cannot retain the whole GPU after a large transient spike.
+static constexpr size_t kTorchleanCudaCacheMaxBlocks = 1024;
+static constexpr size_t kTorchleanCudaCacheMaxBytes = 4ull << 30;  // 4 GiB
+static constexpr size_t kTorchleanCudaPoolMinCapacity = 256;       // float32 elements
+
+static size_t torchlean_cuda_pool_capacity(size_t n) {
+  if (n == 0) {
+    return 0;
+  }
+  size_t cap = kTorchleanCudaPoolMinCapacity;
+  while (cap < n) {
+    if (cap > (SIZE_MAX / 2)) {
+      return n;
+    }
+    cap *= 2;
+  }
+  return cap;
+}
+
 static void torchlean_cuda_cache_push(torchlean_cuda_cached_block block) {
   if (g_torchlean_cuda_cache_count == g_torchlean_cuda_cache_cap) {
     size_t new_cap = g_torchlean_cuda_cache_cap == 0 ? 16 : g_torchlean_cuda_cache_cap * 2;
@@ -97,60 +120,57 @@ static void torchlean_cuda_cache_push(torchlean_cuda_cached_block block) {
     g_torchlean_cuda_cache_cap = new_cap;
   }
   g_torchlean_cuda_cache[g_torchlean_cuda_cache_count++] = block;
+  g_torchlean_cuda_cache_bytes += torchlean_float_bytes_for(block.capacity);
 }
 
-static float* torchlean_cuda_take_cached_block(size_t n) {
+// Pop a cached block with capacity >= n, preferring the tightest fit (and LIFO among ties).
+static float* torchlean_cuda_take_cached_block(size_t n, size_t* out_capacity) {
   if (n == 0) {
     return NULL;
   }
   torchlean_cuda_lock(&g_torchlean_cuda_cache_mutex, "pthread_mutex_lock buffer cache failed");
+  size_t best = (size_t)-1;
+  size_t best_cap = (size_t)-1;
   for (size_t i = 0; i < g_torchlean_cuda_cache_count; ++i) {
-    if (g_torchlean_cuda_cache[i].size != n) {
+    const size_t cap = g_torchlean_cuda_cache[i].capacity;
+    if (cap < n || cap > best_cap) {
       continue;
     }
-    cudaError_t ready = cudaEventQuery(g_torchlean_cuda_cache[i].ready);
-    if (ready == cudaSuccess) {
-      float* data = g_torchlean_cuda_cache[i].data;
-      torchlean_cuda_destroy_event_best_effort(g_torchlean_cuda_cache[i].ready,
-                                               "cudaEventDestroy cached buffer reuse failed");
-      g_torchlean_cuda_cache[i] = g_torchlean_cuda_cache[g_torchlean_cuda_cache_count - 1];
-      g_torchlean_cuda_cache_count--;
-      torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex,
-                            "pthread_mutex_unlock buffer cache failed");
-      return data;
-    }
-    if (ready != cudaErrorNotReady) {
-      fprintf(stderr, "TorchLean CUDA warning: cudaEventQuery cached buffer failed: %s\n",
-              cudaGetErrorString(ready));
+    // Among equal capacities, take the newest entry (LIFO).
+    if (cap < best_cap || i > best) {
+      best = i;
+      best_cap = cap;
     }
   }
+  if (best == (size_t)-1) {
+    torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex,
+                          "pthread_mutex_unlock buffer cache failed");
+    return NULL;
+  }
+  float* data = g_torchlean_cuda_cache[best].data;
+  *out_capacity = g_torchlean_cuda_cache[best].capacity;
+  g_torchlean_cuda_cache_bytes -= torchlean_float_bytes_for(g_torchlean_cuda_cache[best].capacity);
+  g_torchlean_cuda_cache[best] = g_torchlean_cuda_cache[g_torchlean_cuda_cache_count - 1];
+  g_torchlean_cuda_cache_count--;
   torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex, "pthread_mutex_unlock buffer cache failed");
-  return NULL;
+  return data;
 }
 
-static void torchlean_cuda_return_cached_block(size_t n, float* data) {
-  if (!data || n == 0) {
+static void torchlean_cuda_return_cached_block(size_t capacity, float* data) {
+  if (!data || capacity == 0) {
     return;
   }
-  cudaEvent_t ready = nullptr;
-  cudaError_t err = cudaEventCreateWithFlags(&ready, cudaEventDisableTiming);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "TorchLean CUDA warning: cudaEventCreate cached buffer failed: %s\n",
-            cudaGetErrorString(err));
-    torchlean_cuda_free_best_effort(data, "cudaFree uncached buffer after event-create failure failed");
-    return;
-  }
-  err = cudaEventRecord(ready, 0);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "TorchLean CUDA warning: cudaEventRecord cached buffer failed: %s\n",
-            cudaGetErrorString(err));
-    torchlean_cuda_destroy_event_best_effort(ready,
-                                             "cudaEventDestroy buffer after record failure failed");
-    torchlean_cuda_free_best_effort(data, "cudaFree uncached buffer after event-record failure failed");
-    return;
-  }
+  const size_t bytes = torchlean_float_bytes_for(capacity);
   torchlean_cuda_lock(&g_torchlean_cuda_cache_mutex, "pthread_mutex_lock buffer return failed");
-  torchlean_cuda_cache_push({n, data, ready});
+  const bool over_cap = g_torchlean_cuda_cache_count >= kTorchleanCudaCacheMaxBlocks ||
+                        g_torchlean_cuda_cache_bytes + bytes > kTorchleanCudaCacheMaxBytes;
+  if (over_cap) {
+    torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex,
+                          "pthread_mutex_unlock buffer return failed");
+    torchlean_cuda_free_best_effort(data, "cudaFree buffer over cache cap failed");
+    return;
+  }
+  torchlean_cuda_cache_push({capacity, data});
   torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex, "pthread_mutex_unlock buffer return failed");
 }
 
@@ -161,15 +181,11 @@ static void torchlean_cuda_flush_cached_blocks(void) {
   g_torchlean_cuda_cache = nullptr;
   g_torchlean_cuda_cache_count = 0;
   g_torchlean_cuda_cache_cap = 0;
+  g_torchlean_cuda_cache_bytes = 0;
   torchlean_cuda_unlock(&g_torchlean_cuda_cache_mutex, "pthread_mutex_unlock buffer flush failed");
 
   for (size_t i = 0; i < count; ++i) {
-    torchlean_cuda_cached_block block = blocks[i];
-    torchlean_cuda_synchronize_event_best_effort(block.ready,
-                                                 "cudaEventSynchronize cached buffer failed");
-    torchlean_cuda_destroy_event_best_effort(block.ready,
-                                             "cudaEventDestroy cached buffer failed");
-    torchlean_cuda_free_best_effort(block.data, "cudaFree cached buffer failed");
+    torchlean_cuda_free_best_effort(blocks[i].data, "cudaFree cached buffer failed");
   }
   free(blocks);
 }
@@ -227,34 +243,16 @@ static void torchlean_cuda_free_best_effort(void* ptr, const char* what) {
   }
 }
 
-static void torchlean_cuda_destroy_event_best_effort(cudaEvent_t event, const char* what) {
-  if (!event) {
-    return;
-  }
-  cudaError_t err = cudaEventDestroy(event);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "TorchLean CUDA warning: %s: %s\n", what, cudaGetErrorString(err));
-  }
-}
-
-static void torchlean_cuda_synchronize_event_best_effort(cudaEvent_t event, const char* what) {
-  if (!event) {
-    return;
-  }
-  cudaError_t err = cudaEventSynchronize(event);
-  if (err != cudaSuccess) {
-    fprintf(stderr, "TorchLean CUDA warning: %s: %s\n", what, cudaGetErrorString(err));
-  }
-}
-
 static bool torchlean_cuda_buffer_release_data(torchlean_cuda_buffer* b) {
   if (!b || !b->data) {
     return false;
   }
   torchlean_cuda_note_free(b->size);
-  torchlean_cuda_return_cached_block(b->size, b->data);
+  const size_t capacity = b->capacity != 0 ? b->capacity : b->size;
+  torchlean_cuda_return_cached_block(capacity, b->data);
   b->data = NULL;
   b->size = 0;
+  b->capacity = 0;
   return true;
 }
 
@@ -312,24 +310,28 @@ extern "C" torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
     lean_internal_panic_out_of_memory();
   }
   b->size = n;
+  b->capacity = 0;
   b->data = NULL;
   if (n > 0) {
-    b->data = torchlean_cuda_take_cached_block(n);
-  }
-  if (n > 0 && !b->data) {
-    const size_t bytes =
-        checked_bytes_size(n, sizeof(float), "torchlean_cuda_buffer_alloc: byte size overflow");
-    cudaError_t err = cudaMalloc((void**)&b->data, bytes);
-    if (err != cudaSuccess) {
-      torchlean_cuda_flush_cached_blocks();
-      err = cudaMalloc((void**)&b->data, bytes);
+    size_t capacity = 0;
+    b->data = torchlean_cuda_take_cached_block(n, &capacity);
+    if (b->data) {
+      b->capacity = capacity;
+    } else {
+      capacity = torchlean_cuda_pool_capacity(n);
+      const size_t bytes = checked_bytes_size(
+          capacity, sizeof(float), "torchlean_cuda_buffer_alloc: byte size overflow");
+      cudaError_t err = cudaMalloc((void**)&b->data, bytes);
       if (err != cudaSuccess) {
-        free(b);
-        torchlean_cuda_panic_malloc_failed(n, err);
+        torchlean_cuda_flush_cached_blocks();
+        err = cudaMalloc((void**)&b->data, bytes);
+        if (err != cudaSuccess) {
+          free(b);
+          torchlean_cuda_panic_malloc_failed(capacity, err);
+        }
       }
+      b->capacity = capacity;
     }
-  }
-  if (n > 0) {
     torchlean_cuda_note_alloc(n);
   }
   return b;

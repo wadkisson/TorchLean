@@ -51,13 +51,21 @@ BENCH_SAMPLE=0 \
     lake -R -K cuda=true -K libtorch=true exe benchmark_gpt2 --device cuda
 
 echo "==> cuda API summary"
-if [[ -f "$REPORT.sqlite" ]]; then
-  nsys stats --report cudaapisum "$REPORT.sqlite" || nsys stats --report cuda_api_sum "$REPORT.sqlite" || true
+# Old Nsight (2020.3.2) often fails event processing but still writes a usable .qdrep;
+# `nsys stats` on the .qdrep regenerates .sqlite.
+REP=""
+if [[ -f "$REPORT.qdrep" ]]; then
+  REP="$REPORT.qdrep"
+elif [[ -f "$REPORT.sqlite" ]]; then
+  REP="$REPORT.sqlite"
 elif [[ -f "$REPORT.nsys-rep" ]]; then
-  nsys stats --report cuda_api_sum "$REPORT.nsys-rep" || true
+  REP="$REPORT.nsys-rep"
 else
-  echo "no nsys report found at $REPORT.{sqlite,nsys-rep}" >&2
+  echo "no nsys report found at $REPORT.{qdrep,sqlite,nsys-rep}" >&2
   exit 1
 fi
+nsys stats --report cudaapisum "$REP" 2>&1 | tee "$OUT/cudaapisum.txt" \
+  || nsys stats --report cuda_api_sum "$REP" 2>&1 | tee "$OUT/cudaapisum.txt" \
+  || true
 
 echo "done: $REPORT.*"

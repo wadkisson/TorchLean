@@ -82,6 +82,7 @@ static bool torchlean_cuda_buffer_release_data(torchlean_cuda_buffer* b) {
   torchlean_cuda_note_free(b->size);
   b->data = NULL;
   b->size = 0;
+  b->capacity = 0;
   return true;
 }
 
@@ -146,6 +147,7 @@ torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
     lean_internal_panic_out_of_memory();
   }
   b->size = n;
+  b->capacity = n;
   b->data = NULL;
   if (n > 0) {
     const size_t bytes =
@@ -156,6 +158,8 @@ torchlean_cuda_buffer* torchlean_cuda_buffer_alloc(size_t n) {
       lean_internal_panic_out_of_memory();
     }
     torchlean_cuda_note_alloc(n);
+  } else {
+    b->capacity = 0;
   }
   return b;
 }

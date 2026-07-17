@@ -46,8 +46,9 @@ static inline uint32_t nat_to_u32_or_panic(b_lean_obj_arg o, const char* msg) {
 }
 
 typedef struct {
-  size_t size;  // number of float32 elements
-  float* data;  // device/host pointer (depending on build)
+  size_t size;      // logical float32 elements visible to kernels
+  size_t capacity;  // allocated float32 elements (>= size); used by the device pool
+  float* data;      // device/host pointer (depending on build)
 } torchlean_cuda_buffer;
 
 // Helpers implemented by `torchlean_cuda_tensor.cu` / `torchlean_cuda_tensor_stub.c`.
