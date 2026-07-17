@@ -152,10 +152,6 @@ end KernelAudit
 
 namespace ExecutionAudit
 
-/-- Human-readable lines for all selected capsules. -/
-def reportLines (a : ExecutionAudit) : List String :=
-  a.kernels.map KernelAudit.reportLine
-
 /-- Human-readable contract details for all selected capsules. -/
 def detailedReportLines (a : ExecutionAudit) : List String :=
   a.kernels.flatMap KernelAudit.detailedReportLines
@@ -163,10 +159,6 @@ def detailedReportLines (a : ExecutionAudit) : List String :=
 end ExecutionAudit
 
 namespace ExecutionPlan
-
-/-- Human-readable lines for a selected backend plan. -/
-def reportLines (p : ExecutionPlan) : List String :=
-  p.audit.reportLines
 
 /-- Human-readable contract details for a selected backend plan. -/
 def detailedReportLines (p : ExecutionPlan) : List String :=

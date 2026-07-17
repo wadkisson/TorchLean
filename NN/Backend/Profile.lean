@@ -105,12 +105,6 @@ def checkedCpu : BackendProfile :=
     loweringMode := .coalesced
     acceptancePolicy := .checkedRuntime }
 
-/-- Checked CPU/reference profile for a named operating system and architecture. -/
-def checkedCpuTarget (os : OperatingSystem) (arch : Architecture := .unknown) : BackendProfile :=
-  { checkedCpu with
-    name := s!"checked_{reprStr os}_{reprStr arch}_cpu"
-    target := Target.portableCpu os arch }
-
 /-- Checked native CUDA profile. External trusted providers are not admitted. -/
 def checkedCuda : BackendProfile :=
   { name := "checked_cuda"
@@ -154,14 +148,6 @@ def libTorchAutogradCuda : BackendProfile :=
     registryMode := .withLibTorch
     loweringMode := .coalesced
     acceptancePolicy := .allowTrustedRuntime }
-
-/-- Checked macOS CPU/reference profile. -/
-def macOSCpu : BackendProfile :=
-  checkedCpuTarget .macOS .aarch64
-
-/-- Checked Windows CPU/reference profile. Used for CI bring-up before native Windows kernels exist. -/
-def windowsCpu : BackendProfile :=
-  checkedCpuTarget .windows .x86_64
 
 /-- Construct a named target whose runtime capsules are not implemented yet. -/
 def future

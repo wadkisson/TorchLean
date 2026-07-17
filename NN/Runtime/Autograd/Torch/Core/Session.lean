@@ -238,10 +238,6 @@ def selectedCapsule {α : Type} (s : EagerSession α) (op : NN.Backend.BackendOp
           IO.println line
       pure capsule
 
-/-- Accepted capsules actually selected by this eager session. -/
-def backendSelections {α : Type} (s : EagerSession α) : IO (List NN.Backend.AcceptedKernel) :=
-  s.selectedBackends.get
-
 /-- Allocate a fresh eager session with an empty tape and empty side tables. -/
 def new {α : Type} (opts : Options := {}) : IO (EagerSession α) := do
   try

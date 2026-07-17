@@ -32,11 +32,6 @@ def seed (exeName : String) (args : List String) (default : Nat := 0) :
     IO (Nat × List String) :=
   NN.API.Common.orThrow exeName <| TorchLean.CLI.takeSeed args default
 
-/-- Parse an optional natural-number flag such as `--steps 200`. -/
-def natFlag? (exeName : String) (args : List String) (name : String) :
-    IO (Option Nat × List String) :=
-  NN.API.Common.orThrow exeName <| TorchLean.CLI.takeNatFlagOnce args name
-
 /--
 Parse an optional natural-number flag, fall back to a default, and require that the selected value
 is strictly positive.
@@ -48,11 +43,6 @@ def positiveNatFlag
     (default : Nat) :
     IO (Nat × List String) := do
   NN.API.Common.orThrow exeName <| TorchLean.CLI.takePositiveNatFlagDefault args exeName name default
-
-/-- Parse an optional path flag such as `--csv data.csv`. -/
-def pathFlag? (exeName : String) (args : List String) (name : String) :
-    IO (Option System.FilePath × List String) :=
-  NN.API.Common.orThrow exeName <| TorchLean.CLI.takePathFlagOnce args name
 
 /-- Parse an optional path flag and fall back to a default path. -/
 def pathFlagDefault

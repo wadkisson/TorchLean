@@ -91,18 +91,6 @@ structure GraphExecutionPlan where
   kernels : List PlannedNodeKernel
   deriving Repr
 
-namespace GraphExecutionPlan
-
-/-- Node ids covered by backend kernels, in graph order. -/
-def nodeIds (p : GraphExecutionPlan) : List Nat :=
-  p.kernels.map (·.nodeId)
-
-/-- Selected capsule names, in graph order. -/
-def capsuleNames (p : GraphExecutionPlan) : List String :=
-  p.kernels.map fun k => k.capsule.name
-
-end GraphExecutionPlan
-
 /-- Plan a single IR node when it corresponds to runtime work. -/
 def planNode? (cfg : ExecutionConfig) (availability : Availability)
     (registry : List KernelCapsule) (n : NN.IR.Node) :

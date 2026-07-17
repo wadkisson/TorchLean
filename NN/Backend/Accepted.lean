@@ -40,6 +40,14 @@ namespace AcceptedGraphPlan
 def capsuleNames (p : AcceptedGraphPlan) : List String :=
   p.loweringPlan.capsuleNames
 
+/-- Source IR node ids covered by the accepted lowering. -/
+def nodeIds (p : AcceptedGraphPlan) : List Nat :=
+  p.loweringPlan.nodeIds
+
+/-- Audit for the accepted lowering. -/
+def audit (p : AcceptedGraphPlan) : ExecutionAudit :=
+  p.loweringPlan.audit
+
 end AcceptedGraphPlan
 
 /-- Result of planning/lowering/gating a graph. -/

@@ -87,10 +87,6 @@ inductive GateResult where
 
 namespace ObligationReport
 
-/-- Whether this obligation report is admitted by an acceptance policy. -/
-def acceptedBy (policy : AcceptancePolicy) (r : ObligationReport) : Bool :=
-  policy.acceptsDisposition r.disposition
-
 /-- Whether this obligation is fuzz-backed. -/
 def isFuzzed (r : ObligationReport) : Bool :=
   r.disposition == .fuzzed
@@ -202,10 +198,6 @@ namespace GraphLoweringPlan
 /-- Apply an acceptance policy to a lowered backend plan. -/
 def gate (policy : AcceptancePolicy) (p : GraphLoweringPlan) : GateResult :=
   p.toExecutionPlan.gate policy
-
-/-- Whether a lowered backend plan is accepted by a policy. -/
-def acceptedBy (policy : AcceptancePolicy) (p : GraphLoweringPlan) : Bool :=
-  p.toExecutionPlan.acceptedBy policy
 
 end GraphLoweringPlan
 

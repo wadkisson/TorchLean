@@ -131,21 +131,5 @@ def hasNoMissingEvidence (a : ExecutionAudit) : Bool :=
 
 end ExecutionAudit
 
-namespace ExecutionPlan
-
-/-- Whether every selected backend contract obligation has a non-missing audit classification. -/
-def hasNoMissingEvidence (p : ExecutionPlan) : Bool :=
-  p.audit.hasNoMissingEvidence
-
-/-- Missing recheck obligations for a selected plan. -/
-def missingReports (p : ExecutionPlan) : List ObligationReport :=
-  p.audit.missingReports
-
-/-- Trusted-boundary recheck obligations for a selected plan. -/
-def trustedBoundaryReports (p : ExecutionPlan) : List ObligationReport :=
-  p.audit.trustedBoundaryReports
-
-end ExecutionPlan
-
 end Backend
 end NN

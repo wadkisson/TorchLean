@@ -20,7 +20,7 @@ This file stays on the *mathematical* side of training:
 - `SGD.step` lifts the single-tensor SGD equation to a heterogeneous `TList` of parameters.
 
 It is not another runtime optimizer implementation. Runtime files such as
-`Runtime.Autograd.Torch.ParamList.sgdStep{,Fast}` and CUDA eager `sgdStepAllCuda` mutate `IO.Ref`s or
+`Runtime.Autograd.Torch.ParamList.sgdStep{,Fast}` and CUDA eager `sgdStepAllCudaMap` mutate `IO.Ref`s or
 device buffers; their intended mathematical update is the pure context equation stated here.
 
 ## PyTorch correspondence / citations

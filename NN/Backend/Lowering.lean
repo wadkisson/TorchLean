@@ -51,10 +51,6 @@ namespace LoweredKernelGroup
 def toPlannedKernel (g : LoweredKernelGroup) : PlannedKernel :=
   { op := g.op, capsule := g.capsule }
 
-/-- Whether this lowered group crosses a trusted-external boundary. -/
-def hasTrustedExternal (g : LoweredKernelGroup) : Bool :=
-  g.capsule.isTrustedExternal
-
 /-- Whether a planned node can be appended to this lowered backend group. -/
 def canAppend (g : LoweredKernelGroup) (k : IR.PlannedNodeKernel) : Bool :=
   g.op == k.op && g.capsule.sameIdentity k.capsule
@@ -85,10 +81,6 @@ def toExecutionPlan (p : GraphLoweringPlan) : ExecutionPlan :=
 /-- Audit the selected backend boundaries of the lowering plan. -/
 def audit (p : GraphLoweringPlan) : ExecutionAudit :=
   p.toExecutionPlan.audit
-
-/-- Whether any lowered group crosses a trusted-external boundary. -/
-def hasTrustedExternal (p : GraphLoweringPlan) : Bool :=
-  p.groups.any LoweredKernelGroup.hasTrustedExternal
 
 end GraphLoweringPlan
 

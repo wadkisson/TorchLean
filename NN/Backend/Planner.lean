@@ -41,10 +41,6 @@ namespace ExecutionPlan
 def capsuleNames (p : ExecutionPlan) : List String :=
   p.kernels.map fun k => k.capsule.name
 
-/-- Whether every selected capsule is admitted by the config's trust/device/backend policy. -/
-def admissible (cfg : ExecutionConfig) (p : ExecutionPlan) : Bool :=
-  p.kernels.all fun k => k.capsule.admissible cfg
-
 end ExecutionPlan
 
 /-- Put preferred-provider capsules first while preserving the relative order otherwise. -/
