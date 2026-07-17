@@ -35,9 +35,8 @@ open Spec
 open Tensor
 
 /-- Convert any `Except String` into `IO` by throwing `IO.userError` on failure. -/
-def okOrThrow {α : Type} : Except String α → IO α
-  | .ok a => pure a
-  | .error e => throw <| IO.userError e
+abbrev okOrThrow {α : Type} : Except String α → IO α :=
+  Runtime.Autograd.okOrThrow
 
 /-- Approximate equality for `Float` runtime checks. -/
 def assertApprox (msg : String) (x y : Float) (tol : Float := 1e-3) : IO Unit := do

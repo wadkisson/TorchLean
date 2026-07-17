@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.RL.Artifacts.GridWorld.Position
+public import NN.Runtime.RL.Artifacts.GridWorld.IO
 public import NN.Runtime.RL.Artifacts.GridWorld.Policy
 public import NN.Runtime.RL.Artifacts.GridWorld.Path
 

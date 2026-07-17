@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Backend.Capsule
+public import NN.Backend.OpCatalog
 
 /-!
 # Reference and Portable Backend Capsules
@@ -15,6 +16,9 @@ Portable capsules for paths that do not require CUDA or LibTorch.
 
 These are not meant to win benchmarks. They keep TorchLean runnable on CPU-only machines and give
 the planner a clear fallback vocabulary for reference/spec-aligned execution.
+
+Catalog ops (`OpCatalog.*`) are stamped through the builders below. Specials with custom summaries
+stay explicit.
 -/
 
 @[expose] public section
@@ -93,205 +97,93 @@ def referenceConvPoolCapsule (op : BackendOp) : KernelCapsule :=
     s!"Reference `{op.name}` follows the channel-first runtime contract."
     s!"TorchLean tape supplies the `{op.name}` VJP where differentiable."
 
-/-- Reference ReLU activation. -/
+/-- Reference ReLU activation (kept named for backend tests). -/
 def relu : KernelCapsule :=
   referenceCapsule
-    "reference.relu"
-    .relu
-    "Spec.relu / pointwise max(x, 0)"
+    "reference.relu" .relu "Spec.relu / pointwise max(x, 0)"
     "Reference ReLU follows pointwise tensor semantics."
     "TorchLean tape supplies the VJP."
 
-/-- Reference GELU activation. -/
 def gelu : KernelCapsule :=
   referenceCapsule
-    "reference.gelu"
-    .gelu
-    "Spec.gelu"
+    "reference.gelu" .gelu "Spec.gelu"
     "Reference GELU follows the documented runtime approximation contract."
     "TorchLean tape supplies the VJP."
 
-def add : KernelCapsule := referencePointwiseCapsule .add
-def sub : KernelCapsule := referencePointwiseCapsule .sub
-def mul : KernelCapsule := referencePointwiseCapsule .mul
-def scale : KernelCapsule := referencePointwiseCapsule .scale
-def abs : KernelCapsule := referencePointwiseCapsule .abs
-def sqrt : KernelCapsule := referencePointwiseCapsule .sqrt
-def clamp : KernelCapsule := referencePointwiseCapsule .clamp
-def max : KernelCapsule := referencePointwiseCapsule .max
-def min : KernelCapsule := referencePointwiseCapsule .min
-def sigmoid : KernelCapsule := referencePointwiseCapsule .sigmoid
-def tanh : KernelCapsule := referencePointwiseCapsule .tanh
-def softplus : KernelCapsule := referencePointwiseCapsule .softplus
-def exp : KernelCapsule := referencePointwiseCapsule .exp
-def log : KernelCapsule := referencePointwiseCapsule .log
-def sin : KernelCapsule := referencePointwiseCapsule .sin
-def cos : KernelCapsule := referencePointwiseCapsule .cos
-def inv : KernelCapsule := referencePointwiseCapsule .inv
-def safeLog : KernelCapsule := referencePointwiseCapsule .safeLog
-def logSoftmax : KernelCapsule := referencePointwiseCapsule .logSoftmax
-
-/-- Reference softmax path. -/
 def softmax : KernelCapsule :=
   referenceCapsule
-    "reference.softmax"
-    .softmax
-    "Spec.softmax"
+    "reference.softmax" .softmax "Spec.softmax"
     "Reference softmax follows the row/axis normalization contract."
     "TorchLean tape supplies the VJP."
 
-def sum : KernelCapsule := referenceReductionCapsule .sum
-def reduceSum : KernelCapsule := referenceReductionCapsule .reduceSum
-def reduceMean : KernelCapsule := referenceReductionCapsule .reduceMean
-
-def flatten : KernelCapsule := referenceViewCapsule .flatten
-def reshape : KernelCapsule := referenceViewCapsule .reshape
-def permute : KernelCapsule := referenceViewCapsule .permute
-def transpose2d : KernelCapsule := referenceViewCapsule .transpose2d
-def swapAdjacentAtDepth : KernelCapsule := referenceViewCapsule .swapAdjacentAtDepth
-def transpose3dFirstToLast : KernelCapsule := referenceViewCapsule .transpose3dFirstToLast
-def transpose3dLastToFirst : KernelCapsule := referenceViewCapsule .transpose3dLastToFirst
-def transpose3dLastTwo : KernelCapsule := referenceViewCapsule .transpose3dLastTwo
-def broadcastTo : KernelCapsule := referenceViewCapsule .broadcastTo
-def concatVectors : KernelCapsule := referenceViewCapsule .concatVectors
-def concatLeadingAxis : KernelCapsule := referenceViewCapsule .concatLeadingAxis
-def sliceLeadingAxisRange : KernelCapsule := referenceViewCapsule .sliceLeadingAxisRange
-def gatherScalar : KernelCapsule := referenceViewCapsule .gatherScalar
-def gatherScalarNat : KernelCapsule := referenceViewCapsule .gatherScalarNat
-def gatherRow : KernelCapsule := referenceViewCapsule .gatherRow
-def gatherVecNat : KernelCapsule := referenceViewCapsule .gatherVecNat
-def gatherRowsNat : KernelCapsule := referenceViewCapsule .gatherRowsNat
-def scatterAddVec : KernelCapsule := referenceViewCapsule .scatterAddVec
-def scatterAddRow : KernelCapsule := referenceViewCapsule .scatterAddRow
-
 def randUniform : KernelCapsule :=
-  referenceForwardOnlyCapsule
-    .randUniform
-    "IR.randUniform"
+  referenceForwardOnlyCapsule .randUniform "IR.randUniform"
     "Reference deterministic random-uniform tensors follow the seeded spec/runtime contract."
 
 def bernoulliMask : KernelCapsule :=
-  referenceForwardOnlyCapsule
-    .bernoulliMask
-    "IR.bernoulliMask"
+  referenceForwardOnlyCapsule .bernoulliMask "IR.bernoulliMask"
     "Reference deterministic Bernoulli masks follow the seeded spec/runtime contract."
 
-/-- Reference matmul path. -/
 def matmul : KernelCapsule :=
   referenceCapsule
-    "reference.matmul"
-    .matmul
-    "Spec.matmul / IR.matmul"
+    "reference.matmul" .matmul "Spec.matmul / IR.matmul"
     "Portable matmul follows the spec-level matrix product contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference batched matrix multiplication. -/
 def bmm : KernelCapsule :=
   referenceCapsule
-    "reference.bmm"
-    .bmm
-    "Spec.bmm / batched matrix product"
+    "reference.bmm" .bmm "Spec.bmm / batched matrix product"
     "Reference batched matrix multiplication follows the spec-level contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference linear layer. -/
 def linear : KernelCapsule :=
   referenceCapsule
-    "reference.linear"
-    .linear
-    "Spec.linear"
+    "reference.linear" .linear "Spec.linear"
     "Reference linear follows the matvec/matmul plus bias contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference mean-squared-error loss. -/
 def mseLoss : KernelCapsule :=
   referenceCapsule
-    "reference.mse_loss"
-    .mseLoss
-    "Spec.mseLoss"
+    "reference.mse_loss" .mseLoss "Spec.mseLoss"
     "Reference MSE follows the mean squared residual contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference layer normalization. -/
 def layerNorm : KernelCapsule :=
   referenceCapsule
-    "reference.layer_norm"
-    .layerNorm
-    "Spec.layerNorm"
+    "reference.layer_norm" .layerNorm "Spec.layerNorm"
     "Reference LayerNorm follows the per-row normalization contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference batch normalization. -/
 def batchNorm : KernelCapsule :=
   referenceCapsule
-    "reference.batch_norm"
-    .batchNorm
-    "Spec.batchNorm"
+    "reference.batch_norm" .batchNorm "Spec.batchNorm"
     "Reference BatchNorm follows the channel-first normalization contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference channel-first BatchNorm runtime op. -/
 def batchNormChannelFirst : KernelCapsule :=
   referenceCapsule
-    "reference.batchnorm_channel_first"
-    .batchNormChannelFirst
+    "reference.batchnorm_channel_first" .batchNormChannelFirst
     "Spec.batchNorm / channel-first runtime contract"
     "Reference channel-first BatchNorm follows the image/channel normalization contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference generic channel-first convolution. -/
-def conv : KernelCapsule := referenceConvPoolCapsule .conv
-
-/-- Reference 2D convolution. -/
 def conv2d : KernelCapsule :=
   referenceCapsule
-    "reference.conv2d"
-    .conv2d
-    "Spec.conv2d"
+    "reference.conv2d" .conv2d "Spec.conv2d"
     "Reference Conv2D follows the channel-first runtime contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference generic channel-first transpose convolution. -/
-def convTranspose : KernelCapsule := referenceConvPoolCapsule .convTranspose
-
-/-- Reference 2D transpose convolution. -/
-def convTranspose2d : KernelCapsule := referenceConvPoolCapsule .convTranspose2d
-
-/-- Reference max pooling. -/
 def maxPool : KernelCapsule :=
   referenceCapsule
-    "reference.max_pool"
-    .maxPool
-    "Spec.maxPool"
+    "reference.max_pool" .maxPool "Spec.maxPool"
     "Reference max-pooling follows the channel-first window contract."
     "TorchLean tape supplies the VJP."
 
-/-- Reference 2D max pooling. -/
-def maxPool2d : KernelCapsule := referenceConvPoolCapsule .maxPool2d
-
-/-- Reference padded 2D max pooling. -/
-def maxPool2dPad : KernelCapsule := referenceConvPoolCapsule .maxPool2dPad
-
-/-- Reference smooth max pooling. -/
-def smoothMaxPool : KernelCapsule := referenceConvPoolCapsule .smoothMaxPool
-
-/-- Reference smooth 2D max pooling. -/
-def smoothMaxPool2d : KernelCapsule := referenceConvPoolCapsule .smoothMaxPool2d
-
-/-- Reference average pooling. -/
 def avgPool : KernelCapsule :=
   referenceCapsule
-    "reference.avg_pool"
-    .avgPool
-    "Spec.avgPool"
+    "reference.avg_pool" .avgPool "Spec.avgPool"
     "Reference average-pooling follows the channel-first window contract."
     "TorchLean tape supplies the VJP."
-
-/-- Reference 2D average pooling. -/
-def avgPool2d : KernelCapsule := referenceConvPoolCapsule .avgPool2d
-
-/-- Reference padded 2D average pooling. -/
-def avgPool2dPad : KernelCapsule := referenceConvPoolCapsule .avgPool2dPad
 
 /-- Reference attention path using the composed TorchLean expression. -/
 def attention : KernelCapsule :=
@@ -323,73 +215,14 @@ def attention : KernelCapsule :=
 
 /-- Cross-platform reference capsules. -/
 def capsules : List KernelCapsule :=
-  [ matmul
-  , bmm
-  , linear
-  , mseLoss
-  , relu
-  , gelu
-  , add
-  , sub
-  , mul
-  , scale
-  , abs
-  , sqrt
-  , clamp
-  , max
-  , min
-  , sigmoid
-  , tanh
-  , softplus
-  , exp
-  , log
-  , sin
-  , cos
-  , inv
-  , safeLog
-  , logSoftmax
-  , softmax
-  , sum
-  , reduceSum
-  , reduceMean
-  , flatten
-  , reshape
-  , permute
-  , transpose2d
-  , swapAdjacentAtDepth
-  , transpose3dFirstToLast
-  , transpose3dLastToFirst
-  , transpose3dLastTwo
-  , broadcastTo
-  , concatVectors
-  , concatLeadingAxis
-  , sliceLeadingAxisRange
-  , gatherScalar
-  , gatherScalarNat
-  , gatherRow
-  , gatherVecNat
-  , gatherRowsNat
-  , scatterAddVec
-  , scatterAddRow
-  , randUniform
-  , bernoulliMask
-  , layerNorm
-  , batchNorm
-  , batchNormChannelFirst
-  , conv
-  , conv2d
-  , convTranspose
-  , convTranspose2d
-  , maxPool
-  , maxPool2d
-  , maxPool2dPad
-  , smoothMaxPool
-  , smoothMaxPool2d
-  , avgPool
-  , avgPool2d
-  , avgPool2dPad
-  , attention
-  ]
+  [ matmul, bmm, linear, mseLoss, relu, gelu, softmax
+  , randUniform, bernoulliMask
+  , layerNorm, batchNorm, batchNormChannelFirst
+  , conv2d, maxPool, avgPool, attention ]
+  ++ (OpCatalog.pointwiseOps ++ OpCatalog.referenceExtraPointwiseOps).map referencePointwiseCapsule
+  ++ OpCatalog.reductionOps.map referenceReductionCapsule
+  ++ OpCatalog.viewOps.map referenceViewCapsule
+  ++ OpCatalog.convPoolOps.map referenceConvPoolCapsule
 
 end Reference
 end Backend

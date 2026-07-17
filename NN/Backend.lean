@@ -8,6 +8,7 @@ module
 
 public import NN.Backend.Types
 public import NN.Backend.Capsule
+public import NN.Backend.OpCatalog
 public import NN.Backend.Availability
 public import NN.Backend.Target
 public import NN.Backend.Planner

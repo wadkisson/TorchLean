@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.RL.Artifacts.GridWorld.Position
+public import NN.Runtime.RL.Artifacts.GridWorld.IO
 
 /-!
 # GridWorld Policy-Difference Artifacts
@@ -23,10 +24,6 @@ open Lean
 open Json
 open Runtime.Training.JsonCodec
 
-/-!
-## Policy snapshots
--/
-
 /--
 Before/after greedy policy snapshots for a fixed `width × height` GridWorld.
 
@@ -42,6 +39,8 @@ structure PolicyDiff where
 
 namespace PolicyDiff
 
+def artifactLabel : String := "GridWorld policy artifact"
+
 /--
 Validate a `PolicyDiff` record (lengths and action ranges).
 
@@ -51,13 +50,13 @@ specification layer for policies.
 def validateE (p : PolicyDiff) : Except String Unit := do
   let expected := p.width * p.height
   if p.before.size != expected then
-    throw s!"GridWorld policy artifact: `before` expected length {expected}, got {p.before.size}."
+    throw s!"{artifactLabel}: `before` expected length {expected}, got {p.before.size}."
   if p.after.size != expected then
-    throw s!"GridWorld policy artifact: `after` expected length {expected}, got {p.after.size}."
+    throw s!"{artifactLabel}: `after` expected length {expected}, got {p.after.size}."
   if !(p.before.all (fun a => a < 4)) then
-    throw "GridWorld policy artifact: `before` contains an out-of-range action (expected 0..3)."
+    throw s!"{artifactLabel}: `before` contains an out-of-range action (expected 0..3)."
   if !(p.after.all (fun a => a < 4)) then
-    throw "GridWorld policy artifact: `after` contains an out-of-range action (expected 0..3)."
+    throw s!"{artifactLabel}: `after` contains an out-of-range action (expected 0..3)."
 
 /-- JSON encoding for `PolicyDiff`. -/
 def toJson (p : PolicyDiff) : Json :=
@@ -74,71 +73,50 @@ def ofJsonE (j : Json) : Except String PolicyDiff := do
   let o ←
     match j.getObj? with
     | .ok o => pure o
-    | .error e => throw s!"GridWorld policy artifact: expected object: {e}"
-
+    | .error e => throw s!"{artifactLabel}: expected object: {e}"
   let widthJ ←
     match o.get? "width" with
     | some v => pure v
-    | none => throw "GridWorld policy artifact: missing field `width`."
+    | none => throw s!"{artifactLabel}: missing field `width`."
   let heightJ ←
     match o.get? "height" with
     | some v => pure v
-    | none => throw "GridWorld policy artifact: missing field `height`."
+    | none => throw s!"{artifactLabel}: missing field `height`."
   let beforeJ ←
     match o.get? "before" with
     | some v => pure v
-    | none => throw "GridWorld policy artifact: missing field `before`."
+    | none => throw s!"{artifactLabel}: missing field `before`."
   let afterJ ←
     match o.get? "after" with
     | some v => pure v
-    | none => throw "GridWorld policy artifact: missing field `after`."
+    | none => throw s!"{artifactLabel}: missing field `after`."
   let notesJ := (o.get? "notes").getD (.arr #[])
-
   let width ←
     match widthJ.getNat? with
     | .ok n => pure n
-    | .error e => throw s!"GridWorld policy artifact: width expected Nat: {e}"
+    | .error e => throw s!"{artifactLabel}: width expected Nat: {e}"
   let height ←
     match heightJ.getNat? with
     | .ok n => pure n
-    | .error e => throw s!"GridWorld policy artifact: height expected Nat: {e}"
+    | .error e => throw s!"{artifactLabel}: height expected Nat: {e}"
   let before ← natArrayOfJsonE (field := "before") beforeJ
   let after ← natArrayOfJsonE (field := "after") afterJ
   let notes :=
     match stringArrayOfJsonE (field := "notes") notesJ with
     | Except.ok xs => xs
     | Except.error _ => #[]
-
-  let p : PolicyDiff := { width := width, height := height, before := before, after := after, notes := notes }
+  let p : PolicyDiff := { width, height, before, after, notes }
   validateE p
   pure p
 
-/--
-Write a `PolicyDiff` JSON file to disk (creating parent directories if needed).
--/
-def writeJson (path : System.FilePath) (p : PolicyDiff) (pretty : Bool := true) : IO Unit := do
-  match validateE p with
-  | .error e => throw <| IO.userError e
-  | .ok () =>
-      match path.parent with
-      | some parent => IO.FS.createDirAll parent
-      | none => pure ()
-      let j := toJson p
-      let s := if pretty then Json.pretty j else Json.compress j
-      IO.FS.writeFile path (s ++ "\n")
+/-- Write a `PolicyDiff` JSON file to disk (creating parent directories if needed). -/
+def writeJson (path : System.FilePath) (p : PolicyDiff) (pretty : Bool := true) : IO Unit :=
+  writeValidatedJson validateE toJson path p pretty
 
 /-- Read a `PolicyDiff` from a JSON file. -/
-def readJson (path : System.FilePath) : IO PolicyDiff := do
-  let s ← IO.FS.readFile path
-  let j ←
-    match Json.parse s with
-    | .ok j => pure j
-    | .error e => throw <| IO.userError s!"GridWorld policy artifact: parse error: {e}"
-  match ofJsonE j with
-  | .ok p => pure p
-  | .error e => throw <| IO.userError e
+def readJson (path : System.FilePath) : IO PolicyDiff :=
+  readDecodedJson artifactLabel ofJsonE path
 
 end PolicyDiff
-
 
 end Runtime.RL.Artifacts.GridWorld

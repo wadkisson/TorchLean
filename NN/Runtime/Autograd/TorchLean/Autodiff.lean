@@ -44,9 +44,8 @@ Unwrap a runtime `Result` into `IO`, throwing a user error on failure.
 This is used throughout this module because compilation/backprop utilities return an
 `Autograd.Result` with a structured error message.
 -/
-def okOrThrow {α : Type} : Runtime.Autograd.Result α → IO α
-  | .ok a => pure a
-  | .error e => throw <| IO.userError e
+abbrev okOrThrow {α : Type} : Runtime.Autograd.Result α → IO α :=
+  Runtime.Autograd.okOrThrow
 
 /--
 Basis-direction tensors for a shape `s`.
