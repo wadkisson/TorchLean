@@ -212,6 +212,24 @@ lean_lib NN where
     .submodules `NN.Verification
   ]
 
+/-- Shared headers included by CUDA/stub backends — must invalidate `.o` traces when they change. -/
+private def nativeCommonHeaders (pkg : Package) : Array FilePath :=
+  #[
+    pkg.dir / "csrc/cuda/common/torchlean_cuda_common.h",
+    pkg.dir / "csrc/cuda/common/torchlean_cuda_buffer.h",
+    pkg.dir / "csrc/cuda/common/torchlean_size_common.h",
+    pkg.dir / "csrc/cuda/common/torchlean_cublas_common.h",
+    pkg.dir / "csrc/cuda/common/torchlean_cuda_rng_common.h",
+    pkg.dir / "csrc/cuda/common/torchlean_cuda_deterministic_reductions_env.h"
+  ]
+
+/-- Hash shared CUDA headers into an object-file dependency trace. -/
+private def nativeHeaderDepTrace (pkg : Package) : JobM BuildTrace := do
+  let mut t := BuildTrace.nil
+  for h in nativeCommonHeaders pkg do
+    t := mix t (← fetchFileTrace h)
+  pure t
+
 /-- Build one native backend library for the current Lake configuration. -/
 private def buildNativeBackendLib (pkg : Package) (spec : NativeBackendLib) := do
   let lean ← getLeanInstall
@@ -220,12 +238,14 @@ private def buildNativeBackendLib (pkg : Package) (spec : NativeBackendLib) := d
   if cudaEnabled then
     let srcJob ← inputFile (pkg.dir / spec.cudaSrc) false
     let oFile := pkg.buildDir / s!"{spec.stem}.o"
+    -- Lake only hashes the `.cu` by default; header-only pool fixes previously left stale `.o`s.
     let oJob ← buildO oFile srcJob
       (#[
         "-I", lean.includeDir.toString,
         "-I", s!"{cudaHome}/include",
         "-c", "--std=c++17", "-O2", "-Xcompiler", "-fPIC"
       ] ++ includeArgs) #[] "nvcc"
+      (extraDepTrace := nativeHeaderDepTrace pkg)
     buildStaticLib libFile #[oJob]
   else
     let srcJob ← inputFile (pkg.dir / spec.stubSrc) false
@@ -233,6 +253,7 @@ private def buildNativeBackendLib (pkg : Package) (spec : NativeBackendLib) := d
     let oJob ← buildO oFile srcJob
       (#["-I", lean.includeDir.toString] ++ includeArgs ++ #["-O2", "-fPIC"])
       #[] "cc"
+      (extraDepTrace := nativeHeaderDepTrace pkg)
     buildStaticLib libFile #[oJob]
 
 /-- Native backend for `torchlean_dgemm_cuda`: CUDA+cuBLAS when `-K cuda=true`, else C stub. -/
