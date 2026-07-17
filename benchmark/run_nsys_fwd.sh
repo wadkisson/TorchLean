@@ -41,15 +41,13 @@ fi
 echo "==> nsys profile (BENCH_MAX_ITERS=$ITERS) → $REPORT"
 rm -f "$REPORT".qdrep "$REPORT".sqlite "$REPORT".nsys-rep
 
-# Keep capture lean: CUDA API + GPU kernels. Skip NVTX/OSRT noise on old nsys.
+# Keep capture lean for old Nsight (DGX has 2020.x): avoid --cpuctxsw / --sample flags.
 BENCH_MAX_ITERS="$ITERS" \
 BENCH_SAMPLE=0 \
   nsys profile \
     -o "$REPORT" \
     --force-overwrite=true \
-    --trace=cuda,nvtx \
-    --sample=none \
-    --cpuctxsw=none \
+    --trace=cuda \
     lake -R -K cuda=true -K libtorch=true exe benchmark_gpt2 --device cuda
 
 echo "==> cuda API summary"
