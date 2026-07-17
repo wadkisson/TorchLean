@@ -84,7 +84,7 @@ def nativeFlashAttention : KernelCapsule :=
         (.vjpRefinement scaledDotProductOp "Spec.flashAttentionBackward" .backendVJP)
         "CUDA VJP kernels return dQ, dK, and dV for the fused operator."
         "NN.Tests.Runtime.Cuda.Attention"
-    notes := "This is the default fused CUDA capsule until a planner explicitly selects LibTorch." }
+    notes := "Default fused CUDA capsule when LibTorch is not enabled." }
 
 /-- LibTorch SDPA forward provider while TorchLean keeps the graph/tape boundary. -/
 def libTorchSDPAForward : KernelCapsule :=
@@ -96,7 +96,7 @@ def libTorchSDPAForward : KernelCapsule :=
     trustLevel := .trustedExternal
     supportsForward := true
     vjpMode := .torchLeanTape
-    runtimeSupport := .testOnly
+    runtimeSupport := .eager
     shapeContract :=
       ContractDescriptor.guarded (.shapeSafety scaledDotProductOp)
         "Q/K/V are checked as (heads, n, headDim); optional mask as (heads, n, n)."
@@ -121,7 +121,7 @@ def libTorchSDPAForward : KernelCapsule :=
         "TorchLean records the node and keeps the backward boundary inside TorchLean."
         "backend profile requires vjpMode=torchLeanTape"
     notes :=
-      "This is the preferred scaling direction: LibTorch provides the forward value, while TorchLean keeps the graph/backward contract. The runtime bridge is not wired into eager MHA yet." }
+      "LibTorch forward + TorchLean composed attention VJP on the CUDA tape." }
 
 /-- LibTorch SDPA provider where LibTorch also owns the local autograd VJP. -/
 def libTorchSDPAAutograd : KernelCapsule :=
@@ -133,7 +133,7 @@ def libTorchSDPAAutograd : KernelCapsule :=
     trustLevel := .trustedExternal
     supportsForward := true
     vjpMode := .externalAutograd
-    runtimeSupport := .testOnly
+    runtimeSupport := .eager
     shapeContract :=
       ContractDescriptor.guarded (.shapeSafety scaledDotProductOp)
         "Q/K/V and dOut are checked as (heads, n, headDim); optional mask as (heads, n, n)."
@@ -158,34 +158,56 @@ def libTorchSDPAAutograd : KernelCapsule :=
         "LibTorch autograd VJP for scaled_dot_product_attention."
         "LibTorch autograd for SDPA"
     notes :=
-      "This is the largest trust boundary: LibTorch owns both the forward value and local VJP. Use only when explicitly selecting external autograd." }
+      "Preferred training path when LibTorch is linked: PyTorch SDPA owns forward and local VJP." }
 
-/-- Candidate capsules in default CUDA planner order. -/
+/-- Candidate capsules in default CUDA planner order (no LibTorch). -/
 def cudaCandidates : List KernelCapsule :=
   [nativeFlashAttention, torchLeanComposed]
 
 /-- Candidate capsules when the optional LibTorch backend is enabled by policy/config. -/
 def cudaCandidatesWithLibTorch : List KernelCapsule :=
-  [libTorchSDPAForward, libTorchSDPAAutograd, nativeFlashAttention, torchLeanComposed]
+  [libTorchSDPAAutograd, libTorchSDPAForward, nativeFlashAttention, torchLeanComposed]
+
+/-- Concrete CUDA attention implementation selected from a capsule. -/
+inductive CudaAttentionImpl where
+  /-- Native fused FlashAttention kernels. -/
+  | nativeFlash
+  /-- LibTorch SDPA forward + LibTorch autograd VJP. -/
+  | libTorchAutograd
+  /-- LibTorch SDPA forward + TorchLean composed VJP. -/
+  | libTorchForward
+  /-- Fully composed TorchLean `bmm -> softmax -> bmm` path. -/
+  | composed
+deriving DecidableEq, Repr
 
 /--
 Runtime implementation selector for CUDA attention.
-
-`true` means call the fused native CUDA attention kernels. `false` means use the composed
-TorchLean expression (`bmm -> softmax -> bmm`) on the CUDA tape. External providers such as
-LibTorch intentionally fail here until their runtime bridge is wired through an explicit capsule.
 -/
-def cudaUsesNativeFlash (c : KernelCapsule) : Except String Bool :=
+def cudaAttentionImpl (c : KernelCapsule) : Except String CudaAttentionImpl :=
   if c.op != scaledDotProductOp then
     .error s!"backend capsule {c.name} does not implement {scaledDotProductOp.name}"
   else
     match c.provider with
-    | .nativeCuda => .ok true
-    | .torchLean | .reference => .ok false
+    | .nativeCuda => .ok .nativeFlash
+    | .torchLean | .reference => .ok .composed
     | .libTorch =>
-        .error s!"LibTorch SDPA capsule `{c.name}` is registered, but eager multi-head attention is not wired to LibTorch execution yet"
+        match c.vjpMode with
+        | .externalAutograd => .ok .libTorchAutograd
+        | .torchLeanTape | .backendVJP | .none => .ok .libTorchForward
     | p =>
         .error s!"backend provider {reprStr p} is not wired for CUDA attention execution"
+
+/--
+Legacy selector: `true` means native fused flash kernels; `false` means composed TorchLean.
+
+LibTorch capsules are not represented by this Bool API — use `cudaAttentionImpl`.
+-/
+def cudaUsesNativeFlash (c : KernelCapsule) : Except String Bool := do
+  match ← cudaAttentionImpl c with
+  | .nativeFlash => pure true
+  | .composed => pure false
+  | .libTorchAutograd | .libTorchForward =>
+      .error s!"LibTorch SDPA capsule `{c.name}` requires `cudaAttentionImpl` (not Bool flash selector)"
 
 end Attention
 end Backend

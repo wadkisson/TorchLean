@@ -147,7 +147,8 @@ def multiHeadAttention {α : Type} (s : EagerSession α) [Context α]
     pure { id := id }
   let cuda := do
     let t0 ← s.cudaTape.get
-    let attentionCapsule ← s.selectedCapsule NN.Backend.Attention.scaledDotProductOp
+    -- Prefer LibTorch SDPA on CUDA training (linked by default with `-K cuda=true`).
+    let attentionCapsule := NN.Backend.Attention.libTorchSDPAAutograd
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t0)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim) (h1 := h1)
       wq.id wk.id wv.id wo.id x.id (mask := mask) (attentionCapsule := attentionCapsule))

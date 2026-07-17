@@ -406,8 +406,8 @@ def run : IO Unit := do
   expectCapsules "libtorch forward capsule order" libtorchForward.capsuleNames
     ["libtorch.sdpa_forward"]
   expect "libtorch forward records external boundary" libtorchForward.hasTrustedExternal
-  expect "libtorch forward is test-only runtime support"
-    (libtorchForward.audit.kernels.map (·.runtimeSupport) == [.testOnly])
+  expect "libtorch forward is eager runtime support"
+    (libtorchForward.audit.kernels.map (·.runtimeSupport) == [.eager])
   expectCapsules "libtorch forward external op" libtorchForward.trustedExternalOps
     ["scaled_dot_product_attention"]
   expect "strict gate rejects trusted LibTorch forward"
@@ -419,7 +419,7 @@ def run : IO Unit := do
       expectContains "libtorch forward report names capsule"
         "scaled_dot_product_attention: libtorch.sdpa_forward" report
       expectContains "libtorch forward report names runtime support"
-        "runtime=test-only" report
+        "runtime=eager" report
   | .error msg =>
       throw <| IO.userError s!"libtorch forward report failed: {msg}"
 
@@ -428,8 +428,8 @@ def run : IO Unit := do
   expectCapsules "libtorch autograd capsule order" libtorchAutograd.capsuleNames
     ["libtorch.sdpa_autograd"]
   expect "libtorch autograd records external boundary" libtorchAutograd.hasTrustedExternal
-  expect "libtorch autograd is test-only runtime support"
-    (libtorchAutograd.audit.kernels.map (·.runtimeSupport) == [.testOnly])
+  expect "libtorch autograd is eager runtime support"
+    (libtorchAutograd.audit.kernels.map (·.runtimeSupport) == [.eager])
   expectCapsules "libtorch autograd external op" libtorchAutograd.trustedExternalOps
     ["scaled_dot_product_attention"]
   expect "strict gate rejects trusted LibTorch autograd"
@@ -441,7 +441,7 @@ def run : IO Unit := do
       expectContains "libtorch autograd report names capsule"
         "scaled_dot_product_attention: libtorch.sdpa_autograd" report
       expectContains "libtorch autograd report names runtime support"
-        "runtime=test-only" report
+        "runtime=eager" report
   | .error msg =>
       throw <| IO.userError s!"libtorch autograd report failed: {msg}"
 

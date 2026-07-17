@@ -34,11 +34,8 @@ Forward structure matches `Spec.MultiHeadAttention.forward`:
 4. combine heads, then output projection `@ Wo`
 
 Masking:
-- If `useFlash = false`, the composed TorchLean fallback uses hard-mask semantics: blocked entries
-  contribute zero softmax numerator, matching the proof-facing attention spec.
-- If `useFlash = true`, the current CUDA build dispatches to the native fused runtime capsule.
-  Optional LibTorch SDPA capsules use the same hard boolean-mask semantics, but remain separate
-  external runtime and autograd boundaries.
+- Composed TorchLean uses hard-mask semantics: blocked entries contribute zero softmax numerator.
+- Native fused flash and LibTorch SDPA use the same hard boolean-mask semantics.
 - This incurs a host-to-device copy for the mask (since the mask is a host `Tensor Bool`).
 -/
 
@@ -48,7 +45,7 @@ def multiHeadAttention
   (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none)
   (attentionCapsule : NN.Backend.KernelCapsule := NN.Backend.Attention.nativeFlashAttention) :
   Result (Tape × Nat) := do
-  let useFlash ← NN.Backend.Attention.cudaUsesNativeFlash attentionCapsule
+  let attnImpl ← NN.Backend.Attention.cudaAttentionImpl attentionCapsule
   have _ := h1
   let one32 : UInt32 := 1
   let depth0 : UInt32 := 0
@@ -88,23 +85,25 @@ def multiHeadAttention
         let axisMap : Array Nat := #[0, 1, 2]
         let maskB := Buffer.broadcastTo mF inDims outDims axisMap
         (Buffer.releaseThen mF maskB, 1)
-  -- Fused native attention over split heads. This replaces the composed
-  -- `scores -> mask -> softmax -> bmm` path while keeping the same spec contract.
   let (outHeads, attentionWorkspace) ←
-    if useFlash then
-      let outHeads := Buffer.flashAttentionFwd Qh Kh Vh maskB hasMask h32 n32 head32 scale
-      pure (outHeads, ([] : List Buffer))
-    else
-      let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1
-      let scores := Buffer.bmm Qh KhT h32 n32 head32 n32
-      let scaled0 := Buffer.scale scores scale
-      let rowsFold32 ← u32 (numHeads * n)
-      let attnOwned :=
-        match mask with
-        | none => rowSoftmaxForward scaled0 rowsFold32 n32
-        | some _ => rowHardMaskedSoftmaxForward scaled0 maskB rowsFold32 n32
-      let outHeads := Buffer.bmm attnOwned.value Vh h32 n32 n32 head32
-      pure (outHeads, [KhT, scores, scaled0, attnOwned.value] ++ attnOwned.workspace)
+    match attnImpl with
+    | .nativeFlash =>
+        let outHeads := Buffer.flashAttentionFwd Qh Kh Vh maskB hasMask h32 n32 head32 scale
+        pure (outHeads, ([] : List Buffer))
+    | .libTorchAutograd | .libTorchForward =>
+        let outHeads := Buffer.libTorchSDPAFwdBuf Qh Kh Vh maskB hasMask h32 n32 head32 scale
+        pure (outHeads, ([] : List Buffer))
+    | .composed =>
+        let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1
+        let scores := Buffer.bmm Qh KhT h32 n32 head32 n32
+        let scaled0 := Buffer.scale scores scale
+        let rowsFold32 ← u32 (numHeads * n)
+        let attnOwned :=
+          match mask with
+          | none => rowSoftmaxForward scaled0 rowsFold32 n32
+          | some _ => rowHardMaskedSoftmaxForward scaled0 maskB rowsFold32 n32
+        let outHeads := Buffer.bmm attnOwned.value Vh h32 n32 n32 head32
+        pure (outHeads, [KhT, scores, scaled0, attnOwned.value] ++ attnOwned.workspace)
   -- combine heads: swap to (n,numHeads,headDim), then reshape to (n,projDim)
   let swapped := Buffer.swapAdjacentAtDepth outHeads dimsHead depth0  -- (n,numHeads,headDim)
   let concat := swapped  -- view as (n,projDim)
@@ -130,13 +129,16 @@ def multiHeadAttention
         let dSwapped := dConcat -- view (n,numHeads,headDim)
         let dOutHeads := Buffer.swapAdjacentAtDepth dSwapped dimsView depth0 -- (numHeads,n,headDim)
         let (dQh, dKh, dVh) ←
-          if useFlash then
-            let (dQh, dKh, dVh) :=
-              Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
-            -- The fused VJP reads `dOutHeads` but returns three fresh gradient buffers. Thread the
-            -- release through one returned buffer so every attention step retires this activation.
-            pure (Buffer.releaseThen dOutHeads dQh, dKh, dVh)
-          else
+          match attnImpl with
+          | .nativeFlash =>
+              let (dQh, dKh, dVh) :=
+                Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+              pure (Buffer.releaseThen dOutHeads dQh, dKh, dVh)
+          | .libTorchAutograd =>
+              let (dQh, dKh, dVh) :=
+                Buffer.libTorchSDPABwdBuf Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
+              pure (Buffer.releaseThen dOutHeads dQh, dKh, dVh)
+          | .libTorchForward | .composed =>
             let dimsAttn : Array Nat := #[numHeads, n, n]
             let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1
             let scores := Buffer.bmm Qh KhT h32 n32 head32 n32

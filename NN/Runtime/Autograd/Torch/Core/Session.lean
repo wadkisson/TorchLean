@@ -200,35 +200,43 @@ structure EagerSession (α : Type) where
 
 namespace EagerSession
 
-/-- Select and validate the capsule that corresponds to this eager session's concrete executor. -/
+/-- Select and validate the capsule that corresponds to this eager session's concrete executor.
+
+Caches by `op.name` after the first successful plan+accept so eager training does not re-run
+backend planning / acceptance on every micro-op of every step.
+-/
 def selectedCapsule {α : Type} (s : EagerSession α) (op : NN.Backend.BackendOp) :
     IO NN.Backend.KernelCapsule := do
-  let planned ←
-    match s.opts.planBackendOp op with
-    | .ok planned => pure planned
-    | .error msg => throw <| IO.userError s!"torch: backend planning failed for `{op.name}`: {msg}"
-  let capsule := planned.capsule
-  if s.opts.usesCuda then
-    unless capsule.provider == NN.Backend.Provider.nativeCuda &&
-        capsule.device == NN.Backend.Device.cuda do
-      throw <| IO.userError <|
-        s!"torch: CUDA op `{op.name}` selected capsule `{capsule.name}`, " ++
-          "but this eager path is wired to native CUDA"
-  else
-    unless capsule.provider == NN.Backend.Provider.reference &&
-        capsule.device == NN.Backend.Device.cpu do
-      throw <| IO.userError <|
-        s!"torch: CPU op `{op.name}` selected capsule `{capsule.name}`, " ++
-          "but this eager path is wired to the portable reference provider"
   let selected ← s.selectedBackends.get
-  unless selected.any (fun old => old.capsule.sameIdentity capsule) do
-    s.selectedBackends.set (selected ++ [planned])
-    if s.opts.showBackend then
-      let row := NN.Backend.KernelAudit.ofPlannedKernel
-        { op := planned.op, capsule := planned.capsule }
-      for line in row.detailedReportLines do
-        IO.println line
-  pure capsule
+  match selected.find? (fun old => old.op.name == op.name) with
+  | some cached =>
+      pure cached.capsule
+  | none =>
+      let planned ←
+        match s.opts.planBackendOp op with
+        | .ok planned => pure planned
+        | .error msg =>
+            throw <| IO.userError s!"torch: backend planning failed for `{op.name}`: {msg}"
+      let capsule := planned.capsule
+      if s.opts.usesCuda then
+        unless capsule.provider == NN.Backend.Provider.nativeCuda &&
+            capsule.device == NN.Backend.Device.cuda do
+          throw <| IO.userError <|
+            s!"torch: CUDA op `{op.name}` selected capsule `{capsule.name}`, " ++
+              "but this eager path is wired to native CUDA"
+      else
+        unless capsule.provider == NN.Backend.Provider.reference &&
+            capsule.device == NN.Backend.Device.cpu do
+          throw <| IO.userError <|
+            s!"torch: CPU op `{op.name}` selected capsule `{capsule.name}`, " ++
+              "but this eager path is wired to the portable reference provider"
+      s.selectedBackends.set (selected ++ [planned])
+      if s.opts.showBackend then
+        let row := NN.Backend.KernelAudit.ofPlannedKernel
+          { op := planned.op, capsule := planned.capsule }
+        for line in row.detailedReportLines do
+          IO.println line
+      pure capsule
 
 /-- Accepted capsules actually selected by this eager session. -/
 def backendSelections {α : Type} (s : EagerSession α) : IO (List NN.Backend.AcceptedKernel) :=

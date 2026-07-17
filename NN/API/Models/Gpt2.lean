@@ -136,7 +136,8 @@ def causalTransformerTokenScalarModuleDefWithMode
     TorchLean.Module.ScalarModuleDef
       ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body) [] :=
   { initParams :=
-      .cons (Spec.zeros Float (.dim cfg.vocab (.dim cfg.dModel .scalar))) (initParams body)
+      _root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.zeroFloatTList
+        (ss := (.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
     runtimeInit :=
       match _root_.Runtime.Autograd.TorchLean.NN.Seq.runtimeInit? body with
       | some bodyPlan => some (.cons .zeros bodyPlan)
@@ -204,20 +205,32 @@ ids: the eager backend rejects negative or fractional values before indexing the
 This gives the PyTorch-shaped training path, `nn.Embedding` followed by row-wise cross entropy,
 without rebuilding the module at every text window. Optimizer state therefore stays attached to the
 same persistent parameter session.
+
+Storage-first defaults: host `initParams` are cheap zero placeholders. When the body supplies a
+`runtimeInit` plan, `instantiateFloat` allocates/fills embedding + body weights in backend storage
+(CUDA when `opts.usesCuda`) instead of materializing `Seq.initParams` on the host.
 -/
 def causalTransformerTokenIdLmScalarModuleDefWithMode
     (mode : _root_.Runtime.Autograd.TorchLean.NN.Mode)
     (cfg : CausalOneHotConfig)
     (body : nn.Sequential (causalEmbeddingShape cfg) (causalOneHotShape cfg))
-    (initParams : _root_.Runtime.Autograd.Torch.TList Float
-      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body))
-    (reduction : TorchLean.Loss.Reduction := .mean) :
+    (reduction : TorchLean.Loss.Reduction := .mean)
+    (embedInitSeed : Nat := 0) :
     TorchLean.Module.ScalarModuleDef
       ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
       [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg] :=
-  { initParams := initParams
-    initRequiresGrad :=
-      List.replicate (((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body).length) true
+  let ss := (.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body
+  { initParams :=
+      _root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.zeroFloatTList (ss := ss)
+    runtimeInit :=
+      match _root_.Runtime.Autograd.TorchLean.NN.Seq.runtimeInit? body with
+      | some bodyPlan =>
+          some
+            (.cons
+              (.uniform (-0.02) 0.02 embedInitSeed)
+              bodyPlan)
+      | none => none
+    initRequiresGrad := List.replicate ss.length true
     loss := fun {α} => by
       intro _ _
       exact fun {m} _ _ =>
@@ -262,17 +275,17 @@ def causalTransformerTokenIdLmScalarModuleDefWithMode
 Training-mode wrapper for float-encoded token-id causal language modeling.
 
 Use this when the body consumes embeddings and emits logits, while the dataset supplies changing
-integer token-id windows.
+integer token-id windows. Prefer `instantiateFloat` so the attached `runtimeInit` plan runs.
 -/
 def causalTransformerTokenIdLmScalarModuleDef (cfg : CausalOneHotConfig)
     (body : nn.Sequential (causalEmbeddingShape cfg) (causalOneHotShape cfg))
-    (initParams : _root_.Runtime.Autograd.Torch.TList Float
-      ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body))
-    (reduction : TorchLean.Loss.Reduction := .mean) :
+    (reduction : TorchLean.Loss.Reduction := .mean)
+    (embedInitSeed : Nat := 0) :
     TorchLean.Module.ScalarModuleDef
       ((.dim cfg.vocab (.dim cfg.dModel .scalar)) :: paramShapes body)
       [causalTokenIdLmInputShape cfg, causalTokenIdLmInputShape cfg] :=
-  causalTransformerTokenIdLmScalarModuleDefWithMode .train cfg body initParams (reduction := reduction)
+  causalTransformerTokenIdLmScalarModuleDefWithMode .train cfg body
+    (reduction := reduction) (embedInitSeed := embedInitSeed)
 
 end models
 end nn

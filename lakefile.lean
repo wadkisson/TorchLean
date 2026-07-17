@@ -39,11 +39,17 @@ private def libtorchHomeConfig : Option String :=
       if t.isEmpty then none else some t
   | none => none
 
-/-- Whether to build the optional LibTorch-backed backend capsules. -/
+/-- Whether to build LibTorch-backed capsules.
+
+Default: on whenever `-K cuda=true`, so CUDA training prefers LibTorch SDPA for MHA.
+Disable with `-K libtorch=false` (links the stub; calling SDPA then panics).
+-/
 private def libtorchEnabled : Bool :=
   match get_config? libtorch with
-  | some v => v == "true" || v == "1"
-  | none => false
+  | some "false" | some "0" => false
+  | some "true" | some "1" => true
+  | some _ => false
+  | none => cudaEnabled
 
 /-- Native link flags selected by the `cuda` Lake option. -/
 private def nativeLinkArgs : Array String :=
@@ -158,15 +164,38 @@ private def buildLibtorchSDPASo (pkg : Package) := do
       compileSharedLib soFile (#[o.toString] ++ libtorchSDPALinkArgs lt) "g++"
     return art.path
 
+/-- Always-linked LibTorch SDPA stubs when the real bridge is not enabled. -/
+private def buildLibtorchSDPAStub (pkg : Package) := do
+  let lean ← getLeanInstall
+  let srcJob ← inputFile (pkg.dir / "csrc/cuda/kernels/torchlean_libtorch_sdpa_stub.c") false
+  let oFile := pkg.buildDir / "torchlean_libtorch_sdpa_stub.o"
+  let oJob ← buildO oFile srcJob
+    (#[
+      "-I", lean.includeDir.toString,
+      "-I", s!"{pkg.dir}/csrc/cuda/common",
+      "-O2", "-fPIC"
+    ]) #[] "cc"
+  let libFile := pkg.buildDir / nameToStaticLib "torchlean_libtorch_sdpa_stub"
+  buildStaticLib libFile #[oJob]
+
 target torchlean_libtorch_sdpa_so pkg : FilePath :=
   if cudaEnabled && libtorchEnabled then
     buildLibtorchSDPASo pkg
   else
     pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_skipped"))
 
+target torchlean_libtorch_sdpa_stub pkg : FilePath :=
+  if cudaEnabled && !libtorchEnabled then
+    buildLibtorchSDPAStub pkg
+  else
+    pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_stub_skipped"))
+
 @[default_target]
 lean_lib NN where
-  moreLinkObjs := if cudaEnabled && libtorchEnabled then #[torchlean_libtorch_sdpa_so] else #[]
+  moreLinkObjs :=
+    if cudaEnabled && libtorchEnabled then #[torchlean_libtorch_sdpa_so]
+    else if cudaEnabled then #[torchlean_libtorch_sdpa_stub]
+    else #[]
   -- `NN:docs` should document the whole maintained Lean surface, including examples and CLI
   -- dispatchers. Keep tests out of this library surface; they build through `nn_tests_suite`.
   roots := #[

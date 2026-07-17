@@ -266,6 +266,17 @@ opaque libTorchSDPABwd
     (Q K V mask dOut : @& Buffer) (hasMask batch n d : UInt32) (scale : Float) :
     IO (Buffer × Buffer × Buffer)
 
+/-- Pure LibTorch SDPA forward for the CUDA tape (panics if LibTorch was not linked). -/
+@[extern "torchlean_libtorch_sdpa_fwd_buf"]
+opaque libTorchSDPAFwdBuf
+    (Q K V mask : @& Buffer) (hasMask batch n d : UInt32) (scale : Float) : Buffer
+
+/-- Pure LibTorch SDPA VJP for the CUDA tape (panics if LibTorch was not linked). -/
+@[extern "torchlean_libtorch_sdpa_bwd_buf"]
+opaque libTorchSDPABwdBuf
+    (Q K V mask dOut : @& Buffer) (hasMask batch n d : UInt32) (scale : Float) :
+    Buffer × Buffer × Buffer
+
 /--
 Row-major transpose of a 2D buffer.
 

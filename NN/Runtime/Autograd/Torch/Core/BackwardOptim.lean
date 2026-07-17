@@ -54,18 +54,57 @@ def backwardScalarDenseAllCuda {α : Type} [CudaBridge.TensorConv α] (s : Eager
   backwardDenseAllCuda (α := α) s (sh := Shape.scalar) loss (Tensor.scalar (1 : α))
 
 /--
-Accumulate one CUDA gradient contribution into a sparse map.
+Array-backed sparse CUDA gradient table indexed by tape node id.
+
+`none` means no cotangent yet. This replaces `HashMap` accumulation on the training hot path: every
+contribution is an `Array.set` instead of a persistent map insert.
+-/
+abbrev CudaGradTable := Array (Option Runtime.Autograd.Cuda.AnyBuffer)
+
+/--
+Accumulate one CUDA gradient contribution into an array-backed sparse table.
 
 Ownership rule: the contribution buffer `g` is consumed by this function. When a contribution is
-first inserted into the map, we store an owned copy and release the incoming buffer. That extra copy
-is intentional: CUDA backward rules are allowed to return a fresh buffer, but view-like rules may
-also pass through an upstream buffer. Copy-on-insert keeps this sparse accumulator correct for every
-op without requiring every local VJP to expose aliasing metadata. When a second contribution arrives,
-we sum into a fresh buffer and release both inputs.
-
-This rule is what lets sparse CUDA backprop avoid the dense "one zero buffer per tape node"
-representation without leaking transient gradients across long training loops.
+first inserted, we store an owned copy and release the incoming buffer. That extra copy is
+intentional: CUDA backward rules are allowed to return a fresh buffer, but view-like rules may also
+pass through an upstream buffer. Copy-on-insert keeps this accumulator correct for every op without
+requiring every local VJP to expose aliasing metadata. When a second contribution arrives, we sum
+into a fresh buffer and release both inputs.
 -/
+def addCudaGradToTable (t : Runtime.Autograd.Cuda.Tape)
+    (gradsRef : IO.Ref CudaGradTable) (id : Nat)
+    (g : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit := do
+  let node ← match t.getNode? id with
+    | some n => pure n
+    | none => throw <| IO.userError "torch: invalid parent id during CUDA backward"
+  if node.requires_grad = false then
+    releaseCudaAnyBuffer g
+  else if _h : g.s = node.value.s then
+    let g' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := g.buf }
+    let grads ← gradsRef.get
+    match grads[id]? with
+    | none =>
+        releaseCudaAnyBuffer g'
+        throw <| IO.userError "torch: CUDA gradient table out of bounds"
+    | some none =>
+        let owned ← ownedCudaAnyBuffer s!"owned gradient for node {id} ({node.name})" g'
+        releaseCudaAnyBuffer g'
+        gradsRef.set (grads.set! id (some owned))
+    | some (some old) =>
+        if _hold : old.s = node.value.s then
+          let old' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := old.buf }
+          let summed ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.add old' g'
+          releaseCudaAnyBuffer old'
+          releaseCudaAnyBuffer g'
+          gradsRef.set (grads.set! id (some summed))
+        else
+          releaseCudaAnyBuffer g'
+          throw <| IO.userError "torch: CUDA gradient table has wrong shape for node"
+  else
+    releaseCudaAnyBuffer g
+    throw <| IO.userError "torch: CUDA gradient contribution has wrong shape for parent"
+
+/-- Legacy HashMap accumulator kept for non-training call sites / tests. -/
 def addCudaGradToMap (t : Runtime.Autograd.Cuda.Tape)
     (gradsRef : IO.Ref CudaGradMap) (id : Nat)
     (g : Runtime.Autograd.Cuda.AnyBuffer) : IO Unit := do
@@ -73,11 +112,9 @@ def addCudaGradToMap (t : Runtime.Autograd.Cuda.Tape)
     | some n => pure n
     | none => throw <| IO.userError "torch: invalid parent id during CUDA backward"
   if node.requires_grad = false then
-    checkCudaAnyBufferSize s!"discarded gradient for node {id}" g
     releaseCudaAnyBuffer g
   else if _h : g.s = node.value.s then
     let g' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := g.buf }
-    checkCudaAnyBufferSize s!"gradient contribution for node {id} ({node.name})" g'
     let grads ← gradsRef.get
     match grads.get? id with
     | none =>
@@ -87,7 +124,6 @@ def addCudaGradToMap (t : Runtime.Autograd.Cuda.Tape)
     | some old =>
         if _hold : old.s = node.value.s then
           let old' : Runtime.Autograd.Cuda.AnyBuffer := { s := node.value.s, buf := old.buf }
-          checkCudaAnyBufferSize s!"accumulated gradient for node {id} ({node.name})" old'
           let summed ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.add old' g'
           releaseCudaAnyBuffer old'
           releaseCudaAnyBuffer g'
@@ -102,8 +138,8 @@ def addCudaGradToMap (t : Runtime.Autograd.Cuda.Tape)
 /--
 Run scalar-loss CUDA backprop and return gradients only for trainable parameter leaves.
 
-The returned map stays on device so CUDA optimizers can update parameters without downloading dense
-gradient arrays to the host.
+Uses an array-backed sparse table during the tape walk (see `CudaGradTable`), then packs only the
+retained parameter gradients into a `CudaGradMap` for the optimizer.
 -/
 def backwardScalarParamGradsCuda {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
     [One α] [DecidableEq Shape]
@@ -114,32 +150,43 @@ def backwardScalarParamGradsCuda {α : Type} [CudaBridge.TensorConv α] (s : Eag
   let params ← s.paramsByLeaf.get
   let seedAny ← CudaBridge.TensorConv.toAnyBuffer (α := α) (s := Shape.scalar)
     (Tensor.scalar (1 : α))
-  checkCudaAnyBufferSize "scalar CUDA backward seed" seedAny
-  let gradsRef ← IO.mkRef ((Std.HashMap.emptyWithCapacity).insert loss.id seedAny : CudaGradMap)
-  for off in [0:t.nodes.size] do
-    let id := t.nodes.size - 1 - off
+  let n := t.nodes.size
+  if loss.id ≥ n then
+    releaseCudaAnyBuffer seedAny
+    throw <| IO.userError "torch: scalar CUDA backward seed id out of bounds"
+  let mut table : CudaGradTable := Array.replicate n none
+  table := table.set! loss.id (some seedAny)
+  let gradsRef ← IO.mkRef table
+  for off in [0:n] do
+    let id := n - 1 - off
     let grads ← gradsRef.get
-    match grads.get? id with
-    | none => pure ()
-    | some dLdy =>
+    match grads[id]? with
+    | some (some dLdy) =>
         let node ← match t.getNode? id with
-          | some n => pure n
+          | some node => pure node
           | none => throw <| IO.userError "torch: internal CUDA tape node missing"
         if node.requires_grad then
-          checkCudaAnyBufferSize s!"upstream gradient for node {id} ({node.name})" dLdy
           let contribs ← okOrThrow <| node.backward dLdy
           for (pid, pg) in contribs do
-            addCudaGradToMap t gradsRef pid pg
+            addCudaGradToTable t gradsRef pid pg
         if params.contains id then
           pure ()
         else
           let gradsNow ← gradsRef.get
-          match gradsNow.get? id with
-          | none => pure ()
-          | some stale =>
+          match gradsNow[id]? with
+          | some (some stale) =>
               releaseCudaAnyBuffer stale
-              gradsRef.set (gradsNow.erase id)
-  gradsRef.get
+              gradsRef.set (gradsNow.set! id none)
+          | _ => pure ()
+    | _ => pure ()
+  let final ← gradsRef.get
+  let mut out : CudaGradMap := Std.HashMap.emptyWithCapacity
+  for (id, _p) in params.toList do
+    match final[id]? with
+    | some (some g) => out := out.insert id g
+    | _ =>
+        throw <| IO.userError s!"torch: missing CUDA param gradient for leaf {id}"
+  pure out
 
 /--
 Run reverse-mode backprop and return a dense gradient array for all tape entries.
