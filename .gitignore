@@ -102,3 +102,7 @@ Miniconda3-*.sh
 # Sources live in `blueprint/src/`; CI rebuilds outputs and deploys via GitHub Pages.
 blueprint/print/
 blueprint/web/
+
+# Benchmark profiler / nsys outputs
+benchmark/out/
+benchmark/data/
