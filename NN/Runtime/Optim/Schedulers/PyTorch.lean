@@ -154,11 +154,6 @@ def CosineAnnealingLR.getLr (scheduler : CosineAnnealingLR α) : α :=
 def CosineAnnealingLR.step (scheduler : CosineAnnealingLR α) : CosineAnnealingLR α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
 
-/-- Constructor for `CosineAnnealingLR` starting at `current_step = 0`. -/
-def cosineAnnealingLR (baseLr : α) (tMax : Nat) (etaMin : α := Numbers.zero) :
-    CosineAnnealingLR α :=
-  { baseLr := baseLr, tMax := tMax, etaMin := etaMin }
-
 /-! ### OneCycleLR (LR-only) -/
 
 /-- Anneal strategy used by `OneCycleLR` (matches PyTorch `"cos"` or `"linear"`). -/
@@ -259,25 +254,5 @@ def OneCycleLR.getLr (s : OneCycleLR α) : α :=
 /-- Advance `OneCycleLR` by one step. -/
 def OneCycleLR.step (s : OneCycleLR α) : OneCycleLR α :=
   { s with currentStep := s.currentStep + 1 }
-
-/--
-Constructor for `OneCycleLR` starting at `current_step = 0` (LR-only).
-
-This mirrors the PyTorch parameterization:
-- `initial_lr = max_lr / div_factor`
-- `min_lr = initial_lr / final_div_factor`
-- phase endpoints computed as `pct_start * total_steps - 1` and `total_steps - 1` (with the optional
-  `three_phase` middle phase).
--/
-def oneCycleLR (maxLr : α) (totalSteps : Nat) (pctStart : α) (divFactor : α)
-    (finalDivFactor : α) (annealStrategy : OneCycleAnnealStrategy := .cos)
-    (threePhase : Bool := false) : OneCycleLR α :=
-  { maxLr := maxLr
-    totalSteps := totalSteps
-    pctStart := pctStart
-    divFactor := divFactor
-    finalDivFactor := finalDivFactor
-    annealStrategy := annealStrategy
-    threePhase := threePhase }
 
 end Optim

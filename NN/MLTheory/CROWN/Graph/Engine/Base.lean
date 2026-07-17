@@ -8,6 +8,7 @@ module
 
 public import NN.MLTheory.CROWN.Graph.Core
 public import NN.IR.Payload
+public import NN.IR.ShapeHelpers
 
 /-!
 Shared definitions for the graph CROWN engine.
@@ -25,6 +26,7 @@ open _root_.Spec
 open _root_.Spec.Tensor
 open NN.MLTheory.CROWN
 open NN.IR
+open NN.IR.Graph (mkValidAxis? findIndex? swapAt swapDepthsForPerm?)
 
 variable {α : Type} [Context α]
 variable [BoundOps α]
@@ -329,43 +331,6 @@ def flatDValShape {α : Type} [Context α] (v : FlatDVal α) : Shape := v.1
 def flatDValTensor {α : Type} [Context α] (v : FlatDVal α) :
     Tensor α (flatDValShape (α := α) v) := v.2
 
-/-- Return the position of `x` in a list, if present. -/
-def findIndex? (xs : List Nat) (x : Nat) : Option Nat :=
-  let rec go (i : Nat) : List Nat → Option Nat
-    | [] => none
-    | y :: ys => if y = x then some i else go (i + 1) ys
-  go 0 xs
-
-/-- Swap adjacent entries `d` and `d+1` in a list of axis ids. -/
-def swapAt (xs : List Nat) (d : Nat) : List Nat :=
-  match xs, d with
-  | [], _ => []
-  | [x], _ => [x]
-  | x :: y :: rest, 0 => y :: x :: rest
-  | x :: rest, d + 1 => x :: swapAt rest d
-
-/-- Decompose an axis permutation into adjacent swaps, rejecting invalid permutations. -/
-def swapDepthsForPerm? (perm : List Nat) (r : Nat) : Option (List Nat) :=
-  let rec bubbleLeft (cur : List Nat) (swapsRev : List Nat) (i j : Nat) : List Nat × List Nat :=
-    if j ≤ i then
-      (cur, swapsRev)
-    else
-      bubbleLeft (swapAt cur (j - 1)) ((j - 1) :: swapsRev) i (j - 1)
-  if perm.length = r && perm.all (fun d => d < r) then
-    let rec go (i : Nat) (targets : List Nat) (cur : List Nat) (swapsRev : List Nat) :
-        Option (List Nat) :=
-      match targets with
-      | [] => some swapsRev.reverse
-      | target :: targets' =>
-          match findIndex? cur target with
-          | none => none
-          | some j =>
-              let (cur', swapsRev') := bubbleLeft cur swapsRev i j
-              go (i + 1) targets' cur' swapsRev'
-    go 0 perm (List.range r) []
-  else
-    none
-
 /-- Apply one adjacent-axis swap to a dynamic tensor value. -/
 def applySwapDepth {α : Type} [Context α] (v : FlatDVal α) (d : Nat) : FlatDVal α :=
   match v with
@@ -465,18 +430,6 @@ def lastDimLen : Shape → Nat
   | .scalar => 1
   | .dim n .scalar => n
   | .dim _ rest => lastDimLen rest
-
-/-- Runtime witness that an axis is valid for a shape. -/
-def mkValidAxis? (axis : Nat) : (s : Shape) → Option (PLift (Shape.valid_axis axis s))
-  | .scalar => none
-  | .dim n rest =>
-      match axis, n with
-      | 0, Nat.succ k => some ⟨Shape.valid_axis.valid_zero (n := k) (s := rest)⟩
-      | 0, 0 => none
-      | Nat.succ a, Nat.succ k =>
-          (mkValidAxis? a rest).map (fun h => ⟨Shape.valid_axis.valid_succ (n := k) (s := rest) (k
-            := a) h.down⟩)
-      | Nat.succ _, 0 => none
 
 /-- Runtime witness that one shape can broadcast to another. -/
 def mkCanBroadcastTo? : (s₁ s₂ : Shape) → Option (Shape.CanBroadcastTo s₁ s₂)

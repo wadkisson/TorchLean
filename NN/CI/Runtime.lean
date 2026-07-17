@@ -15,7 +15,6 @@ public import NN.Runtime.Autograd.Torch
 public import NN.Runtime.Autograd.TorchLean
 public import NN.Runtime.Autograd.TorchLean.Autodiff
 public import NN.Runtime.Autograd.TorchLean.Backend
-public import NN.Runtime.Autograd.TorchLean.CompileExec
 public import NN.Runtime.Autograd.TorchLean.Dual
 public import NN.Runtime.Autograd.TorchLean.Fno
 public import NN.Runtime.Autograd.TorchLean.Functional

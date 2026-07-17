@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.TorchLean.Functional.Core
+public import NN.IR.ShapeHelpers
 
 @[expose] public section
 
@@ -125,21 +126,7 @@ def einsumBhijBhjdBhid {α : Type} [Context α] [DecidableEq Shape]
 namespace Einsum
 
 -- Needed for runtime checks (e.g. to build a `valid_axis_inst` for reductions).
-/-- Decidable instance for `Shape.well_formed`, used by the dynamic einsum lowering. -/
-def wellFormedDec : (s : Shape) → Decidable s.wellFormed
-  | .scalar => isTrue trivial
-  | .dim n s =>
-      match (inferInstance : Decidable (n > 0)) with
-      | isTrue hn =>
-          match wellFormedDec s with
-          | isTrue hs => isTrue ⟨hn, hs⟩
-          | isFalse hs => isFalse (fun h => hs h.2)
-      | isFalse hn =>
-          isFalse (fun h => hn h.1)
-
-/-- Local decidability instance for `Shape.well_formed` (used by the dynamic einsum lowering). -/
-instance (s : Shape) : Decidable s.wellFormed :=
-  wellFormedDec s
+-- `wellFormedDec` / `Decidable Shape.wellFormed` come from `Functional.Core`.
 
 /--
 Label used by the dynamic einsum parser.
@@ -211,25 +198,15 @@ def parseEquation (raw : String) : Except String Parsed := do
 
 /-- Detect whether a list of labels contains any duplicates (order-preserving scan). -/
 def hasDupLabels (xs : List Label) : Bool :=
-  let rec go (seen : List Label) : List Label → Bool
-    | [] => false
-    | x :: xs => if seen.contains x then true else go (x :: seen) xs
-  go [] xs
+  hasDup xs
 
 /-- Find the first index of a label (like `List.findIdx?`, but returning an `Option Nat`). -/
 def findIndex? (xs : List Label) (x : Label) : Option Nat :=
-  let rec go (i : Nat) : List Label → Option Nat
-    | [] => none
-    | y :: ys => if y == x then some i else go (i + 1) ys
-  go 0 xs
+  NN.IR.Graph.findIndex? xs x
 
 /-- Swap adjacent elements at position `d` (used to implement permutations via adjacent swaps). -/
 def swapAt {α : Type} (xs : List α) (d : Nat) : List α :=
-  match xs, d with
-  | [], _ => []
-  | [x], _ => [x]
-  | x :: y :: rest, 0 => y :: x :: rest
-  | x :: rest, d + 1 => x :: swapAt rest d
+  NN.IR.Graph.swapAt xs d
 
 /--
 Convert a permutation of axes into a sequence of adjacent swaps.
@@ -238,25 +215,7 @@ This mirrors the IR-side lowering strategy: represent a general permutation as a
 depths, then implement swaps with `swapAdjacentAtDepth`.
 -/
 def swapDepthsForPerm? (perm : List Nat) (r : Nat) : Option (List Nat) :=
-  let rec bubbleLeft (cur : List Nat) (swapsRev : List Nat) (i j : Nat) : List Nat × List Nat :=
-    if j ≤ i then
-      (cur, swapsRev)
-    else
-      bubbleLeft (swapAt cur (j - 1)) ((j - 1) :: swapsRev) i (j - 1)
-  if perm.length = r && perm.all (fun d => d < r) then
-    let rec go (i : Nat) (targets : List Nat) (cur : List Nat) (swapsRev : List Nat) :
-        Option (List Nat) :=
-      match targets with
-      | [] => some swapsRev.reverse
-      | target :: targets' =>
-          match (cur.findIdx? (fun z => z = target)) with
-          | none => none
-          | some j =>
-              let (cur', swapsRev') := bubbleLeft cur swapsRev i j
-              go (i + 1) targets' cur' swapsRev'
-    go 0 perm (List.range r) []
-  else
-    none
+  NN.IR.Graph.swapDepthsForPerm? perm r
 
 /--
 Expand an input operand’s labels to a full label list matching the operand’s rank.

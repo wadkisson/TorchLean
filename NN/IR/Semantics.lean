@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.IR.Payload
+public import NN.IR.ShapeHelpers
 public import NN.Runtime.Context
 public import NN.Runtime.Autograd.TorchLean.Random
 public import NN.Spec.Layers.Activation
@@ -94,77 +95,9 @@ namespace Graph
 /-!
 ## Small proof-helpers used by evaluation
 
-The evaluator frequently needs evidence that an axis is valid or that a broadcast is legal so it can
-call the spec-layer operations, which are typed with these preconditions. We build these witnesses
-from runtime data (`Nat` axis values and shapes) using `Option`:
-
-- returning `none` means the IR node is ill-formed for the given shapes,
-- returning `some h` provides the witness needed to call the spec operator.
+Axis witnesses and permute-lowering list helpers live in `NN.IR.ShapeHelpers`
+(`mkValidAxis?`, `findIndex?`, `listGet?`, `swapAt`, `swapDepthsForPerm`).
 -/
-
-/--
-Build a witness that `axis` is a valid axis for shape `s`.
-
-Many spec-layer ops (e.g. reductions, `softmax`, `layernorm`) are typed with a `Shape.valid_axis`
-precondition. Since the IR stores axes as raw `Nat`, we reconstruct the witness at runtime.
-
-Returns `none` when `axis` is out of bounds.
--/
-def mkValidAxis? (axis : Nat) : (s : Shape) → Option (PLift (Shape.valid_axis axis s))
-  | .scalar => none
-  | .dim n rest =>
-      match axis, n with
-      | 0, Nat.succ k => some ⟨Shape.valid_axis.valid_zero (n := k) (s := rest)⟩
-      | 0, 0 => none
-      | Nat.succ a, Nat.succ k =>
-          (mkValidAxis? a rest).map (fun h =>
-            ⟨Shape.valid_axis.valid_succ (n := k) (s := rest) (k := a) h.down⟩)
-      | Nat.succ _, 0 => none
-
-/-- Return the index of the first occurrence of `x` in `xs` (or `none` if absent). -/
-def findIndex? (xs : List Nat) (x : Nat) : Option Nat :=
-  let rec go (i : Nat) : List Nat → Option Nat
-    | [] => none
-    | y :: ys => if y = x then some i else go (i + 1) ys
-  go 0 xs
-
-/-- Safe list indexing: `listGet? xs n` returns `some xs[n]` when in bounds. -/
-def listGet? {α : Type} : List α → Nat → Option α
-  | [], _ => none
-  | x :: _, 0 => some x
-  | _ :: xs, n + 1 => listGet? xs n
-
-/-- Swap the adjacent entries at positions `d` and `d+1` (no-op when out of range). -/
-def swapAt (xs : List Nat) (d : Nat) : List Nat :=
-  match xs, d with
-  | [], _ => []
-  | [x], _ => [x]
-  | x :: y :: rest, 0 => y :: x :: rest
-  | x :: rest, d + 1 => x :: swapAt rest d
-
-/--
-Compute a sequence of adjacent swaps that realizes a target permutation.
-
-This is used to implement `.permute` by repeatedly applying `swapAdjacentAtDepth`, which is already
-available in the spec tensor library. If the permutation is ill-formed, this returns an error
-explaining what went wrong.
--/
-def swapDepthsForPerm (perm : List Nat) (r : Nat) : Except String (List Nat) := do
-  let mut cur : List Nat := List.range r
-  let mut swapsRev : List Nat := []
-  for i in [0:r] do
-    match listGet? perm i with
-    | none => throw s!"permute: internal error: missing perm[{i}]"
-    | some target =>
-        match findIndex? cur target with
-        | none => throw s!"permute: internal error: target axis {target} not in current axes {cur}"
-        | some j =>
-            let mut k := j
-            while k > i do
-              swapsRev := (k - 1) :: swapsRev
-              cur := swapAt cur (k - 1)
-              k := k - 1
-  pure swapsRev.reverse
 
 /--
 Apply one adjacent-swap-at-depth to a dynamic tensor value.

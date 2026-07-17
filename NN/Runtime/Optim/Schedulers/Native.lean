@@ -78,14 +78,6 @@ PyTorch analogy: `scheduler.step()` for a scheduler that does nothing.
 def ConstantScheduler.step (scheduler : ConstantScheduler α) : ConstantScheduler α :=
   scheduler
 
-/--
-Create a constant learning-rate scheduler.
-
-PyTorch analogy: constructing training code with a fixed `lr` and no `lr_scheduler`.
--/
-def constantScheduler (lr : α) : ConstantScheduler α :=
-  { lr := lr }
-
 /-! ## Exponential decay -/
 
 /--
@@ -120,14 +112,6 @@ PyTorch analogy: `scheduler.step()`.
 def ExponentialDecayScheduler.step (scheduler : ExponentialDecayScheduler α) :
   ExponentialDecayScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
-
-/--
-Create an exponential decay scheduler starting at step `0`.
-
-PyTorch analogy: `torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=decay_rate)`.
--/
-def exponentialDecayScheduler (initialLr : α) (decay_rate : α) : ExponentialDecayScheduler α :=
-  { initialLr := initialLr, decayRate := decay_rate }
 
 /-! ## Step decay -/
 
@@ -183,15 +167,6 @@ PyTorch analogy: `scheduler.step()`.
 def StepDecayScheduler.step (scheduler : StepDecayScheduler α) : StepDecayScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
 
-/--
-Create a step-decay scheduler starting at step `0`.
-
-PyTorch analogy: `torch.optim.lr_scheduler.StepLR(optimizer, step_size=..., gamma=decay_factor)`.
--/
-def stepDecayScheduler (initialLr : α) (decay_factor : α) (stepSize : Nat) : StepDecayScheduler α
-  :=
-  { initialLr := initialLr, decayFactor := decay_factor, stepSize := stepSize }
-
 /-! ## Cosine annealing -/
 
 /--
@@ -233,16 +208,6 @@ PyTorch analogy: `scheduler.step()`.
 def CosineAnnealingScheduler.step (scheduler : CosineAnnealingScheduler α) :
   CosineAnnealingScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
-
-/--
-Create a cosine annealing scheduler starting at step `0`.
-
-PyTorch analogy: `torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_steps,
-  eta_min=min_lr)`.
--/
-def cosineAnnealingScheduler (initialLr : α) (maxSteps : Nat) (minLr : α := 0) :
-    CosineAnnealingScheduler α :=
-  { initialLr := initialLr, minLr := minLr, maxSteps := maxSteps }
 
 /-! ## Linear warmup -/
 
@@ -350,15 +315,6 @@ PyTorch analogy: `scheduler.step()`.
 def WarmupCosineScheduler.step (scheduler : WarmupCosineScheduler α) : WarmupCosineScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
 
-/--
-Create a warmup+cosine scheduler starting at step `0`.
-
-PyTorch analogy: composing a warmup schedule with cosine annealing in a training script.
--/
-def warmupCosineScheduler (initialLr : α) (warmupSteps : Nat) (totalSteps : Nat) :
-    WarmupCosineScheduler α :=
-  { initialLr := initialLr, warmupSteps := warmupSteps, totalSteps := totalSteps }
-
 /-! ## Cyclic LR -/
 
 /--
@@ -424,15 +380,6 @@ PyTorch analogy: `scheduler.step()`.
 def CyclicScheduler.step (scheduler : CyclicScheduler α) : CyclicScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
 
-/--
-Create a cyclic learning-rate scheduler starting at step `0`.
-
-PyTorch analogy: `torch.optim.lr_scheduler.CyclicLR(base_lr=..., max_lr=..., step_size_up=...)`.
--/
-def cyclicScheduler (baseLr : α) (maxLr : α) (stepSize : Nat)
-    (mode : String := "triangular") (gamma : α := 1) : CyclicScheduler α :=
-  { baseLr := baseLr, maxLr := maxLr, stepSize := stepSize, mode := mode, gamma := gamma }
-
 /-! ## Triangular cycle (special case) -/
 
 /--
@@ -479,15 +426,6 @@ PyTorch analogy: `scheduler.step()`.
 def TriangularCycleScheduler.step (scheduler : TriangularCycleScheduler α) :
   TriangularCycleScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
-
-/--
-Create a triangular cycle scheduler starting at step `0`.
-
-PyTorch analogy: `CyclicLR(base_lr=..., max_lr=..., mode=\"triangular\")`.
--/
-def triangularCycleScheduler (baseLr : α) (maxLr : α) (stepSize : Nat) :
-    TriangularCycleScheduler α :=
-  { baseLr := baseLr, maxLr := maxLr, stepSize := stepSize }
 
 /-! ## 1cycle Learning Rate Schedule -/
 
@@ -546,21 +484,6 @@ PyTorch analogy: `scheduler.step()`.
 def OneCycleScheduler.step (scheduler : OneCycleScheduler α) : OneCycleScheduler α :=
   { scheduler with currentStep := scheduler.currentStep + 1 }
 
-/--
-Create a simplified 1cycle schedule starting at step `0`.
-
-We derive `initial_lr := max_lr / div_factor` and `final_lr := max_lr / final_div_factor`.
-
-PyTorch analogy: `torch.optim.lr_scheduler.OneCycleLR(max_lr=..., total_steps=...)`.
--/
-def oneCycleScheduler (maxLr : α) (totalSteps : Nat) (divFactor : α) (pctStart : α)
-    (finalDivFactor : α) :
-    OneCycleScheduler α :=
-  let initialLr := maxLr / divFactor
-  let finalLr := maxLr / finalDivFactor
-  { maxLr := maxLr, totalSteps := totalSteps, initialLr := initialLr, finalLr := finalLr
-    divFactor := divFactor, pctStart := pctStart }
-
 /-! ## LR finder -/
 
 /--
@@ -598,13 +521,5 @@ PyTorch analogy: stepping a custom LR schedule inside a training loop.
 -/
 def LRFinder.step (finder : LRFinder α) : LRFinder α :=
   { finder with currentStep := finder.currentStep + 1 }
-
-/--
-Create an LR finder schedule starting at step `0`.
-
-PyTorch analogy: setting up an LR finder run to sweep learning rates.
--/
-def lrFinder (initialLr : α) (finalLr : α) (numSteps : Nat) : LRFinder α :=
-  { initialLr := initialLr, finalLr := finalLr, numSteps := numSteps }
 
 end Optim

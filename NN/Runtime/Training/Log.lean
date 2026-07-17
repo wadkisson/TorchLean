@@ -614,11 +614,6 @@ def writeTrainLog (dest : LogDestination) (log : TrainLog) (pretty : Bool := tru
   | .disabled => pure ()
   | .json path => TrainLog.writeJson path log pretty
 
-/-- Write an `ExperimentLog` to this destination. Disabled destinations are a no-op. -/
-def writeExperimentLog (dest : LogDestination) (log : ExperimentLog)
-    (title : String := "") (pretty : Bool := true) : IO Unit := do
-  writeTrainLog dest (log.toTrainLog title) pretty
-
 end LogDestination
 
 end Runtime.Training

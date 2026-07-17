@@ -39,6 +39,29 @@ def listGet? {β : Type} (xs : List β) (i : Nat) : Option β :=
   | [] => none
   | x :: _ => some x
 
+/-- Detect duplicate elements (used to validate axis/label lists at runtime). -/
+def hasDup {β : Type} [BEq β] (xs : List β) : Bool :=
+  let rec go (seen : List β) : List β → Bool
+    | [] => false
+    | x :: xs => if seen.contains x then true else go (x :: seen) xs
+  go [] xs
+
+/-- Decidable `Shape.wellFormed` for dynamic reduction/slicing/einsum helpers. -/
+def wellFormedDec : (s : Shape) → Decidable s.wellFormed
+  | .scalar => isTrue trivial
+  | .dim n s =>
+      match (inferInstance : Decidable (n > 0)) with
+      | isTrue hn =>
+          match wellFormedDec s with
+          | isTrue hs => isTrue ⟨hn, hs⟩
+          | isFalse hs => isFalse (fun h => hs h.2)
+      | isFalse hn =>
+          isFalse (fun h => hn h.1)
+
+/-- Decidability instance for `Shape.wellFormed` used by dynamic Functional helpers. -/
+instance (s : Shape) : Decidable s.wellFormed :=
+  wellFormedDec s
+
 /--
 Elementwise square: `x ↦ x * x`.
 

@@ -12,6 +12,7 @@ public import NN.IR.Infer
 public import NN.IR.OpContracts
 public import NN.IR.Pretty
 public import NN.IR.Semantics
+public import NN.IR.ShapeHelpers
 
 /-!
 # Intermediate Representation

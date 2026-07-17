@@ -38,10 +38,7 @@ def swapAdjacentAtDepth {α : Type} [Context α] [DecidableEq Shape]
 
 /-- Detect duplicate `Nat`s (used to validate axis lists at runtime). -/
 def hasDupNat (xs : List Nat) : Bool :=
-  let rec go (seen : List Nat) : List Nat → Bool
-    | [] => false
-    | x :: xs => if seen.contains x then true else go (x :: seen) xs
-  go [] xs
+  hasDup xs
 
 /-- Insert `x` into a list kept in descending order. -/
 def insertDesc (x : Nat) : List Nat → List Nat
@@ -60,23 +57,6 @@ def moveAxisToLastSwaps (r axis : Nat) : List Nat :=
 /-- Swap depths that move an axis to the front position. -/
 def moveAxisToFrontSwaps (axis : Nat) : List Nat :=
   (List.range axis).reverse
-
-/-- Decidable `Shape.well_formed` for the dynamic reduction/slicing helpers. -/
-def wellFormedDec : (s : Shape) → Decidable s.wellFormed
-  | .scalar => isTrue trivial
-  | .dim n s =>
-      match (inferInstance : Decidable (n > 0)) with
-      | isTrue hn =>
-          match wellFormedDec s with
-          | isTrue hs => isTrue ⟨hn, hs⟩
-          | isFalse hs => isFalse (fun h => hs h.2)
-      | isFalse hn =>
-          isFalse (fun h => hn h.1)
-
-/-- Local decidability instance for `Shape.well_formed` (used by dynamic reduction/slicing helpers).
-  -/
-instance (s : Shape) : Decidable s.wellFormed :=
-  wellFormedDec s
 
 /-- `Shape.appendDim s 1` preserves size (used to justify `reshape` in unsqueeze/keepdim code). -/
 theorem size_appendDim_one' (s : Shape) : Spec.Shape.size (Shape.appendDim s 1) = Spec.Shape.size s := by

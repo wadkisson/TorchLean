@@ -17,7 +17,8 @@ named optimizer to the projected gradient.
   AdamW, Adadelta, Muon-style orthogonalized momentum, and GaLore-style projected updates.
 - `Schedulers.lean`: deterministic learning-rate schedules, including constant, step, exponential,
   cosine, cyclic, one-cycle, and PyTorch-compatible variants where step-count conventions matter.
-- `GradientUtils.lean`: gradient clipping and utility operations shared by trainer code.
+
+Gradient clipping lives in the spec layer (`Spec.clipGradientsSpec` and friends).
 
 ## Public API
 

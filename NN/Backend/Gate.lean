@@ -57,17 +57,6 @@ def allowTrustedRuntime : AcceptancePolicy :=
     allowTrustedBoundaries := true
     allowFuzzEvidence := true }
 
-/-- Whether an obligation disposition is admitted by this policy. -/
-def acceptsDisposition (p : AcceptancePolicy) (d : EvidenceDisposition) : Bool :=
-  match d with
-  | .missing => !p.requireEvidence
-  | .trusted => p.allowTrustedBoundaries
-  | .fuzzed => p.allowFuzzEvidence
-  | .guarded => p.allowRuntimeGuards
-  | .tested => p.allowTestEvidence
-  | .proved => true
-  | .checked => true
-
 end AcceptancePolicy
 
 /-- Why a candidate plan was rejected by an acceptance gate. -/
