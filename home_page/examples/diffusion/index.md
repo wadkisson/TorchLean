@@ -1,7 +1,7 @@
 ---
-title: "diffusion"
+title: Diffusion
 layout: default
 ---
 
-<script>location.replace("{{ '/blueprint/Examples-and-Applications/Application-Walkthroughs/#TorchLean--Examples-and-Applications--Application-Walkthroughs--Diffusion-Walkthrough' | relative_url }}");</script>
-<p>Moved into the <a href="{{ '/blueprint/Examples-and-Applications/Application-Walkthroughs/#TorchLean--Examples-and-Applications--Application-Walkthroughs--Diffusion-Walkthrough' | relative_url }}">Guide</a>.</p>
+<script>location.replace("{{ '/blueprint/Examples-and-Applications/Generative-Models-and-ML-Theory/' | relative_url }}");</script>
+<p>Moved into the <a href="{{ '/blueprint/Examples-and-Applications/Generative-Models-and-ML-Theory/' | relative_url }}">Guide</a>.</p>
