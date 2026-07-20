@@ -8,10 +8,11 @@ redirect_from:
 
 # Installation
 
-Backend capsules, trust profiles, and “what CUDA proves” are in the
-[Guide]({{ '/blueprint/' | relative_url }}) (*Backend Selection and Trust*, *GPU and CUDA*).
-This page is how to get a working build.
-
+This page is how to get a working build. Backend capsules, trust profiles, and “what CUDA proves”
+are in the Guide:
+[Backend Selection and Trust]({{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }})
+and
+[GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
 
 If you want to try TorchLean on a laptop, start with the CPU build. It does not require PyTorch,
 CUDA, or a GPU. The repository pins its Lean version in `lean-toolchain`, so Elan will select the
@@ -114,8 +115,8 @@ build description. The CUDA regression suite is:
 lake -R -K cuda=true exe nn_tests_suite
 ```
 
-The [CUDA guide]({{ '/cuda/' | relative_url }}) covers deterministic reductions, parity checks,
-sanitizers, and the remaining native-code trust boundary.
+More on CUDA kernels, parity checks, and the native trust boundary:
+[GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
 
 ### Optional LibTorch Attention
 
@@ -250,6 +251,5 @@ producers, and floating-point assumptions, read
 - [NVIDIA CUDA Installation Guide for Linux](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/).
 - [NVIDIA CUDA on WSL User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html).
 - [Installing LibTorch](https://docs.pytorch.org/cppdocs/installing.html).
-- George C. Necula, ["Proof-Carrying Code"](https://doi.org/10.1145/263699.263712), POPL 1997.
-  Kernel capsules borrow the discipline of carrying explicit evidence with executable code, but a
-  current TorchLean capsule is a contract and provenance record, not a proof-carrying binary.
+- TorchLean trust inventory:
+  [`TRUST_BOUNDARIES.md`](https://github.com/lean-dojo/TorchLean/blob/main/TRUST_BOUNDARIES.md).
