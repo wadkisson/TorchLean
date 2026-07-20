@@ -7,16 +7,36 @@ open Verso.Genre Manual
 tag := "verification"
 %%%
 
-Verification claims attach to named objects—usually an
-[NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean) plus payload and
-input region; also tapes, datasets, trajectories, residuals, and JSON certificates. Claim vocabulary
-is in *What TorchLean Is*.
+Verification in TorchLean is not a single button. It is a family of claims about explicit objects.
+A graph can be well formed. A compiler can preserve denotation. A bound propagation pass can
+enclose all outputs over an input box. A certificate can be replayed. An autograd pass can compute
+the adjoint derivative. A Float32 theorem can transfer a real-valued margin to finite precision.
 
-Path: API/GraphSpec/import → `NN.IR.Graph` + `ParamStore` → checker (IBP, CROWN, certificate, ODE,
-scientific ML) → theorem about the named object.
+The first question is always:
 
-Terms used below: `IBP` (interval boxes), `CROWN` (affine relaxations), `LiRPA` (the family containing
-both). `FP32` / `IEEE32Exec` are defined in *Floating Point and Native Boundaries*.
+> What object is being verified?
+
+The usual object is an [NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
+plus a parameter payload and an input region. Other verification chapters use tensor programs,
+tapes, datasets, trajectories, residual functions, and imported JSON certificates. The object
+matters because the theorem can only talk about the artifact it names.
+
+The common path is:
+
+- start from a TorchLean API program, GraphSpec model, or imported artifact;
+- lower or translate it to a semantic object such as `NN.IR.Graph` plus a `ParamStore`;
+- run a checker such as IBP, CROWN, a certificate parser, an ODE corridor checker, or a scientific
+  ML checker;
+- interpret the accepted result through a theorem about the named object.
+
+A few names come up over and over in what follows:
+
+- `IBP`: interval bound propagation, where each node carries an interval box `[lo, hi]`.
+- `CROWN`: a family of backward linear-relaxation methods that propagate affine bounds.
+- `LiRPA`: linear relaxation-based perturbation analysis, the broader family that includes IBP and
+  CROWN methods.
+- `IEEE32Exec`: TorchLean's executable IEEE-754 binary32 kernel in Lean.
+- `FP32`: TorchLean's float32 model used in proofs, instantiated as rounded real semantics.
 
 # A Map Of Claim Types
 
@@ -78,10 +98,31 @@ The same graph serves several roles at once. A model is compiled to an explicit 
 on that graph; and theorems talk about the graph denotation rather than about an opaque execution
 trace.
 
-Claim vocabulary (`proved` / `checked` / `assumed`, run → check → theorem → boundary) is in *What
-TorchLean Is* and *Why Verification Matters*. For verification output, the local rungs are: file
-runs → graph well-formed → checker accepts → theorem on the supported fragment → scalar bridge to
-the claimed runtime path.
+The rest of the manual uses three words carefully:
+
+- `proved` means Lean has a theorem about a semantic object defined in Lean.
+- `checked` means Lean recomputes or structurally validates an imported artifact.
+- `assumed` means a runtime or external producer hypothesis is named instead of folded silently into
+  the verified claim.
+
+## The Claim Ladder
+
+A good way to read TorchLean verification output is as a ladder:
+
+1. *The file runs.* This catches ordinary integration failures.
+2. *The graph is well formed and well shaped.* The symbolic object is structurally meaningful.
+3. *A checker accepts an artifact.* Lean has parsed and checked a concrete object.
+4. *A theorem applies to the supported fragment.* The accepted object implies a mathematical
+   statement about the graph denotation.
+5. *A scalar bridge applies.* The theorem can be related to the runtime scalar path being claimed.
+
+The ladder prevents category mistakes. A CUDA training run supplies evidence about a runtime path.
+A graph soundness theorem supplies a mathematical statement about an IR denotation. An imported
+certificate checker supplies a statement about the artifact it accepts. Strong claims say which
+rungs were used.
+
+The bridge matters because a familiar ML API can lead to verification mathematics that is stated and
+cited precisely.
 
 # Shared Semantic Target
 
@@ -657,10 +698,28 @@ monolithic external script.
 
 The verifier passes consume a small set of explicit artifacts.
 
-## `NN.IR.Graph` And `ParamStore`
+## `NN.IR.Graph` (Structure Only)
 
-Graph structure and payload separation are defined in *Graphs and IR*. Verifiers look up parameters
-in a store (`inputBoxes`, `constVals`, `linearWB`, `matmulW`, `conv2dCfg`); they never guess them.
+- `Graph` is a DAG of `Node`s.
+- Nodes store `parents`, an op tag `OpKind`, and a declared `outShape`.
+- TorchLean keeps *values/parameters out of the graph*, because different backends want
+  different parameter stores.
+
+## `ParamStore` (Values, Weights, and Seed Input Boxes)
+
+`ParamStore` is a minimal, backend-friendly store of payloads keyed by node id:
+
+- `inputBoxes`: node id mapped to `FlatBox` seed regions for designated input nodes
+- `constVals`: node id mapped to constant tensors
+- `linearWB`: node id mapped to linear parameters `(W,b)`
+- `matmulW`: node id mapped to bias-free matrix multiply parameters
+- `conv2dCfg`: node id mapped to typed convolution payloads
+
+Verifiers never guess parameters; they look them up in a store produced by a compiler or provided by
+the user.
+
+The reason for the flattened representation is practical: it is easy to update node by node, easy
+to compare in tests, and easy to inspect when a bound behaves unexpectedly.
 
 ## `PropState` (Per-Node Bound Results)
 

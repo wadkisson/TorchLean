@@ -7,9 +7,39 @@ open Verso.Genre Manual
 tag := "api_tour"
 %%%
 
-Follow one model through the public API: tensors and layers, training, inspection, import/export,
-then a claim about a checked artifact. Start with `import NN.API` (`Tensor`, `nn`, `data`, `optim`,
-`Trainer`); open IR or verification modules only when the question demands it.
+Read TorchLean's public API by following one model as it changes roles. At first, the code looks
+familiar: tensors, layers, losses, optimizers, and training loops. The difference is what TorchLean
+keeps around when the same model is trained, lowered to a graph, inspected, exported, or checked.
+
+A tensor carries its shape. A model carries an input and output contract. A parameter payload is
+ordinary data. A lowered graph has named operations and node ids. A certificate is checked against
+the graph rather than treated as a comment beside it.
+
+A typical workflow looks like this:
+
+1. instantiate tensors and a model,
+2. build parameters and run a training loop,
+3. inspect the run through logs or graphs,
+4. import or export a named artifact when Python belongs in the workflow,
+5. state a claim about the resulting model and check the artifact that supports it.
+
+The application entry point is `import NN.API`. The complete `NN` umbrella and the focused
+subsystem imports become relevant when a chapter asks a more precise question about runtime
+execution, graphs, floating point, proofs, or verification.
+
+The API is intentionally layered. Most users should start with the public names and only descend
+when the question demands it. A training tutorial can stay with `Tensor`, `nn`, `data`, `optim`, and
+`Trainer`. A graph-inspection chapter opens the IR. A certificate chapter opens the verifier and
+bound-propagation code. This keeps the common path readable while still leaving precise objects for
+proof-oriented work.
+
+Here is the map:
+
+- When the user writes a tensor literal, TorchLean keeps the scalar type and shape.
+- When the user builds a model, TorchLean keeps the architecture and parameter shapes.
+- When the user runs training, TorchLean keeps parameter state, optimizer state, random state, and logs.
+- When the user lowers a graph, TorchLean keeps operation names, node ids, parent links, and payloads.
+- When the user checks a certificate, TorchLean keeps the checker predicate and scalar semantics.
 
 # Public Names And Lower Names
 
@@ -83,8 +113,16 @@ difference between a family of networks and one concrete network. TorchLean ther
 payload as data that can be initialized, saved, imported, lowered with a graph, and checked against
 shape expectations.
 
-A verification claim is about architecture + parameter payload + input convention + scalar
-semantics—not an architecture name alone. See *Why Verification Matters* for the mismatch examples.
+This distinction is especially useful when a paper or report says "the model was verified." Usually
+the intended object is not merely an architecture such as "two-layer MLP." It is:
+
+$$`\text{architecture} + \text{parameter payload} + \text{input convention}
+  + \text{scalar semantics}`
+
+Leaving out the payload turns a concrete verification claim into a family-level statement that is
+almost certainly false. Leaving out the input convention can make a true post-normalization claim
+look like a raw-data claim. Leaving out scalar semantics can confuse a real-valued proof with a
+float32 execution result.
 
 # Building And Training
 
@@ -102,17 +140,6 @@ $$`\mathrm{step} :
   (\theta,\mathrm{optState},\mathrm{rng},\mathrm{mode},x,y)
   \longmapsto
   (\theta',\mathrm{optState}',\mathrm{rng}',\mathrm{log})`
-
-The variables are:
-
-- `θ` — the current parameter payload;
-- `optState` — optimizer state such as moments and step counters;
-- `rng` — random-generator state used by stochastic layers or data order;
-- `mode` — train or evaluation mode;
-- `x` — the batch input;
-- `y` — the batch target;
-- `θ'`, `optState'`, `rng'` — the updated state after the step;
-- `log` — the metric report produced by the step.
 
 The state may be large, but it is no longer implicit. Parameters, optimizer moments, random seeds,
 training/evaluation mode, and metric reports are all ordinary data that can be passed, saved,
@@ -195,10 +222,27 @@ code can cite.
 
 # Verification Claims
 
-After lowering, a verifier receives a graph, payload, input region, and scalar semantics. Robustness
-formulas are introduced in *Why Verification Matters*; the public APIs are
-[NN.Verification](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean) and the
-[CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean).
+After lowering, a verifier no longer has to guess which computation is being analyzed. It receives
+a graph, a payload, an input region, and a scalar semantics. A robustness claim, for example, has
+the form:
+
+$$`\forall x\in B,\quad
+\operatorname{margin}(\operatorname{denote}(g,\theta,x)) > 0`
+
+A robustness certificate in TorchLean is a concrete claim about a graph, a parameter payload, an
+input region, a scalar semantics, and a checker result. The [verification import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean)
+collects the public verification API, while the [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean)
+shows the graph objects used by the bound propagation chapters.
+
+The central API pattern is:
+
+$$`\text{runnable model}
+\;\longrightarrow\;
+\text{explicit graph and payload}
+\;\longrightarrow\;
+\text{checked artifact}
+\;\longrightarrow\;
+\text{semantic claim}`
 
 # Failure Modes The API Makes Visible
 
@@ -212,9 +256,10 @@ Hidden runtime state is another. BatchNorm buffers, dropout mode, random seeds, 
 tokenizer tables, and cache layouts affect the computation. TorchLean's functional style keeps
 these objects in the data path instead of leaving them implicit inside a module instance.
 
-Floating-point layer names live in
-[NN.Floats](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats.lean) and *Floating Point and
-Native Boundaries*.
+Floating point semantics also need names. A real valued specification, the `FP32` proof model,
+the executable `IEEE32Exec` model, and native CUDA kernels are related but not identical. The
+[floating-point import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats.lean) exists so a theorem, a verifier claim,
+and a runtime run do not quietly use three different meanings of "float32."
 
 Fast kernels are boundaries too. For attention, the mathematical contract is ordinary scaled
 dot product attention, while fused FlashAttention implementations are optimized kernels that must be

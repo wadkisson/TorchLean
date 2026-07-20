@@ -64,8 +64,13 @@ The surrounding chapters explain how this graph is produced, executed, inspected
 
 ## Where CUDA fits (and where it does not)
 
-CUDA can accelerate runtime float32 ops (*GPU and CUDA Boundaries*). Verifier IBP/CROWN/certificate
-tooling still consumes Lean `NN.IR.Graph` denotations, not the GPU kernel schedule.
+Training and forward evaluation can use optional CUDA buffers and kernels for speed (*Runtime
+and Autograd*). The canonical verifier IR (`NN.IR.Graph`) and its Lean denotation (`Graph.denote`
+/ `denoteAll`) are still defined and executed in Lean for the verification pipeline: IBP, CROWN, and
+certificate tooling consume that graph, not the GPU's internal kernel schedule. GPU mode changes
+*how* some float32 primitives are implemented at runtime; it should not change the
+*meaning* of the shared IR you export for verification on supported operations under their stated
+domain preconditions, modulo the normal float-soundness caveats in *Floating-Point Semantics*.
 
 # The Canonical IR
 

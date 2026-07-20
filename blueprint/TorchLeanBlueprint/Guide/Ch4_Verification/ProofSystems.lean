@@ -7,9 +7,13 @@ open Verso.Genre Manual
 tag := "proof-systems-beyond-bounds"
 %%%
 
-A map of proof systems beyond bound propagation: compiler preservation, autograd, runtime
-approximation, RL/generative theory, BugZoo, and widgets. Claim discipline is defined in the
-Introduction; this chapter points to the specialized pages and their APIs.
+Verification in TorchLean means connecting an artifact to the semantics it claims to represent.
+
+IBP and CROWN enclose outputs. Compiler correctness preserves graph meaning. The autograd theorems
+connect backward rules to derivatives. Runtime approximation accounts for finite precision. BugZoo
+contracts make common ML failure modes precise. These are different proof systems, but they follow
+the same discipline: name the object, state the relation, and prove or check the relation for the
+supported fragment.
 
 # Comparison With ML Frameworks
 
@@ -30,6 +34,15 @@ stated.
   emitted transition records against a Lean boundary contract.
 - *Float32 execution*: ordinary use relies on backend arithmetic; TorchLean connects executable
   binary32 semantics, intervals, and explicit approximation theorems where the bridge is present.
+
+The recurring TorchLean pattern is:
+
+1. name the semantic object;
+2. run or import an artifact;
+3. check the artifact against the semantic object;
+4. prove that the check implies the intended claim;
+5. record native or external pieces as explicit assumptions until a checker or theorem discharges
+   them.
 
 # IRExec Correctness: The Big Compiler Theorem
 
@@ -207,13 +220,42 @@ as a full theorem for a sequence model. A Transformer sublayer theorem is not th
 GPT-2. TorchLean names those boundaries instead of using one broad "autograd works" phrase for
 everything.
 
-# Runtime Approximation
+# Runtime Approximation: Real Proofs Are Not Float Proofs
 
-Tolerance propagation lives in *Runtime Approximation*
-([core](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/Core/),
-[forward](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/ForwardApprox.lean),
-[backward](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/BackwardApprox.lean),
-[FP32 CROWN bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/FP32/CROWN.lean)).
+A common mistake in ML verification is to prove something over real numbers and then deploy Float32
+code as if no bridge were needed. TorchLean has a separate runtime approximation tree because we do
+not want to blur that boundary.
+
+The approximation relation is:
+
+$$`runtimeValue \approx_{\varepsilon} specValue`
+
+For tensors, read this as a componentwise or normed error budget:
+
+$$`\left\|\operatorname{toSpec}(y_{\mathrm{runtime}})-y_{\mathrm{spec}}\right\|_\infty
+\le \varepsilon`
+
+Then each op gets a rule for how its error budget propagates. Forward graphs, backward graphs,
+convolutions, reductions, softmax axis rules, and scale aware tolerances all live in this layer.
+
+The [runtime approximation core](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/Core/) defines tolerances and
+spec/runtime approximation relations. The
+[forward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/ForwardApprox.lean) and
+[backward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/BackwardApprox.lean)
+propagate those relations through graph execution. The
+[normal form operator API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Ops.lean),
+[convolution forward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvForward.lean), and
+[convolution backward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvBackward.lean) give the operator
+cases. The [scale approximation API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/Scale/) adds absolute and
+relative tolerance tracking, and the
+[FP32 CROWN bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/FP32/CROWN.lean) connects approximation
+budgets to verifier margins.
+
+A deployment statement should separate three facts:
+
+- a theorem over the reals says what the ideal spec does;
+- a runtime approximation theorem says the executable path stays within a tolerance;
+- an FP32 or CUDA boundary says which scalar/kernel assumptions remain.
 
 # Reinforcement Learning: MDPs, PPO, Replay, And Boundaries
 
@@ -331,10 +373,41 @@ A concrete comparison with ordinary frameworks is:
 - TorchLean turns the intended behavior into a small spec or theorem so the failure mode has a
   stable regression target.
 
-# Widgets And Model Examples
+# Widgets: Inspecting Proof Objects
 
-See *Widgets* for inspection views and *Examples and Applications* for model coverage. Widgets
-render Lean objects; they do not replace theorems.
+Widgets matter because proof engineering and verifier debugging are much easier when the objects are
+visible.
+
+The [widgets source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives readable views of proof and runtime artifacts:
+
+- IR graph views show node ids, shapes, op kinds, and execution traces.
+- Runtime autograd widgets show tapes, gradients, and reverse traversal.
+- CROWN widgets show bound propagation and tightness.
+- Float32 widgets show the semantics of executable numeric values.
+- RL widgets show trajectories and PPO/GridWorld artifacts.
+- Training widgets show logs and metric traces.
+
+The rule is:
+
+> A widget is an inspection view for the same Lean object that a theorem or checker may later
+> consume.
+
+Widgets belong in the proof layer because they are the human interface to artifacts that would
+otherwise be unreadable arrays, graph contexts, or certificate JSON.
+
+# Model Examples: Runtime Breadth, Not Theorem Overclaiming
+
+The model examples show breadth:
+
+- MLP, CNN, ViT, plus residual/ResNet block specs;
+- RNN, LSTM, Transformer, GPT examples, Mamba;
+- diffusion, VAE, VQ-VAE, GAN;
+- FNO/Burgers operator learning;
+- DQN and PPO examples.
+
+Not every model has a full correctness theorem. The examples share the same API, runtime, graph,
+CUDA, data, and verification boundaries as the theorem files. That bridge matters: the formal
+abstractions are tested against realistic ML shapes instead of living only in small proof snippets.
 
 # Where To Go Next
 

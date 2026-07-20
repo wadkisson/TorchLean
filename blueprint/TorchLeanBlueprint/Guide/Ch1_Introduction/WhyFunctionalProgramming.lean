@@ -109,9 +109,8 @@ The same idea scales to tensors. In TorchLean, a layer is still read as
 
 $$`\operatorname{forward}(\theta, x) = y`
 
-where `θ` is the parameter payload, `x` is the input tensor, and `y` is the output tensor. The
-values now carry tensor shapes, scalar semantics, and graph structure as needed. We can prove facts
-about the same definitions that examples and checkers inspect.
+but the values now carry tensor shapes, scalar semantics, and graph structure as needed. We can
+prove facts about the same definitions that examples and checkers inspect.
 
 # Explicit Effects And Explicit Randomness
 
@@ -159,11 +158,9 @@ This makes optimizer claims more precise. A statement about SGD can talk about o
 
 $$`\theta_{t+1} = \theta_t - \eta \nabla L(\theta_t)`
 
-where `θ_t` is the parameter payload at step `t`, `η` is the learning rate, `L` is the loss, and
-`∇L(θ_t)` is the gradient of that loss at the current parameters. A statement about Adam needs the
-first-moment state, second-moment state, step counter, and bias-correction convention. If those
-fields are implicit, a theorem about "the optimizer" is already underspecified. If they are data,
-the statement can choose exactly the update rule it means.
+whereas a statement about Adam needs the first-moment state, second-moment state, step counter, and
+bias-correction convention. If those fields are implicit, a theorem about "the optimizer" is already
+underspecified. If they are data, the statement can choose exactly the update rule it means.
 
 This also clarifies trust boundaries. If a CUDA kernel, a PyTorch exporter, or an external
 certificate producer contributes a value, TorchLean can name that imported value and state what is

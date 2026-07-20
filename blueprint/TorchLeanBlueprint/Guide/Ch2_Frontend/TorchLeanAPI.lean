@@ -34,10 +34,25 @@ not need to know that internal layout. Direct imports such as `NN.Spec`, `NN.Run
 
 # What Counts As An API Claim
 
-General claim vocabulary is in *What TorchLean Is*. API pages additionally distinguish a *Lean
-snippet* (code that should elaborate under `import NN.API`) from a runtime check, a certificate
-check, and a theorem. A theorem about a Lean graph evaluator is not automatically a CUDA theorem
-unless a bridge or trust boundary says so.
+TorchLean distinguishes four kinds of claims.
+
+First, a *Lean snippet* is code meant to elaborate as Lean code when pasted into a file with the
+right imports. Application examples usually start with `import NN.API` and `open TorchLean`.
+
+Second, a *runtime check* is an executable run: a training script, a data loader, a parity check, or
+a CUDA smoke test. It is evidence about the implementation on the inputs that were run.
+
+Third, a *certificate check* is a Lean program that validates a finite artifact such as a verifier
+certificate. It is stronger than a printout, but its scope is exactly the checker and artifact
+format that were used.
+
+Fourth, a *theorem* is a Lean declaration proved in the proof layer. The theorem statement says
+which semantics, scalar domain, graph fragment, and hypotheses are covered. A theorem about a Lean
+graph evaluator is not automatically a theorem about a native CUDA kernel unless the bridge theorem
+or trust boundary says so.
+
+The public API lets these claims line up without conflating them. A model can train, lower to a
+graph, produce an artifact, and appear in a theorem statement.
 
 # The First Line Of A Tutorial
 

@@ -12,10 +12,7 @@ often not exactly the object we ran.
 
 A trained model may live as Python code, a checkpoint, an exported graph, a verifier input, and a
 CUDA execution path. Each representation can be reasonable on its own, but a guarantee becomes
-fragile if no one can say precisely how these representations agree. When the handoff between these
-representations goes unchecked, we risk certifying one computation and deploying another: a verified
-graph that is not the trained module, a checkpoint that does not match the exported weights, or a
-float32 path that is not the real-valued object named in the theorem. TorchLean is built around that
+fragile if no one can say precisely how these representations agree. TorchLean is built around that
 question: when a model is checked, what exact computation is the claim about?
 
 This is not only a philosophical worry. The adversarial-examples literature made clear that small
@@ -24,8 +21,8 @@ canonical early reference is Szegedy et al.,
 ["Intriguing properties of neural networks"](https://arxiv.org/abs/1312.6199). Verification methods
 such as IBP, CROWN, and LiRPA attack that problem by computing sound output bounds for input
 regions. But a bound is only as meaningful as the object it bounds. If the verifier saw one graph
-and deployment ran another, the certificate proves a fact about the wrong model: the math may check
-out, but it does not apply to the system that actually ran.
+and deployment ran another graph, the certificate may be mathematically interesting and operationally
+irrelevant.
 
 # Why Neural Networks Are Awkward To Check
 
@@ -101,12 +98,10 @@ Suppose a classifier is trained with preprocessing
 
 $$`x \longmapsto (x-\mu)/\sigma`
 
-where `x` is a raw input (for example a pixel vector), `μ` is the per-feature mean, and `σ` is the
-per-feature standard deviation used by the training pipeline. Suppose the verifier then receives
-only the post-normalization network. That can be the right choice if the input region is also
-transformed into post-normalization coordinates. It is the wrong choice if the robustness claim is
-later written over raw pixels. The network did not become unsafe because of a syntax error; the
-claim became ambiguous because a boundary was left implicit.
+but the verifier receives only the post-normalization network. That can be the right choice if the
+input region is also transformed into post-normalization coordinates. It is the wrong choice if the
+robustness claim is later written over raw pixels. The network did not become unsafe because of a
+syntax error; the claim became ambiguous because a boundary was left implicit.
 
 The same pattern appears in smaller bugs:
 
@@ -134,18 +129,9 @@ $$`\forall x,\; x\in B
 \;\Longrightarrow\;
 \operatorname{margin}(\operatorname{denote}(g,\theta,x),y)>0`
 
-The variables are:
-
-- `g` — the IR graph being checked;
-- `θ` — the parameter payload paired with that graph;
-- `x` — an input tensor;
-- `B` — the input region (for example a box around a center point);
-- `y` — the target label for the margin;
-- `denote(g,θ,x)` — the network output under the chosen scalar semantics;
-- `margin(...)` — the logit gap used by the robustness claim.
-
-A certificate checker can then prove that a particular JSON artifact implies the bound predicate for
-that graph and payload pair.
+Here the graph `g`, parameters `θ`, input region `B`, label `y`, scalar semantics, and denotation
+are all part of the mathematical object being checked. A certificate checker can then prove that a
+particular JSON artifact implies the bound predicate for that graph and payload pair.
 
 For a compiler or runtime theorem, the statement has a different shape:
 
@@ -154,11 +140,9 @@ $$`\forall x,\quad
 =
 \operatorname{denoteCompiled}(\operatorname{compile}(g,payload),x)`
 
-Here `g` is again the IR graph, `payload` is its parameter data, `x` is an input, `denoteIR` is the
-interpreter semantics of the graph, `compile` produces a compiled artifact, and `denoteCompiled` is
-that artifact's semantics. The claim is semantic preservation: every input yields the same result
-before and after compilation. Accuracy, robustness, compilation correctness, and floating point
-approximation are different properties, and TorchLean keeps them as different theorems.
+That statement is about semantic preservation. Accuracy, robustness, compilation correctness, and
+floating point approximation are different properties, and TorchLean keeps them as different
+theorems.
 
 # Checks Are Programs, Proofs Are Claims About Programs
 
@@ -180,23 +164,39 @@ hypotheses.
 
 # Our Response
 
-TorchLean keeps model code, graph semantics, float models, checkers, and proof statements in one
-Lean development, with CUDA/PyTorch and external certificates behind named boundaries. The recurring
-shape is:
+TorchLean keeps model code, graph semantics, executable float models, certificate checkers, and
+proof statements in one Lean development. The project distinguishes checked Lean content from named
+boundaries:
+
+- the model is a Lean definition;
+- the graph has a Lean denotation through the IR and specification layers;
+- Float32 has explicit proof and executable models;
+- CUDA and PyTorch sit behind documented boundaries;
+- external certificates are parsed and checked according to stated predicates.
+
+The recurring proof shape is:
 
 $$`\text{checked artifact} \;+\; \text{named boundary assumptions}
 \;\Longrightarrow\;
 \text{semantic claim about the model}`
 
-Robustness uses the margin formula above. A runtime approximation theorem has a different shape:
-the float32 path stays inside a proved envelope of the real specification:
+For a robustness verifier, that might mean that a checked certificate implies a positive margin on
+all inputs in a box:
+
+$$`\forall x\in B,\quad
+\operatorname{margin}(\operatorname{denote}(model,\theta,x))>0`
+
+For a runtime approximation theorem, it might mean that the executable float32 value remains inside
+a proved interval around the real valued specification:
 
 $$`\forall x,\quad
 \operatorname{exec32}(model,\theta,x)\in
 \operatorname{roundingEnvelope}(\operatorname{denote}_{\mathbb R}(model,\theta,x))`
 
-where `exec32` is the float32 path, `denote_ℝ` is the real-valued specification, and
-`roundingEnvelope` is the proved set of values allowed by rounding.
+The habit is the same in each case: the theorem should say what object was checked, what claim
+follows, and which runtime or external assumptions remain. TorchLean keeps runnable code, graph
+artifacts, and formal statements close together so verification remains connected to the object that
+ran, rather than pasted into a report after the fact.
 
 ## References
 

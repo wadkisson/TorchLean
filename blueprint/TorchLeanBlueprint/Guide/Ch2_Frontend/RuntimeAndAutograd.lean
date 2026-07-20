@@ -43,13 +43,33 @@ hidden global context.
 
 # Runtime Artifacts
 
-Runtime-specific questions (IR taxonomy is in *Graphs and IR*):
+Separate the artifacts by what they are for.
+
+An eager tape is for debugging and reverse mode. It records runtime values, parent links, and local
+VJP closures. It is the closest TorchLean analogue of PyTorch eager autograd.
+
+A compiled graph is for repeated execution. It fixes the graph structure once and reuses it across
+many calls. For supported programs, this is the "compile once, run many times" path; it is not a
+separate model API.
+
+An `NN.IR.Graph` is for inspection and verification. Its nodes carry operation names, shapes, and
+parent ids. A verifier can read this object without executing arbitrary closures.
+
+A runtime context is for named values and training state. It records parameters, gradients, RNG
+state, backend selection, and debugging values.
+
+A training log is for audit and debugging. It records losses, metrics, and reports produced during
+the run. It is not the model semantics, but it is the artifact that tells us what happened.
+
+It helps to give each artifact a question:
 
 - tape: "how did this eager value depend on earlier values?"
 - compiled graph: "what fixed computation will be replayed?"
-- IR graph: "what operation DAG can a checker inspect?"
+- IR graph: "what operation DAG can a checker or verifier inspect?"
 - runtime context: "which named tensors, parameters, modes, and backend settings were alive?"
 - training log: "what did this run report over time?"
+
+The same training command may produce several of these. They are related evidence, not one object.
 
 # Two Execution Modes
 
@@ -192,8 +212,13 @@ For a proof tour, use:
 
 # CUDA Is A Backend Choice
 
-GPU mode accelerates supported Float32 buffer ops; Lean still owns model structure, logs, graphs,
-and proof/checker statements. Details: *GPU and CUDA Boundaries*.
+CUDA details have their own guide page. The runtime rule is short: GPU mode accelerates supported
+Float32 buffer operations, while Lean still owns the model structure, typed interfaces, logs, graph
+artifacts, and proof/checker statements.
+
+Use eager mode for stepping through compact examples. Use compiled mode for repeated evaluation over a
+stable graph artifact. Use CUDA when the supported Float32 runtime should place numeric work
+on device buffers.
 
 # Where To Look
 

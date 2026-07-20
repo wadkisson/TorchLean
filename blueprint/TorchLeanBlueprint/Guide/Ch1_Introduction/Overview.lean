@@ -11,11 +11,24 @@ TorchLean is a Lean 4 framework for building neural networks and making precise 
 Its central requirement is that the model being executed, the graph being inspected, and the object
 named in a theorem remain connected by definitions that a reader can follow.
 
-Those connections are hard to keep as a model moves from source to checkpoint, graph, runtime,
-verifier input, and paper claim. Each move can change a convention—layout, train/eval mode, scalar
-semantics, input bounds—without crashing. TorchLean names the pieces inside one Lean development so
-those conventions stay inspectable. PyTorch remains the everyday training ecosystem; TorchLean's
-job is preserving meaning across the handoffs.
+That sentence is easy to say and surprisingly hard to maintain in an ML system. A model starts as
+source code. It may become initialized parameters, a trained checkpoint, a graph, a compiled
+runtime artifact, a batch of CUDA kernel launches, a verifier input file, and finally a statement in
+a paper. Each move can be harmless. Each move can also change a convention: row-major or column-major
+layout, logits or probabilities, train mode or evaluation mode, real arithmetic or float32, closed
+or open input bounds. TorchLean is interested in the places where those conventions stop being
+obvious.
+
+Modern ML systems are larger than a model definition. A working system may include a parameter
+file, a tokenizer, a graph export, a runtime mode, a fused kernel, a floating point convention, a
+verifier certificate, and a scientific claim. TorchLean gives those pieces names inside one Lean
+development, so runnable examples, graph semantics, numerical models, and checked artifacts can be
+read together instead of treated as unrelated files.
+
+PyTorch remains the everyday training ecosystem for many projects. TorchLean addresses a different
+problem: preserving meaning when a model moves from source code to a graph, from a graph to a
+runtime, and from a runtime artifact to a mathematical claim. Producing an export is easy; showing
+that it contains the intended model, parameters, scalar convention, and property is the harder part.
 
 Model and training code begins with
 [NN.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API.lean). Files that combine
@@ -113,11 +126,22 @@ These words prevent three different results from being collapsed into one: a CUD
 checker that recomputes a bound, and a theorem that proves an enclosure for a supported graph
 fragment.
 
-# The Object We Keep In View
+# Three Views Of One Model
 
-Application code starts from `import NN.API` and `open TorchLean`. Under the hood, the same model
-appears as a *spec* meaning, a *graph IR* artifact, and a *runtime* execution path; the relations
-above say how those views are connected.
+At the top level, TorchLean presents a familiar ML API over a shared internal model.
+Application code starts from `import NN.API` and `open TorchLean`, then works with familiar concepts:
+layers, datasets, optimizers, losses, and training loops.
+
+Under the hood, the same model appears in three representations:
+
+- *Spec layer*: the mathematical meaning of tensors, layers, losses, and model structure.
+- *Graph IR*: the DAG with named operations shared by runtime tooling, widgets, export, and verification.
+- *Runtime layer*: eager or compiled execution, autograd, optimizers, logging, and optional CUDA.
+
+The layers are intentionally different representations. Their translations, rather than similar
+names or neighboring files, establish that they describe the same model.
+
+# The Object We Keep In View
 
 The object we keep returning to is a typed model. Informally, it has this shape:
 
@@ -126,11 +150,9 @@ $$`\mathrm{Model}_{\theta} :
    \longrightarrow
    \mathrm{Tensor}(\alpha,s_{\mathrm{out}})`
 
-Here `θ` is the parameter payload, `α` is the scalar type (for example reals or float32), and
-`s_in` / `s_out` are the input and output shapes. The runtime may choose `Float`, executable
-`IEEE32Exec`, or CUDA backed float32 buffers. A proof may instantiate the same architecture over
-real numbers, interval domains, or a float32 proof model. The architecture statement should be
-independent of the execution substrate.
+The runtime may choose `Float`, executable `IEEE32Exec`, or CUDA backed float32 buffers. A proof may
+instantiate the same architecture over real numbers, interval domains, or a float32 proof model. The
+architecture statement should be independent of the execution substrate.
 
 The whole project follows a repeated theorem pattern:
 
@@ -142,18 +164,6 @@ $$`\begin{aligned}
   \in
   \mathrm{safeSet}(\mathrm{denote}(M)(x)).
 \end{aligned}`
-
-The variables are:
-
-- `M` — the mathematical model under discussion (architecture plus parameters under a chosen scalar
-  semantics);
-- `R` — a runtime or checked representation of that model (for example a graph-plus-payload pair, an
-  executable path, or a certificate-backed artifact);
-- `H(M,R)` — the hypothesis relating them (elaboration agreement, semantic agreement, a checked
-  certificate, or a named trust boundary);
-- `x` — an input in the domain of the claim;
-- `denote(M)` / `denote(R)` — the functions those objects compute;
-- `safeSet(...)` — the set of outputs the claim allows for that input.
 
 For an exact theorem, `safeSet` is a singleton. For a finite precision or verifier theorem, it may
 be an interval, box, affine enclosure, or checker backed output region.
@@ -180,9 +190,18 @@ checks, and external assumptions explicit.
 
 # Fast When Needed, Explicit When It Matters
 
-Prototyping can use the host runtime or CUDA float32 paths; formal guarantees use graph denotations,
-Float32 models, checkers, and theorems. A typical silent failure is a checkpoint that loads by name
-while one weight is transposed—see *Why Verification Matters* for the semantic-gap examples.
+TorchLean separates fast execution from proof, but it does not treat them as unrelated worlds. For
+prototyping, examples can use the host runtime or optional CUDA-backed float32 paths. Formal
+guarantees use graph denotations, Float32 models, certificate checkers, and Lean theorems. The boundary
+is visible: some parts are proved in Lean, and some parts are external systems that must be named
+and checked around.
+
+A typical runtime bug is a checkpoint whose parameter names load successfully while one weight has
+been transposed to match a different convention. The model may still run if the surrounding
+dimensions happen to agree, but a verifier might then certify a graph and payload pair that is not the
+deployed computation. TorchLean's design pushes parameter payloads, graph lowering, and shape checks
+into explicit data so that this kind of agreement can be inspected and, where the library has the
+theorem support, proved.
 
 # References
 

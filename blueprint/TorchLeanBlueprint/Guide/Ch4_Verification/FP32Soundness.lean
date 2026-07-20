@@ -14,8 +14,16 @@ The basic situation is common. A verifier or proof establishes a real-valued ine
 margin. A floating-point analysis bounds how far the rounded computation can move from the real one.
 If the margin is larger than the rounding error budget, the property survives finite precision.
 
-`FP32` and `IEEE32Exec` are defined in *Floating Point and Native Boundaries*. Here the guiding
-transfer lemma is:
+Recurring vocabulary:
+
+- `FP32`: TorchLean's proof model for binary32 style rounding on the reals.
+- `IEEE32Exec`: the executable IEEE-754 kernel, used for checking actual bit behavior.
+- `bound/approximation theorem`: a theorem of the form "the float32 execution stays within `eps`
+  of the real spec".
+- `soundness`: the claim that a bound proved in Lean actually covers the runtime behavior being
+  modeled.
+
+The guiding transfer lemma is simple:
 
 - the decoded FP32 result is within `ε` of the real specification;
 - the real specification is above the target threshold by more than `ε`;
@@ -53,11 +61,50 @@ finite value covered by a finite-path theorem, while `0/0`, overflow to `Inf`, o
 negative finite value are handled by the executable `IEEE32Exec` layer and total `toReal?` bridge,
 where the special cases remain visible.
 
-# Where The Approximation Story Becomes Concrete
+# Proof Float32 Model
 
-APIs: [FP32](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/FP32.lean) and
-[IEEE32Exec](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Exec32.lean). This chapter is about
-margin transfer, not re-teaching the layer split.
+`FP32` is the clean proof model for finite-path error budgets. `IEEE32Exec` is the executable bit
+model for special values and edge cases. Bridge theorems connect them when the computation remains
+finite.
+
+In TorchLean, `FP32` serves as the model for binary32-style rounding on the finite path.
+
+More concretely:
+
+- `TorchLean.Floats.FP32` in [NN.Floats.FP32 API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/FP32.lean) is the canonical
+  float32 semantics for proofs:
+  a rounded real model instantiated to binary radix, binary32 style exponent (`fexp32`), and
+  round-to-nearest-even (`rnd32`).
+- It is smaller than full executable IEEE semantics by design. It does not try to represent NaN,
+  Inf, or signed-zero behavior directly.
+- For the executable layer, `IEEE32Exec` is used, with bridge theorems to relate it to `FP32` and to say
+  when the executable computation agrees with the proof model.
+
+Executable IEEE-754-style float32 starts at the
+[IEEE32Exec semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/IEEEExec/Exec32.lean). Bridge and soundness theorems
+connect that executable view to the standardized [FP32 proof semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats/FP32.lean),
+which is still the model we prefer for clean paper-level claims.
+
+This division matters because paper claims usually want the cleanest theorem statement first:
+
+- the proof model gives a theorem about rounding error and interval enclosure,
+- the executable model gives a checkable implementation account,
+- and the bridge theorems say when the executable and proof views coincide on the finite path.
+
+So the relevant claim is an interpretation statement, not the slogan "Float32 is close":
+
+$$`\operatorname{IEEE32Exec}
+\xrightarrow{\operatorname{toReal}}
+\mathbb{R}
+\quad\text{and}\quad
+\operatorname{FP32}
+\xrightarrow{\operatorname{toReal}}
+\mathbb{R}`
+
+plus hypotheses saying the values are finite and the rounded executable path agrees with the proof
+model being cited.
+
+# Where The Approximation Story Becomes Concrete
 
 The repository turns this picture into named theorems in three recurring settings: layerwise error bounds, small network-level bounds for
 common MLP families, and verifier side statements saying that real valued enclosures can be widened
@@ -232,11 +279,23 @@ The intended workflow is to train or import a model, lower or specify its tensor
 prove/check a real valued enclosure, and then spend an explicit FP32 error budget to keep the
 checked claim connected to rounded execution.
 
+# Proof Model Versus IEEE Execution
+
+The rounded-real `FP32` model has a narrower, reusable analysis interface. The
+bit-level `IEEE32Exec` model handles NaN, infinity, signed zeros, and executable binary32 behavior.
+The bridge theorems connect the two on the finite path.
+
 # What People Usually Cite
 
-Cite `FP32` for proof-model bounds, `IEEE32Exec` for bit behavior, and `NN/Proofs/RuntimeApprox/*`
-for real-to-float transfer. Layer definitions: *Floating-Point Semantics*; tool integration:
-*Verification*.
+Usually the right answer is:
+
+- `FP32` for the proof model,
+- `IEEE32Exec` for executable bit behavior,
+- and `NN/Proofs/RuntimeApprox/*` for the theorem family that turns real bounds into float aware
+  bounds.
+
+For the float model split, read *Floating-Point Semantics*. For how these bounds plug into tools,
+read *Verification*.
 
 # References
 
