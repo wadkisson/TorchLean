@@ -41,36 +41,6 @@ TorchLean keeps the rhythm but changes where the objects live:
 That mapping lets a PyTorch reader recognize the workflow without treating the runtime state as
 hidden global context.
 
-# Runtime Artifacts
-
-Separate the artifacts by what they are for.
-
-An eager tape is for debugging and reverse mode. It records runtime values, parent links, and local
-VJP closures. It is the closest TorchLean analogue of PyTorch eager autograd.
-
-A compiled graph is for repeated execution. It fixes the graph structure once and reuses it across
-many calls. For supported programs, this is the "compile once, run many times" path; it is not a
-separate model API.
-
-An `NN.IR.Graph` is for inspection and verification. Its nodes carry operation names, shapes, and
-parent ids. A verifier can read this object without executing arbitrary closures.
-
-A runtime context is for named values and training state. It records parameters, gradients, RNG
-state, backend selection, and debugging values.
-
-A training log is for audit and debugging. It records losses, metrics, and reports produced during
-the run. It is not the model semantics, but it is the artifact that tells us what happened.
-
-It helps to give each artifact a question:
-
-- tape: "how did this eager value depend on earlier values?"
-- compiled graph: "what fixed computation will be replayed?"
-- IR graph: "what operation DAG can a checker or verifier inspect?"
-- runtime context: "which named tensors, parameters, modes, and backend settings were alive?"
-- training log: "what did this run report over time?"
-
-The same training command may produce several of these. They are related evidence, not one object.
-
 # Two Execution Modes
 
 TorchLean exposes one front end with two execution backends:

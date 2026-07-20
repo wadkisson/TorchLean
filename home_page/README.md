@@ -15,9 +15,8 @@ generated output:
 | Public page | Source to edit |
 | --- | --- |
 | Landing page | `home_page/index.md`, site CSS/JS/assets |
-| Getting started | `home_page/start/index.md` |
+| Guide | `blueprint/TorchLeanBlueprint/Guide/**/*.lean` → built into `home_page/blueprint/` |
 | Examples pages | `home_page/examples/**/index.md` plus matching `NN/Examples/**` README/source |
-| Guide | `blueprint/TorchLeanBlueprint/Guide/**/*.lean` |
 | API reference | `NN/**/*.lean` module docstrings and declaration docstrings |
 | Graph pages | `home_page/graphs/index.md`, `scripts/checks/dependency_audit.py`, generated graph JSON |
 | CUDA page | `home_page/cuda/index.md` plus the guide's CUDA/trust-boundary chapters |

@@ -7,138 +7,13 @@ open Verso.Genre Manual
 tag := "verification"
 %%%
 
-Verification in TorchLean is not a single button. It is a family of claims about explicit objects.
-A graph can be well formed. A compiler can preserve denotation. A bound propagation pass can
-enclose all outputs over an input box. A certificate can be replayed. An autograd pass can compute
-the adjoint derivative. A Float32 theorem can transfer a real-valued margin to finite precision.
-
-The first question is always:
-
-> What object is being verified?
-
-The usual object is an [NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
-plus a parameter payload and an input region. Other verification chapters use tensor programs,
-tapes, datasets, trajectories, residual functions, and imported JSON certificates. The object
-matters because the theorem can only talk about the artifact it names.
-
-The common path is:
-
-- start from a TorchLean API program, GraphSpec model, or imported artifact;
-- lower or translate it to a semantic object such as `NN.IR.Graph` plus a `ParamStore`;
-- run a checker such as IBP, CROWN, a certificate parser, an ODE corridor checker, or a scientific
-  ML checker;
-- interpret the accepted result through a theorem about the named object.
-
-A few names come up over and over in what follows:
-
-- `IBP`: interval bound propagation, where each node carries an interval box `[lo, hi]`.
-- `CROWN`: a family of backward linear-relaxation methods that propagate affine bounds.
-- `LiRPA`: linear relaxation-based perturbation analysis, the broader family that includes IBP and
-  CROWN methods.
-- `IEEE32Exec`: TorchLean's executable IEEE-754 binary32 kernel in Lean.
-- `FP32`: TorchLean's float32 model used in proofs, instantiated as rounded real semantics.
-
-# A Map Of Claim Types
-
-TorchLean's verification support is organized by object and support mechanism:
-
-- *Graph and shape checks*: the object is `NN.IR.Graph`; the support is an executable structural
-  checker for node ids, parent ids, op arities, payloads, and output shapes.
-- *Compiler alignment*: the object is an IR graph and a compiled runtime graph; the support is a
-  Lean theorem relating their denotations for a supported fragment.
-- *IBP enclosure*: the object is a graph, payload, and input box; the support is a checker plus a
-  soundness theorem for interval propagation.
-- *CROWN certificate*: the object is affine lower and upper forms over a graph; the support is a
-  replay checker or theorem fragment for the supported operators.
-- *Autograd correctness*: the object is a supported tape node or graph fragment; the support is a
-  Lean theorem saying the corresponding reverse-mode rule computes the intended adjoint derivative.
-- *Runtime approximation*: the object is a runtime tensor and a spec tensor; the support is a
-  tolerance theorem.
-- *External α,β-CROWN artifact*: the object is a JSON leaf artifact; the support is structural
-  checking today, with stronger recomputation certificates as the natural next level.
-- *Scientific ML certificate*: the object is an ODE tube, PINN residual certificate, spline
-  certificate, or controller artifact; the support is a checker plus a theorem pattern for that
-  mathematical domain.
-
-Name the workflow and claim level. "Verified" should come with a noun:
-verified shape check, verified IR compilation theorem, verified IBP enclosure, checked imported
-artifact, or verified float32 transfer theorem.
-
-# Three Theorem Shapes
-
-The details differ by subsystem, but several theorem shapes appear repeatedly.
-
-For robustness, the target is usually a margin statement:
-
-$$`\forall x\in B,\qquad f_y(x)-\max_{k\ne y} f_k(x) > 0`
-
-For a bound propagation pass, the soundness theorem has the form:
-
-$$`x\in B
-\quad\Longrightarrow\quad
-\llbracket G\rrbracket(x)\in \gamma(\mathcal A(G,B))`
-
-Here `G` is the graph, `B` is the input region, `\mathcal A` is the abstract interpreter or
-relaxation pass, and `\gamma` converts the abstract object back into a concrete set of possible
-outputs.
-
-For a certificate checker, the theorem shape is:
-
-$$`\operatorname{Check}(G,C)=\texttt{true}
-\quad\Longrightarrow\quad
-\operatorname{Sound}(G,C)`
-
-This division is what makes external producers fit the story. A producer can search for `C`; Lean
-checks the finite object and applies the theorem attached to the checker.
+IBP/CROWN mechanics, worked examples, and runnable checkers on `NN.IR.Graph` plus parameters and an
+input region. Claim vocabulary: *What TorchLean Is*. Float layers: *Floating Point*.
 
 # The Main Idea
 
-The same graph serves several roles at once. A model is compiled to an explicit symbolic IR graph
-(`NN.IR.Graph`); verifier passes such as interval bounds, affine bounds, and certificate checks run
-on that graph; and theorems talk about the graph denotation rather than about an opaque execution
-trace.
-
-The rest of the manual uses three words carefully:
-
-- `proved` means Lean has a theorem about a semantic object defined in Lean.
-- `checked` means Lean recomputes or structurally validates an imported artifact.
-- `assumed` means a runtime or external producer hypothesis is named instead of folded silently into
-  the verified claim.
-
-## The Claim Ladder
-
-A good way to read TorchLean verification output is as a ladder:
-
-1. *The file runs.* This catches ordinary integration failures.
-2. *The graph is well formed and well shaped.* The symbolic object is structurally meaningful.
-3. *A checker accepts an artifact.* Lean has parsed and checked a concrete object.
-4. *A theorem applies to the supported fragment.* The accepted object implies a mathematical
-   statement about the graph denotation.
-5. *A scalar bridge applies.* The theorem can be related to the runtime scalar path being claimed.
-
-The ladder prevents category mistakes. A CUDA training run supplies evidence about a runtime path.
-A graph soundness theorem supplies a mathematical statement about an IR denotation. An imported
-certificate checker supplies a statement about the artifact it accepts. Strong claims say which
-rungs were used.
-
-The bridge matters because a familiar ML API can lead to verification mathematics that is stated and
-cited precisely.
-
-# Shared Semantic Target
-
-Runtime compilation and verification share one graph semantic target. The scalar semantics are
-explicit enough that floating point assumptions can be named rather than hand-waved, and certificate
-checking is separated into recompute-and-compare checks versus weaker structural checks of imported
-artifacts.
-
-That perspective is why the examples cover several application families instead of a single minimal
-robustness case:
-
-- robustness and certified margins,
-- PINN residual bounds,
-- ODE enclosure and dynamical-system reasoning,
-- controller and Lyapunov two-stage workflows,
-- and benchmark oriented exported artifact checks such as VNN-COMP suites.
+Verifier passes run on the same IR graph that runtime and export use. Theorems talk about the graph
+denotation, not an opaque execution trace.
 
 # External Producers, Python, Julia, And FFI
 
@@ -592,108 +467,6 @@ a local step function with a transfer-soundness hypothesis, so plain CROWN, α-C
 can share the global checker skeleton after their local transfer facts are supplied. The IEEE32Exec
 variant is a separate statement, not an automatic consequence of the real-valued theorem.
 
-# Pointers To Deeper Chapters
-
-The verification tree is broad, so the list below names areas that need their own careful reading
-path rather than being compressed into one verifier slogan:
-
-- `CROWN` as objective dependent backward reasoning, beyond forward node by node affine bounds.
-- The difference between a per node recompute certificate and a branch and bound leaf artifact.
-- Which ops have proofs today versus only executable/debuggable support today.
-- How derivative bounds support PINN and ODE workflows.
-- How `BoundOps` and directed rounding relate to real valued enclosures and float32 execution.
-- How imported PyTorch / VNN-COMP / α,β-CROWN artifacts become Lean objects instead of
-  remaining opaque blobs.
-- How the proof declarations connect to the executable checkers: local transfer soundness, topo-order
-  induction, and final property extraction.
-
-The next sections cover the first few of those more concretely; the certificate and two-stage
-workflows cover the external artifact side.
-
-# Application Families In The Current Repository
-
-The verification tree covers several different application styles. They all reuse the same graph
-ideas, but they answer different scientific questions.
-
-## 1. Robustness and margin certification
-
-For many ML readers, this is the most familiar verifier workflow:
-
-- seed an input perturbation region,
-- propagate bounds through the network,
-- check that the true class margin stays nonnegative.
-
-Relevant tools and examples:
-
-- `torchlean-robustness`
-- `digits`
-- `margin-cert`
-- `torchlean-ibp`
-
-These commands implement claims drawn from the adversarial-robustness, IBP, CROWN, and LiRPA
-literature cited below.
-
-## 2. PINN residual bounds
-
-The repository includes a meaningful PINN slice rather than only generic verifier infrastructure.
-The PINN code answers questions of the form:
-
-> Over a spatial or spatio-temporal box, how large can the PDE residual become, given bounds on
-> the network output and its derivatives?
-
-The implementation is organized around the [PINN CLI](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/CLI.lean), the
-[PINN certificate checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/Certificate.lean), the
-[PINN dataset checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN/DatasetCheck.lean), and the commands
-`pinn-cli`, `pinn-cert`, and `pinn-dataset-check`.
-
-Here TorchLean's derivative-aware graph propagation does something more specialized than standard
-image-classifier robustness.
-
-## 3. ODE enclosure verification
-
-The ODE verifier answers a different question again:
-
-> Does a neural network satisfy subsolution / supersolution style inequalities for a differential
-> equation over a region?
-
-Useful declarations and tools:
-
-- [ODE API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/ODE.lean)
-- [ODE verifier API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/ODE/Verify.lean)
-- CLI tool: `ode`
-
-Here the proof layer and the numerical layer meet directly:
-the executable checker runs over an explicit scalar backend, while the theorem interpretation
-depends on the selected floating-point semantics and runtime agreement.
-
-## 4. External benchmark and ecosystem workflows
-
-Not every TorchLean workflow starts from a model written natively in Lean.
-
-Relevant tools and examples:
-
-- `abcrown-leaf`
-- `vnncomp-mnistfc`
-- [NN/Examples/Verification/VNNComp](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Verification/VNNComp/)
-
-These workflows matter because they show how TorchLean interfaces with existing verifier ecosystems
-without treating "imported JSON" as already a theorem.
-
-## 5. Controller / Lyapunov two-stage workflows
-
-The Lyapunov and controller workflows are still more research-flavored than the smallest public
-examples, but they carry the paper's broader claim: the same artifact/checker/proof discipline
-applies to dynamical systems as well as to classifier margins.
-
-Useful declarations:
-
-- [Lyapunov oracle boundary](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Lyapunov/Oracle.lean)
-- [Lyapunov verification theorems](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Lyapunov/Verification.lean)
-- [two stage Lyapunov runner](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Lyapunov/TwoStage/Run.lean)
-
-These declarations expose oracle or certificate assumptions directly instead of hiding them inside a
-monolithic external script.
-
 # Core Data Structures (What The Verifier Actually Consumes)
 
 The verifier passes consume a small set of explicit artifacts.
@@ -824,15 +597,6 @@ If another branch has box `[0.3, 2]`, then `beta = 1` is consistent and the tran
 exact active rule `ReLU(y) = y`. If a branch has box `[-2, -0.1]`, then `beta = -1` is consistent
 and the transfer can use the exact inactive rule `ReLU(y) = 0`.
 
-## Certificate Strengths
-
-Different certificate formats support different claims.
-
-- A recompute and compare certificate says Lean can independently check a claimed bound artifact.
-- A structural artifact says Lean can check shape and consistency conditions for an artifact.
-- A proof-backed certificate exports enough local evidence for Lean to connect acceptance to the
-  graph semantics.
-
 ## Structural leaf artifacts
 
 Some external workflows export "leaf artifacts" that are meaningful only relative to the verifier's
@@ -845,22 +609,6 @@ hypothesis for those bounds.
 
 The [α,β-CROWN leaf checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert/AbCrownLeafCert.lean) handles that boundary
 and is exposed through `lake exe verify -- abcrown-leaf`.
-
-## Trusted Boundary Table
-
-The table below is the short version auditors usually need:
-
-| Artifact | Lean checks | Lean theorem claim | Remaining boundary |
-|---|---|---|---|
-| `NN.IR.Graph` shape check | node ids, arities, payload shapes | graph is structurally meaningful | none about numerical semantics |
-| IBP pass on supported graph | boxes produced by Lean code | `cert_encloses_semantics` if hypotheses hold | scalar/backend agreement if claiming runtime behavior |
-| CROWN node certificate | local affine transfers match Lean recomputation | CROWN checker theorem for supported transfers | producer search for good slopes is not proved |
-| α,β-CROWN node certificate | α ranges, β phase consistency, affine transfer match | transfer soundness plus global checker theorem | external branch search not proved |
-| α,β-CROWN leaf artifact | JSON structure, nested boxes, exported prune witness | structural leaf condition | soundness of exported lower bounds unless recomputed |
-| CUDA/PyTorch runtime output | tests or explicit bridge artifacts | only if a bridge theorem applies | native kernel and library behavior |
-
-This table is intentionally conservative. A checked artifact is valuable, but it should not be
-described as a theorem about more objects than it actually names.
 
 # Runnable verification workflows today
 
@@ -899,191 +647,131 @@ the [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/V
 Many tools accept an explicit JSON path as the first argument; the `-- list` output shows the
 default path.
 
-# Reference Map
-
-## IR and compilation
-
-- Canonical graph with named operations: [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean)
-- TorchLean forward compiler to IR: [compiler API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Compile.lean)
-- IR evaluation helpers: [TorchLean correctness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Correctness.lean)
-- Proved forward fragment: [proved compiler fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean)
-
-The "Graphs and IR" guide gives the full picture of the different graph representations and how
-they relate.
-
-## Bound propagation (IBP/CROWN)
-
-- Graph payloads and passes: [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean)
-- Operators and transfer rules: [CROWN operators source tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/CROWN/Operators/)
-- Model-specific helpers: [CROWN models source tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/CROWN/Models/)
-- Certificate-side definitions: [CROWN cert source tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/CROWN/Cert/)
-- Soundness proofs: [CROWN proof source tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/CROWN/Proofs/)
-
-## CLI registry
-
-- Unified entrypoint: [verification CLI API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/CLI.lean)
-  - `lake exe verify` runs this entrypoint.
-
-## Certificate checkers (JSON compare)
-
-- [certificate checker API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert.lean): checks externally produced JSON artifacts by
-  Lean recomputation with explicit tolerance comparisons.
-
-## Curated examples
-
-- [NN/Examples/Verification](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Verification/)
-  - Small bundled fixtures and tutorial checkers registered into the `verify` CLI.
-
-## PINN and ODE application code
-
-- PINN helpers and CLIs: [PINN API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/PINN.lean)
-- ODE support: [ODE API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/ODE.lean) and
-  [ODE proof source tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/Verification/ODE/)
-
-## Lyapunov / controller workflows
-
-- [Lyapunov oracle boundary](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Lyapunov/Oracle.lean) and
-  [two stage Lyapunov runner](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Lyapunov/TwoStage/Run.lean): oracle style
-  and two stage controller / Lyapunov developments.
-
-# Trust Boundaries (What Is Executable vs Proved vs Assumed)
-
-TorchLean marks three different kinds of claim explicitly:
-
-## 1) Executable in Lean (Fast Path)
-
-- IR evaluation ([NN.IR.Semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean)) is executable.
-- IBP/CROWN passes are executable (compute boxes/affine forms).
-- Many examples run on an executable float backend (`IEEE32Exec` by default).
-
-This tier is excellent for debugging and for checkable artifacts, but execution alone does not
-establish why a bound is sound.
-
-## 2) Proved Soundness (For a Supported Fragment)
-
-TorchLean has a soundness proof development for a supported subset of the graph dialect:
-
-- Proof entrypoint: [graph certificate soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean)
-
-Informal theorem shape:
-
-> If every node in the graph is in the supported fragment and each local IBP transformer encloses
-> the op semantics, then the propagated boxes enclose the denotation of the whole graph (by
-> induction over node ids / topo order).
-
-The proof uses the standard "local soundness + induction over a DAG" structure, which scales as more
-ops are added.
-
-Important caveat:
-Some operator enclosures, especially for transcendentals, are implemented as heuristics
-and are explicitly marked as not enclosure sound. For a proof quality enclosure layer, prefer the
-operators covered by the soundness theorem and treat the rest as work in progress.
-
-## 3) Imported Artifacts (Externally Produced Certificates)
-
-When a certificate produced by an external verifier such as α,β-CROWN is imported, Lean can still:
-
-- parse it,
-- check it is *structurally consistent* (dimensions, ids, declared property form),
-- and connect it to downstream theorems with the stated producer assumptions.
-
-Lean replays α,β-CROWN only when the computation is exported in a checkable form and verified inside
-Lean.
-
-TorchLean is explicit about what is proved in Lean and what is checked as an external artifact:
-
-- If a verifier recomputes bounds inside Lean over an executable scalar backend, then the remaining
-  runtime agreement is that the scalar backend matches its intended semantics.
-- With an imported external certificate, Lean can check structural consistency; validating the bound
-  computation requires the computation itself to be exported and checked as well.
-
-The certificate guide documents the current minimal JSON leaf-artifact schema (v0.1) used in the
-Two-Stage path.
-
-# Informal theorem shapes (for citations)
-
-The theorem shapes below stay informal, with pointers to the precise Lean theorems that papers and
-talks often need.
-
-## Compiler-to-IR Alignment (Proved Fragment)
-
-Lean source: [TorchLean compile proof fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean)
-
-In words (forward fragment only):
-
-> Compiling a forward program to IR preserves meaning:
-> evaluating the compiled IR graph equals evaluating the forward program's spec evaluator.
-
-In code, look for the compile-forward theorem in the `Correctness` namespace. Its name starts with
-`runForwardIR` and ends with `eq_evalForward`.
-
-## IBP Soundness Over the Graph Dialect (Supported Subset)
-
-Lean source: [graph certificate soundness](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean)
-
-In words:
-
-> If `runIBP` produces boxes for all nodes in a supported graph, then for any input `x` in the
-> seeded input box, the true denotation of every node lies within its IBP box.
-
-This theorem is the main statement behind "interval bounds cover true values" in the proved subset. The Lean source
-to cite is [graph certificate soundness](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean).
-
-## Informal soundness statement (the one-liner)
-
-For a supported graph fragment, the central IBP soundness claim has this informal shape:
-
-Assume `g : NN.IR.Graph` is well formed and uses only supported ops, `ps : ParamStore` provides the
-required payloads and input seed box, every local transformer used by `runIBP` encloses the
-corresponding IR op semantics, and the scalar backend matches its intended meaning. If
-`st := runIBP g ps` produces per node interval boxes, then every input in the seed box evaluates to
-values that lie inside the corresponding `ibpBox st i` for each node `i`.
-
-The actual proof in the repo is a standard "local soundness + induction over node ids" argument
-implemented in
-[NN.MLTheory.CROWN.Proofs.GraphCertSoundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Proofs/GraphCertSoundness.lean).
-
-## Exact theorem names worth citing
-
-Theorem names that are often cited first:
+# From Application Walkthroughs
 
 ```
-#check NN.MLTheory.CROWN.Graph.CertSoundness.cert_encloses_semantics
-#check NN.MLTheory.CROWN.Graph.CrownCertSoundness.crown_checker_encloses_semantics
-#check NN.MLTheory.CROWN.Graph.AlphaCrownTransferSoundness.alphaCrown_transfer_sound
-#check NN.MLTheory.CROWN.Graph.AlphaCrownTransferSoundness.alphaBetaCrown_transfer_sound
+let inputCenter : Tensor α xShape :=
+  NN.Tensor.ofListOfLength (α := α) [2] [cast 0.5, cast 0.8] (by rfl)
+let eps : α := Runtime.ofFloat 0.1
+let rad : Tensor α xShape := Spec.fill eps xShape
+
+let inputBox : FlatBox α :=
+  { dim := inDim
+    lo := Tensor.subSpec inputCenter rad
+    hi := Tensor.addSpec inputCenter rad }
+
+let ps : ParamStore α :=
+  { compiled.ps with inputBoxes := compiled.ps.inputBoxes.insert compiled.inputId inputBox }
 ```
 
-Interpreted as a progression:
-
-- `cert_encloses_semantics` is the IBP enclosure theorem for the supported graph dialect;
-- `crown_checker_encloses_semantics` is the corresponding CROWN checker theorem;
-- `alphaCrown_transfer_sound` and `alphaBetaCrown_transfer_sound` are the transfer-soundness
-  theorems for connecting external α-CROWN / α,β-CROWN artifacts to the Lean semantics.
-
-## Certificate Checking (External Artifact Boundary)
-
-Reference declarations:
-- [certificate checkers](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert.lean)
-- [verification CLI](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/CLI.lean)
-
-In words:
-
-> If Lean accepts a leaf artifact, then the represented leaf's stated prune/verified condition
-> passes TorchLean's structural checks under the artifact's declared fields and any explicit producer
-> assumptions.
-
-Use this shape for integrating external runs without treating them as already proved.
-
-Two theorems that line up compilation and evaluation:
-
 ```
-#check NN.Verification.TorchLean.Proved.compileForward_wellFormed
-#check NN.Verification.TorchLean.Proved.runForwardIR_eq_evalForward
+let ibp := runIBP (α := α) compiled.graph ps
+let some outB := ibp[compiled.outputId]! |
+  throw <| IO.userError "IBP produced no output box"
 ```
 
-Related manual pages: *Graphs and IR* (IR definition), *Floating-Point Semantics* (scalar backends),
-*Certificates* and *Two-Stage Workflows* (α,β-CROWN artifacts).
+```
+let ctx : AffineCtx :=
+  { inputId := compiled.inputId, inputDim := softmaxInDim }
+
+let crown := runCROWN (α := α) compiled.graph ps ctx ibp
+```
+
+```
+let objV : Tensor α (.dim softmaxOutDim .scalar) :=
+  NN.Tensor.ofListOfLength
+    (α := α) [3] [cast 1.0, cast (-1.0), cast 0.0] (by rfl)
+
+let obj : FlatVec α := { n := softmaxOutDim, v := objV }
+
+match runCROWNBackwardObjective
+    (α := α) compiled.graph ps ctx ibp compiled.outputId obj with
+| none => IO.println "[CROWN-backward] no affine bounds"
+| some objAff => IO.println s!"[CROWN-backward] objective dim = {objAff.outDim}"
+```
+
+```
+[IBP] logits lo = ...
+[IBP] logits hi = ...
+[CROWN] logits lo = ...
+[CROWN] logits hi = ...
+[CROWN-backward] objective bound = ...
+```
+
+```
+def leafVerifiedAt (lb thr : Array Float) (witnessIdx : Nat) : Bool :=
+  if witnessIdx < lb.size ∧ witnessIdx < thr.size then
+    ltBool thr[witnessIdx]! lb[witnessIdx]!
+  else
+    false
+```
+
+```
+camera_P : 3 x 4 projection matrix
+corners3d : 8 x 3 cuboid corners
+bbox2d : [xmin, ymin, xmax, ymax]
+```
+
+```
+structure BoxCameraCert (α : Type) where
+  width : α
+  height : α
+  tol : α
+  camera : CameraP α
+  corners : BoxCorners α
+  bbox : Box2D α
+```
+
+```
+def checkCert (cert : BoxCameraCert α) : Bool :=
+  checkPositiveImageSize cert &&
+    checkBBoxOrdered cert &&
+    checkBBoxInsideImage cert &&
+    checkPositiveDepths cert &&
+    checkProjectedInImage cert &&
+    checkBBoxEnclosesProjection cert
+```
+
+```
+theorem checkCert_sound
+    {cert : BoxCameraCert α} (h : checkCert cert = true) :
+    Verified3DBox cert
+```
+
+```
+{
+  "format": "torchlean.camera.box3d.v1",
+  "width": 640.0,
+  "height": 480.0,
+  "tol": 1.0,
+  "camera_P": [1.0, 0.0, 320.0, 0.0, 0.0, 1.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+  "corners3d": [0.0, 0.0, 8.0, 1.0, 0.0, 8.0, 1.0, 1.0, 8.0, 0.0, 1.0, 8.0,
+                0.0, 0.0, 10.0, 1.0, 0.0, 10.0, 1.0, 1.0, 10.0, 0.0, 1.0, 10.0],
+  "bbox2d": [319.0, 239.0, 321.0, 241.0]
+}
+```
+
+```
+theorem accepted_camera_box_certificate_is_verified
+    {cert : BoxCameraCert α}
+    (h : checkCert cert = true) :
+    Verified3DBox cert :=
+  checkCert_sound h
+```
+
+```
+theorem homogeneous_projection_uncertainty_stays_inside_bbox :
+    xmin cert ≤ uNum / z ∧
+      uNum / z ≤ xmax cert ∧
+      ymin cert ≤ vNum / z ∧
+      vNum / z ≤ ymax cert
+```
+
+![figure](Guide/Assets/walkthroughs/verification-bounds.png)
+
+![figure](Guide/Assets/walkthroughs/geometry3d-vision-certificates.png)
+
+![figure](Guide/Assets/bug-zoo/geometry3d-wilddet3d-bbox-diagnostic.png)
 
 # References
 

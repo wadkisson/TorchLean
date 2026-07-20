@@ -16,39 +16,6 @@ Good citations name the semantics of the claim. A TorchLean theorem should say w
 reals, `FP32`, `IEEE32Exec`, or a verifier enclosure, and it should name the quantity being bounded:
 pointwise error, the image of a set, or an interval overapproximation.
 
-# Three Questions Before Citing A Result
-
-For a "floating-point universal approximation" claim, three concrete checks apply:
-
-1. Is the theorem about reals, about a rounded real model, or about actual executable IEEE-754 bits?
-2. What is the approximation target (a pointwise function, a direct image of a set, or an interval enclosure)?
-3. If the theorem feeds a verifier, what semantics is the verifier using?
-
-TorchLean keeps these cases separate in code:
-
-- `FP32` is the rounded real model used in proofs.
-- `IEEE32Exec` is the executable binary32 kernel.
-- `NN.IR.Graph` is the shared "this is the computation" object used by execution and verification.
-
-Two common citation chains are:
-
-- real target function, classical approximation error, FP32 rounding model, then interval or LiRPA
-  verification semantics;
-- executable `IEEE32Exec` bits, then the `FP32` proof model on the finite bridge path.
-
-# Definitions we use in this book
-
-- `direct image`: the exact output set `f(B)` of a network over an input region `B`.
-- `interval abstraction`: a sound overapproximation of `f(B)` (a box, or a box plus affine forms).
-- `rounded target`: the same computation after fixing a scalar semantics (reals vs FP32 vs IEEE bits).
-- `bridge theorem`: a statement that connects an executable semantics to a proof semantics on a
-  stated "finite path" (no NaN/Inf, no overflow, etc).
-
-The same feed-forward architecture can therefore be discussed at several incompatible levels of
-precision. Papers and theorems should name the level explicitly so readers can tell whether the
-claim concerns real valued idealization, a float model used for proofs, executable IEEE-754
-behavior, or a verifier's overapproximation of outputs.
-
 # Key References
 
 ## Standards And Numerical Analysis

@@ -597,39 +597,6 @@ The informal theorem shape is:
 
 This reading is valid under the stated finite and operation specific hypotheses.
 
-# Exception Status
-
-The value of an IEEE operation and the status it raises are related but distinct outputs. The
-value-only operations remain convenient when a proof only needs the resulting bits. Their
-status-bearing counterparts return an `IEEEOutcome`, which contains the same value together with an
-`IEEEStatus`:
-
-- `invalid` for operations such as `0/0`, opposite signed infinities added together, or square root
-  of a negative nonzero value;
-- `divideByZero` for a finite nonzero dividend divided by zero;
-- `overflow` when a finite exact result rounds to infinity;
-- `underflow` when an inexact result is tiny after rounding;
-- `inexact` when the rounded finite result differs from the exact dyadic or rational intermediate.
-
-The underflow convention is explicit: TorchLean detects tininess after rounding and raises
-underflow only when the result is also inexact. The theorems
-`dyadicRoundingStatus_inexact_of_underflow` and
-`rationalRoundingStatus_inexact_of_underflow` record the corresponding implication. Special-value
-theorems prove, for example, that finite nonzero division by zero raises `divideByZero` but not
-`invalid`.
-
-```
-import NN.Floats.IEEEExec.Rules.SpecialRules
-
-open TorchLean.Floats.IEEE754
-
-#check IEEE32Exec.addWithStatus
-#check IEEE32Exec.divWithStatus
-#check IEEE32Exec.fmaWithStatus
-#check IEEE32Exec.sqrtWithStatus
-#check IEEE32Exec.divWithStatus_divideByZero_of_finite_nonzero
-```
-
 # Transcendentals And Library Boundaries
 
 The `FP32` proof model defines transcendentals by applying the corresponding real function and
@@ -653,52 +620,6 @@ certified enclosure, or a named external assumption for that implementation.
 The floating point verification literature makes the same point: compiler, library, and hardware
 choices are part of the semantics unless they are isolated behind a proof or contract.
 
-# Runtime And CUDA Boundaries
-
-Lean's runtime `Float32` operations are external runtime calls. Lean documents `Float` operations as
-IEEE-style opaque operations that do not reduce in the kernel and compile to C operators; the same
-general concern applies here. Runtime operations can be used, tested, and connected to Lean side
-semantics through explicit agreement assumptions.
-
-TorchLean names that assumption explicitly:
-
-```
-import NN.Floats.IEEEExec.Bridge.RuntimeFloat32
-
-open TorchLean.Floats.IEEE754
-open TorchLean.Floats.IEEE754.Float32Bridge
-
-#check RuntimeFloat32MatchesIEEE32Exec
-#check RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_add
-#check RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_mul
-#check RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_sqrt
-```
-
-The class says, operation by operation, that runtime float32 bits match the `IEEE32Exec` reference
-bits. Once that bridge is supplied, downstream proofs can reuse the `IEEE32Exec` and `FP32`
-theorems. Without it, a runtime result remains implementation evidence rather than a Lean side
-scalar statement.
-
-CUDA uses the same idea at the native boundary:
-
-```
-import NN.Runtime.Autograd.Engine.Cuda.Float32Contract
-import NN.Runtime.Autograd.Engine.Cuda.KernelSpec
-
-open Runtime.Autograd.Cuda.Float32Contract
-
-#check NativePrimitiveAgreement
-#check native_add_abs_error_of_isFinite
-#check native_mul_abs_error_of_isFinite
-#check native_div_abs_error_of_isFinite
-#check native_fma_abs_error_of_isFinite
-#check native_sqrt_abs_error_of_isFinite
-```
-
-For the engineering details, read *GPU and CUDA Boundaries*. The scalar semantics here fix the
-meaning: native arithmetic is connected to proofs through explicit bit-agreement contracts, fixed
-reduction specifications, and finite-path hypotheses.
-
 # Concrete Bit Patterns
 
 `IEEE32Exec` makes special values concrete:
@@ -721,42 +642,15 @@ For a visual inspection path, open the widget examples:
 [Widgets source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean), especially `#float32_view` and
 `#float32_round_view`.
 
-# What The Claims Mean
+# Additional Formulas And Snippets
 
-Checked by Lean:
-
-- `FP32` rounded-real definitions and local error lemmas;
-- `IEEE32Exec` bit-level definitions for the supported core operations;
-- finite bridge theorems from `IEEE32Exec` to `FP32`;
-- total `toReal?` theorems that expose NaN/Inf paths;
-- interval-facing and runtime-approximation lemmas that cite these scalar models.
-
-Runtime agreement paths:
-
-- Lean runtime `Float32` agreement with `IEEE32Exec`;
-- CUDA primitive and kernel agreement with the Lean contracts;
-- cuBLAS, cuFFT, libdevice, compiler, driver, and GPU behavior;
-- correctly-rounded claims for external transcendental libraries;
-- correspondence between host or device exception state and `IEEEStatus`.
-
-That split is the claim. Native execution is part of the workflow, and TorchLean makes the agreement
-with Lean side semantics small, named, and testable.
-
-# How To Choose The Right Layer
-
-Use this rule:
-
-- Use `ℝ` for ideal networks, losses, and verifier statements.
-- Use `FP32` / `NF` for compositional finite-precision error bounds.
-- Use `IEEE32Exec` for bit inspection, NaN/Inf behavior, signed zeros, and executable binary32
-  examples.
-- Use `RuntimeFloat32MatchesIEEE32Exec` when runtime float results must be transported into the
-  executable reference semantics.
-- Use `Float32Contract` / `KernelSpec` when native CUDA kernels must be connected to the proof
-  layer.
-
-The rule is simple: choose the numerical object for the claim, then cite the bridge theorem,
-checker, or runtime agreement that connects it to the layer below.
+$$`\operatorname{IEEE32Exec}
+\xrightarrow{\operatorname{toReal}}
+\mathbb{R}
+\quad\text{and}\quad
+\operatorname{FP32}
+\xrightarrow{\operatorname{toReal}}
+\mathbb{R}`
 
 # References
 

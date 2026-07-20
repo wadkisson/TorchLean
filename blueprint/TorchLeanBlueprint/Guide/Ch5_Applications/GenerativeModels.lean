@@ -314,30 +314,104 @@ large-scale representation quality.
 The paper anchor for MAE is He et al., "Masked Autoencoders Are Scalable Vision Learners" (CVPR
 2022, https://arxiv.org/abs/2111.06377).
 
-# Claim Scope
+# From Application Walkthroughs
 
-For generative models, the safest citation discipline is:
+```
+def toDiffusionRange (unitImage : Tensor Float (cleanImageShape c h w)) :
+    Tensor Float (cleanImageShape c h w) :=
+  Spec.Tensor.mapSpec (fun x => 2.0 * x - 1.0) unitImage
+```
 
-- For a command that trains or samples through TorchLean, cite the corresponding file in
-  `NN/Examples/Models/Generative`.
-- For the diffusion forward law being Gaussian, cite `forwardGaussian_isGaussian` in the forward
-  Gaussian API.
-- For a sampler step being Lipschitz or contractive under hypotheses, cite the named theorems in the
-  diffusion samplers API.
-- For a VAE objective decomposing into reconstruction plus beta-weighted KL, cite
-  `betaVae_loss_eq_weightedTwoTerm`.
-- For diagonal Gaussian KL nonnegativity, cite `diagonalGaussianKlToStandardReal_nonneg`.
-- For a VQ-VAE loss splitting into reconstruction, codebook, and commitment terms, cite
-  `vqvae_loss_eq_weightedThreeTerm`.
-- For nearest-code minimization in a finite codebook, cite `nearestCode_minimizes_quantization_loss`.
-- For LSGAN generator and discriminator losses as weighted objectives, cite
-  `generatorLoss_eq_weightedTwoTerm` and `discriminatorLoss_eq_weightedThreeTerm`.
+```
+structure EpsModel (α : Type) (s : Shape) [Context α] where
+  eps : Tensor α s → α → Tensor α s
+```
 
-The current development focuses on objective and sampler facts, plus runnable examples. Global
-distribution matching, convergence of SGD, image quality, FID, and complete training-step
-equivalence are separate claims that would require additional theorem layers. That scope is part of
-the discipline: TorchLean can run programs shaped like ML systems, and we can grow the formal
-island around the parts whose meaning we are ready to state precisely.
+```
+def qSample (sched : VPSchedule α T)
+    (x0 : Tensor α s) (t : Fin (T + 1)) (eps : Tensor α s) :
+    Tensor α s :=
+  let αbar : α := sched.alphaBar t
+  let c0 : α := sqrtNonneg αbar
+  let c1 : α := sqrtNonneg (1 - αbar)
+  Tensor.scaleSpec x0 c0 + Tensor.scaleSpec eps c1
+```
+
+```
+def epsPredLoss (sched : VPSchedule α T) (model : EpsModel α s)
+    (x0 : Tensor α s) (t : Fin (T + 1)) (eps : Tensor α s) : α :=
+  let x_t := qSample sched x0 t eps
+  let tScalar : α := VPSchedule.timeOfIndex (α := α) (T := T) t
+  let epsHat := model.eps x_t tScalar
+  Spec.mseSpec epsHat eps
+```
+
+```
+def noisedSampleFromEps (leading : Spec.Shape) {d c : Nat} (spatial : Vector Nat d)
+    (alphaBars : Array Float) (T : Nat)
+    (x0 eps : Tensor Float
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList)))) (step : Nat) :
+    SupervisedSample Float
+      (leading.concat (Spec.Shape.ofList ((c + 1) :: spatial.toList)))
+      (leading.concat (Spec.Shape.ofList (c :: spatial.toList))) :=
+  let x_t :=
+    Spec.Tensor.scaleSpec x0 sqrtAb +
+    Spec.Tensor.scaleSpec eps sqrtOneMinusAb
+  Sample.mk (appendTimeChannel x_t tNorm) eps
+```
+
+```
+def ddimPrev {s : Spec.Shape}
+    (abPrev ab : Float)
+    (x_t epsHat : Tensor Float s) : Tensor Float s :=
+  let x0Hat :=
+    Spec.Tensor.scaleSpec
+      (Spec.Tensor.subSpec x_t (Spec.Tensor.scaleSpec epsHat sqrtOneMinusAb))
+      (1.0 / (if sqrtAb > 1e-12 then sqrtAb else 1e-12))
+  let x0Clipped := Spec.Tensor.clampSpec x0Hat (-1.0) 1.0
+  Spec.Tensor.scaleSpec x0Clipped sqrtAbPrev +
+    Spec.Tensor.scaleSpec epsHat sqrtOneMinusAbPrev
+```
+
+```
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.CausalTransformerOneHot
+    { batch := batch
+      seqLen := seqLen
+      vocab := vocab
+      numHeads := numHeads
+      headDim := headDim
+      ffnHidden := ffnHidden
+      layers := layers }
+```
+
+$$`y_j=\sum_i \phi_{ij}(x_i)`
+
+$$`\operatorname{block}(x)=x+F_\theta(x)`
+
+$$`(h_t,x_t)\mapsto(h_{t+1},y_t)`
+
+$$`(h_t,c_t,x_t)\mapsto(h_{t+1},c_{t+1},y_t).`
+
+$$`\operatorname{logits}_t =
+\operatorname{model}_\theta(tokens_{<t}),
+\qquad
+L = -\sum_t \log p_\theta(tokens_t \mid tokens_{<t})`
+
+$$`h_{t+1}=A_t h_t+B_t x_t,
+\qquad
+y_t=C_t h_t+D_t x_t`
+
+$$`x_t=\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\epsilon,
+\qquad
+\epsilon_\theta(x_t,t)\approx\epsilon.`
+
+$$`\mathcal{G}_\theta :
+\operatorname{function\ samples\ on\ a\ grid}
+\to
+\operatorname{function\ samples\ on\ a\ grid}`
+
+![figure](Guide/Assets/walkthroughs/diffusion_imagenette64_real_vs_generated_plot.png)
 
 # References
 

@@ -251,36 +251,6 @@ That tiny example is the design in miniature. TorchLean does not try to guess wh
 reshape, or deployment convention you meant. A real convention should appear as a named operation in
 the code, so the model author, exporter, and checker all see the same transformation.
 
-# What To Watch For
-
-As the examples get larger, keep track of where each object lives:
-
-- *Spec*: the mathematical meaning of tensors, layers, and losses.
-- *Runtime*: eager or compiled execution, gradients, optimizers, logging, and devices.
-- *IR*: a graph with named operations that can be inspected and verified.
-- *Proofs*: theorems about the spec, the graph, or the verifier output.
-- *Trust boundaries*: CUDA kernels, PyTorch exporters, external certificate producers, and datasets.
-
-Is this a tensor in the spec layer? A runtime value? A graph node? A theorem about graph denotation?
-A certificate imported from outside Lean? Most TorchLean mistakes become easier to diagnose once
-that question is clear.
-
-# The Paper Trail For This Example
-
-The same classifier produces several artifacts, and each artifact supports a different kind of
-sentence.
-
-- Model source: "this is a two-layer classifier from `.dim 4 .scalar` to `.dim 2 .scalar`."
-- Parameter payload: "these tensors instantiate that architecture."
-- Runtime output: "this backend produced these logits on this input."
-- Lowered graph: "these named operations are the graph view of the model."
-- Shape check: "the payload and graph agree on dimensions."
-- Bound artifact: "these intervals or affine bounds were produced for this graph and input box."
-- Lean theorem: "under the theorem hypotheses, accepted bounds imply the stated semantic property."
-
-Not every line above is automatically proved. Keeping the artifacts together makes it possible to
-see which object supports each claim and where an additional proof obligation remains.
-
 # References
 
 - PyTorch paper for the contrasting imperative ML style: https://arxiv.org/abs/1912.01703

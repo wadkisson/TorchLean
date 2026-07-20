@@ -39,31 +39,6 @@ start from narrower entry points such as
 [NN.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR.lean), and
 [NN.Verification](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean).
 
-# What TorchLean Covers
-
-At a high level, TorchLean has three layers.
-
-First, it has a familiar ML interface: tensors, layers, datasets, optimizers, losses, autograd,
-logging, import/export, optional CUDA backed execution, and examples ranging from small MLPs to
-CNNs, ViTs, GPT models, Mamba sequence models, diffusion, operator learning,
-reinforcement learning, and scientific ML. Residual models and ResNets are represented in the
-API, spec, and GraphSpec layers.
-
-Second, it gives those programs a semantic core. Tensor shapes can appear in types. Architectures
-can be lowered to a shared graph IR whose nodes name their operations. Scalar meanings can be real
-valued, executable float32, float32 as modeled in proofs, intervals, or verifier domains. GraphSpec
-lets an architecture be described once and read both as executable structure and as symbolic graph
-structure.
-
-Third, it has ways to check claims about the resulting artifacts: graphs that are well formed,
-shape inference, IBP/CROWN bounds, JSON certificate replay, robustness margins, PINN
-residuals, ODE enclosures, 3D projection certificates, attention mask contracts, and floating point
-bridge statements.
-
-These layers do not all have the same proof status. Some are executable infrastructure, some are
-checked artifacts, and some are Lean theorems. TorchLean keeps those roles separate because they
-support different kinds of claims.
-
 # What "The Same Model" Means
 
 TorchLean does not require every representation to be textually identical. A readable model builder,
@@ -126,20 +101,46 @@ These words prevent three different results from being collapsed into one: a CUD
 checker that recomputes a bound, and a theorem that proves an enclosure for a supported graph
 fragment.
 
-# Three Views Of One Model
+Recurring claim shapes used later in the Guide:
 
-At the top level, TorchLean presents a familiar ML API over a shared internal model.
-Application code starts from `import NN.API` and `open TorchLean`, then works with familiar concepts:
-layers, datasets, optimizers, losses, and training loops.
+$$`\text{known architecture family}
+\;+\;
+\text{named tensor payload}
+\;+\;
+\text{shape checks}
+\quad\leadsto\quad
+\text{TorchLean parameters}`
 
-Under the hood, the same model appears in three representations:
+$$`\forall x\in B,\quad
+\operatorname{margin}(\operatorname{denote}(g,\theta,x)) > 0`
 
-- *Spec layer*: the mathematical meaning of tensors, layers, losses, and model structure.
-- *Graph IR*: the DAG with named operations shared by runtime tooling, widgets, export, and verification.
-- *Runtime layer*: eager or compiled execution, autograd, optimizers, logging, and optional CUDA.
+$$`\text{runnable model}
+\;\longrightarrow\;
+\text{explicit graph and payload}
+\;\longrightarrow\;
+\text{checked artifact}
+\;\longrightarrow\;
+\text{semantic claim}`
 
-The layers are intentionally different representations. Their translations, rather than similar
-names or neighboring files, establish that they describe the same model.
+$$`\forall x\in B,\qquad f_y(x)-\max_{k\ne y} f_k(x) > 0`
+
+$$`x\in B
+\quad\Longrightarrow\quad
+\llbracket G\rrbracket(x)\in \gamma(\mathcal A(G,B))`
+
+$$`\operatorname{Check}(G,C)=\texttt{true}
+\quad\Longrightarrow\quad
+\operatorname{Sound}(G,C)`
+
+```
+command output
+  -> persisted artifact
+  -> widget or report
+  -> checker acceptance
+  -> theorem about the checker or semantics
+  -> named external assumptions
+
+```
 
 # The Object We Keep In View
 
@@ -188,20 +189,10 @@ Those references are background, not claims that TorchLean inherits their result
 TorchLean reuses ideas from the surrounding ecosystem while keeping its own proof objects, executable
 checks, and external assumptions explicit.
 
-# Fast When Needed, Explicit When It Matters
 
-TorchLean separates fast execution from proof, but it does not treat them as unrelated worlds. For
-prototyping, examples can use the host runtime or optional CUDA-backed float32 paths. Formal
-guarantees use graph denotations, Float32 models, certificate checkers, and Lean theorems. The boundary
-is visible: some parts are proved in Lean, and some parts are external systems that must be named
-and checked around.
 
-A typical runtime bug is a checkpoint whose parameter names load successfully while one weight has
-been transposed to match a different convention. The model may still run if the surrounding
-dimensions happen to agree, but a verifier might then certify a graph and payload pair that is not the
-deployed computation. TorchLean's design pushes parameter payloads, graph lowering, and shape checks
-into explicit data so that this kind of agreement can be inspected and, where the library has the
-theorem support, proved.
+
+
 
 # References
 

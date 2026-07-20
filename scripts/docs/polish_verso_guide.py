@@ -616,8 +616,12 @@ TORCHLEAN_JS_BODY = r"""
 (function () {
   const pages = TORCHLEAN_GUIDE_PAGES;
   const storageKey = "torchlean-guide-read-v1";
-  const script = document.currentScript;
-  const rootUrl = new URL(".", script ? script.src : window.location.href);
+  // Deferred scripts have a null currentScript when they run; fall back to the
+  // injected polish bundle so nested pages still resolve the guide root.
+  const script =
+    document.currentScript ||
+    document.querySelector('script[src*="torchlean-guide-polish.js"]');
+  const rootUrl = new URL(".", script && script.src ? script.src : window.location.href);
 
   function normalizedCurrentPage() {
     const here = new URL(window.location.href);
@@ -654,11 +658,10 @@ TORCHLEAN_JS_BODY = r"""
     const guideHome = rootUrl.href;
     const siteRoot = new URL("../", rootUrl);
     const links = [
-      ["Main site", "./"],
+      ["Home", "./"],
       ["Installation", "installation/"],
-      ["Examples", "examples/"],
-      ["API Reference", "docs/"],
-      ["Graphs", "graphs/"],
+      ["Guide", null],
+      ["API", "docs/"],
     ];
 
     document.querySelectorAll(".header-title").forEach((a) => {
@@ -675,7 +678,7 @@ TORCHLEAN_JS_BODY = r"""
     nav.setAttribute("aria-label", "TorchLean site navigation");
     for (const [label, path] of links) {
       const a = document.createElement("a");
-      a.href = new URL(path, siteRoot).href;
+      a.href = path === null ? guideHome : new URL(path, siteRoot).href;
       a.textContent = label;
       nav.appendChild(a);
     }
@@ -1014,20 +1017,24 @@ def write_js(root: Path) -> None:
 def inject_script(root: Path) -> None:
     """Install the shared guide script into every generated HTML page."""
     marker = "torchlean-guide-polish.js"
-    script_re = re.compile(r'\s*<script defer src="[^"]*torchlean-guide-polish\.js(?:\?v=[^"]*)?"></script>\n?')
+    script_re = re.compile(
+        r'[ \t]*<script defer(?:="defer")? src="[^"]*torchlean-guide-polish\.js(?:\?v=[^"]*)?"></script>\n?'
+    )
     # Verso emits a <base> tag on every generated page. A bare script URL is
     # therefore resolved relative to the guide root, even from nested pages.
-    tag = '    <script defer src="torchlean-guide-polish.js?v=20260706-nav"></script>\n'
+    # Verso often closes the head as `</style></head>` with no leading spaces,
+    # so match any `</head>` rather than the indented `  </head>` form only.
+    tag = '<script defer src="torchlean-guide-polish.js?v=20260717-guide-nav"></script>\n'
     for path in root.rglob("*.html"):
         html = path.read_text()
         if marker in html:
-            new_html = script_re.sub("\n" + tag, html, count=1)
+            new_html = script_re.sub(tag, html, count=1)
             if new_html != html:
                 path.write_text(new_html)
             continue
         if "</head>" not in html:
             continue
-        path.write_text(html.replace("  </head>", tag + "  </head>", 1))
+        path.write_text(html.replace("</head>", tag + "</head>", 1))
 
 
 def rewrite_repository_links(root: Path) -> None:

@@ -369,3 +369,32 @@ zero attention under the hard-masked softmax reference.
 This style avoids two common mistakes: treating a small theorem as proof of an entire production
 stack, or treating a real bug report as if it automatically proves the TorchLean example. The bridge
 is the named contract in the file.
+
+# From Application Walkthroughs
+
+```
+theorem trueInfinityMask_future_attention_weight_zero :
+  Spec.get2 (Spec.hardMaskedSoftmaxSpec scores (Spec.causalMask n)) i j = 0
+```
+
+```
+theorem runtimeFloat32_add_rewrites_to_ieee32
+    [RuntimeFloat32MatchesIEEE32Exec] (a b : F32) :
+    toIEEE32Exec (a + b) = IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b)
+```
+
+![figure](Guide/Assets/walkthroughs/geometry3d-vision-certificates.png)
+
+![figure](Guide/Assets/bug-zoo/geometry3d-wilddet3d-bbox-diagnostic.png)
+
+![figure](Guide/Assets/walkthroughs/attention-masks.png)
+
+![figure](Guide/Assets/walkthroughs/kv-cache-rope.png)
+
+![figure](Guide/Assets/walkthroughs/tokenizer-boundaries.png)
+
+![figure](Guide/Assets/walkthroughs/normalization-state.png)
+
+![figure](Guide/Assets/walkthroughs/batch-invariance.png)
+
+![figure](Guide/Assets/walkthroughs/float-autograd-boundaries.png)

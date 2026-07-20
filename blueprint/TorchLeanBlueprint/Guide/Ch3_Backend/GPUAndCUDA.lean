@@ -316,21 +316,6 @@ shape, but the contract we state is fused SDPA with a fused VJP. A stronger clai
 IO-tiled FlashAttention implementation would require a separate native-kernel proof or conformance
 story.
 
-# What A CUDA Claim Means
-
-Read CUDA claims by the evidence they provide:
-
-- CUDA example ran: the native path executed and produced values.
-- CUDA parity test passed: the native path matched CPU fallback or reference cases under the test
-  conditions.
-- Lean spec theorem: the pure Lean specification has the stated property.
-- Runtime agreement assumption: native bits refine the Lean side contract under stated conditions.
-- Verified CUDA kernel: a proof about the compiled native kernel itself.
-
-This vocabulary keeps extension points clear: verified layout proofs around more kernels, generated
-proof obligations for FFI symbols, fixed-tree reductions for reproducibility, narrower
-cuBLAS/cuFFT contracts, and future translation infrastructure for native kernels.
-
 # Runtime Shape
 
 At the Lean level, CUDA execution is a specialized eager tape, implemented by the
@@ -396,18 +381,6 @@ Runtime initializers do not change the mathematical semantics.  The parameter is
 declared shape.  The improvement is where storage is materialized: zeros, ones, uniform,
 Xavier/Glorot, Kaiming/He, and exact flat payloads can be created through the runtime path instead
 of first building a huge Lean object only to upload it immediately.
-
-# Float32 Only
-
-The CUDA backend is a float32 backend. Native buffers store C/CUDA `float`, and the Lean
-FFI exposes them as opaque float32 buffers.  That choice has three reasons:
-
-- it matches the common training precision for the examples;
-- it keeps the bridge to `IEEE32Exec` and the float32 proof layer manageable;
-- it avoids adding a partial complex or float64 layer before the runtime has a clean need for it.
-
-Higher precision can be added later, but it should be a real design extension, not a couple of
-duplicated kernels with unclear semantics.
 
 # Randomness And Reproducibility
 
@@ -526,19 +499,6 @@ What remains trusted:
 That split is part of the contract. The boundary should be visible enough that a reader knows where
 the theorem ends and the engineering validation begins.
 
-# Common Failure Modes This Design Avoids
-
-- *Silent CPU fallback.* Build-time CUDA selection and runtime `--device cuda` selection are separate, so a
-  missing native build should fail loudly.
-- *Unstated nondeterminism.* Atomic reductions are called out explicitly, and deterministic
-  reductions are available where reproducibility matters.
-- *Confusing the verifier with the device runtime.* Verification consumes `NN.IR.Graph`; it does not
-  inspect a GPU kernel schedule.
-- *Assuming library calls are proved.* cuBLAS, cuFFT, libdevice, the CUDA compiler, and the driver
-  remain external dependencies unless a future proof or checker discharges a narrower contract.
-- *Collapsing every float32 path into one object.* `IEEE32Exec`, `FP32`, runtime `Float32`, and
-  native CUDA `float` are related by named bridges and assumptions.
-
 # CUDA Validation Checklist
 
 When changing CUDA code, run at least:
@@ -571,12 +531,12 @@ lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda --steps 700 --lr 
 python3 NN/Examples/Data/plot_fno1d_burgers.py --csv data/real/fno/predictions.csv
 ```
 
-# Where To Read Next
+# Regression And Sanitizer Scripts
 
-- *Runtime and Autograd* explains eager and compiled execution.
-- *Floating-Point Semantics* explains `IEEE32Exec`, `FP32`, and the finite path bridge.
-- *FP32 Soundness Notes* explains the CUDA float32 agreement assumptions.
-- *Example Walkthroughs* and *Modern Models and Training* show the public commands.
+```
+scripts/checks/example_regression.sh --cuda
+scripts/checks/cuda_sanitize_tests.sh --all-tools
+```
 
 # References
 

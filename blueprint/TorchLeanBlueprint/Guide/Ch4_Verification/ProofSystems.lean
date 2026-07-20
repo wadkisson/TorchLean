@@ -15,35 +15,6 @@ contracts make common ML failure modes precise. These are different proof system
 the same discipline: name the object, state the relation, and prove or check the relation for the
 supported fragment.
 
-# Comparison With ML Frameworks
-
-PyTorch, JAX, TensorFlow, XLA, TVM, CUDA, Gymnasium, and α,β-CROWN are excellent tools. TorchLean is
-not treating those tools as a problem. The difference is where the mathematical claim is
-stated.
-
-- *PyTorch autograd*: ordinary use relies on the dynamic autograd engine and kernels; TorchLean proves
-  local VJP/JVP laws and then global backprop correctness for a supported tape/graph fragment.
-- *`torch.compile` and graph lowering*: ordinary use relies on compiler passes plus regression tests;
-  TorchLean proves that successful lowering from IR to executable graph preserves denotation for
-  supported ops.
-- *CUDA kernels*: ordinary use relies on native code, vendor libraries, and tests; TorchLean keeps
-  CUDA attached to Lean specs and explicit runtime agreement statements.
-- *α,β-CROWN*: ordinary use relies on external optimization/search or checks solver outputs informally;
-  TorchLean parses or recomputes selected certificate steps and names the remaining oracle boundary.
-- *Gymnasium/RL environments*: ordinary use relies on Python environment records; TorchLean can check
-  emitted transition records against a Lean boundary contract.
-- *Float32 execution*: ordinary use relies on backend arithmetic; TorchLean connects executable
-  binary32 semantics, intervals, and explicit approximation theorems where the bridge is present.
-
-The recurring TorchLean pattern is:
-
-1. name the semantic object;
-2. run or import an artifact;
-3. check the artifact against the semantic object;
-4. prove that the check implies the intended claim;
-5. record native or external pieces as explicit assumptions until a checker or theorem discharges
-   them.
-
 # IRExec Correctness: The Big Compiler Theorem
 
 The theorem to care about first is:
@@ -196,136 +167,6 @@ $$`\left\langle \operatorname{JVP}_G(x;\dot x),\bar y\right\rangle
 Once this is proved locally for primitive nodes and lifted through the graph, reverse mode becomes a
 theorem about the graph denotation rather than only an execution trace.
 
-# Autograd Proofs For Model Blocks
-
-The autograd proof tree is not limited to scalar examples. It also contains theorem entry points
-for selected model families.
-
-Examples:
-
-- The [softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/Softmax.lean) proves the derivative and adjoint
-  identities behind softmax.
-- The [log-softmax derivative API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/FDeriv/LogSoftmax.lean) records the log-softmax
-  derivative account used by stable losses.
-- The [attention proof API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/Models/Attention/) contains attention invariants such as
-  weight normalization and causal mask properties.
-- The [Transformer post-norm API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Transformer/PostNorm.lean) contains
-  post-norm Transformer sublayer VJP theorems and the bridge theorem for two sublayers with post norm
-  blocks.
-- The [Elman cell API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Ops/Recurrent/ElmanCell.lean) gives a
-  recurrent theorem for one cell and explains that full BPTT is the next induction over the unroll.
-
-That last phrase separates proved fragments from open work. A theorem for one cell is not the same
-as a full theorem for a sequence model. A Transformer sublayer theorem is not the same as all of
-GPT-2. TorchLean names those boundaries instead of using one broad "autograd works" phrase for
-everything.
-
-# Runtime Approximation: Real Proofs Are Not Float Proofs
-
-A common mistake in ML verification is to prove something over real numbers and then deploy Float32
-code as if no bridge were needed. TorchLean has a separate runtime approximation tree because we do
-not want to blur that boundary.
-
-The approximation relation is:
-
-$$`runtimeValue \approx_{\varepsilon} specValue`
-
-For tensors, read this as a componentwise or normed error budget:
-
-$$`\left\|\operatorname{toSpec}(y_{\mathrm{runtime}})-y_{\mathrm{spec}}\right\|_\infty
-\le \varepsilon`
-
-Then each op gets a rule for how its error budget propagates. Forward graphs, backward graphs,
-convolutions, reductions, softmax axis rules, and scale aware tolerances all live in this layer.
-
-The [runtime approximation core](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/Core/) defines tolerances and
-spec/runtime approximation relations. The
-[forward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/ForwardApprox.lean) and
-[backward graph approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/BackwardApprox.lean)
-propagate those relations through graph execution. The
-[normal form operator API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Ops.lean),
-[convolution forward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvForward.lean), and
-[convolution backward API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ConvBackward.lean) give the operator
-cases. The [scale approximation API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RuntimeApprox/Scale/) adds absolute and
-relative tolerance tracking, and the
-[FP32 CROWN bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/FP32/CROWN.lean) connects approximation
-budgets to verifier margins.
-
-A deployment statement should separate three facts:
-
-- a theorem over the reals says what the ideal spec does;
-- a runtime approximation theorem says the executable path stays within a tolerance;
-- an FP32 or CUDA boundary says which scalar/kernel assumptions remain.
-
-# Reinforcement Learning: MDPs, PPO, Replay, And Boundaries
-
-Reinforcement learning is another place where the claim matters. Saying "we implemented PPO" is a
-runtime statement. TorchLean also has Lean definitions for transition data, rollout boundaries, and
-MDP facts, so the executable algorithm can be separated from the mathematical claims attached to it.
-
-Runtime side:
-
-- [NN.Runtime.RL.Core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Core.lean) defines transition and rollout data.
-- [NN/Runtime/RL/PPO](https://github.com/lean-dojo/TorchLean/tree/main/NN/Runtime/RL/PPO/) covers PPO rollout collection.
-- [NN/Runtime/RL/PolicyGradient](https://github.com/lean-dojo/TorchLean/tree/main/NN/Runtime/RL/PolicyGradient/) contains policy gradient and
-  PPO objective code.
-- [NN.Runtime.RL.Replay API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Replay.lean) defines replay buffers.
-- [NN/Runtime/RL/Gymnasium](https://github.com/lean-dojo/TorchLean/tree/main/NN/Runtime/RL/Gymnasium/) is the external Python environment
-  boundary.
-
-Proof side:
-
-- [NN.Proofs.RL.MDP API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/MDP.lean) and
-  the [finite stochastic MDP API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/FiniteStochasticMDP.lean) prove monotonicity,
-  contraction, uniqueness, and fixed point/error facts for Bellman operators.
-- [NN.Proofs.RL.Envs.GridWorld API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Envs/GridWorld.lean) proves simple
-  GridWorld transition facts and bridges deterministic successors to finite stochastic MDP rows.
-- [NN.Proofs.RL.Replay API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Replay.lean) proves structural properties of replay
-  buffer push/size behavior.
-- [NN/Proofs/RL/Floats](https://github.com/lean-dojo/TorchLean/tree/main/NN/Proofs/RL/Floats/) connects discounted backups and TD residuals to
-  executable float32 formulas under explicit finiteness checks.
-- [NN.Proofs.RL.Boundary API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Boundary.lean) proves facts about checked boundary
-  contracts.
-
-Compared with ordinary Gymnasium usage, the difference is again the boundary. A Python environment
-can return an observation and reward; TorchLean can additionally check that a transition record has
-the expected shape/action/reward contract before treating it as evidence on a path toward a theorem.
-
-# Generative Models: Objectives, Samplers, And Checked Claims
-
-TorchLean has generative model examples and theory declarations for objectives, schedulers, and
-sampler equations. Image-quality or distributional claims require additional evaluation assumptions,
-but the mathematical pieces used by the models can still be named, inspected, and checked in Lean.
-
-Theory APIs:
-
-- [NN.MLTheory.Generative.Diffusion API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion.lean) collects the
-  diffusion theory API.
-- The [forward Gaussian API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/ForwardGaussian.lean) states that
-  affine forward noising of a standard Gaussian remains Gaussian.
-- The [diffusion samplers API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/Samplers.lean) records boundary and
-  dynamics adapter facts for DDPM/DDIM/probability flow style samplers.
-- The [VAE theory API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/VAE.lean) proves ELBO/KL style structural
-  facts such as nonnegativity of the diagonal Gaussian KL to a standard normal.
-- The [VQ-VAE theory API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/VQVAE.lean) proves nearest code and
-  quantization loss facts.
-- The [GAN theory API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/GAN.lean) records generator/discriminator
-  loss decompositions.
-
-Executable examples:
-
-- [NN.Examples.Models.Generative.Diffusion source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean)
-- [autoencoder example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean)
-- [VAE example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean)
-- [VQ-VAE example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/VqVae.lean)
-- [GAN example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean)
-
-The precise wording is:
-
-> TorchLean can run small generative examples and prove selected objective/sampler facts. The claim is
-> not full generative model quality, distributional convergence, or production sampler correctness for
-> every native kernel.
-
 # Learning Theory: DP, Stability, Robustness
 
 The learning theory pages name definitions that mainstream ML code usually keeps in papers or
@@ -346,82 +187,11 @@ This material is closer to mathematical ML theory than to runtime training. Defi
 "DP is preserved under post processing" or "this Bellman operator is a contraction" belong in the
 theory layer, not buried inside model examples.
 
-# BugZoo: Real Bugs As Checked Contracts
+# Additional Formulas And Snippets
 
-BugZoo is one of the most teachable parts of TorchLean because it connects formal methods to bugs
-ML engineers already recognize.
-
-The [BugZoo API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/) and
-[BugZoo overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/README.md) map each example to real bug families.
-
-- *Attention mask*: causal or future positions receive exactly zero attention weight under hard
-  mask semantics.
-- *KV cache*: appending a key/value makes that key/value the final cache entry.
-- *RoPE position*: appending a decode token assigns the next position, avoiding position mismatch.
-- *Tokenizer boundary*: token ids are `Fin vocabSize`, so out-of-vocabulary ids are not
-  representable in the checked fragment.
-- *Stable loss*: stable losses and safe domains are named instead of relying on backend numerics.
-- *Ignored labels*: ignored labels contribute zero, including the case where all labels are ignored.
-- *Normalization state*: BatchNorm epsilon placement and eval-time running stats become explicit.
-- *Shape and broadcast*: intended axes and broadcasts become named shape operations.
-- *Compiler boundary*: accepted backends must match source semantics.
-- *Float boundary*: runtime Float32 ops are tied to explicit IEEE style semantics.
-
-A concrete comparison with ordinary frameworks is:
-
-- PyTorch usually catches these through tests, bug reports, runtime warnings, and regression suites.
-- TorchLean turns the intended behavior into a small spec or theorem so the failure mode has a
-  stable regression target.
-
-# Widgets: Inspecting Proof Objects
-
-Widgets matter because proof engineering and verifier debugging are much easier when the objects are
-visible.
-
-The [widgets source](https://github.com/lean-dojo/TorchLean/tree/main/NN/Widgets/) gives readable views of proof and runtime artifacts:
-
-- IR graph views show node ids, shapes, op kinds, and execution traces.
-- Runtime autograd widgets show tapes, gradients, and reverse traversal.
-- CROWN widgets show bound propagation and tightness.
-- Float32 widgets show the semantics of executable numeric values.
-- RL widgets show trajectories and PPO/GridWorld artifacts.
-- Training widgets show logs and metric traces.
-
-The rule is:
-
-> A widget is an inspection view for the same Lean object that a theorem or checker may later
-> consume.
-
-Widgets belong in the proof layer because they are the human interface to artifacts that would
-otherwise be unreadable arrays, graph contexts, or certificate JSON.
-
-# Model Examples: Runtime Breadth, Not Theorem Overclaiming
-
-The model examples show breadth:
-
-- MLP, CNN, ViT, plus residual/ResNet block specs;
-- RNN, LSTM, Transformer, GPT examples, Mamba;
-- diffusion, VAE, VQ-VAE, GAN;
-- FNO/Burgers operator learning;
-- DQN and PPO examples.
-
-Not every model has a full correctness theorem. The examples share the same API, runtime, graph,
-CUDA, data, and verification boundaries as the theorem files. That bridge matters: the formal
-abstractions are tested against realistic ML shapes instead of living only in small proof snippets.
-
-# Where To Go Next
-
-The detailed follow-up chapters cover the major proof layers:
-
-- *Graphs and IR* covers IRExec correctness and the compiled graph theorem.
-- *Autograd Proofs* follows local VJP laws up to `backpropVec_eq_adjoint_fderiv`.
-- *Runtime Approximation* explains tolerance propagation and finite precision assumptions.
-- *Reinforcement Learning Stack* covers MDP proofs, PPO runtime objects, Gymnasium boundaries, and
-  float32 diagnostics.
-- *Generative Models* explains diffusion, VAE, VQ-VAE, GAN, and sampler facts.
-- *Learning Theory* covers differential privacy, stability, robustness, and ridge regression.
-- *BugZoo Catalog* gives the real bug case studies and their checked TorchLean boundaries.
-- widget documentation that pairs each widget with the Lean object it visualizes.
+$$`\operatorname{Graph.denote}(g,payload,input)
+=
+\operatorname{evalForward}(p,params,input)`
 
 # References
 

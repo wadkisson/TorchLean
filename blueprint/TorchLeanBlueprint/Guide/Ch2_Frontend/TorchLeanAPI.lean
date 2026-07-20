@@ -32,28 +32,6 @@ modules so that TorchLean itself can be developed without import cycles, but app
 not need to know that internal layout. Direct imports such as `NN.Spec`, `NN.Runtime`, and
 `NN.Proofs` are available for files devoted to one subsystem.
 
-# What Counts As An API Claim
-
-TorchLean distinguishes four kinds of claims.
-
-First, a *Lean snippet* is code meant to elaborate as Lean code when pasted into a file with the
-right imports. Application examples usually start with `import NN.API` and `open TorchLean`.
-
-Second, a *runtime check* is an executable run: a training script, a data loader, a parity check, or
-a CUDA smoke test. It is evidence about the implementation on the inputs that were run.
-
-Third, a *certificate check* is a Lean program that validates a finite artifact such as a verifier
-certificate. It is stronger than a printout, but its scope is exactly the checker and artifact
-format that were used.
-
-Fourth, a *theorem* is a Lean declaration proved in the proof layer. The theorem statement says
-which semantics, scalar domain, graph fragment, and hypotheses are covered. A theorem about a Lean
-graph evaluator is not automatically a theorem about a native CUDA kernel unless the bridge theorem
-or trust boundary says so.
-
-The public API lets these claims line up without conflating them. A model can train, lower to a
-graph, produce an artifact, and appear in a theorem statement.
-
 # The First Line Of A Tutorial
 
 The shortest setup is:
@@ -408,15 +386,6 @@ complete umbrella.
 
 GraphSpec is TorchLean's typed architecture DSL. It connects architecture descriptions to runtime
 model examples and can be inspected with `lake exe torchlean graphspec`.
-
-# How The Pieces Fit Together
-
-The public constructors, runtime objects, specifications, and proofs are separate declarations, but
-they refer to the same model structures and operator names. This lets application code remain short
-while proof and backend files state exactly which semantics they use.
-
-Read *Training From Scratch* for the first full training file, *Example Walkthroughs* for curated
-commands, and *PyTorch Round Trip* then *TorchLean vs PyTorch* for interop.
 
 # References
 

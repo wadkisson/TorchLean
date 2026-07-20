@@ -24,31 +24,6 @@ We encourage readers to come here after the autograd proof layer. The autograd t
 the ideal forward and backward maps mean; here we explain how far an executable or rounded path
 may differ from that ideal, and how we keep that difference explicit.
 
-# Why Real Proofs Are Not Float Proofs
-
-It is tempting to prove a property over real numbers and then deploy float32 code with the same
-sentence in mind. TorchLean does not allow that step to be implicit: a real valued safety theorem
-does not become a float32 safety theorem unless there is a bridge theorem that relates the runtime
-path to the real specification.
-
-That implication is not free. It needs a bridge theorem. Rounding, cancellation, overflow,
-different reduction orders, fused kernels, and domain guards can all change the behavior. A
-mathematical softmax is smooth; an implementation may use max-subtraction, exponent approximations,
-finite accumulators, and library calls specific to a backend. A real convolution is a sum; a GPU
-convolution may choose a different accumulation order or fused algorithm.
-
-TorchLean's answer is to name the bridge:
-
-1. prove the claim over the reals or over the spec;
-2. prove an approximation relation between runtime tensors and spec tensors;
-3. inflate margins, enclosures, or certificates by the approximation budget;
-4. leave native hardware assumptions explicit when they are outside Lean.
-
-This matches standard numerical analysis practice; see Higham's *Accuracy and Stability of
-Numerical Algorithms* (https://epubs.siam.org/doi/book/10.1137/1.9780898718027) for the classical
-background. It also matches the caution needed in neural network verification, where a tiny
-rounding gap can matter if the verified margin is tiny.
-
 # The Core Relation: Spec Tensors And Tolerances
 
 The small vocabulary is defined by
@@ -381,3 +356,4 @@ and any finite or runtime assumptions that remain outside the theorem.
 
 When the approximation theorem is present, the bridge is proved. When it is not present, the claim
 should say which runtime path or external producer supplies the remaining evidence.
+

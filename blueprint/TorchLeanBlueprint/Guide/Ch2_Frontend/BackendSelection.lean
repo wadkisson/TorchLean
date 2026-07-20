@@ -72,8 +72,65 @@ with the backend. The planner may select it only when the requested device, prov
 gradient mode, and trust policy allow it. This makes an unsupported path a planning error rather
 than an accidental change of semantics.
 
-The complete installation and platform guide includes a
-[worked capsule example](https://lean-dojo.github.io/TorchLean/installation/#what-a-kernel-capsule-looks-like).
+A concrete fused-attention capsule looks like this:
+
+```
+def nativeFlashAttention : KernelCapsule :=
+  { name := "native_cuda.flash_attention"
+    op := .scaledDotProductAttention
+    provider := .nativeCuda
+    device := .cuda
+    specName := "Spec.flashAttention"
+    trustLevel := .checked
+    supportsForward := true
+    vjpMode := .backendVJP
+    shapeContract := ...
+    layoutContract := ...
+    valueContract := ...
+    vjpContract := ... }
+```
+
+Each contract field is a structured claim. For example, the layout field can state:
+
+```
+{ claim := .layoutCompatibility .scaledDotProductAttention .flatRowMajor
+  summary := "Q, K, V, mask, and output use contiguous row-major buffers"
+  evidence := .runtimeGuard "Runtime.Autograd.Cuda.Tape.flashAttention" }
+```
+
+The claim says what must hold; the evidence says why the current profile is willing to use that
+implementation. A runtime guard or regression suite remains a guard or test—it is not promoted to a
+theorem by placing it in the record.
+
+:::table
+*
+ * Field
+ * Question it answers
+*
+ * `op`
+ * Which graph operation does this implementation claim to execute?
+*
+ * `provider`, `device`
+ * Which runtime family and hardware target may select it?
+*
+ * `specName`
+ * Which Lean-level meaning is it expected to refine?
+*
+ * shape and layout contracts
+ * Which dimensions, memory order, mask convention, and payload assumptions are required?
+*
+ * value contract
+ * What supports the forward-value claim?
+*
+ * VJP mode and contract
+ * Who computes the local gradient, and what supports that claim?
+*
+ * runtime support
+ * Is the path executable, test-only, planner-only, or not wired yet?
+*
+ * trust level
+ * Is the evidence proof-backed, checked, fuzzed, or an external assumption?
+:::
 
 # Evidence Is Not A Label
 
@@ -233,29 +290,71 @@ Unsupported devices and providers should fail with a readable message. Silent CP
 acceptable when the user requested an accelerator, because it makes benchmark and deployment claims
 ambiguous.
 
-# Reading Backend Claims
+# Maintained Profiles
 
-These statements have different strengths:
+:::table
+*
+ * Profile
+ * Forward provider
+ * Backward ownership
+ * Current status
+*
+ * `checked_cpu`
+ * Reference CPU runtime
+ * TorchLean tape
+ * Implemented
+*
+ * `checked_cuda`
+ * Native CUDA, cuBLAS, cuFFT
+ * TorchLean tape or named backend VJP
+ * Implemented
+*
+ * `libtorch_forward_cuda`
+ * Selected LibTorch forward capsules
+ * TorchLean tape
+ * Registered selectively; not a universal dispatcher
+*
+ * `libtorch_autograd_cuda`
+ * Selected LibTorch capsules
+ * External autograd
+ * Explicit larger trust boundary
+*
+ * `future_*`
+ * Metal, ROCm, WebGPU, XLA, Neuron, custom providers
+ * Provider-specific
+ * Extension targets, not implemented runtimes
+:::
 
-- "the example ran on CUDA" reports an execution path;
-- "CUDA matched the CPU reference on this test suite" reports finite parity evidence;
-- "the fused attention spec equals standard attention" cites a Lean semantic theorem;
-- "the native attention kernel implements the fused spec" requires a native refinement argument;
-- "the LibTorch result is correct" depends on the explicitly named LibTorch boundary unless a
-  stronger checker or theorem covers it.
+The default CUDA profile does not silently choose LibTorch. LibTorch SDPA remains `testOnly` until
+its capsule is connected to eager multi-head attention. External providers must be enabled
+explicitly and remain visible in the backend report.
 
-A backend report is useful because it records the selected provider and evidence. It should be
-published beside benchmark results, but it should never be described as if every evidence row were
-already a proof.
+Lean definitions live under `NN.Backend.Capsule`, `NN.Backend.Profile`, and `NN.Backend.Gate`.
+
+# Adding Another Platform
+
+Metal, ROCm, WebGPU/WASM, TPU/XLA, Trainium/Neuron, custom chips, and caller-supplied accelerators
+use the same extension points:
+
+1. add the device and provider vocabulary;
+2. detect build and runtime availability honestly;
+3. register capsules only for the operations the provider implements;
+4. connect the selected capsules to executable runtime dispatch;
+5. supply shape, layout, value, and VJP evidence at the right trust level;
+6. add platform CI and parity tests before calling the target supported.
+
+Until those pieces exist, target selection fails. Asking for Metal or TPU must never become an
+unreported CPU run.
+
+Platform build commands (Elan, apt, WSL, LibTorch paths) stay on the Installation page.
 
 # Where To Continue
 
 Read [Execution Modes and Runners](Runtime___-Autograd___-and-Interop/Execution-Modes-and-Runners/)
 for the public runtime API. Read
 [GPU and CUDA Boundaries](Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/)
-for the native implementation details. The
-[Installation page](https://lean-dojo.github.io/TorchLean/installation/) lists platform commands and
-the profiles currently wired into the repository.
+for the native implementation details. The Installation page lists platform build commands. Profiles and capsules are documented in this
+chapter.
 
 # References
 

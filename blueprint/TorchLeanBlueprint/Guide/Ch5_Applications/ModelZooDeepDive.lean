@@ -27,49 +27,6 @@ Read each model along five axes:
 - *Verification*: does the example point to a spec, theorem, checker, or explicit producer
   assumption?
 
-# Model Families And Stress Tests
-
-Most examples are dispatched by [NN.Examples.Models.Runner source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean):
-
-```
-lake exe torchlean <example> [flags...]
-```
-
-That runner dispatches to model files that own their data path, model constructor, optimizer, logs,
-and caveats. When the docs say "run `gpt2`", the code path is not hidden in a script; it ends in a
-namespaced Lean `main`.
-
-The examples are organized by stressor:
-
-- *MLP, KAN, CNN*: baseline supervised training stresses parameters, optimizers, data loaders,
-  edge-basis layers, and image tensors.
-- *GPT-2 style and CharGPT*: causal language model commands stress causal windows, tokenization,
-  generation probes, save/load, and logs.
-- *Mamba*: the selective scan example stresses sequence modeling without attention, recurrent state,
-  and CUDA paths for selective scan.
-- *RNN/LSTM/GRU style recurrence*: recurrent text and forecasting examples stress recurrent state,
-  gated cells, short text windows, and forecasting data.
-- *Residual/ResNet specs*: residual blocks stress skip wiring, convolution shape facts, and graph
-  shape discipline. The runnable vision commands currently stay with CNN and ViT.
-- *ViT*: the patch-token vision transformer stresses image patches, token sequences, and attention
-  blocks.
-- *FNO*: the Burgers operator learning example stresses scientific data, spectral kernels, and a CUDA
-  primitive backed by cuFFT.
-- *Diffusion and latent generators*: the generative examples stress stochastic schedules,
-  reconstruction targets, and generator/discriminator losses.
-- *RL examples*: PPO and replay examples stress trajectories, environment boundaries, replay, and
-  policy/value losses.
-
-There is no separate GRU command in the runner. GRU still appears here as
-part of the gated recurrent design space: TorchLean's present runnable recurrent coverage is RNN,
-LSTM, and LSTM forecasting; a future GRU example would stress the same typed recurrent state and
-runtime loop boundary with a smaller gate set.
-
-The common model example contract is that an example should make the data boundary, model, loss, optimizer,
-and logs visible. It does not need to be large to be valuable.
-It needs to make clear what was run, what data entered, what state changed, and which semantic
-contract the example points back to.
-
 # Baselines That Still Matter
 
 The MLP, KAN, and CNN examples are not just warmups. They are where the public training API proves
@@ -452,25 +409,88 @@ lake -R -K cuda=true exe torchlean ppo_pong_ram --device cuda --updates 1 \
 This example is useful because the observation boundary is larger but still inspectable: a fixed RAM
 vector crosses from Gymnasium/ALE into typed TorchLean rollout data.
 
-# API, Runtime, Graph, CUDA, Verification
+# Additional Formulas And Snippets
 
-The model examples are best read as five overlapping tests:
+```
+lake -R -K cuda=true build
+lake -R -K cuda=true exe torchlean mlp --device cuda --steps 20
+```
 
-- *API*: can modern models be expressed as typed Lean constructors rather than opaque Python
-  modules?
-- *Runtime*: can eager autograd, optimizers, logs, save/load paths, and data loaders run end to end?
-- *Graph*: can branchy, tokenized, recurrent, and spectral programs be lowered or related to shared
-  graph concepts when needed?
-- *CUDA*: can GPU execution accelerate examples without changing their public model shape?
-- *Verification*: can examples point to specs used by theorems and make any remaining producer or
-  runtime assumptions explicit?
+# From Application Walkthroughs
 
-The answer is layered. MLP, KAN, CNN, ViT, GPT, Mamba, FNO, diffusion, and RL commands exercise
-real runtime APIs. ResNet is currently an API/spec and GraphSpec example rather than a `torchlean`
-command. Some model families also have dedicated spec or theory declarations with citeable theorem
-names. Not every command has full verification. Not every CUDA kernel has a fully proved
-equivalence to a high level spec. Not every external data source is trusted.
+```
+lake build
+lake exe torchlean quickstart_mlp --device cpu --steps 10 --dtype float32 --backend eager
+lake exe verify -- torchlean-ibp
+lake exe torchlean --help
+lake exe verify --help
+lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+python3 scripts/datasets/download_example_data.py --cifar10
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
+python3 scripts/datasets/download_example_data.py --tiny-shakespeare
+lake -R -K cuda=true exe torchlean text_gpt2 --device cuda \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
+lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare --steps 1 --windows 1 --generate 0
+lake -R -K cuda=true exe torchlean mamba --device cuda --tiny-shakespeare \
+lake exe verify -- torchlean-ibp --dtype float
+lake exe verify -- torchlean-crown-ops --dtype float
+lake exe verify -- torchlean-robustness --dtype float
+lake exe verify -- torchlean-mlp-workflow
+lake exe verify -- digits-train-certify --epochs=50 --eps=0.02 --max=100
+lake exe verify -- margin-cert
+lake exe verify -- vnncomp-mnistfc
+lake exe verify -- camera-box3d-cert
+lake exe verify -- abcrown-leaf
+lake exe verify -- lirpa-mlp
+lake exe verify -- lirpa-cnn
+lake exe verify -- lirpa-attention
+lake exe verify -- lirpa-gru
+lake exe verify -- lirpa-encoder
+lake exe verify -- all
+lake exe verify -- abcrown-leaf \
+python3 NN/Examples/Data/prepare_fno1d_burgers.py \
+lake -R -K cuda=true exe torchlean fno1d_burgers \
+python3 NN/Examples/Data/plot_fno1d_burgers.py \
+python3 scripts/verification/regenerate_assets.py --group pinn-small --run
+lake exe verify -- pinn-cert
+lake exe verify -- pinn-cli -- "u_t + u*u_x - 0.01*u_xx" 0.0 0.5 0.01
+lake exe verify -- pinn-dataset-check
+python3 scripts/verification/pinn/train_pinn_1d.py \
+python3 scripts/verification/regenerate_assets.py --group geometry3d-wilddet3d --run
+```
 
-That layered view is a feature of the example suite. Readers can see where TorchLean is already a proof
-artifact, where it is a runnable ML artifact, and where the bridge between those two worlds is still
-being strengthened.
+```
+def vocab : Nat := text.Tokenizer.byte.vocabSize
+```
+
+```
+abbrev σ : Shape := shape![batch, seqLen, vocab]
+abbrev τ : Shape := σ
+```
+
+```
+def mkSampleFromTokenIds (toks : List Nat) : SupervisedSample Float σ τ :=
+  Data.causalLmOneHotSample (α := Float) batch seqLen vocab toks (padId := 32)
+```
+
+```
+abbrev σ : Shape := nn.models.mambaTokenMat cfg seqLen
+abbrev τ : Shape := nn.models.mambaLogitMat cfg seqLen
+
+def model : nn.M (nn.Sequential σ τ) :=
+  nn.models.MambaTextLM cfg seqLen
+```
+
+```
+nn.causalTransformerFromEmbeddings
+nn.causalTransformerOneHot
+nn.causalTransformerTokenScalarModuleDef
+```
+
+```
+let trainer := Trainer.new model <|
+  Trainer.Config.fromRunConfig run (.crossEntropy)
+let trained ← trainer.train data train.options probes
+trained.printSummary
+```
+

@@ -303,30 +303,6 @@ well formed and still fail evaluation if a `.const`, `.linear`, or `.conv2d` nod
 payload. That failure is local: the error is attached to a node id rather than becoming a silent
 mismatch between the model and the verifier input.
 
-# Denotation In Plain Terms
-
-The [IR semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Semantics.lean) centers on two functions:
-
-- `Graph.denoteAll` evaluates the whole graph and returns a table of dynamic values
-  (`DVal α := Σ s, Tensor α s`).
-- `Graph.denote` evaluates the graph and returns the dynamic value at `outputId`.
-
-Two practical notes:
-
-- evaluation returns `Except String ...` (so missing payloads and shape errors are explicit),
-- and the evaluator performs `checkWellFormed` up front (fast path for compiler-produced graphs).
-
-Informally, this is the compiler-output theorem shape:
-
-$$`\operatorname{denoteAll}(g,payload,input)
-= \text{the table whose entry } i \text{ is the denotation of node } i`
-
-and the rewrite theorem shape:
-
-$$`\operatorname{denote}(g,payload,input,outId)
-=
-\operatorname{denote}(\operatorname{rewrite}(g),payload,input,outId)`
-
 # Why This IR Is Shared
 
 Once the object of interest is a denotation of a symbolic DAG defined in Lean, the three major
@@ -397,33 +373,6 @@ Start from the [IR graph API](https://github.com/lean-dojo/TorchLean/blob/main/N
 [IR checking API](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Check.lean). Those three
 files give enough context for the rest of the verification path.
 
-# What Can Go Wrong
-
-Most graph bugs fall into one of a few categories:
-
-- a parent id points forward or outside the graph,
-- an opcode has the wrong number of parents,
-- a declared shape disagrees with the inferred shape,
-- a parameterized node has no payload,
-- a verifier pass supports the opcode only under additional assumptions.
-
-TorchLean tries to make these failures local. Instead of discovering a bad certificate at the end of
-a long verification run, the IR checks should identify the first malformed node or missing payload.
-Node ids, shapes, and payloads keep returning throughout the graph material because they are the
-diagnostic coordinates of this layer.
-
-# Verification Reuses The Same Graph
-
-Verification does *not* define a second graph type. It reuses `NN.IR.Graph` and adds per node
-bound state.
-
-The [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean) does not introduce a second graph
-language. Instead, it takes `NN.IR.Graph` as given and layers verification state on top of it:
-interval boxes, affine forms, parameter stores, propagation state, and the passes that compute them.
-
-The IR needs named operations because verification passes cannot be generic over an arbitrary
-runtime trace.
-
 # Runtime Graphs Have A Different Job
 
 Runtime graphs are designed around *execution*, so their shape is different from the verifier IR.
@@ -466,62 +415,6 @@ for comparing compiled graphs with the IR semantics (`NN.IR.Graph.denote`).
 GraphSpec is the typed architecture layer. `NN.IR.Graph` is the lower shared IR used by
 runtime compilation and verification. The compiler connects those levels while preserving a single
 denotation for verification.
-
-# The Compiler Proof Fragment
-
-The semantics alignment theorem people usually want to cite is:
-
-> evaluating the compiled IR graph equals evaluating the TorchLean forward model.
-
-For the full public TorchLean embedding (`Runtime.Autograd.TorchLean.Program`), this is a big
-theorem because that embedding is higher order and tagless final.
-
-Rather than forcing the public API to become an AST, TorchLean takes an additive path:
-a first-order forward fragment is introduced whose compiler correctness can be proved inside Lean,
-and coverage grows op by op.
-
-The [compiler proof fragment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/Proved.lean) defines a
-first-order SSA/DAG language (`FGraph`) with typed indices (`Idx`) into the current context. It
-provides a spec evaluator `evalForward`, a compiler `compileForward` into `NN.IR.Graph` plus
-`ParamStore`, and structural lemmas saying the compiled graph is well formed.
-
-The main semantic theorem for the fragment is:
-
-```
-runForwardIR (compileForward p params) x = evalForward p params x
-```
-
-The informal correctness statement is simple:
-
-For the proved forward fragment, the compiler preserves denotation:
-
-- take a forward program `p` (in the fragment),
-- compile it to IR (`compileForward p params = (g, payload)`),
-- then evaluating the IR graph under the IR semantics equals evaluating the fragment directly:
-
-$$`\operatorname{Graph.denote}(g,payload,input)
-=
-\operatorname{evalForward}(p,params,input)`
-
-(with the required typing and shape conditions, which are also proved).
-
-Why this matters, from an ML and verification point of view:
-
-- For the proved fragment, it eliminates the "verified the wrong graph" failure mode: proofs and
-  certificates attach to the same denotation as execution.
-- It makes the trust boundary explicit: if the only remaining gap is "runtime backend matches the IR evaluator",
-  it's a narrow, auditable assumption.
-- It scales: once the theorem exists for a fragment, coverage extends by adding one op at a time (plus its local lemma).
-
-# Longer Term Direction
-
-The long-term direction is to make the IR bridge broader: more public programs should be lowerable
-to `NN.IR.Graph`, and more runtime paths should come with direct semantic alignment theorems. The
-repository takes an incremental route: prove a first-order forward fragment, then extend coverage
-operator by operator.
-
-Next: *Verification* (TorchLean to IR to bounds), *Floating-Point Semantics* (which scalar backend
-the verifier uses), *Widgets* (infoview inspection of graphs and bounds).
 
 # References
 

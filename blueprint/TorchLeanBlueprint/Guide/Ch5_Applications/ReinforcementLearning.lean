@@ -377,34 +377,3 @@ The widgets are useful because RL output is otherwise hard to audit. A scalar re
 bad episode termination, malformed observations, or a mistaken action convention. Boundary and
 rollout views make those intermediate objects visible.
 
-# Interpreting A TorchLean RL Claim
-
-When an RL example succeeds, we try to be precise and fair about the claim:
-
-- The executable ran the PPO/autograd program and produced artifacts.
-- The rollout boundary checked shapes, actions, finite values, and configured ranges.
-- If the environment is defined in Lean, its MDP semantics can be used directly by proofs.
-- If the environment is Gymnasium/ALE, the external dynamics remain a named producer assumption.
-- Checked float32 helpers can connect selected scalar recurrences to `IEEE32Exec` and FP32-style
-  semantics with rounding after each primitive.
-- MDP and replay proofs certify specific structural or dynamic programming facts, not global PPO
-  convergence.
-
-It is less flashy than "verified RL," but it is more honest. Each claim can be
-upgraded independently: prove more about GridWorld, add stronger Gymnasium contracts, extend
-checked PPO numerics, or connect a larger algorithm theorem to the same runtime objects.
-
-# What Is Not Claimed
-
-TorchLean's current RL layer should not be read as a proof that PPO converges, that Gymnasium's
-implementation is correct, or that native CUDA kernels are proved equivalent to every scalar helper.
-The current support is layered:
-
-- executable PPO and DQN-shaped paths;
-- transition-boundary checks for external environments;
-- typed rollout and replay objects;
-- checked float32 scalar recurrences for selected formulas;
-- MDP, environment, and replay-buffer theorems over named Lean objects.
-
-That is already useful. It lets readers see exactly where a later proof would attach, and exactly
-which external producer assumptions remain.
