@@ -92,6 +92,8 @@ inductive FloatInit where
   | ones
   /-- Uniform distribution over `[lo, hi)`, using TorchLean's deterministic runtime RNG. -/
   | uniform (lo hi : Float) (seed : Nat := 0)
+  /-- Normal distribution with explicit mean and standard deviation. -/
+  | normal (mean std : Float) (seed : Nat := 0)
   /-- Xavier/Glorot uniform with explicit fan-in and fan-out. -/
   | xavierUniform (fanIn fanOut : Nat) (seed : Nat := 0)
   /-- Kaiming/He uniform with explicit fan-in. -/
@@ -105,6 +107,7 @@ def FloatInit.ofScheme (scheme : Torch.Init.Scheme) (seed : Nat := 0) : FloatIni
   | .zeros => .zeros
   | .ones => .ones
   | .uniform lo hi => .uniform lo hi seed
+  | .normal mean std => .normal mean std seed
   | .xavierUniform fanIn fanOut => .xavierUniform fanIn fanOut seed
   | .kaimingUniform fanIn => .kaimingUniform fanIn seed
 
@@ -225,6 +228,8 @@ def sampleAt : FloatInit → Nat → Float
   | .zeros, _ => 0.0
   | .ones, _ => 1.0
   | .uniform lo hi seed, idx => lo + unitAt seed idx * (hi - lo)
+  | .normal mean std seed, idx =>
+      Torch.Init.Internal.sampleAt (.normal mean std) seed idx
   | .xavierUniform fanIn fanOut seed, idx =>
       let denom := Float.ofNat fanIn + Float.ofNat fanOut
       let limit := Float.sqrt (6.0 / denom)
@@ -292,6 +297,9 @@ def cudaBufferOf (n : Nat) (init : FloatInit) : IO _root_.Runtime.Autograd.Cuda.
   | .ones => pure <| _root_.Runtime.Autograd.Cuda.Buffer.full n32 1.0
   | .uniform lo hi seed =>
       cudaUniformBuffer n lo hi seed
+  | .normal mean std seed =>
+      let key := _root_.Runtime.Autograd.TorchLean.Random.keyOf seed 0
+      pure <| _root_.Runtime.Autograd.Cuda.Buffer.randNormal n32 mean std key
   | .xavierUniform fanIn fanOut seed =>
       let denom := Float.ofNat fanIn + Float.ofNat fanOut
       let limit := Float.sqrt (6.0 / denom)
@@ -524,6 +532,41 @@ def meanLoss {α : Type} [Context α] [DecidableEq Shape] [ToString α]
 end ScalarModule
 
 namespace ScalarModuleDef
+
+/--
+Evaluate a scalar module definition against an existing live parameter list.
+
+This is useful when two definitions share the same parameter layout but differ in execution mode,
+for example training and evaluation losses for a model containing dropout. Parameters remain in
+their current backend storage; the alternate definition only supplies the scalar program.
+-/
+def forwardWithParams
+    {α : Type} [Context α] [DecidableEq Shape]
+    [tensorConv : _root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
+    {paramShapes inputShapes : List Shape}
+    (d : ScalarModuleDef paramShapes inputShapes)
+    (opts : Torch.Options)
+    (params : Torch.ParamList α paramShapes)
+    (xs : Torch.TList α inputShapes) : IO (Tensor α Shape.scalar) := do
+  let opts := { opts with trackGradients := false }
+  let sess ← Torch.Internal.EagerSession.new (α := α) opts
+  sess.resetTape
+  let outRef ← (do
+    let pRefs ← Torch.Internal.useParams (α := α) (ss := paramShapes) params
+    let xRefs ← Torch.Internal.useInputs (α := α) (ss := inputShapes) xs
+    let allRefs := Torch.RefList.append
+      (ss₁ := paramShapes) (ss₂ := inputShapes) pRefs xRefs
+    Torch.CurriedRef.uncurry
+      (ss := paramShapes ++ inputShapes)
+      (d.loss (α := α)) allRefs) |>.run sess
+  let result ← Torch.Internal.EagerSession.getValue (α := α) sess outRef
+  if opts.usesCuda then
+    Torch.Internal.EagerSession.releaseCudaTapeNonParamValues sess
+    sess.cudaTape.set _root_.Runtime.Autograd.Cuda.Tape.empty
+    sess.paramsByLeaf.set (Std.HashMap.emptyWithCapacity)
+    sess.nats.set #[]
+    Torch.Internal.EagerSession.collectCudaAllocator
+  pure result
 
 /--
 Instantiate a `ScalarModuleDef` by casting Float initializers to `α` and choosing Torch options.

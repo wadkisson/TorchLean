@@ -326,6 +326,25 @@ def multiHeadAttention {α : Type} [Context α] [DecidableEq Shape]
         (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim)
         h1 wq wk wv wo xRow (mask := mask))
 
+/-- Multi-head attention followed by a trainable bias on the output feature axis. -/
+def multiHeadAttentionOutputBias {α : Type} [Context α] [DecidableEq Shape]
+    {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]
+    {batch n numHeads dModel headDim : Nat} (h1 : n ≠ 0)
+    (wq : RefTy (m := m) (α := α) (.dim dModel (.dim (numHeads * headDim) .scalar)))
+    (wk : RefTy (m := m) (α := α) (.dim dModel (.dim (numHeads * headDim) .scalar)))
+    (wv : RefTy (m := m) (α := α) (.dim dModel (.dim (numHeads * headDim) .scalar)))
+    (wo : RefTy (m := m) (α := α) (.dim (numHeads * headDim) (.dim dModel .scalar)))
+    (bo : RefTy (m := m) (α := α) (.dim dModel .scalar))
+    (x : RefTy (m := m) (α := α) (.dim batch (.dim n (.dim dModel .scalar))))
+    (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none) :
+    m (RefTy (m := m) (α := α) (.dim batch (.dim n (.dim dModel .scalar)))) := do
+  let y ← multiHeadAttention (m := m) (α := α) h1 wq wk wv wo x mask
+  let boFull ← _root_.Runtime.Autograd.Torch.broadcastTo (m := m) (α := α)
+    (s₁ := .dim dModel .scalar) (s₂ := .dim batch (.dim n (.dim dModel .scalar)))
+    Shape.BroadcastTo.proof bo
+  _root_.Runtime.Autograd.Torch.add (m := m) (α := α)
+    (s := .dim batch (.dim n (.dim dModel .scalar))) y boFull
+
 /-- Flatten everything except the leading batch axis: `(N × s) → (N × (size s))`. -/
 def flattenKeep0 {α : Type} [Context α] [DecidableEq Shape]
     {m : Type → Type} [Monad m] [Ops (m := m) (α := α)]

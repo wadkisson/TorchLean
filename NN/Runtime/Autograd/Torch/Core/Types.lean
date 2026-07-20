@@ -91,14 +91,14 @@ structure Options where
   backward, not whether forward execution is allowed to allocate intermediate values.
   -/
   trackGradients : Bool := true
-  /-- Explicit eager execution device. The CLI resolves `auto` before constructing this record. -/
-  device : NN.Backend.Device := .cpu
   /--
-  Optional backend-contract profile selected by higher-level helpers.
+  Backend-contract profile selected for this run.
 
-  If omitted, `Options.backendProfile` derives a conservative profile from `device`.
+  Device, provider preference, assurance policy, VJP ownership, target availability, and capsule
+  modules travel together in this value. Keeping one profile avoids inconsistent combinations such
+  as a CUDA device paired with a CPU capsule catalog.
   -/
-  backendProfile? : Option NN.Backend.BackendProfile := none
+  executionProfile : NN.Backend.BackendProfile := NN.Backend.BackendProfile.checkedCpu
   /-- Print each accepted backend capsule the first time an eager session executes it. -/
   showBackend : Bool := false
 deriving Repr
@@ -106,29 +106,35 @@ deriving Repr
 /- Convenience API for PyTorch-style device selection. -/
 namespace Options
 
-/-- Return a copy of the options that selects the requested execution device. -/
-def toDevice (opts : Options) (device : NN.Backend.Device) : Options :=
-  { opts with device, backendProfile? := none }
+/-- Device selected by the effective execution profile. -/
+def device (opts : Options) : NN.Backend.Device :=
+  opts.executionProfile.config.device
 
-/-- Whether the current eager runtime implements an explicit backend device. -/
-def runtimeImplementsDevice : NN.Backend.Device → Bool
-  | .cpu | .cuda => true
-  | .rocm | .metal | .wasm | .tpu | .trainium | .custom | .external => false
+/-- Select a maintained execution device or explain that it needs a caller-supplied profile. -/
+def toDevice (opts : Options) (device : NN.Backend.Device) : Except String Options := do
+  match NN.Backend.BackendProfile.maintainedForDevice? device with
+  | some profile => pure { opts with executionProfile := profile }
+  | none =>
+      throw s!"device `{device.cliName}` has no maintained runtime profile; provide a backend profile with executable capsules"
 
-/-- Explain why an explicit backend target cannot execute in the current eager runtime. -/
-def unsupportedDeviceMessage (device : NN.Backend.Device) : String :=
-  s!"device `{device.cliName}` is a named TorchLean target, but this runtime build only implements cpu and cuda execution"
+/-- Select a complete backend profile, including its device and contract policy. -/
+def withBackendProfile (opts : Options) (profile : NN.Backend.BackendProfile) : Options :=
+  { opts with executionProfile := profile }
+
+/-- Explain why a profile has no implementation catalog for its selected device. -/
+def unsupportedProfileMessage (profile : NN.Backend.BackendProfile) : String :=
+  s!"backend profile `{profile.name}` has no capsule for device `{profile.config.device.cliName}`"
 
 /-- Whether the effective runtime device is CUDA. -/
 def usesCuda (opts : Options) : Bool :=
   opts.device == .cuda
 
-/-- Reject devices that are named for planning but not implemented by the eager runtime yet. -/
+/-- Reject profiles with no registered capsule for their selected device. -/
 def validateDevice (opts : Options) : Except String Unit :=
-  if runtimeImplementsDevice opts.device then
+  if opts.executionProfile.hasDeviceCapsule then
     pure ()
   else
-    throw <| unsupportedDeviceMessage opts.device
+    throw <| unsupportedProfileMessage opts.executionProfile
 
 /-- Validate both the named device and the linked native runtime before executing user code. -/
 def validateForExecution (opts : Options) : IO Unit := do
@@ -142,24 +148,9 @@ def validateForExecution (opts : Options) : IO Unit := do
 def deviceName (opts : Options) : String :=
   opts.device.cliName
 
-/-- Conservative backend-contract profile implied by the selected runtime device. -/
-def defaultBackendProfile (opts : Options) : NN.Backend.BackendProfile :=
-  match opts.device with
-  | .cpu => NN.Backend.BackendProfile.checkedCpu
-  | .cuda => NN.Backend.BackendProfile.checkedCuda
-  | .rocm => NN.Backend.BackendProfile.futureRocm
-  | .metal => NN.Backend.BackendProfile.futureMetal
-  | .wasm => NN.Backend.BackendProfile.futureWasm
-  | .tpu => NN.Backend.BackendProfile.futureTpu
-  | .trainium => NN.Backend.BackendProfile.futureTrainium
-  | .custom => NN.Backend.BackendProfile.futureCustomChip
-  | .external => NN.Backend.BackendProfile.futureExternal
-
 /-- Backend-contract profile attached to this runtime options record. -/
 def backendProfile (opts : Options) : NN.Backend.BackendProfile :=
-  let profile := match opts.backendProfile? with
-  | some p => p
-  | none => opts.defaultBackendProfile
+  let profile := opts.executionProfile
   if opts.trackGradients then
     profile
   else
@@ -167,21 +158,16 @@ def backendProfile (opts : Options) : NN.Backend.BackendProfile :=
 
 /-- Select a backend capsule for one operation under this options record. -/
 def planBackendOp (opts : Options) (op : NN.Backend.BackendOp) :
-    Except String NN.Backend.AcceptedKernel :=
-  match opts.backendProfile.planOps [op] with
+    Except String NN.Backend.AcceptedKernel := do
+  let profile := opts.backendProfile
+  match profile.planOps [op] with
   | .ok { kernels := k :: _ } =>
-      match k.accept opts.backendProfile.acceptancePolicy with
+      match k.accept profile.config.assurance with
       | .error failures =>
-          .error s!"backend profile {opts.backendProfile.name} rejected `{op.name}`: {repr failures}"
-      | .ok accepted =>
-          if k.capsule.runtimeSupport == .eager then
-            .ok accepted
-          else
-            .error <|
-              s!"backend capsule `{k.capsule.name}` for `{op.name}` is " ++
-                s!"{repr k.capsule.runtimeSupport}, not eager runtime support"
+          .error s!"backend profile {profile.name} rejected `{op.name}`: {repr failures}"
+      | .ok accepted => .ok accepted
   | .ok { kernels := [] } =>
-      .error s!"backend profile {opts.backendProfile.name} returned no capsule for {op.name}"
+      .error s!"backend profile {profile.name} returned no capsule for {op.name}"
   | .error msg => .error msg
 
 end Options

@@ -8,28 +8,28 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 
 ## Summary
 
-- Modules: `1260`
-- Import edges: `4051`
-- Internal import edges: `3510`
-- Public imports: `3698`
-- Private imports: `353`
-- Critical-path length over internal imports: `131`
+- Modules: `1270`
+- Import edges: `4076`
+- Internal import edges: `3535`
+- Public imports: `3747`
+- Private imports: `329`
+- Critical-path length over internal imports: `133`
 - Findings: `0` (`0` errors, `0` warnings)
-- Lean files: `1260`
-- Lean source lines: `312727`
-- Declaration headers: `12985`
-- Theorem/lemma headers: `2480`
+- Lean files: `1270`
+- Lean source lines: `318880`
+- Declaration headers: `13302`
+- Theorem/lemma headers: `2628`
 
 ## Top Fan-In Modules
 
-- `NN.API`: `80` incoming imports
+- `NN.API`: `73` incoming imports
+- `NN.Spec.Core.TensorOps`: `34` incoming imports
 - `NN.Spec.Core.Tensor`: `33` incoming imports
-- `NN.Spec.Core.TensorOps`: `32` incoming imports
+- `NN.Spec.Layers.Activation`: `31` incoming imports
 - `NN.Spec.Core.TensorReductionShape`: `30` incoming imports
-- `NN.Spec.Layers.Activation`: `30` incoming imports
 - `NN.MLTheory.CROWN.Graph`: `29` incoming imports
 - `NN.Spec.Core.Context`: `28` incoming imports
-- `NN.Floats.IEEEExec.Exec32`: `27` incoming imports
+- `NN.Floats.IEEEExec.Exec32`: `26` incoming imports
 - `NN.Spec.Module.SpecModule`: `22` incoming imports
 - `NN.Tensor`: `22` incoming imports
 
@@ -43,27 +43,27 @@ Inspired by Li, Peng, Severini, and Shafto, "The Network Structure of Mathlib" (
 - `NN.Spec.Module`: `26` imports
 - `NN.CI.Verification`: `25` imports
 - `NN.Spec.Models`: `25` imports
-- `blueprint.TorchLeanBlueprint.Guide.Ch3_Backend.Floats`: `25` imports
 - `NN.MLTheory.API`: `24` imports
+- `NN.Verification.CLI`: `20` imports
 
 ## Layer Edges
 
 - `NN.Runtime` -> `NN.Runtime`: `385`
-- `NN.Proofs` -> `NN.Proofs`: `328`
-- `NN.API` -> `NN.API`: `323`
+- `NN.Proofs` -> `NN.Proofs`: `347`
+- `NN.API` -> `NN.API`: `320`
 - `NN.Spec` -> `NN.Spec`: `309`
-- `NN.Floats` -> `NN.Floats`: `273`
+- `NN.Floats` -> `NN.Floats`: `284`
 - `NN.MLTheory` -> `NN.MLTheory`: `229`
 - `NN.Verification` -> `NN.Verification`: `176`
-- `NN.Examples` -> `NN.Examples`: `157`
+- `NN.Examples` -> `NN.Examples`: `159`
 - `NN.CI` -> `NN.Spec`: `85`
 - `NN.MLTheory` -> `NN.Spec`: `71`
 - `NN.CI` -> `NN.MLTheory`: `68`
-- `NN.Proofs` -> `NN.Spec`: `62`
-- `NN.Tests` -> `NN.Tests`: `59`
+- `NN.Proofs` -> `NN.Spec`: `67`
+- `NN.Tests` -> `NN.Tests`: `60`
+- `NN.Examples` -> `NN.API`: `56`
 - `NN.CI` -> `NN.Floats`: `55`
-- `NN.Examples` -> `NN.API`: `55`
-- `NN.Tests` -> `NN.Runtime`: `54`
+- `NN.Tests` -> `NN.Runtime`: `55`
 - `Backend` -> `Backend`: `42`
 - `NN.API` -> `NN.Spec`: `42`
 - `NN.API` -> `NN.Runtime`: `39`

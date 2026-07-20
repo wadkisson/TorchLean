@@ -134,7 +134,7 @@ theorem approxT_reduce_sum_by_row_2d
       linfNorm boundVec) := by
   intro s hm' hn' hAxis hRed
   classical
-  have hε : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) (s := s) hx
+  have hε : 0 ≤ eps := approxT_eps_nonneg (s := s) hx
   cases xS with
   | dim xSf =>
       cases xR with
@@ -149,7 +149,7 @@ theorem approxT_reduce_sum_by_row_2d
           have hRed' : Shape.reducibleAlong 1 (.dim m (.dim n .scalar)) := by
             simpa [s] using hRed
 
-          refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+          refine approxT_dim_of_forall
             (n := m) (s := .scalar)
             (xS := Spec.Tensor.reduceSum (α := ℝ) (s := .dim m (.dim n .scalar)) 1 (Tensor.dim xSf)
               hRed')
@@ -235,7 +235,7 @@ theorem approxT_reduce_mean_by_row_2d
       linfNorm boundVec) := by
   intro s hm' hn' hAxis hRed
   classical
-  have hε : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) (s := s) hx
+  have hε : 0 ≤ eps := approxT_eps_nonneg (s := s) hx
   have hn1 : (1 : ℝ) ≤ (n : ℝ) := by
     exact_mod_cast (Nat.succ_le_iff.2 hn : (1 : Nat) ≤ n)
   cases xS with
@@ -259,7 +259,7 @@ theorem approxT_reduce_mean_by_row_2d
           have hRed' : Shape.reducibleAlong 1 (.dim m (.dim n .scalar)) := by
             simpa [s] using hRed
 
-          refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+          refine approxT_dim_of_forall
             (n := m) (s := .scalar)
             (xS := Spec.Tensor.reduceMean (α := ℝ) (s := .dim m (.dim n .scalar)) 1 (Tensor.dim
               xSf) hRed')
@@ -385,7 +385,7 @@ theorem approxT_reduce_sum_by_column_2d
       linfNorm boundVec) := by
   intro s hAxis hRed
   classical
-  have hε : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) (s := s) hx
+  have hε : 0 ≤ eps := approxT_eps_nonneg (s := s) hx
   cases xS with
   | dim xSf =>
       cases xR with
@@ -396,7 +396,7 @@ theorem approxT_reduce_sum_by_column_2d
                 eps (colR (m := m) (n := n) xRf j)))
           have hBoundNonneg : 0 ≤ linfNorm boundVec := linf_norm_nonneg (t := boundVec)
 
-          refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+          refine approxT_dim_of_forall
             (n := n) (s := .scalar)
             (xS := Spec.Tensor.reduceSum (α := ℝ) (s := s) 0 (Tensor.dim xSf) hRed)
             (xR := Spec.Tensor.reduceSum (α := R) (s := s) 0 (Tensor.dim xRf) hRed)
@@ -406,7 +406,7 @@ theorem approxT_reduce_sum_by_column_2d
           have hcol :
               approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
                 (colS (m := m) (n := n) xSf j) (colR (m := m) (n := n) xRf j) eps := by
-            refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+            refine approxT_dim_of_forall
               (n := m) (s := .scalar) (xS := colS (m := m) (n := n) xSf j) (xR := colR (m := m) (n
                 := n) xRf j)
               (eps := eps) hε ?_

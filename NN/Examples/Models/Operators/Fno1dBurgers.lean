@@ -141,7 +141,7 @@ def parse (args : List String) :
     trainXPath trainYPath testXPath testYPath defaultTrainRows defaultTestRows
   let (artifact, args) ← ModelZoo.CsvArtifactFlags.parse args defaultPlotCsv
   let cfg : BurgersOptions :=
-    { toSeededModelTrainFlags := trainBase
+    { toSeededTrainFlags := trainBase
       toPairedNpyEvalFlags := data
       toCsvArtifactFlags := artifact }
   pure (cfg, args)
@@ -323,7 +323,8 @@ def run (cfg : BurgersOptions) : IO Unit := do
       (grid := grid) (width := width) (modes := modes) (blocks := blocks) cfg.seed
   let mut adamSt : _root_.Runtime.Autograd.Cuda.Fno1dRfftFused.AdamState := {}
   let mut hist ← recordEval eval.reportTrainSamples eval.reportTestSamples metricHistory 0 ps "before"
-  let cudaOpts : _root_.Runtime.Autograd.Torch.Options := { device := .cuda }
+  let cudaOpts : _root_.Runtime.Autograd.Torch.Options :=
+    { executionProfile := NN.Backend.BackendProfile.checkedCuda }
   let cudaMemWatch := cfg.effectiveCudaMemWatch cudaOpts
   let mut memWatch? ← ModelZoo.reportCudaMemWatch cudaOpts cudaMemWatch cfg.steps 0 none
   let progressEvery : Nat := Nat.max 1 (cfg.steps / 10)

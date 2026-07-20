@@ -117,7 +117,7 @@ lemma approxT_expand_to_col_spec {n : Nat} {s : Shape}
           -- Unfold `expand_to_col_spec` so the goal is pointwise on rows.
           simp [Tensor.expandToColSpec]
           refine
-            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+            approxT_dim_of_forall
               heps ?_
           intro i
           have hrow :
@@ -127,7 +127,7 @@ lemma approxT_expand_to_col_spec {n : Nat} {s : Shape}
               (n := n) (s := s) (xS := Tensor.dim xSf) (xR := Tensor.dim xRf) (eps := eps) hx i
           -- Build the singleton-column tensor by reusing the row approximation.
           refine
-            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+            approxT_dim_of_forall
               heps (by intro _j; simpa [getAtSpec] using hrow)
 
 omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
@@ -164,11 +164,11 @@ lemma approxT_matrix_transpose_spec {m n : Nat}
           -- Unfold transpose so the goal is pointwise on rows/entries.
           simp [Tensor.matrixTransposeSpec]
           refine
-            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+            approxT_dim_of_forall
               heps ?_
           intro j
           refine
-            approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd)
+            approxT_dim_of_forall
               heps ?_
           intro i
 
@@ -234,17 +234,6 @@ Closed-form bound for a runtime dot-product over `List.finRange n`.
 starting from 0.
 -/
 def dotBound {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
-  let initEps : ℝ := neuralUlp β fexp 0 / 2
-  ((List.finRange n).foldl (dotStep (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR)
-      ((0 : R), initEps)).2
-
-/--
-Public-facing alias of `dot_bound`.
-
-Exported tensor-bound constructors use this name instead of the local helper that Lean treats as
-non-exportable in this file.
--/
-def dotBoundExport {n : Nat} (epsa epsb : ℝ) (aR bR : Fin n → R) : ℝ :=
   let initEps : ℝ := neuralUlp β fexp 0 / 2
   ((List.finRange n).foldl (dotStep (β := β) (fexp := fexp) (rnd := rnd) epsa epsb aR bR)
       ((0 : R), initEps)).2
@@ -394,12 +383,8 @@ private theorem approx_dot_finRange {n : Nat}
   have h0 :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) - (0 : SpecScalar)) ≤
         neuralUlp β fexp 0 / 2 := by
-    -- `toSpec 0 = roundR 0`, then apply the rounding abs-error bound.
-    convert
-      (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ))
-      using 1
-    · simp [toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR]
-      exact congrArg abs (show (0 : R).val = neuralRound (β := β) (fexp := fexp) rnd 0 from rfl)
+    rw [toSpec_zero (β := β) (fexp := fexp) (rnd := rnd), sub_zero, abs_zero]
+    exact div_nonneg (neuralUlp.nonneg β fexp 0) (by norm_num)
   simpa [dotBound] using
     (approx_dot_list (β := β) (fexp := fexp) (rnd := rnd) (n := n) (l := List.finRange n)
       (aS := aS) (bS := bS) (aR := aR) (bR := bR)
@@ -420,7 +405,7 @@ def matVecMulBoundTensor {m n : Nat} (epsA epsV : ℝ)
     (A : Tensor R (.dim m (.dim n .scalar))) (v : Tensor R (.dim n .scalar)) :
     SpecTensor (.dim m .scalar) :=
   Tensor.dim (fun i =>
-    Tensor.scalar (dotBoundExport (β := β) (fexp := fexp) (rnd := rnd) (n := n) epsA epsV
+    Tensor.scalar (dotBound (β := β) (fexp := fexp) (rnd := rnd) (n := n) epsA epsV
       (fun k => matGet (β := β) (fexp := fexp) (rnd := rnd) A i k)
       (fun k => vecGet (β := β) (fexp := fexp) (rnd := rnd) v k)))
 
@@ -596,7 +581,7 @@ theorem approxT_mat_vec_mul_spec {m n : Nat} :
                           B := by
                       have :=
                         linf_norm_le_get_dim (t := bnd) i
-                      simpa [bnd, matVecMulBoundTensor, dotBoundExport, dotBound, B, linfNorm,
+                      simpa [bnd, matVecMulBoundTensor, dotBound, B, linfNorm,
                         RuntimeApprox.linfNorm, tensorLinfNorm, MathFunctions.abs, SpecScalar] using
                         this
 
@@ -698,7 +683,7 @@ def matMulBoundTensor {m n p : Nat} (epsA epsB : ℝ)
     SpecTensor (.dim m (.dim p .scalar)) :=
   Tensor.dim (fun i =>
     Tensor.dim (fun j =>
-      Tensor.scalar (dotBoundExport (β := β) (fexp := fexp) (rnd := rnd) (n := n) epsA epsB
+      Tensor.scalar (dotBound (β := β) (fexp := fexp) (rnd := rnd) (n := n) epsA epsB
         (fun k => matGet (β := β) (fexp := fexp) (rnd := rnd) A i k)
         (fun k => matGet (β := β) (fexp := fexp) (rnd := rnd) B k j))))
 
@@ -922,7 +907,7 @@ theorem approxT_mat_mul_spec {m n p : Nat} :
                           exact hRow
                         exact le_trans hCol hRowB
                       -- scalar entry simplifies to `abs (dot_bound ..)`
-                      simpa [bnd, matMulBoundTensor, dotBoundExport, dotBound, B, linfNorm,
+                      simpa [bnd, matMulBoundTensor, dotBound, B, linfNorm,
                         RuntimeApprox.linfNorm, tensorLinfNorm, MathFunctions.abs, SpecScalar] using this
 
                     have hBound :

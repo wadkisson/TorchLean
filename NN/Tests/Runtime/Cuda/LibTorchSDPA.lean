@@ -7,7 +7,9 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.Autograd.Engine.Cuda.Kernels
+public import NN.Runtime.Autograd.Torch.Core.Session
 public import NN.Tensor
+public import NN.Tests.Runtime.Cuda.Attention
 public import NN.Tests.Runtime.Cuda.Utils
 
 /-!
@@ -154,6 +156,66 @@ def run : IO Unit := do
     "libtorch hard-masked sdpa dK" libTorchMaskedDKT nativeMaskedDKT (tol := 2e-2)
   Tests.Cuda.Utils.assertTensorApprox (s := s)
     "libtorch hard-masked sdpa dV" libTorchMaskedDVT nativeMaskedDVT (tol := 2e-2)
+
+  -- Exercise the actual capsule route, not only the raw FFI. LibTorch computes the forward value;
+  -- the CUDA tape records the node and evaluates the composed TorchLean VJP during backward.
+  let profileSession ← Runtime.Autograd.Torch.Internal.EagerSession.new (α := Float)
+    ({ executionProfile := NN.Backend.BackendProfile.libTorchForwardCuda } :
+      Runtime.Autograd.Torch.Options)
+  let selectedAttention ← profileSession.selectedCapsule
+    NN.Backend.Attention.scaledDotProductOp
+  unless selectedAttention.sameIdentity NN.Backend.Attention.libTorchSDPAForward do
+    throw <| IO.userError <|
+      s!"libtorch-forward profile selected unexpected capsule `{selectedAttention.name}`"
+  let base0 : Runtime.Autograd.Cuda.Tape := Runtime.Autograd.Cuda.Tape.empty
+  let (base1, wqId) := Runtime.Autograd.Cuda.Tape.leaf (t := base0)
+    (Tests.Cuda.Utils.tensorToAnyBuffer Tests.Cuda.Attention.wq)
+  let (base2, wkId) := Runtime.Autograd.Cuda.Tape.leaf (t := base1)
+    (Tests.Cuda.Utils.tensorToAnyBuffer Tests.Cuda.Attention.wk)
+  let (base3, wvId) := Runtime.Autograd.Cuda.Tape.leaf (t := base2)
+    (Tests.Cuda.Utils.tensorToAnyBuffer Tests.Cuda.Attention.wv)
+  let (base4, woId) := Runtime.Autograd.Cuda.Tape.leaf (t := base3)
+    (Tests.Cuda.Utils.tensorToAnyBuffer Tests.Cuda.Attention.wo)
+  let (base5, xId) := Runtime.Autograd.Cuda.Tape.leaf (t := base4)
+    (Tests.Cuda.Utils.tensorToAnyBuffer Tests.Cuda.Attention.x)
+  let libTorchTapeResult ← Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := base5)
+    (n := Tests.Cuda.Attention.n) (numHeads := Tests.Cuda.Attention.numHeads)
+    (dModel := Tests.Cuda.Attention.dModel) (headDim := Tests.Cuda.Attention.headDim)
+    (h1 := Tests.Cuda.Attention.hN) wqId wkId wvId woId xId
+    (mask := some Tests.Cuda.Attention.mask)
+    (attentionCapsule := selectedAttention)
+  let (libTorchTape, libTorchOutId) ← Tests.Cuda.Utils.okOrThrow libTorchTapeResult
+  let composedTapeResult ← Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := base5)
+    (n := Tests.Cuda.Attention.n) (numHeads := Tests.Cuda.Attention.numHeads)
+    (dModel := Tests.Cuda.Attention.dModel) (headDim := Tests.Cuda.Attention.headDim)
+    (h1 := Tests.Cuda.Attention.hN) wqId wkId wvId woId xId
+    (mask := some Tests.Cuda.Attention.mask)
+    (attentionCapsule := NN.Backend.Attention.torchLeanComposed)
+  let (composedTape, composedOutId) ← Tests.Cuda.Utils.okOrThrow composedTapeResult
+  let modelOutShape : Shape :=
+    shape![Tests.Cuda.Attention.n, Tests.Cuda.Attention.dModel]
+  let libTorchTapeOut ← Tests.Cuda.Utils.cudaValue
+    (s := modelOutShape) libTorchTape libTorchOutId
+  let composedTapeOut ← Tests.Cuda.Utils.cudaValue
+    (s := modelOutShape) composedTape composedOutId
+  Tests.Cuda.Utils.assertTensorApprox (s := modelOutShape)
+    "libtorch-forward capsule output" libTorchTapeOut composedTapeOut (tol := 2e-2)
+  let seed : Runtime.Autograd.Cuda.AnyBuffer :=
+    { s := modelOutShape
+      buf := Runtime.Autograd.Cuda.Buffer.full
+        (UInt32.ofNat (Spec.Shape.size modelOutShape)) 1.0 }
+  let libTorchGrads ← Tests.Cuda.Utils.okOrThrow <|
+    Runtime.Autograd.Cuda.Tape.backwardDenseAll libTorchTape libTorchOutId seed
+  let composedSeed : Runtime.Autograd.Cuda.AnyBuffer :=
+    { s := modelOutShape
+      buf := Runtime.Autograd.Cuda.Buffer.full
+        (UInt32.ofNat (Spec.Shape.size modelOutShape)) 1.0 }
+  let composedGrads ← Tests.Cuda.Utils.okOrThrow <|
+    Runtime.Autograd.Cuda.Tape.backwardDenseAll composedTape composedOutId composedSeed
+  let libTorchDx ← Tests.Cuda.Utils.cudaGrad (s := modelOutShape) libTorchGrads xId
+  let composedDx ← Tests.Cuda.Utils.cudaGrad (s := modelOutShape) composedGrads xId
+  Tests.Cuda.Utils.assertTensorApprox (s := modelOutShape)
+    "libtorch-forward capsule TorchLean backward" libTorchDx composedDx (tol := 2e-2)
 
   let shortQ := Runtime.Autograd.Cuda.Buffer.zeros 1
   let rejected ← try

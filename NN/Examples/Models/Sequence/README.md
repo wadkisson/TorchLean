@@ -12,8 +12,8 @@ generation options enter the model zoo.
   head.
 - `Transformer.lean` (`lake exe torchlean transformer ...`): a compact transformer encoder block
   over a real text window.
-- `CharGpt.lean` (`lake exe torchlean chargpt ...`): the minGPT-style character-tokenizer teaching
-  path.
+- `CharGpt.lean` (`lake exe torchlean chargpt ...`): character-level GPT training with a two-update
+  smoke preset and a full Tiny Shakespeare lecture preset.
 - `Gpt2.lean` (`lake exe torchlean gpt2 ...`): a compact byte-level GPT-2-style causal Transformer
   with save/reload support.
 - `Gpt2Saved.lean` (`lake exe torchlean gpt2_saved ...`): load weights saved by `gpt2` and sample.

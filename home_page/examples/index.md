@@ -82,6 +82,15 @@ Lean.
     </span>
   </a>
 
+  <a class="showcase-card showcase-image-card" href="{{ '/examples/numerical-runtime/' | relative_url }}">
+    <img class="showcase-media" src="{{ '/assets/media/examples/showcase/graph-ir-bounds-new.png' | relative_url }}" alt="Numerical certificate and binary32 replay for a two-layer MLP"/>
+    <span class="showcase-body">
+      <span class="showcase-title">Numerical Runtime Certificates</span>
+      <span class="showcase-text">Run a two-layer MLP through operation coverage, interval propagation, backend-capsule audit, and bit-level binary32 replay.</span>
+      <span class="showcase-link">Open the complete run</span>
+    </span>
+  </a>
+
   <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Examples-and-Applications/Reinforcement-Learning/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/reinforcement-learning-new.png' | relative_url }}" alt="Reinforcement learning examples"/>
     <span class="showcase-body">

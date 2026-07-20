@@ -7,130 +7,298 @@ open Verso.Genre Manual
 tag := "classical-ml-proofs"
 %%%
 
-Not every proof in TorchLean is about a modern runtime boundary. Some declarations formalize
-classical ML theory: Hopfield energy, ReLU approximation components, and state space scan
-or causality facts. TorchLean can host mathematical ML theory directly beside runtime artifact
-checkers.
+Some neural-network properties are independent of any particular GPU kernel or training loop.
+Hopfield networks have an energy argument. ReLU networks can assemble multiplication from
+piecewise-linear approximants. Recurrent state-space models are causal because their output at time
+`t` is computed before future inputs are seen. These are structural facts about the mathematical
+models.
 
-The common shape is small but powerful:
+TorchLean formalizes such results beside its runtime developments so that later work can connect
+them. The proofs in this chapter do not certify a CUDA implementation, but neither are they
+informal descriptions of an architecture. They are Lean theorems about the spec-level definitions.
 
-- *Hopfield networks*: finite Boolean states, weights, thresholds, and an energy function, with
-  asynchronous updates that do not increase energy under symmetry assumptions.
-- *ReLU approximation*: local gadgets, compact domains, and MLP bridges, so approximation
-  components can be reused in later network theorems.
-- *State space scans*: recurrent scan equations over lists, with prefix theorems saying future
-  inputs do not affect past outputs.
+# Hopfield Dynamics
 
-# Hopfield Networks
+A TorchLean Hopfield state is a Boolean vector:
 
-The Hopfield proof island formalizes the classical energy argument. A state is a finite Boolean spin
-assignment, parameters contain weights and thresholds, and the energy is the scalar quantity that
-should not increase under an asynchronous update when the weights are symmetric and the diagonal is
-zero.
+```
+abbrev State (n : Nat) := Fin n → Bool
+```
 
-The central assumptions are named in the
-[Hopfield energy API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Hopfield/Energy.lean):
+The numeric activation map interprets `true` as `+1` and `false` as `-1`. Parameters contain a
+weight matrix and a threshold vector:
 
-$$`\operatorname{SymmetricW}(p) :=
-\forall i\,j,\; p.W(i,j)=p.W(j,i),
-\qquad
-\operatorname{DiagonalZero}(p) :=
-\forall i,\; p.W(i,i)=0`
+```
+structure Params (α : Type) (n : Nat) where
+  W : Fin n → Fin n → α
+  θ : Fin n → α
+```
 
-The energy has the classical quadratic form:
+For state `s`, write `xᵢ ∈ {-1,+1}` for its numeric activation. The net input to neuron `u` is
 
-$$`E(x)=-\frac12 x^\top W x+\theta^\top x.`
+$$`\operatorname{net}_u(s)=\sum_j W_{uj}x_j.`
 
-The theorem `energy_updateAt_le` is the local statement:
+`updateAt p s u` changes only coordinate `u`, using
 
-> Updating one coordinate according to the Hopfield rule does not increase energy under symmetric
-> weights and zero diagonal.
+$$`x_u'=
+\begin{cases}
++1,&\theta_u\leq\operatorname{net}_u(s),\\
+-1,&\operatorname{net}_u(s)<\theta_u.
+\end{cases}`
 
-In symbols:
+The non-strict comparison fixes a detail often omitted on paper: ties go to `+1`. That convention
+becomes important in the convergence proof.
 
-$$`E(x^{t+1})\le E(x^t),`
+The energy is
 
-and away from threshold ties, when the state actually changes,
+$$`E(s)
+=-\frac12\sum_i\sum_j W_{ij}x_i x_j
+ +\sum_i\theta_i x_i.`
 
-$$`E(x^{t+1})<E(x^t).`
+Under symmetric weights and zero diagonal,
 
-The stronger theorem `energy_updateAt_lt_of_change_of_ne` says that when the coordinate really
-changes and the net input is not exactly at threshold, the energy strictly decreases. The dynamics
-file lifts this to trajectories through `energy_seqStates_succ_le` and
-`energy_seqStates_le_start`.
+$$`W_{ij}=W_{ji},
+\qquad W_{ii}=0,`
 
-The convergence proof then uses finiteness: a strictly decreasing energy path cannot cycle forever
-through nontrivial state changes. The theorems `cycleUpdate_no_nontrivial_cycles`,
-`cycleUpdate_exists_fixedpoint_le_card`, and `cycleUpdate_exists_fixedpoint_le_pow` are the checked
-versions of that classical argument.
+the theorem
+[`energy_updateAt_le`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Hopfield/Energy.lean)
+proves
 
-The development is not a complete theory of all associative memory models. It is a named Hopfield
-vocabulary: states, energy, update assumptions, progress lemmas, and finite fixed point style
-theorems that later extensions can build on.
+$$`E(\operatorname{updateAt}(p,s,u))\leq E(s).`
 
-# ReLU Approximation Bridges
+The proof expands the quadratic energy difference. Symmetry makes the changed row and column
+contribute the same net-input term, while the zero diagonal removes the self-interaction. When the
+coordinate actually changes and the net input is not tied with the threshold,
+`energy_updateAt_lt_of_change_of_ne` strengthens the inequality to a strict decrease.
 
-The ReLU approximation bridge is a library of reusable components, not a standalone model claim.
-The [ReLU multiplication approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Approx/ReLUMulApprox.lean)
-records a small network shaped approximation component for multiplication. The
-[compact set approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Approximation/CompactSet.lean) gives
-the language for approximation on compact domains. The
-[ReLU MLP bridge API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Bridge/ReLUMlpBridge.lean) connects those pieces
-back to MLP style objects.
+# Execute A Two-Neuron Update
 
-The theory shape is:
+The spec is executable over rational numbers. This scratch file uses two mutually excitatory
+neurons, zero thresholds, and the initial state `[+1,-1]`:
 
-$$`\text{local ReLU gadget theorem}
-+ \text{compact-domain hypotheses}
-+ \text{bridge from gadget notation to MLP notation}
-\Longrightarrow
-\text{reusable approximation fact for later model proofs}`
+```
+import NN.Spec.Models.Hopfield
 
-This proof component is neither a runtime test nor a full model theorem. It is a reusable
-mathematical part, and larger formalizations often depend on these quiet lemmas.
+open Spec.Hopfield
 
-# State Space and Mamba Causality
+def p : Params Rat 2 where
+  W := fun i j => if i = j then 0 else 1
+  θ := fun _ => 0
 
-State space models replace attention with recurrent scan structure, so the theorem we care about is
-causality. If two input sequences agree on a prefix, then the produced outputs should agree on that
-prefix. Future tokens should not affect past outputs.
+def s : State 2 := fun i => i = 0
+def s' : State 2 := updateAt p s 1
 
-The recurrence shape is:
+#eval List.ofFn s
+#eval List.ofFn s'
+#eval energy p s
+#eval energy p s'
+```
+
+The current output is:
+
+```
+[true, false]
+[true, true]
+1
+-1
+```
+
+The update aligns the second neuron with the first, and the energy decreases from `1` to `-1`.
+Changing `W 0 1` without changing `W 1 0` still produces an executable state sequence, but it
+prevents use of `energy_updateAt_le`: Lean asks for `SymmetricW p`. Setting a diagonal weight to a
+nonzero value similarly leaves the program runnable while invalidating the theorem’s
+`DiagonalZero p` premise.
+
+# Why Non-Increasing Energy Is Not Quite Enough
+
+If every state change strictly lowered energy, finiteness would immediately rule out cycles. Ties
+make the argument subtler. With the convention “ties go to `+1`,” a state may change while energy
+stays equal. TorchLean therefore uses the number of positive neurons,
+
+$$`\operatorname{pluses}(s)
+=|\{i\mid s_i=\texttt{true}\}|,`
+
+as a secondary progress measure. For one full cyclic sweep, `cycleUpdate_progress` proves:
+
+- either energy strictly decreases;
+- or energy is unchanged and `pluses` strictly increases.
+
+The lexicographic pair
+
+$$`\bigl(E(s),-\operatorname{pluses}(s)\bigr)`
+
+therefore progresses whenever a sweep changes the state. Since `State n` is finite,
+[`cycleUpdate_no_nontrivial_cycles`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Hopfield/Convergence.lean)
+rules out a nontrivial cycle, and `cycleUpdate_exists_fixedpoint_le_card` gives a fixed point within
+at most `Fintype.card (State n)` sweeps. The more explicit
+`cycleUpdate_exists_fixedpoint_le_pow` states the corresponding `2^n` bound.
+
+Inspect the exact hypotheses in the Infoview:
+
+```
+import NN.MLTheory.Proofs.Hopfield
+
+open NN.MLTheory.Proofs.Hopfield
+
+#check energy_updateAt_le
+#check cycleUpdate_progress
+#check cycleUpdate_exists_fixedpoint_le_pow
+```
+
+These are theorems about asynchronous coordinate updates arranged into cyclic sweeps. They do not
+apply automatically to synchronous updates, stochastic schedules, modern continuous-state
+Hopfield layers, or a floating-point kernel. Each variation needs its own transition relation and
+energy argument.
+
+# ReLU Networks As An Algebra Of Approximants
+
+ReLU is piecewise linear, so one hidden layer cannot represent multiplication exactly on all of
+`ℝ²`. It can, however, approximate multiplication uniformly on a bounded box.
+
+The identity
+
+$$`xy=\frac{(x+y)^2-(x-y)^2}{4}`
+
+reduces the problem to approximating the square function on `[-2M,2M]`. The file
+[`ReLUMulApprox`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Approx/ReLUMulApprox.lean)
+first builds a one-dimensional ReLU approximation to `u²`, lifts copies along the ridge directions
+
+$$`w_+=(1,1),\qquad w_-=(1,-1),`
+
+and combines their outputs with coefficients `1/4` and `-1/4`.
+
+The final theorem is:
+
+```
+theorem relu_mul_universal_approximation_box
+    {M : ℝ} (hM : 0 < M) :
+  ∀ ε > 0,
+    ∃ (hidDim : ℕ)
+      (l1 : LinearSpec ℝ 2 hidDim)
+      (l2 : LinearSpec ℝ hidDim 1),
+    ∀ x ∈ box M,
+      |mulFun x - mlpEvalNd l1 l2 x| < ε
+```
+
+The box hypothesis bounds both coordinates by `M`. Without it, no finite piecewise-linear function
+can uniformly approximate the quadratic growth of multiplication on the whole plane.
+
+The bridge module
+[`ReLUMlpBridge`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Bridge/ReLUMlpBridge.lean)
+supplies network algebra used in these constructions. A particularly useful exact identity is
+
+$$`\operatorname{ReLU}(u)-\operatorname{ReLU}(-u)=u.`
+
+In Lean:
+
+```
+lemma relu_sub_relu_neg (u : ℝ) :
+  relu u - relu (-u) = u
+```
+
+This identity lets a ReLU network carry affine terms exactly even though individual hidden units
+clip negative values.
+
+To explore the proof surface:
+
+```
+import NN.MLTheory.Proofs.ReLU.Approx.ReLUMulApprox
+import NN.MLTheory.Proofs.ReLU.Bridge.ReLUMlpBridge
+
+open NN.MLTheory.Proofs.ReLUMlpBridge
+open NN.MLTheory.Proofs.ReLUMulApprox
+
+#check relu_sub_relu_neg
+#check relu_mul_universal_approximation_box
+```
+
+Try specializing the multiplication theorem with `M = 0`. The proof cannot supply `0 < M`.
+That does not mean multiplication is hard on the singleton zero box; it means this particular
+construction and theorem are stated for a positive-radius box. A separate zero-radius lemma would
+be trivial but would not strengthen the useful approximation result.
+
+On arbitrary compact subsets of finite-dimensional real space, the larger
+[`CompactSet`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/ReLU/Approximation/CompactSet.lean)
+development combines coordinate polynomials, multiplication approximants, and Stone-Weierstrass.
+`relu_universal_approximation_compact` proves density of one-hidden-layer ReLU MLPs in continuous
+real-valued functions on the compact domain. This is an exact existence theorem over `ℝ`; it is not
+a runtime or training guarantee.
+
+# Causality In State-Space Models
+
+A recurrent sequence model should not revise an earlier output after future tokens arrive. For a
+simple state-space recurrence,
 
 $$`h_{t+1}=A_t h_t+B_t x_t,\qquad
-y_t=C_t h_t+D_t x_t.`
+y_t=C_t h_t+D_t x_t,`
 
-The [state space scan API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/StateSpace/Scan.lean) proves append theorems for
-scalar affine scans and diagonal selective scans:
+the causal claim can be phrased without derivatives or probability:
 
-$$`\operatorname{outputs}\!\left(\operatorname{run}(prefix \mathbin{++} suffix)\right)
-\text{ restricted to the prefix }
+$$`\operatorname{take}_{|xs|}
+  \bigl(\operatorname{outputs}(\operatorname{run}(xs\mathbin{++}ys))\bigr)
 =
-\operatorname{outputs}\!\left(\operatorname{run}(prefix)\right)`
+\operatorname{outputs}(\operatorname{run}(xs)).`
 
-Equivalently:
+The theorem says that appending a future suffix `ys` preserves every output already produced for
+the prefix `xs`.
 
-$$`x_{0:k}=x'_{0:k}
-\quad\Longrightarrow\quad
-y_{0:k}=y'_{0:k}.`
+[`MambaCausality`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/StateSpace/MambaCausality.lean)
+proves this statement for three increasingly rich specifications:
 
-The [Mamba causality API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/StateSpace/MambaCausality.lean) specializes that
-idea to Mamba computations. The theorem names stay direct:
-`diagonalS4_runList_append_outputs_prefix`, `compactMamba_runList_append_outputs_prefix`,
-`selectiveMamba_runListAux_append_outputs_prefix`, and
-`selectiveMamba_runList_append_outputs_prefix`.
+- `DiagonalS4Spec`;
+- `MambaBlockSpec`;
+- `SelectiveMambaBlockSpec`, including its carried convolution history.
 
-Sequence model verification includes more than attention. Attention has masks, KV caches, and
-positional encodings. State space models have scan order, recurrent state, and causality
-conventions. The Mamba causality theorems give those concerns a place in the formal layer.
+The public selective theorem is:
 
-# What Carries Forward
+```
+theorem selectiveMamba_runList_append_outputs_prefix
+    (m : SelectiveMambaBlockSpec α
+      inputDim innerDim stateDim outputDim convWidth)
+    (h0 : Tensor α (.dim innerDim (.dim stateDim .scalar)))
+    (xs ys : List (Tensor α (.dim inputDim .scalar))) :
+  (m.runList h0 (xs ++ ys)).2.take xs.length =
+    (m.runList h0 xs).2
+```
 
-This area provides reusable proof components:
+The theorem is polymorphic over any scalar `α` with a TorchLean `Context`. Its proof is structural:
+induct on `xs`, unfold one recurrent step, and apply the induction hypothesis to the updated state
+and history. It does not require commutative or exact arithmetic because causality depends on
+evaluation order, not algebraic rearrangement.
 
-- Hopfield theorems seed energy and convergence arguments.
-- ReLU approximation lemmas seed MLP bridge arguments.
-- State space scan theorems seed causality arguments.
+Open the declarations:
 
-They are the named mathematical objects that future model theorems can reuse: energy functions,
-approximation lemmas, scan equations, and convergence hypotheses.
+```
+import NN.MLTheory.Proofs.StateSpace.MambaCausality
+
+open NN.MLTheory.StateSpace
+
+#check diagonalS4_runList_append_outputs_prefix
+#check compactMamba_runList_append_outputs_prefix
+#check selectiveMamba_runList_append_outputs_prefix
+```
+
+A useful failed variation is to replace `.take xs.length` by `.take (xs.length + 1)`. The extra
+output is the first one allowed to depend on the suffix, so the theorem is false in general. The
+prefix length in the checked statement is exactly the causal boundary.
+
+# Proof Boundary
+
+The three developments establish different kinds of structure:
+
+| Development | Proved object | Not established by that theorem |
+|---|---|---|
+| Hopfield | finite real-valued energy and cyclic asynchronous dynamics | floating execution or arbitrary update schedules |
+| ReLU approximation | existence of real MLP parameters with uniform error | training convergence or binary32 error |
+| Mamba/S4 | prefix preservation of spec-level list runners | equality with a particular fused scan kernel |
+
+The Hopfield example executes over `Rat`; the energy theorem is stated over `ℝ`. The Mamba
+causality theorem works over an abstract `Context`, but a runtime refinement theorem is still
+needed to connect a backend kernel to the spec runner. The ReLU theorem constructs real-valued
+layers, while quantization and rounded execution require the finite-precision bridge described in
+the approximation chapter.
+
+These boundaries are what make the results reusable. A future CUDA proof does not need to reprove
+the Hopfield energy algebra, and a future Mamba kernel proof does not need to rediscover the list
+causality invariant. It only needs to connect the new executable object to the mathematical one
+already named here.

@@ -7,7 +7,6 @@ Authors: TorchLean Team
 module
 
 public import NN.API.Public.Facade.Trainer.Train
-public import NN.API.Public.Facade.Trainer.Verify
 
 /-!
 # TorchLean Public Trainer Methods
@@ -112,68 +111,6 @@ def Handle.predictBatch {σ τ : Shape} (trainer : Handle σ τ) (xs : List (Ten
     IO (List (Tensor.T Float τ)) :=
   xs.mapM trainer.predict
 
-/-- Result returned by the unified public `Trainer.train` method. -/
-inductive TrainResult (σ τ : Shape) where
-  /-- Trained regression model. -/
-  | regression (result : Implementation.Regression.TrainResult σ τ)
-  /-- Trained one-hot cross-entropy model. -/
-  | crossEntropy (result : Implementation.CrossEntropy.TrainResult σ τ)
-  /-- Trained custom-loss model. -/
-  | custom (result : Implementation.Custom.TrainResult σ τ)
-
-namespace TrainResult
-
-/-- The before/after scalar summary for this training run. -/
-def report {σ τ : Shape} : TrainResult σ τ → TrainSummary
-  | .regression result => result.report
-  | .crossEntropy result => result.report
-  | .custom result => result.report
-
-/-- One-line summary suitable for quickstarts and scripts. -/
-def summary {σ τ : Shape} (result : TrainResult σ τ) : String :=
-  result.report.summary
-
-/-- Print the standard before/after training summary. -/
-def printSummary {σ τ : Shape} (result : TrainResult σ τ) : IO Unit :=
-  IO.println (summary result)
-
-/-- Predict one input using the trained model. -/
-def predict {σ τ : Shape} : TrainResult σ τ → Tensor.T Float σ → IO (Tensor.T Float τ)
-  | .regression result, x => result.predict x
-  | .crossEntropy result, x => result.predict x
-  | .custom result, x => result.predict x
-
-/-- Predict a list of inputs using the trained model. -/
-def predictBatch {σ τ : Shape} : TrainResult σ τ → List (Tensor.T Float σ) →
-    IO (List (Tensor.T Float τ))
-  | .regression result, xs => result.predictBatch xs
-  | .crossEntropy result, xs => result.predictBatch xs
-  | .custom result, xs => result.predictBatch xs
-
-/-- Print one prediction from a unified trained handle. -/
-def printPrediction {σ τ : Shape} (result : TrainResult σ τ)
-    (name : String) (x : Tensor.T Float σ) : IO Unit := do
-  let y ← result.predict x
-  IO.println s!"{name} = {Tensor.pretty y}"
-
-/-- Verify an `ℓ∞` input ball for a trained regression handle. -/
-def verifyRobustLInf {σ τ : Shape}
-    (result : TrainResult σ τ) (center : Tensor.T Float σ) (eps : Float) :
-    IO Implementation.Regression.VerificationReport := do
-  match result with
-  | .regression result => result.verifyRobustLInf center eps
-  | .crossEntropy _ =>
-      throw <| IO.userError
-        "Trainer.TrainResult.verifyRobustLInf: verification is currently implemented for trained regression handles"
-  | .custom _ =>
-      throw <| IO.userError
-        "Trainer.TrainResult.verifyRobustLInf: verification is currently implemented for trained regression handles"
-
-instance {σ τ : Shape} : ToString (TrainResult σ τ) where
-  toString := summary
-
-end TrainResult
-
 /--
 Train a unified public trainer.
 
@@ -184,17 +121,13 @@ def Handle.train {σ τ : Shape} (trainer : Handle σ τ)
     IO (TrainResult σ τ) := do
   match trainer.task with
   | .regression reduction =>
-      let out ← (Implementation.regressionHandle trainer reduction).train data trainOptions probes
-      pure (.regression out)
+      (Implementation.regressionHandle trainer reduction).train data trainOptions probes
   | .classification reduction =>
-      let out ← (Implementation.crossEntropyHandle trainer reduction).train data trainOptions probes
-      pure (.crossEntropy out)
+      (Implementation.crossEntropyHandle trainer reduction).train data trainOptions probes
   | .crossEntropy reduction =>
-      let out ← (Implementation.crossEntropyHandle trainer reduction).train data trainOptions probes
-      pure (.crossEntropy out)
+      (Implementation.crossEntropyHandle trainer reduction).train data trainOptions probes
   | .custom loss =>
-      let out ← (Implementation.customHandle trainer loss).train data trainOptions
-      pure (.custom out)
+      (Implementation.customHandle trainer loss).train data trainOptions
 
 /--
 Train a unified regression trainer from a Float sample stream.
@@ -211,7 +144,7 @@ def Handle.trainStreamFloat {σ τ : Shape}
     (cudaMemWatch : Nat := 0)
     (onEval : Nat → String → (Tensor.T Float σ → IO (Tensor.T Float τ)) → IO Unit :=
       fun _ _ _ => pure ()) :
-    IO (Implementation.Regression.StreamTrainResult σ τ) := do
+    IO (StreamTrainResult σ τ) := do
   match trainer.task with
   | .regression reduction =>
       (Implementation.regressionHandle trainer reduction).trainStreamFloat opts sampleAt evalSample
@@ -240,7 +173,7 @@ def Handle.trainPairStreamFloat {σ₁ τ₁ σ₂ τ₂ : Shape}
     (trainOptions : TrainOptions := {})
     (curveEvery : Nat := 1)
     (cudaMemWatch : Nat := 0) :
-    IO (Implementation.Regression.PairStreamTrainResult σ₁ τ₁ σ₂ τ₂) := do
+    IO (PairStreamTrainResult σ₁ τ₁ σ₂ τ₂) := do
   match first.task, second.task with
   | .regression r1, .regression r2 =>
       Implementation.Regression.trainPairStreamFloat
@@ -261,7 +194,7 @@ def Handle.trainSelectedCrossEntropy {σ τ : Shape} {α : Type}
     (trainer : Handle σ τ)
     (opts : Options) (data : Dataset σ τ) (trainOptions : TrainOptions := {})
     (probes : List (Probe σ) := []) :
-    IO (Implementation.CrossEntropy.TrainResult σ τ) := do
+    IO (TrainResult σ τ) := do
   match trainer.task with
   | .crossEntropy reduction =>
       (Implementation.crossEntropyHandle trainer reduction).trainSelected (α := α) opts data

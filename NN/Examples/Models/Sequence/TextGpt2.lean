@@ -112,7 +112,7 @@ local instance : NeZero seqLen := ⟨by decide⟩
 local instance : NeZero dModel := ⟨by decide⟩
 
 /-- Byte-level GPT configuration shared by shapes and the model constructor. -/
-def cfg : nn.models.CausalOneHotConfig :=
+def cfg : nn.models.CausalTransformerConfig :=
   { batch := batch
     seqLen := seqLen
     vocab := vocab
@@ -123,7 +123,7 @@ def cfg : nn.models.CausalOneHotConfig :=
 
 /-- Input shape: byte-level one-hot token sequence. -/
 abbrev σ : Shape :=
-  nn.models.causalOneHotShape cfg
+  nn.models.causalVocabularyShape cfg
 
 /-- Output shape: one byte-logit row per input position. -/
 abbrev τ : Shape :=
@@ -232,7 +232,7 @@ local instance : NeZero seqLen := ⟨by decide⟩
 local instance : NeZero dModel := ⟨by decide⟩
 
 /-- BPE GPT configuration shared by shapes and the model constructor. -/
-def cfg : nn.models.CausalOneHotConfig :=
+def cfg : nn.models.CausalTransformerConfig :=
   { batch := batch
     seqLen := seqLen
     vocab := vocab
@@ -243,7 +243,7 @@ def cfg : nn.models.CausalOneHotConfig :=
 
 /-- Input shape: local-BPE one-hot token batch. -/
 abbrev σ : Shape :=
-  nn.models.causalOneHotShape cfg
+  nn.models.causalVocabularyShape cfg
 
 /-- Output shape: one local-BPE logit row per input position. -/
 abbrev τ : Shape :=
@@ -470,8 +470,6 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runCudaFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "GPU corpus trainer")
     (k := fun opts rest => do
-      if !opts.usesCuda then
-        throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
       let (trainOpts, rest) ← ModelZoo.orThrow exeName <|
         text.CorpusLoggedPromptInteractiveOptions.parse
           exeName rest defaultLogJson 1

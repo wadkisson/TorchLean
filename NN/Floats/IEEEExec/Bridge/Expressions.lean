@@ -109,28 +109,6 @@ We store the dyadic because it gives us a convenient “finiteness certificate�
 `toDyadic? x = some d` immediately rules out NaN/Inf and unlocks the op-level bridge lemmas.
 -/
 
-private lemma isFinite_eq_true_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
-    (hx : toDyadic? x = some d) : isFinite x = true := by
-  unfold IEEE32Exec.isFinite
-  apply (bne_iff_ne).2
-  intro hEq
-  have hEqb : (expField x == expAllOnes) = true := (beq_iff_eq).2 hEq
-  by_cases hFrac : fracField x = 0
-  · have hFracB : (fracField x == 0) = true := (beq_iff_eq).2 hFrac
-    have hinfTrue : isInf x = true := by
-      simp [IEEE32Exec.isInf, hEqb, hFracB]
-    have hinfFalse : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hx)
-    have : False := by
-      simp [hinfTrue] at hinfFalse
-    exact this.elim
-  · have hFracNeB : (fracField x != 0) = true := (bne_iff_ne).2 hFrac
-    have hnanTrue : isNaN x = true := by
-      simp [IEEE32Exec.isNaN, hEqb, hFracNeB]
-    have hnanFalse : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hx)
-    have : False := by
-      simp [hnanTrue] at hnanFalse
-    exact this.elim
-
 /-- Finite-evaluation witness for the compact scalar expression language. -/
 inductive FiniteEval (env : Nat → IEEE32Exec) : Expr → Dyadic → Prop where
   | var (i : Nat) (d : Dyadic) (h : toDyadic? (env i) = some d) :

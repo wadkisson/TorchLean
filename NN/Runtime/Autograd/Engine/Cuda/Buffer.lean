@@ -354,6 +354,10 @@ deterministic given `(seed, counter)` and a row-major linear index.
 @[extern "torchlean_cuda_buffer_rand_uniform"]
 opaque randUniform (n : UInt32) (key : UInt64) : Buffer
 
+/-- Deterministic normal generator using Box-Muller on the device. -/
+@[extern "torchlean_cuda_buffer_rand_normal"]
+opaque randNormal (n : UInt32) (mean std : Float) (key : UInt64) : Buffer
+
 /-- Deterministic `{0,1}` mask generator: returns a length-`n` buffer keyed by `key`. -/
 @[extern "torchlean_cuda_buffer_bernoulli_mask"]
 opaque bernoulliMask (n : UInt32) (keepProb : Float) (key : UInt64) : Buffer

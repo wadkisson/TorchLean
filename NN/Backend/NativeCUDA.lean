@@ -31,7 +31,6 @@ def nativeCapsule
     op
     provider := .nativeCuda
     device := .cuda
-    specName
     trustLevel := .checked
     supportsForward := true
     vjpMode
@@ -51,6 +50,11 @@ def nativeCapsule
       { claim := .vjpRefinement op specName vjpMode
         summary := vjpSummary
         evidence := .testSuite "NN.Tests.Runtime.Cuda.Suite" }
+    numericalPolicy :=
+      { rounding := .nearestEven
+        subnormals := .implementationDefined
+        contraction := .implementationDefined
+        reduction := .notApplicable }
     notes := "Native CUDA code is an FFI boundary; the capsule records the contract TorchLean checks." }
 
 def nativePointwiseCapsule (op : BackendOp) : KernelCapsule :=
@@ -62,12 +66,24 @@ def nativePointwiseCapsule (op : BackendOp) : KernelCapsule :=
     s!"Native CUDA `{op.name}` VJP is checked through runtime autograd tests."
 
 def nativeReductionCapsule (op : BackendOp) : KernelCapsule :=
-  nativeCapsule
+  { nativeCapsule
     s!"native_cuda.{op.name}"
     op
     s!"IR.{op.name} / Spec reduction contract"
     s!"Native CUDA `{op.name}` follows the explicit reduction shape contract."
-    s!"Native CUDA `{op.name}` adjoint is checked through runtime gradient tests."
+    s!"Native CUDA `{op.name}` adjoint is checked through runtime gradient tests." with
+    numericalPolicy.reduction := .implementationDefined }
+
+/-- Native CUDA kernel with an accumulation whose tree/order is selected by the implementation.
+
+This covers matrix products, affine layers, convolutions, losses, and average pooling. CUDA may use
+parallel trees, fused multiply-add, cuBLAS/cuDNN algorithms, or architecture-specific schedules;
+the capsule therefore records the reduction as implementation-defined instead of pretending it is
+the reference left fold. -/
+def nativeAccumulationCapsule (name : String) (op : BackendOp) (specName valueSummary vjpSummary :
+    String) (vjpMode : VJPMode := .backendVJP) : KernelCapsule :=
+  { nativeCapsule name op specName valueSummary vjpSummary vjpMode with
+    numericalPolicy.reduction := .implementationDefined }
 
 def nativeViewCapsule (op : BackendOp) : KernelCapsule :=
   nativeCapsule
@@ -94,23 +110,19 @@ def nativeConvPoolCapsule (op : BackendOp) : KernelCapsule :=
     s!"Native CUDA `{op.name}` follows the channel-first runtime contract."
     s!"Native CUDA `{op.name}` VJP is checked by CUDA runtime coverage."
 
+/-- Native window selection whose traversal and tie winner are chosen by the CUDA implementation. -/
+def nativeSelectionCapsule (op : BackendOp) : KernelCapsule :=
+  { nativeConvPoolCapsule op with
+    numericalPolicy.reduction := .implementationDefined }
+
 /-- Native CUDA batched/matrix multiplication, backed by CUDA/cuBLAS paths. -/
 def matmul : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.matmul"
     .matmul
     "Spec.matmul / IR.matmul"
     "Matrix products agree with the row-major runtime contract."
     "Backward products are checked through autograd/runtime parity."
-
-/-- Native CUDA batched matrix multiplication. -/
-def bmm : KernelCapsule :=
-  nativeCapsule
-    "native_cuda.bmm"
-    .bmm
-    "Spec.bmm / batched matrix product"
-    "Batched matrix products agree with the row-major runtime contract."
-    "Batched matrix-product VJPs are checked through autograd/runtime parity."
 
 /-- Native CUDA ReLU activation. -/
 def relu : KernelCapsule :=
@@ -146,40 +158,33 @@ def exp : KernelCapsule := nativePointwiseCapsule .exp
 def log : KernelCapsule := nativePointwiseCapsule .log
 def inv : KernelCapsule := nativePointwiseCapsule .inv
 def safeLog : KernelCapsule := nativePointwiseCapsule .safeLog
-def logSoftmax : KernelCapsule := nativePointwiseCapsule .logSoftmax
+def logSoftmax : KernelCapsule :=
+  nativeAccumulationCapsule
+    "native_cuda.log_softmax"
+    .logSoftmax
+    "Spec.logSoftmax"
+    "Log-softmax kernels follow the stable row/axis normalization contract."
+    "Log-softmax VJPs are checked through runtime autograd tests."
 
 /-- Native CUDA row/axis softmax kernels. -/
 def softmax : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.softmax"
     .softmax
     "Spec.softmax"
     "Softmax kernels follow the row/axis normalization contract."
     "Softmax VJPs are checked through runtime autograd tests."
 
-def sum : KernelCapsule := nativeReductionCapsule .sum
 def reduceSum : KernelCapsule := nativeReductionCapsule .reduceSum
 def reduceMean : KernelCapsule := nativeReductionCapsule .reduceMean
 
-def flatten : KernelCapsule := nativeViewCapsule .flatten
 def reshape : KernelCapsule := nativeViewCapsule .reshape
 def permute : KernelCapsule := nativeViewCapsule .permute
-def transpose2d : KernelCapsule := nativeViewCapsule .transpose2d
-def swapAdjacentAtDepth : KernelCapsule := nativeViewCapsule .swapAdjacentAtDepth
-def transpose3dFirstToLast : KernelCapsule := nativeViewCapsule .transpose3dFirstToLast
-def transpose3dLastToFirst : KernelCapsule := nativeViewCapsule .transpose3dLastToFirst
-def transpose3dLastTwo : KernelCapsule := nativeViewCapsule .transpose3dLastTwo
-def broadcastTo : KernelCapsule := nativeViewCapsule .broadcastTo
-def concatVectors : KernelCapsule := nativeViewCapsule .concatVectors
-def concatLeadingAxis : KernelCapsule := nativeViewCapsule .concatLeadingAxis
-def sliceLeadingAxisRange : KernelCapsule := nativeViewCapsule .sliceLeadingAxisRange
-def gatherScalar : KernelCapsule := nativeViewCapsule .gatherScalar
-def gatherScalarNat : KernelCapsule := nativeViewCapsule .gatherScalarNat
-def gatherRow : KernelCapsule := nativeViewCapsule .gatherRow
-def gatherVecNat : KernelCapsule := nativeViewCapsule .gatherVecNat
-def gatherRowsNat : KernelCapsule := nativeViewCapsule .gatherRowsNat
-def scatterAddVec : KernelCapsule := nativeViewCapsule .scatterAddVec
-def scatterAddRow : KernelCapsule := nativeViewCapsule .scatterAddRow
+def broadcast : KernelCapsule := nativeViewCapsule .broadcast
+def concat : KernelCapsule := nativeViewCapsule .concat
+def slice : KernelCapsule := nativeViewCapsule .slice
+def gather : KernelCapsule := nativeViewCapsule .gather
+def scatterAdd : KernelCapsule := nativeViewCapsule .scatterAdd
 
 def randUniform : KernelCapsule :=
   nativeForwardOnlyCapsule
@@ -195,7 +200,7 @@ def bernoulliMask : KernelCapsule :=
 
 /-- Native CUDA layer normalization. -/
 def layerNorm : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.layer_norm"
     .layerNorm
     "Spec.layerNorm"
@@ -204,79 +209,56 @@ def layerNorm : KernelCapsule :=
 
 /-- Native CUDA batch normalization. -/
 def batchNorm : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.batch_norm"
     .batchNorm
     "Spec.batchNorm"
     "BatchNorm follows the channel-first normalization contract."
     "BatchNorm VJP is checked by CUDA runtime coverage."
 
-/-- Native CUDA channel-first BatchNorm runtime op. -/
-def batchNormChannelFirst : KernelCapsule :=
-  nativeCapsule
-    "native_cuda.batchnorm_channel_first"
-    .batchNormChannelFirst
-    "Spec.batchNorm / channel-first runtime contract"
-    "Channel-first BatchNorm follows the image/channel normalization contract."
-    "Channel-first BatchNorm VJP is checked by CUDA runtime coverage."
-
 /-- Native CUDA generic channel-first convolution. -/
-def conv : KernelCapsule := nativeConvPoolCapsule .conv
-
-/-- Native CUDA 2D convolution. -/
-def conv2d : KernelCapsule :=
-  nativeCapsule
-    "native_cuda.conv2d"
-    .conv2d
-    "Spec.conv2d"
-    "Conv2D follows the NCHW/channel-first runtime contract."
-    "Conv2D VJP is checked by CUDA runtime coverage."
+def conv : KernelCapsule :=
+  nativeAccumulationCapsule
+    "native_cuda.conv"
+    .conv
+    "Spec.conv"
+    "Convolution follows the generic channel-first runtime contract."
+    "Convolution VJP is checked by CUDA runtime coverage."
 
 /-- Native CUDA generic channel-first transpose convolution. -/
-def convTranspose : KernelCapsule := nativeConvPoolCapsule .convTranspose
-
-/-- Native CUDA 2D transpose convolution. -/
-def convTranspose2d : KernelCapsule := nativeConvPoolCapsule .convTranspose2d
+def convTranspose : KernelCapsule :=
+  nativeAccumulationCapsule
+    "native_cuda.conv_transpose"
+    .convTranspose
+    "Spec.convTranspose"
+    "Transpose convolution follows the generic channel-first runtime contract."
+    "Transpose-convolution VJP is checked by CUDA runtime coverage."
 
 /-- Native CUDA max pooling. -/
 def maxPool : KernelCapsule :=
-  nativeCapsule
-    "native_cuda.max_pool"
-    .maxPool
-    "Spec.maxPool"
-    "Max-pooling follows the channel-first window contract."
-    "Max-pooling VJP is checked by CUDA runtime coverage."
-
-/-- Native CUDA 2D max pooling. -/
-def maxPool2d : KernelCapsule := nativeConvPoolCapsule .maxPool2d
-
-/-- Native CUDA padded 2D max pooling. -/
-def maxPool2dPad : KernelCapsule := nativeConvPoolCapsule .maxPool2dPad
+  nativeSelectionCapsule .maxPool
 
 /-- Native CUDA smooth max pooling. -/
-def smoothMaxPool : KernelCapsule := nativeConvPoolCapsule .smoothMaxPool
-
-/-- Native CUDA smooth 2D max pooling. -/
-def smoothMaxPool2d : KernelCapsule := nativeConvPoolCapsule .smoothMaxPool2d
+def smoothMaxPool : KernelCapsule :=
+  nativeAccumulationCapsule
+    "native_cuda.smooth_max_pool"
+    .smoothMaxPool
+    "Spec.smoothMaxPool"
+    "Smooth max pooling follows the generic window contract."
+    "Smooth-max-pooling VJP is checked by CUDA runtime coverage."
 
 /-- Native CUDA average pooling. -/
 def avgPool : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.avg_pool"
     .avgPool
     "Spec.avgPool"
     "Average-pooling follows the channel-first window contract."
     "Average-pooling VJP is checked by CUDA runtime coverage."
 
-/-- Native CUDA 2D average pooling. -/
-def avgPool2d : KernelCapsule := nativeConvPoolCapsule .avgPool2d
-
-/-- Native CUDA padded 2D average pooling. -/
-def avgPool2dPad : KernelCapsule := nativeConvPoolCapsule .avgPool2dPad
-
 /-- Native CUDA linear layer. -/
 def linear : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.linear"
     .linear
     "Spec.linear"
@@ -285,7 +267,7 @@ def linear : KernelCapsule :=
 
 /-- Native CUDA mean-squared-error loss. -/
 def mseLoss : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.mse_loss"
     .mseLoss
     "Spec.mseLoss"
@@ -294,7 +276,7 @@ def mseLoss : KernelCapsule :=
 
 /-- Native CUDA FFT/FNO kernels. -/
 def fftFno : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.fft_fno"
     .fftFno
     "packed rFFT and FNO spectral-convolution contracts"
@@ -303,7 +285,7 @@ def fftFno : KernelCapsule :=
 
 /-- Native CUDA selective scan kernels. -/
 def selectiveScan : KernelCapsule :=
-  nativeCapsule
+  nativeAccumulationCapsule
     "native_cuda.selective_scan"
     .selectiveScan
     "diagonal selective-scan recurrence contract"
@@ -314,7 +296,6 @@ def selectiveScan : KernelCapsule :=
 /-- Native CUDA capsules, excluding attention which has a dedicated semantic split. -/
 def capsules : List KernelCapsule :=
   [ matmul
-  , bmm
   , linear
   , mseLoss
   , relu
@@ -337,45 +318,24 @@ def capsules : List KernelCapsule :=
   , safeLog
   , logSoftmax
   , softmax
-  , sum
   , reduceSum
   , reduceMean
-  , flatten
   , reshape
   , permute
-  , transpose2d
-  , swapAdjacentAtDepth
-  , transpose3dFirstToLast
-  , transpose3dLastToFirst
-  , transpose3dLastTwo
-  , broadcastTo
-  , concatVectors
-  , concatLeadingAxis
-  , sliceLeadingAxisRange
-  , gatherScalar
-  , gatherScalarNat
-  , gatherRow
-  , gatherVecNat
-  , gatherRowsNat
-  , scatterAddVec
-  , scatterAddRow
+  , broadcast
+  , concat
+  , slice
+  , gather
+  , scatterAdd
   , randUniform
   , bernoulliMask
   , layerNorm
   , batchNorm
-  , batchNormChannelFirst
   , conv
-  , conv2d
   , convTranspose
-  , convTranspose2d
   , maxPool
-  , maxPool2d
-  , maxPool2dPad
   , smoothMaxPool
-  , smoothMaxPool2d
   , avgPool
-  , avgPool2d
-  , avgPool2dPad
   , fftFno
   , selectiveScan
   ]

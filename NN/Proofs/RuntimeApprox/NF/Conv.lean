@@ -182,7 +182,7 @@ lemma approx_get_at_or_zero {s : Shape} :
                       rnd))
                       (x := x) (xR := xR) (eps := eps)).1 _hx
               | cons i is =>
-                  have heps : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) _hx
+                  have heps : 0 ≤ eps := approxT_eps_nonneg _hx
                   -- Both sides are `0` for out-of-shape indices.
                   simpa [get_at_or_zero_scalar_cons, toSpec_zero (β := β) (fexp := fexp) (rnd :=
                     rnd)] using heps
@@ -193,7 +193,7 @@ lemma approx_get_at_or_zero {s : Shape} :
           | dim xRf =>
               cases idx with
               | nil =>
-                  have heps : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) _hx
+                  have heps : 0 ≤ eps := approxT_eps_nonneg _hx
                   -- Out-of-shape: both reads are `0`.
                   simpa [get_at_or_zero_dim_nil, toSpec_zero (β := β) (fexp := fexp) (rnd := rnd)]
                     using heps
@@ -212,7 +212,7 @@ lemma approx_get_at_or_zero {s : Shape} :
                     simpa [get_at_or_zero_dim_cons, hi] using ih (xS := xSf fi) (xR := xRf fi) hx_i
                       is
                   · -- Out-of-bounds: both reads are `0`.
-                    have heps : 0 ≤ eps := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd)
+                    have heps : 0 ≤ eps := approxT_eps_nonneg
                       _hx
                     have hn : ¬ i < n := hi
                     simpa [get_at_or_zero_dim_cons, hn, toSpec_zero (β := β) (fexp := fexp) (rnd :=
@@ -270,7 +270,7 @@ lemma approx_padded_input_read
       Spec.get_at_or_zero_pad_multi_channel (α := ℝ) (img := xS) (c := c) (p := p) (q := q) (padding
         := padding)
     by_cases ht : p < padding ∨ q < padding
-    · have heps : 0 ≤ epsX := approxT_eps_nonneg (β := β) (fexp := fexp) (rnd := rnd) hx
+    · have heps : 0 ≤ epsX := approxT_eps_nonneg hx
       simpa [h4, ht, hR, hS] using heps
     · have hcore :=
         approx_get_at_or_zero (β := β) (fexp := fexp) (rnd := rnd)

@@ -37,8 +37,6 @@ canonical truncation, and representation-level arithmetic used by the rounded-re
 - `Format/` defines magnitudes, digit counts, exponent functions, and representable grids.
 - `Rounding/` defines rounding modes and proves their order and double-rounding properties.
 - `Scalar/` packages rounded-real semantics as `NF` and supplies neural-network scalar operations.
-  Its conversion module also defines storage-width-independent affine quantization and proves code
-  range, monotonicity, in-range round-trip, and nearest reconstruction-error results.
 - `Analysis/` studies ULP spacing, neighboring values, and exact subtraction.
 - `Error/` proves absolute, relative, directed, and exact-residual results.
 - `Special/` contains execution policies such as flush-to-zero that intentionally differ from the
@@ -46,6 +44,8 @@ canonical truncation, and representation-level arithmetic used by the rounded-re
 
 Each directory has one umbrella module with the same name.  Import the narrow folder umbrella when
 possible; import `NN.Floats.NeuralFloat` only when the full generic theory is required.
+Storage-width-independent affine quantization lives in `NN.Floats.Quantization`, where the scalar
+definition and its rank-polymorphic tensor lift share one rounding semantics.
 
 ## When To Use It
 
@@ -63,8 +63,9 @@ A useful mental model is:
   `TRUST_BOUNDARIES.md`.
 
 For a fixed grid with spacing `step`, `neuralRoundAtScale` applies any valid integer rounding rule
-without introducing a second format semantics. `AffineQuantizer` uses that same rounding theory
-with a positive scale, zero point, and bounded integer code interval. The theorem
+without introducing a second format semantics. `NN.Floats.Quantization` builds scalar and tensor
+affine quantizers from that rounding theory, using a positive scale, zero point, and bounded integer
+code interval. The theorem
 `neuralRoundAtScale_nearestEven_after_odd_binary_extra` proves that round-to-odd on a sufficiently
 fine binary intermediate avoids nearest-even double rounding on the final grid.
 

@@ -2,358 +2,359 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Generative Models and ML Theory" =>
+#doc (Manual) "Generative Models" =>
 %%%
 tag := "generative-models"
 %%%
 
-Generative models stress the library because they mix runtime, probability, objectives, and
-sampling. A diffusion example has a noising process, a denoising network, a timestep schedule, and
-a sampler. A VAE has an encoder, decoder, latent distribution, KL term, and ELBO. A VQ-VAE has a
-codebook and nearest-code objective. A GAN has two networks and two coupled losses.
+Generative modeling forces several kinds of reasoning into one program. There is a trainable
+network, but also a probability law, a noise source, an objective with several terms, and a
+sampling procedure that may not resemble the training pass. TorchLean does not package all of this
+under one vague claim of “verified generation.” It gives the pieces separate Lean definitions and
+connects them where the current proofs justify the connection.
 
-TorchLean separates the runnable examples from the formal statements. The
-[generative model examples](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/Generative/) show that the TorchLean API and
-runtime can train compact programs shaped like diffusion models, autoencoders, VAEs, VQ-VAEs, and
-GANs. The [generative theory API](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/Generative/) records the pieces we can presently
-cite as checked Lean statements: Gaussian forward noising, sampler Lipschitz facts, ELBO algebra,
-KL nonnegativity, nearest code facts, and generator/discriminator objective decompositions.
+This chapter begins with one complete diffusion run. It then uses the VAE, VQ-VAE, GAN, and masked
+autoencoder examples to show where executable training and formal objective theory currently meet.
 
-The split is deliberate. A generated image, reconstruction loss, or adversarial loss trace is a
-runtime artifact. A theorem about a forward Gaussian law, a KL term, or a finite codebook is a
-mathematical artifact. They should be connected in prose, but not collapsed into the same claim.
+# A Diffusion Run From Data To Sample
 
-# Runtime Examples And Theory Statements
+The maintained
+[`diffusion` application](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean)
+supports prepared CIFAR-10 arrays and converted `64 × 64` image folders. Its compact CIFAR branch
+crops images to `2 × 2` for a fast end-to-end check.
 
-The generative material is split by role. The runnable examples cover the training and data
-path; the theorem declarations state the objective or sampler facts that can be checked in Lean.
+Prepare CIFAR and run one CPU update:
 
-- *Diffusion*: the [diffusion command](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean) has
-  timestep sampling, epsilon prediction, logs, and PPM samples; the theory side records a forward
-  Gaussian law plus sampler Lipschitz and contraction facts.
-- *VAE*: the [compact VAE example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean) runs over flattened
-  image tensors; the theory side records ELBO algebra, beta weighting, and diagonal Gaussian KL
-  nonnegativity.
-- *VQ-VAE*: the [VQ-VAE example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/VqVae.lean) gives a
-  reconstruction path; the theory side records codebook loss decomposition and nearest-code facts.
-- *GAN / LSGAN*: the [GAN warmup](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean) runs a small
-  generator/discriminator objective; the theory side packages generator and discriminator losses.
-- *Autoencoder / MAE*: the [autoencoder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean) and
-  [masked autoencoder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean) examples connect to reconstruction
-  and masked objective algebra.
+```
+python3 scripts/datasets/download_example_data.py --cifar10
 
-The formal layer currently proves objective and sampler facts. These are the pieces that future
-stronger generative-model theorems can reuse.
+lake exe torchlean diffusion --device cpu \
+  --dataset cifar10 --n-total 1 \
+  --steps 1 --hidden-c 1 --T 2 \
+  --log /tmp/diffusion-trainlog.json
+```
 
-Some objective shapes to keep in mind:
+The command prints the exact typed network before training:
 
-$$`x_t=\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\,\epsilon`
+```
+torchlean diffusion: diffusion trainer (device=cpu)
+model:
+Sequential: [1, 4, 2, 2] -> [1, 3, 2, 2], layers=7, params=15
+  [0] Conv2d(4, 1): [1, 4, 2, 2] -> [1, 1, 2, 2]
+  [1] ReLU: [1, 1, 2, 2] -> [1, 1, 2, 2]
+  [2] Conv2d(1, 1): [1, 1, 2, 2] -> [1, 1, 2, 2]
+  [3] ReLU: [1, 1, 2, 2] -> [1, 1, 2, 2]
+  [4] Conv2d(1, 1): [1, 1, 2, 2] -> [1, 1, 2, 2]
+  [5] ReLU: [1, 1, 2, 2] -> [1, 1, 2, 2]
+  [6] Conv2d(1, 3): [1, 1, 2, 2] -> [1, 3, 2, 2]
+steps=1 loss0=1.093821 loss1=1.092744
+  wrote TrainLog JSON: /tmp/diffusion-trainlog.json
+torchlean diffusion: ok
+```
+
+Why does the input have four channels while the output has three? The clean image has three RGB
+channels. The noised image receives one additional channel containing the normalized timestep.
+For batch `B`, data channels `C`, and spatial extent `S`, the model contract is
+
+$$`B\times(C+1)\times S
+\longrightarrow
+B\times C\times S.`
+
+The public constructor
+[`nn.models.epsConvNet`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Diffusion.lean)
+is parameterized by arbitrary spatial rank. The runnable command instantiates two spatial axes and
+uses four `1 × 1` convolutions. A stronger residual same-resolution denoiser also exists in the API,
+but it is not the default command path.
+
+# Forward Noising
+
+Let `β_t` be the variance schedule, `α_t=1-β_t`, and
+
+$$`\bar\alpha_t=\prod_{s=0}^{t}\alpha_s.`
+
+The DDPM forward process can sample timestep `t` directly:
+
+$$`x_t
+=\sqrt{\bar\alpha_t}\,x_0
++\sqrt{1-\bar\alpha_t}\,\epsilon,
+\qquad \epsilon\sim\mathcal N(0,I).`
+
+The training sample stores the noised image and timestep as input and the same `ε` as target. The
+network therefore learns an epsilon predictor `ε_θ(x_t,t)` by mean squared error.
+
+TorchLean keeps randomness outside the pure noising helper. In
+[`NN.API.Models.Diffusion`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Diffusion.lean),
+`noisedSampleFromEps` receives an explicit noise tensor. `noisedSample` obtains a reproducible
+tensor from a `(seed, step)` pair and then calls the pure helper. This separation makes it possible
+to state properties of the noising map without treating ambient randomness as an invisible global
+effect.
+
+The mathematical forward law is developed separately in
+[`NN.MLTheory.Generative.Diffusion.ForwardGaussian`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/ForwardGaussian.lean).
+The theorem
+
+```
+NN.MLTheory.Generative.Diffusion.forwardGaussian_isGaussian
+```
+
+proves that the affine transformation of a Gaussian used by `forwardGaussian` is again Gaussian,
+with the corresponding mean and covariance. It is a theorem about a probability law. It is not a
+proof that the runtime RNG produced independent standard-normal bits, nor that a trained denoiser
+matches the exact score.
+
+# Reverse Sampling
+
+The command uses deterministic DDIM updates for reconstruction and sample artifacts. Given adjacent
+schedule values and a predicted noise tensor,
+
+$$`\widehat x_0
+=\frac{x_t-\sqrt{1-\bar\alpha_t}\,\widehat\epsilon_t}
+       {\sqrt{\bar\alpha_t}},`
+
+$$`x_{t-1}
+=\sqrt{\bar\alpha_{t-1}}\,\operatorname{clip}(\widehat x_0,-1,1)
++\sqrt{1-\bar\alpha_{t-1}}\,\widehat\epsilon_t.`
+
+The implementation exposes `ddimPrev` as a dataset-independent helper. The command can write four
+different images:
+
+- `--reference-ppm`: the clean input;
+- `--noisy-ppm`: a forward-noised input;
+- `--reconstruct-ppm`: DDIM reconstruction from a chosen timestep;
+- `--sample-ppm`: an unconditional sample beginning from noise.
+
+A small CUDA run that writes all four is:
+
+```
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
+  --dataset cifar10 --n-total 8 \
+  --steps 20 --hidden-c 4 --T 20 \
+  --reference-ppm /tmp/reference.ppm \
+  --noisy-ppm /tmp/noisy.ppm \
+  --reconstruct-ppm /tmp/reconstruct.ppm \
+  --sample-ppm /tmp/sample.ppm
+```
+
+The sampler theory in
+[`NN.MLTheory.Generative.Diffusion.Samplers`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/Samplers.lean)
+proves local facts such as
+`eulerStep_l2_lipschitz_of_rhs_lipschitz` and contraction results for composed DDIM or
+probability-flow Euler steps under explicit hypotheses. Those theorems reason about mathematical
+step maps. They do not establish FID, perceptual quality, learned-score accuracy, or end-to-end
+equivalence of a CUDA run.
+
+## Two Useful Variations
+
+Increase `--T` while keeping `--steps 1`. The optimizer still takes one update, but the noising
+schedule has more timesteps and the reverse artifact requires more model evaluations.
+
+Then keep `--T` fixed and increase `--hidden-c`. The schedule is unchanged; only the denoiser
+capacity and parameter count change. Separating those knobs helps distinguish diffusion-process
+cost from network cost.
+
+# Autoencoders Before Latent Probability
+
+The plain autoencoder is the smallest reconstruction baseline:
+
+$$`x
+\xrightarrow{\mathrm{encoder}}z
+\xrightarrow{\mathrm{decoder}}\widehat x,\qquad
+L_{\mathrm{recon}}=\|x-\widehat x\|_2^2.`
+
+The public vector model is
+
+```
+dataDim -> hiddenDim -> latentDim -> hiddenDim -> dataDim
+```
+
+with ReLU hidden activations and a sigmoid output. The runnable example flattens a small prefix of a
+CIFAR image into a typed vector.
+
+```
+lake exe torchlean autoencoder --device cpu \
+  --n-total 1 --steps 1 \
+  --log /tmp/autoencoder-trainlog.json
+```
+
+Observed output:
+
+```
+torchlean autoencoder: CIFAR vector reconstruction (device=cpu)
+dataset size = 1
+mean_loss(before) = 0.024575
+mean_loss(after) = 0.024385
+steps=1 loss0=0.024575 loss1=0.024385
+torchlean autoencoder: ok
+```
+
+This baseline is useful because it isolates data loading, flattening, reconstruction, and optimizer
+state before adding a probabilistic interpretation.
+
+# The VAE Objective And The Current Runtime Example
+
+A VAE introduces an approximate posterior `q_φ(z|x)`, a prior `p(z)`, and the negative evidence
+lower bound
 
 $$`\mathcal L_{\mathrm{VAE}}
 =
-\mathbb E_{q_\phi(z\mid x)}[-\log p_\theta(x\mid z)]
-+\beta\,D_{\mathrm{KL}}(q_\phi(z\mid x)\|p(z))`
+\mathbb E_{q_\phi(z\mid x)}
+  [-\log p_\theta(x\mid z)]
++\beta\,D_{\mathrm{KL}}
+  \left(q_\phi(z\mid x)\,\|\,p(z)\right).`
 
-$$`L_{\mathrm{VQ}}
-=
-L_{\mathrm{recon}}
-+\|\operatorname{sg}(z_e)-e_k\|^2
-+\beta\|z_e-\operatorname{sg}(e_k)\|^2`
+For diagonal Gaussian posterior parameters `μ_i` and `σ_i²`, the KL to a standard normal is
 
-$$`L_D=(D(x)-1)^2+D(G(z))^2,\qquad
-L_G=(D(G(z))-1)^2.`
+$$`D_{\mathrm{KL}}
+=\frac12\sum_i
+\left(\mu_i^2+\sigma_i^2-\log\sigma_i^2-1\right)\ge0.`
 
-The exact Lean declarations name the precise weights, reductions, and scalar choices used by the
-corresponding theory file.
-
-A useful source-reading pass is:
+The nonnegativity theorem is
 
 ```
-#check NN.MLTheory.Generative.Diffusion.forwardGaussian_isGaussian
-#check NN.MLTheory.Generative.Diffusion.eulerStep_l2_lipschitz_of_rhs_lipschitz
-#check NN.MLTheory.Generative.Latent.betaVae_loss_eq_weightedTwoTerm
-#check NN.MLTheory.Generative.Latent.diagonalGaussianKlToStandardReal_nonneg
-#check NN.MLTheory.Generative.Latent.nearestCode_minimizes_quantization_loss
-#check NN.MLTheory.Generative.Latent.generatorLoss_eq_weightedTwoTerm
+NN.MLTheory.Generative.Latent.diagonalGaussianKlToStandardReal_nonneg
 ```
 
-Those names are intentionally local. They do not claim that a trained image generator converges.
-They state reusable facts about the objective, distribution, sampler, or finite choice that the
-runtime examples are built around.
+and `betaVae_loss_eq_weightedTwoTerm` records the reconstruction-plus-weighted-KL decomposition.
+The theory also contains coordinatewise reparameterization laws.
 
-# Diffusion
-
-Diffusion is the most visibly generative example in the current example set. The executable is exposed by
-the [diffusion example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Diffusion.lean), and the API model
-constructor is in [NN.API.Models.Diffusion API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Diffusion.lean). The example
-uses a compact residual convolutional epsilon predictor because it gives users a real noising and
-denoising training loop with an inspectable sampling artifact.
-
-A compact CUDA runtime check looks like:
+The current executable is intentionally narrower. Its output contains a reconstruction followed by
+latent mean and log-variance proxy channels, and its supervised target asks for the image plus zero
+latent proxies. It trains that target with MSE; it does not sample `z=μ+σε` and optimize a complete
+Monte Carlo ELBO.
 
 ```
-python3 scripts/datasets/download_example_data.py --cifar10
-lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+lake exe torchlean vae --device cpu \
+  --n-total 1 --steps 1 \
+  --log /tmp/vae-trainlog.json
 ```
 
-For a longer image run, increase `--n-total`, `--steps`, `--hidden-c`, and the diffusion horizon:
+The current run reports:
 
 ```
-python3 scripts/datasets/download_example_data.py --cifar10
-lake -R -K cuda=true exe torchlean diffusion --device cuda \
-  --dataset cifar10 --n-total 128 --steps 50 --hidden-c 8
+torchlean vae: CIFAR beta-VAE-style training (device=cpu)
+dataset size = 1
+mean_loss(before) = 0.142191
+mean_loss(after) = 0.140895
+steps=1 loss0=0.142191 loss1=0.140895
+torchlean vae: ok
 ```
 
-For 64 by 64 local image folders, the example accepts converted arrays in the ImageNet style:
+The honest combined statement is therefore: TorchLean has a runnable VAE-shaped network and proved
+algebraic and distributional facts for the VAE objective, but the current command is not yet an
+end-to-end proved stochastic variational-inference implementation.
 
-```
-python3 scripts/datasets/torchlean_data_convert.py image-folder \
-  --input /path/to/imagenet/train \
-  --x-output data/real/imagenet64/imagenet64_train_X.npy \
-  --y-output data/real/imagenet64/imagenet64_train_y.npy \
-  --height 64 --width 64 --labels-from-dirs --limit 2000
+# Finite Codebooks In VQ-VAE
 
-lake -R -K cuda=true exe torchlean diffusion --device cuda \
-  --dataset imagenet64 --n-total 800 --steps 200 --hidden-c 8 \
-  --sample-ppm data/model_zoo/imagenet64_sample.ppm
-```
+VQ-VAE replaces a continuous latent sample by the nearest entry in a finite codebook. If
+`e₁,...,e_K` are code vectors and `z_e(x)` is the encoder output, then
 
-The theory layer covers a different, more mathematical part of the subject:
+$$`k^\star
+\in\operatorname*{arg\,min}_{1\le k\le K}
+\|z_e(x)-e_k\|_2^2.`
 
-- The [forward Gaussian API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/ForwardGaussian.lean) defines
-  `forwardGaussian` and proves `forwardGaussian_isGaussian`, so the forward noising distribution is
-  recorded as a Gaussian law in Lean.
-- The [diffusion samplers API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Diffusion/Samplers.lean) states base case identities
-  for DDPM, DDIM, and probability flow Euler samplers, then proves Lipschitz and contraction style
-  facts such as `eulerStep_l2_distance_bound`, `eulerStep_l2_lipschitz_of_rhs_lipschitz`,
-  `ddimStepSystem_contracts_of_step_contracts`, and
-  `pfOdeEulerSystem_contracts_of_step_lipschitz`.
+The standard objective combines reconstruction, codebook, and commitment terms:
 
-Those are local sampler facts, not a full diffusion convergence theorem. The executable
-still owns the empirical ML workflow: data loading, timestep sampling, optimizer steps, logs, and
-image artifacts. The theory layer owns citeable statements about the mathematical objects that the
-runtime example is named after.
+$$`L
+=L_{\mathrm{recon}}
++\|\operatorname{sg}(z_e)-e_{k^\star}\|_2^2
++\beta\|z_e-\operatorname{sg}(e_{k^\star})\|_2^2.`
 
-The shortest honest diffusion claim therefore looks like:
+The theory module
+[`NN.MLTheory.Generative.Latent.VQVAE`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/VQVAE.lean)
+proves `vqvae_loss_eq_weightedThreeTerm` and
+`nearestCode_minimizes_quantization_loss` for the stated finite codebook predicate.
 
-```
-The `diffusion` command ran a compact epsilon-prediction training loop and wrote a sample/log.
-The forward noising law used in the mathematical account is represented by `forwardGaussian`.
-The theorem `forwardGaussian_isGaussian` proves that this law is Gaussian.
-```
+The current `vqvae` command is again a compact reconstruction proxy with a narrow `tanh`
+bottleneck. It does not execute a learned discrete codebook lookup or straight-through estimator.
+The theorem and the runtime example occupy adjacent parts of the intended architecture; they should
+not be described as one completed proof.
 
-Anything stronger, such as sample quality, FID, convergence of the learned denoiser, or equivalence
-between a CUDA training run and a real-valued sampler theorem, needs a separate artifact.
+# Two Networks In The GAN Example
 
-The informal definition is:
-
-$$`\operatorname{forwardGaussian}(c_0,c_1,x_0)
-= \mathcal{L}\!\left(c_0x_0+c_1Z\right),
-\qquad Z\sim\mathcal{N}(0,I)`
-
-and the theorem `forwardGaussian_isGaussian` says that this law is Gaussian with the expected mean
-and covariance transformation. Sampler facts then talk about one step maps:
-
-$$`x_{t-1} = \operatorname{step}(t,x_t,\operatorname{scoreOrNoise})`
-
-under Lipschitz or contraction hypotheses. The proof does not inspect image quality; it proves
-properties of the mathematical step map.
-
-The usual paper lineage is DDPM by Ho, Jain, and Abbeel, "Denoising Diffusion Probabilistic Models"
-(NeurIPS 2020, https://arxiv.org/abs/2006.11239), DDIM by Song, Meng, and Ermon, "Denoising
-Diffusion Implicit Models" (ICLR 2021, https://arxiv.org/abs/2010.02502), and score based SDEs by
-Song et al., "Score-Based Generative Modeling through Stochastic Differential Equations" (ICLR
-2021, https://arxiv.org/abs/2011.13456).
-
-# VAE And The ELBO Boundary
-
-The VAE example is kept modest. In
-[NN.Examples.Models.Generative.Vae source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Vae.lean), the model
-trains on flattened CIFAR images with a supervised target that keeps reconstruction channels near
-the input and latent mean/log variance proxy channels near zero. It is a runnable beta VAE style
-path through the TorchLean model API; it is not a full stochastic variational inference experiment.
-
-The proof statements are sharper:
-
-- [NN.Spec.Models.Vae API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Vae.lean) names the VAE forward pass and loss shape.
-- [NN.MLTheory.Generative.Latent.VAE API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/VAE.lean) proves
-  objective decompositions such as `betaVae_loss_eq_weightedTwoTerm`,
-  `betaVae_loss_eq_reconstruction_of_zero_kl`, and `betaVae_loss_mono_beta_of_kl_nonneg`.
-- The same file proves diagonal Gaussian KL facts, including
-  `coordinateKlToStandard_nonneg`, `diagonalGaussianKlToStandardReal_nonneg`, and
-  `diagonalGaussianKlToStandardReal_eq_zero_iff`.
-- It also records the reparameterization side with `scalar_reparameterization_law` and
-  `diagonal_reparameterization_coordinate_law`, plus named ELBO helpers `negativeElbo` and
-  `betaNegativeElbo`.
-
-The precise VAE claim is: the runtime example trains a compact
-model shaped like a VAE, while the ML theory declarations prove algebraic and distributional facts about the
-VAE objective and diagonal reparameterization. That distinction is healthier than claiming that a
-tiny CIFAR runtime check formalizes all of variational inference.
-
-The basic objective shape is:
-
-$$`\operatorname{negativeElbo}(terms)
-= \operatorname{reconstruction}(terms)+\operatorname{KL}(terms)`
-
-$$`\operatorname{betaNegativeElbo}(\beta,terms)
-= \operatorname{reconstruction}(terms)+\beta\operatorname{KL}(terms)`
-
-The KL theorem `diagonalGaussianKlToStandardReal_nonneg` is the guarantee to remember: the diagonal
-Gaussian KL to the standard normal is nonnegative, and it is zero exactly in the standard normal case
-stated by `diagonalGaussianKlToStandardReal_eq_zero_iff`.
-
-The paper anchor is Kingma and Welling, "Auto-Encoding Variational Bayes" (ICLR 2014,
-https://arxiv.org/abs/1312.6114). For beta-VAE terminology, the common citation is Higgins et al.,
-"beta-VAE: Learning Basic Visual Concepts with a Constrained Variational Framework" (ICLR 2017,
-https://openreview.net/forum?id=Sy2fzU9gl).
-
-# VQ-VAE
-
-The VQ-VAE runtime file,
-[NN.Examples.Models.Generative.VqVae source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/VqVae.lean), uses a
-small vector reconstruction model with a narrow bottleneck. That shape keeps the example runnable
-while making the intended VQ-VAE connection explicit in the nearby spec and theory modules.
-
-The theorem statements are in:
-
-- [NN.Spec.Models.VqVae API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/VqVae.lean), which states quantization and loss
-  equations for a codebook model.
-- [NN.MLTheory.Generative.Latent.VQVAE API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/VQVAE.lean), which
-  proves `vqvae_loss_eq_weightedThreeTerm`,
-  `vqvae_loss_eq_reconstruction_of_zero_quantization`,
-  `vqvae_loss_mono_beta_of_commitment_nonneg`, and nearest code facts such as
-  `exactCodeMatch_isNearestCode` and `nearestCode_minimizes_quantization_loss`.
-
-Here again, the boundary is precise. The runnable example exercises TorchLean's training API for
-a reconstruction model shaped like a VQ-VAE. The Lean theory proves that the named VQ-VAE objective splits
-into reconstruction, codebook, and beta weighted commitment terms, and that selected nearest codes
-minimize the stated finite squared distance objective.
-
-The nearest code predicate is the key mathematical object:
+For least-squares GAN objectives, one common scalar form is
 
 $$`\begin{aligned}
-\operatorname{IsNearestCode}(codebook,z,k)
-:= \forall j,\;&
-\operatorname{squaredL2}(z,codebook(k))\\
-&\le \operatorname{squaredL2}(z,codebook(j))
+L_D
+&=\mathbb E_x[(D(x)-1)^2]
+  +\mathbb E_z[D(G(z))^2],\\
+L_G
+&=\mathbb E_z[(D(G(z))-1)^2].
 \end{aligned}`
 
-From that, `nearestCode_minimizes_quantization_loss` turns the finite codebook choice into the
-stated quantization loss minimum.
+The theory in
+[`NN.MLTheory.Generative.Latent.GAN`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/GAN.lean)
+packages the weighted generator and discriminator objectives and proves zero-loss facts at the
+ideal scalar scores.
 
-The paper anchor is van den Oord, Vinyals, and Kavukcuoglu, "Neural Discrete Representation
-Learning" (NeurIPS 2017, https://arxiv.org/abs/1711.00937).
+The runnable
+[`GAN example`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean)
+uses two trainers, but it chooses a stable warm-up:
 
-# GAN And LSGAN
+- the generator maps deterministic latent noise toward one CIFAR minibatch;
+- the discriminator separates that minibatch from deterministic noise images.
 
-GANs are especially easy to overstate. The
-[NN.Examples.Models.Generative.Gan source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Gan.lean) is a small
-LSGAN style executable path. It trains a generator from latent noise toward a CIFAR minibatch as a
-stable warm up objective, and it trains a discriminator on real CIFAR images and deterministic noise
-images. It is not a full alternating adversarial training recipe with all of the empirical care that
-production GANs require.
+It exercises generator state, discriminator state, two optimizers, and combined logging. It is not
+a full alternating adversarial recipe in which the discriminator consumes the generator's latest
+samples.
 
-The formal side is captured by two declaration groups:
+```
+lake exe torchlean gan --device cpu --n-total 1 --steps 1
+```
 
-- [NN.Spec.Models.Gan API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Gan.lean), which names generation, fake scores, and
-  discriminator losses.
-- [NN.MLTheory.Generative.Latent.GAN API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Generative/Latent/GAN.lean), which
-  proves objective packaging lemmas such as `generatorLoss_eq_weightedTwoTerm` and
-  `discriminatorLoss_eq_weightedThreeTerm`, plus zero loss facts
-  `generatorLoss_zero_of_fake_score_real` and `discriminatorLoss_zero_of_perfect_scores`.
+This is a good source to read when implementing a genuinely alternating trainer because the
+two-model state boundary is already explicit.
 
-The citation line is clean: TorchLean contains checked algebra for LSGAN style scalar
-objectives and a runnable generator/discriminator example. Convergence and distribution-matching
-claims would require additional theorem layers.
+# Masked Autoencoding
 
-The objective packaging is kept simple:
+The `mae` command uses real image masking rather than merely a narrow vector bottleneck. It divides
+the image into patches, applies a deterministic mask, embeds visible patch tokens with a compact
+ViT encoder, and trains a decoder head to reconstruct a flattened image prefix.
 
-$$`\begin{aligned}
-\operatorname{generatorLoss}
-&= \text{weighted two-term objective},\\
-\operatorname{discriminatorLoss}
-&= \text{weighted three-term objective}
-\end{aligned}`
+For a mask set `M`, the finite reconstruction objective has the form
 
-$$`\begin{aligned}
-\text{perfect discriminator scores}
-&\Longrightarrow \operatorname{discriminatorLoss}=0,\\
-\text{fake score marked real}
-&\Longrightarrow \operatorname{generatorLoss}=0
-\end{aligned}`
+$$`L_{\mathrm{MAE}}
+=\frac1{|M|}\sum_{i\in M}
+\|\widehat x_i-x_i\|_2^2.`
 
-Those are compact theorems, but they matter because they pin down which scalar objective the example is
-claiming to optimize.
+The self-supervised theory proves finite-patch identities such as `maeLoss_append`,
+`maeLoss_reverse`, and `exactReconstruction_identity`. These are exact objective facts. They do not
+prove that a learned representation transfers to downstream tasks.
 
-The original GAN reference is Goodfellow et al., "Generative Adversarial Nets" (NeurIPS 2014,
-[paper page](https://papers.nips.cc/paper_files/paper/2014/hash/f033ed80deb0234979a61f95710dbe25-Abstract.html)).
-The least squares variant is Mao et al., "Least Squares Generative Adversarial Networks" (ICCV
-2017, https://arxiv.org/abs/1611.04076).
+The executable source is
+[`NN/Examples/Models/Generative/Mae.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean);
+the mathematical development is under
+[`NN/MLTheory/SelfSupervised`](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/SelfSupervised).
 
-# Autoencoders And Masked Autoencoders
+# Results From The Run
 
-The plain autoencoder in
-[the autoencoder example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Autoencoder.lean) is the simplest
-reconstruction baseline: load a CIFAR vector batch, run an encoder/decoder, and optimize MSE. With
-the probabilistic and adversarial interpretation removed, this example exposes the runtime path
-itself.
+The generative stack is strongest when its claims remain compositional:
 
-The masked autoencoder in [the MAE example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Generative/Mae.lean) is more
-architectural. It loads CIFAR image tensors, masks deterministic patches, embeds patch tokens with a
-small ViT encoder, and trains a decoder head to reconstruct a flattened prefix of the image. The
-example includes real masking and patch tokens, but it is not a large asymmetric MAE pretraining
-run.
+| Result | Meaning |
+|---|---|
+| training loss decreased | one executable optimization run completed |
+| PPM or JSON was written | a runtime artifact was produced at the named path |
+| `forwardGaussian_isGaussian` | the formal affine Gaussian law is Gaussian |
+| sampler Lipschitz theorem | the mathematical step satisfies the stated bound under its hypotheses |
+| KL nonnegativity | the formal diagonal-Gaussian KL term is nonnegative |
+| nearest-code theorem | the selected finite code minimizes the stated squared-distance objective |
+| backend capsule | the run records the provider and evidence level of accelerated operations |
 
-The self-supervised theory side lives under
-[NN.MLTheory.SelfSupervised](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/SelfSupervised/).
-For MAE, the useful finite-patch hooks are `maeLoss`, `maeLoss_append`, `maeLoss_reverse`, and
-`exactReconstruction_identity`. They prove facts about a finite masked-patch objective, not about
-large-scale representation quality.
-
-The paper anchor for MAE is He et al., "Masked Autoencoders Are Scalable Vision Learners" (CVPR
-2022, https://arxiv.org/abs/2111.06377).
-
-# Claim Scope
-
-For generative models, the safest citation discipline is:
-
-- For a command that trains or samples through TorchLean, cite the corresponding file in
-  `NN/Examples/Models/Generative`.
-- For the diffusion forward law being Gaussian, cite `forwardGaussian_isGaussian` in the forward
-  Gaussian API.
-- For a sampler step being Lipschitz or contractive under hypotheses, cite the named theorems in the
-  diffusion samplers API.
-- For a VAE objective decomposing into reconstruction plus beta-weighted KL, cite
-  `betaVae_loss_eq_weightedTwoTerm`.
-- For diagonal Gaussian KL nonnegativity, cite `diagonalGaussianKlToStandardReal_nonneg`.
-- For a VQ-VAE loss splitting into reconstruction, codebook, and commitment terms, cite
-  `vqvae_loss_eq_weightedThreeTerm`.
-- For nearest-code minimization in a finite codebook, cite `nearestCode_minimizes_quantization_loss`.
-- For LSGAN generator and discriminator losses as weighted objectives, cite
-  `generatorLoss_eq_weightedTwoTerm` and `discriminatorLoss_eq_weightedThreeTerm`.
-
-The current development focuses on objective and sampler facts, plus runnable examples. Global
-distribution matching, convergence of SGD, image quality, FID, and complete training-step
-equivalence are separate claims that would require additional theorem layers. That scope is part of
-the discipline: TorchLean can run programs shaped like ML systems, and we can grow the formal
-island around the parts whose meaning we are ready to state precisely.
+The table also suggests the next useful integrations: a stochastic VAE trainer tied to the formal
+ELBO, a VQ-VAE command with a learned codebook, and graph-level numerical certificates for
+diffusion steps.
 
 # References
 
-- Ho, Jain, and Abbeel, [*Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2006.11239),
-  2020.
-- Song, Meng, and Ermon, [*Denoising Diffusion Implicit Models*](https://arxiv.org/abs/2010.02502),
-  2020/2021.
-- Song et al., [*Score-Based Generative Modeling through Stochastic Differential
-  Equations*](https://arxiv.org/abs/2011.13456), 2020/2021.
-- Kingma and Welling, [*Auto-Encoding Variational Bayes*](https://arxiv.org/abs/1312.6114),
-  2013/2014.
+- Ho, Jain, and Abbeel,
+  [*Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2006.11239), 2020.
+- Song, Meng, and Ermon,
+  [*Denoising Diffusion Implicit Models*](https://arxiv.org/abs/2010.02502), 2020/2021.
+- Kingma and Welling,
+  [*Auto-Encoding Variational Bayes*](https://arxiv.org/abs/1312.6114), 2013/2014.
 - van den Oord, Vinyals, and Kavukcuoglu,
   [*Neural Discrete Representation Learning*](https://arxiv.org/abs/1711.00937), 2017.
-- Goodfellow et al., [*Generative Adversarial Nets*](https://papers.nips.cc/paper_files/paper/2014/hash/f033ed80deb0234979a61f95710dbe25-Abstract.html),
-  2014.
-- Mao et al., [*Least Squares Generative Adversarial Networks*](https://arxiv.org/abs/1611.04076),
-  2016/2017.
-- He et al., [*Masked Autoencoders Are Scalable Vision Learners*](https://arxiv.org/abs/2111.06377),
+- Mao et al.,
+  [*Least Squares Generative Adversarial Networks*](https://arxiv.org/abs/1611.04076), 2016/2017.
+- He et al.,
+  [*Masked Autoencoders Are Scalable Vision Learners*](https://arxiv.org/abs/2111.06377),
   2021/2022.

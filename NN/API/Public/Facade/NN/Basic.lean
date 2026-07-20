@@ -21,7 +21,7 @@ namespace TorchLean
 namespace nn
 
 export NN.API.nn
-  (Sequential LayerDef M
+  (Sequential LayerDef M of
    manualSeed run runGlobal nextSeed nextSeeds freshSeed
    paramShapes paramRequiresGrad initParams updateBuffers programWithMode forwardProgram)
 

@@ -21,6 +21,7 @@ public import NN.Spec.Core.Shape
 public import NN.Spec.Core.Tensor
 public import NN.Spec.Core.TensorOps
 public import NN.Spec.Core.TensorReductionShape
+public import NN.Spec.Core.Utils
 
 /-!
 # Real Tensor Proof Toolkit
@@ -97,6 +98,22 @@ noncomputable instance {n : Nat} : Module ℝ (Tensor ℝ (.dim n .scalar)) :=
   Equiv.module ℝ (Tensor.dimScalarEquiv n)
 
 /-! ## 1D helpers -/
+
+/-- Mapping a scalar tensor and then extracting it is the same as mapping its scalar value. -/
+@[simp] lemma toScalar_mapTensor {α β : Type} (f : α -> β) (x : Tensor α .scalar) :
+    Tensor.toScalar (Spec.mapTensor f x) = f (Tensor.toScalar x) := by
+  cases x
+  rfl
+
+/-- Coordinate extraction commutes with a tensor map on vectors. -/
+@[simp] lemma toVec_mapTensor {α β : Type} {n : Nat}
+    (f : α -> β) (x : Tensor α (.dim n .scalar)) (i : Fin n) :
+    Proofs.TensorAlgebra.toVec (Spec.mapTensor f x) i =
+      f (Proofs.TensorAlgebra.toVec x i) := by
+  cases x with
+  | dim values =>
+      cases hvalue : values i
+      simp [Proofs.TensorAlgebra.toVec, Spec.mapTensor, hvalue]
 
 /-- `toVec` distributes over pointwise addition (`add_spec`). -/
 lemma toVec_add_spec {n : Nat} (x y : Tensor ℝ (.dim n .scalar)) :

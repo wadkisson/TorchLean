@@ -51,16 +51,6 @@ This avoids needing a separate `log` approximation lemma while remaining extensi
 def oneEps : ℝ :=
   neuralUlp β fexp (1 : ℝ) / 2
 
-/--
-Scalar forward-error envelope for `exp`.
-
-This packages the exact value, the perturbed value at `a + eps`, and the final rounding budget
-into one reusable bound for the later softplus/safe-log proofs.
--/
-def expBoundScalar (a eps : ℝ) : ℝ :=
-  Real.exp a + Real.exp (a + eps) +
-    neuralUlp β fexp (Real.exp a) / 2
-
 /-- Rounded representation of the scalar constant `1` at the `NF` backend. -/
 def oneHat : ℝ :=
   Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ)
@@ -76,7 +66,7 @@ def addHatSoftplus (a : ℝ) : ℝ :=
 
 /-- Forward-error envelope for the rounded `1 + exp a` subexpression used by `softplus`. -/
 def addBoundSoftplus (a eps : ℝ) : ℝ :=
-  oneEps (β := β) (fexp := fexp) + expBoundScalar (β := β) (fexp := fexp) a eps +
+  oneEps (β := β) (fexp := fexp) + expErrorBound (β := β) (fexp := fexp) a eps +
     neuralUlp β fexp
         (oneHat (β := β) (fexp := fexp) (rnd := rnd) + expHat (β := β) (fexp := fexp) (rnd := rnd)
           a) / 2
@@ -108,9 +98,9 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
   -- Step 1: exp approximation.
   have hexp :
       abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.exp xR) - Real.exp x) ≤
-        expBoundScalar (β := β) (fexp := fexp) (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
+        expErrorBound (β := β) (fexp := fexp) (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
           eps := by
-    simpa [expBoundScalar] using (approx_exp_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR
+    simpa using (approx_exp_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR
       := xR) (eps := eps) hx)
 
   -- Step 2: `1 + exp x` approximation.
@@ -160,11 +150,11 @@ compose the scalar bounds for `exp`, `+`, and `safeLog`.
         (x := (1 : ℝ)) (y := Real.exp x)
         (xR := oneR) (yR := MathFunctions.exp xR)
         (epsx := oneEps (β := β) (fexp := fexp))
-        (epsy := expBoundScalar (β := β) (fexp := fexp) (toSpec (β := β) (fexp := fexp) (rnd :=
+        (epsy := expErrorBound (β := β) (fexp := fexp) (toSpec (β := β) (fexp := fexp) (rnd :=
           rnd) xR) eps)
         hone hexp
     -- Rewrite to match the local definitions.
-    simpa [oneR, yR, y, addBoundSoftplus, expBoundScalar, oneHat, expHat,
+    simpa [oneR, yR, y, addBoundSoftplus, expErrorBound, oneHat, expHat,
       hOneVal, hExpVal,
       NFBackend.toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR,
       TorchLean.Floats.NF.roundR, TorchLean.Floats.NF.ofReal, TorchLean.Floats.NF.instOne,

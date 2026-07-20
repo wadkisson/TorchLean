@@ -88,6 +88,22 @@ def scaleBoundTensor {s : Shape} (eps : ℝ) (c : R) (xR : Tensor R s) : SpecTen
           / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
+/-- Per-entry budget for scaling when the scalar coefficient is itself approximate.
+
+`scaleBoundTensor` is the zero-coefficient-error specialization. This general form is required by
+constants such as `1 / sqrt(d)` in attention, where constructing the runtime coefficient already
+incurs rounding.
+-/
+def scaleApproxBoundTensor {s : Shape} (eps epsC : ℝ) (c : R)
+    (xR : Tensor R s) : SpecTensor s :=
+  mapSpec
+    (fun a =>
+      (abs a + eps) * epsC +
+        (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) c) + epsC) * eps +
+        neuralUlp β fexp
+          (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) c) / 2)
+    (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
+
 /-- Per-entry bound tensor for negation. -/
 def negBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
@@ -106,9 +122,13 @@ Per-entry bound tensor for exponentiation (`exp`).
 This matches `approx_exp_nf`: a mean-value-theorem bound on the real `exp` plus one rounding term.
 -/
 def expBoundTensor {s : Shape} (eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
+  mapSpec (fun a => expErrorBound (β := β) (fexp := fexp) a eps)
+    (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
+
+/-- Per-entry square-root budget on a domain with exact lower bound `η`. -/
+def sqrtPosBoundTensor {s : Shape} (η eps : ℝ) (xR : Tensor R s) : SpecTensor s :=
   mapSpec
-    (fun a =>
-      Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) / 2)
+    (fun a => eps / Real.sqrt η + neuralUlp β fexp (Real.sqrt (max a 0)) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
 
 /--

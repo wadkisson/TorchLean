@@ -135,6 +135,30 @@ In mathematical notation:
 
 $$`x_{t+1}=x_t-\eta g(x_t).`
 
+Before reading the general theorem, run the recurrence for
+
+$$`f(x)=x^2,\qquad \nabla f(x)=2x,\qquad \eta=\frac14.`
+
+Create `GradientDescentDemo.lean`:
+
+```
+import Mathlib
+
+def grad (x : ℚ) : ℚ := 2 * x
+def step (x : ℚ) : ℚ := x - (1 / 4) * grad x
+
+#eval step 4
+#eval step (step 4)
+
+example (x : ℚ) : step x = x / 2 := by
+  simp [step, grad]
+  ring
+```
+
+Lean prints `2` and `1`. The final theorem proves why: each step halves the distance to the
+minimizer `0`, so the squared distance contracts by a factor of `1/4`. The library theorem replaces
+this one-dimensional calculation by assumptions on an abstract gradient map.
+
 If `g` is strongly monotone with parameter $`\mu`, Lipschitz with parameter $`L`, and the step size
 $`\eta` is in the safe range, then one step is contractive:
 

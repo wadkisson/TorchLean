@@ -2,241 +2,428 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Autograd Walkthrough" =>
+#doc (Manual) "Differentiation By Example" =>
 %%%
 tag := "autograd-walkthrough"
 %%%
 
-Most ML users first meet automatic differentiation through `loss.backward()`. TorchLean keeps that
-workflow, but it does not hide the objects involved. A gradient call names the function being
-differentiated, the input shape, the output shape, and, for vector outputs, the cotangent seed that
-chooses which linear combination of outputs to differentiate.
+Reverse-mode automatic differentiation is usually introduced as “call backward and read the
+gradients.” TorchLean makes the derivative object explicit: a function, input, and output
+cotangent determine a vector-Jacobian product. Parameter gradients are returned in a pack whose
+shapes match the model's parameters.
 
-The objects to watch are:
+We will begin with a two-coordinate function, then differentiate a linear model, stop a gradient
+with `detach`, and finish with Jacobian and Hessian products.
 
-- the function or model being differentiated,
-- the input and parameter shapes,
-- the seed for a vector-Jacobian product when one is needed,
-- the gradient tensors returned by the runtime.
+# Run The Complete Tour
+
+```
+lake exe torchlean quickstart_autograd
+```
+
+The run prints several derivative views. The final portion is:
+
+```
+jacfwdInput(square) cols = 2
+  col[0] = [1.000000, -0.000000]
+  col[1] = [0.000000, -2.400000]
+
+hessianInput(mean(x^2)) cols = 2
+  H*e[0] = [1.000000, 0.000000]
+  H*e[1] = [0.000000, 1.000000]
+
+vjp(square, seed=ones) = [1.000000, -2.400000]
+grad1(mean(x^2)) = [0.500000, -1.200000]
+valueAndGradScalar(mean(x^2))
+  value = 0.845000
+  grad = [0.500000, -1.200000]
+```
+
+We will derive each value below. The source is
+[`AutogradBasics.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean).
 
 # A Scalar Function
 
-The smallest case is a scalar valued tensor function.
+Define:
+
+$$`
+f(x_0,x_1)=\frac{x_0^2+x_1^2}{2}.
+`
+
+In the public functional API:
 
 ```
 import NN.API
-
 open TorchLean
 
-def sumsq : autograd.func.Fn (.dim 2 .scalar) Shape.scalar :=
+def sumsq :
+    autograd.func.Fn (shape![2]) Shape.scalar :=
   fun x => do
     let y ← nn.functional.square x
     nn.functional.mean y
+```
 
+The type states that `sumsq` maps a two-vector to a scalar. The `do` block builds a checked tensor
+program; it is not using a special untyped scalar expression language.
+
+The mathematical gradient is:
+
+$$`
+\nabla f(x_0,x_1)=(x_0,x_1).
+`
+
+At `x=(0.5,-1.2)`:
+
+$$`
+f(x)=\frac{0.25+1.44}{2}=0.845,
+\qquad
+\nabla f(x)=(0.5,-1.2).
+`
+
+The executable call is:
+
+```
 def example : IO Unit := do
-  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, -1.2]
-  let g ← autograd.func.grad (α := Float) sumsq x
-  IO.println s!"grad = {Spec.pretty g}"
+  let x : Tensor.T Float (shape![2]) :=
+    tensor! [0.5, -1.2]
+  let (value, grad) ←
+    autograd.func.valueAndGradScalar
+      (alpha := Float) sumsq x
+  IO.println s!"value={value}, grad={Tensor.pretty grad}"
 ```
 
-The shape tells us that `sumsq` consumes a vector of length two and returns a scalar. Because the
-output is scalar, `autograd.func.grad` returns a tensor with the same shape as the input.
+The observed values match the hand calculation. That is a useful executable check. A theorem that
+the autograd transform is correct for every input requires the semantic proof layer described
+later; one agreeing sample is not that theorem.
 
-For `x = (x_1, x_2)`, the function is:
+# Why A VJP Is The Primitive Reverse Operation
 
-$$`\operatorname{mean}(x^2) = (x_1^2 + x_2^2)/2`
+Let:
 
-So the mathematical gradient is:
+$$`f:\mathbb R^n\to\mathbb R^m`
 
-$$`\nabla_x \operatorname{mean}(x^2) = x`
+with Jacobian:
 
-so the returned gradient has the same two coordinates as `x`.
+$$`J_f(x)\in\mathbb R^{m\times n}`.
 
-The example is a runtime computation. It is not a theorem about every possible scalar backend. The
-mathematical calculation explains what should happen, and the executable call checks the selected
-runtime implementation on this input.
+Reverse mode accepts an output cotangent `ȳ ∈ ℝ^m` and returns:
 
-# Value And Gradient Together
+$$`\bar x=J_f(x)^\mathsf{T}\bar y`.
 
-For debugging, compute the value and gradient in one call:
-
-```
-let (value, grad) ← autograd.func.valueAndGrad (α := Float) sumsq x
-```
-
-This mirrors the common workflow:
+TorchLean writes:
 
 ```
-y = f(x)
-dy_dx = grad(y, x)
+let dx ←
+  autograd.func.vjp
+    (alpha := Float)
+    f x seedOut
 ```
 
-TorchLean keeps both results ordinary values. There is no hidden `.grad` field that must be cleared
-before the next step.
-
-A common debugging pattern is to print both:
+The types enforce:
 
 ```
-def debugGrad : IO Unit := do
-  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [0.5, -1.2]
-  let (value, grad) ← autograd.func.valueAndGradScalar (α := Float) sumsq x
-  IO.println s!"value = {value}"
-  IO.println s!"grad = {Tensor.pretty grad}"
+x       : Tensor α inputShape
+seedOut : Tensor α outputShape
+dx      : Tensor α inputShape
 ```
 
-Use this when the function is small enough that a single value and gradient tell you what is going
-on. Use the trainer when the function is really a model, a dataset, and an optimizer loop.
+For a scalar output, choosing seed one gives the ordinary gradient. For a vector output, the seed
+selects a linear combination of output rows without materializing the whole Jacobian.
 
-# Vector Outputs Need A Seed
+# Elementwise Square
 
-For scalar outputs, there is a single gradient. For vector outputs, there is not. If
-`f(x) = [f_1(x), f_2(x)]`, then “the gradient of `f`” could mean the gradient of `f_1`, the
-gradient of `f_2`, their sum, or some weighted combination. A vector-Jacobian product supplies that
-choice.
+Let:
 
-```
-let dx ← autograd.func.vjp (α := Float) f x seedOut
-```
+$$`g(x_0,x_1)=(x_0^2,x_1^2)`.
 
-Informally:
+Its Jacobian is diagonal:
 
-$$`\operatorname{vjp}(f,x,\bar y) = J_f(x)^\mathsf{T}\bar y`
+$$`
+J_g(x)=
+\begin{bmatrix}
+2x_0&0\\
+0&2x_1
+\end{bmatrix}.
+`
 
-Here `seedOut` is the output cotangent. It has the same shape as the output of `f`, and the returned
-tensor has the same shape as `x`.
-
-Reverse mode needs exactly this operation. Each local operation sends an output cotangent back to
-input cotangents; composing those local rules gives the full gradient.
-
-Here the shape discipline pays off: the derivative type tells you what kind of object to expect
-back.
-
-A tiny example is a diagonal scaling function:
+The TorchLean definition and VJP are:
 
 ```
-def scale2 : autograd.func.Fn (.dim 2 .scalar) (.dim 2 .scalar) :=
-  fun x => do
-    let twoX ← nn.functional.scale x 2.0
-    pure twoX
+def square :
+    autograd.func.Fn (shape![2]) (shape![2]) :=
+  fun x => nn.functional.square x
 
 def vjpExample : IO Unit := do
-  let x : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [3.0, 4.0]
-  let seed : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [1.0, 10.0]
-  let dx ← autograd.func.vjp (α := Float) scale2 x seed
-  IO.println s!"dx = {Tensor.pretty dx}"
+  let x : Tensor.T Float (shape![2]) :=
+    tensor! [0.5, -1.2]
+  let seed : Tensor.T Float (shape![2]) :=
+    tensor! [1.0, 1.0]
+  let dx ←
+    autograd.func.vjp
+      (alpha := Float) square x seed
+  IO.println s!"dx={Tensor.pretty dx}"
 ```
 
-The seed says which output cotangent is flowing backward. For this function, the returned input
-cotangent is twice the seed. In a larger graph, the same idea is applied node by node.
+The result is:
 
-# Model Parameters
+$$`
+J_g(x)^\mathsf T(1,1)=(1,-2.4).
+`
 
-Training usually differentiates a loss with respect to parameters. The model API uses the same
-reverse mode idea, but the returned gradient has the same parameter structure as the model.
+Change the seed to `(1,10)`. The expected result becomes `(1,-24)`. This is a clean way to see that
+a VJP is not “the gradient” of a vector-valued function until an output cotangent is chosen.
 
-The usual calls are:
+# Full Jacobians
 
-- `autograd.model.gradParams` for gradients of the loss with respect to parameters,
-- `autograd.model.gradInputs` for gradients with respect to input and target tensors,
-- `autograd.model.valueAndGradParams` when the loss value and parameter gradients are both needed.
+TorchLean provides:
 
-Those declarations live in [NN.API.Public](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public.lean), while the runtime
-implementation lives in [NN.API.Runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime.lean) and
-[NN.Runtime.Autograd.TorchLean.Autodiff](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Autodiff.lean).
+- `jacfwd`, one output-shaped column per input coordinate;
+- `jacrev`, one input-shaped row per output coordinate.
 
-The shape of a model-parameter call is:
+For `square` at `(0.5,-1.2)`, the quickstart prints:
 
 ```
+col[0] = [1.000000, -0.000000]
+col[1] = [0.000000, -2.400000]
+```
+
+These are the columns of the diagonal Jacobian. Reverse mode prints the same entries organized by
+rows.
+
+The result is an array of shaped tensors rather than one anonymous flat matrix. The order follows
+the row-major flattened coordinate order of the relevant shape. This preserves enough structure to
+relate a derivative coordinate back to a tensor axis.
+
+Forward mode is attractive when the input dimension is small; reverse mode is attractive when the
+output dimension is small. Building the full Jacobian requires repeating one of these products for
+each basis direction.
+
+# Parameter VJPs
+
+Consider a linear map with three outputs and two inputs:
+
+$$`y=Wx+b`,
+
+where:
+
+$$`W\in\mathbb R^{3\times2},\qquad b\in\mathbb R^3`.
+
+For an output cotangent `ȳ`, the derivatives are:
+
+$$`
+\bar W=\bar y\,x^\mathsf T,
+\qquad
+\bar b=\bar y,
+\qquad
+\bar x=W^\mathsf T\bar y.
+`
+
+With `x=(0.5,-1.2)` and `ȳ=(1,1,1)`, each row of `dW` is `x` and each bias derivative is one. The
+quickstart prints:
+
+```
+vjpOutParams (seed=ones) dW =
+  [[0.500000, -1.200000],
+   [0.500000, -1.200000],
+   [0.500000, -1.200000]]
+vjpOutParams (seed=ones) db =
+  [1.000000, 1.000000, 1.000000]
+```
+
+The model API returns a dependent parameter pack:
+
+```
+let dparams ←
+  autograd.model.vjpParams
+    (alpha := Float)
+    model params x seedOut
+```
+
+`dparams` has exactly the shapes and order of `params`. There is no mutable `.grad` field that might
+contain stale values from a previous reverse pass.
+
+# A Loss Turns Output Derivatives Into Parameter Gradients
+
+For a model output and target of the same shape:
+
+```
+def loss :
+    autograd.model.OutputLoss outputShape outputShape :=
+  autograd.model.OutputLoss.mse
+
 let (lossValue, dparams) ←
   autograd.model.valueAndGradParamsScalar
-    (α := Float) model mseLoss params x target
+    (alpha := Float)
+    model loss params x target
 ```
 
-Read it carefully:
+Conceptually:
 
-- `model` names the checked architecture;
-- `mseLoss` turns prediction and target into a scalar loss;
-- `params` is the current parameter bundle;
-- `x` and `target` are the current input and label tensors;
-- `dparams` has the same parameter structure as `params`.
+$$`
+\nabla_\theta L
+=
+J_{F_\theta}^{\theta}(x)^\mathsf T
+\nabla_{\widehat y}L(\widehat y,y).
+`
 
-This is the public analogue of PyTorch's `loss.backward()`, but the gradient bundle is returned as a
-value. The optimizer step consumes `params` and `dparams` instead of looking for mutable `.grad`
-fields on tensors.
-
-# Jacobians, JVPs, And HVPs
-
-TorchLean also exposes analysis tools beyond the basic training gradient:
-
-- `autograd.func.jacfwd` for a forward mode Jacobian,
-- `autograd.func.jacrev` for a reverse mode Jacobian,
-- `autograd.func.hessian` for scalar valued functions,
-- `autograd.model.jvpParams` for a directional derivative of a scalar loss,
-- `autograd.model.hvpParams` for Hessian vector products over parameters.
-
-Read the APIs this way:
-
-- `grad` returns a scalar-output gradient, the common case for losses.
-- `vjp` returns `J_f(x)^T seedOut`, the reverse-mode object for vector outputs.
-- `jacfwd` works well when the input dimension is small.
-- `jacrev` works well when the output dimension is small.
-- `hvpParams` gives a Hessian-vector product for curvature diagnostics.
-
-These tools appear again in chapters on sensitivity, curvature, verification, and second order
-diagnostics. They also show why typed shapes matter: every returned object has the shape dictated by
-the derivative it represents.
-
-A Hessian-vector product is a good example of why TorchLean keeps parameter structure visible. The
-vector is not a flat anonymous buffer; it has the same parameter tree as the model:
+The quickstart's concrete result is:
 
 ```
-let hv ← autograd.model.hvpParams
-  (α := Float) model mseLoss params x target vparams
+loss(mse) = 0.165133
+gradParams (mse) gW =
+  [[-0.156667, 0.376000],
+   [-0.160000, 0.384000],
+   [0.070000, -0.168000]]
+gradParams (mse) gb =
+  [-0.313333, -0.320000, 0.140000]
 ```
 
-Here `vparams` is the direction in parameter space, and `hv` is the Hessian applied to that
-direction. Curvature diagnostics, influence-style calculations, and some optimizers want exactly
-that object.
+An optimizer consumes this pack together with parameters and its own state.
 
-# From Local Rules To Global Backprop
+# `detach` Preserves Values And Cuts Derivatives
 
-The proof story for autograd starts from a familiar calculation.
+`autograd.model.OutputLoss.detach` leaves the forward value unchanged while replacing the backward
+map by zero.
 
-1. Each primitive operation has a forward meaning.
-2. Each primitive operation has a local VJP or JVP rule.
-3. If those local rules match the derivative of the forward operation, then the composed reverse
-   pass computes the adjoint derivative of the whole graph.
+The quickstart checks both effects:
 
-At the user level, that is the picture. The proof chapters point to the Lean theorems that make it
-precise: supported primitive rules are linked to their forward meanings, and the tape theorem turns
-those local facts into a statement about the whole reverse pass.
+```
+loss(mse) = 0.165133
+loss(mse ∘ detach) = 0.165133
 
-The main proof trail starts here:
+gradParams (mse ∘ detach) gW =
+  [[0.000000, 0.000000],
+   [0.000000, 0.000000],
+   [0.000000, 0.000000]]
+gradParams (mse ∘ detach) gb =
+  [0.000000, 0.000000, 0.000000]
+```
 
-- [NN.Proofs.Autograd.Overview API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Overview.lean)
-- [NN.Proofs.Autograd.Tape.Algebra.Soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
-- [NN.Proofs.Autograd.Runtime.Link API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link.lean)
+This is a good diagnostic experiment: if the loss value changes, the forward implementation of
+detach is wrong; if a gradient remains nonzero, the backward edge was not cut.
 
-# A Practical Rule
+Detach is useful for target networks, stop-gradient estimators, contrastive objectives, and
+statistics that should not receive gradients. It also changes the mathematical objective seen by
+the optimizer, so it should never be inserted merely to make an error disappear.
 
-Use the smallest API that matches the question.
+# JVPs And Hessian-Vector Products
 
-- For a gradient of `Tensor σ -> scalar`, use `autograd.func.grad`.
-- For a value and gradient together, use `autograd.func.valueAndGrad`.
-- For a vector output with a chosen cotangent, use `autograd.func.vjp`.
-- For a model loss gradient with respect to parameters, use `autograd.model.gradParams`.
-- For minibatch training, use `Trainer.Config`, `Trainer.TrainOptions`, `trainer.train`, and the
-  quickstart examples.
+Forward mode computes:
 
-For a runnable tour, open
-[NN.Examples.Quickstart.AutogradBasics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean). It prints
-gradients, VJPs, Jacobians, Hessian vector products, and parameter gradients in one place.
+$$`J_f(x)v`.
 
-# References
+TorchLean exposes JVPs for functions and model parameters. Combining forward and reverse
+differentiation gives a Hessian-vector product:
 
-- [PyTorch's autograd tutorial](https://docs.pytorch.org/tutorials/beginner/blitz/autograd_tutorial.html)
-  is the closest conceptual comparison.
-- [PyTorch's autograd reference](https://docs.pytorch.org/docs/stable/autograd.html)
-  documents the corresponding Python API.
-- For the mathematical background, see Baydin et al.,
-  "Automatic differentiation in machine learning: a survey": https://arxiv.org/abs/1502.05767
+$$`H_f(x)v`
+
+without constructing the full Hessian.
+
+For:
+
+$$`f(x)=\frac{x_0^2+x_1^2}{2}`,
+
+the Hessian is the identity matrix:
+
+$$`H_f(x)=I_2`.
+
+The quickstart therefore prints:
+
+```
+H*e[0] = [1.000000, 0.000000]
+H*e[1] = [0.000000, 1.000000]
+```
+
+Change the function from `mean(square x)` to `sum(square x)`. The Hessian should become `2I`.
+This variation checks both the reduction convention and second derivative.
+
+# Local Rules And The Global Reverse Pass
+
+At runtime, each primitive operation contributes:
+
+1. a forward value;
+2. parent references;
+3. a local VJP rule.
+
+Reverse traversal starts from an output seed, applies each local rule in reverse topological order,
+and adds cotangents when several paths meet. For:
+
+$$`z=x^2+x^2`,
+
+the two paths each contribute `2x`, so accumulation returns `4x`. A tape that overwrote one parent
+contribution instead of adding would be wrong even if the local square rule were correct.
+
+This local-to-global split also structures the proofs. Primitive derivative theorems establish the
+local rules; tape soundness establishes that reverse accumulation composes them according to the
+graph.
+
+# Runtime Derivatives And Mathematical Derivatives
+
+There are three claims to distinguish:
+
+1. the calculus derivative of the ideal real operation;
+2. the derivative program generated by TorchLean's graph/autograd transform;
+3. the numeric values produced by CPU, CUDA, or an external VJP provider.
+
+The first two can be related by Lean theorems for supported primitives and well-formed graphs. The
+third additionally needs a runtime refinement or an explicit backend boundary. A CUDA kernel may
+use floating-point rounding and a different reduction tree even when it implements the same formal
+VJP equation.
+
+The public `autograd.func` helpers execute the compiled derivative machinery directly. Trainer
+eager/compiled selection and native capsule selection are separate runtime surfaces.
+
+# Inspect The Tape In VS Code
+
+Open the widget deep dive and place the cursor on:
+
+```
+#tape_view ...
+#tape_grads_view ...
+#tape_trace_view ...
+```
+
+The views show nodes, parent edges, accumulated gradients, and reverse traversal. Use them to answer:
+
+- which operations are on the path to the scalar output?
+- where do cotangents merge?
+- which leaf corresponds to each parameter?
+- did a detached branch disappear from reverse traversal?
+
+Widgets visualize an executable artifact. They do not add a theorem to it.
+
+# API Summary
+
+For one-input tensor functions:
+
+```
+autograd.func.grad
+autograd.func.valueAndGradScalar
+autograd.func.vjp
+autograd.func.jacfwd
+autograd.func.jacrev
+autograd.func.hessian
+```
+
+For checked models:
+
+```
+autograd.model.gradParams
+autograd.model.gradInputs
+autograd.model.valueAndGrads
+autograd.model.vjpParams
+autograd.model.vjpInput
+autograd.model.jacrevParams
+autograd.model.jvpParams
+autograd.model.hvpParams
+```
+
+The next runtime chapter explains which graph or tape each call constructs and why the canonical
+verification IR is a different artifact.
+
+References:
+
+- [`NN/API/Public/Autograd/Core.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public/Autograd/Core.lean);
+- Baydin et al.,
+  [Automatic Differentiation in Machine Learning](https://arxiv.org/abs/1502.05767);
+- [PyTorch autograd reference](https://docs.pytorch.org/docs/stable/autograd.html).

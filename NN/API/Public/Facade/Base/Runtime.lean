@@ -159,7 +159,8 @@ def parseArgs (args : List String) (defaultDType : DType := .float) :
     Except String (Options × List String) := do
   let (cfg, rest) ←
     NN.API.TorchLean.Module.ExecConfig.parseAndStripWithDefaultDType args defaultDType
-  pure (NN.API.TorchLean.Module.ExecConfig.toOptions cfg, rest)
+  let opts ← NN.API.TorchLean.Module.ExecConfig.toOptions cfg
+  pure (opts, rest)
 
 namespace BackendContracts
 

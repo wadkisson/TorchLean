@@ -41,13 +41,13 @@ def sum {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .sum
+    let _ ← requireNativeCudaCapsule s .reduceSum
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sum (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .sum cpu cuda
+  dispatchCudaOpt (α := α) s .reduceSum cpu cuda
 
 /-- Flatten a tensor to a 1D vector. PyTorch: `torch.flatten`. -/
 def flatten {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape] {sh : Shape}
@@ -58,13 +58,13 @@ def flatten {α : Type} (s : EagerSession α) [Inhabited α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .flatten
+    let _ ← requireNativeCudaCapsule s .reshape
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.flatten (t := t0) (s := sh) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .flatten cpu cuda
+  dispatchCudaOpt (α := α) s .reshape cpu cuda
 
 /--
 Reshape a tensor while preserving total number of elements.
@@ -96,13 +96,13 @@ def transpose2d {α : Type} (s : EagerSession α) [DecidableEq Shape] {m n : Nat
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .transpose2d
+    let _ ← requireNativeCudaCapsule s .permute
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose2d (t := t0) (m := m) (n := n) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .transpose2d cpu cuda
+  dispatchCudaOpt (α := α) s .permute cpu cuda
 
 /-- Swap two adjacent axes at a given depth. PyTorch analogue: `x.transpose(dim, dim+1)`. -/
 def swapAdjacentAtDepth {α : Type} (s : EagerSession α) [DecidableEq Shape] {sh : Shape}
@@ -114,13 +114,13 @@ def swapAdjacentAtDepth {α : Type} (s : EagerSession α) [DecidableEq Shape] {s
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .swapAdjacentAtDepth
+    let _ ← requireNativeCudaCapsule s .permute
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.swapAdjacentAtDepth (t := t0) (s := sh) depth x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .swapAdjacentAtDepth cpu cuda
+  dispatchCudaOpt (α := α) s .permute cpu cuda
 
 /-- Permute a 3D tensor `(a,b,c) → (b,c,a)`. PyTorch: `x.permute(1,2,0)`. -/
 def transpose3dFirstToLast {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -133,13 +133,13 @@ def transpose3dFirstToLast {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .transpose3dFirstToLast
+    let _ ← requireNativeCudaCapsule s .permute
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dFirstToLast (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .transpose3dFirstToLast cpu cuda
+  dispatchCudaOpt (α := α) s .permute cpu cuda
 
 /-- Permute a 3D tensor `(a,b,c) → (c,a,b)`. PyTorch: `x.permute(2,0,1)`. -/
 def transpose3dLastToFirst {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -152,13 +152,13 @@ def transpose3dLastToFirst {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .transpose3dLastToFirst
+    let _ ← requireNativeCudaCapsule s .permute
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dLastToFirst (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .transpose3dLastToFirst cpu cuda
+  dispatchCudaOpt (α := α) s .permute cpu cuda
 
 /-- Swap the last two axes of a 3D tensor `(a,b,c) → (a,c,b)`. PyTorch: `x.transpose(1,2)`. -/
 def transpose3dLastTwo {α : Type} (s : EagerSession α) [DecidableEq Shape] {a b c : Nat}
@@ -171,13 +171,13 @@ def transpose3dLastTwo {α : Type} (s : EagerSession α) [DecidableEq Shape] {a 
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .transpose3dLastTwo
+    let _ ← requireNativeCudaCapsule s .permute
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.transpose3dLastTwo (t := t0) (a := a) (b := b) (c := c) x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .transpose3dLastTwo cpu cuda
+  dispatchCudaOpt (α := α) s .permute cpu cuda
 
 /-- Broadcast a tensor to a larger shape. PyTorch: implicit broadcasting / `expand`. -/
 def broadcastTo {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Zero α] [DecidableEq Shape]
@@ -190,13 +190,13 @@ def broadcastTo {α : Type} (s : EagerSession α) [Inhabited α] [Add α] [Zero 
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .broadcastTo
+    let _ ← requireNativeCudaCapsule s .broadcast
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.broadcastTo (t := t0) (s₁ := sh1) (s₂ := sh2) cb x.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .broadcastTo cpu cuda
+  dispatchCudaOpt (α := α) s .broadcast cpu cuda
 
 /-- Sum-reduce along `axis`. PyTorch: `torch.sum(x, dim=axis)`. -/
 def reduceSum {α : Type} (s : EagerSession α) [Add α] [Zero α] [Inhabited α] [DecidableEq Shape]

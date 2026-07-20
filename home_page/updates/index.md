@@ -40,8 +40,10 @@ removed.
 
 We also broke up several files that had become difficult to navigate. Training, data handling,
 schedulers, CROWN propagation, graph compilation, runtime operations, normalization, Muon, and
-floating-point semantics now live in smaller modules with narrower imports. Even after accounting
-for those new files, the `NN` source tree is about 1,500 lines smaller.
+floating-point semantics now live in smaller modules with narrower imports. The public API tree is
+about 300 lines smaller and the guide is more than 5,000 lines shorter. The proof tree is larger
+because the numerical certificates, rounded backpropagation, optimizer contracts, and floating-point
+results below are new formal developments rather than forwarding wrappers.
 
 <div class="update-grid">
   <section>
@@ -80,6 +82,12 @@ rounding, round-to-odd, ULPs and neighboring values, double rounding, Sterbenz s
 absolute and relative error bounds. Flocq influenced this organization, but this is a native Lean
 development rather than a port of the whole Coq library.
 
+Sterbenz subtraction now covers gradual underflow and has a binary32 specialization. Every finite
+`IEEE32Exec` bit pattern is proved representable in that specification, so the executable Sterbenz
+theorem can identify nearby subtraction with the exact real difference. Finite executable values
+also expose a checked ULP exponent, and an absorption theorem connects an unchanged binary32
+accumulator to the rounded-real specification.
+
 We use the following distinction throughout TorchLean:
 
 - `NeuralFloat` and `NF` describe configurable rounded-real arithmetic used in proofs;
@@ -92,6 +100,63 @@ mode, perform the rounding, and derive the resulting error bound. The runtime-ap
 then start from the ideal autograd theorems and make every extra hypothesis about rounded execution
 explicit.
 
+### Whole-Graph Numerical Certificates
+
+TorchLean can now build a numerical trace over the canonical `NN.IR.Graph` rather than stopping at
+isolated scalar lemmas. Source intervals use exact binary32 endpoints. The checker reconstructs
+outward-rounded ranges for supported arithmetic, activations, directed square root, reductions,
+matrix multiplication, pooling, MSE, and stable softmax; malformed domains and non-finite ranges
+fail at the node that produced them.
+
+Range propagation is now an operation registry rather than one large match over model cases. The
+same traversal handles any architecture after lowering. Before propagation, a coverage pass lists
+the exact nodes whose primitives lack a range contract. Custom registries are named and the name is
+stored in the certificate, so an artifact cannot be replayed under a different set of rules.
+
+The same certificate contains the backend planning audit. Rounding mode, subnormal behavior,
+FMA/contraction, and reduction order are recorded by each kernel capsule. Portable accumulations
+use the fixed left fold from the tensor semantics. CUDA and LibTorch accumulations are marked
+implementation-dependent, so their matrix products, convolutions, normalizations, FFT/FNO paths,
+scans, and attention kernels cannot accidentally inherit a proof for a different reduction order.
+
+The bit-level replay evaluates every graph intermediate with `IEEE32Exec`, checks its shape and
+range, and rejects NaN or infinity. A checked certificate now stores the exact graph it was checked
+against, so replay cannot substitute a different graph. A separate proved real execution supplies
+the semantic enclosure; combining it with the bit-level replay yields an entrywise error trace for
+every node. The deep-dive example includes successful arithmetic, reduction, matmul, LayerNorm,
+`abs -> sqrt`, and softmax traces, together with deliberately tampered, invalid-domain, and
+wrong-reduction-policy cases. It now ends with a complete two-layer MLP: ten graph nodes pass
+coverage, range generation, backend-capsule audit, and bit-level replay. The
+[numerical-runtime walkthrough]({{ '/examples/numerical-runtime/' | relative_url }}) follows that
+run from source enclosures to its checked output.
+
+### Rounded Backpropagation and Optimizers
+
+The numerical proof now continues past the forward graph. Proof-bearing reverse nodes carry both
+their ideal VJP and their rounded VJP error transformer. The global reverse theorem composes those
+local bounds through gradient accumulation and connects the result to executable autograd
+`GraphData`.
+
+One optimizer contract carries the gradient error through parameter updates. SGD and momentum SGD
+have no extra domain condition. AdamW uses the same interface, with step data recording errors from
+both moments, bias correction, square root, adaptive division, decoupled weight decay, and the final
+subtraction; explicit margins keep the rounded denominator away from zero. The end-to-end theorem
+therefore works unchanged for all three optimizers and for every model represented by a `RevGraph`.
+A model-wide update applies it at each typed parameter index.
+
+The canonical `NN.IR.Graph` certificate remains a forward certificate. Its current compiler does not
+attach proved VJPs, so backward claims use the proof-bearing reverse graph path instead of silently
+attributing autograd semantics to a forward-only lowering.
+
+### Tensor Quantization
+
+Uniform affine quantization now has one scalar definition and one rank-polymorphic tensor lift under
+`NN.Floats.Quantization`. The proofs cover code-range preservation, monotonicity, exact
+dequantize/quantize round trips for in-range integer tensors, and the half-step reconstruction bound
+when saturation is inactive. Layout and storage width are not part of the arithmetic: int8, uint8,
+int4, and custom code sets differ through their integer bounds rather than separate image-specific
+APIs.
+
 ### Backend Contracts
 
 A user should be able to choose where a model runs without learning a pile of unrelated switches.
@@ -100,11 +165,22 @@ says whose implementation performs it, and `BackendOp` names the operation being
 each available implementation, a kernel capsule records its shape and layout requirements, whether
 it supplies forward and backward computation, and what evidence supports its numerical contract.
 
+The backend catalog is modular as well. Attention, native CUDA, portable reference code, and
+optional LibTorch providers contribute named capsule modules. A downstream provider can extend a
+profile with another module; model definitions do not change, because they request operations rather
+than provider-specific kernels.
+
+Capability names are now rank-polymorphic operation families. Convolution, pooling, reduction,
+permutation, slicing, gathering, and matrix multiplication each have one backend capability; rank,
+axes, padding, strides, and index tensors remain in the graph payload. Numerical certificates use
+their own transfer keys where two payloads need different interval rules, so provider discovery no
+longer doubles as a mathematical semantics table.
+
 Named profiles bundle choices that must agree. The checked CPU and native CUDA profiles keep the
-TorchLean tape and backward rules. The LibTorch-forward profile may use an external forward kernel
-while TorchLean still records the graph and performs backward. A separate LibTorch-autograd profile
-hands backward to LibTorch and says so plainly in the audit report. At present, the LibTorch bridge
-is for scaled dot-product attention; it is not a general PyTorch dispatcher.
+TorchLean tape and backward rules. The LibTorch-forward profile prefers its registered attention
+kernel, falls back to native CUDA for other operations, records the same TorchLean tape node, and
+uses TorchLean's local VJP. At present, the LibTorch bridge covers scaled dot-product attention; it
+is not a general PyTorch dispatcher.
 
 TorchLean runs on macOS CPU and on Linux CPU or native CUDA. For Windows, WSL2 is currently the
 documented route. The type system already has room for Metal, ROCm, WebGPU, TPU, Trainium, native
@@ -202,8 +278,8 @@ now build `NN` directly rather than passing through the deleted `NN.Library` she
   <h3>Validation</h3>
 
 - `lake lint`
-- `lake build` (4,271 build jobs)
-- `lake build NN NN.CI.All` (4,308 build jobs)
+- `lake build`
+- `lake build NN NN.CI.All`
 - `lake exe nn_tests_suite`
 - `lake -R -K cuda=true exe nn_tests_suite`
 - `scripts/checks/example_regression.sh` across 42 registered commands and examples

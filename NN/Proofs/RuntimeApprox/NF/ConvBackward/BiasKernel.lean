@@ -775,7 +775,7 @@ theorem approxT_conv2d_bias_deriv_spec
   intro layerS layerR outS outR bT
   classical
   have hε : 0 ≤ linfNorm bT := linf_norm_nonneg (t := bT)
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := outC) (s := .scalar)
+  refine approxT_dim_of_forall (n := outC) (s := .scalar)
     (xS := outS) (xR := outR) (eps := linfNorm bT) hε ?_
   intro oc
   have hpt :=
@@ -876,22 +876,22 @@ theorem approxT_conv2d_kernel_deriv_spec
   intro layerS layerR outS outR bT
   classical
   have hε : 0 ≤ linfNorm bT := linf_norm_nonneg (t := bT)
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := outC)
+  refine approxT_dim_of_forall (n := outC)
     (s := .dim inC (.dim kH (.dim kW .scalar)))
     (xS := outS) (xR := outR) (eps := linfNorm bT) hε ?_
   intro oc
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := inC)
+  refine approxT_dim_of_forall (n := inC)
     (s := .dim kH (.dim kW .scalar))
     (xS := (match outS with | .dim f => f oc)) (xR := (match outR with | .dim f => f oc))
     (eps := linfNorm bT) hε ?_
   intro ic
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := kH)
+  refine approxT_dim_of_forall (n := kH)
     (s := .dim kW .scalar)
     (xS := (match (match outS with | .dim f => f oc) with | .dim g => g ic))
     (xR := (match (match outR with | .dim f => f oc) with | .dim g => g ic))
     (eps := linfNorm bT) hε ?_
   intro di
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := kW)
+  refine approxT_dim_of_forall (n := kW)
     (s := .scalar)
     (xS :=
       (match

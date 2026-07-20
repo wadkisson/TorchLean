@@ -54,16 +54,16 @@ def label : TrustLevel → String
 
 end TrustLevel
 
-namespace TrustPolicy
+namespace AssurancePolicy
 
-/-- Short stable spelling for a profile trust policy. -/
-def label : TrustPolicy → String
-  | .verifiedOnly => "verified-only"
-  | .checked => "checked"
-  | .fuzzedOk => "fuzzed-ok"
-  | .allowTrustedExternal => "trusted-external-ok"
+/-- Short stable spelling for a profile assurance policy. -/
+def label (policy : AssurancePolicy) : String :=
+  if policy == .verified then "verified"
+  else if policy == .checked then "checked"
+  else if policy == .external then "external"
+  else "custom"
 
-end TrustPolicy
+end AssurancePolicy
 
 namespace VJPMode
 
@@ -72,20 +72,8 @@ def label : VJPMode → String
   | .none => "none"
   | .torchLeanTape => "torchlean-tape"
   | .backendVJP => "backend-vjp"
-  | .externalAutograd => "external-autograd"
 
 end VJPMode
-
-namespace RuntimeSupport
-
-/-- Short stable spelling for how a capsule is wired to runtime execution. -/
-def label : RuntimeSupport → String
-  | .eager => "eager"
-  | .testOnly => "test-only"
-  | .plannerOnly => "planner-only"
-  | .notWired => "not-wired"
-
-end RuntimeSupport
 
 namespace TensorLayout
 
@@ -138,7 +126,7 @@ namespace KernelAudit
 def reportLine (a : KernelAudit) : String :=
   s!"  {a.op.name}: {a.capsuleName} " ++
   s!"provider={a.provider.label} trust={a.trustLevel.label} vjp={a.vjpMode.label} " ++
-  s!"runtime={a.runtimeSupport.label}"
+  s!"numeric=[{a.numericalPolicy.reportLabel}]"
 
 /-- Full contract report for a selected backend capsule. -/
 def detailedReportLines (a : KernelAudit) : List String :=
@@ -146,7 +134,8 @@ def detailedReportLines (a : KernelAudit) : List String :=
   , a.shapeContract.reportLine "shape"
   , a.layoutContract.reportLine "layout"
   , a.valueContract.reportLine "value"
-  , a.vjpContract.reportLine "vjp" ]
+  , a.vjpContract.reportLine "vjp"
+  , s!"    numerical: {a.numericalPolicy.reportLabel}" ]
 
 end KernelAudit
 
@@ -176,35 +165,9 @@ end ExecutionPlan
 
 namespace BackendProfile
 
-/-- Representative operation set for an explicit profile preview. This is not an execution trace. -/
-def representativeOps : List BackendOp :=
-  [ .matmul
-  , .bmm
-  , .linear
-  , .mseLoss
-  , .add
-  , .relu
-  , .softmax
-  , .reduceSum
-  , .reshape
-  , .broadcastTo
-  , .gatherRowsNat
-  , .layerNorm
-  , .batchNormChannelFirst
-  , .conv
-  , .conv2d
-  , .convTranspose2d
-  , .maxPool
-  , .maxPool2d
-  , .smoothMaxPool2d
-  , .avgPool
-  , .avgPool2d
-  , .scaledDotProductAttention
-  ]
-
 /-- One-line profile description for logs and interactive choosers. -/
 def summary (p : BackendProfile) : String :=
-  s!"profile={p.name} device={p.config.device.cliName} trust={p.config.trustPolicy.label} " ++
+  s!"profile={p.name} device={p.config.device.cliName} assurance={p.config.assurance.label} " ++
   s!"vjp={p.config.vjpMode.label}"
 
 /-- Plan a list of backend ops and format the selected capsules. -/

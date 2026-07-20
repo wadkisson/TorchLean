@@ -47,9 +47,8 @@ def softmaxBoundScalar (eps : ℝ) (xR : R) : ℝ :=
   let denomHat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) denomR
   let qhat : ℝ := numHat / denomHat
   let epsNum : ℝ :=
-    Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
-      Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
-      neuralUlp β fexp (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2
+    expErrorBound (β := β) (fexp := fexp)
+      (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) eps
   neuralUlp β fexp qhat / 2 +
     abs numHat * abs (1 / denomHat) + abs numHat + epsNum
 
@@ -95,11 +94,8 @@ theorem approxT_softmax_spec {s : Shape} :
               have hdiv :=
                 approx_div_nf_of_one_le (β := β) (fexp := fexp) (rnd := rnd)
                   (x := Real.exp x) (y := y) (xR := numR) (yR := denomR)
-                  (epsx :=
-                    Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
-                      Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
-                      neuralUlp β fexp
-                          (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2)
+                  (epsx := expErrorBound (β := β) (fexp := fexp)
+                    (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) eps)
                   hy hnum
               have hb :
                   abs (toSpec (β := β) (fexp := fexp) (rnd := rnd)

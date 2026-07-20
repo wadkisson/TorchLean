@@ -7,283 +7,257 @@ open Verso.Genre Manual
 tag := "running-example"
 %%%
 
-We begin with a two-layer classifier from four input features to two output logits. The model is
-small enough that its architecture, parameters, lowered graph, numerical execution, and verification
-problem can all be written down explicitly. Larger models add operators and state, but they cross
-the same boundaries.
+Our running example is the checked-in `quickstart_mlp` program. It is deliberately small, but it is
+not pseudocode: it builds a dataset, initializes a model, runs autograd and Adam, prints predictions,
+and can execute through the same runtime interfaces used by larger examples.
 
-At each boundary we will identify the model's input shape, parameter payload, graph, scalar
-semantics, and checked claim. These objects are related, but they are not interchangeable: a graph
-does not contain a robustness theorem, and a successful runtime execution is not by itself a proof
-about every input in a region.
+The task is to learn the piecewise-linear function
 
-The path looks like this:
+$$`y(x_1,x_2)
+  =0.8\,\operatorname{ReLU}(x_1+x_2)
+   -0.4\,\operatorname{ReLU}(x_2-x_1)+0.2`
 
-```
-tinyClassifier
-  -> model builder
-  -> parameter payload
-  -> graph plus payload
-  -> Float32 execution
-  -> input box plus verifier bounds
-  -> semantic claim
-```
+on a grid in `[-1,1]^2`. This target is a useful first case for three reasons. It is nonlinear, so a
+single affine layer cannot solve it. It is built from ReLUs, so a small ReLU network can represent it
+without approximation-theory distractions. Finally, its two-dimensional input lets us inspect every
+shape and parameter without pages of indices.
 
-The later chapters apply the same structure to causal attention, fused kernels, PINN residuals,
-neural controllers, geometric certificates, and CROWN margin bounds.
+# The Source Program
 
-# The Public Model
-
-The ordinary application entry point is `import NN.API`. A small multilayer perceptron looks like familiar
-model construction code, but the input and output shapes are part of the type. Here the model consumes a
-feature vector of length `4` and produces two logits:
+The model is a two-layer MLP:
 
 ```
 import NN.API
 
 open TorchLean
 
-def tinyClassifier : nn.M (nn.Sequential (.dim 4 .scalar) (.dim 2 .scalar)) :=
+def inDim : Nat := 2
+def outDim : Nat := 1
+
+def model :
+    nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar)) :=
   nn.Sequential![
-    nn.Linear 4 8,
-    nn.ReLU,
-    nn.Linear 8 2
+    nn.linear inDim 8,
+    nn.relu,
+    nn.linear 8 outDim
   ]
-
-def tinyTask (seed : Nat) :=
-  Trainer.new tinyClassifier { task := .classification, seed := seed }
 ```
 
-At this stage there is no proof obligation; it is model code. The difference from a Python script is
-that the shape contract has already become part of the program. A later theorem, exporter, graph
-pass, or checker does not have to rediscover that the model expects four input features and returns
-two outputs.
+Read the type before the body. `nn.M` says that model construction consumes a deterministic seed
+stream. `nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)` says that the initialized model will map a
+length-two tensor to a length-one tensor. The hidden width `8` is checked through composition: the
+first linear layer produces length eight, ReLU preserves the shape, and the second linear layer
+expects length eight.
 
-The type is already saying the essential input/output contract:
+The model returns a one-element tensor rather than a scalar because the public layer API treats the
+output feature dimension uniformly. A dataset target must therefore have shape `[1]`, not shape `[]`
+and not shape `[batch]`.
 
-$$`\operatorname{tinyClassifier} :
-\operatorname{Model}\bigl(\operatorname{Tensor}(\alpha,[4]),
-                           \operatorname{Tensor}(\alpha,[2])\bigr)`
+# Why The Builder Is Seeded
 
-That contract is intentionally modest. It says nothing about accuracy, initialization quality, or
-robustness. It says the model is a computation from four features to two logits. Later claims add
-more hypotheses: trained parameters, an input box, a label, a scalar interpretation, and a checker
-or theorem.
-
-# The Same Model As Data
-
-When the model is built, TorchLean separates architecture from parameters. The first verification and
-interop boundary is already present: the architecture says which operations exist and how they are
-composed, while the parameter bundle says which trained numbers those operations use.
+Linear layers need initial weights and biases. Hiding randomness in a global generator would make a
+model definition depend on ambient state. TorchLean instead represents initialization as a pure
+state computation:
 
 ```
-def builtTiny :=
-  Trainer.new tinyClassifier { task := .classification, seed := 2026 }
-
--- The task contains the model structure and initialized parameter bundle.
-#check builtTiny
+def initialized :=
+  nn.run 2026 model
 ```
 
-PyTorch also has a parameter bundle, usually exposed through `state_dict`. TorchLean makes that idea
-central rather than incidental: parameters are passed, saved, loaded, lowered, and checked as data.
-That choice is what lets the same trained model move from model authoring to graph inspection to
-verification without becoming an untyped blob.
+Running the same builder with the same seed produces the same initialization stream. The resulting
+`nn.Sequential` contains four parameter tensors in layer order:
 
-The denotation we keep returning to has this shape:
+1. first-layer weights of shape `[8, 2]`;
+2. first-layer bias of shape `[8]`;
+3. second-layer weights of shape `[1, 8]`;
+4. second-layer bias of shape `[1]`.
 
-$$`\operatorname{forward}(architecture,\theta,x) = y`
-
-where the architecture, parameters `θ`, input `x`, and output `y` are all ordinary values that can
-be inspected or related by theorems.
-
-# A Concrete Input Convention
-
-For the running example, imagine the four input coordinates are normalized sensor features:
+We can ask Lean for that layout:
 
 ```
-def featureNames : List String :=
-  ["temperature", "pressure", "velocity", "bias"]
+#check nn.paramShapes initialized
+#check nn.initParams initialized
 ```
 
-TorchLean's tensor type can record that there are four coordinates, but it does not know the human
-meaning of coordinate `2` unless we record that convention somewhere. This is a useful limitation.
-Types catch shape mistakes; documentation, metadata, loaders, and predicates record domain
-conventions.
+The order is part of the forward-program interface. It is not a PyTorch-style dictionary of names.
+Checkpoint adapters may use names at an external boundary, but they must eventually construct this
+typed ordered payload.
 
-If a later verifier states a box property, it should be clear whether the box is over raw features
-or normalized features:
+# The Dataset
 
-$$`x_i \in [c_i-\varepsilon_i, c_i+\varepsilon_i]`
-
-Changing that convention changes the verification problem even when the tensor shape stays
-`.dim 4 .scalar`.
-
-# The Same Model As A Graph
-
-The graph chapters explain how TorchLean lowers model code into `NN.IR.Graph`, a DAG whose nodes name
-their operations and are shared by runtime inspection and verifier code. User-facing model code stays
-readable, while the graph gives compilers, widgets, and verifiers an object they can inspect node by
-node.
-
-The discipline is:
-
-- user code should stay readable;
-- the lowered graph should stay explicit;
-- theorem statements should name the semantics of that graph.
-
-We spend time on both `nn.Sequential` and `NN.IR.Graph` because they are not competing interfaces.
-They are two views of the same computation.
-
-For a lowered graph, the semantic question becomes:
-
-$$`\operatorname{NN.IR.Graph.denoteAll}(g,payload,input)`
-
-That expression is the reference meaning that a compiler pass, widget, verifier, or runtime bridge
-has to respect. If a pass fuses two operations, changes a layout, or exports a certificate, the
-claim is always about preserving or soundly approximating this denotation.
-
-# The Same Model As A Payload Contract
-
-A graph without numbers is still a family of computations. The trained classifier is the graph plus
-the payload. Informally:
+The target in the source example is:
 
 ```
-structure TinyPayloadSketch where
-  w1 : String
-  b1 : String
-  w2 : String
-  b2 : String
+def target (x1 x2 : Float) : Float :=
+  let relu (x : Float) := if x < 0.0 then 0.0 else x
+  (0.8 * relu (x1 + x2)) -
+    (0.4 * relu (x2 - x1)) + 0.2
 ```
 
-The real payload stores tensors, not strings. The sketch shows the audit point: the first linear
-layer's weight, the first bias, the second weight, and the second bias have names, shapes, and
-places in the graph. An import step can check that the payload it received matches those positions.
-A theorem about the graph should not silently use a different set of weights.
-
-# The Same Model Under Float32
-
-A theorem over real numbers and a float32 execution are not the same statement. TorchLean keeps the
-scalar semantics visible:
-
-- `ℝ` is the clean mathematical target;
-- `FP32` is the proof friendly model based on rounded reals;
-- `IEEE32Exec` is the executable IEEE-754 binary32 model;
-- native CUDA kernels are accelerated external code behind an explicit boundary.
-
-The Float32 chapters explain how those views are connected, and where a theorem still depends on an
-assumption about the external runtime.
-
-For the tiny classifier, a real-valued statement might say:
-
-$$`\forall x\in B,\;
-\operatorname{logit}_0(\operatorname{denote}_{\mathbb R}(g,\theta,x))
->
-\operatorname{logit}_1(\operatorname{denote}_{\mathbb R}(g,\theta,x))`
-
-A float32 statement is not the same sentence with a different font. It has to say whether the
-operations are modeled as rounded real operations, executable `IEEE32Exec`, or a native backend. If
-the theorem is real-valued and the deployment path is CUDA float32, a bridge or an explicit
-assumption is still part of the story.
-
-# The Same Model As A Verification Problem
-
-Once the model has a graph and a payload, verification tools can ask bounded questions about it. For
-the two-logit classifier above, a typical local robustness question is:
-
-> For every input `x` in this box around a reference example, is logit `0` still greater than logit `1`?
-
-The verifier does not need to trust the training script. It receives explicit objects:
-
-- What output interval follows from this input box?
-- Does a margin remain positive after bound propagation?
-- Which certificate or JSON artifact was checked, and which values came from an external producer?
-
-The core checker can be read schematically as a small Boolean computation over checked bounds:
+`Data.regressionGrid (-1.0) 1.0 5 target` samples five positions on each input axis, giving 25
+examples. Each input has shape `[2]` and each target has shape `[1]`:
 
 ```
--- Accept when class 0 is still ahead of class 1.
-def marginCertificateOK (logit0Lower logit1Upper : Float) : Bool :=
-  logit0Lower > logit1Upper
+def dataset : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
+  Data.regressionGrid (-1.0) 1.0 5 target
 ```
 
-The real verifier carries richer data than two floats, but the shape of the argument is the same:
-an external analyzer may propose bounds or artifacts, while Lean checks the part of the condition
-that is represented in the artifact.
+The tensor types settle the dimensional question: every row fits the model. Whether 25 points are
+enough to learn the target is a different question, and this small run gives us a concrete place to
+start asking it.
 
-The corresponding semantic statement is stronger than the Boolean check:
+# Training It
 
-$$`\operatorname{marginCertificateOK}(\ell_0,u_1)=\mathrm{true}
-\;\Longrightarrow\;
-\forall x\in B,\; f_0(x)>f_1(x)`
-
-To prove that implication, the checker needs hypotheses saying that `ℓ₀` is a valid lower bound on
-logit `0`, that `u₁` is a valid upper bound on logit `1`, and that both bounds apply to the same
-graph, payload, input box, and scalar semantics. The tiny Boolean is the final comparison; the
-soundness theorem is about why that comparison is allowed to stand for all inputs in the box.
-
-# A Tiny Checked Shape Example
-
-Here is the smallest version of the idea. Two vectors of the same shape can be added. Two tensors of
-different shapes cannot be passed to the same typed binary op without an explicit reshape, cast, or
-proof.
+The public trainer combines the model, task, optimizer, seed, and runtime choices:
 
 ```
-import NN.API
+def trainer :=
+  Trainer.new model
+    { task := .regression
+      optimizer := optim.adam { lr := 0.03 }
+      seed := 2026 }
+```
+
+Run the complete checked-in command from the repository root:
+
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu \
+  --steps 200 \
+  --seed 2026
+```
+
+On the current implementation, this deterministic run reports:
+
+```
+dataset size = 25
+mean_loss(before) = 0.761530
+mean_loss(after)  = 0.003234
+
+heldout: x=(0.250000,-0.750000)
+target=0.200000
+prediction(after)=[0.210239]
+```
+
+The exact log also includes intermediate losses and the prediction before training. We will keep
+this seed and configuration fixed throughout the guide so later chapters are talking about the same
+run.
+
+# What Happens During One Step
+
+For one sampled pair `(x,y)`, the runtime performs:
+
+1. read the current four parameter tensors;
+2. compute `Linear -> ReLU -> Linear`;
+3. compute the regression loss;
+4. seed the loss cotangent with one;
+5. traverse the autograd tape backward to obtain parameter gradients;
+6. update Adam's first and second moments;
+7. replace each parameter with its updated value;
+8. release or retain runtime buffers according to ownership.
+
+The mathematical forward map is
+
+$$`f_\theta(x)
+  =W_2\,\operatorname{ReLU}(W_1x+b_1)+b_2`.
+
+The loss for a single example is a scalar function of `θ`, even though the prediction has shape
+`[1]`. Reverse mode computes vector-Jacobian products from that scalar back to all four tensors.
+Adam then uses those gradients and its optimizer state to construct the next payload.
+
+The repository contains four views of this step:
+
+- eager runtime code that actually allocates tensors and records tape nodes;
+- ideal VJP definitions used in autograd proofs;
+- rounded VJP error transformers used by runtime-approximation proofs;
+- optimizer contracts for SGD, momentum, and AdamW-style updates.
+
+That gives us a running program, an ideal derivative, and a way to discuss the gap between them.
+
+# Changing The Device
+
+The source model does not mention CPU or CUDA. Device selection belongs to the runtime
+configuration:
+
+```
+lake exe torchlean quickstart_mlp --device cpu --steps 200
+```
+
+or, in a CUDA-enabled build:
+
+```
+lake -R -K cuda=true exe torchlean \
+  quickstart_mlp --device cuda --steps 200
+```
+
+The model type and parameter layout stay put. The selected backend profile plans the operations
+using the capsules available in that build, and `--show-backend` prints the resulting plan. We will
+look inside that plan in the backend chapter; there is no need to understand it before running this
+example.
+
+# Lowering The Forward Map
+
+Verification starts from an initialized model and a concrete parameter payload:
+
+```
+import NN
 
 open TorchLean
 
-def a : Tensor Float (shape![2]) :=
-  tensor! [1.0, 2.0]
-
-def b : Tensor Float (shape![2]) :=
-  tensor! [0.25, -0.5]
-
-def good := Spec.Tensor.addSpec a b
-
-def wrongShape : Tensor Float (shape![2, 1]) :=
-  tensor! [[1.0], [2.0]]
-
--- Rejected by the type checker:
--- def shapeMismatch := Spec.Tensor.addSpec a wrongShape
+#check Verification.compileForward
+  initialized
+  (nn.initParams initialized)
 ```
 
-That tiny example is the design in miniature. TorchLean does not try to guess which broadcast,
-reshape, or deployment convention you meant. A real convention should appear as a named operation in
-the code, so the model author, exporter, and checker all see the same transformation.
+The result is a `CompiledIR Float` containing:
 
-# What To Watch For
+- an `NN.IR.Graph`;
+- the payload store used by parameterized operations;
+- the distinguished input node;
+- the distinguished output node.
 
-As the examples get larger, keep track of where each object lives:
+For this MLP, the graph has an input, two linear operations, a ReLU, and an output path determined by
+the compiler's lowering. Each node records its parents and output shape. The parameter store carries
+the matrices and biases.
 
-- *Spec*: the mathematical meaning of tensors, layers, and losses.
-- *Runtime*: eager or compiled execution, gradients, optimizers, logging, and devices.
-- *IR*: a graph with named operations that can be inspected and verified.
-- *Proofs*: theorems about the spec, the graph, or the verifier output.
-- *Trust boundaries*: CUDA kernels, PyTorch exporters, external certificate producers, and datasets.
+Using `nn.initParams initialized` analyzes the initial model. To analyze the trained model, the
+compiler must receive the trained runtime parameters through the lower-level manual interface or a
+saved exact-bits payload. Reusing the initial payload after training would verify another function.
 
-Is this a tensor in the spec layer? A runtime value? A graph node? A theorem about graph denotation?
-A certificate imported from outside Lean? Most TorchLean mistakes become easier to diagnose once
-that question is clear.
+# An Input Region Instead Of One Point
 
-# The Paper Trail For This Example
+A forward prediction answers "what did the model return at `x`?" Verification usually asks a
+quantified question. Around the held-out point
 
-The same classifier produces several artifacts, and each artifact supports a different kind of
-sentence.
+$$`c=(0.25,-0.75)`,
 
-- Model source: "this is a two-layer classifier from `.dim 4 .scalar` to `.dim 2 .scalar`."
-- Parameter payload: "these tensors instantiate that architecture."
-- Runtime output: "this backend produced these logits on this input."
-- Lowered graph: "these named operations are the graph view of the model."
-- Shape check: "the payload and graph agree on dimensions."
-- Bound artifact: "these intervals or affine bounds were produced for this graph and input box."
-- Lean theorem: "under the theorem hypotheses, accepted bounds imply the stated semantic property."
+an `L∞` ball of radius `ε` is the box
 
-Not every line above is automatically proved. Keeping the artifacts together makes it possible to
-see which object supports each claim and where an additional proof obligation remains.
+$$`B_\varepsilon(c)
+ =\{x\mid |x_i-c_i|\leq\varepsilon\text{ for }i=1,2\}`.
 
-# References
+`Verification.seedLInfBall` places this box at the graph's input node. IBP propagates one interval
+per coordinate through the graph. CROWN propagates affine lower and upper forms and can retain
+dependencies that plain intervals lose.
 
-- PyTorch paper for the contrasting imperative ML style: https://arxiv.org/abs/1912.01703
-- CROWN robustness certification: https://arxiv.org/abs/1811.00866
-- LiRPA on general computational graphs: https://arxiv.org/abs/2002.12920
-- TorchLean graph source: https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean
+For this one-output regression model, a useful property might be
+
+$$`\forall x\in B_\varepsilon(c),\qquad
+  |f_\theta(x)-0.2|\leq\delta`.
+
+A computed output interval `[l,u]` supports this claim when
+
+$$`0.2-\delta\leq l
+  \quad\text{and}\quad
+  u\leq 0.2+\delta`,
+
+provided a soundness theorem covers the graph operations, payload, input bounds, and scalar
+semantics used by the pass.
+
+# Where We Go From Here
+
+We now have one object worth following: a trained two-layer network with a known seed, parameter
+layout, dataset, and held-out prediction. The frontend chapters explain how its tensors and tape are
+built. The graph chapters lower the same forward map. The floating-point chapter compares ideal and
+rounded evaluations. Finally, the verification chapters replace the single held-out point with an
+entire input region.

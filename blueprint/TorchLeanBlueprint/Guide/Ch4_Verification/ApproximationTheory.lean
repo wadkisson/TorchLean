@@ -7,116 +7,252 @@ open Verso.Genre Manual
 tag := "approximation-theory"
 %%%
 
-The word "approximation" appears in several places in TorchLean, and the meanings are different.
-Runtime approximation asks how far executable arithmetic may differ from ideal semantics. Verifier
-approximation asks for sound enclosures of activations or margins. Approximation theory asks a more
-classical mathematical question: what functions can networks represent, and with what error?
+A trained network is an approximation in an everyday sense, but that sentence hides three
+different mathematical claims. Suppose a ReLU network is intended to represent a function `f` on
+an interval.
 
-The quantifiers are different in each setting:
+First, an approximation theorem may say that a suitable network *exists*. Second, after choosing
+weights, a verifier may enclose the values of that particular network on an input box. Third, a
+runtime theorem may compare ideal real arithmetic with the binary32 program that actually runs.
+The three statements have different quantifiers:
 
-- *CROWN verifier approximation*: one network, one input region, and sound bounds; the
-  artifact is a certificate over activations or margins.
-- *Runtime approximation*: one executable path compared with one specification path; the artifact
-  is a tolerance proof for Float32 or `IEEE32Exec`.
-- *Universal approximation*: for a target function and error, there exists a network; the artifact
-  is an existence theorem over a function class.
+$$`\begin{aligned}
+\text{representation:}\quad&
+  \forall f\,\forall\varepsilon>0\,\exists\theta\,
+  \sup_{x\in K}|N_\theta(x)-f(x)|<\varepsilon,\\
+\text{verification:}\quad&
+  \forall x\in B,\quad N_\theta(x)\in\mathcal A_\theta(B),\\
+\text{execution:}\quad&
+  \forall x\in B,\quad
+  |N_{\theta,\mathrm{run}}(x)-N_{\theta,\mathbb R}(x)|\leq\delta(x).
+\end{aligned}`
 
-Keeping the quantifiers visible is the whole point. A theorem saying that ReLU networks are dense in
-a function space is not a deployment certificate for one trained model, and a CROWN certificate for
-one model is not a universal approximation theorem.
+Only the first line is universal approximation. It does not certify a trained checkpoint, choose
+the parameters for an optimizer, or prove that floating-point evaluation is close to the real
+network. TorchLean keeps these statements near one another because they eventually need to be
+composed, but it does not identify them.
 
-The three forms are:
+# Building A ReLU Approximant
 
-$$`\text{universal approximation:}\quad
-\forall f,\forall\varepsilon>0,\exists N_\theta,\;
-\sup_x |N_\theta(x)-f(x)|<\varepsilon`
+The one-dimensional construction is easier to understand in hinge notation. Let
 
-$$`\text{runtime approximation:}\quad
-\forall x,\;
-\|N_{\mathrm{run}}(x)-N_{\mathrm{spec}}(x)\|\le \varepsilon`
+$$`H(x)=b_0+\sum_{i=0}^{N-1} c_i\,\operatorname{ReLU}(x-t_i).`
 
-$$`\text{verifier approximation:}\quad
-x\in B\Longrightarrow N(x)\in \mathcal A(B).`
+Each term changes the slope at one knot `tᵢ`. By choosing knots on a sufficiently fine mesh and
+choosing `cᵢ` from changes in the piecewise-linear slope, `H` interpolates a Lipschitz target.
+The same expression is a one-hidden-layer network: the first linear layer computes `x - tᵢ`, ReLU
+applies the hinges, and the second linear layer forms their weighted sum.
 
-# Universal Approximation
+The theorem
+[`relu_universal_approximation_Icc`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximation.lean)
+makes precisely that conversion. Its current signature is:
 
-The basic one dimensional theorem has the familiar form:
+```
+theorem relu_universal_approximation_Icc
+    {f : ℝ → ℝ} {a b L : ℝ}
+    (h_ab : a < b)
+    (hL : 0 < L)
+    (h_lip :
+      ∀ x ∈ Set.Icc a b, ∀ y ∈ Set.Icc a b,
+        |f x - f y| ≤ L * |x - y|) :
+    ∀ ε > 0,
+      ∃ (hidDim : ℕ)
+        (l1 : LinearSpec ℝ 1 hidDim)
+        (l2 : LinearSpec ℝ hidDim 1),
+      ∀ x ∈ Set.Icc a b,
+        |f x - mlpEval1d hidDim l1 l2 x| < ε
+```
 
-$$`\forall f:[a,b]\to\mathbb{R},\quad
-\forall \varepsilon>0,\quad
-\exists h_{\mathrm{ReLU}},\quad
-\forall x\in[a,b],\quad
-\left|h_{\mathrm{ReLU}}(x)-f(x)\right|<\varepsilon`
+The assumptions are not decoration. `a < b` gives a nonempty interval with positive length.
+`L > 0` and `h_lip` provide a quantitative continuity bound. `ε > 0` is needed before a finite
+mesh can be chosen. The conclusion supplies an actual TorchLean `LinearSpec` pair, not merely an
+unnamed continuous approximating function.
 
-The [universal approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximation.lean)
-contains the real valued statement `relu_universal_approximation_Icc`. The rate file
-[universal approximation with rates](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationRate.lean)
-adds `reluApproximationWidth` and proves rate style theorems such as
-`relu_universal_approximation_Icc_rate`: the width is chosen as an explicit function of the
-Lipschitz constant, interval size, and error target.
+The rate theorem chooses the width
 
-The multidimensional file
-[universal approximation in higher dimension](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationND.lean)
-uses coordinate subalgebras and Stone-Weierstrass style reasoning. The shape of the theorem changes
-from an interval on the line to compact domains and tensor valued coordinates, but the reader
-should keep the same mental picture: networks are used as a dense class of functions under stated
-topological hypotheses.
+$$`N(L,a,b,\varepsilon)
+  = \left\lceil\frac{2L(b-a)}{\varepsilon}\right\rceil+1.`
 
-The float32 and `IEEE32Exec` variants express the same conceptual theorem after the approximating
-network is tied to a concrete scalar model. The clean real theorem and the executable bridge are
-related, but they are not the same statement.
+In Lean this is
+[`reluApproximationWidth`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationRate.lean),
+and `relu_universal_approximation_Icc_rate` uses exactly that hidden dimension. The arithmetic
+lemma underneath it proves
 
-The float versions spell out their extra obligations:
+$$`\frac{2L(b-a)}{N}<\varepsilon.`
 
-$$`\text{real approximation error}
-+ \text{dyadic parameter quantization error}
-+ \text{rounded execution error}
-\le \text{requested tolerance}`
+This bound is conservative. It establishes a construction with a stated size; it does not claim
+that the width is minimal, nor that gradient descent will discover these hinge parameters.
 
-For example, the [IEEE32Exec approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationIEEE32Exec.lean)
-contains theorems such as `reluApproximationIccIEEE32Exec_threeTerm`,
-`hinge_fun_dyadic_quantization_error_le_Icc`, and
-`reluApproximationIccIEEE32Exec_dyadicHalfUlp`. These statements make the finite precision bridge
-visible instead of claiming that a theorem over `ℝ` automatically transfers to binary32 code.
+# An Infoview Experiment
 
-# Float Interval Approximation
+Create a scratch file at the repository root and ask Lean for the theorem types:
 
-Float interval approximation asks for a sound set interpretation of finite values. The interval
-semantics starts with an interpretation map:
+```
+import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationRate
 
-$$`\gamma_I : \operatorname{Interval}\to\operatorname{Set}(\operatorname{IEEE32Exec}),
-\qquad
-\gamma : \operatorname{Box}(d)\to
-\operatorname{Set}\!\left(\operatorname{Fin}(d)\to\operatorname{IEEE32Exec}\right)`
+open NN.MLTheory.Proofs.UniversalApproximation
 
-An abstract operation is sound when every concrete result produced by inputs in the concrete sets
-is still inside the abstract output. In the
-[float interval semantics API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/Semantics.lean),
-the central theorems are `add_sound`, `mul_sound`, `relu_sound`, `aff_sound`, and `eval_sound`.
-The theorem shape is:
+#check reluApproximationWidth
+#check relu_universal_approximation_Icc_rate
+#check two_mul_mul_sub_div_relu_approximation_width_lt
+```
 
-$$`x\in\gamma(B)\quad\Longrightarrow\quad
-\operatorname{eval}(net,x)\in\gamma_I(\operatorname{evalSharp}(net,B))`
+Run it with `lake env lean Scratch.lean`, or hover over each declaration in an editor. The second
+line should display a conclusion of the form
 
-This follows the same soundness pattern as verification certificates, but here the carrier is finite
-float semantics and interval images. The
-[exact image theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/ExactImageTheorem.lean)
-then states stronger exact image style conditions, including `ExactIntervalImage` and
-`roundedTargetExactIntervalImage_of_correctRounding`. The
-[constant target example](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/ConstantTarget.lean)
-is the small case readers can use to see the definitions without the full network machinery.
+```
+∃ l1 l2, ∀ x ∈ Set.Icc a b,
+  |f x - mlpEval1d (reluApproximationWidth L a b ε) l1 l2 x| < ε
+```
 
-This sits close to verification, but it is still a different layer. A verifier certificate
-usually checks a specific network on a specific input region. The approximation theory layer is
-about representability and semantic approximation statements.
+There is a revealing variation. Try:
 
-# Three Meanings We Keep Separate
+```
+#eval reluApproximationWidth 1 0 1 (1 / 10)
+```
 
-TorchLean uses "approximation" in at least three different ways:
+Lean rejects this with a `dependsOnNoncomputable` error. The width uses `Nat.ceil` on mathematical
+real numbers, so it is a proof-level construction rather than a compiled numerical routine. This
+is not a defect in the approximation theorem. It is the boundary between an existence proof over
+exact reals and an executable parameter-selection program. A runtime tool could compute the same
+formula from rational inputs, but that would be a separate executable definition with a refinement
+theorem.
 
-- *Approximation theory*: networks as function approximators.
-- *Runtime approximation*: executable arithmetic versus ideal semantics.
-- *Verifier approximation*: sound overapproximations of reachable activations or output margins.
+# From Real Parameters To Binary32
 
-Keeping those meanings separate prevents ambiguity: an approximation theorem, a Float32 tolerance,
-and a CROWN bound are different claims with different proof obligations.
+The real theorem is only the first leg of a finite-precision result. Once knots, coefficients, and
+the bias are stored in binary32, the total error naturally splits into
+
+$$`\begin{aligned}
+|f(x)-H_{\mathrm{IEEE}}(x)|
+\leq{}&
+|f(x)-H_{\mathbb R}(x)|\\
+&+|H_{\mathbb R}(x)-H_{\mathrm{embedded}}(x)|\\
+&+|H_{\mathrm{embedded}}(x)-H_{\mathrm{IEEE}}(x)|.
+\end{aligned}`
+
+These are, respectively:
+
+1. approximation error of the real hinge network;
+2. parameter-quantization or reference error;
+3. rounded evaluation error.
+
+The distinction is visible in
+[`reluApproximationIccIEEE32Exec_threeTerm`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationIEEE32Exec.lean).
+The theorem takes real hinge parameters `tR` and `cR`, executable `IEEE32Exec` parameters `t`, `c`,
+and `b0`, and separate assumptions for the real approximation and quantization terms. It also
+requires finiteness witnesses for the intermediate hinge sum and output. Its conclusion adds
+`hingeFunErrorBound` to the two supplied tolerances.
+
+That theorem deliberately does not say that every real parameter can be converted to binary32
+without overflow. The more concrete
+`reluApproximationIccIEEE32Exec_dyadicHalfUlp` starts from dyadic parameters and uses a half-ULP
+rounding bound, but it still asks for finite evaluation witnesses. NaNs and infinities do not
+disappear because the target function was continuous.
+
+TorchLean also has an intermediate
+[`FP32` theorem](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationFP32.lean).
+`relu_universal_approximation_Icc_fp32` evaluates the hinge construction in the clean finite
+rounding model and proves a pointwise bound of the form
+
+$$`|f(x)-H_{\mathrm{FP32}}(x)|
+  < \varepsilon+\operatorname{hingeFunErrorBound}(x).`
+
+`FP32` is convenient for error analysis because values are represented by reals rounded to the
+finite binary32 grid. `IEEE32Exec` is the explicit bit-level model with signed zero, subnormals,
+infinities, and NaNs. A proof in the former is not silently promoted to the latter.
+
+# Exact Finite Interval Images
+
+Approximation theory also appears in a finite semantic form. The module
+[`FloatInterval.Semantics`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/FloatInterval/Semantics.lean)
+defines intervals of `IEEE32Exec` values and computes abstract operations by enumerating the finite
+concrete image and taking its hull. For addition, the central theorem is:
+
+```
+theorem add_sound (A B : I) :
+  ∀ {x y : F}, x ∈ A → y ∈ B →
+    IEEE32Exec.add x y ∈ addSharp A B
+```
+
+The multiplication and ReLU theorems have the same shape. They are then composed through an affine
+layer and a two-layer ReLU network:
+
+```
+theorem eval_sound [OpsExact.Sound]
+    (net : Net d h) (B : I.Box d)
+    (hW1 : ...)
+    (hb1 : ...)
+    (hW2 : ...)
+    (hb2 : ...) :
+  ∀ {x}, x ∈ I.γ B → eval net x ∈ evalSharp net B
+```
+
+The weight and bias hypotheses rule out NaN parameters. The conclusion is about the explicit
+`IEEE32Exec` evaluation, not an ideal real network. Because binary32 is finite, the exact abstract
+operators can in principle enumerate every concrete pair in an interval. That makes them excellent
+reference semantics and very poor large-scale kernels: their cost grows with the number of
+represented values.
+
+Run the proof modules directly:
+
+```
+lake env lean \
+  NN/MLTheory/Proofs/Approximation/FloatInterval/Semantics.lean
+
+lake env lean \
+  NN/MLTheory/Proofs/Approximation/FloatInterval/ExactImageTheorem.lean
+```
+
+A successful run is silent and exits with status zero. To inspect the composition point, use:
+
+```
+import NN.MLTheory.Proofs.Approximation.FloatInterval.Semantics
+
+open NN.MLTheory.Proofs.Approximation.FloatInterval
+
+#check OpsExact.add_sound
+#check aff_sound
+#check eval_sound
+```
+
+As a deliberate failure, remove one of the `isNaN ... = false` hypotheses from a attempted use of
+`aff_sound`. Lean leaves exactly that missing premise as a goal. A point interval containing NaN
+cannot be treated as an ordinary ordered singleton, so the proof correctly refuses to proceed.
+
+# Higher-Dimensional Domains
+
+The one-dimensional hinge proof is constructive and quantitative. The higher-dimensional
+development uses a different route. In
+[`UniversalApproximationND`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationND.lean),
+`TensorVec n` is identified with `Fin n → ℝ` by a homeomorphism. Coordinate functions generate a
+subalgebra of continuous functions, and the proof establishes that this subalgebra separates
+points. Stone-Weierstrass then supplies density on compact domains.
+
+That topological argument answers a broad representation question, but it does not produce the
+same explicit width formula as the one-dimensional Lipschitz construction. The two proofs are
+complementary:
+
+- the hinge mesh exposes parameters and a rate on `[a,b]`;
+- the coordinate-subalgebra proof handles compact multidimensional domains at a more abstract
+  level.
+
+# What The Result Buys
+
+After these layers are composed, one can make a statement with all errors visible:
+
+$$`\text{target error}
+\leq
+\text{representation error}
++\text{parameter rounding error}
++\text{execution error}.`
+
+A CROWN or interval certificate can then add a fourth component: a sound enclosure over an input
+region for the chosen network. Each term comes from a different argument: model construction,
+parameter conversion, runtime arithmetic, and regional verification. Writing the sum explicitly
+lets an application decide where to spend its error budget.
+
+The constructions follow the classical universal-approximation tradition, including the
+Cybenko and Hornik results, while the explicit ReLU viewpoint is closer to modern constructive
+piecewise-linear proofs. The finite interval development is instead an abstract-interpretation
+argument over the executable binary32 carrier.

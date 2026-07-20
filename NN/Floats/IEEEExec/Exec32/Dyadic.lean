@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.IEEEExec.Exec32.Core
+import Mathlib.Data.Nat.Bitwise
 
 /-!
 Dyadic helpers for executable IEEE32 arithmetic.
@@ -111,6 +112,74 @@ lemma isInf_eq_false_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
   · rfl
   · simp [toDyadic?, h] at hx
 
+/-- A successful dyadic decoding certifies that the source bit pattern is finite. -/
+theorem isFinite_eq_true_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
+    (hx : toDyadic? x = some d) : isFinite x = true := by
+  unfold isFinite
+  apply (bne_iff_ne).2
+  intro hexp
+  have hexpB : (expField x == expAllOnes) = true := (beq_iff_eq).2 hexp
+  by_cases hfrac : fracField x = 0
+  · have hinf : isInf x = true := by simp [isInf, hexpB, hfrac]
+    have hnotInf := isInf_eq_false_of_toDyadic?_some hx
+    simp [hinf] at hnotInf
+  · have hnan : isNaN x = true := by simp [isNaN, hexpB, hfrac]
+    have hnotNaN := isNaN_eq_false_of_toDyadic?_some hx
+    simp [hnan] at hnotNaN
+
+/-- The extracted binary32 fraction field fits in its 23-bit storage width. -/
+theorem fracField_toNat_lt_pow2_23 (x : IEEE32Exec) :
+    (fracField x).toNat < 2 ^ 23 := by
+  have hfracMask : fracMask.toNat = 2 ^ 23 - 1 := by decide
+  have hfracLe : (fracField x).toNat ≤ fracMask.toNat := by
+    simp [fracField, UInt32.toNat_and]
+    apply Nat.le_of_testBit
+    intro i hi
+    have hi' :
+        Nat.testBit x.bits.toNat i = true ∧ Nat.testBit fracMask.toNat i = true := by
+      simpa [Nat.testBit_land, Bool.and_eq_true] using hi
+    exact hi'.2
+  have hmaskLt : fracMask.toNat < 2 ^ 23 := by
+    rw [hfracMask]
+    exact Nat.sub_lt (Nat.pow_pos (by decide)) (by decide)
+  exact lt_of_le_of_lt hfracLe hmaskLt
+
+/-- A finite binary32 value has a biased exponent field at most `254`. -/
+theorem expField_toNat_le_254_of_isFinite (x : IEEE32Exec)
+    (hfin : isFinite x = true) :
+    (expField x).toNat ≤ 254 := by
+  have hexpNe : expField x ≠ expAllOnes := (bne_iff_ne).mp hfin
+  have hexpLe : (expField x).toNat ≤ expAllOnes.toNat := by
+    simp [expField, UInt32.toNat_and]
+    apply Nat.le_of_testBit
+    intro i hi
+    have hi' :
+        Nat.testBit ((x.bits >>> 23).toNat) i = true ∧
+          Nat.testBit expAllOnes.toNat i = true := by
+      simpa [Nat.testBit_land, Bool.and_eq_true] using hi
+    exact hi'.2
+  have hexpNe255 : (expField x).toNat ≠ 255 := by
+    intro h
+    apply hexpNe
+    apply UInt32.toNat_inj.mp
+    simpa [show expAllOnes.toNat = 255 by decide, UInt32.toNat_ofNat] using h
+  have hexpLt255 : (expField x).toNat < 255 := by
+    exact lt_of_le_of_ne (by simpa [show expAllOnes.toNat = 255 by decide] using hexpLe) hexpNe255
+  grind
+
+/-- Dyadic decoding preserves the sign bit of every finite executable value. -/
+theorem sign_eq_signBit_of_toDyadic?_some {x : IEEE32Exec} {d : Dyadic}
+    (hx : toDyadic? x = some d) : d.sign = signBit x := by
+  have hnan : isNaN x = false := isNaN_eq_false_of_toDyadic?_some hx
+  have hinf : isInf x = false := isInf_eq_false_of_toDyadic?_some hx
+  unfold toDyadic? at hx
+  simp only [hnan, hinf, Bool.false_or, Bool.false_eq_true, if_false] at hx
+  split at hx
+  · split at hx
+    · simpa using congrArg Dyadic.sign (Option.some.inj hx.symm)
+    · simpa using congrArg Dyadic.sign (Option.some.inj hx.symm)
+  · simpa using congrArg Dyadic.sign (Option.some.inj hx.symm)
+
 /-- NaNs have no finite dyadic decoding. -/
 @[simp] lemma toDyadic?_eq_none_of_isNaN {x : IEEE32Exec} (hx : isNaN x = true) :
     toDyadic? x = none := by
@@ -140,6 +209,21 @@ lemma exists_toDyadic?_of_isFinite {x : IEEE32Exec} (hx : isFinite x = true) :
   have hnan : isNaN x = false := by simp [isNaN, hexp]
   have hinf : isInf x = false := by simp [isInf, hexp]
   exact exists_toDyadic?_of_not_isNaN_not_isInf hnan hinf
+
+/-- Dyadic decoding succeeds exactly on finite executable binary32 values. -/
+theorem toDyadic?_isSome_eq_isFinite (x : IEEE32Exec) :
+    (toDyadic? x).isSome = isFinite x := by
+  cases hdy : toDyadic? x with
+  | some d =>
+      have hfin := isFinite_eq_true_of_toDyadic?_some hdy
+      simp [hfin]
+  | none =>
+      cases hfin : isFinite x with
+      | false => rfl
+      | true =>
+          obtain ⟨d, hd⟩ := exists_toDyadic?_of_isFinite hfin
+          rw [hdy] at hd
+          contradiction
 
 /-- Both signed zeros decode to the zero dyadic while retaining their sign bit. -/
 @[simp] lemma toDyadic?_eq_zero_of_isZero {x : IEEE32Exec} (hx : isZero x = true) :

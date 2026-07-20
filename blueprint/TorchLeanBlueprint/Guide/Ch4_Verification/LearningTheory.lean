@@ -14,21 +14,14 @@ robustness, stability, convergence, or a finite precision bridge from an ideal t
 arithmetic.
 
 Learning-theory support is not a single certificate checker. It names the predicates that appear in
-learning theory papers and makes them usable inside the same codebase as models, runtimes, and
-verification artifacts.
-
-We formalized this layer so those predicates have names inside Lean. Runtime diagnostics still
-matter, but they are not silently upgraded into theorems. The recurring pattern is:
+learning theory papers and makes them usable beside models, runtimes, and verification artifacts.
+The recurring pattern is:
 
 - state a mathematical predicate such as privacy, robustness, or stability;
 - compute a runtime diagnostic or artifact when that evidence matters;
 - add a bridge theorem when an artifact is used to support a formal claim.
 
-The same discipline appears elsewhere in TorchLean. Specifications say what the claim means,
-runtime code computes evidence or artifacts, and proofs connect checked hypotheses to the theorem
-being cited.
-
-# Core Definitions And Checked Claims
+# Five Kinds Of Claim
 
 The learning theory material is organized around five concrete objects:
 
@@ -40,11 +33,15 @@ The learning theory material is organized around five concrete objects:
   Lean gives typed datasets, `replaceAt`, `removeAt`, learning maps, and loss change bounds.
 - *Dynamical stability*: trajectories stay bounded or converge under stated hypotheses; Lean names
   Lyapunov, ISS, BIBO, incremental, practical, and finite time predicates.
-- *Ridge regression case study*: a one dimensional strongly regularized ERM theorem, with a real
+- *Ridge regression case study*: a one-dimensional strongly regularized ERM theorem, with a real
   stability theorem plus an `IEEE32Exec` execution bridge.
 
-Read each section in the same order: first the definition, then the theorem shape, then the runtime
-boundary. The source links point to the exact declarations.
+These objects do not share one proof method. Differential privacy is an inequality between
+measures. Robustness quantifies over a neighborhood of an input. Algorithmic stability compares
+two executions of a learning algorithm on neighboring datasets. Dynamical stability concerns an
+entire trajectory. The ridge result is a concrete algebraic proof whose constants can be carried
+into a numerical analysis. Their common feature is that the quantified object and its boundary are
+stated before any runtime evidence is interpreted.
 
 # Differential Privacy
 
@@ -68,30 +65,36 @@ In symbols, the definition has the usual event form:
 $$`\forall D\sim D',\;\forall S,\qquad
 \Pr[M(D)\in S]\le e^\varepsilon \Pr[M(D')\in S]+\delta.`
 
-The file also proves two closure facts we expect to reuse in larger developments:
+Two closure facts are especially important:
 
 - `differentialPrivacy_mono_delta`: a mechanism that is private for `δ₁` is also private for any looser
   `δ₂ ≥ δ₁`.
 - `differentialPrivacy_postprocess`: measurable post processing preserves DP.
 
-That second theorem is the practical bridge to ordinary ML practice. In training code, we often
+The second theorem is the practical bridge to ordinary ML practice. In training code, we often
 train a private model and then pass it through exporters, evaluators, dashboards, or downstream
 selection logic. The DP theorem says the post processing step does not need to inspect the private
 input again. TorchLean states that as a Lean theorem rather than relying on a comment.
-
-Concrete names to look for:
-
-```
-#check NN.MLTheory.LearningTheory.DifferentialPrivacy.DifferentialPrivacy
-#check NN.MLTheory.LearningTheory.DifferentialPrivacy.differentialPrivacy_mono_delta
-#check NN.MLTheory.LearningTheory.DifferentialPrivacy.differentialPrivacy_postprocess
-```
 
 The theorem shape is:
 
 $$`M\ \text{is}\ (\varepsilon,\delta)\text{-DP}
 \quad\Longrightarrow\quad
 f\circ M\ \text{is}\ (\varepsilon,\delta)\text{-DP}.`
+
+The proof is short for a mathematical reason. For a measurable output event `T`, the
+post-processed mechanism lands in `T` exactly when the original mechanism lands in the measurable
+preimage `f⁻¹(T)`. Applying the DP inequality to that preimage gives
+
+$$`\begin{aligned}
+\Pr[f(M(D))\in T]
+&=\Pr[M(D)\in f^{-1}(T)]\\
+&\le e^\varepsilon\Pr[M(D')\in f^{-1}(T)]+\delta\\
+&=e^\varepsilon\Pr[f(M(D'))\in T]+\delta.
+\end{aligned}`
+
+The measurability hypothesis is what licenses the preimage step. No assumption about the internal
+representation of the model or report is needed.
 
 The reference point is the standard DP event inequality from Dwork, McSherry, Nissim, and Smith,
 ["Calibrating Noise to Sensitivity in Private Data Analysis"](https://link.springer.com/chapter/10.1007/11681878_14)
@@ -142,6 +145,24 @@ robustness notebook might compute "max observed ratio" and report it as if it we
 the model. TorchLean names it as an empirical runtime quantity unless a separate proof connects it
 to a certified bound.
 
+The bundled logit-margin artifact makes the difference visible:
+
+```
+lake exe verify -- margin-cert
+```
+
+It reports:
+
+```
+[margin cert] examples=360
+[margin cert] nominal_ok=349
+[margin cert] certified_ok=318
+```
+
+`nominal_ok` counts correctly predicted recorded examples. `certified_ok` counts examples whose
+stored bounds imply the required margin. Neither number is automatically a theorem about unseen
+data, and the second number depends on the soundness and provenance of the bounds in the artifact.
+
 # Algorithmic Stability
 
 The [algorithmic stability API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Core.lean) uses one
@@ -149,7 +170,7 @@ central representation choice: a dataset of size `n` is a `Spec.Vec n Z`, so its
 the type, not an untyped list whose length must be remembered separately. That lets stability definitions quantify over replace one and remove one
 perturbations while keeping the sample size in the type.
 
-The core file defines:
+The core definitions include:
 
 - coordinate access for datasets,
 - `replaceAt` and `removeAt`,
@@ -169,15 +190,35 @@ The theorem shape is the standard uniform stability inequality:
 $$`\forall S,S^{(i)},z,\qquad
 |\ell(A(S),z)-\ell(A(S^{(i)}),z)|\le \beta.`
 
-Concrete declarations:
+The representation can be explored without proving a stability bound. Put the following in
+`StabilityDataset.lean`:
 
 ```
-#check NN.MLTheory.LearningTheory.Stability.Dataset
-#check NN.MLTheory.LearningTheory.Stability.replaceAt
-#check NN.MLTheory.LearningTheory.Stability.removeAt
-#check NN.MLTheory.LearningTheory.Stability.UniformStableReplace
-#check NN.MLTheory.LearningTheory.Stability.UniformStability
+import NN.MLTheory.LearningTheory.Stability.Core
+
+open NN.MLTheory.LearningTheory.Stability
+
+def sample : Dataset 3 Nat :=
+  Dataset.ofFn (fun i => i.val + 10)
+
+def changed : Dataset 3 Nat :=
+  replaceAt sample ⟨1, by decide⟩ 99
+
+#eval List.ofFn (Dataset.toFn sample)
+#eval List.ofFn (Dataset.toFn changed)
 ```
+
+Elaborating the file prints:
+
+```
+[10, 11, 12]
+[10, 99, 12]
+```
+
+Now try to replace coordinate `3`. Lean rejects the index before any learner runs, because an
+element of `Fin 3` must carry a proof that its value is smaller than three. The type ensures that
+replace-one perturbation preserves dataset size; the stability theorem then reasons about how the
+learner responds to that perturbation.
 
 The classical reference is Bousquet and Elisseeff,
 ["Stability and Generalization"](https://jmlr.org/papers/v2/bousquet02a.html) (JMLR 2002). The
@@ -219,23 +260,26 @@ inspectable:
 4. The proof bounds the difference between the two fitted weights.
 5. A difference of squares argument converts the weight change bound into a loss change bound.
 
-The final stability statement has the same form as the general predicate, now with an explicit
-bound depending on the sample size, regularization, and data bounds:
+The final stability statement has the same form as the general predicate. Writing `N = n + 1`,
+the proved constant is
+
+$$`\beta
+=\frac{4X^2Y^2(\lambda+X^2)^2}{\lambda^3N}.`
+
+Thus the theorem concludes
 
 $$`|\ell(\hat w(S),z)-\ell(\hat w(S'),z)|
 \le
-\beta(N,\lambda,X,Y).`
+\frac{4X^2Y^2(\lambda+X^2)^2}{\lambda^3N}.`
+
+The `1/N` dependence comes from the ridge denominator. The stronger dependence on `λ` records the
+cost of controlling both the fitted weight and the change in its reciprocal denominator. This is
+an explicit valid bound, not a claim that the constant is optimal.
 
 The worked theorem is compact enough to inspect. The estimator is not a foreign function.
 The dataset is the same `Dataset` representation from the stability core. The boundedness
 assumptions are carried by types and hypotheses. The final statement is a Lean theorem, not a prose
 claim next to a Python implementation.
-
-The headline theorem name is:
-
-```
-#check NN.MLTheory.LearningTheory.Stability.RidgeRegression1D.ridgeFit1D_sqLoss_uniformStableReplace
-```
 
 A reader should notice what this theorem does and does not say. It proves a real-valued stability
 bound for the closed-form ridge estimator under bounded data and positive regularization. It does
@@ -276,7 +320,7 @@ its real interpretation agrees with the proof-level FP32 expression. That is not
 by itself. It is one bridge that can be composed with a stability theorem when the remaining
 rounded-arithmetic error bounds have also been supplied.
 
-# Learning Theory Claim Checklist
+# Reading A Learning-Theory Result
 
 A learning-theory claim has four visible fields:
 
@@ -287,13 +331,7 @@ evidence     : theorem, checker, runtime diagnostic, or imported artifact
 boundary     : real semantics, FP32/IEEE32Exec bridge, or external producer assumption
 ```
 
-This checklist is intentionally plain. It prevents a sampled diagnostic from being described as a
-certificate, and it prevents a real-valued theorem from being described as a deployment guarantee
-without a numerical bridge.
-
-# A Concrete Comparison To Mainstream Stacks
-
-The formal statements differ from common runtime evidence in specific ways:
+These four fields separate a theorem from nearby runtime evidence. In particular:
 
 - If a script says an optimizer is differentially private because it used a DP library, the formal
   claim must define a mechanism and prove the DP event inequality or import a
@@ -307,9 +345,6 @@ The formal statements differ from common runtime evidence in specific ways:
 - If the theorem is over the reals but the code uses float32, the missing link is an
   `IEEE32Exec`/FP32 bridge with explicit finite path hypotheses.
 
-This does not make TorchLean automatically prove every learning theory theorem. It makes the boundary
-between theorem, checker, diagnostic, and assumption harder to blur.
-
 # References
 
 - Cynthia Dwork, Frank McSherry, Kobbi Nissim, and Adam Smith,
@@ -318,19 +353,3 @@ between theorem, checker, diagnostic, and assumption harder to blur.
 - Olivier Bousquet and Andre Elisseeff,
   ["Stability and Generalization"](https://jmlr.org/papers/v2/bousquet02a.html),
   JMLR 2002.
-
-# Learning Theory APIs
-
-We keep the mathematical predicate beside the executable evidence that may support it. These are the
-main entry points:
-
-- The [differential privacy core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/DifferentialPrivacy/Core.lean)
-  gives a reusable measure-theoretic definition and closure lemmas.
-- The [robustness spec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Spec.lean) and
-  [robustness runtime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Robustness/Runtime.lean) expose the spec/runtime split.
-- The [stability core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/Core.lean) defines datasets,
-  replace-one perturbations, learning maps, and loss/error functions.
-- The [ridge regression real theorem API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/Real.lean)
-  contains a complete theorem with explicit constants.
-- The [ridge regression IEEE32Exec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/LearningTheory/Stability/RidgeRegression1D/IEEE32Exec.lean)
-  supplies the finite-precision bridge.

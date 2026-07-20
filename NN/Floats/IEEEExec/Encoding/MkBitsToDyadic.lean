@@ -385,5 +385,17 @@ theorem toDyadic?_ofBits_mkBits_fin (sign : Bool) (exp frac : Nat)
     simp [toDyadic?, hNoSpecial, hs, he, hf, pow2, Nat.shiftLeft_eq, hExp0, hE0, hexp_mod,
       hfrac_mod]
 
+/-- A bit pattern built from in-range binary32 fields is finite. -/
+theorem isFinite_ofBits_mkBits_fin (sign : Bool) (exp frac : Nat)
+    (hexp : exp < 255) (hfrac : frac < 2 ^ 23) :
+    isFinite (ofBits (mkBits sign exp frac)) = true := by
+  have hdecode :=
+    toDyadic?_ofBits_mkBits_fin sign exp frac hexp hfrac
+  by_cases he : exp = 0
+  · by_cases hf : frac = 0
+    · exact isFinite_eq_true_of_toDyadic?_some (by simpa [he, hf] using hdecode)
+    · exact isFinite_eq_true_of_toDyadic?_some (by simpa [he, hf] using hdecode)
+  · exact isFinite_eq_true_of_toDyadic?_some (by simpa [he] using hdecode)
+
 end IEEE32Exec
 end TorchLean.Floats.IEEE754

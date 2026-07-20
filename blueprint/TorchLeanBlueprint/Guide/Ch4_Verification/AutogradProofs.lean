@@ -371,18 +371,6 @@ graph traversal, cotangent accumulation, and scalar loss seeding. The proof cont
 TorchLean turns those engineering moves into named Lean statements instead of leaving them as a
 large opaque execution layer.
 
-# Scope
-
-The autograd proofs are over the mathematical semantics stated by their declarations. They do not, by
-themselves, prove all of the following:
-
-- that every TorchLean runtime path uses only proved nodes;
-- that CUDA kernels implement those nodes bit for bit;
-- that float32 arithmetic equals real arithmetic;
-- that all graphs exported from PyTorch or JAX fall inside the proved fragment;
-- that every architecture in the model examples has a full training theorem.
-
-Those are separate bridges. Some live in compiled graph correctness, some in CUDA contracts, and
-some in runtime approximation. This modular structure keeps the theorem boundaries explicit. Proved
-claims should have theorem names that say what is proved. Claims that cross into runtime execution,
-finite precision, or external kernels should keep that boundary visible.
+The next question is numerical rather than differential. We now know how the ideal reverse pass is
+assembled from local rules; the runtime-approximation chapter asks how far an executable reverse
+pass can drift when those rules run with rounded arithmetic.

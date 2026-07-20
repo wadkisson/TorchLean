@@ -587,8 +587,8 @@ private lemma pow2_eq_two_pow (k : Nat) : (pow2 k) = 2 ^ k := by
   -- `pow2 k` is `1 <<< k`.
   simp [IEEE32Exec.pow2, Nat.shiftLeft_eq]
 
-/-- The IEEE32 constant `posOne` decodes to the real number `1`. -/
-private lemma toReal_posOne : toReal (posOne : IEEE32Exec) = 1 := by
+/-- The executable binary32 constant `posOne` decodes to the real number `1`. -/
+@[simp] theorem toReal_posOne : toReal (posOne : IEEE32Exec) = 1 := by
   -- `posOne` is the binary32 constant `0x3F800000`, i.e. `mkBits false 127 0`.
   have hbits : (0x3F800000 : UInt32) = mkBits false 127 0 := by decide
   have hdy_mk :

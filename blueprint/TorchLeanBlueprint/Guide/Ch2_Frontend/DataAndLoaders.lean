@@ -2,280 +2,330 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Datasets, Loaders, and Minibatches" =>
+#doc (Manual) "From Files To Typed Minibatches" =>
 %%%
 tag := "datasets-loaders"
 %%%
 
-One hard-coded tensor is enough to explain a loss or a gradient, but real examples need data
-pipelines. TorchLean accepts in-memory samples, file-backed tensors, deterministic loaders, and
-minibatches with shapes the model can see. The API stays close to `torch.utils.data`, while samples
-carry Lean shapes.
+A model type tells Lean the shape of one input and one output. A dataset must eventually provide
+values of exactly those shapes, but real data begins in a less orderly form: rows in a CSV file,
+arrays in an NPY file, text tokens, simulator output, or tensors generated on demand.
 
-The reader model is:
+TorchLean treats loading as a boundary. Parsing and dimension checks happen before a value becomes
+a typed training sample. Once the boundary succeeds, the training loop does not need to ask on
+every step whether a row had the right number of columns.
 
-```
-file or in-memory tensors
-  -> typed dataset
-  -> batch loader
-  -> training loop
-  -> report or saved curve
-```
+# The Public Dataset Type
 
-# Samples Have Shapes
-
-A supervised sample has two tensors:
+The public type is:
 
 ```
-(x : Tensor alpha inputShape, y : Tensor alpha targetShape)
+Trainer.Dataset inputShape targetShape
 ```
 
-TorchLean packages that idea with the public `Data` and `sample` namespaces. In the MLP quickstart,
-the dataset is built from two batched tensors:
+It describes one training item. The scalar type is intentionally absent. Its `build` field
+materializes a concrete dataset after the trainer chooses `Float`, `IEEE32Exec`, or another
+supported executable scalar.
+
+This lets the same Float-authored data feed several scalar runtimes while keeping the conversion
+visible at materialization. It also means a proof-level real tensor is not accidentally passed to
+an IO training loop.
+
+# Begin With Four Samples
+
+The XOR table is small enough to see in full:
 
 ```
 import NN.API
 open TorchLean
 
-def X : Tensor.T Float (shape![25, 2]) :=
-  Samples.squareGrid (-1.0) 1.0 5
+def xs : Tensor.T Float (shape![4, 2]) :=
+  tensor! [
+    [0.0, 0.0],
+    [0.0, 1.0],
+    [1.0, 0.0],
+    [1.0, 1.0]
+  ]
 
-def Y : Tensor.T Float (shape![25, 1]) :=
-  Samples.regressionTargetsFloat X target
+def ys : Tensor.T Float (shape![4, 1]) :=
+  tensor! [[0.0], [1.0], [1.0], [0.0]]
 
-def dataset : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
-  Data.tensorDataset X Y
+def xorData : Trainer.Dataset (shape![2]) (shape![1]) :=
+  Data.tensorDataset xs ys
 ```
 
-The leading dimension is the sample dimension. The loader then turns per sample shapes into batched
-shapes.
-
-# TensorDataset Style Data
-
-For small tutorials, the simplest path is fully in memory:
+The leading dimension of `xs` and `ys` is the sample count. `Data.tensorDataset` checks that both
+counts agree and removes that leading axis from the item shapes:
 
 ```
-let dataset :=
-  Data.Bands.dataset
+whole input tensor    [4, 2]
+one input sample         [2]
+
+whole target tensor   [4, 1]
+one target sample        [1]
 ```
 
-Think of this as TorchLean's version of a small PyTorch `TensorDataset`: a finite dataset whose
-elements are already tensors. It fits introductory examples, tests, and examples where the model or
-proof interface matters more than file IO.
+Try changing the target annotation to `shape![3,1]` while leaving four rows in the literal. The
+literal itself fails to elaborate. If the mismatch instead arrives from runtime files, the loader
+returns an error before constructing the dataset.
 
-The image band dataset used by the CNN tutorial is exposed through the public `Data` API and is
-used directly by
-[NN.Examples.Quickstart.SimpleCnnTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean).
+`Data.samples`, `Data.singleton`, and `Data.floatSamples` serve list-backed or generated data.
+`Data.regressionGrid` builds the deterministic grid used by the running MLP.
 
-# File Sources
+# A Real CSV Run
 
-For real data, TorchLean uses small, predictable file contracts:
+TorchLean includes a 25-row regression file with columns `x1,x2,y`. Run:
 
-- `.npy` for numeric tensors;
-- small numeric CSV for tabular examples;
-- text files for sequence examples;
-- conversion scripts for formats such as image folders, `.mat`, `.pt`, `.pth`, or `.npz`.
+```
+lake exe torchlean data_csv \
+  --device cpu --batch 5 --steps 5 --seed 2026
+```
 
-The public source types are:
+The loader prints the model and boundary choices before training:
 
-- `Data.TensorSource` for one tensor file;
-- `Data.SupervisedSource` for `(X, Y)` tensor files;
-- `Data.LabeledSource` for inputs plus integer labels;
-- `Data.TabularSupervisedSource` for numeric CSV with input and target columns.
+```
+model:
+Sequential: [5, 2] -> [5, 1], layers=3, params=33
+  [0] Linear(2, 8): [5, 2] -> [5, 8]
+  [1] ReLU: [5, 8] -> [5, 8]
+  [2] Linear(8, 1): [5, 8] -> [5, 1]
+data_dir = NN/Examples/Data
+csv_path = NN/Examples/Data/small_regression.csv
+seed = 2026
+train = Adam(lr=0.05), steps=5,
+        batch_size=5, shuffle=true, drop_last=true
+dataset size = 5
+mean_loss(before) = 1.367492
+mean_loss(after) = 0.323823
+```
 
-Loading returns an error when the file or shape does not match the declared contract. A loader
-failure is not delayed until the model sees a bad batch.
+“Dataset size = 5” now counts materialized minibatches, not source rows. Each item already has input
+shape `[5,2]` and target shape `[5,1]`.
 
-The exact constructor names vary by source, but the shape of a file-backed load looks like this:
+The constructor in
+[`Csv.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
+is:
+
+```
+let csvOptions : Data.CsvOptions :=
+  { skipHeader := true }
+
+let data :=
+  Data.tabularCsvDataset csvPath batch 2 1
+    (csvOptions := csvOptions)
+    (shuffle := true)
+    (seed := seed)
+```
+
+The arguments `2` and `1` state how many columns belong to the input and target. Malformed numbers,
+wrong column counts, missing files, or too few rows become explicit `IO` errors when `build` runs.
+
+# Break The File Boundary Deliberately
+
+Run the same command with a nonexistent path:
+
+```
+lake exe torchlean data_csv --csv /tmp/no-such-data.csv
+```
+
+The program stops at `Data.requireFile`; no randomly initialized model is reported as having
+trained on an empty dataset.
+
+For a second experiment, copy the small CSV and remove one value from a row. The CSV parser may
+still recognize the row as text, but the supervised loader rejects its column count. These two
+failures are different:
+
+- file existence is an operating-system boundary;
+- row width is a data-schema boundary.
+
+Neither is a theorem about the data-generating process. They establish that the accepted artifact
+has the structure requested by the model.
+
+# NPY And Other Numeric Sources
+
+NPY preserves numeric dtype and array dimensions, making it a cleaner boundary for already prepared
+numeric tensors:
 
 ```
 def source : Data.SupervisedSource :=
-  Data.SupervisedSource.ofPaths .npy "data/x.npy" "data/y.npy" 100 [2] [1]
+  Data.SupervisedSource.ofPaths
+    .npy
+    "data/x.npy"
+    "data/y.npy"
+    100
+    [2]
+    [1]
 
-def loadData : IO (Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar)) := do
-  match ← source.load (α := Float) with
-  | .ok data => pure data
-  | .error msg => throw <| IO.userError msg
+def data : Trainer.Dataset (shape![2]) (shape![1]) :=
+  Data.supervisedDataset source
 ```
 
-That `Except String` boundary is not decoration. It is where a file-system object becomes a typed
-training dataset. Once the loader succeeds, the trainer does not need to ask whether `x.npy` was
-really two columns wide on every step.
+The source declares:
 
-For tabular CSV data, the same idea is column based:
+- the file format;
+- input and target paths;
+- sample count;
+- one-sample input dimensions;
+- one-sample target dimensions.
 
-```
-def csvSource : Data.TabularSupervisedSource :=
-  { path := "data/samples.csv"
-    inDim := 2
-    outDim := 1 }
-```
+`Data.supervisedNpyDataset` is the convenience constructor. `Data.LabeledSource` reads integer
+labels and constructs one-hot targets for classification.
 
-The CSV convention is simple: each row contains the input columns followed by the target columns.
-The table can be messy as a file, but the resulting dataset is not allowed to be vague. Either the
-rows parse into the declared numeric shapes or the load fails with a concrete error.
+TorchLean does not maintain a second parser for every ecosystem format. `.pt`, `.pth`, `.npz`,
+image folders, and specialized scientific containers can be converted with Python into a small
+numeric boundary such as NPY or CSV. The converter is an untrusted producer; the Lean loader checks
+the resulting artifact.
 
-The data contract references are:
+# Text Is Not A Numeric Matrix
 
-- [NN/API/Data/README.md](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Data/README.md)
-- [NN/Examples/Data/README.md](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/README.md)
-- [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
-- [NPY loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Npy.lean)
-- [CIFAR image loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Cifar10Images.lean)
+Language models need a vocabulary, tokenization rule, context window, and target shift. Those are
+semantic choices, not generic CSV parsing.
 
-# Minibatches and Epochs
+A next-token dataset typically turns tokens:
 
-The basic minibatch API is:
+$$`t_0,t_1,\ldots,t_n`
 
-```
-let loader :=
-  Data.batchLoader dataset batch (shuffle := true) (seed := seed) (dropLast := true)
-```
+into windows:
 
-The arguments mean what a PyTorch reader expects:
+$$`
+x_i=(t_i,\ldots,t_{i+L-1}),\qquad
+y_i=(t_{i+1},\ldots,t_{i+L}).
+`
 
-- `batch` is the number of samples per minibatch;
-- `shuffle := true` permutes the dataset at epoch boundaries;
-- `seed` makes the order reproducible;
-- `dropLast := true` keeps every batch at the same static shape.
+The shapes may both be `[batch,L]`, but the one-position shift is the learning problem. TorchLean's
+text helpers make integer tokens and window construction explicit. A tokenizer file or vocabulary
+mapping should be stored with the run because changing it changes the meaning of every integer in
+the dataset.
 
-That last point matters in Lean. A batch of size `5` has a different type from a batch of size `4`.
-For tutorials that want one model type throughout training, `dropLast := true` is usually the clean
-choice.
+# Two Meanings Of “Batch Size”
 
-## Why `dropLast` Matters In Lean
+The distinction here is important.
 
-In PyTorch, a final batch of size `3` after several batches of size `8` is usually fine. In
-TorchLean, the batch dimension can appear in the type. If the model is written for
-`.dim 8 (.dim inDim .scalar)`, then a final `.dim 3 (.dim inDim .scalar)` batch is not the same type. `dropLast := true`
-keeps the tutorial simple by making every batch have the same static shape.
+## Tensor minibatches
 
-More flexible loaders can still be written, but then the file has to say how it handles the changing
-batch dimension. The tradeoff is less implicit convenience and more visible shape information.
-
-When a full epoch is needed directly, `Data.BatchLoader.epoch` materializes the batches and returns
-the updated loader state. Most public examples stay one level higher and batch the dataset first:
+`Data.batchDataset` changes the item shapes:
 
 ```
-let data := Data.batchDataset batch baseData (shuffle := true) (seed := seed)
-let trained ← trainer.train data { steps := 200, batchSize := 16 }
-trained.printSummary
+def batched :
+    Trainer.Dataset (shape![5, 2]) (shape![5, 1]) :=
+  Data.batchDataset 5 xorData
+    (shuffle := true)
+    (seed := 42)
 ```
 
-The standard public path goes through `Data.batchDataset` and `trainer.train`. The loader still
-exists under the hood, but the example does not need to own runner state, callbacks, or a separate
-epoch loop.
+The model must accept `[5,2]` and return `[5,1]`. One forward/backward operation processes the whole
+tensor minibatch.
 
-# A Complete Minibatch Shape
+## Groups of unbatched samples
 
-Suppose a CSV row has:
+`Trainer.TrainOptions.batchSize` on a model `[2] → [1]` controls how many samples are consumed in an
+outer step. In the current in-memory loop, an optimizer update is still applied for each sample in
+that group. The option affects scheduling and logging; it does not insert a leading tensor axis.
 
-- two input columns,
-- one target column,
-- and we train with `batch = 5`.
+The two paths can have different optimization behavior. Calling both of them “batch size” without
+examining the model shape would hide that difference.
 
-The per sample task is:
+# Why The Final Partial Batch Is Dropped
 
-```
-.dim 2 .scalar -> .dim 1 .scalar
-```
+A model accepting `[5,2]` cannot receive `[3,2]`; these are different Lean types. Therefore the
+fixed-size typed batching path uses `dropLast := true`. In a 23-sample dataset with batch size five,
+four full minibatches are produced and three samples remain.
 
-The minibatch model is:
+Dropping is one policy, not a law of machine learning. Alternatives include:
 
-```
-.dim 5 (.dim 2 .scalar) -> .dim 5 (.dim 1 .scalar)
-```
+- padding to five and carrying a validity mask;
+- bucketing examples so each group has a fixed length;
+- using a dynamic wrapper at a lower runtime layer;
+- choosing a batch size that divides the dataset.
 
-For that reason, the quickstart writes:
+Each alternative changes the data contract. TorchLean refuses to silently change the shape of the
+last item.
 
-```
-def mkModel {batch : Nat} :
-    nn.M (nn.Sequential (.dim batch (.dim inDim .scalar)) (.dim batch (.dim outDim .scalar))) :=
-  nn.Sequential![
-    nn.Linear inDim hidDim,
-    nn.ReLU,
-    nn.Linear hidDim outDim
-  ]
-```
+# Materialized Loaders And Epoch State
 
-The model says it consumes a batch. The dataset says it contains individual samples. The loader
-connects those two views.
-
-This distinction is worth making explicit in code:
+The public `Trainer.Dataset` delays scalar choice. Lower-level manual code may already own a
+materialized:
 
 ```
-def perSample : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
-  Data.tensorDataset xs ys
-
-def batched : IO (Trainer.Dataset (.dim 5 (.dim 2 .scalar)) (.dim 5 (.dim 1 .scalar))) := do
-  Data.batchDataset 5 perSample (shuffle := true) (seed := 42)
+Data.Dataset α inputShape targetShape
 ```
 
-The first value is a dataset of individual examples. The second value is a dataset of minibatches.
-That is why a batched model has matrix-shaped inputs even though the original row had only two
-features.
+`Data.batchLoader` constructs a loader whose batch size appears in its type.
+`Data.BatchLoader.epoch name loader` returns both:
 
-If the dataset size is not divisible by the batch size, a fixed-size typed batch must decide what to
-do with the remainder. The beginner path drops the remainder. More advanced examples can pad,
-bucket by length, or use a dynamic batch wrapper, but they must say so in the code.
+- the full typed batches for this epoch;
+- updated deterministic shuffle state for the next epoch.
 
-# Hooks And Curves
+This functional state transition makes data order reproducible. There is no hidden global RNG whose
+position depends on unrelated code.
 
-Good runnable commands should still leave an artifact behind. The public trainer result writes a
-two-point TrainLog when JSON logging is enabled, and it still exposes that same before/after summary
-as its quick terminal report.
+Use the lower loader API for a custom epoch loop. Ordinary model training should prefer
+`Data.batchDataset`, `Data.tabularCsvDataset`, or another public constructor.
+
+# Generated Streams
+
+Some workloads are not finite passes over a stored dataset. PINNs resample collocation points,
+reinforcement-learning agents collect new transitions, and language models may generate windows
+from a large file on demand.
+
+`Trainer.Manual.StepBatchStream α shapes` represents a source indexed by the training step. The
+shape list remains fixed in the type, while values can be generated or loaded lazily.
+
+This gives the loop explicit control over:
+
+- the step number;
+- generator state;
+- file position;
+- simulator state;
+- checkpoint restoration.
+
+A generated stream should log enough state to reproduce a batch. “Seed 42” is insufficient if the
+generator also depends on an evolving environment or file cursor.
+
+# Reproducibility Needs More Than One Seed
+
+At minimum, record:
+
+| Choice | Example |
+| --- | --- |
+| model initialization | trainer seed |
+| sample order | loader/shuffle seed |
+| source identity | file path and preferably content hash |
+| preprocessing | tokenizer, normalization, column split |
+| batch policy | size, shuffling, dropping, padding |
+| runtime | scalar semantics, backend, device |
+
+The CSV example uses `2026` for both model initialization and shuffling for convenience. They are
+conceptually separate choices and may be configured independently in a larger experiment.
+
+Training can write a JSON `TrainLog`:
 
 ```
 let trained ← trainer.train data
   { steps := 200
-    log := .json outPath }
+    log := .json outPath
+    title := "small regression" }
 ```
 
-The returned `trained` value keeps the trained runtime handle alive. Public examples can immediately
-run `trained.predict ...` without reopening the manual runner API.
+The log is an execution artifact. It can support debugging and reproducibility, but it is not a
+certificate of convergence or generalization.
 
-Lower-level callbacks still exist for runtime-module tutorials and custom training loops:
+# Continue With Training
+
+The complete minibatch example is runnable as:
 
 ```
-Trainer.Manual.onTrainStart do
-  Trainer.Manual.Report.reportMeanLoss (task := task) runner dataset "before"
+lake exe torchlean quickstart_minibatch_mlp \
+  --device cpu --batch 5 --steps 5 --seed 2026
 ```
 
-The model examples also accept a log path through the shared CLI flags. The JSON log records the
-quantities needed for later plots or checks, so the examples can answer the practical question: did
-the model learn on the dataset we gave it?
+It exercises CSV parsing, deterministic shuffling, fixed-size typed batching, model execution,
+autograd, Adam, and prediction. The next chapter opens the training loop and explains what state
+changes at each optimizer step.
 
-# Text and Sequence Data
+Sources:
 
-Text models use the same principle, but the sample builder is different. The sequence examples read
-a corpus, tokenize or encode it, and create causal samples. The relevant files are:
-
-- [NN/API/Text.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Text.lean)
-- [NN/Examples/Models/Sequence/Transformer.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Transformer.lean)
-- [NN/Examples/Models/Sequence/TextGpt2.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/TextGpt2.lean)
-
-The shapes remain explicit. A language model sample is a tensor with a sequence length and a
-target convention, rather than an unstructured list of tokens.
-
-# What the Data Layer Guarantees
-
-The data layer gives the rest of the library a stable contract for examples and experiments:
-
-- it checks that tensors entering training have the shapes the model expects;
-- it keeps minibatches reproducible when the seed is fixed;
-- it gives training loops stable batch shapes when the example requests them;
-- it produces logs and reports that can be inspected later.
-
-The data layer is deliberately modest: enough to train real examples, but small enough that the
-reader can still see the path from file to tensor to model update.
-
-# Data Is Evidence, Not A Proof
-
-It is tempting to overstate what a clean training log says. The data layer can show that a file was
-parsed, shapes matched, batches were reproducible, and loss moved during a run. Those are useful
-runtime facts. They are not the same as a theorem about generalization, a proof of optimizer
-convergence, or a certified robustness bound.
-
-Stronger claims about these datasets require separate generalization, convergence, robustness, or
-numerical arguments. A typed executable path supplies their concrete inputs; it does not replace
-those arguments.
+- [`NN/API/Data/README.md`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Data/README.md);
+- [`NN/Examples/Data/README.md`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/README.md);
+- [`Npy.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Npy.lean);
+- [`Cifar10Images.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Cifar10Images.lean).

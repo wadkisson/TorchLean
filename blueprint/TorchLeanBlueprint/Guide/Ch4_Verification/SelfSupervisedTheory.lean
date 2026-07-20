@@ -2,156 +2,310 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Self Supervised Theory" =>
+#doc (Manual) "Self-Supervised Objectives" =>
 %%%
 tag := "self-supervised-theory"
 %%%
 
-Self supervised learning is full of objectives whose code looks simple but whose meaning depends on
-bookkeeping: which patches are masked, which view is predicted, which encoder receives gradients,
-and which term prevents collapse.
+Self-supervised losses are often short enough to fit in one line of Python. Their meaning is not.
+An MAE loss depends on which patches were hidden. A JEPA loss depends on which branch supplies the
+target representation. An alignment objective can be minimized by mapping every view to the same
+vector unless another term prevents collapse.
 
-TorchLean's SSL layer is about these objective semantics. The formal claims are local:
-masked sums decompose as intended, MAE and JEPA instantiate a common predictive-view contract, and
-collapse guards are positive under the stated hypotheses. Generalization or representation-quality
-claims can then cite those objective facts instead of treating the training script as the definition.
+TorchLean’s present self-supervised theory isolates this bookkeeping. It is a finite algebraic
+skeleton for masks, target views, predictive losses, and collapse guards. It does not formalize
+a complete MAE or JEPA training run, and it does not prove that minimizing one of these objectives
+learns useful representations.
 
-# The Minimal Pattern
+# Masks And Explicit Index Lists
 
-Most SSL objectives in this layer have the same three ingredients:
+A Boolean mask over `n` positions is:
 
-- *View*: a finite piece of an input, image, graph, or sequence, such as visible patches versus
-  masked patches.
-- *Prediction*: a map from a context representation to a target representation, such as a JEPA
-  style predictor head.
-- *Guard term*: an extra scalar penalty that rules out a degenerate solution, such as a VICReg
-  variance floor for collapse.
+```
+abbrev Mask (n : Nat) := Fin n → Bool
+```
 
-That lets us write theorem statements about the objective itself: the named loss decomposes,
-respects finite masks, and penalizes the degenerate cases it claims to penalize.
+`selected m i` means `m i = true`. The module provides all-false, all-true, and complement
+operations with the expected pointwise theorems.
 
-# Predictive Views and Masks
+The finite loss itself takes an explicit list of selected indices:
 
-The common predictive view pattern compares a prediction from one view against a representation of
-another view:
+```
+def maskedLoss
+    (idxs : List (Fin n))
+    (perPatchLoss : Fin n → Nat) : Nat :=
+  (idxs.map perPatchLoss).sum
+```
 
-- encode a context view, then apply a predictor head to get `z_ctx`;
-- encode the target view to get `z_target`;
-- evaluate the view loss as `ell z_ctx z_target`.
+This design makes ordering and duplication visible. If `idxs = [0, 2]`, then
 
-The [predictive view API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/PredictiveView.lean) packages that
-pattern as `PredictiveViewContract`. The corresponding objective decomposes over a finite list of
-views by summing `predictiveLoss C v` over the selected views.
+$$`L=\ell_0+\ell_2.`
 
-In symbols, the view contract has the shape:
+Appending index chunks distributes over addition, and reversing the list preserves the sum:
 
-$$`z_c=p(f_c(x_c)),
-\qquad
-z_t=f_t(x_t),
-\qquad
-L_{\mathrm{view}}=\ell(z_c,z_t).`
+```
+theorem maskedLoss_append (xs ys : List (Fin n)) (ell : Fin n → Nat) :
+  maskedLoss (xs ++ ys) ell =
+    maskedLoss xs ell + maskedLoss ys ell
 
-The theorem `predictiveViewObjective_decomposes` records that equation in Lean. The bridge theorems
-`mae_is_predictive_view_loss`, `mae_is_predictive_view_objective`,
-`jepa_is_predictive_view_loss`, and `jepa_is_predictive_view_objective` say that MAE and JEPA style
-objectives are instances of the same contract rather than unrelated pieces of code.
+theorem maskedLoss_reverse (idxs : List (Fin n)) (ell : Fin n → Nat) :
+  maskedLoss idxs.reverse ell = maskedLoss idxs ell
+```
 
-Masks are equally concrete. The [masking API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/Masking.lean)
-uses finite indices throughout: a mask for length `n` is a function from `Fin n` to `Bool`, and
-`maskedLoss idxs ell` is the finite sum of `ell i` over the selected indices.
+Run a concrete example:
 
-The masked objective is a finite sum:
+```
+import NN.MLTheory.SelfSupervised
 
-$$`L_M=\sum_{i\in M}\ell(\hat x_i,x_i).`
+open NN.MLTheory.SelfSupervised
 
-The key theorems are small: `maskedLoss_append`, `maskedLoss_reverse`, and
-`maskedLoss_eq_zero_of_all_zero`. They make sure that serialization details such as splitting or
-reversing the selected patch list do not silently change the algebra being proved.
+def chosen : List (Fin 4) := [0, 2]
 
-A compact example is enough to see why this matters. If a mask selects indices `[0, 2]`, then the masked
-loss is `loss 0 + loss 2`. Reversing the selected list should not change the sum, and appending two
-disjoint chunks should give the same result as summing over the combined list. These are simple
-algebraic facts, but they are exactly the facts that catch bookkeeping mistakes in masked
-objectives.
+#eval maskedLoss chosen (fun i => i.val + 1)
+#check maskedLoss_reverse
+```
 
-# MAE and JEPA
+The output begins:
 
-The [MAE API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/MAE.lean) starts with a patch batch, represented as a
-function from `Fin n` to patches. Exact reconstruction means every finite patch index agrees, and
-`maeLoss` is the masked reconstruction loss over the selected indices.
+```
+4
+NN.MLTheory.SelfSupervised.maskedLoss_reverse ...
+```
 
-The MAE shape is:
+The two selected losses are `1` and `3`. Now change the list to `[0, 2, 2]`; the result becomes
+`7`, because an explicit list may contain duplicate indices. `maskedLoss_reverse` proves
+order-insensitivity, not duplicate elimination. A producer that intends a set of masked patches
+must prove its exported index list has no duplicates or deliberately accept repeated weighting.
 
-$$`L_{\mathrm{MAE}}
-=
-\sum_{i\in M}
-\ell\!\left(\operatorname{dec}(\operatorname{enc}(x_{\mathrm{visible}}))_i,x_i\right).`
+Another boundary is the scalar type. The finite skeleton uses `Nat`, so its “losses” are
+already-computed nonnegative summaries. It is convenient for exact list algebra. It is not a
+definition of mean-squared error over runtime floats.
 
-The theorem `exactReconstruction_identity` is the base case: the identity reconstruction is exact.
-Theorems such as `maeLoss_append`, `maeLoss_reverse`, and
-`maeLoss_eq_zero_of_patch_losses_zero` give the list algebra for masked reconstruction losses.
+# One Contract For Predictive Views
 
-The [JEPA API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/JEPA.lean) keeps `encodeContext`, `encodeTarget`,
-and `predict` abstract. Its loss compares `predict (encodeContext ctx)` with
-`encodeTarget target` under the chosen scalar loss.
+MAE predicts pixels or patches. JEPA predicts a latent target representation. The surrounding
+index algebra is almost identical, so
+[`PredictiveViewContract`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/PredictiveView.lean)
+keeps the target types separate:
 
-The JEPA shape is:
+```
+structure PredictiveViewContract
+    (n : Nat)
+    (Context Target TargetRep Prediction : Type) where
+  targetIdxs : List (Fin n)
+  context : Context
+  target : Fin n → Target
+  targetEncoder : Fin n → Target → TargetRep
+  predict : Context → Fin n → Prediction
+  distance : TargetRep → Prediction → Nat
+  geometryGuard : Nat := 0
+```
+
+For a selected index `i`, the predictive term is
+
+$$`\ell\!\left(
+  \operatorname{targetEncoder}_i(\operatorname{target}_i),
+  \operatorname{predict}(\operatorname{context},i)
+\right).`
+
+Summing over `targetIdxs` gives `predictiveLoss`. The full finite objective is simply
+
+$$`L_{\mathrm{SSL}}
+=L_{\mathrm{predictive}}+L_{\mathrm{geometry}}.`
+
+The four separate types prevent an accidental identification:
+
+- `Target` is the raw target-view value;
+- `TargetRep` is what the target encoder produces;
+- `Prediction` is what the context-side predictor produces;
+- `distance` is the operation that compares the last two.
+
+This is where a stopped-gradient target branch would be represented semantically: the contract
+contains a target value, but the finite objective does not itself run autograd or prove which
+parameters receive gradients. Gradient stopping belongs to a runtime or differentiation theorem.
+
+# MAE Is The Identity-Target Case
+
+In
+[`MAE.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/MAE.lean),
+a patch batch is `Fin n → Patch`, and
+
+```
+def maeLoss
+    (maskedIdxs : List (Fin n))
+    (target : PatchBatch n Patch)
+    (pred : Fin n → Pred)
+    (patchLoss : Patch → Pred → Nat) : Nat := ...
+```
+
+The corresponding predictive-view contract uses the identity target encoder:
+
+$$`\operatorname{targetEncoder}_i(x_i)=x_i.`
+
+`mae_is_predictive_view_loss` proves that `predictiveLoss` for this contract is definitionally the
+same finite sum as `maeLoss`. `mae_is_predictive_view_objective` adds that the full objective is
+still `maeLoss` because the geometry guard is zero.
+
+The identity reconstruction theorem
+
+```
+theorem exactReconstruction_identity (x : PatchBatch n Patch) :
+  ExactReconstruction x (reconstruct (fun i patch => patch) x)
+```
+
+is a sanity theorem about the abstract reconstruction map. It is not a theorem that a trained MAE
+decoder reconstructs its input.
+
+The finite MAE loss also inherits append, reverse, and zero-per-patch theorems. These prove that the
+objective is assembled as intended. They say nothing about image patchification, pixel
+normalization, or a tensor decoder until those runtime components are connected to this contract.
+
+# JEPA Changes The Target Space
+
+[`JEPA.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/JEPA.lean)
+starts at the target-representation boundary:
 
 $$`L_{\mathrm{JEPA}}
-=
-\sum_{v\in V}
-\ell\!\left(p(f_{\mathrm{ctx}}(x_{\mathrm{ctx}}^v)),
-f_{\mathrm{target}}(x_{\mathrm{target}}^v)\right).`
+=\sum_{i\in I}
+\ell\!\left(z_i^{\mathrm{target}},
+p(z^{\mathrm{context}},i)\right).`
 
-The theorems `jepaLoss_append`, `jepaLoss_reverse`, and `jepaLoss_target_ext` are objective algebra
-facts. They do not say that a representation learned something good; they say that the target and context
-terms in the objective are exactly the terms named in the statement.
+`jepaAsPredictiveViewContract` uses the supplied target representation as `TargetRep`, while
+`encodedTargetPredictiveViewContract` exposes a separate target encoder for the more general case.
+Theorems `jepa_is_predictive_view_loss` and `jepa_is_predictive_view_objective` identify the JEPA
+finite sum with the common predictive contract.
 
-# VICReg and Redundancy Reduction
+An extensionality theorem, `jepaLoss_target_ext`, says that replacing the target function by one
+that agrees at every selected index preserves the loss. This is exactly as strong as it sounds:
+values at unselected indices may differ because they are not read by the objective.
 
-The [VICReg API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/VICReg.lean) names the three pressure terms that
-show up in VICReg and related redundancy reduction methods: invariance, variance, and covariance.
-The variance floor penalty is the positive part of `gamma - sigma^2`, so a representation with
-zero variance is penalized whenever the floor `gamma` is positive.
+As a useful exercise, prove equality after changing an unselected target:
 
-The objective has the familiar weighted shape:
+```
+import NN.MLTheory.SelfSupervised
 
-$$`L
-=
-\lambda L_{\mathrm{inv}}
-+\mu L_{\mathrm{var}}
-+\nu L_{\mathrm{cov}}.`
+open NN.MLTheory.SelfSupervised
 
-A variance guard has the form:
+#check jepaLoss_target_ext
+#check encodedTargetPredictiveViewContract_loss_eq_maskedLoss
+```
 
-$$`L_{\mathrm{var}}
-=
-\sum_j \max(0,\gamma-\sigma_j)^2.`
+Then try to use `jepaLoss_target_ext` when the targets differ at a selected index. The missing goal
+is the pointwise equality at that index; Lean does not accept the informal claim that the change is
+“small.”
 
-The theorem pattern is collapse detection. If every variance is zero and the variance floor
-`γ` is positive, then the variance penalty is positive:
+# Why Alignment Alone Collapses
 
-`varianceTerm_collapsed_positive` is the Lean theorem name for this collapsed representation case.
+The predictive-view file also gives a concrete real-valued graph model. A representation is
 
-The predictive view API also has real valued graph SSL facts such as
-`graphAlignmentEnergy_eq_zero_of_collapsed`, `realVarianceFloorGuard_zero_spread_positive`, and
-`graphSSLObjective_collapsed_positive`. These make the common self supervised warning precise:
-alignment alone may accept collapsed representations, so a guard term is needed if collapse is a
-failure mode.
+$$`z:\operatorname{Fin}(n)\to\mathbb R^d,`
 
-Collapse is one of the central semantic hazards in self supervised learning. A runtime experiment
-may show that a loss decreased; the formal objective can additionally state whether the collapsed
-case is penalized by the loss itself.
+and an `SSLViewGraph n` stores positive pairs of views. The alignment energy is
 
-A loss going down does not tell us whether the implementation used the intended mask, whether
-masked patches were ordered correctly, or whether the collapse penalty was active. The SSL theory
-layer checks objective identities and degenerate cases directly.
+$$`E_{\mathrm{align}}(z)
+=\sum_{(i,k)\in E_+}\|z_i-z_k\|_2^2.`
 
-# What We Claim
+Every term is nonnegative. But if the representation is collapsed,
 
-TorchLean formalizes selected SSL objective components and finite mask/list properties. It does not
-prove that MAE, JEPA, or VICReg training learns good representations. External anchors are
-[MAE by He et al.](https://arxiv.org/abs/2111.06377),
-[VICReg by Bardes et al.](https://arxiv.org/abs/2105.04906), and JEPA style predictive embedding
-objectives from LeCun and collaborators. Those papers motivate the shapes of the objectives; the
-Lean declarations state the algebraic pieces checked in this layer.
+$$`\exists c,\;\forall i,\;z_i=c,`
+
+then every squared distance is zero. The theorem
+`graphAlignmentEnergy_eq_zero_of_collapsed` proves this for any positive-edge graph. Thus
+alignment by itself cannot rule out the constant representation.
+
+TorchLean uses a finite pairwise coordinate-spread summary:
+
+$$`\operatorname{spread}_j(z)
+=\sum_i\sum_k(z_{ij}-z_{kj})^2.`
+
+This is not the sample variance or standard deviation from the VICReg paper; it is an unnormalized
+finite spread with the key property needed here: collapsed representations have zero spread in
+every coordinate.
+
+For floor `γ`, the guard is
+
+$$`G_\gamma(z)
+=\sum_{j=0}^{d-1}
+\max\!\left(0,\gamma-\operatorname{spread}_j(z)\right).`
+
+The complete graph objective is
+
+$$`E_{\mathrm{SSL}}(z)=E_{\mathrm{align}}(z)+G_\gamma(z).`
+
+`graphSSLObjective_collapsed_positive` proves:
+
+```
+theorem graphSSLObjective_collapsed_positive
+    (graph : SSLViewGraph n)
+    (rep : Fin n → EuclideanRep d)
+    (hcollapsed : CollapsedRep rep)
+    (hd : 0 < d)
+    (hgamma : 0 < gamma) :
+  0 < graphSSLObjective graph rep gamma
+```
+
+In the Infoview:
+
+```
+import NN.MLTheory.SelfSupervised
+
+open NN.MLTheory.SelfSupervised
+
+#check graphAlignmentEnergy_eq_zero_of_collapsed
+#check graphSSLObjective_collapsed_positive
+```
+
+Remove `hgamma`, or set `gamma = 0`, and the strict positivity claim is false: a collapsed
+representation pays zero. Remove `hd`, and a zero-dimensional embedding has no guarded
+coordinates. Both hypotheses are mathematically necessary for this theorem.
+
+# The Discrete VICReg Skeleton
+
+[`VICReg.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/SelfSupervised/VICReg.lean)
+also contains a deliberately simpler `Nat` model. Its variance-floor penalty is natural-number
+subtraction:
+
+$$`\operatorname{varianceFloorPenalty}(\gamma,v)=\gamma-v,`
+
+which is truncated at zero by the semantics of `Nat.sub`. It is therefore the discrete analogue of
+`max(0, γ-v)`, without the square and without a statistical variance estimator.
+
+For `d` collapsed coordinates:
+
+$$`\operatorname{varianceTerm}
+  \bigl(\gamma,[0,\ldots,0]\bigr)=d\gamma.`
+
+`varianceTerm_collapsed_positive` proves positivity when there is at least one coordinate and
+`γ > 0`. `vicregObjective` combines already-computed invariance, variance, and covariance
+summaries with natural-number weights. The Barlow-style declarations similarly encode finite
+diagonal and off-diagonal penalties, not the full floating cross-correlation computation.
+
+These small exact models are useful for objective algebra, but their names should not be read as a
+claim that TorchLean has formalized every estimator and normalization in production VICReg or
+Barlow Twins.
+
+# Proof And Runtime Boundary
+
+The current theory establishes:
+
+- finite index and list algebra;
+- exact relationships among MAE, JEPA, and a common predictive-view contract;
+- zero alignment energy for collapsed real representations;
+- positivity of explicit anti-collapse guards under positive dimension and floor.
+
+It does not establish:
+
+- correctness of patch extraction or data augmentation;
+- equivalence to a PyTorch MAE, JEPA, VICReg, or Barlow Twins training script;
+- stopped-gradient behavior of a target encoder;
+- quality, identifiability, or downstream usefulness of learned representations;
+- floating-point agreement for the runtime objective.
+
+The architecture is nevertheless useful. A runtime bridge can map tensor masks, encoder outputs,
+and loss reductions into the finite contract. Once that bridge exists, the list and collapse
+theorems do not need to be reproved.
+
+The objective shapes are motivated by MAE (He et al.), VICReg (Bardes, Ponce, and LeCun), Barlow
+Twins (Zbontar et al.), and joint-embedding predictive architectures. The Lean statements are
+narrower than those papers: they formalize the finite algebra and explicit degenerate cases that
+the present TorchLean definitions actually express.

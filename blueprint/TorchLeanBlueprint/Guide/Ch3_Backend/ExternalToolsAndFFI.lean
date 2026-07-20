@@ -2,274 +2,320 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "External Tools and FFI" =>
+#doc (Manual) "Crossing Lean's Boundary" =>
 %%%
-tag := "external-tools-ffi"
+tag := "external-tools-and-ffi"
 %%%
 
-TorchLean is not trying to make Lean do every job. Python can train models and load checkpoints.
-Julia can run numerical search. Arb can produce high-precision interval evidence. CUDA can execute
-kernels. External verifiers can optimize bounds. The question is what comes back to Lean and what
-Lean checks before using it.
+TorchLean does not require every useful program to be rewritten in Lean. PyTorch can capture a
+model, an interval library can propose a numerical enclosure, and a CUDA kernel can compute a
+tensor. The engineering question is not whether external code exists; it is what Lean learns when
+that code returns.
 
-The guiding pattern is producer and checker: external tools produce small artifacts; Lean checks
-the parts that have a stated contract.
+There are two main boundaries:
 
-The pattern we use is:
+- a *subprocess* exchanges files, standard output, or JSON with another executable;
+- an *FFI call* invokes a linked native symbol and may exchange opaque memory handles.
 
-1. Lean defines the semantic target or checker.
-2. An external tool performs search, training, numeric enclosure, graph capture, plotting, or fast
-   execution.
-3. The tool returns a small artifact: JSON, raw bits, a typed buffer handle, a graph, weights, bounds,
-   or a certificate.
-4. Lean parses and validates the artifact against the contract it owns.
-5. Any part that Lean did not check remains a named runtime or producer assumption.
+Both can be used safely. They have different failure modes and support different proof stories.
 
-CUDA is one instance of the broader pattern: an external producer may do heavy work, while Lean
-checks the metadata, bits, certificate, or agreement condition that is small enough to validate.
+# A Subprocess Is An Untrusted Producer
 
-# Ecosystem Boundary
-
-The previous pages covered tensors, graphs, Float32, CUDA, and certificates. The missing bridge was
-the ecosystem layer:
-
-- how Lean launches external programs without making them part of the kernel;
-- how Python bridges PyTorch checkpoints, graph capture, datasets, Gymnasium, and plotting;
-- how Julia can produce numeric or spline/PINN artifacts that Lean checks later;
-- how Arb through `python-flint` can produce high-precision interval evidence;
-- how C/CUDA FFI differs from subprocess integration;
-- how we decide what is proved, what is parsed, what is tested, and what remains an assumption.
-
-That distinction matters because TorchLean often sits beside numerical tools rather than replacing
-them. Lean serves as the accountability layer; the other tools remain excellent at what they do,
-while the boundary stays explicit.
-
-# Two Kinds Of Boundary
-
-TorchLean uses two main external boundaries.
-
-The FFI path is direct and fast. Lean calls native symbols for CUDA buffers, kernels, cuBLAS, cuFFT,
-allocation, and finalizers. Use it for runtime execution.
-
-The subprocess path is slower but easier to audit. Lean launches Python, Julia, Arb, or a verifier,
-then reads JSON, stdout, or a file. Use it for certificate producers, data conversion, plotting, and
-external numeric search.
-
-In practice:
-
-- FFI is for runtime execution: CUDA buffers, kernels, BLAS/FFT calls, and fast tensor paths.
-- Subprocesses are for producers: PyTorch export, Arb interval queries, Julia spline fitting,
-  Gymnasium environments, external verifiers, dataset conversion, and plotting.
-
-Both paths matter. The question is which artifact returns to Lean and which contract Lean checks.
-
-# Producer Roles
-
-The common producer/checker roles are:
-
-- PyTorch trains models, loads checkpoints, or captures graphs; Lean checks names, shapes, supported
-  ops, and payload layout.
-- Python data scripts convert and plot data; Lean checks dimensions, schemas, and tensor contracts.
-- Julia produces numerical artifacts, splines, ODE/PINN data, or search results; Lean checks
-  domains, coefficients, bounds, and certificate fields.
-- Arb or `python-flint` produces high-precision intervals; Lean decodes exact rational bounds and
-  can check stronger certificate formats when available.
-- CUDA FFI produces buffers, bits, and values; Lean checks shape metadata and applies parity tests
-  or runtime agreement assumptions.
-- External verifiers produce bounds, slopes, leaves, or certificates; Lean replays or structurally
-  checks the accepted artifact.
-
-# Lean-Side Plumbing
-
-The generic subprocess utilities live in `NN.Runtime.External`. They have one focused job:
-resolve an executable, check availability, run a command, capture stdout, and parse JSON.
+The common process helper is small:
 
 ```
-import NN.Runtime.External
-
-namespace Runtime.External.Process
-#check resolveCmdFromEnv
-#check isCmdAvailable
-#check ensureCmdAvailable
-#check runStdoutChecked
-#check runJsonStdoutChecked
-end Runtime.External.Process
-
-namespace Runtime.External.Julia
-#check resolveJuliaCmd
-#check isAvailable
-#check run
-#check runJson
-end Runtime.External.Julia
+def runJsonStdoutChecked
+    (ctx : String)
+    (cmd : String)
+    (args : Array String)
+    (cwd : Option String := some ".") :
+    IO Json := do
+  let stdout ← runStdoutChecked ctx cmd args cwd
+  match Json.parse stdout with
+  | .ok value => pure value
+  | .error message =>
+      throw <| IO.userError
+        s!"{ctx}: JSON parse error: {message}\nstdout:\n{stdout}"
 ```
 
-The interface is plain. Oracle wrappers share the same environment-variable
-conventions, error shape, and JSON parsing path so readers can see where external execution enters
-the trusted story.
+`runStdoutChecked` starts the process, captures its streams, and rejects a nonzero exit code with the
+command, arguments, status, and standard error in the diagnostic. `runJsonStdoutChecked` then
+requires all of standard output to be one JSON document.
 
-# Python: PyTorch, Data, Gymnasium, And Producers
-
-Python enters TorchLean in several different roles, which have different trust meanings.
-
-For PyTorch interop, Python is the right loader and graph-capture tool. PyTorch checkpoints are
-pickle/zip artifacts and PyTorch modules can contain Python object structure, so Lean should not
-pretend to parse arbitrary `.pt` files directly. Instead, we generate small Python adapters that
-emit TorchLean-readable JSON.
+Suppose Python prints:
 
 ```
-import NN.Runtime.PyTorch.Export.StateDict
-import NN.Runtime.PyTorch.Export.TorchExport
-import NN.Runtime.PyTorch.Import.Core
-import NN.Runtime.PyTorch.Import.TorchExport
-
-namespace Export.PyTorch.StateDict
-#check generateJsonBridgeScript
-end Export.PyTorch.StateDict
-
-namespace Export.PyTorch.TorchExport
-#check generateGraphBridgeScript
-end Export.PyTorch.TorchExport
-
-namespace Import.PyTorch
-#check parseTensor
-#check loadWeightsE
-#check getTensorE
-end Import.PyTorch
-
-namespace Import.PyTorch.TorchExport
-#check parseGraph
-end Import.PyTorch.TorchExport
+{"format":"torchlean.bound.v1","lower":0.12,"upper":0.31}
 ```
 
-The decision here is conservative: Python may load the checkpoint or capture the graph, but Lean
-checks the JSON shape, parameter names, supported op subset, and IR validators. Unsupported Python
-operators fail closed. They do not get silently approximated as verified TorchLean operations.
+Successful parsing establishes only that this text is valid JSON. A useful checker must still:
 
-Python also appears in:
+1. require the exact `format` string;
+2. require finite numeric fields;
+3. establish `lower ≤ upper`;
+4. connect the interval to a particular graph, payload, input set, and output;
+5. invoke a sound acceptance theorem.
 
-- data preparation scripts such as tiny Shakespeare, TinyStories, CIFAR, and FNO Burgers helpers;
-- plotting scripts, where Python renders visual summaries while model claims come from the checked
-  artifact or theorem named by the workflow;
-- Gymnasium RL environments, where Lean checks observation shape, action count, reward parsing, and
-  transition records against a `Runtime.RL.Boundary.Contract`;
-- external verification producers such as alpha,beta-CROWN / Two-Stage scripts that emit JSON
-  certificates for Lean checks.
+Changing `upper` to `1e999` is a good boundary test. JSON syntax accepts the number, but converting
+it to a machine `Float` can produce infinity. Verification parsers therefore use
+`expectFiniteFloatE` or `expectFieldFiniteFloatE`, not the permissive float parser, whenever the
+certificate schema promises finite claims.
 
-The same rule applies each time: Python can produce; Lean decides what part of the production is
-accepted.
+# A Complete PyTorch Capture
 
-# Julia: Numeric Producers And Certificate Search
-
-Julia fits the producer role when a workflow needs high performance numerical code, differential
-equation tooling, optimization, spline fitting, or GPU-heavy search. The wrapper stays thin and
-optional:
+Run:
 
 ```
-import NN.Runtime.External.Julia
-
-namespace Runtime.External.Julia
-#check resolveJuliaCmd
-#check ensureAvailable
-#check runJson
-end Runtime.External.Julia
+lake exe torchlean pytorch_export_check
 ```
 
-We resolve `TORCHLEAN_JULIA` when it is set, otherwise we use `julia` from `PATH`. Importing the
-Lean wrapper does not require Julia to be installed; Julia is needed only when code actually runs the
-IO action.
+The command asks Python and `torch.export` to capture several small `nn.Module`s, emits
+`torchlean.ir.v1` JSON, parses each document in Lean, lowers supported values to `NN.IR.Graph`, and
+runs the graph validators.
 
-The trust rule is the same as for Python. A Julia script may fit a piecewise polynomial, search for
-a candidate certificate, or produce PINN/spline residual data. Lean should then check the small
-certificate data it needs: cell domains, polynomial coefficients, interval bounds, residual
-inequalities, and shape conventions. Julia's optimizer, floating-point arithmetic, GPU scheduler,
-and package environment remain external evidence unless Lean checks the returned certificate.
-
-# Arb And python-flint
-
-Arb is the example where external numerical strength is genuinely valuable. Through `python-flint`,
-we can ask Arb/FLINT for rigorous ball-arithmetic enclosures at high precision. Those enclosures
-are strong evidence, especially for transcendental functions or interval experiments, but they are
-still external oracle results unless the returned certificate is independently checked in Lean.
+The current run accepts:
 
 ```
-import NN.Floats.Arb
-
-namespace TorchLean.Floats.Arb
-#check Query
-#check MidRad10Exp
-#check MidRad10Exp.toRatBounds
-#check run
-#check runExpr
-#check runMLP
-end TorchLean.Floats.Arb
+TinyAddRelu                 nodes=3
+TinyMLP                     nodes=4
+TinyCheckpointMLP           nodes=4
+TinyCNN                     nodes=4
+TinyCNNHead                 nodes=6
+TinyBatchNorm2d             nodes=2
+TinyNormSoftmax             nodes=3
+TinyTransformerishBlock     nodes=7
+TinySelfAttentionOps        nodes=5
+TinySingleHeadMHA           nodes=11
 ```
 
-The Arb boundary returns results with enough structure to become exact Lean data. The
-`mid_rad_10exp` encoding represents a rational enclosure:
+Every accepted line reports:
 
 ```
-[(mid - rad) * 10^exp, (mid + rad) * 10^exp]
+guarantee: WellShaped via parseGraph_wellShaped
 ```
 
-That lets us separate two statements:
+The wording is precise. The parser theorem says that successful parsing yields a graph satisfying
+the executable well-shaped predicate. It does not say that Python captured the intended module or
+that every PyTorch operator has been translated correctly.
 
-- "Arb says this interval encloses the result" is an oracle statement.
-- "This JSON payload decodes to these exact rational bounds" is something Lean can check.
+# Inspect The Exchange Format
 
-For a stronger theorem, we need an additional Lean checker that proves the external enclosure
-is valid for the specific expression, graph op, or certificate format. Until then, Arb is powerful
-evidence, not Lean kernel proof.
+A minimal captured graph looks like:
 
-# C And CUDA FFI
+```
+{
+  "format": "torchlean.ir.v1",
+  "input_id": 0,
+  "output_id": 2,
+  "nodes": [
+    {"id": 0, "kind": "input", "parents": [], "shape": [1, 4]},
+    {"id": 1, "kind": "relu",  "parents": [0], "shape": [1, 4]},
+    {"id": 2, "kind": "sum",   "parents": [1], "shape": []}
+  ]
+}
+```
 
-The C/CUDA FFI boundary sits below Python or Julia subprocesses. The native code does not
-usually return a neat JSON certificate; it mutates buffers, launches kernels, and hands Lean opaque
-external objects. The CUDA contract is therefore stricter about source maps, bit contracts, and
-regression tests.
+The Python producer is responsible for translating raw FX or ATen names into stable TorchLean tags.
+The Lean parser does not accept arbitrary operator strings and guess their meaning. It recognizes a
+conservative list, parses operation-specific fields, constructs candidate nodes, and validates the
+result.
 
-The declarations to read are the
-[trusted CUDA bridge](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Trusted.lean),
-[buffer API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Buffer.lean),
-[native source map](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/NativeSources.lean),
-[float32 contract](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/Float32Contract.lean), and
-[kernel specs](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Engine/Cuda/KernelSpec.lean).
+This division is intentional:
 
-The reason we made `NativeSources` explicit is practical: when a Lean file says it calls
-`flashAttentionFwd`, `bmm`, or an FFT/FNO kernel, the native source should be easy to find without
-guessing which `.cu` file owns it.
+```
+PyTorch module
+   ↓ external capture, trusted as a producer
+FX/value graph
+   ↓ explicit JSON schema
+Lean parser
+   ↓ checked structural lowering
+NN.IR.Graph
+   ↓ denotation / verifier / exporter
+TorchLean analysis
+```
 
-# What Counts As Connected?
+The container-valued FX layer matters. `nn.MultiheadAttention` returns a tuple of attention output
+and attention weights. Treating every FX node as a tensor loses that fact. TorchLean first retains
+tuple shape metadata, then lowers only supported tensor projections.
 
-There are several levels of "connected to Lean", and they should not be confused.
+# Rejection Is Part Of The Interface
 
-- *Launched from Lean*: Lean starts a process or calls an FFI symbol. The connection is at the
-  interface level.
-- *Parsed by Lean*: Lean successfully reads JSON, raw bits, or a buffer handle. This checks format.
-- *Shape-checked by Lean*: tensors, graphs, or observations match declared shapes and supported ops.
-- *Replay-checked by Lean*: Lean recomputes the artifact's local condition, such as a certificate
-  predicate or graph validator.
-- *Proved in Lean*: a theorem in Lean connects the checked artifact to a mathematical claim.
+The same command deliberately tries unsupported models.
 
-Most external workflows should aim for replay-checked artifacts. Full proof is better when feasible,
-but a replay checker is already much stronger than treating external stdout as truth.
+`torch.sort(...).values` is rejected because the current producer has no lowering rule for that
+tuple-valued operation. A two-head `nn.MultiheadAttention` is captured as a tuple-valued node but
+then rejected with:
 
-# Next Improvements
+```
+PyTorch graph import: node[2]:
+`nn.MultiheadAttention` lowering supports only num_heads=1, got 2
+```
 
-This ecosystem boundary is usable, and the next improvements are concrete:
+This is useful behavior. Replacing the unsupported node by an identity or silently dropping the
+attention weights would produce a valid-looking graph for the wrong model.
 
-- More external producers should emit small certificate formats rather than logs or ad hoc JSON.
-- JSON parsers should report precise context: field name, expected shape, actual shape, and
-  supported op subset.
-- New external tools should update the trust-boundary docs in the same commit.
+Try adding `torch.sort` to the Python example without changing the Lean parser. The expected result
+is an explicit unsupported-operation failure, not partial import.
 
-The principle does not change: external tools can be powerful, and Lean is where the returned
-artifact is checked against the claim we are willing to state.
+# A State Dictionary Is Not A Graph
 
-# Where To Read Next
+A `state_dict` supplies named tensors. It does not describe data flow. A graph capture supplies
+operations and edges. It may refer to parameters without carrying the full checkpoint provenance.
 
-- *GPU and CUDA Boundaries* for the native FFI version of this pattern.
-- *PyTorch Round Trip* for Python graph and weight artifacts.
-- *Verification Certificates* and *Two-Stage Workflows* for external producer / Lean checker
-  verification.
-- `TRUST_BOUNDARIES.md` for the current inventory of axioms, FFI code,
-  oracle wrappers, and external numeric producers.
+Round-trip import therefore has two obligations:
+
+| Artifact | Checks |
+|---|---|
+| graph | operator subset, IDs, parents, shapes, attributes, input/output IDs |
+| state dictionary | key mapping, tensor shape, flat length, layout, finite values |
+
+Run:
+
+```
+lake exe torchlean pytorch_roundtrip
+```
+
+This writes the generated MLP PyTorch artifacts under
+`NN/Examples/Interop/PyTorch/MLP/`. Open the generated model and parameter files together: neither
+one is a complete description of the executable network by itself.
+
+# From Import Success To Semantic Equality
+
+Three propositions are easy to conflate:
+
+1. Python produced a document and exited successfully.
+2. Lean parsed the document into a well-shaped supported graph.
+3. The graph's denotation equals the original PyTorch module on all admissible inputs.
+
+The capture experiment and `parseGraph_wellShaped` establish the second proposition, conditional on
+the bytes received. The third needs a translation theorem for the supported producer or an explicit
+trust assumption about capture and lowering.
+
+Parity tests on random inputs are excellent engineering evidence for that assumption. They can
+find transposes, axis errors, missing biases, and mask inversions. They do not universally quantify
+over every parameter and input.
+
+# Native FFI Calls Have A Different Risk
+
+A subprocess returns copied bytes owned by Lean after parsing. A native symbol can allocate,
+mutate, alias, or free memory behind an opaque Lean value.
+
+The CUDA buffer boundary contains declarations such as:
+
+```
+@[extern "torchlean_cuda_buffer_of_float_array_with_token"]
+opaque ofFloatArrayWithToken
+    (values : @& FloatArray) (token : UInt32) : Buffer
+
+@[extern "torchlean_cuda_buffer_to_float_array_io"]
+opaque toFloatArrayIO (buffer : @& Buffer) : IO FloatArray
+
+@[extern "torchlean_cuda_buffer_release_with_token"]
+opaque releaseWithToken
+    (buffer : @& Buffer) (token : UInt32) : UInt32
+```
+
+The type `Buffer` is opaque. Lean code cannot forge its internal pointer, but the C implementation
+still determines whether allocation, copying, finalization, and release are correct.
+
+# Why The IO Token Exists
+
+An external declaration that appears pure may be common-subexpression eliminated or reused by Lean
+as if equal arguments always denote the same value. Allocation does not have that semantics: two
+uploads of the same host array should produce independently owned buffers.
+
+The effectful wrapper obtains a changing monotonic-time token:
+
+```
+def ofFloatArrayIO (values : @& FloatArray) : IO Buffer := do
+  let timestamp ← IO.monoNanosNow
+  pure <| ofFloatArrayWithToken values (UInt32.ofNat timestamp)
+```
+
+The native function ignores the token numerically. Its presence makes each allocation depend on the
+surrounding `IO` sequence, preventing Lean from treating repeated uploads as one pure object.
+
+Release has the same issue. `releaseIO` uses a token and is called only at an ownership boundary
+where no alias will be used again. The native finalizer remains safe after explicit release because
+the implementation nulls the pointer.
+
+This is not merely performance plumbing. A stale alias after release is a memory-safety bug that
+the tensor's shape type cannot detect.
+
+# Workspaces And Backward
+
+Some forward kernels produce an output plus intermediates needed by their VJP. TorchLean represents
+that ownership as:
+
+```
+structure WithWorkspace where
+  value : Buffer
+  workspace : List Buffer := []
+```
+
+The tape node retains the workspace until backward has consumed it. Afterwards
+`releaseWorkspaceThen` or `releaseAllThen` threads cleanup through a retained result, so the native
+release cannot be erased as dead pure code.
+
+For long training runs this prevents two forms of growth:
+
+- GPU allocations waiting for Lean external-object finalizers;
+- tape closures retaining workspaces after their VJP has run.
+
+Allocator counters report live and peak bytes, allocation/free counts, wrapper counts, and device
+free memory. They are observability tools, not a proof that no native leak exists.
+
+# External Oracles And Certificates
+
+TorchLean also calls arbitrary-precision or interval tools to propose bounds. A typical workflow is:
+
+```
+Lean writes an exact query
+        ↓
+Arb / python-flint computes an enclosure
+        ↓
+Lean parses rational midpoint-radius data
+        ↓
+a checker validates the enclosure or treats it as oracle evidence
+```
+
+Parsing exact rationals avoids an extra binary64 conversion at ingestion. It still does not verify
+the external interval algorithm. If the result is replayed by a proved checker, checker acceptance
+supports the checker's proposition. If it is only compared in a test, it remains an oracle.
+
+The same producer/checker distinction applies to α,β-CROWN leaf dumps, PINN residual artifacts,
+ODE enclosures, and geometry certificates. Search can be large and external; the accepted schema
+and soundness theorem should stay small enough to audit.
+
+# Evidence Is Field-Specific
+
+A useful boundary report may honestly say:
+
+- *shape:* proved by a typed constructor;
+- *layout:* guarded by length and row-major checks;
+- *value:* compared by a regression suite;
+- *VJP:* delegated to a trusted external provider;
+- *provenance:* native symbol `torchlean_cuda_buffer_matmul`.
+
+One strong field does not upgrade the others. In particular, a proof of shape safety is not a proof
+of arithmetic, and a source-file link is provenance rather than evidence.
+
+# Reproduce And Break The Boundary
+
+The two most useful experiments are:
+
+```
+lake exe torchlean pytorch_export_check
+lake -R -K cuda=true exe torchlean quickstart_mlp \
+  --device cuda --steps 2 --show-backend
+```
+
+Then deliberately break one condition:
+
+1. add an unsupported PyTorch operation and observe import rejection;
+2. change a JSON shape and observe `checkShapes` reject it;
+3. request CUDA from a stub build and observe runtime availability rejection;
+4. pass a wrong-size Q buffer to the LibTorch SDPA test and observe the Lean/native guard reject it.
+
+These failure paths are part of the contract. A boundary that reports only success is difficult to
+audit and easy to overstate.

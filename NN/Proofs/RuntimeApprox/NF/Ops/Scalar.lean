@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.Floats.NeuralFloat.Rounding.Order
 public import NN.Proofs.RuntimeApprox.NF.Ops.Plumbing
 
 /-!
@@ -38,6 +39,22 @@ local notation "R" => TorchLean.Floats.NF β fexp rnd
 
 /-- Interpret a runtime `NF` scalar as a spec scalar (`ℝ`) by forgetting rounding metadata. -/
 @[inline] abbrev toSpec (x : R) : SpecScalar := TorchLean.Floats.NF.toReal x
+
+/-- Constructing an `NF` value from a real incurs at most one half ULP.
+
+This is the canonical bridge for rounded constants and casts. Keeping it next to `toSpec` avoids
+repeating the implementation-level `NF.ofReal` unfolding in attention scales, optimizer
+hyperparameters, and quantization parameters.
+-/
+lemma approx_ofReal_nf (x : ℝ) :
+    abs
+      (toSpec (β := β) (fexp := fexp) (rnd := rnd)
+          (TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd) x) - x) ≤
+      neuralUlp β fexp x / 2 := by
+  simpa [toSpec, TorchLean.Floats.NF.toReal, TorchLean.Floats.NF.ofReal,
+    TorchLean.Floats.NF.roundR, Proofs.RuntimeRoundingApprox.roundR] using
+      (Proofs.RuntimeRoundingApprox.roundR_abs_error
+        (β := β) (fexp := fexp) (rnd := rnd) x)
 
 /-!
 ## NF → ℝ bridge lemmas
@@ -78,6 +95,27 @@ private lemma NF_roundR_zero : TorchLean.Floats.NF.roundR (β := β) (fexp := fe
   change (TorchLean.Floats.NF.ofReal (β := β) (fexp := fexp) (rnd := rnd) (0 : ℝ)).val = (0 : ℝ)
   simpa [TorchLean.Floats.NF.ofReal] using
     (NF_roundR_zero (β := β) (fexp := fexp) (rnd := rnd))
+
+omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
+/-- `max` on `NF` is a pure selection, so forgetting the format commutes with maximum exactly. -/
+lemma toSpec_max (x y : R) :
+    toSpec (β := β) (fexp := fexp) (rnd := rnd) (max x y) =
+      max (toSpec (β := β) (fexp := fexp) (rnd := rnd) x)
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) y) := by
+  by_cases h : y <= x
+  · have hReal : toSpec (β := β) (fexp := fexp) (rnd := rnd) y <=
+        toSpec (β := β) (fexp := fexp) (rnd := rnd) x := by
+      simpa [toSpec, TorchLean.Floats.NF.toReal, LE.le, TorchLean.Floats.NF.instLE] using h
+    rw [sup_eq_left.mpr hReal]
+    simp [Max.max, h]
+  · have hReal : toSpec (β := β) (fexp := fexp) (rnd := rnd) x <=
+        toSpec (β := β) (fexp := fexp) (rnd := rnd) y := by
+      have : ¬ toSpec (β := β) (fexp := fexp) (rnd := rnd) y <=
+          toSpec (β := β) (fexp := fexp) (rnd := rnd) x := by
+        simpa [toSpec, TorchLean.Floats.NF.toReal, LE.le, TorchLean.Floats.NF.instLE] using h
+      exact le_of_not_ge this
+    rw [sup_eq_right.mpr hReal]
+    simp [Max.max, h]
 
 omit [NeuralValidRndToNearest rnd] in
 /--
@@ -488,6 +526,16 @@ lemma approx_abs_nf {x : ℝ} {xR : R} {eps : ℝ}
       _ = eps + neuralUlp β fexp (abs xhat) / 2 := by ring
   simpa [xhat, add_assoc, add_left_comm, add_comm] using this
 
+/-- Forward-error budget for one rounded exponential.
+
+The first term propagates an input error `eps` through `exp`; the second pays for the final
+rounding. In particular, exact input contributes no propagation error. This definition is shared
+by scalar activations, tensor lifting, and stable axis softmax so that all three use the same
+numerical contract.
+-/
+def expErrorBound (a eps : ℝ) : ℝ :=
+  Real.exp (a + eps) * eps + neuralUlp β fexp (Real.exp a) / 2
+
 /--
 Forward approximation bound for `exp` in `NF`.
 
@@ -497,11 +545,51 @@ rounding-ULP term for the final `NF` rounding.
 lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
     (hx : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR - x) ≤ eps) :
     abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.exp xR) - Real.exp x) ≤
-      Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) +
-        Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR + eps) +
-        neuralUlp β fexp
-            (Real.exp (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
+      expErrorBound (β := β) (fexp := fexp)
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) eps := by
   let xhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) xR
+
+  have heps : 0 ≤ eps :=
+    le_trans (abs_nonneg (xhat - x)) (by simpa [xhat] using hx)
+
+  have hx_le : x ≤ xhat + eps := by
+    have h : x - xhat ≤ eps := by
+      calc
+        x - xhat ≤ abs (x - xhat) := le_abs_self _
+        _ = abs (xhat - x) := abs_sub_comm _ _
+        _ ≤ eps := by simpa [xhat] using hx
+    linarith
+
+  have hxhat_le : xhat ≤ xhat + eps := le_add_of_nonneg_right heps
+
+  have hderiv : ∀ z ∈ Set.Iic (xhat + eps),
+      HasDerivWithinAt Real.exp (Real.exp z) (Set.Iic (xhat + eps)) z := by
+    intro z _
+    exact (Real.hasDerivAt_exp z).hasDerivWithinAt
+
+  have hderivBound : ∀ z ∈ Set.Iic (xhat + eps),
+      ‖Real.exp z‖ ≤ Real.exp (xhat + eps) := by
+    intro z hz
+    rw [Real.norm_eq_abs, abs_of_pos (Real.exp_pos z)]
+    exact Real.exp_monotone hz
+
+  have hmean :=
+    Convex.norm_image_sub_le_of_norm_hasDerivWithin_le
+      (f := Real.exp) (f' := Real.exp) (s := Set.Iic (xhat + eps))
+      (x := x) (y := xhat) (C := Real.exp (xhat + eps))
+      hderiv hderivBound (convex_Iic (xhat + eps)) hx_le hxhat_le
+
+  have hinput : abs (xhat - x) ≤ eps := by
+    simpa [xhat] using hx
+
+  have hpropagation :
+      abs (Real.exp xhat - Real.exp x) ≤ Real.exp (xhat + eps) * eps := by
+    calc
+      abs (Real.exp xhat - Real.exp x)
+          ≤ Real.exp (xhat + eps) * abs (xhat - x) := by
+              simpa [Real.norm_eq_abs] using hmean
+      _ ≤ Real.exp (xhat + eps) * eps :=
+        mul_le_mul_of_nonneg_left hinput (Real.exp_nonneg _)
 
   have hround :
       abs
@@ -513,28 +601,12 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
       (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (Real.exp
         xhat))
 
-  have hx_le : x ≤ xhat + eps := by
-    have hx' := (abs_sub_le_iff.1 (by simpa [xhat] using hx))
-    have h : x - xhat ≤ eps := hx'.2
-    have : x ≤ eps + xhat := (sub_le_iff_le_add).1 h
-    simpa [add_comm, add_left_comm, add_assoc] using this
-
-  have hexp_le : Real.exp x ≤ Real.exp (xhat + eps) :=
-    Real.exp_monotone hx_le
-
-  have hdiff : abs (Real.exp xhat - Real.exp x) ≤ Real.exp xhat + Real.exp (xhat + eps) := by
-    have h' : abs (Real.exp xhat - Real.exp x) ≤ Real.exp xhat + Real.exp x := by
-      have := abs_add_le (Real.exp xhat) (-Real.exp x)
-      simpa [sub_eq_add_neg, abs_neg, abs_of_nonneg (Real.exp_nonneg _),
-        abs_of_nonneg (Real.exp_nonneg _)] using this
-    exact le_trans h' (by linarith [hexp_le])
-
   have htotal :
       abs
           (Proofs.RuntimeRoundingApprox.roundR (β := β) (fexp := fexp) (rnd := rnd) (Real.exp xhat)
             -
             Real.exp x) ≤
-        Real.exp xhat + Real.exp (xhat + eps) + neuralUlp β fexp (Real.exp xhat) / 2 := by
+        Real.exp (xhat + eps) * eps + neuralUlp β fexp (Real.exp xhat) / 2 := by
     have :=
       calc
         abs
@@ -552,14 +624,14 @@ lemma approx_exp_nf {x : ℝ} {xR : R} {eps : ℝ}
                         (Real.exp xhat))
                       (Real.exp xhat) (Real.exp x)
         _ ≤ neuralUlp β fexp (Real.exp xhat) / 2 +
-              (Real.exp xhat + Real.exp (xhat + eps)) := by
-              exact add_le_add hround hdiff
-        _ = Real.exp xhat + Real.exp (xhat + eps) +
+              Real.exp (xhat + eps) * eps :=
+              add_le_add hround hpropagation
+        _ = Real.exp (xhat + eps) * eps +
               neuralUlp β fexp (Real.exp xhat) / 2 := by ring
     exact this
 
-  simpa [xhat, toSpec_exp (β := β) (fexp := fexp) (rnd := rnd) xR, add_assoc, add_left_comm,
-    add_comm]
+  simpa [expErrorBound, xhat, toSpec_exp (β := β) (fexp := fexp) (rnd := rnd) xR, add_assoc,
+    add_left_comm, add_comm]
     using htotal
 
 /--
@@ -762,6 +834,64 @@ lemma approx_safeLog_nf {x : ℝ} {xR : R} {eps ε : ℝ}
       _ = (1 / ε) * eps + neuralUlp β fexp (safeLog (ε := ε) xhat) / 2 := by
             simp [safeLog, xhat, yhat, add_comm]
   simpa [xhat] using this
+
+/-- Forward approximation bound for ordinary square root on a certified positive domain.
+
+The extra runtime hypothesis is not cosmetic: the executable `NF.sqrt` receives the rounded input,
+so a real lower bound alone does not rule out an invalid rounded argument. Once both exact and
+runtime inputs are nonnegative, the clamped theorem above reduces definitionally to ordinary
+square root.
+-/
+lemma approx_sqrt_nf_of_pos_lb {x : ℝ} {xR : R} {eps η : ℝ}
+    (hη : 0 < η) (hdom : η ≤ x)
+    (hxR : 0 ≤ toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
+    (hx : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR - x) ≤ eps) :
+    abs
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt xR) -
+          Real.sqrt x) ≤
+      eps / Real.sqrt η +
+        neuralUlp β fexp
+          (Real.sqrt (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
+  have hx0 : 0 ≤ x := le_trans (le_of_lt hη) hdom
+  have hzeroR : toSpec (β := β) (fexp := fexp) (rnd := rnd) (0 : R) = 0 :=
+    toSpec_zero (β := β) (fexp := fexp) (rnd := rnd)
+  have hxR0 : (0 : R) ≤ xR := by
+    change (0 : R).val ≤ xR.val
+    have hzeroVal : (0 : R).val = 0 := by
+      simpa [toSpec, TorchLean.Floats.NF.toReal] using hzeroR
+    rw [hzeroVal]
+    exact hxR
+  have hmaxR : max xR (0 : R) = xR := by
+    simp [Max.max, hxR0]
+  have hmaxS : max x 0 = x := max_eq_left hx0
+  have h := approx_sqrt_clamp_nf_of_lb (β := β) (fexp := fexp) (rnd := rnd)
+    (x := x) (xR := xR) (eps := eps) (η := η) hη (by simpa [hmaxS] using hdom) hx
+  simpa [hmaxR, hmaxS, hxR] using h
+
+/-- Square-root approximation when the input error budget itself certifies runtime positivity.
+
+From `η ≤ x`, `|x̂-x| ≤ eps`, and `eps < η`, the rounded input satisfies `0 < x̂`; callers do not
+need a separate runtime-domain hypothesis. This is the form used by normalization certificates.
+-/
+lemma approx_sqrt_nf_of_pos_lb_of_error {x : ℝ} {xR : R} {eps η : ℝ}
+    (hη : 0 < η) (hdom : η ≤ x) (hbudget : eps < η)
+    (hx : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR - x) ≤ eps) :
+    abs
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) (MathFunctions.sqrt xR) -
+          Real.sqrt x) ≤
+      eps / Real.sqrt η +
+        neuralUlp β fexp
+          (Real.sqrt (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)) / 2 := by
+  have hxR : 0 ≤ toSpec (β := β) (fexp := fexp) (rnd := rnd) xR := by
+    have hdiff : x - toSpec (β := β) (fexp := fexp) (rnd := rnd) xR ≤ eps := by
+      calc
+        x - toSpec (β := β) (fexp := fexp) (rnd := rnd) xR ≤
+            abs (x - toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) := le_abs_self _
+        _ = abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR - x) := abs_sub_comm _ _
+        _ ≤ eps := hx
+    linarith
+  exact approx_sqrt_nf_of_pos_lb (β := β) (fexp := fexp) (rnd := rnd)
+    hη hdom hxR hx
 
 /--
 Forward approximation bound for multiplication in `NF`.

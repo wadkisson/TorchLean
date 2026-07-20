@@ -2,62 +2,232 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Command-Line Tools" =>
+#doc (Manual) "Command-Line Reference" =>
 %%%
 tag := "cli"
 %%%
 
-The public command line runs model examples, individual Lean example files, and verification tools:
+TorchLean uses two command dispatchers:
 
-- `lake exe torchlean <example> [args...]` for the main model examples,
-- `lake env lean --run NN/Examples/.../Foo.lean -- [args...]` for files in the
-  [examples tree](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/),
-- `lake exe verify -- ...` for verification workflows and checkers.
+```
+lake exe torchlean <example> [flags...]
+lake exe verify -- <tool> [args...]
+```
 
-| Command | Purpose |
+The first runs examples, training applications, data checks, and numerical deep dives. The second
+runs verifiers and certificate checkers. Small source-local programs can also be executed directly:
+
+```
+lake env lean --run NN/Examples/Quickstart/TensorBasics.lean
+```
+
+The dispatch tables are ordinary Lean definitions:
+
+- [`NN.Examples.Models.Runner`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean)
+  owns the `torchlean` subcommands;
+- [`NN.Verification.CLI`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/CLI.lean)
+  owns the `verify` tools.
+
+When this chapter and the executable disagree, the executable is authoritative.
+
+# Discovering Commands
+
+Start with:
+
+```
+lake exe torchlean --help
+```
+
+The current help begins:
+
+```
+TorchLean runnable examples
+
+Usage:
+  lake exe torchlean <example> [flags...]
+  lake exe torchlean --choose <example> [flags...]
+  lake exe torchlean <example> --help
+
+Start here:
+  lake exe torchlean quickstart_tensors
+  lake exe torchlean quickstart_autograd
+  lake exe torchlean quickstart_mlp --steps 20
+```
+
+The shorter list in top-level help is a starting point, not the complete dispatch table. Verification
+tools are listed independently:
+
+```
+lake exe verify -- list
+```
+
+That command currently includes in-memory TorchLean-to-IR workflows, LiRPA artifact checkers,
+PINN and geometry certificate checkers, numerical ODE tools, and VNN-COMP-style applications. Use
+the list printed by your checkout rather than copying a stale inventory from a paper or issue.
+
+# Command Grammar
+
+The normal form is:
+
+```
+lake exe torchlean <subcommand> [runtime flags] [command flags]
+```
+
+For example:
+
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu --steps 20 --seed 2026
+```
+
+Runtime flags may also precede the subcommand:
+
+```
+lake exe torchlean --device cpu quickstart_mlp \
+  --steps 20 --seed 2026
+```
+
+Both forms reach the same parser. Documentation uses the first because the application name appears
+before its options.
+
+A leading separator is accepted for wrappers that require one:
+
+```
+lake exe torchlean -- quickstart_mlp --device cpu --steps 20
+```
+
+# The Interactive Device Chooser
+
+Use `--choose` when running a command by hand and you do not want to remember the device flag:
+
+```
+lake exe torchlean --choose quickstart_mlp --steps 1
+```
+
+The prompt is:
+
+```
+TorchLean runtime chooser
+Runtime device:
+  1) CPU    portable default
+  2) CUDA   GPU runtime, requires `lake -R -K cuda=true exe ...`
+Select device [1]:
+```
+
+Pressing Enter selects CPU. The chooser is opt-in so shell scripts, tests, and continuous
+integration never block waiting for input. It currently chooses only between implemented CPU and
+CUDA execution. Other target names belong to the backend registry but do not yet have runnable
+training engines.
+
+# Runtime Flags
+
+The common runtime parser recognizes:
+
+| Flag | Current meaning |
 |---|---|
-| `lake build` | build the project |
-| `lake build NN.Examples.Zoo` | build curated examples |
-| `lake exe torchlean --help` | list model examples |
-| `lake exe torchlean <example>` | run a model example |
-| `lake env lean --run NN/Examples/.../Foo.lean` | run a direct example file |
-| `lake exe verify -- list` | list verifier tools |
-| `lake exe verify -- <tool>` | run a verifier/checker |
-| `scripts/docs/build_site.sh` | build the website/docs |
+| `--device auto|cpu|cuda|...` | requested execution device |
+| `--dtype float|ieee754exec` | scalar runtime, where the command supports it |
+| `--backend eager|compiled` | eager autograd or proof-linked compiled host path where supported |
+| `--seed N` | explicit random seed |
+| `--show-backend` | print selected backend capsules |
 
-The runner accepts runtime flags either before or after the subcommand. These are equivalent:
+The parser also accepts names such as `rocm`, `metal`, `wasm`, `tpu`, `trainium`, `custom`, and
+`external`. They are planning targets in the current registry, not completed runtimes. Requesting
+one fails validation rather than silently falling back to CPU.
+
+Most full model applications call the native `Float` trainer. They accept `--dtype float` only.
+Some quickstarts and numerical workflows are scalar-polymorphic and accept `--dtype ieee754exec`.
+The command decides; the presence of a name in the shared parser does not imply universal support.
+
+Likewise, `--backend compiled` is not a generic CUDA graph mode. It selects the proof-linked
+compiled host path for commands that implement that interpretation. CUDA-only specialized
+applications may require eager execution.
+
+# CPU And CUDA Builds
+
+CPU execution uses the ordinary build:
 
 ```
-lake exe torchlean mlp --device cpu --steps 10
-lake exe torchlean --device cpu mlp --steps 10
+lake build
+lake exe torchlean quickstart_mlp --device cpu --steps 20
 ```
 
-Use the first form in prose and scripts because it reads like "run this example with these flags."
-Use a leading `--` separator only when another wrapper needs it:
-
-```
-lake exe torchlean -- mlp --device cpu --steps 10
-```
-
-# Building with CUDA
-
-GPU-backed examples require a CUDA-enabled build of the Lean project so the native archives in the
-[CUDA source tree](https://github.com/lean-dojo/TorchLean/tree/main/csrc/cuda/) link against the toolkit:
+Real CUDA execution must be compiled with the Lake option:
 
 ```
 lake -R -K cuda=true build
-lake -R -K cuda=true exe torchlean gpt2 --device cuda --steps 1
+lake -R -K cuda=true exe torchlean chargpt --device cuda \
+  --tiny-shakespeare --preset smoke
 ```
 
-Without `cuda=true`, CUDA symbols resolve to stubs so CPU builds remain portable. An explicit
-`--device cuda` request then fails instead of silently changing the requested device. See *GPU and
-CUDA Boundaries* for the build/runtime split. Verification CLI tools (`lake exe verify`) do not
-require CUDA unless a particular producer workflow says otherwise.
+Keep `-R` when changing a Lake configuration so affected native archives are rebuilt. Without
+`cuda=true`, TorchLean links portable CUDA stubs. An explicit `--device cuda` request then fails;
+it does not pretend to have used the GPU.
 
-# Shared Parsers
+Add `--show-backend` to inspect the selected contracts:
 
-Command authors can import `NN.API.CLI` without loading the tensor or runtime stack. Its definitions
-live in the canonical `TorchLean.CLI` namespace:
+```
+lake -R -K cuda=true exe torchlean quickstart_mlp \
+  --device cuda --steps 1 --show-backend
+```
+
+The printed capsules name the operation, provider, layouts, numerical policy, forward and backward
+ownership, and evidence level. Device selection answers “where did this run?”; capsule reporting
+answers the more precise question “which implementation was selected for each operation?”
+
+# Command-Specific Flags
+
+Ask the subcommand for help:
+
+```
+lake exe torchlean chargpt --help
+```
+
+The CharGPT command documents presets and structural overrides:
+
+```
+Presets:
+  smoke       two-update end-to-end CUDA check
+  karpathy    full Tiny Shakespeare lecture experiment
+
+Architecture:
+  --width N       embedding width
+  --heads N       attention heads; must divide width
+  --layers N      Transformer blocks
+  --dropout P     dropout probability in [0, 1)
+  --batch N       training windows per update
+  --seq-len N     context length
+  --steps N       optimizer updates
+```
+
+Not every application has equally detailed command-specific help yet. If a generic runtime page is
+printed, inspect the module documentation or parser next to that application. The source links in
+the preceding chapters point to the maintained definitions.
+
+# Strict Parsing
+
+TorchLean parsers remove the flags they understand and then reject whatever remains. This catches
+misspellings and copied options from another command.
+
+For example, GridWorld has a fixed source-level horizon and does not accept `--rollout`:
+
+```
+lake exe torchlean ppo_gridworld \
+  --device cpu --updates 1 --rollout 8
+```
+
+The command fails with:
+
+```
+torchlean ppo_gridworld: unexpected arguments: [--rollout, 8]
+```
+
+The FNO command expects `--x` and `--y` for training arrays, not `--train-x` and `--train-y`.
+Unknown path flags fail in the same way.
+
+Shared parsing lives in
+[`NN.API.CLI`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/CLI.lean)
+under the `TorchLean.CLI` namespace. A lightweight command can write:
 
 ```
 import NN.API.CLI
@@ -66,188 +236,153 @@ open TorchLean
 
 #check CLI.takeFlagValueOnce
 #check CLI.takeNatFlagOnce
-#check CLI.takeBoolFlagOnce
+#check CLI.takeBoolValueFlagOnce
+#check CLI.takePathFlagOnce
 #check CLI.checkNoArgs
-#check CLI.orThrowIO
 ```
 
-The shared parsers accept both `--key value` and `--key=value`, reject duplicate flags, and return
-unconsumed arguments so each command can reject misspellings rather than ignore them.
+Value flags accept both `--key value` and `--key=value`. Duplicate occurrences are rejected.
+Parsers return the unconsumed argument list, and `checkNoArgs` closes the loop.
 
-Common failure modes are usually simple: CUDA examples need `-K cuda=true`; real-data examples need
-the dataset files under `data/real`; some verifier tools need an external artifact; and Python
-producer workflows need their Python dependencies installed before Lean can check the exported
-artifact.
+# Preparing Data
 
-# Command Families
-
-The `torchlean` runner is intentionally broad, but the names still fall into a few useful groups.
-Check `lake exe torchlean --help` for the current list.
-
-| Family | Examples | What the command establishes |
-|---|---|---|
-| quickstart | `quickstart_tensors`, `quickstart_autograd`, `quickstart_mlp` | public API smoke path |
-| supervised / vision | `mlp`, `kan`, `cnn`, `vit` | training loop, data path, optimizer, backend |
-| sequence | `rnn`, `lstm`, `transformer`, `gpt2`, `text_gpt2`, `chargpt`, `mamba` | token windows, recurrence, attention, scan state |
-| scientific ML | `fno1d_burgers` | prepared scientific data and spectral convolution |
-| generative | `autoencoder`, `mae`, `vae`, `vqvae`, `gan`, `diffusion` | reconstruction, latent objectives, denoising, sampling artifacts |
-| reinforcement learning | `ppo_gridworld`, `ppo_cartpole`, `ppo_pong_ram`, `dqn_replay` | environment boundary, rollout/replay data, policy/value losses |
-| interop / deep dives | `pytorch_roundtrip`, `pytorch_export_check`, `graphspec`, `torch_ir_pytorch` | graph and external artifact workflows |
-| numerics | `float32_modes`, `floats_arb_ieee_compare` | finite precision inspection |
-
-This table is a claim-scope table, not a promise that every command proves a theorem. A successful
-model command establishes an executable run through the selected runtime path. A verifier command
-establishes checker acceptance for a named artifact. A theorem must still be cited by name when the
-claim depends on proof support.
-
-# A Good First Check Test
-
-After cloning, a fast runtime check is:
+The small public downloader prepares the common datasets:
 
 ```
-lake build
-lake build NN.Examples.Zoo
-lake env lean --run NN/Examples/Quickstart/TensorBasics.lean
-lake exe torchlean mlp --device cpu --steps 10
-lake exe verify -- torchlean-ibp
+python3 scripts/datasets/download_example_data.py \
+  --auto-mpg --tiny-shakespeare --tinystories-valid --cifar10
 ```
 
-Those commands answer four different questions:
-
-- does the project build?
-- does the typed-tensor layer work?
-- does the public model runner and training API feel reasonable?
-- does the verification pipeline complete?
-
-This sequence is a confidence check rather than full coverage: within a minute or two it shows
-whether the project builds, whether a small training run works, and whether the verifier command is
-present.
-
-# Examples In Practice
-
-Model examples use the `torchlean` runner:
+The forecasting and Burgers applications use dedicated preparation:
 
 ```
-lake exe torchlean --help
-lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
+python3 scripts/datasets/download_example_data.py \
+  --household-power --household-power-windows 512
+
+python3 NN/Examples/Data/prepare_fno1d_burgers.py \
+  --download --grid 32 --ntrain 128 --ntest 32
 ```
 
-Some tutorial and deep dive examples are ordinary Lean `--run` programs under `NN/Examples/*`. Pick
-one and run it directly:
+Convert a local labeled image folder with:
 
 ```
-lake env lean --run NN/Examples/Quickstart/TensorBasics.lean
-```
-
-For data-backed model runs, prepare the public example datasets first:
-
-```
-python3 scripts/datasets/download_example_data.py --tiny-shakespeare --tinystories-valid --cifar10
-```
-
-Some examples have specialized data or artifact helpers:
-
-```
-python3 scripts/datasets/download_example_data.py --household-power --household-power-windows 512
-python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
 python3 scripts/datasets/torchlean_data_convert.py image-folder \
   --input /path/to/images \
   --x-output data/real/imagenet64/imagenet64_train_X.npy \
   --y-output data/real/imagenet64/imagenet64_train_y.npy \
-  --height 64 --width 64 --labels-from-dirs --limit 2000
+  --height 64 --width 64 \
+  --labels-from-dirs --limit 2000
 ```
 
-When a command writes artifacts, prefer explicit paths in documentation:
+These Python tools are data producers. Lean checks file existence, array metadata, dimensions,
+finite values where the loader contract requires them, and typed conversion. It does not prove the
+downloaded labels or preprocessing script semantically correct.
+
+# Artifact Paths
+
+Pass explicit paths when an output will be inspected later:
 
 ```
-lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
-  --steps 10 --windows 1 --generate 64 --log data/model_zoo/gpt2_trainlog.json
-
-lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 \
-  --n-total 1 --steps 1 --hidden-c 1 --T 2 \
-  --sample-ppm data/model_zoo/cifar_sample.ppm
+lake exe torchlean autoencoder --device cpu \
+  --n-total 1 --steps 1 \
+  --log /tmp/autoencoder-trainlog.json
 ```
 
-The path is part of the workflow. It tells readers which object a widget, plotter, or later checker
-is meant to inspect.
+```
+lake exe torchlean ppo_gridworld --device cpu \
+  --updates 1 --eval-every 1 \
+  --log /tmp/ppo-trainlog.json \
+  --policy /tmp/ppo-policy.json \
+  --path /tmp/ppo-path.json
+```
 
-# Verification In Practice
+```
+lake -R -K cuda=true exe torchlean diffusion --device cuda \
+  --dataset cifar10 --n-total 8 --steps 20 --T 20 \
+  --sample-ppm /tmp/diffusion-sample.ppm
+```
 
-The verification side has the same small feel: list the registered tools, then run one directly.
+The path is part of the experiment. It tells a widget, plotting script, or checker which exact
+object it is reading.
 
-- Show registered verification tools:
+# Verification Commands
+
+List the registry, then choose one workflow:
 
 ```
 lake exe verify -- list
-```
-
-- Run the smallest IR-to-bounds workflow:
-
-```
 lake exe verify -- torchlean-ibp
 ```
 
-- Run the CROWN operator example:
+An in-memory workflow such as `torchlean-ibp` constructs a model, lowers it to IR, and runs a bound
+algorithm. An artifact checker such as `pinn-cert` or `abcrown-leaf` parses a file produced
+elsewhere. Their success messages have different meanings.
+
+Representative forms are:
 
 ```
-lake exe verify -- torchlean-crown-ops
+lake exe verify -- torchlean-transformer-ibp
+lake exe verify -- pinn-cert path/to/pinn-cert.json
+lake exe verify -- abcrown-leaf path/to/leaf-artifact.json
+lake exe verify -- camera-box3d-cert path/to/camera-cert.json
 ```
 
-These commands are plain, so the verification workflow is easy to invoke without
-knowing the internal directory structure of the repository.
+A checker accepts only its declared schema and semantic fragment. It does not retroactively verify
+the external process that produced the artifact.
 
-# Direct Lean Files
+# A Practical Validation Sequence
 
-The runner covers the curated examples, but direct files are still useful when a tutorial is meant
-to be read beside its source. The command shape is:
+After a fresh clone or a substantial local change, run these commands sequentially:
 
 ```
-lake env lean --run NN/Examples/Quickstart/AutogradBasics.lean -- --dtype float
+lake build
+lake build NN.Examples.Zoo
+lake exe torchlean quickstart_tensors
+lake exe torchlean quickstart_autograd
+lake exe torchlean quickstart_mlp --device cpu --steps 20 --seed 2026
+lake exe torchlean numerical_certificate
+lake exe verify -- torchlean-ibp
 ```
 
-Use direct files for small, source-local demonstrations. Use `lake exe torchlean ...` when the
-example has a public subcommand and should be cited as part of the model suite.
+They answer different questions:
 
-# Reading Failures
+| Command | Question |
+|---|---|
+| `lake build` | does the project elaborate and link? |
+| `lake build NN.Examples.Zoo` | do the curated examples elaborate? |
+| tensor/autograd quickstarts | do small executable values and derivatives behave as expected? |
+| MLP training | does a complete optimizer path run? |
+| numerical certificate | are positive and negative certificate cases handled? |
+| TorchLean IBP | does model lowering and bound propagation complete? |
 
-Most failed application commands are informative if read through the right boundary:
+For CUDA changes, follow with CUDA-specific builds and runtime checks. For external tools, prepare
+their dependencies separately. No single green command subsumes all of these boundaries.
 
-- *unknown example*: run `lake exe torchlean --help` and use the registered subcommand name;
-- *missing file under `data/real`*: run the documented data helper or pass a smaller synthetic-data flag;
-- *CUDA symbol or device failure*: rebuild with `lake -R -K cuda=true build` and keep `-K cuda=true`
-  on the executable command;
-- *Gymnasium import/server failure*: install the Python dependency and check the external environment name;
-- *verifier artifact failure*: distinguish "artifact missing" from "artifact present but rejected";
-- *widget file view is empty*: confirm the example wrote the JSON/CSV/PPM path the widget is reading.
+# Building The Website
 
-These are not merely operational tips. They also mark trust boundaries. A dataset converter, a Python
-environment, a CUDA kernel, and an external certificate producer are different kinds of dependencies,
-and must be named separately.
-
-# Website Build
-
-The website combines the API reference, this book, and the homepage. The local build command is kept in
-the repository:
+The guide, API reference, and application pages are built by:
 
 ```
 scripts/docs/build_site.sh
 ```
 
-That script builds the API reference with equation rendering disabled, rebuilds the Verso guide (from
-the `blueprint/` package), and installs the homepage bundle.
-
-For more runnable examples, see *Example Walkthroughs*. For what `verify` subcommands do internally, see
-*Verification*.
-
-# Checking Guide Edits
-
-Each guide file is a Lean source file. During development, a focused check gives faster feedback:
+For a local Jekyll preview after the generated site exists:
 
 ```
-lake env lean blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/CLI.lean
-lake env lean blueprint/TorchLeanBlueprint/Guide/Ch5_Applications/Examples.lean
-lake env lean blueprint/TorchLeanBlueprint/Guide/Ch6_Conclusion/Conclusion.lean
+cd home_page
+bundle _2.3.14_ exec jekyll serve \
+  --config _config.yml,_config_dev.yml \
+  --host 127.0.0.1 --port 4001
 ```
 
-Pages that import executable widget or runtime modules should be checked directly. Command tables
-should be compared with `lake exe torchlean --help` so that the published flags match the runner.
+Then open:
+
+```
+http://127.0.0.1:4001/
+http://127.0.0.1:4001/blueprint/
+http://127.0.0.1:4001/examples/
+http://127.0.0.1:4001/docs/
+```
+
+If the source changed but the browser did not, rebuild the generated site before restarting
+Jekyll. A running web server cannot regenerate Lean documentation on its own.

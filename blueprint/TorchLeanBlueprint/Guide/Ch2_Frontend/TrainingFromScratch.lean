@@ -2,395 +2,437 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Training From Scratch" =>
+#doc (Manual) "Training, One State Transition At A Time" =>
 %%%
 tag := "training-from-scratch"
 %%%
 
-A TorchLean training file usually has five blocks: constants, model, trainer, data, and train/report.
-Once you can recognize those blocks, most examples in the repository become readable.
+Training is not a magical property attached to a model. It is a repeated state transition involving
+parameters, optimizer memory, data order, and runtime state. TorchLean's high-level trainer packages
+that transition, while the lower manual API exposes each piece.
 
-The smallest workflow is:
+We will train the running `2 → 8 → 1` MLP and then unpack what happened.
 
-1. define a typed model,
-2. attach a loss by choosing a trainer,
-3. choose an optimizer,
-4. build or load a dataset,
-5. run training and inspect the report.
+# The Smallest Complete Run
 
-No theorem is needed yet. The objects that later become graph artifacts and verification targets
-should still feel like ordinary model code.
-
-# A Minimal Complete Script
-
-The shortest way to get a feel for the public API is to run the focused MLP example:
-
-- [SimpleMlpTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
-- [SimpleCnnTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
-- [AutogradBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
+Execute:
 
 ```
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 200 --dtype float --backend eager
+lake exe torchlean quickstart_mlp \
+  --device cpu --steps 200 --seed 2026
 ```
 
-A few details to notice in that file:
-
-- `import NN.API` is the supported application entrypoint.
-- `open TorchLean` gives you the public namespaces: `nn`, `Trainer`, `optim`, `Data`, and CLI parsers.
-- `Trainer.new mkModel { task := .regression, seed := seed }` fixes initialization and returns the training task.
-- The dataset is ordinary Lean data with tensor shapes.
-- The report prints loss before and after training, then probes the trained model on a few inputs.
-
-# Building Models With `nn`
-
-Here is the core model definition pattern used across the tutorials:
+The current checkout reports:
 
 ```
-import NN.API
-open TorchLean
-
-def mkModel : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
-  nn.Sequential![
-    nn.Linear 2 8,
-    nn.ReLU,
-    nn.Linear 8 1
-  ]
-
-def trainer (seed : Nat) :=
-  Trainer.new mkModel { task := .regression, seed := seed }
+dataset size = 25
+mean_loss(before) = 0.761530
+mean_loss(after) = 0.003234
+heldout x=(0.25,-0.75), target=0.2,
+prediction(after)=[0.210239]
 ```
 
-Think of `nn.M` as a small “model builder” monad: it allocates parameters and wires layers
-together, while keeping the end result purely functional.
-
-## PyTorch Similarity
-
-The PyTorch training pattern and the TorchLean training pattern are close by design:
+The source is
+[`SimpleMlpTrain.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean).
+Its public structure is:
 
 ```
-import torch
-
-model = torch.nn.Sequential(
-    torch.nn.Linear(2, 8),
-    torch.nn.ReLU(),
-    torch.nn.Linear(8, 1),
-)
-opt = torch.optim.Adam(model.parameters(), lr=0.03)
+model builder
+  + trainer configuration
+  + dataset
+  + train options
+  -> trained handle
 ```
 
-TorchLean writes the same structure in Lean, but makes the parameter bundle explicit:
+The loss values are measurements from this run. The model and optimizer definitions, by contrast,
+are reusable objects that can appear in theorem statements or another runtime profile.
+
+# Declare The Architecture
 
 ```
 import NN.API
 open TorchLean
 
-def mkModel : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
+def model :
+    nn.M (nn.Sequential (shape![2]) (shape![1])) :=
   nn.Sequential![
-    nn.Linear 2 8,
-    nn.ReLU,
-    nn.Linear 8 1
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
   ]
+```
 
+At this point we have:
+
+- input and output shapes;
+- layer structure;
+- parameter shapes;
+- seeded initialization actions.
+
+We do not yet have a loss, optimizer, concrete parameter values, or device.
+
+# Attach A Training Problem
+
+```
 def trainer (seed : Nat) :=
-  Trainer.new mkModel { task := .regression, seed := seed }
-```
-
-The loop has the same rhythm as PyTorch: forward pass, loss, backward pass, optimizer step.
-TorchLean's difference is where the state lives. Parameters, optimizer state, runtime mode, and logs
-are explicit values rather than hidden fields of a module object.
-
-Here is a fuller public configuration:
-
-```
-def task :=
-  Trainer.new mkModel
+  Trainer.new model
     { task := .regression
-      optimizer := optim.adam { lr := 0.03, beta1 := 0.9, beta2 := 0.999 }
+      optimizer := optim.adam { lr := 0.03 }
       dtype := .float
-      backend := .compiled
-      seed := 17 }
-
-def trainOpts : Trainer.TrainOptions :=
-  { steps := 200
-    batchSize := 16
-    logEvery := 25
-    title := "two-layer regression" }
+      backend := .eager
+      seed := seed }
 ```
 
-Persistent choices live on the trainer: task family, optimizer, scalar dtype, backend, seed, and
-device/runtime options. Per-call choices live in `TrainOptions`: how many steps, how often to log,
-where to write logs, and whether to load or save parameters.
+`Trainer.new` runs the seeded builder and stores persistent choices. It still does not consume data
+or update a parameter.
 
-That division keeps repeated experiments legible. If two runs differ only in `backend`, the
-architecture and optimizer should be identical in the file. If two runs differ in `steps`, the
-trainer should not have to be rebuilt.
+For regression, the default objective is mean-squared error. If a prediction and target each have
+`n` entries:
 
-# Workflow Lessons
+$$`
+L(\theta;x,y)
+=
+\frac1n\sum_{i=1}^{n}
+\left(F_\theta(x)_i-y_i\right)^2.
+`
 
-The first training example is small, but it is already exercising the decisions that matter later:
+Changing `.regression` to `.crossEntropy` changes the objective and target convention without
+changing the architecture. A custom task supplies a checked scalar loss program.
 
-- parameters are explicit data, so compilation and verification can find them without inspecting a
-  hidden Python object;
-- the model builder records structure separately from scalar execution, so the same architecture can
-  be reused across backends;
-- losses and optimizers are ordinary Lean functions over typed tensors, not implicit methods attached
-  to mutable modules;
-- the tutorial path and the verifier path share the same public model definitions instead of using
-  unrelated examples.
+# Build The Dataset
 
-A successful training run establishes that the model, data, loss, optimizer, and selected backend
-execute together and produce a report. Convergence, robustness, and CUDA-correctness claims live in
-later layers: optimizer theorems, certificate checkers, runtime boundary docs, or backend-specific
-tests.
-
-In a run log, read each line for what it actually says:
-
-- a decreasing loss says the selected training loop made progress on the selected data;
-- a saved parameter file says a runtime artifact was written in a known format;
-- a backend parity check says two implementations agreed on tested inputs;
-- a theorem in the proof layer says its exact Lean statement was proved;
-- a certificate check says the finite certificate passed the checker.
-
-All of these are useful. None of them silently upgrades into the others.
-
-After the MLP example, move to a data-backed training tutorial:
-
-- [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
-- [NPY loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Npy.lean)
-- [CIFAR image loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Cifar10Images.lean)
-
-If you want more than an MLP:
-
-- [SimpleCnnTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
-- [Vision CNN source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/Cnn.lean)
-
-# Autograd and Training
-
-TorchLean’s differentiation is functional: tensors do not carry mutable `.grad` fields. Instead,
-TorchLean provides `autograd` primitives that transform functions.
-
-For the smallest autograd-only example, see:
-
-- [AutogradBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
-
-The current tutorial files stay short by using the public API directly:
-
-- `Data.*` builds shape-indexed datasets from small tensors, generated grids, CSV files, or image
-  loaders.
-- `Trainer.new` and `trainer.train` own the runtime scalar and backend
-  selection.
-- `Tensor`, `TensorPack`, and the `tensor!` / `tensorOfList!` / `tensorpack!` macros keep examples
-  typed without making each tutorial reopen the runtime callback layer.
-
-Public tutorials should describe the model, data, optimizer, and training options. The
-`NN.API.Runtime` callback layer still exists for runtime implementers and proof work, but it is no
-longer the path a first example has to copy.
-
-Runnable examples that show the public style:
-
-- [Float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/Float32Modes.lean)
-- [SimpleMlpTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
-
-There is also a small public data layer that keeps examples self-contained without importing
-external datasets or Python preprocessing:
-
-- `Data.regressionGrid` for 2D regression grids,
-- `Data.tensorDataset` for already-materialized input/target tensors,
-- `Data.tabularCsvDataset` for small supervised CSV files,
-- `Data.cifar10Dataset` and related loader APIs for image examples,
-- `Trainer.Probe.*` constructors for before/after prediction reports.
-
-That keeps the introductory tutorials focused on the training loop instead of on repetitive data setup.
-
-## A Direct Loop Comparison
-
-PyTorch usually looks like this:
+The quickstart uses a deterministic grid. A four-point example can be written directly:
 
 ```
-for step in range(steps):
-    opt.zero_grad()
-    pred = model(x)
-    loss = mse(pred, y)
-    loss.backward()
-    opt.step()
-```
-
-TorchLean’s equivalent is the same loop shape, but the gradients and the model state are explicit in
-the API:
-
-```
-let loop ← Trainer.Manual.stepper (task := task) runner (optim.adam { lr := 0.03 })
-
-for step in [0:steps] do
-  let sample := getSample step
-  let loss ← Trainer.Manual.step (task := task) loop sample
-  if step % 25 = 0 then
-    IO.println s!"step {step}: loss={loss}"
-```
-
-TorchLean keeps the training rhythm familiar while making the state explicit enough for later graph,
-runtime, and proof chapters.
-
-# The Anatomy Of A Training File
-
-Most training examples have the same five blocks.
-
-## 1. Constants
-
-```
-def inDim : Nat := 2
-def hidden : Nat := 8
-def outDim : Nat := 1
-```
-
-These are ordinary Lean definitions. They are not hidden inside a module object, so the shapes that
-depend on them are visible to the type checker.
-
-## 2. Model builder
-
-```
-def mkModel : nn.M (nn.Sequential (.dim inDim .scalar) (.dim outDim .scalar)) :=
-  nn.Sequential![
-    nn.Linear inDim hidden,
-    nn.ReLU,
-    nn.Linear hidden outDim
+def xs : Tensor.T Float (shape![4, 2]) :=
+  tensor! [
+    [0.0, 0.0],
+    [0.0, 1.0],
+    [1.0, 0.0],
+    [1.0, 1.0]
   ]
-```
 
-This definition is only the architecture. It does not train anything by itself.
+def ys : Tensor.T Float (shape![4, 1]) :=
+  tensor! [[0.0], [1.0], [1.0], [0.0]]
 
-## 3. Trainer
-
-```
-def trainer (seed : Nat) :=
-  Trainer.new mkModel { task := .regression, seed := seed }
-```
-
-This line chooses the public model and loss family. For classification examples, use
-`Trainer.new model { task := .classification }`.
-
-## 4. Dataset or loader
-
-```
-let data : Trainer.Dataset (.dim inDim .scalar) (.dim outDim .scalar) :=
+def data : Trainer.Dataset (shape![2]) (shape![1]) :=
   Data.tensorDataset xs ys
 ```
 
-For tiny examples this is an in memory dataset. For real examples it is often loaded from CSV or
-NPY, then wrapped in a `Data.batchLoader`.
+The dataset type matches the model map `[2] → [1]`. A batched model would require a batched dataset
+with a leading dimension in both item shapes.
 
-## 5. Train and report
-
-```
-let trainer := Trainer.new mkModel
-  { task := .regression, optimizer := optim.adam { lr := 0.03 }, seed := seed }
-let trained ← trainer.train data { steps := steps, batchSize := 16 }
-trained.printSummary
-let yhat ← trained.predict (tensorOfList! [2] [0.25, -0.75])
-IO.println s!"heldout={yhat}"
-```
-
-The public shape stays stable even when the model family changes: define a model, define data,
-choose a trainer, pass one config, call `trainer.train`, then reuse the trained handle for inference.
-
-If a file needs callbacks, custom step scheduling, or runtime access for proofs, it can drop into
-`Trainer.Manual`. That should read as manual code. The beginner path should remain the same
-four-value shape: model, data, trainer, config.
-
-The returned handle is the important object after training:
+# Call Train And Keep The Result
 
 ```
-let trained ← trainer.train data trainOpts
+def run : IO Unit := do
+  let trained ← (trainer 2026).train data
+    { steps := 200
+      batchSize := 4
+      logEvery := 25 }
 
-trained.printSummary
+  trained.printSummary
 
-let probe : Tensor.T Float (.dim inDim .scalar) :=
-  tensorOfList! [inDim] [0.25, -0.75]
-
-let pred ← trained.predict probe
-IO.println s!"prediction={pred}"
+  let heldout : Tensor.T Float (shape![2]) :=
+    tensor! [0.25, -0.75]
+  let yhat ← trained.predict heldout
+  IO.println s!"prediction={Tensor.pretty yhat}"
 ```
 
-The original `trainer` still names the architecture and run configuration. The `trained` handle owns
-the updated parameters and any runtime state needed for prediction.
+The returned handle retains:
 
-A training file should make four things visible:
+- final parameters;
+- runtime model state;
+- before/after summary;
+- prediction and public-verification closures.
 
-- the tensor shapes;
-- the minibatch shape;
-- the selected backend;
-- the trained handle produced by training.
+Prediction accepts public Float tensors and performs the runtime scalar conversion selected by the
+trainer. It does not rebuild or reinitialize the model.
 
-If you want the autograd side of the same example, jump to:
+# What One Update Computes
 
-- [AutogradBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
+Let `θ_t` be the parameter pack at update `t`. A plain SGD update is:
 
-# Datasets and Minibatching
+$$`
+g_t=\nabla_\theta L(\theta_t;x_t,y_t),
+\qquad
+\theta_{t+1}=\theta_t-\eta g_t.
+`
 
-TorchLean supports fully in-memory datasets (TensorDataset-style), plus typed minibatching.
+Every symbol is structured:
 
-Examples:
+- `θ_t` is a heterogeneous pack of tensors whose shapes are fixed by the model;
+- `g_t` has exactly the same pack structure;
+- `L` is a scalar tensor program;
+- the subtraction and scaling occur coordinatewise in the selected scalar semantics.
 
-- [MinibatchMlpTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/MinibatchMlpTrain.lean)
-- [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
-- [NPY loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Npy.lean)
+An optimizer is therefore not merely a function from a flat vector to a flat vector. It owns
+shape-aligned state.
 
-For the data boundary contract (`.npy`, small numeric CSV, UTF-8 text), see:
+# Adam's Hidden State Is Explicit
 
-- [NN/API/Data/README.md](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Data/README.md)
-- [NN/Examples/Data/README.md](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/README.md)
+Adam maintains first and second moment estimates:
 
-# Step Streams
+$$`
+m_t=\beta_1m_{t-1}+(1-\beta_1)g_t,
+`
 
-Not every training job is a finite dataset pass.  Some workloads produce the next batch from a
-rule, a simulator, a replay buffer, or a file-backed token window.  For those cases TorchLean has a
-typed step stream:
+$$`
+v_t=\beta_2v_{t-1}+(1-\beta_2)g_t^2.
+`
+
+With bias correction:
+
+$$`
+\widehat m_t=\frac{m_t}{1-\beta_1^t},
+\qquad
+\widehat v_t=\frac{v_t}{1-\beta_2^t},
+`
+
+and the parameter update is:
+
+$$`
+\theta_{t+1}
+=
+\theta_t-\eta
+\frac{\widehat m_t}{\sqrt{\widehat v_t}+\epsilon}.
+`
+
+The two moment packs have the same dependent tensor shapes as `θ`. The step counter matters because
+it changes the bias correction. Restoring only parameters from a checkpoint but not Adam state is
+not the same continuation of training.
+
+TorchLean also provides SGD, momentum SGD, AdamW, AdaGrad, RMSProp, Adadelta, and Muon-related
+runtime configuration. Their public constructors share one trainer interface; their state and laws
+remain optimizer-specific.
+
+# What Does `steps` Count?
+
+For the unbatched model `[2] → [1]`, the current in-memory loop interprets:
 
 ```
-Trainer.Manual.StepBatchStream α inputShapes
+steps := 200
+batchSize := 4
 ```
 
-A `StepBatchStream` is a function from the optimizer step number to the already-collated input list
-for the module. The shape list is still checked by Lean. A stream for `[x, y]` samples and a stream
-for `[tokens, targets]` samples have different types, even if both are loaded from external files.
+as 200 outer loop steps, each consuming a group of four samples. An optimizer update is currently
+applied per sample in that group. Logging follows the outer step cadence.
 
-The corresponding training APIs are:
-
-```
-Trainer.Manual.trainModuleStreamStepsWith
-Trainer.Manual.trainModuleStreamStepsReport
-Trainer.Manual.trainModuleStreamStepsCurveFloat
-```
-
-Use a loader when the dataset is a fixed finite table. Use a step stream when the batch is produced
-on demand: RL rollouts, collocation points, generated windows from a large text file, or synthetic
-diagnostic inputs. The public loop is model-agnostic; only the stream knows where the next
-batch comes from.
-
-The stream boundary is especially useful for scientific ML and reinforcement learning. In both
-settings, the "dataset" may be a rule:
+For a true vectorized minibatch, define:
 
 ```
-def collocationStream : Trainer.Manual.StepBatchStream Float inputShapes :=
-  fun step => do
-    -- Generate points from `step`, evaluate boundary conditions,
-    -- and return tensors with the same checked shapes every time.
-    pure batch
+def batchedModel :
+    nn.M
+      (nn.Sequential
+        (shape![5, 2])
+        (shape![5, 1])) :=
+  nn.Sequential![
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
+  ]
+
+def batchedData :
+    Trainer.Dataset (shape![5, 2]) (shape![5, 1]) :=
+  Data.batchDataset 5 data
+    (shuffle := true)
+    (seed := 2026)
 ```
 
-The shape list on the stream says what the training loop will receive. The generator decides where
-the values come from.
+Now one forward/backward operation sees five samples in one tensor. This can change reduction order,
+optimizer cadence, and performance. It is not an optimization flag applied to the first model.
 
-# Explicit Training Loops
+Run the maintained version:
 
-If you want something that looks closer to “manual PyTorch training code”, use the quickstart
-training files directly. They keep the same explicit rhythm (build model, choose optimizer, run
-steps), while the PyTorch interop folder stays focused on actual Python import/export:
+```
+lake exe torchlean quickstart_minibatch_mlp \
+  --device cpu --batch 5 --steps 5 --seed 2026
+```
 
-- [SimpleMlpTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
-- [SimpleCnnTrain source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
-- [AutogradBasics source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
+The printed model confirms:
 
-Once you are comfortable running and training models, continue with “Runtime and Autograd” for the
-execution modes (eager vs compiled graphs), what gets cached, and where the trust boundary sits.
+```
+Sequential: [5, 2] -> [5, 1], layers=3, params=33
+```
+
+The parameter count remains 33 because linear layers preserve the batch prefix; the batch axis does
+not create separate weights per sample.
+
+# Eager And Compiled Are Execution Choices
+
+Compare:
+
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu --backend eager --steps 20 --seed 2026
+
+lake exe torchlean quickstart_mlp \
+  --device cpu --backend compiled --steps 20 --seed 2026
+```
+
+Eager mode records operations and local reverse rules as they execute. Compiled mode builds a typed
+forward/derivative graph and replays it with current parameters and inputs.
+
+The public method remains `train`; compilation is a property of the configured runner, analogous to
+wrapping a PyTorch model with an execution transform rather than renaming the model's `forward`
+method.
+
+Compiled trainer execution is currently CPU-only. A non-CPU compiled request is rejected rather
+than silently falling back to a different semantics.
+
+# Device Selection Is A Profile
+
+Device is not just an enum passed to every tensor. The execution profile includes:
+
+- target device and platform;
+- provider preference;
+- numerical and assurance policy;
+- forward and VJP ownership;
+- available kernel capsules.
+
+Programmatically:
+
+```
+def cudaRun : Trainer.RunConfig :=
+  ({ optimizer := optim.adam { lr := 0.03 }
+     dtype := .float
+     backend := .eager } :
+    Trainer.RunConfig).cuda
+
+def cudaTrainer :=
+  Trainer.new model
+    (Trainer.Config.fromRunConfig
+      cudaRun .regression
+      (seed := 2026))
+```
+
+A maintained CUDA run requires a CUDA-enabled build:
+
+```
+lake -R -K cuda=true exe torchlean quickstart_mlp \
+  --device cuda --steps 20 --seed 2026 --show-backend
+```
+
+`--show-backend` prints the selected capsules as operations first execute. This is how a run reports
+which provider owned matmul, ReLU, loss, and their VJPs.
+
+Named future devices such as Metal, ROCm, TPU, or Trainium may be represented in configuration, but
+`withDevice` fails if the current build has no maintained profile. A name in an enum is not an
+implementation.
+
+# Scalar Semantics Are Part Of The Run
+
+The common executable selections are:
+
+```
+--dtype float
+--dtype ieee754exec
+```
+
+Host `Float` is fast and relies on the platform runtime. `IEEE32Exec` is TorchLean's bit-level
+binary32 reference and is much slower, but exposes precise finite and exceptional behavior.
+Proof-level `Real` and finite rounded-real `FP32` are not executable trainer choices.
+
+A loss curve without its scalar semantics is incomplete. The same architecture and seed may round
+differently in binary32, binary64, a fused CUDA kernel, or an external provider.
+
+# Save Enough State To Resume Honestly
+
+`Trainer.TrainOptions` can select JSON logging and exact-bit parameter checkpoint paths. Persistent
+configuration includes optimizer and runtime choices; per-call options include:
+
+- number of steps;
+- sample grouping and logging cadence;
+- output path and notes;
+- checkpoint load/save;
+- CUDA allocator watch cadence.
+
+For a faithful resume, preserve:
+
+1. parameters;
+2. optimizer state and step number;
+3. data-loader or stream state;
+4. model and preprocessing configuration;
+5. scalar/backend/device profile;
+6. RNG state where stochastic layers or sampling are used.
+
+A parameter-only checkpoint is still useful for inference. It simply should not be described as an
+exact continuation of Adam training.
+
+# Manual Training
+
+The high-level trainer is intended for common runs. `Trainer.Manual` exposes:
+
+```
+stepper
+step
+trainMode
+evalMode
+callbacks
+loader loops
+prediction
+```
+
+Use it when the program needs gradient accumulation, custom scheduling, multiple losses, generated
+batches, reinforcement-learning interaction, or detailed instrumentation.
+
+`Trainer.Manual.StepBatchStream α shapes` supplies already collated tensors as a function of the
+step. PINN collocation points and simulator batches naturally fit this interface.
+
+The lower API does not change the model or autograd semantics. It exposes the runner state that the
+high-level trainer normally manages.
+
+# Four Useful Experiments
+
+## Initialization only
+
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu --steps 0 --seed 2026
+```
+
+This isolates initialization and the initial loss.
+
+## Seed sensitivity
+
+Run 20 steps with seeds `2026`, `2027`, and `2028`. Keep the dataset order fixed if you want to
+study only initialization.
+
+## Optimizer sensitivity
+
+In the quickstart source, replace Adam with SGD while keeping the model, seed, and steps fixed.
+Compare both the initial and final losses; the initial values should agree when initialization and
+data order agree.
+
+## Backend report
+
+Add `--show-backend`. On CPU, inspect the reference capsules. On a CUDA build, inspect which native
+capsules are selected and whether any trusted external provider appears.
+
+# What Training Establishes
+
+A successful run establishes that one configured pipeline executed:
+
+```
+data -> forward -> loss -> reverse pass -> optimizer -> parameters
+```
+
+It can produce valuable evidence:
+
+- loss and prediction traces;
+- exact parameter artifacts;
+- capsule audit rows;
+- reproducible configuration;
+- runtime errors or successful completion.
+
+It does not automatically prove:
+
+- convergence for all initializations;
+- generalization to unseen data;
+- robustness to an input region;
+- equality of eager, compiled, CUDA, and LibTorch paths;
+- correctness of every native instruction.
+
+TorchLean's contribution is not to rename those observations as proofs. It gives the run enough
+structure that a theorem, numerical bound, backend contract, or verification certificate can refer
+to the same model without erasing the boundary between them.

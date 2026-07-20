@@ -28,7 +28,7 @@ namespace Backend
 structure AcceptedGraphPlan where
   graphPlan : IR.GraphExecutionPlan
   loweringPlan : GraphLoweringPlan
-  policy : AcceptancePolicy
+  policy : AssurancePolicy
   gateProof : loweringPlan.gate policy = .accepted
 
 instance : Repr AcceptedGraphPlan where
@@ -76,7 +76,7 @@ end AcceptedPlanResult
 
 /-- Gate a graph lowering and expose an accepted plan only when every obligation passes policy. -/
 def acceptGraphPlan (graphPlan : IR.GraphExecutionPlan) (loweringPlan : GraphLoweringPlan)
-    (policy : AcceptancePolicy) : AcceptedPlanResult :=
+    (policy : AssurancePolicy) : AcceptedPlanResult :=
   match h : loweringPlan.gate policy with
   | .accepted => .accepted { graphPlan, loweringPlan, policy, gateProof := h }
   | .rejected failures => .rejected loweringPlan failures

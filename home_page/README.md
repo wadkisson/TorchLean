@@ -142,7 +142,7 @@ Before publishing a docs-heavy change, check:
 - the page explains what object is being discussed: model, graph, artifact, checker, or theorem;
 - runtime examples name their data path, command, and output artifacts;
 - verification pages name the predicate Lean recomputes and the producer boundary that remains;
-- CUDA/ATen/PyTorch text does not imply external backward or native kernels are proved unless a
+- CUDA/LibTorch/PyTorch text does not imply external backward or native kernels are proved unless a
   theorem says so;
 - generated pages were rebuilt from source rather than edited directly;
 - `bundle _2.3.14_ exec jekyll build --config _config.yml,_config_dev.yml` succeeds.

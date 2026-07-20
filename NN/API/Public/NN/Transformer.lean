@@ -41,6 +41,12 @@ structure TransformerEncoderBlock where
   activation : Activation := .gelu
   /-- Optional dropout probability for examples; `none` means no dropout. -/
   dropout? : Option Float := none
+  /-- Normalize before attention and feed-forward sublayers instead of after each residual. -/
+  normFirst : Bool := false
+  /-- Add a trainable bias after the attention output projection. -/
+  attentionOutputBias : Bool := false
+  /-- Attention and feed-forward weight initialization. `none` keeps each layer's default. -/
+  weightInit? : Option _root_.Runtime.Autograd.Torch.Init.Scheme := none
   /-- Base seed used to derive deterministic per-layer seeds inside the block. -/
   seedBase : Nat := 0
 
@@ -74,7 +80,8 @@ def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dM
   let attn : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
       (.dim batch (.dim n (.dim dModel .scalar))) :=
     multiheadAttentionWith (batch := batch) (n := n) (dModel := dModel)
-      { numHeads := cfg.numHeads, headDim := cfg.headDim, seedW := seedAttn }
+      { numHeads := cfg.numHeads, headDim := cfg.headDim, seedW := seedAttn,
+        outputBias := cfg.attentionOutputBias, weightInit? := cfg.weightInit? }
       (hN := NeZero.ne (n := n))
       (mask := mask)
   let attnInner :=
@@ -90,9 +97,11 @@ def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dM
   let ffn : Sequential (.dim batch (.dim n (.dim dModel .scalar)))
       (.dim batch (.dim n (.dim dModel .scalar))) :=
     seq!
-      linear dModel cfg.ffnHidden seedFfnW1 seedFfnB1 (pfx := .dim batch (.dim n .scalar)),
+      linearWith dModel cfg.ffnHidden { weightInit? := cfg.weightInit? }
+        seedFfnW1 seedFfnB1 (pfx := .dim batch (.dim n .scalar)),
       activation (s := .dim batch (.dim n (.dim cfg.ffnHidden .scalar))) cfg.activation,
-      linear cfg.ffnHidden dModel seedFfnW2 seedFfnB2 (pfx := .dim batch (.dim n .scalar))
+      linearWith cfg.ffnHidden dModel { weightInit? := cfg.weightInit? }
+        seedFfnW2 seedFfnB2 (pfx := .dim batch (.dim n .scalar))
   let ffnInner :=
     match cfg.dropout? with
     | none => ffn
@@ -103,11 +112,16 @@ def transformerEncoderBlockWithMask {batch n dModel : Nat} [NeZero n] [NeZero dM
     layerNorm (batch := batch) (seqLen := n) (embedDim := dModel)
       { seedGamma := seedNorm2Gamma, seedBeta := seedNorm2Beta }
 
-  seq!
-    residual attnInner,
-    norm1,
-    residual ffnInner,
-    norm2
+  if cfg.normFirst then
+    seq!
+      residual (seq! norm1, attnInner),
+      residual (seq! norm2, ffnInner)
+  else
+    seq!
+      residual attnInner,
+      norm1,
+      residual ffnInner,
+      norm2
 
 /--
 Transformer encoder block.

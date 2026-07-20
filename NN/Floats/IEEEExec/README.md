@@ -39,7 +39,9 @@ TorchLean keeps two float32 views:
 Bridge files connect these on the finite, no overflow path:
 
 - `Bridge/FP32.lean` and `Bridge/FP32/`: per-operation refinement lemmas on the finite branch,
-  including dyadic/rational rounding infrastructure.
+  including dyadic/rational rounding infrastructure, exact subtraction under Sterbenz's
+  hypotheses, and executable ULP exponents. The ULP query succeeds exactly for finite bit patterns
+  and returns `none` exactly for NaNs and infinities.
 - `Bridge/Expressions.lean`: expression-level refinement that composes operation lemmas once.
 - `Bridge/FP32Total.lean`: packages finite refinement and proved special-value rules using
   `toReal?`.

@@ -84,7 +84,7 @@ def accuracyOneHotBatched
     for i in List.finRange batch do
       let logits := Spec.getAtSpec logitsBatch i
       let target := Spec.getAtSpec yBatch i
-      if let some true := metrics.correctOneHot? logits target then
+      if let some true := TorchLean.Metrics.correctOneHot? logits target then
         correct := correct + 1
       total := total + 1
   pure (correct, total)
@@ -582,7 +582,7 @@ an optimizer state plus (optional) schedule state, ready to step on a batch.
 -/
 def stepper {σ τ : Spec.Shape} {task : Task σ τ}
     {α : Type} [Semantics.Scalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
-    (runner : Runner α task) (optimizer : optim.Optimizer)
+    (runner : Runner α task) (optimizer : TorchLean.Trainer.Optimizer)
     (scheduler : Option TorchLean.Schedulers.Config := none) :
     IO (Stepper α task) :=
   TorchLean.Trainer.stepper (task := task) runner optimizer scheduler
@@ -669,7 +669,7 @@ def reportClassProbes
     (includeLogits : Bool := false) : IO Unit := do
   reportProbes title probes (fun (name, x, expected) => do
     let logits ← predict (task := task) runner x
-    let pred? := metrics.argmax? logits
+    let pred? := TorchLean.Metrics.argmax? logits
     let predStr :=
       match pred? with
       | some k => toString k.val
@@ -705,7 +705,7 @@ def reportClassProbesBatchedFromSingle
         pure s!"  {name}: batch=0 (no prediction)"
     | i0 :: _ =>
         let logits0 := Spec.getAtSpec logitsBatch i0
-        let pred? := metrics.argmax? logits0
+        let pred? := TorchLean.Metrics.argmax? logits0
         let predStr :=
           match pred? with
           | some k => toString k.val

@@ -116,7 +116,7 @@ def batchnormChannelFirst {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .batchNormChannelFirst
+    let _ ← requireNativeCudaCapsule s .batchNorm
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.batchnormChannelFirst (t := t0)
       (channels := channels) (height := height) (width := width) (h_c := h_c) (h_h := h_h)
@@ -124,7 +124,7 @@ def batchnormChannelFirst {α : Type} (s : EagerSession α) [Context α]
       x.id gamma.id beta.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .batchNormChannelFirst cpu cuda
+  dispatchCudaOpt (α := α) s .batchNorm cpu cuda
 
 /-- Multi-head self-attention (typed, proof-friendly). PyTorch: `nn.MultiheadAttention`
   (conceptually). -/
@@ -148,9 +148,10 @@ def multiHeadAttention {α : Type} (s : EagerSession α) [Context α]
   let cuda := do
     let t0 ← s.cudaTape.get
     let attentionCapsule ← s.selectedCapsule NN.Backend.Attention.scaledDotProductOp
-    let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t0)
+    let result ← Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t0)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim) (h1 := h1)
-      wq.id wk.id wv.id wo.id x.id (mask := mask) (attentionCapsule := attentionCapsule))
+      wq.id wk.id wv.id wo.id x.id (mask := mask) (attentionCapsule := attentionCapsule)
+    let (t1, id) ← okOrThrow result
     s.cudaTape.set t1
     pure (some { id := id })
   dispatchCudaOpt (α := α) s .scaledDotProductAttention cpu cuda

@@ -10,10 +10,12 @@ CUDA is a runtime path, not a separate mathematical model. When CUDA is enabled,
 native GPU kernels for selected tensor operations while the graph IR, verification artifacts, and
 proof statements keep their own stated semantics and assumptions.
 
-The rule is simple:
+The responsibilities are separate:
 
 - the spec layer owns the mathematical meaning;
-- the TorchLean runtime owns the graph/tape node and backward rule used for training;
+- the TorchLean runtime owns the graph or tape node used for training;
+- a backend capsule records whether the local VJP comes from TorchLean's tape or from the native
+  provider;
 - CUDA owns selected Float32 kernels, device buffers, launches, and library calls;
 - tests, sanitizer runs, and trust-boundary docs say what evidence supports the native path.
 
@@ -59,13 +61,16 @@ the theorem statement attached to a checker.
 
 ## Training Boundary
 
-For training, TorchLean must keep the derivative story visible. A fast native kernel may compute a
-forward value, but the operation still has to be represented in TorchLean's tape or graph and use
-the TorchLean backward rule. If a kernel cannot preserve that relation yet, the training path should
-fall back to the TorchLean-native operation for that case.
+For training, TorchLean keeps the derivative boundary visible. A backend capsule states both the
+forward provider and the VJP mode. The native fused-attention capsule uses CUDA forward and VJP
+kernels. The optional LibTorch SDPA capsule uses LibTorch only for the forward value and records a
+TorchLean tape node for its local VJP. Other operations follow the mode declared by their selected
+capsule.
 
-The same rule explains the ATen/libtorch boundary. ATen can provide fast forward kernels, but handing
-backward to an external autograd tape changes the proof boundary.
+What TorchLean avoids is an unrecorded switch to a foreign autograd tape. Such a switch changes
+parameter ownership, graph identity, and the assumptions behind backward execution. If no capsule
+satisfies the requested forward, VJP, device, and trust policy, planning fails instead of silently
+claiming a different boundary.
 
 ## Determinism and Evidence
 

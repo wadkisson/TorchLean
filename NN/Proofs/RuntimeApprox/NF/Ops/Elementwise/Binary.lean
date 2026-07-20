@@ -396,6 +396,19 @@ theorem approxT_mul_spec {s : Shape} [NeuralValidRndToNearest rnd] :
                           MathFunctions.abs, Spec.mapTensor] using hfold
 
                       simpa [approxT, approxWith, B, mulSpec, map2Spec] using this
+
+/-- Squaring is the diagonal specialization of elementwise multiplication, so it uses the same
+rounded multiplication bound rather than a separate numerical rule. -/
+theorem approxT_square_spec {s : Shape} :
+    ∀ {xS : SpecTensor s} {xR : Tensor R s} {eps : ℝ},
+      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR eps →
+        approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+          (squareSpec xS) (squareSpec xR)
+          (linfNorm (mulBoundTensor (β := β) (fexp := fexp) eps eps xR xR)) := by
+  intro xS xR eps hx
+  have h := approxT_mul_spec
+    (β := β) (fexp := fexp) (rnd := rnd) hx hx
+  simpa only [squareSpec_eq_mulSpec] using h
 end NFBackend
 
 end

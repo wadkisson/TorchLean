@@ -22,7 +22,7 @@ namespace TorchLean
 namespace Module
 
 export NN.API.TorchLean.Module
-  (instantiateConfigured forward backward step initOptim stepWith
+  (instantiateConfigured instantiateFloat forwardWithParams forward backward step initOptim stepWith
    params setParams trainSGD trainWith meanLoss run)
 
 @[inherit_doc NN.API.TorchLean.Module.ScalarModule]

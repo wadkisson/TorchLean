@@ -475,6 +475,30 @@ theorem abs_dyadicToReal_lt_bpow_succ_log2 (d : Dyadic) :
   -- Rewrite `l` back to `log2 mant` and expand `succ` as `+1`.
   -- `Int.ofNat l.succ = Int.ofNat l + 1`.
   simpa [hl, Int.natCast_succ, add_assoc, add_left_comm, add_comm] using this
+
+/--
+Lower companion to `abs_dyadicToReal_lt_bpow_succ_log2`.
+
+For a nonzero mantissa, `2^(log2 mant + exp)` is no larger than the decoded dyadic magnitude.
+-/
+theorem bpow_log2_add_exp_le_abs_dyadicToReal (d : Dyadic) (hm : d.mant ≠ 0) :
+    neuralBpow binaryRadix (Int.ofNat (Nat.log2 d.mant) + d.exp) ≤
+      _root_.abs (dyadicToReal d) := by
+  have hpowNat : 2 ^ Nat.log2 d.mant ≤ d.mant := by
+    have hlog : Nat.log 2 d.mant = Nat.log2 d.mant := by
+      simpa using (Nat.log2_eq_log_two (n := d.mant)).symm
+    simpa [hlog] using Nat.pow_log_le_self 2 hm
+  have hpowReal : ((2 ^ Nat.log2 d.mant : Nat) : ℝ) ≤ (d.mant : ℝ) := by
+    exact_mod_cast hpowNat
+  calc
+    neuralBpow binaryRadix (Int.ofNat (Nat.log2 d.mant) + d.exp) =
+        neuralBpow binaryRadix (Int.ofNat (Nat.log2 d.mant)) *
+          neuralBpow binaryRadix d.exp := neuralBpow.add_exp binaryRadix _ _
+    _ = ((2 ^ Nat.log2 d.mant : Nat) : ℝ) * neuralBpow binaryRadix d.exp := by
+      simp [neuralBpow, binaryRadix, NeuralRadix.toReal]
+    _ ≤ (d.mant : ℝ) * neuralBpow binaryRadix d.exp :=
+      mul_le_mul_of_nonneg_right hpowReal (neuralBpow.nonneg binaryRadix _)
+    _ = _root_.abs (dyadicToReal d) := (abs_dyadicToReal d).symm
 end IEEE32Exec
 
 end TorchLean.Floats.IEEE754

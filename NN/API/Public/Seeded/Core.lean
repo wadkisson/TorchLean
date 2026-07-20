@@ -62,7 +62,7 @@ the public builder.
 -/
 
 export Internal
-  (Embedding LearnedPositionalEmbedding SinusoidalPositionalEncoding RoPE
+  (Linear Embedding LearnedPositionalEmbedding SinusoidalPositionalEncoding RoPE
    Conv Pool LayerNorm RMSNorm ChannelNorm MultiheadAttention)
 
 @[inherit_doc Internal.globalAvgPool]
@@ -192,6 +192,12 @@ def linear (inDim outDim : Nat) (pfx : Spec.Shape := Spec.Shape.scalar) :
     M (Sequential (pfx.appendDim inDim) (pfx.appendDim outDim)) :=
   withSeedPair (fun seedW seedB =>
     Internal.linear inDim outDim seedW seedB (pfx := pfx))
+
+/-- Seeded affine layer with an explicit initialization policy. -/
+def linearWith (inDim outDim : Nat) (cfg : Linear) (pfx : Spec.Shape := Spec.Shape.scalar) :
+    M (Sequential (pfx.appendDim inDim) (pfx.appendDim outDim)) :=
+  withSeedPair (fun seedW seedB =>
+    Internal.linearWith inDim outDim cfg seedW seedB (pfx := pfx))
 
 /-- Vector-only linear layer, specialized to the scalar prefix shape. -/
 def linearV (inDim outDim : Nat) : M (Sequential (.dim inDim .scalar)

@@ -16,17 +16,11 @@ The round trip is narrow by design. TorchLean does not import arbitrary `nn.Modu
 supports known model families with known layouts. A bridge this small can be audited, tested, and
 connected to later graph and verification work.
 
-For runnable examples around this boundary, see:
-
-- [PyTorch round trip source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
-- [Torch export check source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/TorchExportCheck.lean)
-- [Torch IR and PyTorch example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/TorchIRPyTorch.lean)
-
-The main declarations for this boundary are
-[PyTorch export](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Export.lean),
-[PyTorch import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Import.lean),
-[interop examples](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch.lean), and the spec pages for
-[modules](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Module.lean) and [models](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models.lean).
+The checked-in
+[round-trip program](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
+uses the same importer for an MLP, a convolutional network, and a transformer encoder. The examples
+below differ in parameter layout, but not in the rule at the boundary: Python supplies a named
+payload, and Lean either reconstructs the expected typed parameters or rejects it.
 
 # The Contract
 
@@ -130,12 +124,6 @@ The repository uses three family examples:
 
 ## MLP
 
-Open:
-
-- Lean entrypoint: [PyTorch round trip source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
-- Python: [MLP training script](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/MLP/train_mlp.py)
-- Output JSON: `NN/Examples/Interop/PyTorch/MLP/mlp.json`
-
 The MLP example is the smallest place to read the round trip as a contract rather than as infrastructure.
 The architecture is small enough to inspect exported names, compare them against PyTorch's
 `state_dict`, and see exactly what Lean checks on re-import.
@@ -152,13 +140,11 @@ python3 NN/Examples/Interop/PyTorch/MLP/train_mlp.py
 lake env lean --run NN/Examples/Interop/PyTorch/Roundtrip.lean -- --model mlp --action import
 ```
 
+The Python step is
+[`train_mlp.py`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/MLP/train_mlp.py);
+it writes `NN/Examples/Interop/PyTorch/MLP/mlp.json`.
+
 ## CNN
-
-Open:
-
-- Lean entrypoint: [PyTorch round trip source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
-- Python: [CNN training script](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/CNN/train_cnn.py)
-- Output JSON: `NN/Examples/Interop/PyTorch/CNN/cnn.json`
 
 The CNN example exercises nontrivial tensor shapes and weight layouts, while remaining small enough
 to debug by hand when the importer reports a mismatch.
@@ -171,13 +157,11 @@ python3 NN/Examples/Interop/PyTorch/CNN/train_cnn.py
 lake env lean --run NN/Examples/Interop/PyTorch/Roundtrip.lean -- --model cnn --action import
 ```
 
+Here
+[`train_cnn.py`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/CNN/train_cnn.py)
+writes `NN/Examples/Interop/PyTorch/CNN/cnn.json`.
+
 ## Transformer (Encoder)
-
-Open:
-
-- Lean entrypoint: [PyTorch round trip source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Roundtrip.lean)
-- Python: [Transformer training script](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Transformer/train_transformer.py)
-- Output JSON: `NN/Examples/Interop/PyTorch/Transformer/transformer_encoder.json`
 
 The transformer example shows why the boundary must stay explicit. Once attention layers and
 multiple projections appear, Lean needs a known layout to check, not a vague promise that every
@@ -195,14 +179,16 @@ python3 NN/Examples/Interop/PyTorch/Transformer/train_transformer.py
 lake env lean --run NN/Examples/Interop/PyTorch/Roundtrip.lean -- --model transformer --action import
 ```
 
+The companion
+[`train_transformer.py`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch/Transformer/train_transformer.py)
+writes `NN/Examples/Interop/PyTorch/Transformer/transformer_encoder.json`.
+
 # TorchLean, IR, and Generated PyTorch Code
 
-A second interop path complements the JSON round trip workflow:
-
-- file: [Torch IR and PyTorch example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/TorchIRPyTorch.lean)
-
-This example compiles a TorchLean model to the shared IR and then emits runnable PyTorch code for a
-curated set of architectures:
+The
+[IR export example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/TorchIRPyTorch.lean)
+does the reverse kind of work: it compiles a TorchLean model to the shared IR and emits runnable
+PyTorch code for a curated set of architectures:
 
 - `linear`, `mlp`, `sum`, `autoencoder`
 - `mha`, `mha-mask`
@@ -280,10 +266,7 @@ The scope is narrow:
 - binary32 behavior is handled by the floating point bridge rather than by the round trip format.
 
 Binary32 claims still require the relevant TorchLean float backend and the theorems in the
-floating point chapters.
-
-For a direct comparison with PyTorch, read *TorchLean vs PyTorch*.
-Verification after import: *Graphs and IR*, then *Verification*.
+floating-point chapters.
 
 The round trip is a checked artifact workflow, not a universal conversion tool. Python can remain
 the right place to train. Lean becomes the place where the returned object is named, shaped,

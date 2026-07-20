@@ -181,6 +181,37 @@ If `0 ∈ B`, we return `whole`.
 @[inline] def inv (B : Interval32) : Interval32 :=
   div (point posOne) B
 
+/-! ## Pointwise activation ranges -/
+
+/-- Image enclosure for ReLU. Because ReLU is monotone, applying `max(x,0)` to both endpoints is
+both sound and sharp on the binary32 endpoint grid. -/
+@[inline] def relu (A : Interval32) : Interval32 :=
+  { lo := IEEE32Exec.maximum A.lo posZero
+    hi := IEEE32Exec.maximum A.hi posZero }
+
+/-- Image enclosure for absolute value.
+
+Intervals entirely on one side of zero are preserved or negated. An interval crossing zero maps to
+`[0, max(-lo, hi)]`.
+-/
+def abs (A : Interval32) : Interval32 :=
+  if leB A.hi negZero then
+    neg A
+  else if leB posZero A.lo then
+    A
+  else
+    { lo := posZero
+      hi := IEEE32Exec.maximum (IEEE32Exec.neg A.lo) A.hi }
+
+/-- Outward-rounded square-root image of a nonnegative interval.
+
+The operation itself is total because `IEEE32Exec.sqrtDown` and `sqrtUp` implement IEEE special
+values. Callers that want a real enclosure must separately establish that both endpoints are finite
+and nonnegative; the graph numerical checker enforces that domain before constructing this range. -/
+@[inline] def sqrt (A : Interval32) : Interval32 :=
+  { lo := IEEE32Exec.sqrtDown A.lo
+    hi := IEEE32Exec.sqrtUp A.hi }
+
 end Interval32
 
 end IEEE32Exec

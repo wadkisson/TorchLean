@@ -2,51 +2,37 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Backend Selection and Trust" =>
+#doc (Manual) "Inside The Backend Planner" =>
 %%%
 tag := "backend-selection"
 %%%
 
-Running a model on the CPU and running it on a GPU should not create two different model
-definitions. The layers, parameters, tensor shapes, and loss remain the same. What changes is the
-program that supplies each numeric value and gradient.
+The previous page selected CPU, CUDA, or an optional provider from the public API. Now we can look
+at the less visible question: when a graph asks for matrix multiplication, attention, or a
+reduction, how does TorchLean decide which implementation is allowed to answer?
 
-That distinction is easy to miss once an execution path becomes fast. A fused attention call may
-replace several graph nodes. cuBLAS may perform a matrix multiply. LibTorch may choose among several
-scaled-dot-product-attention implementations. These are valuable implementation choices, but none
-of them is a theorem merely because the call was made from Lean.
+A device name is not enough. One CUDA build may contain a hand-written kernel, a cuBLAS call, and a
+LibTorch bridge for different operations. Their layouts, numerical behavior, backward support, and
+supporting evidence differ. The backend planner keeps those differences in data and either returns
+an accepted plan or explains why it could not make one.
 
-TorchLean therefore records backend choices separately from model semantics.
+The path is:
 
-# Four Choices That Should Not Be Confused
+$$`
+\text{operation}+\text{profile}+\text{available providers}
+\longrightarrow \text{capsule}
+\longrightarrow \text{audit}
+\longrightarrow \text{accepted kernel}.
+`
 
-The public runtime has four related decisions:
-
-1. *Execution mode* chooses eager or compiled TorchLean execution. Eager mode records operations
-   as they run; compiled mode reuses a lowered graph.
-2. *Device* chooses the hardware target, currently CPU or CUDA for implemented paths.
-3. *Provider* names the implementation family for an operation, such as TorchLean, native CUDA,
-   cuBLAS, cuFFT, or LibTorch.
-4. *Trust policy* decides which kinds of evidence are acceptable for this run.
-
-The first choice does not determine the others. Compiled execution is not automatically CUDA, and
-CUDA does not automatically mean LibTorch. A run may use TorchLean's compiled graph while selected
-matrix operations are supplied by cuBLAS and other operations use native TorchLean CUDA kernels.
-
-At the semantic level, the division of responsibility is:
-
-- the specification defines the mathematical operation;
-- the graph records which operation occurs and with which payload;
-- the runtime owns storage, scheduling, and execution state;
-- a backend provider computes a selected value or local VJP;
-- a checker or theorem carries the correctness claim.
+That path, rather than another tour of command-line flags, is the subject of this chapter.
 
 # Kernel Capsules
 
-Suppose a graph contains scaled dot-product attention. TorchLean currently knows several possible
-implementations: a composed TorchLean expression, a native fused CUDA implementation, a LibTorch
-forward bridge, and a LibTorch autograd bridge. They share TorchLean's hard boolean-mask semantics,
-but differ in gradient ownership, runtime status, and trust boundary.
+Suppose a graph reaches scaled dot-product attention. TorchLean currently knows three maintained
+ways to compute it: a composed TorchLean expression, a native fused CUDA implementation, and a
+LibTorch forward bridge with a TorchLean-owned backward pass. The operation is the same; the
+implementation contract is not.
 
 A `KernelCapsule` records those differences:
 
@@ -56,26 +42,44 @@ structure KernelCapsule where
   op : BackendOp
   provider : Provider
   device : Device
-  specName : String
   trustLevel : TrustLevel
   supportsForward : Bool
   vjpMode : VJPMode
-  runtimeSupport : RuntimeSupport
   shapeContract : ContractDescriptor
   layoutContract : ContractDescriptor
   valueContract : ContractDescriptor
   vjpContract : ContractDescriptor
+  numericalPolicy : NumericalPolicy
+  notes : String
 ```
 
-The capsule is not generated from a successful run. It is declared before planning and registered
-with the backend. The planner may select it only when the requested device, provider preference,
-gradient mode, and trust policy allow it. This makes an unsupported path a planning error rather
-than an accidental change of semantics.
+Capsules are declared before the run and registered with the backend. The planner may select one
+only when its device, provider, gradient mode, and assurance level fit the requested profile. If no
+capsule fits, planning stops with an error.
+
+Capsules are collected in named `CapsuleModule`s. Built-in attention, native CUDA, portable
+reference, and optional LibTorch code contribute modules to the same registry. A downstream
+provider can prepend another module with `BackendProfile.withCapsuleModules`; it does not add a new
+model class or a branch to the graph walker. The model still lowers to ordinary `BackendOp`s, and
+the planner either finds an admissible capsule for each operation or reports the missing operation.
+Adding a module with an existing name replaces that module. Planning rejects repeated module names
+and repeated capsule identities, so provider precedence cannot change through accidental duplicate
+registration.
+
+`BackendOp` names semantic operation families such as matrix multiplication, reduction, pooling, or
+convolution. Rank, axes, padding, strides, and index tensors remain in the graph payload. This keeps
+capability discovery general without erasing the information needed to state the operation
+correctly.
+
+```
+#check NN.Backend.Registry.CapsuleModule
+#check NN.Backend.BackendProfile.withCapsuleModules
+```
 
 The complete installation and platform guide includes a
 [worked capsule example](https://lean-dojo.github.io/TorchLean/installation/#what-a-kernel-capsule-looks-like).
 
-# Evidence Is Not A Label
+# Looking Inside A Capsule
 
 Each capsule has four obligations: shape, layout, forward value, and VJP. An obligation may point to
 a Lean theorem, an executable checker, a native source symbol, a fuzz oracle, or an explicit trusted
@@ -83,14 +87,13 @@ boundary.
 
 The obligation itself is a structured `ContractClaim`: shape safety, compatibility with a named
 tensor layout, refinement of a forward specification, or refinement of a VJP specification. The
-human-readable summary does not replace that claim, and provenance such as a source path does not
-replace evidence.
+free-form note is there for readers; the planner works with the structured claim.
 
 Before planning, TorchLean checks that each descriptor has the right obligation kind and operation,
 and that a VJP descriptor names the capsule's declared VJP mode. Thus a value theorem placed in the
 shape field is rejected rather than counted as shape evidence. The registry author must still ensure
 that the proposition carried by theorem or checker evidence is the intended formalization of the
-structured claim; a string such as `specName` is documentation, not a proof link.
+structured claim; a capsule note is documentation, not a proof link.
 
 The distinction matters:
 
@@ -102,10 +105,15 @@ The distinction matters:
 - *trusted external evidence* names code whose correctness is assumed for the claim;
 - *missing evidence* prevents acceptance under the normal strict policies.
 
-Source paths and native symbols are provenance rather than evidence. They can identify the code that
-ran, but their existence says nothing about its numerical correctness. Strict acceptance allows only
-proof-bearing theorem or checker evidence; maintained runtime profiles may separately allow named
-guards and test coverage.
+Numerical policy is recorded separately from evidence. It states which rounding mode, subnormal
+behavior, multiply-add contraction, and reduction order the implementation uses. For example, the
+portable matrix-product capsule records the fixed left fold used by the tensor semantics, whereas
+the CUDA capsule records an implementation-dependent reduction. A range proof for one order cannot
+therefore be reused for the other merely because both capsules implement `matmul`.
+
+Source paths and native symbols identify the code behind a capsule. Strict acceptance asks for
+proof-bearing theorem or checker evidence; ordinary maintained profiles may also allow named guards
+and test coverage.
 
 # A Real Attention Theorem
 
@@ -121,32 +129,31 @@ They prove that the fused *Lean specification* has the same forward and backward
 TorchLean's standard scaled-dot-product-attention specification. They are useful for semantic graph
 rewrites and for stating the contract expected of a fused implementation.
 
-They do not inspect PTX, CUDA machine code, cuBLAS, a GPU driver, or LibTorch. The native CUDA
-attention capsule consequently uses runtime guards, regression tests, source provenance, and trust
-level `checked`. A proof of
-the native implementation would need an additional refinement theorem, or a replay checker with a
-soundness theorem, connecting the executable result to the specification under explicit Float32,
-layout, compiler, and hardware assumptions.
+Those theorems compare two Lean specifications. The native CUDA capsule additionally records the
+runtime guards, regression tests, source provenance, and `checked` trust level used for the actual
+kernel. Connecting PTX or a library call all the way to the specification would require another
+refinement argument over Float32, layout, compiler, and hardware behavior.
 
 # Forward And Backward Ownership
 
 Inference asks for a forward value. Training asks for more: the value must remain connected to the
 derivative rule used by the optimizer.
 
-TorchLean distinguishes four VJP modes:
+TorchLean distinguishes three VJP modes:
 
 - `none`: no gradient is requested;
 - `torchLeanTape`: TorchLean records the node and applies its local backward rule;
-- `backendVJP`: TorchLean owns the tape, while a named backend kernel computes the local VJP;
-- `externalAutograd`: the external runtime owns the local autograd computation.
+- `backendVJP`: TorchLean owns the tape, while a named backend kernel computes the local VJP.
 
 The preferred external-forward design is therefore precise: a provider may compute a fast forward
 value, TorchLean records the same operation on its tape, and TorchLean applies the backward rule.
 This requires enough forward information to be retained for that rule. If the bridge cannot provide
 it, the implementation must fall back or expose a larger trust boundary.
 
-External autograd is allowed as an explicit option, but it is a different contract. In that mode the
-claim depends on the external forward implementation and its derivative implementation.
+The maintained LibTorch-forward profile implements this design for scaled-dot-product attention.
+It prefers the registered LibTorch forward capsule and selects native CUDA capsules for surrounding
+operations. Provider selection is therefore per operation, not a second model API or an
+attention-specific boolean switch.
 
 No-grad sessions request `none` automatically. During training, a differentiable operation cannot
 select a forward-only capsule. Seeded random sources are the deliberate exception: they create
@@ -162,7 +169,7 @@ scaled dot-product attention. Additive score biases remain a separate operation.
 # Acceptance Gates
 
 Planning and acceptance are separate steps. Planning finds capsules for graph operations. Auditing
-turns their contract fields into obligation reports. An `AcceptancePolicy` then decides whether the
+turns their contract fields into obligation reports. An `AssurancePolicy` then decides whether the
 run may proceed.
 
 The implementation follows one explicit path:
@@ -174,7 +181,7 @@ The implementation follows one explicit path:
    operation. Together these choices form an `ExecutionPlan`.
 4. `Audit` and `Recheck` expose the selected evidence and any obligations that must be discharged
    again for this run.
-5. `Gate` applies the requested acceptance policy. Eager execution receives an `AcceptedKernel` for
+5. `Gate` applies the requested assurance policy. Eager execution receives an `AcceptedKernel` for
    each operation. Graph lowering can similarly produce an `AcceptedGraphPlan` for a later graph
    executor; the current eager runtime does not pretend that this data-level graph plan is executable.
 6. `Report` renders the providers, devices, trust levels, and recheck dispositions for logs and
@@ -187,18 +194,16 @@ Inspection tools can retain rejected graph plans and explain why they failed.
 `AcceptedKernel` and `AcceptedGraphPlan` carry the equality proof that their policy gate returned
 `accepted`; they are not records that a caller can populate while omitting the gate result.
 
-The strict policy allows only proof-bearing theorem and checker evidence. Runtime policies can allow
-guards, regression tests, fuzzing, or named trusted boundaries explicitly. The gate
-itself has a small Lean theorem:
+The strict policy allows proof-bearing theorem and checker evidence. Runtime policies can also
+permit guards, regression tests, fuzzing, or a named external dependency. The gate itself has a
+small Lean theorem:
 
 ```
 #check ExecutionAudit.gate_eq_accepted_iff_gateFailures_eq_nil
 ```
 
-This theorem proves a fact about TorchLean's acceptance function: acceptance is equivalent to an
-empty failure list. It does not prove the kernels mentioned in the audit. The distinction between a
-proved policy function and an assumed native implementation should remain visible in every backend
-claim.
+This theorem says exactly what the policy function does: it accepts precisely when the audit has no
+failures. The evidence inside that audit is what carries the kernel-specific argument.
 
 # Public Configuration
 
@@ -221,19 +226,7 @@ selection does not change the model's public forward function. This is similar t
 between calling a PyTorch model and wrapping it with `torch.compile`: compilation changes
 execution, not the mathematical intention of the model.
 
-# Choosing A Path
-
-- Use *CPU eager* while inspecting individual operations and autograd behavior.
-- Use *CPU compiled* for repeated execution of a supported fixed graph.
-- Use *CUDA* when the required Float32 operations have registered executable capsules.
-- Enable *LibTorch* only for the external kernels that have explicit bridges and capsules.
-- Use *graph export* when the next consumer is a verifier, checker, or code generator.
-
-Unsupported devices and providers should fail with a readable message. Silent CPU fallback is not
-acceptable when the user requested an accelerator, because it makes benchmark and deployment claims
-ambiguous.
-
-# Reading Backend Claims
+# Reading The Report
 
 These statements have different strengths:
 
@@ -244,9 +237,9 @@ These statements have different strengths:
 - "the LibTorch result is correct" depends on the explicitly named LibTorch boundary unless a
   stronger checker or theorem covers it.
 
-A backend report is useful because it records the selected provider and evidence. It should be
-published beside benchmark results, but it should never be described as if every evidence row were
-already a proof.
+A backend report records the selected provider and the evidence attached to it. Keeping that report
+beside a benchmark makes “CUDA” concrete: readers can see which operations were native, external,
+checked, or proved.
 
 # Where To Continue
 

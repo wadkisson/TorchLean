@@ -7,11 +7,9 @@ open Verso.Genre Manual
 tag := "bugzoo-catalog"
 %%%
 
-BugZoo is where we turn "this class of ML bug happens in real systems" into a small, named
-TorchLean contract. We built it as a verification catalog, not as a collection of artificial
-failures. Each example points at a bug family that has appeared in frameworks, compilers, deployment
-tools, or LLM serving systems, then asks a narrow question: what object would have made the
-intended behavior explicit?
+BugZoo starts from failures that have appeared in frameworks, compilers, deployment tools, and LLM
+serving systems. Each file asks a narrow question: what object or proposition would have made the
+intended behavior explicit before the failure reached production?
 
 The [BugZoo catalog API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/BugZoo/) and
 [BugZoo overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/BugZoo/README.md) focus on the TorchLean fragment itself:
@@ -19,13 +17,37 @@ once a computation enters a typed TorchLean spec, shape changes, masks, token bo
 choices, stateful normalization parameters, and backend semantics become named objects that can be
 checked.
 
-BugZoo is the smallest public proof of concept for TorchLean's philosophy. Each example starts from
-a failure mode that can occur in ordinary ML code, then asks what object would have made the intended
-behavior explicit.
-
 Every BugZoo file is small for a reason. A tiny theorem is often a better public contract than a
 large example. It lets us say "this is the exact thing we checked" beside the paper or issue from the
 real world that motivated the example.
+
+# Compile The Catalog
+
+All entries are imported by `NN/Examples/BugZoo/All.lean`. Compile them together with:
+
+```
+lake env lean NN/Examples/BugZoo/All.lean
+```
+
+A successful command is silent. It means every definition and theorem in the catalog elaborated;
+it does not mean that every external framework implementation satisfies those contracts.
+
+For a more interactive pass, create `BugZooAudit.lean`:
+
+```
+import NN.Examples.BugZoo.AttentionMask
+import NN.Examples.BugZoo.ShapeAndBroadcast
+
+#check NN.Examples.BugZoo.AttentionMask.exactMaskedLogit_blocked_exp_zero
+#check NN.Examples.BugZoo.AttentionMask.trueInfinityMask_future_attention_weight_zero
+#check NN.Examples.BugZoo.ShapeAndBroadcast.addSingletonBatch
+#check NN.Examples.BugZoo.ShapeAndBroadcast.broadcastRowToMatrix_firstRow
+```
+
+Open the file in the Lean Infoview. The attention theorem quantifies over every strict-future
+position `j > i`; the shape theorem exposes the singleton batch insertion and the proof-carrying
+broadcast as different operations. These are the contracts. The motivating PyTorch snippets in the
+source comments explain the bug family, but are not imported as trusted evidence.
 
 # Example Anatomy
 
@@ -340,10 +362,9 @@ The TorchLean response is to expose projection preconditions and the safe divisi
 verified perception or control argument should not inherit an unspoken "all points have valid
 positive depth" assumption from preprocessing code.
 
-# Catalog Value
+# What The Catalog Changes
 
-BugZoo makes proof engineering more concrete. Instead of saying "TorchLean helps with ML bugs," we
-can point at an example and ask what changed:
+The entries turn recurring implementation mistakes into small contracts:
 
 - shape bugs become typed shapes and explicit broadcast evidence;
 - unstable losses become named stable specs and operators with explicit domains;
@@ -352,20 +373,5 @@ can point at an example and ask what changed:
 - tokenizer and cache bugs become import or append contracts;
 - compiler and float bugs become semantic preservation or runtime conformance boundaries.
 
-Future BugZoo entries should follow the same rhythm: cite the real bug family, name the TorchLean
-object that captures the intended behavior, and say plainly where the checked statement stops.
-
-# How To Cite A BugZoo Entry
-
-Use one sentence for the real-world bug family and one sentence for the local Lean claim. For
-example:
-
-```
-Attention mask bugs can arise from mask polarity or fully masked rows in fused attention APIs.
-`NN.Examples.BugZoo.AttentionMask` states the causal-mask property that future positions receive
-zero attention under the hard-masked softmax reference.
-```
-
-This style avoids two common mistakes: treating a small theorem as proof of an entire production
-stack, or treating a real bug report as if it automatically proves the TorchLean example. The bridge
-is the named contract in the file.
+That is the useful scale for a new entry: one recognizable failure, one explicit contract, and one
+runnable example that breaks when the contract is violated.

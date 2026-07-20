@@ -151,6 +151,17 @@ noncomputable def ieeeMaxFinite : ℝ :=
   (binaryRadix.toReal - NeuralPrecision.machineEpsilon NeuralPrecision.ieeeSingle) *
     neuralBpow binaryRadix (2^(NeuralPrecision.expBits NeuralPrecision.ieeeSingle - 1) - 1)
 
+/-- Mantissa/exponent form of the largest finite binary32 magnitude. -/
+theorem ieeeMaxFinite_eq :
+    ieeeMaxFinite = (((2 ^ 24 - 1 : Nat) : ℝ) * neuralBpow binaryRadix 104) := by
+  norm_num [ieeeMaxFinite, NeuralPrecision.machineEpsilon, NeuralPrecision.mantissaBits,
+    NeuralPrecision.expBits, neuralBpow, binaryRadix, NeuralRadix.toReal]
+
+/-- The largest finite binary32 value lies strictly below `2^128`. -/
+theorem ieeeMaxFinite_lt_bpow_128 :
+    ieeeMaxFinite < neuralBpow binaryRadix 128 := by
+  norm_num [ieeeMaxFinite_eq, neuralBpow, binaryRadix, NeuralRadix.toReal]
+
 /--
 Convenience constant: the smallest positive normal binary32 number (approximately `2^-126`).
 

@@ -74,10 +74,6 @@ def orThrow {α : Type} (tag : String := "Example") : Except String α → IO α
   | .ok a => pure a
   | .error msg => throw <| IO.userError s!"{tag}: {msg}"
 
-/-- Standard location for model-example training logs under `data/model_zoo`. -/
-def modelZooTrainLog (stem : String) : System.FilePath :=
-  System.FilePath.mk s!"data/model_zoo/{stem}_trainlog.json"
-
 /--
 Fail with a tagged `userError` if a boolean condition is false.
 
@@ -258,31 +254,6 @@ def parseModelTrainFlags (exeName : String) (args : List String)
   let (lr, args) ← TorchLean.CLI.takePositiveFloatFlagDefault args exeName "lr" defaultLr
   pure ({ toLoggedTrainFlags := train, lr := lr }, args)
 
-/--
-Model-training flags plus an RNG/data-order seed.
-
-Use this when the command needs reproducible initialization, synthetic data, or shuffled row order in
-addition to the standard training flags.
--/
-structure SeededModelTrainFlags extends ModelTrainFlags where
-  /-- Seed used for model initialization, synthetic data, or row order. -/
-  seed : Nat
-deriving Repr
-
-/--
-Parse the standard model-training flags together with `--seed`.
-
-Examples use this when model initialization, synthetic data, or row order needs a reproducible seed.
--/
-def parseSeededModelTrainFlags (exeName : String) (args : List String)
-    (defaultLogPath : System.FilePath) (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
-    (allowZeroSteps : Bool := false) :
-    Except String (SeededModelTrainFlags × List String) := do
-  let (seed, args) ← TorchLean.CLI.takeSeed args 0
-  let (train, args) ← parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
-    allowZeroSteps
-  pure ({ toModelTrainFlags := train, seed := seed }, args)
-
 /-! ### Progress Cadence Helpers -/
 
 /--
@@ -333,19 +304,6 @@ def reportCudaMemWatch (opts : _root_.Runtime.Autograd.Torch.Options)
   API.TorchLean.Trainer.reportCudaMemWatch opts watchEvery totalSteps done state?
 
 /--
-Default Adam optimizer constructor used by supervised and vision examples.
-
-The reusable part is the optimizer convention, not the model.  Individual examples still own their
-architecture and loss, while this helper keeps the Adam hyperparameter spelling identical across
-MLP, CNN, ResNet, ViT, and similar model commands.
--/
-def adamOptimizer {α : Type} [Semantics.Scalar α] [Runtime.Scalar α]
-    (cast : Float → α) (ps : List Spec.Shape) (lr : Float) :
-    TorchLean.Optim.Optimizer α ps :=
-  TorchLean.Optim.adam (α := α) (paramShapes := ps)
-    (lr := cast lr) (beta1 := cast 0.9) (beta2 := cast 0.999) (epsilon := cast 1e-8)
-
-/--
 Run an executable on the concrete `Float` runtime path.
 
 We use this for runnable training commands that produce Float-valued artifacts: CPU/CUDA eager
@@ -365,20 +323,22 @@ def runCudaFloat
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (extraFlags : List String := [])
     (printOk : Bool := true) : IO UInt32 := do
-  let requestsCpu := args.any fun arg => arg == "--device=cpu"
-    || (args.zip (args.drop 1)).any fun pair => pair == ("--device", "cpu")
-  if requestsCpu then
-    IO.eprintln s!"{exeName}: this command is GPU-only; remove --device cpu"
-    return 1
-  let requestsCuda := args.any fun arg => arg == "--device=cuda" || arg == "--device=gpu"
-    || (args.zip (args.drop 1)).any fun pair =>
-      pair == ("--device", "cuda") || pair == ("--device", "gpu")
-  let args := if requestsCuda then args else "--device" :: "cuda" :: args
-  let args := extraFlags.foldl
-    (fun acc flag => if acc.contains flag then acc else flag :: acc)
-    args
+  let hasDeviceFlag :=
+    args.any fun arg => arg == "--device" || arg.startsWith "--device="
+  let cudaArgs : Except String (List String) := do
+    if hasDeviceFlag then
+      let (cfg, _) ← TorchLean.Module.ExecConfig.parseAndStripWithDefaultDType args .float
+      unless cfg.device == .cuda do
+        throw s!"this command requires --device cuda, not --device {cfg.device.cliName}"
+      pure args
+    else
+      pure ("--device" :: "cuda" :: args)
+  let args ← match cudaArgs with
+    | .ok parsed => pure parsed
+    | .error msg =>
+        IO.eprintln s!"{exeName}: {msg}"
+        return 1
   runFloat exeName args banner k printOk
 
 /-- Run a Float-only command after forcing CUDA eager-runtime flags. -/
@@ -387,18 +347,17 @@ def runCudaEagerFloat
     (args : List String)
     (banner : TorchLean.Options → String)
     (k : (opts : TorchLean.Options) → (rest : List String) → IO Unit)
-    (extraFlags : List String := [])
     (printOk : Bool := true) : IO UInt32 := do
-  let requestsCompiled := args.any fun arg => arg == "--backend=compiled"
-    || (args.zip (args.drop 1)).any fun pair => pair == ("--backend", "compiled")
-  if requestsCompiled then
-    IO.eprintln s!"{exeName}: this command requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
-    return 1
-  runCudaFloat exeName args banner k extraFlags printOk
+  runCudaFloat exeName args banner
+    (fun opts rest => do
+      unless opts.backend == .eager do
+        throw <| IO.userError s!"{exeName}: this command requires --backend eager; compiled is proof-compiled host execution, not CUDA graph execution"
+      k opts rest)
+    printOk
 
-/-! ### Common model-run parsers -/
+/-! ### Shared model and text controls -/
 
-/-- Shared corpus-window or training-window count used by finite cyclic examples. -/
+/-- Shared corpus-window or training-window count used by finite cyclic workflows. -/
 structure WindowOptions where
   /-- Number of windows used by the training set, sampler, or cyclic schedule. -/
   windows : Nat
@@ -406,25 +365,21 @@ deriving Repr
 
 namespace WindowOptions
 
-/--
-Parse the shared `--windows` flag.
-
-The model decides how to use the windows; this helper just keeps the flag spelling and positivity
-check consistent.
--/
+/-- Parse the shared `--windows` flag and require a positive value. -/
 def parse
     (exeName : String)
     (args : List String)
     (defaultWindows : Nat) :
     Except String (WindowOptions × List String) := do
-  let (windows, args) ← TorchLean.CLI.takePositiveNatFlagDefault args exeName "windows" defaultWindows
-  pure ({ windows := windows }, args)
+  let (windows, args) ←
+    TorchLean.CLI.takePositiveNatFlagDefault args exeName "windows" defaultWindows
+  pure ({ windows }, args)
 
 end WindowOptions
 
-/-- Optional parameter-checkpoint load/save paths shared by runnable model commands. -/
+/-- Optional parameter-checkpoint load/save paths shared by runnable workflows. -/
 structure CheckpointOptions where
-  /-- Optional checkpoint path loaded before training/generation. -/
+  /-- Optional checkpoint path loaded before training or generation. -/
   loadParams? : Option System.FilePath
   /-- Optional checkpoint path written after training. -/
   saveParams? : Option System.FilePath
@@ -432,366 +387,13 @@ deriving Repr
 
 namespace CheckpointOptions
 
-/-- Parse the shared `--load-params` / `--save-params` flags. -/
-def parse
-    (args : List String) :
-    Except String (CheckpointOptions × List String) := do
+/-- Parse the shared `--load-params` and `--save-params` flags. -/
+def parse (args : List String) : Except String (CheckpointOptions × List String) := do
   let (loadParams?, args) ← TorchLean.CLI.takePathFlagOnce args "load-params"
   let (saveParams?, args) ← TorchLean.CLI.takePathFlagOnce args "save-params"
-  pure ({ loadParams? := loadParams?, saveParams? := saveParams? }, args)
+  pure ({ loadParams?, saveParams? }, args)
 
 end CheckpointOptions
-
-/-- Diffusion schedule knobs shared by model-zoo diffusion commands. -/
-structure DiffusionScheduleFlags where
-  /-- Number of diffusion timesteps in the schedule. -/
-  T : Nat
-  /-- First beta value in the schedule. -/
-  betaStart : Float
-  /-- Final beta value in the schedule. -/
-  betaEnd : Float
-deriving Repr
-
-namespace DiffusionScheduleFlags
-
-/-- Parse shared diffusion schedule flags: `--T`, `--beta-start`, and `--beta-end`. -/
-def parse
-    (args : List String)
-    (defaultT : Nat := 100)
-    (defaultBetaStart : Float := 1e-4)
-    (defaultBetaEnd : Float := 0.12) :
-    Except String (DiffusionScheduleFlags × List String) := do
-  let (T, args) ← TorchLean.CLI.takeNatFlagDefault args "T" defaultT
-  let (betaStart, args) ← TorchLean.CLI.takeFloatFlagDefault args "beta-start" defaultBetaStart
-  let (betaEnd, args) ← TorchLean.CLI.takeFloatFlagDefault args "beta-end" defaultBetaEnd
-  pure ({ T := T, betaStart := betaStart, betaEnd := betaEnd }, args)
-
-/-- Standard TrainLog metadata for a diffusion schedule. -/
-def trainLogNotes (cfg : DiffusionScheduleFlags) : Array String :=
-  #[s!"T={cfg.T}", s!"betaStart={cfg.betaStart}", s!"betaEnd={cfg.betaEnd}"]
-
-end DiffusionScheduleFlags
-
-/-- Optional image artifacts emitted by image-generation or reconstruction commands. -/
-structure ImageArtifactFlags where
-  /-- Optional timestep used for reconstruction-from-noise artifacts. -/
-  reconstructStep? : Option Nat
-  /-- Optional path for an unconditional sample image. -/
-  samplePpm? : Option System.FilePath
-  /-- Optional path for the clean reference image. -/
-  referencePpm? : Option System.FilePath
-  /-- Optional path for the noised/intermediate image. -/
-  noisyPpm? : Option System.FilePath
-  /-- Optional path for the reconstructed image. -/
-  reconstructPpm? : Option System.FilePath
-deriving Repr
-
-namespace ImageArtifactFlags
-
-/--
-Parse shared image artifact flags for generation/reconstruction commands.
-
-This only parses artifact paths and the optional reconstruction timestep. The model still decides
-which images it can write.
--/
-def parse (args : List String) : Except String (ImageArtifactFlags × List String) := do
-  let (reconstructStep?, args) ← TorchLean.CLI.takeNatFlagOnce args "reconstruct-step"
-  let (samplePpm?, args) ← TorchLean.CLI.takePathFlagOnce args "sample-ppm"
-  let (referencePpm?, args) ← TorchLean.CLI.takePathFlagOnce args "reference-ppm"
-  let (noisyPpm?, args) ← TorchLean.CLI.takePathFlagOnce args "noisy-ppm"
-  let (reconstructPpm?, args) ← TorchLean.CLI.takePathFlagOnce args "reconstruct-ppm"
-  pure ({ reconstructStep? := reconstructStep?,
-          samplePpm? := samplePpm?,
-          referencePpm? := referencePpm?,
-          noisyPpm? := noisyPpm?,
-          reconstructPpm? := reconstructPpm? },
-        args)
-
-/-- Standard TrainLog metadata for requested image artifacts. -/
-def trainLogNotes (cfg : ImageArtifactFlags) : Array String :=
-  (match cfg.reconstructStep? with | none => #[] | some t => #[s!"reconstructStep={t}"]) ++
-  (match cfg.samplePpm? with | none => #[] | some p => #[s!"samplePpm={p}"]) ++
-  (match cfg.referencePpm? with | none => #[] | some p => #[s!"referencePpm={p}"]) ++
-  (match cfg.noisyPpm? with | none => #[] | some p => #[s!"noisyPpm={p}"]) ++
-  (match cfg.reconstructPpm? with | none => #[] | some p => #[s!"reconstructPpm={p}"])
-
-end ImageArtifactFlags
-
-/--
-Common paired-NPY dataset flags for scientific supervised examples.
-
-This shape is for commands that train on one `(x,y)` tensor pair and evaluate/report on a held-out
-pair. The model file supplies the tensor shapes and file defaults.
--/
-structure PairedNpyEvalFlags where
-  /-- Number of rows loaded from the prepared training tensors. -/
-  trainRows : Nat
-  /-- Number of rows loaded from the prepared held-out tensors. -/
-  testRows : Nat
-  /-- Prefix length used for deterministic train/test loss reports. -/
-  evalRows : Nat
-  /-- Training input `.npy` path. -/
-  trainX : System.FilePath
-  /-- Training target `.npy` path. -/
-  trainY : System.FilePath
-  /-- Held-out input `.npy` path. -/
-  testX : System.FilePath
-  /-- Held-out target `.npy` path. -/
-  testY : System.FilePath
-deriving Repr
-
-namespace PairedNpyEvalFlags
-
-/--
-Parse common train/test paired-NPY flags.
-
-Commands supply their default paths and row counts. This parser keeps the repeated
-`--train-rows`, `--test-rows`, `--eval-rows`, `--x`, `--y`, `--test-x`, and `--test-y` flags in one
-place.
--/
-def parse
-    (args : List String)
-    (defaultTrainX defaultTrainY defaultTestX defaultTestY : System.FilePath)
-    (defaultTrainRows defaultTestRows : Nat)
-    (defaultEvalRows : Nat := 16) :
-    Except String (PairedNpyEvalFlags × List String) := do
-  let (trainRows, args) ← TorchLean.CLI.takeNatFlagDefault args "train-rows" defaultTrainRows
-  let (testRows, args) ← TorchLean.CLI.takeNatFlagDefault args "test-rows" defaultTestRows
-  let (evalRows, args) ← TorchLean.CLI.takeNatFlagDefault args "eval-rows" defaultEvalRows
-  let (trainX, args) ← TorchLean.CLI.takePathFlagDefault args "x" defaultTrainX
-  let (trainY, args) ← TorchLean.CLI.takePathFlagDefault args "y" defaultTrainY
-  let (testX, args) ← TorchLean.CLI.takePathFlagDefault args "test-x" defaultTestX
-  let (testY, args) ← TorchLean.CLI.takePathFlagDefault args "test-y" defaultTestY
-  pure ({ trainRows := trainRows,
-          testRows := testRows,
-          evalRows := evalRows,
-          trainX := trainX,
-          trainY := trainY,
-          testX := testX,
-          testY := testY },
-        args)
-
-/-- Standard TrainLog metadata for paired train/test NPY tensors. -/
-def trainLogNotes (cfg : PairedNpyEvalFlags) : Array String :=
-  #[
-    s!"train_rows={cfg.trainRows}",
-    s!"test_rows={cfg.testRows}",
-    s!"eval_rows={cfg.evalRows}",
-    s!"train_x={cfg.trainX}",
-    s!"train_y={cfg.trainY}",
-    s!"test_x={cfg.testX}",
-    s!"test_y={cfg.testY}"
-  ]
-
-end PairedNpyEvalFlags
-
-/-- Optional CSV artifact path for commands that emit one tabular diagnostic. -/
-structure CsvArtifactFlags where
-  /-- CSV path for the diagnostic artifact. -/
-  plotCsv : System.FilePath
-deriving Repr
-
-namespace CsvArtifactFlags
-
-/-- Parse the shared optional `--plot-csv` artifact path. -/
-def parse
-    (args : List String)
-    (defaultPlotCsv : System.FilePath) :
-    Except String (CsvArtifactFlags × List String) := do
-  let (plotCsv, args) ← TorchLean.CLI.takePathFlagDefault args "plot-csv" defaultPlotCsv
-  pure ({ plotCsv := plotCsv }, args)
-
-end CsvArtifactFlags
-
-/--
-Generic NPY-backed labeled dataset flags.
-
-Examples provide default paths and data-preparation hints. The repeated flags are `--seed`,
-`--n-total`, `--x`, and `--y`.
--/
-structure NpyDataFlags where
-  /-- Prepared feature/image tensor path. -/
-  xPath : System.FilePath
-  /-- Prepared label/target tensor path. -/
-  yPath : System.FilePath
-  /-- Number of rows to read from the prepared arrays. -/
-  nRows : Nat
-  /-- Data-loader seed. -/
-  seed : Nat
-deriving Repr
-
-namespace NpyDataFlags
-
-/--
-Parse the standard `--seed`, `--n-total`, `--x`, and `--y` flags for NPY-backed datasets.
-
-Examples provide dataset-specific defaults; this parser keeps the repeated NPY dataset flags
-consistent.
--/
-def parse
-    (args : List String)
-    (defaultX defaultY : System.FilePath)
-    (defaultRows : Nat) :
-    Except String (NpyDataFlags × List String) := do
-  let (seed, args) ← TorchLean.CLI.takeSeed args (default := 0)
-  let (nRows, args) ← TorchLean.CLI.takeNatFlagDefault args "n-total" defaultRows
-  let (xPath, args) ← TorchLean.CLI.takePathFlagDefault args "x" defaultX
-  let (yPath, args) ← TorchLean.CLI.takePathFlagDefault args "y" defaultY
-  pure ({ xPath := xPath, yPath := yPath, nRows := nRows, seed := seed }, args)
-
-/-- Standard TrainLog metadata for an NPY-backed dataset branch. -/
-def trainLogNotes (cfg : NpyDataFlags) (datasetName : String) : Array String :=
-  #[s!"data={datasetName}", s!"x={cfg.xPath}", s!"y={cfg.yPath}", s!"nRows={cfg.nRows}"]
-
-end NpyDataFlags
-
-/-- Built-in image dataset branches shared by image-model commands. -/
-inductive ImageDatasetChoice where
-  /-- Prepared 64×64 RGB image tensors. -/
-  | imagenet64
-  /-- Prepared CIFAR-10 32×32 RGB tensors. -/
-  | cifar10
-deriving Repr, BEq
-
-namespace ImageDatasetChoice
-
-/-- Parse `--dataset`, `--cifar10`, and `--imagenet64`, rejecting ambiguous selectors. -/
-def parse (args : List String) : Except String (ImageDatasetChoice × List String) := do
-  let (dataset?, args) ← TorchLean.CLI.takeFlagValueOnce args "dataset"
-  let (cifarFlag, args) ← TorchLean.CLI.takeBoolFlagOnce args "cifar10"
-  let (imagenetFlag, args) ← TorchLean.CLI.takeBoolFlagOnce args "imagenet64"
-  match dataset?, cifarFlag, imagenetFlag with
-  | some _, true, _ | some _, _, true | none, true, true =>
-      throw "choose only one dataset selector: --dataset, --cifar10, or --imagenet64"
-  | some raw, false, false =>
-      match raw with
-      | "imagenet64" | "imagenet" | "imagenette64" => pure (.imagenet64, args)
-      | "cifar10" | "cifar" => pure (.cifar10, args)
-      | _ => throw s!"unknown --dataset {raw}; expected imagenet64 or cifar10"
-  | none, true, false => pure (.cifar10, args)
-  | none, false, true => pure (.imagenet64, args)
-  | none, false, false => pure (.imagenet64, args)
-
-end ImageDatasetChoice
-
-/-- Shared forecasting-window data flags: paths, window count, report offset, and seed. -/
-structure ForecastWindowDataFlags where
-  /-- Prepared input-window tensor path. -/
-  xPath : System.FilePath
-  /-- Prepared target-window tensor path. -/
-  yPath : System.FilePath
-  /-- Number of forecasting windows to use. -/
-  windows : Nat
-  /-- Report window index used for before/after forecast display. -/
-  reportOffset : Nat
-  /-- Data-loader seed. -/
-  seed : Nat
-deriving Repr
-
-namespace ForecastWindowDataFlags
-
-/-- Standard TrainLog metadata for forecasting-window datasets. -/
-def trainLogNotes (cfg : ForecastWindowDataFlags) : Array String :=
-  #[
-    s!"windows={cfg.windows}",
-    s!"report_index={cfg.reportOffset}",
-    s!"x={cfg.xPath}",
-    s!"y={cfg.yPath}"
-  ]
-
-end ForecastWindowDataFlags
-
-/-- Common arguments for a fixed-sample command backed by supervised `.npy` arrays. -/
-structure NpyLoggedTrainFlags extends LoggedTrainFlags, NpyDataFlags where
-deriving Repr
-
-/--
-Parse a supervised NPY dataset, logged training flags, and require that no command-specific
-arguments remain.
-
-Dataset-specific commands provide `parseData`, which owns defaults such as CIFAR or ImageNet paths;
-this helper keeps the reusable "NPY data + logged TrainLog" path in one place.
--/
-def parseNpyLoggedTrainFlags
-    (exeName : String)
-    (args : List String)
-    (defaultLogPath : System.FilePath)
-    (defaultSteps : Nat)
-    (parseData : List String → Except String (NpyDataFlags × List String)) :
-    Except String NpyLoggedTrainFlags := do
-  let (data, rest) ← parseData args
-  let (train, rest) ← parseLoggedTrainFlags exeName rest defaultLogPath defaultSteps
-  TorchLean.CLI.checkNoArgs rest
-  pure { toLoggedTrainFlags := train, toNpyDataFlags := data }
-
-/-- Common arguments for a model-training command backed by supervised `.npy` arrays. -/
-structure NpyModelTrainFlags extends ModelTrainFlags, NpyDataFlags where
-deriving Repr
-
-/--
-Parse a supervised NPY dataset and standard model-training flags.
-
-The remaining arguments are returned so callers can still pass runtime/backend flags through a
-higher-level runner.
--/
-def parseNpyModelTrainFlags
-    (exeName : String)
-    (args : List String)
-    (defaultLogPath : System.FilePath)
-    (defaultSteps : Nat := 1)
-    (defaultLr : Float := 1e-3)
-    (parseData : List String → Except String (NpyDataFlags × List String)) :
-    Except String (NpyModelTrainFlags × List String) := do
-  let (data, rest) ← parseData args
-  let (train, rest) ← parseModelTrainFlags exeName rest defaultLogPath defaultSteps defaultLr
-  pure ({ toModelTrainFlags := train, toNpyDataFlags := data }, rest)
-
-/-- Common arguments for forecasting-window model-training commands. -/
-structure ForecastWindowModelTrainFlags extends ModelTrainFlags, ForecastWindowDataFlags where
-deriving Repr
-
-/--
-Parse forecasting-window data flags plus standard model-training flags.
-
-The data parser comes from the caller because file defaults often depend on a dataset directory or a
-preparation script.
--/
-def parseForecastWindowModelTrainFlags
-    (exeName : String)
-    (args : List String)
-    (defaultLogPath : System.FilePath)
-    (defaultSteps : Nat := 100)
-    (defaultLr : Float := 0.01)
-    (parseData : List String → Except String (ForecastWindowDataFlags × List String)) :
-    Except String (ForecastWindowModelTrainFlags × List String) := do
-  let (data, rest) ← parseData args
-  let (train, rest) ← parseModelTrainFlags exeName rest defaultLogPath defaultSteps defaultLr
-  pure ({ toModelTrainFlags := train, toForecastWindowDataFlags := data }, rest)
-
-/-- Common arguments for a model command that reads one supervised CSV. -/
-structure CsvModelTrainFlags extends ModelTrainFlags where
-  /-- CSV file containing model inputs and targets. -/
-  csvPath : System.FilePath
-  /-- Seed used for model initialization and data shuffling. -/
-  seed : Nat
-deriving Repr
-
-/--
-Parse common flags for a supervised CSV model runner.
-
-Model files choose their default CSV, default log path, step count, and learning rate.
--/
-def parseCsvModelTrainFlags (exeName : String) (args : List String)
-    (defaultCsv : System.FilePath) (defaultLogPath : System.FilePath)
-    (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
-    (allowZeroSteps : Bool := false) :
-    Except String (CsvModelTrainFlags × List String) := do
-  let (csv?, args) ← TorchLean.CLI.takePathFlagOnce args "csv"
-  let csvPath := csv?.getD defaultCsv
-  let (seed, args) ← TorchLean.CLI.takeSeed args 0
-  let (train, args) ← parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
-    allowZeroSteps
-  pure ({ toModelTrainFlags := train, csvPath := csvPath, seed := seed }, args)
 
 /-- List generator: `[0, 1, ..., n-1]` mapped through `f`. -/
 def listGen {α : Type} (n : Nat) (f : Nat → α) : List α :=

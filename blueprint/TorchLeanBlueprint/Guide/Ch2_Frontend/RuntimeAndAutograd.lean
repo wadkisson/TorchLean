@@ -2,241 +2,341 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Runtime Internals and Artifacts" =>
+#doc (Manual) "What Actually Runs" =>
 %%%
 tag := "runtime-autograd"
 %%%
 
-The runtime layer is where a typed model becomes a run. It allocates values, records operations,
-computes gradients, updates parameters, writes logs, and produces artifacts that can be inspected
-later.
-
-TorchLean has more than one runtime artifact. Eager execution produces a tape. Compiled execution
-produces a reusable graph object. Verification uses an IR whose nodes name their operations. These
-artifacts are related, but they are not the same data structure.
-
-If a compact model has not run all the way through yet, *Training From Scratch* is the best first
-stop; it makes the runtime layer much easier to ground.
-
-# PyTorch Mental Model
-
-PyTorch's default workflow is approximately:
-
-1. create parameters and modules,
-2. run a forward pass,
-3. let autograd record the operations used by that forward pass,
-4. call `loss.backward()` to compute gradients,
-5. call `optimizer.step()` to update parameters,
-6. zero gradients and repeat.
-
-TorchLean keeps the rhythm but changes where the objects live:
-
-- parameters and modules become explicit typed values and parameter bundles;
-- the dynamic autograd tape becomes a Lean `Tape`;
-- `.grad` accumulation becomes explicit gradient values returned by reverse mode;
-- the normal user-facing loop is `trainer.train`; manual `optimizer.step()`-style loops live behind
-  `Trainer.Manual.step`/`stepper` for runtime work;
-- eager mode produces a tape, while compiled mode produces a reusable graph artifact.
-
-That mapping lets a PyTorch reader recognize the workflow without treating the runtime state as
-hidden global context.
-
-# Runtime Artifacts
-
-Separate the artifacts by what they are for.
-
-An eager tape is for debugging and reverse mode. It records runtime values, parent links, and local
-VJP closures. It is the closest TorchLean analogue of PyTorch eager autograd.
-
-A compiled graph is for repeated execution. It fixes the graph structure once and reuses it across
-many calls. For supported programs, this is the "compile once, run many times" path; it is not a
-separate model API.
-
-An `NN.IR.Graph` is for inspection and verification. Its nodes carry operation names, shapes, and
-parent ids. A verifier can read this object without executing arbitrary closures.
-
-A runtime context is for named values and training state. It records parameters, gradients, RNG
-state, backend selection, and debugging values.
-
-A training log is for audit and debugging. It records losses, metrics, and reports produced during
-the run. It is not the model semantics, but it is the artifact that tells us what happened.
-
-It helps to give each artifact a question:
-
-- tape: "how did this eager value depend on earlier values?"
-- compiled graph: "what fixed computation will be replayed?"
-- IR graph: "what operation DAG can a checker or verifier inspect?"
-- runtime context: "which named tensors, parameters, modes, and backend settings were alive?"
-- training log: "what did this run report over time?"
-
-The same training command may produce several of these. They are related evidence, not one object.
-
-# Two Execution Modes
-
-TorchLean exposes one front end with two execution backends:
-
-- *Eager*: tape recording and reverse-mode backprop in the style familiar from PyTorch.
-- *Compiled*: a stable SSA/DAG artifact for repeated evaluation and proof alignment.
-
-Many curated examples accept `--backend eager|compiled`.
+The previous chapter used one public call:
 
 ```
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 50 --dtype float --backend eager
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- --steps 50 --dtype float --backend compiled
+autograd.model.valueAndGradParamsScalar ...
 ```
 
-With matching seeds and supported operators, the forward computation should agree. What changes is
-the runtime artifact:
+Behind that call, TorchLean may construct a tape, replay a compiled derivative graph, invoke native
+CUDA kernels, and return a dependent gradient pack. Other parts of the repository also use explicit
+IR graphs and backend execution plans. These objects are related, but they are not interchangeable.
 
-- eager is easier to step through;
-- compiled is easier to replay and connect to graph proof artifacts.
+This chapter identifies each artifact, its lifetime, and the claim it can support.
 
-# Runtime Contexts And Named Values
+# Four Objects Commonly Called “The Graph”
 
-Spec tensors are indexed by shape, but realistic training loops need registries:
+| Object | Purpose | Contains |
+| --- | --- | --- |
+| eager tape | reverse-mode execution | values, parents, local VJPs |
+| compiled derivative graph | repeated runtime execution | forward, JVP, VJP closures |
+| `NN.IR.Graph` | inspection and verification | explicit operation tags and payload references |
+| backend execution plan | provider selection | accepted capsules and audit metadata |
 
-- parameter maps such as `"w1" ↦ weights`;
-- gradient maps such as `"w1" ↦ dL/dw1`;
-- named values for debugging and widgets.
+A fifth object, a CUDA Graph capture, is a device launch-replay mechanism. Selecting TorchLean's
+`.compiled` backend does not mean CUDA Graph capture.
 
-TorchLean therefore uses an existential container, `Runtime.AnyTensor α`, which pairs a `Shape` with
-the corresponding tensor. That preserves the strongly typed spec layer while still supporting
-runtime tooling.
+Confusing these artifacts leads to bad guarantees. For example, accepting a backend plan does not
+prove that the compiled trainer executed it, and proving an IR semantics theorem does not certify a
+native tape node whose provider was never related to that IR operation.
 
-See the [runtime context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Context.lean)
-and the runtime-context widgets for the concrete declarations.
+# Eager Execution
 
-# A Small Runtime Walkthrough
-
-For a single training step, the objects move like this:
-
-1. Build a model and parameter bundle through `NN.API`.
-2. Run a forward pass with a chosen backend.
-3. Produce a scalar loss.
-4. Run reverse mode to obtain explicit gradients.
-5. Pass parameters and gradients to an optimizer update.
-6. Log metrics and, when needed, inspect the tape or compiled graph.
-
-Those steps change the runtime state and the produced artifacts. They do not require rewriting the
-architecture or the parameter-shape contract.
-
-# Autograd Tape
-
-The eager engine records operations into a `Tape`:
-
-- nodes store forward values;
-- nodes remember parent ids;
-- nodes carry local VJP closures;
-- reverse mode traverses node ids backward and accumulates gradients.
-
-In PyTorch terms, this is the part of the system behind `loss.backward()`. TorchLean makes the tape
-and gradient flow explicit. There is no hidden `.grad` mutation on tensor objects; the reverse pass
-produces gradients directly.
-
-The widgets make this visible:
-
-- `#tape_view t` renders nodes, parents, and values;
-- `#tape_grads_view t, outId` runs scalar backprop and shows which nodes receive gradients;
-- `#tape_trace_view t, outId` shows the reverse traversal step by step;
-- `#runtime_ctx_view ctx` shows the value and gradient registries.
-
-The [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-contains compact examples for these views.
-
-A useful reading habit is to follow one scalar loss backward:
+Run a short eager training job:
 
 ```
-prediction -> loss
-loss cotangent = 1
-reverse traversal sends cotangents to parents
-parameter cotangents become gradients
-optimizer consumes parameters + gradients
+lake exe torchlean quickstart_mlp \
+  --device cpu --backend eager --steps 2 --seed 2026
 ```
 
-TorchLean's eager tape exposes those intermediate objects. A theorem about the tape proves a
-statement about the reverse traversal under its hypotheses. A training run merely executes the path
-for the selected model, data, scalar backend, and runtime options.
+An eager session is created for the chosen scalar and profile. As the model runs, each operation:
 
-# Compiled Graphs
+1. reads one or more parent values;
+2. computes and stores its output;
+3. records parent identifiers;
+4. records a local reverse rule.
 
-The compiled runtime uses a typed SSA/DAG representation. Each node bundles the information needed
-for forward evaluation and derivative propagation:
+For:
 
-- `forward` computes a value;
-- `jvp` computes a forward-mode pushforward;
-- `vjp` computes a reverse-mode pullback.
+$$`y=\operatorname{ReLU}(Wx+b)`,
 
-The compiled form is separate from the eager tape for a practical reason. Eager mode is best for
-debugging and interactive iteration. Compiled mode is best for a stable, replayable artifact that
-proof code can reason about. Both paths are produced from the same public model definition.
+the tape has operations corresponding to matrix multiplication, bias addition, and ReLU. The loss
+adds subtraction, squaring, and reduction nodes. Reverse traversal begins from cotangent one at the
+scalar loss.
 
-API starting points:
+CPU eager values and VJPs live on the ordinary tape. CUDA eager values are device buffers and their
+reverse actions live on the CUDA tape. Both obey the same high-level reverse traversal idea, but
+their storage and primitive providers differ.
 
-- [compiled graph builder](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/GraphM.lean)
-- [compiled runtime core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core.lean)
-- [runtime overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Overview.lean)
+# Gradient Accumulation Is Part Of The Tape Semantics
 
-The compiled path still has a derivative story. A compiled node records enough local structure to
-evaluate forward values and propagate derivative information. That is why compiled execution is more
-than a cache of numbers. It is a reusable executable representation of the same typed computation.
+Consider:
 
-# IR Execution Bridge
+$$`z=x^2+x^2`.
 
-For verification, TorchLean standardizes on `NN.IR.Graph`, the DAG described in *Graphs and IR*.
-Runtime closures are good for execution, but a verifier needs explicit operation
-tags, shapes, and parent ids.
+The graph contains two paths from `x` to `z`. Each square contributes `2x`; the addition sends the
+output seed to both parents. The final cotangent is:
 
-The [IR execution compiler](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/IRExec.lean)
-connects that IR to the compiled runtime backend. In words, `execGraphOfIR` produces
-a compiled graph whose forward evaluation agrees with the IR evaluator on the same payload and
-input, for the supported operator fragment.
+$$`\bar x=2x+2x=4x`.
 
-That last phrase matters: *for the supported operator fragment*. If an imported or generated graph
-contains an operation outside the fragment, the bridge must extend its semantics or reject the graph.
-Otherwise a checker would be reasoning about a different program than the runtime executed.
+The runtime must add contributions associated with the same parent identifier. A correct local VJP
+for square is insufficient if the tape traversal overwrites one contribution.
 
-# Proof Link
+This is why TorchLean's autograd proofs have two layers:
 
-The proof layer follows a local-to-global pattern. Each primitive operation has a forward rule and a
-VJP rule. If the local VJP rule is the adjoint derivative of the local forward rule, then reverse
-traversal of a well-formed graph computes the adjoint derivative of the whole graph.
+- primitive derivative facts;
+- global tape/traversal soundness.
 
-Later proof chapters state the exact Lean theorems. Here the runtime fact to remember is simpler:
-the tape and compiled artifacts expose the structure those theorems need.
+The theorem is about their composition, not just a table of formulas.
 
-For a proof tour, use:
+# Inspect An Eager Tape
 
-- [autograd proof overview](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Overview.lean)
-- [tape algebra soundness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean)
-- [runtime autograd link API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link.lean)
+Open the widgets deep dive in VS Code and place the cursor on:
 
-# CUDA Is A Backend Choice
+```
+#tape_view ...
+#tape_grads_view ...
+#tape_trace_view ...
+```
 
-CUDA details have their own guide page. The runtime rule is short: GPU mode accelerates supported
-Float32 buffer operations, while Lean still owns the model structure, typed interfaces, logs, graph
-artifacts, and proof/checker statements.
+The first view shows operation nodes and parent edges. The second evaluates a scalar-output reverse
+pass and annotates gradients. The third exposes traversal order.
 
-Use eager mode for stepping through compact examples. Use compiled mode for repeated evaluation over a
-stable graph artifact. Use CUDA when the supported Float32 runtime should place numeric work
-on device buffers.
+A useful experiment is to duplicate one branch of a scalar expression, inspect the two incoming
+paths, and verify that the leaf gradient doubles. Then wrap one branch with `detach`; its forward
+node remains visible while its reverse contribution becomes zero.
 
-# Where To Look
+The widget reads a runtime artifact. It does not alter execution or prove the tape correct.
 
-For runnable examples close to this runtime layer:
+# Compiled Execution
 
-- [Float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/Float32Modes.lean)
-- [AutogradBasics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
-- [SimpleMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean)
-- [MinibatchMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/MinibatchMlpTrain.lean)
+Now run:
 
-To read the runtime layer in dependency order, begin with eager tensors and tapes, then compiled
-graph construction, then the IR execution bridge, and finally the curated model examples.
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu --backend compiled --steps 2 --seed 2026
+```
 
-# References
+Compiled execution records the model's scalar loss once in a typed graph-building monad. Nodes carry
+forward behavior and derivative behavior used for JVPs and VJPs. Each training step supplies current
+parameters and inputs and replays the graph.
 
-- TorchLean paper: https://arxiv.org/abs/2602.22631
-- Baydin et al., "Automatic differentiation in machine learning: a survey": https://arxiv.org/abs/1502.05767
-- Griewank and Walther, *Evaluating Derivatives: Principles and Techniques of Algorithmic
-  Differentiation*.
-- PyTorch autograd docs: https://pytorch.org/docs/stable/autograd.html
-- PyTorch FX docs: https://pytorch.org/docs/stable/fx.html
+This avoids reconstructing the same high-level program on every step. The public method remains
+`train`; the backend choice changes execution without introducing a second model API.
+
+The current compiled trainer is CPU-only. Asking for a non-CPU compiled run is rejected. That
+failure is preferable to printing “compiled” while silently using another path.
+
+Compiled execution is distinct from `NN.IR.Graph` for an important reason: compiled nodes may carry
+Lean functions implementing behavior, whereas a verification/import/export IR needs explicit,
+inspectable operation tags and serializable payload references.
+
+# The Canonical IR
+
+`NN.IR.Graph` represents operations such as linear, ReLU, reduction, normalization, and shape
+transforms as data. Each node records:
+
+- operation tag;
+- input node identifiers;
+- input/output shapes;
+- operation-specific payload reference where needed.
+
+Because the operation is data, an importer can validate it, a verifier can interpret it, and a code
+generator can reject unsupported cases without executing an arbitrary closure.
+
+The graph chapter later constructs:
+
+$$`
+x
+\to\operatorname{Linear}_1
+\to\operatorname{ReLU}
+\to\operatorname{Linear}_2
+\to\operatorname{sum}
+\to\tanh.
+`
+
+Its evaluator interprets the same graph over real, interval, and IEEE scalar contexts. An eager tape
+produced while evaluating this model is still a separate trace of one execution.
+
+# Backend Planning
+
+Before an eager operation executes, the session asks its backend profile for a capsule. The capsule
+declares:
+
+- semantic operation;
+- target and provider;
+- forward and VJP ownership;
+- shape and layout requirements;
+- numerical policy;
+- evidence level.
+
+The planner filters by operation and target, ranks candidates according to the profile, and runs an
+acceptance gate. The accepted capsule is cached in the session and can be printed on first use.
+
+Run:
+
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu --steps 1 --seed 2026 --show-backend
+```
+
+On a CUDA build:
+
+```
+lake -R -K cuda=true exe torchlean quickstart_mlp \
+  --device cuda --steps 1 --seed 2026 --show-backend
+```
+
+The report answers “which provider was selected for this semantic operation?” It does not, by
+itself, prove that the provider implementation satisfies every declared contract. That depends on
+the capsule's evidence and the executor's guards.
+
+# Planning Is Not Execution
+
+Suppose the planner accepts a native CUDA matmul capsule. The executor must still:
+
+1. find the linked native symbol;
+2. verify device availability;
+3. check concrete dimensions and layout;
+4. allocate or reuse buffers;
+5. launch the operation;
+6. turn native failures into Lean errors;
+7. register the output and backward action.
+
+An accepted plan describes admissible execution. It is not a receipt showing that the launch
+completed.
+
+Conversely, a native launch can succeed while violating an undeclared numerical assumption. This is
+why capsule metadata includes contraction, reduction, subnormal, and rounding policies rather than
+only a function pointer.
+
+# Runtime Parameter Storage
+
+A model parameter pack is heterogeneous:
+
+```
+[weight1 : Tensor α [8,2],
+ bias1   : Tensor α [8],
+ weight2 : Tensor α [1,8],
+ bias2   : Tensor α [1]]
+```
+
+The public type preserves this dependent list. Runtime registries sometimes need to iterate over
+parameters by name or identifier, so they package each tensor existentially with its shape.
+
+This is not erasing shape information. It moves the shape from a compile-time index of the whole
+collection into a value stored beside each registry entry. A lookup must recover and validate the
+expected shape before returning to the typed API.
+
+Parameter names, integer token inputs, RNG state, optimizer memory, and mutable model buffers belong
+to the instantiated runner. Train/eval mode also belongs there.
+
+# Train Mode And Eval Mode
+
+Some operations depend on mode:
+
+- dropout samples a mask during training and becomes identity during evaluation;
+- batch normalization may update running statistics during training and use stored statistics at
+  evaluation;
+- other stochastic or stateful layers can follow the same pattern.
+
+Calling `trained.predict` uses the retained runner in evaluation mode. `Trainer.Manual` exposes
+mode changes directly for custom loops.
+
+Mode is not a backend. The same eager CUDA runner can switch between training and evaluation while
+remaining on the same device and provider profile.
+
+# Randomness Is Runtime State
+
+Dropout and stochastic model components need explicit generator state. A replayable run must know
+which random state was used at each operation. The tape records the realized forward values needed
+by the backward rule; it should not resample a different mask during reverse traversal.
+
+This distinction becomes important for checkpointing. Saving parameters without RNG, optimizer, and
+loader state can reproduce inference but not necessarily the next training update.
+
+# Public Autograd Surfaces
+
+Function-level calls:
+
+```
+autograd.func.grad
+autograd.func.valueAndGradScalar
+autograd.func.vjp
+autograd.func.jacfwd
+autograd.func.jacrev
+autograd.func.hessian
+```
+
+compile a backend-generic tensor program and execute the requested derivative.
+
+Model-level calls accept:
+
+```
+model
+parameter pack
+input
+target or output cotangent
+loss when needed
+```
+
+and return parameter-structured or input-structured derivatives. The high-level trainer uses this
+runtime machinery inside its optimizer loop.
+
+# From Runtime To Proof
+
+The proof path is:
+
+```
+calculus rule for each primitive
+  -> semantic local VJP
+  -> well-formed graph/tape composition
+  -> global reverse result
+```
+
+Runtime refinement adds:
+
+```
+executable primitive
+  -> declared semantic primitive
+```
+
+for every provider used by the run.
+
+The first path can be entirely internal to Lean for a supported abstract graph. The second may be a
+theorem, a sound checked guard, a numerical certificate, or an explicit trusted boundary. Native
+CUDA, LibTorch, compiler, driver, and hardware behavior do not become proved merely because the
+abstract derivative theorem exists.
+
+Relevant proof sources:
+
+- [`Autograd/Overview.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Overview.lean);
+- [`Tape/Algebra/Soundness.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Tape/Algebra/Soundness.lean);
+- [`Runtime/Link.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Autograd/Runtime/Link.lean).
+
+# A Debugging Checklist
+
+When a gradient is surprising:
+
+1. Recompute a tiny case by hand.
+2. Print the scalar semantics, device, backend, and selected capsules.
+3. Inspect the forward tape and ensure the expected branch is reachable.
+4. Check output cotangent shape and values.
+5. Look for detach, train/eval mode, or stochastic state.
+6. Compare eager and compiled CPU on the same explicit parameters.
+7. Compare a native provider with `IEEE32Exec` or a reference path on a small finite case.
+8. Distinguish a numerical discrepancy from a wrong derivative graph.
+
+This workflow is more informative than asking whether “autograd” is correct as one indivisible
+component. It identifies which artifact and which boundary must explain the mismatch.
+
+# What To Carry Into The Graph Chapter
+
+The eager tape explains one execution. The compiled graph accelerates repeated differentiation. The
+canonical IR makes operation structure inspectable. The backend plan records provider choices.
+
+TorchLean keeps all four because they solve different problems. The next chapters define the
+specification and canonical IR precisely, then relate runtime approximation and verification claims
+to those objects.
+
+References:
+
+- Baydin et al.,
+  [Automatic Differentiation in Machine Learning](https://arxiv.org/abs/1502.05767);
+- [PyTorch autograd](https://pytorch.org/docs/stable/autograd.html);
+- [PyTorch FX](https://pytorch.org/docs/stable/fx.html).

@@ -42,6 +42,18 @@ noncomputable section
 
 /-! ## Tensor Approximation Plumbing -/
 
+/-- Enlarge an existing tensor approximation budget.
+
+Composed operators often prove a row- or coordinate-level estimate and then embed it into a global
+infinity-norm budget. This lemma records that monotonicity once, without unfolding the tensor
+distance predicate at every use site.
+-/
+lemma approxT_mono {α : Type} {toSpec : α → SpecScalar} {s : Shape}
+    {xS : SpecTensor s} {xR : Tensor α s} {eps eps' : SpecScalar}
+    (h : approxT (α := α) (toSpec := toSpec) xS xR eps) (hle : eps ≤ eps') :
+    approxT (α := α) (toSpec := toSpec) xS xR eps' :=
+  le_trans h hle
+
 /-- `linf_norm` is always nonnegative. -/
 lemma linf_norm_nonneg : ∀ {s : Shape} (t : SpecTensor s), 0 ≤ linfNorm t := by
   intro s t
@@ -150,6 +162,65 @@ lemma approxT_dim_get {α : Type} {toSpec : α → SpecScalar} {n : Nat} {s : Sh
               exact hle
           have := le_trans hComp h
           simpa [approxT, approxWith] using this
+
+/-- Every valid tensor approximation has a nonnegative error budget.
+
+This fact is independent of the executable scalar type.  Keeping it at the plumbing layer avoids
+repeating the same norm argument in each backend-specific development.
+-/
+lemma approxT_eps_nonneg {α : Type} {toSpec : α → SpecScalar} {s : Shape}
+    {xS : SpecTensor s} {xR : Tensor α s} {eps : SpecScalar}
+    (hx : approxT (α := α) (toSpec := toSpec) xS xR eps) : 0 ≤ eps := by
+  have h0 :
+      0 ≤ tensorDistance (α := SpecScalar) linfNorm xS
+        (tensorToSpec (α := α) (toSpec := toSpec) xR) := by
+    simpa [tensorDistance, linfNorm] using
+      (linf_norm_nonneg
+        (t := tensorDistance.tensor_sub (α := SpecScalar) (s := s) xS
+          (tensorToSpec (α := α) (toSpec := toSpec) xR)))
+  exact le_trans h0 hx
+
+/-- Assemble a dimensioned tensor approximation from uniform componentwise approximations.
+
+The premise uses one common infinity-norm budget for every component.  This is the converse of
+`approxT_dim_get` and is deliberately polymorphic in the runtime scalar representation, so NF,
+IEEE execution, interval, and future quantized backends can share the same structural proof.
+-/
+lemma approxT_dim_of_forall {α : Type} {toSpec : α → SpecScalar} {n : Nat} {s : Shape}
+    {xS : SpecTensor (.dim n s)} {xR : Tensor α (.dim n s)} {eps : SpecScalar}
+    (hε : 0 ≤ eps)
+    (h : ∀ i : Fin n,
+      approxT (α := α) (toSpec := toSpec)
+        (match xS with | .dim f => f i) (match xR with | .dim f => f i) eps) :
+    approxT (α := α) (toSpec := toSpec) xS xR eps := by
+  classical
+  cases xS with
+  | dim xSf =>
+    cases xR with
+    | dim xRf =>
+      have hf :
+          ∀ i ∈ List.finRange n,
+            tensorDistance (α := SpecScalar) linfNorm (xSf i)
+                (tensorToSpec (α := α) (toSpec := toSpec) (xRf i)) ≤ eps := by
+        intro i _hi
+        simpa [approxT, approxWith] using h i
+      have hfold :=
+        List.foldl_max_le_of_le (List.finRange n)
+          (fun i =>
+            tensorDistance (α := SpecScalar) linfNorm (xSf i)
+              (tensorToSpec (α := α) (toSpec := toSpec) (xRf i)))
+          (acc := (0 : SpecScalar)) (eps := eps) hε hf
+      simp [approxT, approxWith, tensorDistance,
+        linfNorm, RuntimeApprox.linfNorm, tensorToSpec, Spec.mapTensor]
+      change
+        List.foldl
+          (fun a i =>
+            max a
+              (tensorLinfNorm
+                ((xSf i).subSpec (mapTensor toSpec (xRf i)))))
+          0 (List.finRange n) ≤ eps
+      simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec,
+        MathFunctions.abs, Spec.mapTensor] using hfold
 
 -- ---------------------------------------------------------------------------
 -- Generic lifting lemmas for elementwise ops (`map_spec`, `map2_spec`)

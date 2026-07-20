@@ -10,7 +10,6 @@ public import NN.API.Public.Facade.Trainer.Core
 public import NN.API.Public.Facade.Trainer.Constructor
 public import NN.API.Public.Facade.Trainer.Results
 public import NN.API.Public.Facade.Trainer.Run
-public import NN.API.Public.Facade.Trainer.Verify
 public import NN.API.Public.Facade.Trainer.Train
 public import NN.API.Public.Facade.Trainer.Predict
 

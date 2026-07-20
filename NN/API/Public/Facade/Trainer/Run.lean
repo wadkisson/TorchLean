@@ -74,9 +74,22 @@ def withDType (run : RunConfig) (dtype : Runtime.DType) : RunConfig :=
 def withBackend (run : RunConfig) (backend : Runtime.Backend) : RunConfig :=
   { run with backend := backend }
 
-/-- Override the execution device for this run configuration. -/
-def withDevice (run : RunConfig) (device : Runtime.Device) : RunConfig :=
-  { run with device := device }
+/-- Override the execution device using a maintained backend profile. -/
+def withDevice (run : RunConfig) (device : Runtime.Device) : Except String RunConfig := do
+  match _root_.NN.Backend.BackendProfile.maintainedForDevice? device with
+  | some profile => pure { run with executionProfile := profile }
+  | none =>
+      throw s!"device `{device.cliName}` has no maintained runtime profile; provide an explicit backend profile"
+
+/--
+Select a complete backend contract profile.
+
+The profile carries device, provider preference, assurance policy, VJP ownership, and capsule registry
+together. This is the programmatic entrypoint for choices such as LibTorch forward with a
+TorchLean-owned backward pass.
+-/
+def withBackendProfile (run : RunConfig) (profile : _root_.NN.Backend.BackendProfile) : RunConfig :=
+  { run with executionProfile := profile }
 
 /-- Enable or disable first-use backend capsule reporting. -/
 def withBackendReport (run : RunConfig) (enabled : Bool := true) : RunConfig :=
@@ -92,17 +105,17 @@ def compiled (run : RunConfig) : RunConfig :=
 
 /-- Run on CPU. -/
 def cpu (run : RunConfig) : RunConfig :=
-  run.withDevice .cpu
+  run.withBackendProfile _root_.NN.Backend.BackendProfile.checkedCpu
 
 /-- Run on CUDA. -/
 def cuda (run : RunConfig) : RunConfig :=
-  run.withDevice .cuda
+  run.withBackendProfile _root_.NN.Backend.BackendProfile.checkedCuda
 
 /-- Apply parsed runtime/device options to a persistent trainer run configuration. -/
 def withOptions (run : RunConfig) (opts : Options) : RunConfig :=
   { run with
       backend := opts.backend
-      device := opts.device
+      executionProfile := opts.executionProfile
       showBackend := opts.showBackend }
 
 /-- Build a run configuration from parsed runtime flags and trainer choices. -/
@@ -112,7 +125,7 @@ def fromOptions (opts : Options) (base : RunConfig := {}) : RunConfig :=
 /-- Lower a public run configuration to the runtime `Options` record. -/
 def toOptions (run : RunConfig) : Options :=
   { backend := run.backend
-    device := run.device
+    executionProfile := run.executionProfile
     showBackend := run.showBackend }
 
 /-- CLI spelling for a Float32 runtime mode. -/
@@ -149,11 +162,15 @@ def parseRuntimeArgs (args : List String) (base : RunConfig := {}) :
     Except String (RunConfig × List String) := do
   let (exec, rest) ←
     NN.API.TorchLean.Module.ExecConfig.parseAndStripWithDefaultDType args base.dtype
+  let profile ← match _root_.NN.Backend.BackendProfile.maintainedForDevice? exec.device with
+    | some profile => pure profile
+    | none =>
+        throw s!"device `{exec.device.cliName}` has no maintained runtime profile; use a programmatic backend profile"
   pure
     ({ base with
         dtype := exec.dtype
         backend := exec.backend
-        device := exec.device
+        executionProfile := profile
         showBackend := exec.showBackend },
       rest)
 
@@ -172,7 +189,7 @@ def parseRuntimeArgsOrThrow
 def toArgs (run : RunConfig) : List String :=
   dtypeArgs run.dtype ++
   backendArgs run.backend ++
-  deviceArgs run.device ++
+  deviceArgs run.executionProfile.config.device ++
   (if run.showBackend then ["--show-backend"] else [])
 
 end RunConfig
@@ -188,7 +205,7 @@ def fromRunConfig {σ τ : Shape}
     optimizer := run.optimizer
     dtype := run.dtype
     backend := run.backend
-    device := run.device
+    executionProfile := run.executionProfile
     showBackend := run.showBackend }
 
 end Config

@@ -41,13 +41,13 @@ def gatherScalar {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .gatherScalar
+    let _ ← requireNativeCudaCapsule s .gather
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherScalar (t := t0) (n := n) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .gatherScalar cpu cuda
+  dispatchCudaOpt (α := α) s .gather cpu cuda
 
 /-- Gather a row from a 2D tensor with a `Fin rows` index. PyTorch: `x[i]` for 2D tensors. -/
 def gatherRow {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -60,13 +60,13 @@ def gatherRow {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .gatherRow
+    let _ ← requireNativeCudaCapsule s .gather
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherRow (t := t0) (rows := rows) (cols := cols) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .gatherRow cpu cuda
+  dispatchCudaOpt (α := α) s .gather cpu cuda
 
 /-- Gather a scalar from a 1D vector with a raw `Nat` index (totalized by the tape op). -/
 def gatherScalarNat {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -77,13 +77,13 @@ def gatherScalarNat {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .gatherScalarNat
+    let _ ← requireNativeCudaCapsule s .gather
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherScalarNat (t := t0) (n := n) x.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .gatherScalarNat cpu cuda
+  dispatchCudaOpt (α := α) s .gather cpu cuda
 
 /-- Dynamic gather scalar using an index stored in `NatRef`. -/
 def gatherScalarRef {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -114,13 +114,13 @@ def gatherVecNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .gatherVecNat
+    let _ ← requireNativeCudaCapsule s .gather
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherVecNat (t := t0) (n := n) (k := k) x.id idx
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .gatherVecNat cpu cuda
+  dispatchCudaOpt (α := α) s .gather cpu cuda
 
 /-- Gather `k` rows using an explicit index tensor. PyTorch: `index_select(dim=0, index=...)`. -/
 def gatherRowsNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
@@ -134,13 +134,13 @@ def gatherRowsNat {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .gatherRowsNat
+    let _ ← requireNativeCudaCapsule s .gather
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.gatherRowsNat (t := t0) (rows := rows) (cols := cols) (k := k) x.id idx
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .gatherRowsNat cpu cuda
+  dispatchCudaOpt (α := α) s .gather cpu cuda
 
 /--
 Read a float input vector and return the corresponding `Tensor Nat` index vector.
@@ -186,13 +186,13 @@ def scatterAddVec {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .scatterAddVec
+    let _ ← requireNativeCudaCapsule s .scatterAdd
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.scatterAddVec (t := t0) (n := n) x.id v.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .scatterAddVec cpu cuda
+  dispatchCudaOpt (α := α) s .scatterAdd cpu cuda
 
 /-- Scatter-add into a matrix row: return a copy of `x` with `x[i,:] += v`. -/
 def scatterAddRow {α : Type} (s : EagerSession α) [Add α] [Zero α] [DecidableEq Shape]
@@ -207,13 +207,13 @@ def scatterAddRow {α : Type} (s : EagerSession α) [Add α] [Zero α] [Decidabl
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .scatterAddRow
+    let _ ← requireNativeCudaCapsule s .scatterAdd
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.scatterAddRow (t := t0) (rows := rows) (cols := cols) x.id v.id i
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .scatterAddRow cpu cuda
+  dispatchCudaOpt (α := α) s .scatterAdd cpu cuda
 
 end EagerSession
 

@@ -46,6 +46,72 @@ def mapTensor {α β : Type} : ∀ {s : Shape}, (α → β) → Tensor α s → 
   | .scalar, f, Tensor.scalar x => Tensor.scalar (f x)
   | .dim _ _, f, Tensor.dim g => Tensor.dim (fun i => mapTensor f (g i))
 
+namespace Tensor
+
+/-- `Forall p x` means that every scalar entry of `x` satisfies `p`.
+
+The definition is rank-generic: domain conditions such as positivity, finite-value assumptions,
+quantizer code ranges, and interval membership use the same predicate for scalars, vectors, and
+higher-rank tensors. -/
+def Forall {α : Type} (p : α → Prop) : {s : Shape} → Tensor α s → Prop
+  | .scalar, Tensor.scalar x => p x
+  | .dim n s, Tensor.dim values => ∀ i : Fin n, Forall p (s := s) (values i)
+
+@[simp] theorem forall_scalar {α : Type} {p : α → Prop} {x : α} :
+    Forall p (Tensor.scalar x) ↔ p x := Iff.rfl
+
+@[simp] theorem forall_dim {α : Type} {p : α → Prop} {n : Nat} {s : Shape}
+    {values : Fin n → Tensor α s} :
+    Forall p (Tensor.dim values) ↔ ∀ i, Forall p (values i) := Iff.rfl
+
+/-- The predicate that is always true holds at every tensor coordinate. -/
+theorem forall_true {α : Type} {s : Shape} (x : Tensor α s) :
+    Forall (fun _ => True) x := by
+  induction s with
+  | scalar =>
+      cases x
+      trivial
+  | dim n inner ih =>
+      cases x with
+      | dim values =>
+          intro i
+          exact ih (values i)
+
+/-- Transport a pointwise property through a shape-preserving scalar map. -/
+theorem forall_mapTensor {α β : Type} {p : α → Prop} {q : β → Prop}
+    {f : α → β} {s : Shape} {x : Tensor α s}
+    (hx : Forall p x) (hf : ∀ a, p a → q (f a)) :
+    Forall q (mapTensor f x) := by
+  induction s with
+  | scalar =>
+      cases x with
+      | scalar a => exact hf a (by simpa using hx)
+  | dim n inner ih =>
+      cases x with
+      | dim values =>
+          intro i
+          exact ih (hx i)
+
+/-- Replicating a scalar satisfying `p` produces a tensor satisfying `p` everywhere. -/
+theorem forall_replicate {α : Type} {p : α → Prop} {s : Shape} {x : α}
+    (hx : p x) : Forall p (Spec.replicate (s := s) (Tensor.scalar x)) := by
+  induction s with
+  | scalar => exact hx
+  | dim n inner ih =>
+      intro _
+      exact ih
+
+/-- A constant-filled tensor satisfies any predicate satisfied by the constant. -/
+theorem forall_fill {α : Type} {p : α → Prop} {s : Shape} {x : α}
+    (hx : p x) : Forall p (Spec.fill x s) := by
+  induction s with
+  | scalar => exact hx
+  | dim n inner ih =>
+      intro _
+      exact ih
+
+end Tensor
+
 -- Tensor constructors used by examples, specs, and small proof artifacts.
 
 /-! ### Small constructors -/

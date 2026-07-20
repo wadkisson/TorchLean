@@ -53,53 +53,17 @@ noncomputable section
 /-- `toDyadic? x = none` implies `x` is not finite. -/
 theorem isFinite_eq_false_of_toDyadic?_eq_none (x : IEEE32Exec) (hx : toDyadic? x = none) :
     isFinite x = false := by
-  unfold toDyadic? at hx
-  cases hcond : (isNaN x || isInf x) with
-  | false =>
-      -- In the non-special branch, `toDyadic?` always returns `some …`.
-      cases hE : (expField x == 0) <;> cases hF : (fracField x == 0) <;>
-        simp [hcond, hE, hF] at hx
-  | true =>
-      cases hnan : isNaN x with
-      | true =>
-          have hexp : expField x = expAllOnes := expField_eq_expAllOnes_of_isNaN (x := x) hnan
-          exact isFinite_eq_false_of_expField_eq_expAllOnes (x := x) hexp
-      | false =>
-          -- `isNaN x = false` and `isNaN x || isInf x = true` implies `isInf x = true`.
-          cases hinf : isInf x with
-          | true =>
-              have hexp : expField x = expAllOnes := expField_eq_expAllOnes_of_isInf (x := x) hinf
-              exact isFinite_eq_false_of_expField_eq_expAllOnes (x := x) hexp
-          | false =>
-              -- Contradiction: the disjunction cannot be `true`.
-              have hcondFalse : (isNaN x || isInf x) = false := by simp [hnan, hinf]
-              have hcontra : False := by
-                have : (false : Bool) = true := by
-                  simp [hcondFalse]  at hcond
-                cases this
-              exact hcontra.elim
+  simpa [hx] using (toDyadic?_isSome_eq_isFinite x).symm
 
 /-- If `x` is not finite, then `toDyadic? x = none`. -/
 theorem toDyadic?_eq_none_of_isFinite_eq_false (x : IEEE32Exec) (hx : isFinite x = false) :
     toDyadic? x = none := by
-  -- By cases on the fraction field: expField=all-ones gives either Inf or NaN.
-  unfold toDyadic?
-  unfold isFinite at hx
-  have hx' : (expField x != expAllOnes) = false := by simpa using hx
-  have hexp : expField x = expAllOnes := by
-    by_contra hne
-    have htrue : (expField x != expAllOnes) = true := (bne_iff_ne).2 hne
-    have : False := by
-      simp [htrue] at hx'
-    exact this.elim
-  have hexpB : (expField x == expAllOnes) = true := (beq_iff_eq).2 hexp
-  by_cases hfrac : fracField x = 0
-  · have hfracB : (fracField x == 0) = true := (beq_iff_eq).2 hfrac
-    have hinf : isInf x = true := by simp [isInf, hexpB, hfracB]
-    simp [hinf]
-  · have hfracNeB : (fracField x != 0) = true := (bne_iff_ne).2 hfrac
-    have hnan : isNaN x = true := by simp [isNaN, hexpB, hfracNeB]
-    simp [hnan]
+  cases hdy : toDyadic? x with
+  | none => rfl
+  | some d =>
+      have hfin := isFinite_eq_true_of_toDyadic?_some hdy
+      rw [hx] at hfin
+      contradiction
 
 /-- `toReal?` returns `none` on non-finite values. -/
 theorem toReal?_eq_none_of_isFinite_eq_false (x : IEEE32Exec) (hx : isFinite x = false) :

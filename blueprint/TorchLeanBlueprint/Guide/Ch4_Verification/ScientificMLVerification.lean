@@ -7,10 +7,11 @@ open Verso.Genre Manual
 tag := "scientific-ml-verification"
 %%%
 
-TorchLean also has verification bridges for scientific ML artifacts: ODE enclosures, PINN residual
-certificates, and piecewise polynomial or spline certificates. These are not side examples. They show
-the same producer/checker discipline when the artifact comes from numerical analysis, Julia,
-Python, or a scientific ML workflow rather than from a standard neural network classifier.
+Scientific models make the verification boundary unusually visible. A trained PINN may look
+accurate on a plot while violating its PDE between sample points. A numerical ODE trajectory may
+look smooth while accumulated error takes it outside the claimed corridor. A spline fit may be
+excellent at the knots and wrong inside one interval. TorchLean therefore treats the trained model
+or fitted curve as a producer of a mathematical claim, not as the claim itself.
 
 The shared certificate pattern is:
 
@@ -25,6 +26,77 @@ For classifier verification, the artifact is often an input box and logit bounds
 the artifact may be a time corridor, a residual bound, a polynomial certificate, or a derivative
 enclosure. TorchLean makes all of these look like the same proof pattern: a producer proposes a
 finite object, Lean checks the object, and a theorem states what follows.
+
+# Three Commands To Try
+
+The registered verification tools can be listed with:
+
+```
+lake exe verify -- list
+```
+
+Three entries correspond to the scientific paths in this chapter:
+
+```
+pinn-cert [<path>]    -- PINN certificate recomputation check
+spline-cert [<path>]  -- piecewise-polynomial certificate checker
+ode                   -- ODE enclosure verification
+```
+
+Start with the bundled PINN artifact:
+
+```
+lake exe verify -- pinn-cert
+```
+
+For each domain location, TorchLean prints enclosures for the first and second derivatives. A
+portion of the output is:
+
+```
+Residual R(x) from PDE 'uxx': [-5.556681,-5.220827]
+u'(x)∈[2.858092,2.969166]
+u''(x)∈[-5.556681,-5.220827]
+...
+PINN artifact replay matched Lean's recomputed residual bounds.
+```
+
+This run demonstrates recomputation: the checker does not merely trust the residual interval stored
+in JSON. It reconstructs the relevant derivative bounds and compares the artifact with the result.
+It does not say that a small residual alone implies closeness to the true PDE solution; that
+requires a separate stability or a posteriori error theorem for the PDE.
+
+The spline sample is shorter:
+
+```
+lake exe verify -- spline-cert
+```
+
+and prints:
+
+```
+Piecewise polynomial certificate verified.
+```
+
+The message refers to the predicates of the piecewise-polynomial certificate format. To understand
+the claim, inspect the intervals, coefficients, and bounds in the sample artifact, then change one
+coefficient and rerun the checker. A certificate interface is doing its job when a small invalid
+change causes a clear rejection.
+
+The ODE tool has no meaningful default differential equation, so invoking it without a certificate
+prints the required data:
+
+```
+lake exe verify -- ode
+```
+
+```
+lake exe verify -- ode [--model=direct|torchlean]
+  [--scalar=float|ieee32exec] --cert=<ode_enclosure.json>
+```
+
+The explicit `--model` and `--scalar` choices are important. They record whether the expression
+came directly from the ODE certificate or through a TorchLean model, and whether the checker used
+host `Float` arithmetic or the executable IEEE binary32 semantics.
 
 # ODE Enclosures
 
@@ -193,15 +265,11 @@ producer hypotheses named in the statement.
 
 # Scientific Artifacts In The Same Trust Story
 
-Scientific ML often lives at the boundary between theorem proving and numerical tooling. TorchLean's
-verification layer includes ODEs, PINNs, and splines alongside image classifiers and language
-models. These sections give readers a clear place to start when their question is:
-
-> How do I bring a scientific artifact into Lean without treating the external producer as
-> already verified?
-
-The answer is the same pattern we use elsewhere: small certificate formats, explicit parsers,
-checked predicates, and theorem statements that say exactly which mathematical claim follows.
+Scientific ML often lives at the boundary between theorem proving and numerical tooling. The
+working discipline is simple: export a small artifact, recompute as much of it as practical in
+Lean, and attach the accepted artifact to a theorem whose hypotheses name anything still supplied
+by the producer. The plots remain useful evidence, but they no longer have to carry the logical
+meaning of the result by themselves.
 
 # References
 

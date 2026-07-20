@@ -355,6 +355,29 @@ body {
   max-width: 960px;
 }
 
+.home-intro {
+  display: flow-root;
+  margin: 0.35rem 0 2.8rem;
+}
+
+.home-intro .lede {
+  max-width: 1080px;
+  margin: 0 0 1.4rem;
+  font-size: clamp(1.38rem, calc(1.16rem + 0.7vw), 1.86rem);
+  line-height: 1.3;
+}
+
+.home-intro-copy {
+  color: var(--tl-text);
+  font-size: 1.04rem;
+  line-height: 1.72;
+  text-align: left;
+}
+
+.home-intro-copy p {
+  margin: 0 0 1rem;
+}
+
 .eyebrow {
   margin: 0 0 0.55rem;
   color: var(--tl-subtle);
@@ -530,18 +553,35 @@ body {
 }
 
 .home-overview {
-  margin: 1rem 0 0.75rem;
+  float: right;
+  width: min(54%, 680px);
+  margin: 0.2rem 0 1.35rem clamp(1.6rem, 3.5vw, 3.25rem);
+}
+
+.home-overview a {
+  display: block;
   border: 1px solid var(--tl-border);
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: none;
+  border-radius: 6px;
   overflow: hidden;
+  background: #ffffff;
+  line-height: 0;
+}
+
+.home-overview a:hover {
+  border-color: var(--tl-subtle);
 }
 
 .home-overview img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.home-overview figcaption {
+  margin-top: 0.55rem;
+  color: var(--tl-subtle);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .media-slab img {
@@ -1489,17 +1529,13 @@ input.search-input[type="search"] {
 
   .site-nav {
     flex: 1 1 100%;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow-x: visible;
     justify-content: flex-start;
     gap: 0.2rem 0.35rem;
     max-width: none;
     margin: 0;
-    padding-bottom: 0.1rem;
-    scrollbar-width: none;
-  }
-
-  .site-nav::-webkit-scrollbar {
-    display: none;
+    padding-bottom: 0;
   }
 
   .page-header .search-open {
@@ -1508,8 +1544,8 @@ input.search-input[type="search"] {
 
   .page-header .btn {
     min-height: 2rem;
-    padding: 0.48rem 0.64rem;
-    font-size: 0.9rem;
+    padding: 0.46rem 0.5rem;
+    font-size: 0.86rem;
   }
 
   .lede {
@@ -1524,6 +1560,23 @@ input.search-input[type="search"] {
   .home-title-row img {
     width: 72px;
     height: 72px;
+  }
+
+  .home-intro {
+    margin-bottom: 2.1rem;
+  }
+
+  .home-overview {
+    float: none;
+    width: 100%;
+    max-width: 720px;
+    margin: 0.25rem 0 1.35rem;
+  }
+
+  .home-intro-copy {
+    font-size: 1rem;
+    line-height: 1.65;
+    text-align: left;
   }
 }
 

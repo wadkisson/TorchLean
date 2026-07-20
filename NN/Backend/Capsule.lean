@@ -41,18 +41,6 @@ structure NativeSymbolRef where
   buildTarget? : Option String := none
   deriving DecidableEq, BEq, Repr
 
-/-- Whether a selected capsule is wired to an executable runtime path. -/
-inductive RuntimeSupport where
-  /-- The capsule can be selected by an eager runtime path. -/
-  | eager
-  /-- The capsule has a direct bridge/check, but is not selected by the eager runtime yet. -/
-  | testOnly
-  /-- The capsule is useful for planning/auditing only. -/
-  | plannerOnly
-  /-- The capsule is intentionally registered before runtime wiring exists. -/
-  | notWired
-  deriving DecidableEq, Repr
-
 /-- Source-level provenance for a contract descriptor. Provenance is not correctness evidence. -/
 inductive ContractProvenance where
   | sourceFile (ref : SourceRef)
@@ -136,6 +124,112 @@ def trusted (claim : ContractClaim) (summary reason : String)
 
 end ContractDescriptor
 
+/-! ## Numerical execution policy
+
+These fields describe floating-point choices that are invisible at the tensor-shape level but
+matter to numerical certificates. They are metadata, not correctness evidence: the ordinary value
+and VJP contracts still state what a capsule refines and how that claim is justified.
+-/
+
+/-- Rounding behavior advertised by a backend capsule. -/
+inductive RoundingPolicy where
+  | scalarContext
+  | nearestEven
+  | directed
+  | implementationDefined
+  | unspecified
+  deriving DecidableEq, Repr
+
+/-- Treatment of subnormal values at the backend boundary. -/
+inductive SubnormalPolicy where
+  | gradualUnderflow
+  | flushToZero
+  | implementationDefined
+  | unspecified
+  deriving DecidableEq, Repr
+
+/-- Whether multiplication and addition may be contracted into one fused operation. -/
+inductive ContractionPolicy where
+  | separate
+  | fused
+  | implementationDefined
+  | notApplicable
+  | unspecified
+  deriving DecidableEq, Repr
+
+/-- Ordering contract for reductions. Different valid orders need not be bitwise equal. -/
+inductive ReductionPolicy where
+  | fixedLeft
+  | fixedTree
+  | implementationDefined
+  | notApplicable
+  | unspecified
+  deriving DecidableEq, Repr
+
+/-- Floating-point choices attached to one kernel capsule. -/
+structure NumericalPolicy where
+  rounding : RoundingPolicy := .unspecified
+  subnormals : SubnormalPolicy := .unspecified
+  contraction : ContractionPolicy := .unspecified
+  reduction : ReductionPolicy := .unspecified
+  deriving DecidableEq, Repr
+
+namespace RoundingPolicy
+
+/-- Stable report label for rounding behavior. -/
+def label : RoundingPolicy -> String
+  | .scalarContext => "scalar-context"
+  | .nearestEven => "nearest-even"
+  | .directed => "directed"
+  | .implementationDefined => "implementation-defined"
+  | .unspecified => "unspecified"
+
+end RoundingPolicy
+
+namespace SubnormalPolicy
+
+/-- Stable report label for subnormal handling. -/
+def label : SubnormalPolicy -> String
+  | .gradualUnderflow => "gradual-underflow"
+  | .flushToZero => "flush-to-zero"
+  | .implementationDefined => "implementation-defined"
+  | .unspecified => "unspecified"
+
+end SubnormalPolicy
+
+namespace ContractionPolicy
+
+/-- Stable report label for multiply-add contraction. -/
+def label : ContractionPolicy -> String
+  | .separate => "separate"
+  | .fused => "fused"
+  | .implementationDefined => "implementation-defined"
+  | .notApplicable => "n/a"
+  | .unspecified => "unspecified"
+
+end ContractionPolicy
+
+namespace ReductionPolicy
+
+/-- Stable report label for reduction order. -/
+def label : ReductionPolicy -> String
+  | .fixedLeft => "fixed-left"
+  | .fixedTree => "fixed-tree"
+  | .implementationDefined => "implementation-defined"
+  | .notApplicable => "n/a"
+  | .unspecified => "unspecified"
+
+end ReductionPolicy
+
+namespace NumericalPolicy
+
+/-- Compact representation used in execution audits. -/
+def reportLabel (policy : NumericalPolicy) : String :=
+  s!"round={policy.rounding.label},subnormal={policy.subnormals.label}," ++
+    s!"contract={policy.contraction.label},reduce={policy.reduction.label}"
+
+end NumericalPolicy
+
 /-- The four contract fields carried by every kernel capsule. -/
 inductive ContractObligationKind where
   | shape
@@ -163,15 +257,14 @@ structure KernelCapsule where
   op : BackendOp
   provider : Provider
   device : Device
-  specName : String
   trustLevel : TrustLevel
   supportsForward : Bool := true
   vjpMode : VJPMode := .none
-  runtimeSupport : RuntimeSupport := .eager
   shapeContract : ContractDescriptor
   layoutContract : ContractDescriptor
   valueContract : ContractDescriptor
   vjpContract : ContractDescriptor
+  numericalPolicy : NumericalPolicy := {}
   notes : String := ""
   deriving Repr
 
@@ -192,9 +285,21 @@ def contractsAligned (c : KernelCapsule) : Bool :=
 def sameIdentity (a b : KernelCapsule) : Bool :=
   a.name == b.name && a.op == b.op && a.provider == b.provider && a.device == b.device
 
-/-- Whether the trust policy admits this capsule. -/
+/-- Validate the common part of an eager executor request.
+
+This does not decide how an operation invokes a provider. It prevents every runtime operation from
+reimplementing the op, device, and wiring checks before interpreting the capsule locally.
+-/
+def validateEagerRequest (c : KernelCapsule) (op : BackendOp) (device : Device) :
+    Except String Unit := do
+  unless c.op == op do
+    throw s!"capsule `{c.name}` implements `{c.op.name}`, not `{op.name}`"
+  unless c.device == device do
+    throw s!"capsule `{c.name}` targets `{c.device.cliName}`, not `{device.cliName}`"
+
+/-- Whether the assurance policy admits this capsule. -/
 def allowedBy (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
-  cfg.trustPolicy.accepts c.trustLevel
+  cfg.assurance.acceptsTrust c.trustLevel
 
 /-- Whether the backend preference admits this capsule's provider. -/
 def matchesPreference (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
@@ -211,8 +316,8 @@ def matchesDevice (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
 Whether the capsule's gradient boundary is compatible with the requested execution config.
 
 `none` is inference mode, so any forward-capable capsule is suitable even when it also advertises a
-VJP. `externalAutograd` is intentionally opt-in. A native backend VJP is still compatible with the
-normal TorchLean tape mode: the TorchLean tape owns the node and calls the backend for the local VJP.
+VJP. A backend VJP is compatible with normal TorchLean tape mode: TorchLean still owns the node and
+calls the selected backend only for that local derivative computation.
 -/
 def matchesVJP (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
   if cfg.vjpMode == .none || !c.op.requiresVJP then
@@ -222,7 +327,6 @@ def matchesVJP (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
     | .none => true
     | .torchLeanTape => c.vjpMode == .torchLeanTape || c.vjpMode == .backendVJP
     | .backendVJP => c.vjpMode == .backendVJP
-    | .externalAutograd => c.vjpMode == .externalAutograd
 
 /-- Planner-side admissibility predicate for a single capsule. -/
 def admissible (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
@@ -231,10 +335,22 @@ def admissible (cfg : ExecutionConfig) (c : KernelCapsule) : Bool :=
 
 end KernelCapsule
 
-/-- Pick the first admissible capsule for a typed operation. -/
+/--
+Pick an admissible capsule for a typed operation.
+
+An `.only` preference filters the catalog through `admissible`. An `.auto` preference preserves
+catalog order. A `.prefer provider` request first searches that provider and then falls back to the
+ordinary catalog, so preference does not depend on module registration order.
+-/
 def chooseCapsuleFor? (cfg : ExecutionConfig) (op : BackendOp)
     (capsules : List KernelCapsule) : Option KernelCapsule :=
-  capsules.find? fun c => c.op == op && c.admissible cfg
+  let eligible := fun c => c.op == op && c.admissible cfg
+  match cfg.backend with
+  | .prefer provider =>
+      (capsules.find? fun c => eligible c && c.provider == provider).orElse fun _ =>
+        capsules.find? eligible
+  | .auto | .only _ =>
+      capsules.find? eligible
 
 end Backend
 end NN

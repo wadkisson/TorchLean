@@ -231,6 +231,67 @@ lemma approx_safeDiv_nf {x y : ℝ} {xR yR : R} {epsx epsy ε : ℝ}
 
   simpa [xhat, yhat] using this
 
+/-- Error budget for division with exact denominator lower bound `η` and denominator approximation
+error `epsy`. The caller must separately establish `epsy < η`; otherwise the rounded denominator
+may cross zero and no finite perturbation bound follows.
+-/
+def divPosErrorBound (η epsx epsy xhat yhat : ℝ) : ℝ :=
+  (1 / (η - epsy)) * epsx +
+    (abs xhat + epsx) * (epsy / ((η - epsy) * (η - epsy))) +
+    neuralUlp β fexp (xhat / yhat) / 2
+
+/-- Forward error for ordinary division when the exact denominator stays positively separated
+from zero and its approximation budget is smaller than that separation.
+
+The effective runtime margin is `η - epsy`: from `η ≤ y` and `|ŷ - y| ≤ epsy` we obtain
+`η - epsy ≤ ŷ`. The result is proved through the shared clamped-division analysis, after showing
+that neither the exact nor rounded denominator activates the clamp. This is the form needed by
+stable softmax and normalization, where a mathematical lower bound on a reduction must survive
+rounding before division is allowed.
+-/
+lemma approx_div_nf_of_pos_lb {x y : ℝ} {xR yR : R} {epsx epsy η : ℝ}
+    (hyLower : η ≤ y) (hbudget : epsy < η)
+    (hx : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR - x) ≤ epsx)
+    (hy : abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR - y) ≤ epsy) :
+    abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) - x / y) ≤
+      divPosErrorBound (β := β) (fexp := fexp) η epsx epsy
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
+        (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) := by
+  let margin : ℝ := η - epsy
+  let yhat : ℝ := toSpec (β := β) (fexp := fexp) (rnd := rnd) yR
+  have hepsy : 0 ≤ epsy :=
+    le_trans (abs_nonneg (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR - y)) hy
+  have hmargin : 0 < margin := by
+    dsimp [margin]
+    linarith
+  have hyhatLower : margin ≤ yhat := by
+    have hdiff : y - yhat ≤ epsy := by
+      calc
+        y - yhat ≤ abs (y - yhat) := le_abs_self _
+        _ = abs (yhat - y) := abs_sub_comm _ _
+        _ ≤ epsy := by simpa [yhat] using hy
+    dsimp [margin]
+    linarith
+  have hyMargin : margin ≤ y := by
+    dsimp [margin]
+    linarith
+  have hmaxHat : max (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR) margin =
+      toSpec (β := β) (fexp := fexp) (rnd := rnd) yR :=
+    max_eq_left (by simpa [yhat] using hyhatLower)
+  have hmaxReal : max y margin = y := max_eq_left hyMargin
+  have hruntime :
+      safeDivR (β := β) (fexp := fexp) (rnd := rnd) margin xR yR = xR / yR := by
+    simp only [safeDivR, safeDiv, hmaxHat]
+    rfl
+  have hspec : safeDiv (ε := margin) x y = x / y := by
+    simp [safeDiv, hmaxReal]
+  have hsafe :=
+    approx_safeDiv_nf (β := β) (fexp := fexp) (rnd := rnd)
+      (x := x) (y := y) (xR := xR) (yR := yR)
+      (epsx := epsx) (epsy := epsy) (ε := margin) hmargin hx hy
+  rw [hruntime, hspec] at hsafe
+  simpa [safeDiv, hmaxHat, margin, divPosErrorBound] using hsafe
+
 /--
 Per-entry bound tensor for `safeDiv`.
 
@@ -244,6 +305,110 @@ def safeDivBoundTensor {s : Shape} (ε epsx epsy : ℝ) (xR yR : Tensor R s) : S
         neuralUlp β fexp (safeDiv (ε := ε) a b) / 2)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
     (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
+
+/-- Per-entry budget for ordinary division on a certified positive denominator domain.
+
+Unlike `safeDivBoundTensor`, this definition does not change the operation by clamping its
+denominator. The accompanying theorem therefore requires `epsy < η`, ensuring that an exact lower
+bound `η ≤ y` remains positive after the denominator is rounded.
+-/
+def divPosBoundTensor {s : Shape} (η epsx epsy : ℝ)
+    (xR yR : Tensor R s) : SpecTensor s :=
+  map2Spec
+    (divPosErrorBound (β := β) (fexp := fexp) η epsx epsy)
+    (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)
+    (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yR)
+
+/-- Shape-generic forward error for ordinary elementwise division by positive denominators.
+
+The domain condition is stated over the exact tensor, while `epsy < η` certifies that every
+runtime denominator remains separated from zero. This is the reusable division rule for softmax,
+normalization, and positive quantization scales; callers do not need a rank-specific theorem.
+-/
+theorem approxT_div_spec_of_pos_lb {s : Shape} (η : ℝ) :
+    ∀ {xS yS : SpecTensor s} {xR yR : Tensor R s} {epsx epsy : ℝ},
+      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR epsx →
+      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) yS yR epsy →
+      Tensor.Forall (fun y : ℝ => η ≤ y) yS →
+      epsy < η →
+        approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+          (divSpec xS yS) (divSpec xR yR)
+          (linfNorm (divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+            (s := s) η epsx epsy xR yR)) := by
+  induction s with
+  | scalar =>
+      intro xS yS xR yR epsx epsy hx hy hdom hmargin
+      cases xS with
+      | scalar x =>
+          cases yS with
+          | scalar y =>
+              cases xR with
+              | scalar xR =>
+                  cases yR with
+                  | scalar yR =>
+                      have hx' := (approxT_scalar_iff (α := R)
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).mp hx
+                      have hy' := (approxT_scalar_iff (α := R)
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).mp hy
+                      have hdiv := approx_div_nf_of_pos_lb
+                        (β := β) (fexp := fexp) (rnd := rnd)
+                        (by simpa using hdom) hmargin hx' hy'
+                      apply (approxT_scalar_iff (α := R)
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).mpr
+                      change
+                        abs
+                            (toSpec (β := β) (fexp := fexp) (rnd := rnd) (xR / yR) -
+                              x / y) ≤
+                          abs
+                            (divPosErrorBound (β := β) (fexp := fexp) η epsx epsy
+                              (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR)
+                              (toSpec (β := β) (fexp := fexp) (rnd := rnd) yR))
+                      exact le_trans hdiv (le_abs_self _)
+  | dim n inner ih =>
+      intro xS yS xR yR epsx epsy hx hy hdom hmargin
+      cases xS with
+      | dim valuesXS =>
+          cases yS with
+          | dim valuesYS =>
+              cases xR with
+              | dim valuesXR =>
+                  cases yR with
+                  | dim valuesYR =>
+                      let bound := linfNorm
+                        (divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                          (s := .dim n inner) η epsx epsy
+                          (Tensor.dim valuesXR) (Tensor.dim valuesYR))
+                      have hbound : 0 ≤ bound := by
+                        simpa [bound] using
+                          (linf_norm_nonneg
+                            (t := divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                              (s := .dim n inner) η epsx epsy
+                              (Tensor.dim valuesXR) (Tensor.dim valuesYR)))
+                      refine approxT_dim_of_forall
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                        (xS := divSpec (Tensor.dim valuesXS) (Tensor.dim valuesYS))
+                        (xR := divSpec (Tensor.dim valuesXR) (Tensor.dim valuesYR))
+                        (eps := bound) hbound ?_
+                      intro i
+                      have hxI := approxT_dim_get (α := R)
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) hx i
+                      have hyI := approxT_dim_get (α := R)
+                        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) hy i
+                      have hlocal := ih hxI hyI (by simpa using hdom i) hmargin
+                      have hle :
+                          linfNorm
+                              (divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                                (s := inner) η epsx epsy (valuesXR i) (valuesYR i)) ≤ bound := by
+                        have h := linf_norm_le_get_dim
+                          (t := divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                            (s := .dim n inner) η epsx epsy
+                            (Tensor.dim valuesXR) (Tensor.dim valuesYR)) i
+                        change
+                          linfNorm
+                              (divPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                                (s := inner) η epsx epsy (valuesXR i) (valuesYR i)) ≤ bound at h
+                        exact h
+                      exact approxT_mono hlocal hle
 
 /--
 `approxT` bound for `safeDiv` lifted to arbitrary tensor shapes.

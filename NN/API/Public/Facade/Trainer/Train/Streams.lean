@@ -50,7 +50,7 @@ def trainStreamFloatWithRun {σ τ : Shape}
     (cudaMemWatch : Nat := 0)
     (onEval : Nat → String → (Tensor.T Float σ → IO (Tensor.T Float τ)) → IO Unit :=
       fun _ _ _ => pure ()) :
-    IO (Regression.StreamTrainResult σ τ) := do
+    IO (StreamTrainResult σ τ) := do
   let run := run.withOptions runtimeOpts
   let runner ←
     NN.API.TorchLean.Trainer.instantiateConfigured
@@ -107,7 +107,7 @@ def trainStreamFloat {σ τ : Shape}
     (cudaMemWatch : Nat := 0)
     (onEval : Nat → String → (Tensor.T Float σ → IO (Tensor.T Float τ)) → IO Unit :=
       fun _ _ _ => pure ()) :
-    IO (Regression.StreamTrainResult σ τ) :=
+    IO (StreamTrainResult σ τ) :=
   trainStreamFloatWithRun trainer runtimeOpts sampleAt evalSample trainer.runConfig trainOpts curveEvery
     cudaMemWatch onEval
 
@@ -144,7 +144,7 @@ def trainPairStreamFloat {σ₁ τ₁ σ₂ τ₂ : Shape}
     (trainOpts : TrainOptions := {})
     (curveEvery : Nat := 1)
     (cudaMemWatch : Nat := 0) :
-    IO (Regression.PairStreamTrainResult σ₁ τ₁ σ₂ τ₂) := do
+    IO (PairStreamTrainResult σ₁ τ₁ σ₂ τ₂) := do
   let firstRun := first.runConfig.withOptions runtimeOpts
   let secondRun := second.runConfig.withOptions runtimeOpts
   let firstRunner ←

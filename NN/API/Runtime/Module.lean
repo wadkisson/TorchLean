@@ -74,7 +74,8 @@ end RuntimeInit
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModule
   (create forward backward step initOptim stepWith params setParams trainSGD trainWith meanLoss)
 export _root_.Runtime.Autograd.TorchLean.Module.ScalarModuleDef
-  (instantiate instantiateFloat instantiateFloatWithRuntimePlan instantiateFloatWithRuntimeInit)
+  (forwardWithParams instantiate instantiateFloat instantiateFloatWithRuntimePlan
+   instantiateFloatWithRuntimeInit)
 
 /--
 Instantiate a `ScalarModuleDef` under explicit Torch options such as `backend` and `device`.
@@ -165,9 +166,7 @@ def parseDevice (value : String) : Except String NN.Backend.Device :=
 def requestsCuda : List String → Bool
   | [] => false
   | "--device=cuda" :: _ => true
-  | "--device=gpu" :: _ => true
   | "--device" :: "cuda" :: _ => true
-  | "--device" :: "gpu" :: _ => true
   | _ :: rest => requestsCuda rest
 
 /--
@@ -221,11 +220,16 @@ def parseAndStripWithDefaultDType (args : List String) (defaultDType : DType) :
   }, rest)
 
 /-- Convert a parsed CLI execution config to runtime `Options`. -/
-def toOptions (cfg : ExecConfig) (seed : Nat := 0) : Options :=
-  { backend := cfg.backend
-    seed := seed
-    device := cfg.device
-    showBackend := cfg.showBackend }
+def toOptions (cfg : ExecConfig) (seed : Nat := 0) : Except String Options := do
+  let profile ← match NN.Backend.BackendProfile.maintainedForDevice? cfg.device with
+    | some profile => pure profile
+    | none =>
+        throw s!"device `{cfg.device.cliName}` has no maintained runtime profile; use a programmatic backend profile"
+  pure
+    { backend := cfg.backend
+      seed := seed
+      executionProfile := profile
+      showBackend := cfg.showBackend }
 
 /-- Parse CLI flags with the standard TorchLean default dtype policy. -/
 def parseAndStrip (args : List String) : Except String (ExecConfig × List String) := do
@@ -236,7 +240,7 @@ def parseAndStrip (args : List String) : Except String (ExecConfig × List Strin
 def log (cfg : ExecConfig) : IO Unit := do
   DType.log cfg.dtype
   IO.println s!"[TorchLean] backend: {reprStr cfg.backend}"
-  IO.println s!"[TorchLean] device: {(toOptions cfg).deviceName}"
+  IO.println s!"[TorchLean] device: {cfg.device.cliName}"
 
 end ExecConfig
 
@@ -262,7 +266,9 @@ def withRuntime
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options := ExecConfig.toOptions cfg
+  let opts ← match ExecConfig.toOptions cfg with
+    | .ok opts => pure opts
+    | .error msg => throw <| IO.userError msg
   opts.validateForExecution
   match (← DType.withRuntime cfg.dtype (fun {α} _ _ _ _ => do
         k (α := α) (API.Runtime.ofFloat (α := α)) opts rest
@@ -290,7 +296,9 @@ def withModule
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options := ExecConfig.toOptions cfg
+  let opts ← match ExecConfig.toOptions cfg with
+    | .ok opts => pure opts
+    | .error msg => throw <| IO.userError msg
   opts.validateForExecution
   match cfg.dtype with
   | .float =>
@@ -330,7 +338,9 @@ def withModuleRuntime
     | .ok v => pure v
     | .error msg => throw <| IO.userError msg
   ExecConfig.log cfg
-  let opts : Options := ExecConfig.toOptions cfg
+  let opts ← match ExecConfig.toOptions cfg with
+    | .ok opts => pure opts
+    | .error msg => throw <| IO.userError msg
   opts.validateForExecution
   match cfg.dtype with
   | .float =>
@@ -486,7 +496,9 @@ def run
       if cfg.dtype != .float then
         throw <| IO.userError s!"{exeName}: this program only supports `--dtype float`"
       ExecConfig.log cfg
-      let opts : Options := ExecConfig.toOptions cfg seed
+      let opts ← match ExecConfig.toOptions cfg seed with
+        | .ok opts => pure opts
+        | .error msg => throw <| IO.userError msg
       opts.validateForExecution
       runOpts.printBanner opts
       k opts rest

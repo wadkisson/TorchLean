@@ -30,8 +30,9 @@ mathematical statement" into one sentence.
 
 The backend planner and capsule vocabulary are documented in the
 [Installation guide](https://lean-dojo.github.io/TorchLean/installation/#devices-providers-and-kernel-capsules).
-It describes how TorchLean names native CUDA, LibTorch, ATen, and future platform providers before
-a runtime path uses them.
+It describes how TorchLean names native CUDA, LibTorch, and future platform providers before
+a runtime path uses them. Capsule modules may extend a backend profile, but the ordinary alignment,
+availability, trust-policy, and VJP gates apply to every contributed capsule.
 
 ## Lean Axioms
 
@@ -154,8 +155,38 @@ Important examples include:
 
 - `NN/Floats/IEEEExec/` proves and implements a deterministic IEEE-style executable model for many
   core operations.
+- `NN/Proofs/RuntimeApprox/Graph/NumericalCertificate.lean` checks graph-wide binary32 interval
+  traces against the canonical `NN.IR.Graph`. It rebuilds ranges rather than trusting claimed
+  endpoints, rejects non-finite replay values, and re-runs backend planning before accepting the
+  embedded execution audit. A `CheckedCertificate` stores the exact graph checked, and
+  `executeIEEE32` can replay only that stored graph.
 - Transcendental functions such as `exp`, `log`, and `tanh` are deterministic approximations unless
   a file states a stronger theorem for a specific operation.
+
+Kernel capsules now record four numerical choices: rounding, subnormal handling, contraction/FMA,
+and reduction order. These fields are audited contract data, not proof evidence. Portable reference
+accumulations advertise their fixed left fold. Native CUDA and LibTorch matrix products, convolutions,
+normalizations, pooling operations, FFT/FNO paths, scans, and attention advertise
+implementation-dependent reductions. Consequently, the fixed-left graph certificate refuses to
+reuse its transfer for those accelerated paths. A theorem about such a path needs either a
+backend-specific schedule or the order-independent enclosure from
+`NN/Floats/IEEEExec/Reductions.lean`.
+
+For a checked replay, interval validity proves that each endpoint is finite and ordered. The replay
+also checks every computed entry for finiteness. `CheckedRealExecution` separately proves that the
+exact-real denotation of the stored graph lies in the same trace. Pairing it with a checked bit-level
+execution through `CheckedExecution.errorTrace` gives the pointwise interval-width bound for every
+intermediate. This is a theorem about the `IEEE32Exec` replay. Transporting it to Lean runtime
+`Float32`, CUDA, LibTorch, cuBLAS, or cuDNN still requires the agreement recorded by that backend's
+capsule.
+
+The proof-bearing `RevGraph` path has rounded forward and VJP theorems and erases to executable
+autograd `GraphData`. One optimizer contract carries those gradient bounds through SGD,
+momentum-SGD, and AdamW; AdamW supplies additional positivity and denominator-margin evidence at
+each step. These are Lean theorems about the `NF` rounded-real scalar model. The canonical
+`NN.IR.Graph` compiler currently proves forward semantic preservation only. It must not be cited as
+an autograd or backward-certificate theorem until an autograd-capable lowering and correspondence
+proof are added.
 
 Use the float layers as follows:
 
@@ -166,17 +197,15 @@ Use the float layers as follows:
 | precision-parametric rounding theorem | `NN/Floats/NeuralFloat` |
 | endpoint interval enclosure | `NN/Floats/Interval` |
 | external high-precision enclosure evidence | `NN/Floats/Arb` plus the oracle boundary |
-| runtime CUDA/ATen/Lean `Float` behavior | runtime bridge or trust-boundary statement |
+| runtime CUDA/LibTorch/Lean `Float` behavior | runtime bridge or trust-boundary statement |
 
 ## External Numeric Oracles
 
-- ATen/libtorch may be used as an external forward-kernel provider for selected runtime paths. In
-  inference/no-grad mode, that means the returned value is trusted under the stated runtime
-  agreement assumption. In training mode, TorchLean should still record the TorchLean graph/tape
-  node and use the TorchLean backward rule; otherwise the run has crossed into libtorch autograd and
-  no longer has the same proof boundary. ATen backward, libtorch `requires_grad`, gradient
-  extraction, and optimizer handoff are separate external-backend assumptions unless a future module
-  explicitly checks or proves them.
+- LibTorch may be used as an external forward-kernel provider for selected runtime paths. The
+  maintained LibTorch-forward attention capsule returns the forward value, records the ordinary
+  TorchLean tape node, and uses TorchLean's local VJP. The forward value is still trusted under the
+  capsule's runtime agreement assumption. TorchLean does not maintain a LibTorch-autograd profile;
+  tape ownership, gradient extraction, and optimizer handoff remain in the TorchLean runtime.
 - CROWN/Lyapunov certificate generation is an external evidence producer when used through the
   oracle-backed workflow. Lean isolates that assumption behind `crown_oracle`; theorem claims should
   state exactly which certificate predicate was checked and which external completeness assumption is

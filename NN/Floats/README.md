@@ -30,7 +30,7 @@ Executable examples that exercise this infrastructure live under `NN/Examples/`.
 | the mantissa and exponent produced by a rounding operation | `Calc`, specialized through `FP32` when appropriate |
 | interval enclosures with directed endpoints | `Interval` |
 | high-precision external enclosure evidence | `Arb`, with the oracle boundary named |
-| CUDA, ATen/libtorch, or Lean runtime `Float` | a runtime bridge or `TRUST_BOUNDARIES.md` assumption |
+| CUDA, LibTorch, or Lean runtime `Float` | a runtime bridge or `TRUST_BOUNDARIES.md` assumption |
 
 This distinction is part of the correctness story. A theorem over `FP32` does not become a CUDA
 claim until a runtime bridge or trust-boundary statement connects the executable path to that model.
@@ -56,7 +56,10 @@ Why we keep it:
 Where to look:
 - `NN/Floats/IEEEExec/Exec32.lean`: the core executable kernel (`IEEE32Exec`),
 - `NN/Floats/IEEEExec/Rules/SpecialRules.lean`: NaN/Inf propagation rules,
-- `NN/Floats/IEEEExec/Reductions.lean`: reduction semantics (sums/dot products) that match deployment realities.
+- `NN/Floats/IEEEExec/Reductions.lean`: reduction semantics (sums/dot products) that match deployment realities,
+- `NN/Floats/IEEEExec/Bridge/FP32/Core.lean`: finite bit-pattern representability in `fexp32`,
+- `NN/Floats/IEEEExec/Bridge/FP32/Ops.lean`: arithmetic refinement and executable exact subtraction,
+- `NN/Floats/IEEEExec/Bridge/FP32/Ulp.lean`: executable ULP exponents and absorption soundness.
   (For executable endpoint-interval arithmetic, see `NN/Floats/Interval/IEEEExec32.lean`.)
 
 ### 2. `FP32` (Finite Real Rounded Float32 Model)
@@ -75,6 +78,7 @@ Why we keep it:
 Where to look:
 - `NN/Floats/FP32/Core.lean`: the main definitions,
 - `NN/Floats/FP32/Error.lean`: error bounds,
+- `NN/Floats/FP32/Sterbenz.lean`: exact subtraction for nearby representable operands,
 - `NN/Floats/Interval/FP32.lean`: interval-style enclosure corollaries.
 
 ### 3. `NeuralFloat` / `NF` (Generic Format And Error Analysis)
@@ -93,8 +97,8 @@ Where to look:
 - `NN/Floats/NeuralFloat/Format.lean` for representable grids,
 - `NN/Floats/NeuralFloat/Rounding.lean` for rounding semantics,
 - `NN/Floats/NeuralFloat/Scalar.lean` for `NF`,
-- `NN/Floats/NeuralFloat/Scalar/Conversion.lean` for affine quantization and its code-range,
-  round-trip, monotonicity, and reconstruction-error theorems,
+- `NN/Floats/Quantization.lean` for affine scalar and tensor quantization,
+- `NN/Floats/NeuralFloat/Analysis/SterbenzFLT.lean` for exact subtraction with gradual underflow,
 - `NN/Floats/NeuralFloat/Analysis.lean` and `NN/Floats/NeuralFloat/Error.lean` for numerical bounds.
 
 ## How The Bridge Layers Fit Together
@@ -138,7 +142,7 @@ coarser grid.
 rounded-real and executable IEEE paths. Its theorems expose the computed mantissa/exponent result on
 both sides of the finite bridge.
 
-For native CUDA and ATen/libtorch paths, the bridge is not in this folder by default. Those backends
+For native CUDA and LibTorch paths, the bridge is not in this folder by default. Those backends
 are runtime providers. A proof layer float claim should say which Lean model it uses and where the
 runtime/backend agreement assumption is discharged or documented.
 

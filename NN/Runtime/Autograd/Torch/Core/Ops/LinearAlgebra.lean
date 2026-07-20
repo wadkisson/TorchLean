@@ -67,13 +67,13 @@ def bmm {α : Type} (s : EagerSession α) [Add α] [Mul α] [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .bmm
+    let _ ← requireNativeCudaCapsule s .matmul
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.bmm (t := t0) (batch := batch) (m := m) (n := n) (p := p) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .bmm cpu cuda
+  dispatchCudaOpt (α := α) s .matmul cpu cuda
 
 /-- Concatenate two vectors along dim 0. PyTorch: `torch.cat([a,b], dim=0)`. -/
 def concatVectors {α : Type} (s : EagerSession α) [Context α]
@@ -89,13 +89,13 @@ def concatVectors {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .concatVectors
+    let _ ← requireNativeCudaCapsule s .concat
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.concatVectors (t := t0) (n := n) (m := m) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .concatVectors cpu cuda
+  dispatchCudaOpt (α := α) s .concat cpu cuda
 
 /-- Concatenate along dim 0 for tensors with leading dimension. PyTorch: `torch.cat(..., dim=0)`. -/
 def concatLeadingAxis {α : Type} (s : EagerSession α) [DecidableEq Shape]
@@ -110,13 +110,13 @@ def concatLeadingAxis {α : Type} (s : EagerSession α) [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .concatLeadingAxis
+    let _ ← requireNativeCudaCapsule s .concat
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.concatLeadingAxis (t := t0) (n := n) (m := m) (s := sh) a.id b.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .concatLeadingAxis cpu cuda
+  dispatchCudaOpt (α := α) s .concat cpu cuda
 
 /-- Slice along dim 0: `x[start:start+len]`. PyTorch: standard slicing. -/
 def sliceLeadingAxisRange {α : Type} (s : EagerSession α) [Zero α] [DecidableEq Shape]
@@ -130,13 +130,13 @@ def sliceLeadingAxisRange {α : Type} (s : EagerSession α) [Zero α] [Decidable
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .sliceLeadingAxisRange
+    let _ ← requireNativeCudaCapsule s .slice
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.sliceLeadingAxisRange (t := t0) (n := n) (s := sh) x.id start len h
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .sliceLeadingAxisRange cpu cuda
+  dispatchCudaOpt (α := α) s .slice cpu cuda
 
 end EagerSession
 

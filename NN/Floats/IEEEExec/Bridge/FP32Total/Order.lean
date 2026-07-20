@@ -11,29 +11,11 @@ public import NN.Floats.IEEEExec.Bridge.FP32Total.Core
 /-!
 # Total FP32 Bridge: Ordering
 
-“Total” bridge theorems combining:
+This module relates executable IEEE comparisons to real order when the operands are finite. It
+keeps unordered NaN cases explicit rather than coercing every bit pattern into `ℝ`; signed zeros,
+which have distinct encodings but equal real values, are handled by the IEEE comparison rules.
 
-- `IEEE32Exec`'s proved NaN/Inf propagation rules, and
-- the `FP32`-on-`ℝ` refinement theorems for the finite/no-overflow branch (`Bridge/FP32.lean`).
-
-The key end-user view is `toReal?`:
-- `toReal? x = none` for NaN/Inf,
-- `toReal? x = some r` for finite values, with `r : ℝ`.
-
-In most of TorchLean, the finite path is treated as real arithmetic + float32 rounding while
-special-value behavior is kept explicit. This file packages that split in one place.
-
-The per-op lemmas are phrased in the style:
-
-`toReal? (op …) = if isFinite (op …) then some (fp32Round …) else none`.
-
-That makes the trust boundary readable at the call site: the `if` is exactly where NaN/Inf (or
-overflow-to-Inf) can occur.
-
-Background references (for float32 rounding/special values):
-- IEEE 754-2019: https://doi.org/10.1109/IEEESTD.2019.8766229
-- Goldberg (1991): https://doi.org/10.1145/103162.103163
-- Flocq (Boldo–Melquiond, 2011): https://doi.org/10.1109/ARITH.2011.40
+See `FP32Total.Core` for the total bridge convention and references.
 -/
 
 @[expose] public section

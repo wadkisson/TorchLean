@@ -7,12 +7,19 @@ open Verso.Genre Manual
 tag := "certificates"
 %%%
 
-A certificate is a finite artifact that lets Lean check a larger verification claim without relying
-on the entire search procedure that produced it.
+A certificate is useful when producing an answer is expensive but checking the answer can be made
+small. A branch-and-bound verifier may explore thousands of subdomains, optimize relaxation
+parameters, and use GPU kernels. Lean need not replay that entire search if the producer emits
+enough evidence for a compact checker.
 
-The producer may be α,β-CROWN, a branch-and-bound verifier, a scientific solver, or a Python
-script. The checker asks three questions: what finite object was returned, what local conditions
-does Lean validate, and what theorem turns acceptance into a semantic claim?
+For every certificate format, ask three questions:
+
+1. What finite object did the producer return?
+2. Which conditions does Lean recompute?
+3. Which theorem turns acceptance into the final semantic claim?
+
+The third question matters most. A perfectly parsed file can still contain a number that was never
+proved to bound the network.
 
 TorchLean does not vendor the Two-Stage / α,β-CROWN repository. The core Lean build does not
 require that Python environment. Generating fresh α,β-CROWN leaf artifacts requires external verifier
@@ -31,7 +38,7 @@ stated prune rule, and the fields fit together. The numeric bound propagation th
 `lb` belongs to the external producer unless a separate recompute-and-compare certificate path is
 added.
 
-The path is:
+The concrete path is:
 
 - α,β-CROWN performs branch and bound outside Lean;
 - the producer exports or exposes terminal leaf domains;
@@ -40,14 +47,46 @@ The path is:
 - Lean checks the structural predicate for each leaf;
 - the checker accepts or rejects the artifact.
 
-A few terms will help keep the certificate layers straight:
+Here, `verified` or `pruned` means that a represented leaf passes the producer's exported local
+test. It does not yet mean that Lean has proved the neural-network property on the root box.
 
-- `certificate`: an artifact produced outside Lean that Lean can parse and check.
-- `leaf artifact`: exported per-subdomain data from a branch-and-bound run.
-- `verified` / `pruned`: here, a leaf passes the solver's local check and can be removed
-  from the search tree.
-- `producer hypothesis`: the part supplied by the external solver when Lean checks only the exported
-  artifact rather than recomputing the bound.
+# Run The Bundled Checker
+
+The sample artifact contains one two-dimensional leaf. Its box equals the declared root, its
+exported lower bound is `1.0`, and its threshold is `0.0`.
+
+```
+lake exe verify -- abcrown-leaf
+```
+
+Lean reports:
+
+```
+[artifact] Checked 1 leaves: ok=1, bad=0
+```
+
+To see what was actually checked, make a temporary copy whose threshold is larger than the
+exported lower bound:
+
+```
+jq '.leaves[0].threshold=[2.0] | .leaves[0].witness_margin=-1.0' \
+  NN/Examples/Verification/AbCrown/sample_abcrown_leaf_artifact_v0_1.json \
+  > /tmp/torchlean_bad_leaf.json
+
+lake exe verify -- abcrown-leaf /tmp/torchlean_bad_leaf.json
+```
+
+The command exits unsuccessfully:
+
+```
+[artifact] Checked 1 leaves: ok=0, bad=1
+uncaught exception: Artifact failed checks for 1 leaves
+```
+
+This is a useful failure: the JSON is valid, but the claimed witness no longer satisfies the prune
+inequality. Try two other changes. Move a leaf coordinate outside the root box; then replace one
+numeric field by an infinite value. Both should be rejected before the artifact can be treated as
+checked evidence.
 
 The checked predicate is small enough to write informally: a leaf is accepted when its box lies
 inside the root box, its dimensions are coherent, and it has a witness index whose exported lower
@@ -88,31 +127,27 @@ the top level metadata is coherent. It does not turn a set of leaves into a root
 coverage of the root by those leaves is separately supplied and checked. In this fragment, the
 certificate is structural.
 
-# What The Checker Proves Today
+# Three Levels Of Checking
 
-This `v0.1` format stays small. Lean checks that every leaf domain sits inside the declared
-root input box, that every leaf marked as verified really satisfies the solver's own prune test
-(`∃ i, lb[i] > threshold[i]`), and that the JSON is internally consistent enough for downstream
-tooling to rely on it.
+The `v0.1` format intentionally stops at structural checking. Lean checks that every represented
+leaf lies inside the root box, that dimensions and arrays agree, that numeric fields are finite,
+and that every leaf's witness satisfies `∃ i, lb[i] > threshold[i]`.
 
 The current artifact checks `lb_i > threshold_i` for an exported lower bound. A stronger artifact
 would also check that `lb_i` is a sound lower bound for the graph on the leaf.
 
-If we later add a recompute path, the stronger predicate would recompute the bound for the network
-on the leaf box, compare that recomputed bound with the exported `lb`, and then check the same
-margin witness.
+There are three progressively stronger designs:
 
-That would move more work from the external solver into Lean's checker. The current JSON format was
-kept focused so the first boundary is clear.
+- *Structural checking:* the artifact is self-consistent and each exported witness passes its
+  stated arithmetic test. This is what `abcrown-leaf` provides.
+- *Recompute and compare:* the artifact contains a network and enough node data for Lean to
+  reproduce the bound calculation, then compare the result with the exported `lb`. TorchLean's
+  node-certificate checkers move in this direction, but use `Float` values and tolerances.
+- *Proof-backed soundness:* checker acceptance supplies the exact hypotheses of a theorem that
+  encloses the graph semantics. This requires a proved local transfer for every supported
+  operator, plus a compiler correspondence and any required floating-point bridge.
 
-There are therefore three levels of confidence to keep straight:
-
-- structural checking: the artifact is self-consistent.
-- recompute-and-compare checking: Lean can reproduce the arithmetic.
-- full soundness: Lean also checks the bound computation that produced the artifact.
-
-Those levels are not a weakness of certificates. They let the project increase the amount checked by
-Lean without changing the surrounding workflow.
+The levels can share one producer workflow, but they support different public claims.
 
 # Lean Entry Points
 
@@ -223,10 +258,14 @@ Example:
 lake exe verify -- abcrown-leaf
 ```
 
-The checker also runs on the bundled sample artifact when invoked with the tool's default input.
+With no path, the command uses the bundled sample. With a path, it checks that artifact instead.
+Run `lake exe verify -- list` to see the other registered certificate and workflow checkers,
+including LiRPA, PINN, spline, logit-margin, and TorchLean-to-IR robustness paths.
 
-End-to-end Python plus Lean post-check: *Two-Stage Workflows*. What TorchLean proves vs imports:
-*Verification*.
+The leaf command is intentionally modest: it answers whether the exported leaf document satisfies
+the `v0.1` structural contract. The neural-network verification chapter gives the theorem chain
+needed for a semantic robustness result, while the two-stage chapter shows where an external
+producer enters that chain.
 
 # References
 

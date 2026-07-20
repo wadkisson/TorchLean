@@ -2,280 +2,325 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "A Tour of the API" =>
+#doc (Manual) "A First Walk Through The API" =>
 %%%
 tag := "api_tour"
 %%%
 
-Read TorchLean's public API by following one model as it changes roles. At first, the code looks
-familiar: tensors, layers, losses, optimizers, and training loops. The difference is what TorchLean
-keeps around when the same model is trained, lowered to a graph, inspected, exported, or checked.
+The shortest useful TorchLean import is:
 
-A tensor carries its shape. A model carries an input and output contract. A parameter payload is
-ordinary data. A lowered graph has named operations and node ids. A certificate is checked against
-the graph rather than treated as a comment beside it.
+```
+import NN.API
 
-A typical workflow looks like this:
+open TorchLean
+```
 
-1. instantiate tensors and a model,
-2. build parameters and run a training loop,
-3. inspect the run through logs or graphs,
-4. import or export a named artifact when Python belongs in the workflow,
-5. state a claim about the resulting model and check the artifact that supports it.
+It gives application code five main places to begin:
 
-The application entry point is `import NN.API`. The complete `NN` umbrella and the focused
-subsystem imports become relevant when a chapter asks a more precise question about runtime
-execution, graphs, floating point, proofs, or verification.
+- `Tensor` for shape-indexed tensor values and constructors;
+- `nn` for layers, blocks, model families, and seeded initialization;
+- `Data` for in-memory datasets, loaders, checkpoints, and text helpers;
+- `optim` for optimizer configurations;
+- `Trainer` for prediction, training, summaries, and the public verification bridge.
 
-The API is intentionally layered. Most users should start with the public names and only descend
-when the question demands it. A training tutorial can stay with `Tensor`, `nn`, `data`, `optim`, and
-`Trainer`. A graph-inspection chapter opens the IR. A certificate chapter opens the verifier and
-bound-propagation code. This keeps the common path readable while still leaving precise objects for
-proof-oriented work.
+We will take those names in order and use each one once. Every command below runs from the
+repository root.
 
-Here is the map:
+# First Contact: Print A Few Tensors
 
-- When the user writes a tensor literal, TorchLean keeps the scalar type and shape.
-- When the user builds a model, TorchLean keeps the architecture and parameter shapes.
-- When the user runs training, TorchLean keeps parameter state, optimizer state, random state, and logs.
-- When the user lowers a graph, TorchLean keeps operation names, node ids, parent links, and payloads.
-- When the user checks a certificate, TorchLean keeps the checker predicate and scalar semantics.
+Run:
 
-# Public Names And Lower Names
+```
+lake exe torchlean quickstart_tensors
+```
 
-The public API prefers names that describe the ML task. The lower layers prefer names that describe
-the semantic object being manipulated. Both are useful.
+The checked-in example prints:
+
+```
+== Quickstart: tensor basics ==
+[Float] [0.100000, 0.200000, 0.300000, 0.400000]
+[ℚ] [1/10, 1/5, 3/10, 2/5]
+[Int] [1, 2, 3, 4]
+[IEEE32Exec] [0.100000, 0.200000, 0.300000, 0.400000]
+[Float] [[[1.000000, 2.000000], [3.000000, 4.000000]],
+         [[5.000000, 6.000000], [7.000000, 8.000000]]]
+Expected failure printing Tensor ℝ: Refusing to print `Tensor ℝ` ...
+```
+
+The same tensor structure can carry several scalar types. `Float` is Lean's executable host
+floating type. `ℚ` is exact rational arithmetic. `IEEE32Exec` is TorchLean's executable bit-level
+binary32 model. `ℝ` is useful in specifications and proofs, but arbitrary real values do not have a
+general executable printer.
+
+Open
+[`NN/Examples/Quickstart/TensorBasics.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean)
+and find the definitions of `xF`, `xQ`, and `x32`. The values look alike when printed, but their
+types select different arithmetic.
+
+# Build A Small File Of Your Own
+
+Create `Tour.lean` at the repository root:
 
 ```
 import NN.API
 
 open TorchLean
 
--- Public authoring layer: compact model construction.
-def publicMlp : nn.M (nn.Sequential (.dim 8 .scalar) (.dim 3 .scalar)) :=
+def point : Tensor.T Float (shape![2]) :=
+  tensorOfList! [2] [0.25, -0.75]
+
+def model : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
   nn.Sequential![
-    nn.Linear 8 16,
-    nn.ReLU,
-    nn.Linear 16 3
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
   ]
 
--- Interactive inspection: ask Lean what object was built.
-#check publicMlp
+def initialized :=
+  nn.run 2026 model
+
+#eval Tensor.pretty point
+#eval IO.println (nn.info initialized)
 ```
 
-`NN.IR.Graph`, `NN.Spec`, `NN.MLTheory.CROWN`, and `NN.Verification` shift the question from "how do
-I build and run this model?" to "what does this artifact mean?"
-
-# Tensors And Models
-
-The first visible difference from ordinary Python model code is that tensor shapes appear in the
-Lean type. A value of type `Tensor Float (shape![32, 1])` is not interchangeable with a value of
-type `Tensor Float (shape![32])`; a reshape, squeeze, or different loss must be named explicitly.
+Run it:
 
 ```
-import NN.API
-
-open TorchLean
-
-def logits : Tensor.T Float (shape![32, 1]) :=
-  tensorOfList! [32, 1] (List.replicate 32 0.0)
-
-def labels : Tensor.T Float (shape![32]) :=
-  tensorOfList! [32] (List.replicate 32 0.0)
-
--- A loss expecting matching shapes cannot silently reinterpret `labels`.
+lake env lean Tour.lean
 ```
 
-Broadcasting is sometimes intended, but a training loss with predictions shaped `[batch, 1]` and
-targets shaped `[batch]` is often a modeling bug. TorchLean does not guess whether the right
-convention is one-hot encoding, a singleton dimension squeeze, a different loss, or a different
-model head.
-
-The same shape discipline appears at the model level. A compact classifier states its input and output
-shapes before it ever runs:
+The expected output is:
 
 ```
-def classifier : nn.M (nn.Sequential (.dim 16 .scalar) (.dim 4 .scalar)) :=
-  nn.Sequential![
-    nn.Linear 16 32,
-    nn.GELU,
-    nn.Linear 32 4
+"[0.250000, -0.750000]"
+Sequential: [2] -> [1], layers=3, params=33
+  [0] Linear(2, 8): [2] -> [8] params=24 [[8, 2], [8]]
+  [1] ReLU: [8] -> [8] params=0 []
+  [2] Linear(8, 1): [8] -> [1] params=9 [[1, 8], [1]]
+```
+
+The summary accounts for every scalar parameter:
+
+$$`8\cdot2+8+1\cdot8+1=33`.
+
+It also exposes the ordered payload shapes. A later compiler or checkpoint adapter must provide
+weights and biases in this order and with these shapes.
+
+As a quick experiment, change the hidden width from `8` to `12` in both linear layers. Before
+running Lean, predict the parameter count:
+
+$$`12\cdot2+12+1\cdot12+1=49`.
+
+The model summary should confirm `params=49`.
+
+# Tensor Constructors
+
+TorchLean offers two useful styles for fixed data. `tensorOfList!` takes dimensions and a flat
+row-major list:
+
+```
+def matrix : Tensor.T Float (shape![2, 3]) :=
+  tensorOfList! [2, 3] [
+    1.0, 2.0, 3.0,
+    4.0, 5.0, 6.0
   ]
 ```
 
-Tensor constructors, literals, and model builders are exported by
-[`NN.API`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API.lean).
-
-# Parameters Are Part Of The Interface
-
-In a proof-aware workflow, parameters are not just implementation details. A trained payload is the
-difference between a family of networks and one concrete network. TorchLean therefore treats the
-payload as data that can be initialized, saved, imported, lowered with a graph, and checked against
-shape expectations.
-
-This distinction is especially useful when a paper or report says "the model was verified." Usually
-the intended object is not merely an architecture such as "two-layer MLP." It is:
-
-$$`\text{architecture} + \text{parameter payload} + \text{input convention}
-  + \text{scalar semantics}`
-
-Leaving out the payload turns a concrete verification claim into a family-level statement that is
-almost certainly false. Leaving out the input convention can make a true post-normalization claim
-look like a raw-data claim. Leaving out scalar semantics can confuse a real-valued proof with a
-float32 execution result.
-
-# Building And Training
-
-In TorchLean, model structure and parameters are separate values. Building a model chooses an
-initial parameter payload, but it does not make those parameters hidden fields of a mutable object.
+The nested `tensor!` syntax mirrors the visible dimensions:
 
 ```
-def task (seed : Nat) :=
-  Trainer.new classifier { task := .classification, seed := seed }
+def sameMatrix : Tensor.T Float (shape![2, 3]) :=
+  tensor! [
+    [1.0, 2.0, 3.0],
+    [4.0, 5.0, 6.0]
+  ]
 ```
 
-That separation makes a training step an explicit state transition:
+Both constructors check their dimensions. `Tensor.vector` is convenient when the length should be
+inferred from a list:
 
-$$`\mathrm{step} :
-  (\theta,\mathrm{optState},\mathrm{rng},\mathrm{mode},x,y)
-  \longmapsto
-  (\theta',\mathrm{optState}',\mathrm{rng}',\mathrm{log})`
+```
+def inferred := Tensor.vector (α := Float) [1.0, 2.0, 3.0]
 
-The state may be large, but it is no longer implicit. Parameters, optimizer moments, random seeds,
-training/evaluation mode, and metric reports are all ordinary data that can be passed, saved,
-loaded, displayed, or mentioned in a theorem statement.
+#check inferred
+-- inferred : Tensor.T Float (shape![3])
+```
 
-The training API follows the familiar pattern:
+Use an explicit type when the shape belongs to an interface. Use inference for local data whose
+length is already clear from the value.
 
-- `Trainer.new model { task := ... }` chooses the task,
-- the trainer config carries optimizer, dtype, backend, and device,
-- `Trainer.TrainOptions` carries training choices such as steps and logging,
-- `trainer.train data trainOptions` is the normal training entrypoint,
-- `optim.sgd`, `optim.adam`, and `optim.adamw` construct optimizer configurations.
+# Turn Rows Into A Dataset
 
-Manual callbacks and explicit step loops live under `Trainer.Manual`; ordinary tutorials should not
-need them. Those names live behind the same public API, with implementation details in the
-[training runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train.lean) and the
-[runtime optimizer definitions](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/Optim.lean).
+A supervised dataset pairs one input tensor with one target tensor. Add to `Tour.lean`:
 
-# A Step Is Not A Theorem
+```
+def xs : Tensor.T Float (shape![4, 2]) :=
+  tensorOfList! [4, 2] [
+    0.0, 0.0,
+    0.0, 1.0,
+    1.0, 0.0,
+    1.0, 1.0
+  ]
 
-Running a training step computes new parameters. It does not prove that the model is accurate,
-robust, or even useful. That sounds obvious, but documentation often blurs the categories by
-describing a successful run as "verified" because it passed a suite of checks.
+def ys : Tensor.T Float (shape![4, 1]) :=
+  tensorOfList! [4, 1] [0.2, 1.0, 1.0, 1.8]
 
-TorchLean keeps the categories separate:
+def dataset : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
+  Data.tensorDataset xs ys
 
-- the training API executes an optimization procedure;
-- the logging API records what happened;
-- graph checks validate structural properties such as well-formedness and shapes;
-- theorem files state and prove semantic properties for supported fragments.
+#check dataset
+```
 
-This separation is what lets a later theorem cite the trained payload without treating the training
-run itself as a proof of the final property.
+The outer dimension `4` counts examples. `Data.tensorDataset` removes that common batch axis from
+the sample types, so each input has shape `[2]` and each target has shape `[1]`.
 
-# Inspecting Runs
+Try changing the declared type of `ys` to `shape![4]` while leaving `dataset` unchanged. Lean
+rejects the dataset because its target samples would be scalars rather than length-one vectors. This
+is the same distinction the model output type makes.
 
-A runnable model should not become opaque after it trains. TorchLean keeps several inspection
-tools close to the training path:
+For large data, application code does not need to place every value in a source literal. `Data`
+also exposes CSV, NPY, image, token-stream, batching, shuffling, and checkpoint helpers. The shape
+conversion still occurs at a named boundary: runtime dimensions are checked before values enter a
+statically shaped dataset.
 
-- structured training logs, persisted as ordinary JSON, are defined by the
-  [training log API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Training/Log.lean);
-- logger hooks for training loops are defined by the
-  [training logger API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Train/Logging.lean);
-- widgets can display tensors, logs, execution traces, and IR graphs through the
-  [widget import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Widgets.lean).
+# Configure A Trainer
 
-Logs and graphs are audit artifacts. A loss curve records which run was performed, while a lowered
-graph records which operations a verifier or compiler is about to interpret.
+Add:
 
-# Graphs, Export, And Import
+```
+def trainer : Trainer (.dim 2 .scalar) (.dim 1 .scalar) :=
+  Trainer.new model
+    { task := .regression
+      optimizer := optim.adam { lr := 0.03 }
+      seed := 2026 }
 
-The public model API is comfortable for writing models. Verification and interop need a more
-explicit object: a graph whose nodes name their operations, together with a payload store.
-[NN.IR.Graph](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR/Graph.lean) is that object. Its denotation is the semantic reference used by graph
-checkers, widgets, compiler bridges, and verifier passes.
+#check trainer
+```
 
-The PyTorch boundary follows the same discipline. The supported path is a compact contract:
+`Trainer.new` materializes the seeded builder and returns a handle carrying:
 
-$$`\text{known architecture family}
-\;+\;
-\text{named tensor payload}
-\;+\;
-\text{shape checks}
-\quad\leadsto\quad
-\text{TorchLean parameters}`
+- the checked model;
+- the loss task;
+- optimizer and runtime settings;
+- the initialization seed.
 
-That contract is implemented by the [PyTorch export](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Export.lean) and
-[PyTorch import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/PyTorch/Import.lean) APIs, with runnable examples in the
-[PyTorch interop tutorial](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Interop/PyTorch.lean). Python can remain the right tool
-for data preparation or large-scale training, while Lean receives a payload with names, shapes, and
-model family assumptions it can check.
+The default execution profile is checked CPU, using the eager runtime and host `Float`. A trainer
+configuration may instead select the compiled runtime, executable IEEE binary32, or another backend
+profile. Device and provider selection are runtime concerns; they do not change the model's input
+and output shapes.
 
-The wider ecosystem has similar graph-export pressures. PyTorch's
-[`torch.export`](https://docs.pytorch.org/docs/main/user_guide/torch_compiler/export.html) aims to
-capture a full graph representation for deployment and ahead-of-time workflows. ONNX describes an
-open format for representing machine-learning models. TorchLean's graph layer is not trying to
-replace those systems as an interchange standard. It is narrower: the graph is a Lean object with
-operations, shape information, payload links, and denotational hooks that later proof and checker
-code can cite.
+Training options belong to the call:
 
-# Verification Claims
+```
+def options : Trainer.TrainOptions :=
+  { steps := 200
+    batchSize := 4
+    logEvery := 25 }
+```
 
-After lowering, a verifier no longer has to guess which computation is being analyzed. It receives
-a graph, a payload, an input region, and a scalar semantics. A robustness claim, for example, has
-the form:
+In an `IO` definition, the public lifecycle is:
 
-$$`\forall x\in B,\quad
-\operatorname{margin}(\operatorname{denote}(g,\theta,x)) > 0`
+```
+def trainTour : IO Unit := do
+  let before ← trainer.predict point
+  IO.println s!"before = {Tensor.pretty before}"
 
-A robustness certificate in TorchLean is a concrete claim about a graph, a parameter payload, an
-input region, a scalar semantics, and a checker result. The [verification import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean)
-collects the public verification API, while the [CROWN graph API](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/CROWN/Graph.lean)
-shows the graph objects used by the bound propagation chapters.
+  let trained ← trainer.train dataset options
+  trained.printSummary
+  trained.printPrediction "after" point
+```
 
-The central API pattern is:
+`trainer.train` returns a trained handle. It does not mutate the immutable `trainer` definition in
+the source file. The returned handle closes over the runtime state containing the updated
+parameters.
 
-$$`\text{runnable model}
-\;\longrightarrow\;
-\text{explicit graph and payload}
-\;\longrightarrow\;
-\text{checked artifact}
-\;\longrightarrow\;
-\text{semantic claim}`
+# Hand The Model To The Trainer
 
-# Failure Modes The API Makes Visible
+At this point `Tour.lean` has a model, a dataset, and a trainer. The checked-in version of the same
+workflow is ready to run:
 
-The API choices above come from concrete failure modes.
+```
+lake exe torchlean quickstart_mlp \
+  --device cpu \
+  --steps 200 \
+  --seed 2026
+```
 
-Shape mismatch is the simplest one. A target tensor with shape `[batch]` should not silently become a
-`[batch, 1]` tensor because a loss function can broadcast. The type mismatch forces the
-training script to state the intended convention.
+Its summary ends with:
 
-Hidden runtime state is another. BatchNorm buffers, dropout mode, random seeds, optimizer moments,
-tokenizer tables, and cache layouts affect the computation. TorchLean's functional style keeps
-these objects in the data path instead of leaving them implicit inside a module instance.
+```
+dataset size = 25
+mean_loss(before) = 0.761530
+mean_loss(after) = 0.003234
+heldout x=(0.25,-0.75), target=0.2, prediction(after)=[0.210239]
+```
 
-Floating point semantics also need names. A real valued specification, the `FP32` proof model,
-the executable `IEEE32Exec` model, and native CUDA kernels are related but not identical. The
-[floating-point import](https://github.com/lean-dojo/TorchLean/blob/main/NN/Floats.lean) exists so a theorem, a verifier claim,
-and a runtime run do not quietly use three different meanings of "float32."
+The next chapter opens this run up and follows one step through the model, loss, tape, optimizer,
+and parameter update. Here the useful API fact is simpler: `Trainer.new` creates the initial handle,
+and `train` returns a new handle containing the trained runtime state.
 
-Fast kernels are boundaries too. For attention, the mathematical contract is ordinary scaled
-dot product attention, while fused FlashAttention implementations are optimized kernels that must be
-related back to that contract. The relevant proof statements live near the attention and GPU
-chapters: a fast path should preserve a slow, readable meaning, or else it is a different model.
+Command-specific help shows the available runtime options:
 
-# References
+```
+lake exe torchlean quickstart_mlp --help
+```
 
-- Szegedy et al., ["Intriguing properties of neural networks"](https://arxiv.org/abs/1312.6199),
-  ICLR 2014.
-- Zhang et al., ["Efficient Neural Network Robustness Certification with General Activation
-  Functions"](https://arxiv.org/abs/1811.00866), NeurIPS 2018.
-- Xu et al., ["Automatic Perturbation Analysis for Scalable Certified Robustness and
-  Beyond"](https://arxiv.org/abs/2002.12920), NeurIPS 2020.
-- Goldberg, ["What Every Computer Scientist Should Know About Floating-Point Arithmetic"](https://doi.org/10.1145/103162.103163),
-  ACM Computing Surveys 1991.
-- PyTorch `torch.export` documentation: https://docs.pytorch.org/docs/main/user_guide/torch_compiler/export.html
-- ONNX project documentation: https://onnx.ai/
-- IEEE 754-2019, *Standard for Floating-Point Arithmetic*.
+At the top level,
+
+```
+lake exe torchlean --help
+```
+
+lists runnable model families and the common `--device`, `--dtype`, `--backend`, `--seed`, and
+`--show-backend` flags.
+
+# Take A Quick Look At Autograd
+
+Training uses reverse-mode automatic differentiation. There is a small command for inspecting it
+without the rest of the trainer:
+
+```
+lake exe torchlean quickstart_autograd
+```
+
+It prints gradients, VJPs, Jacobian rows and columns, and a Hessian-vector product. One particularly
+useful pair compares a loss with the same loss after `detach`: the forward values agree, while the
+detached gradient is zero. We will derive that behavior in the autograd walkthrough instead of
+reproducing the full log here.
+
+# Move From A Run To A Region
+
+Executable verification tools use a separate runner:
+
+```
+lake exe verify -- list
+```
+
+For the small MLP workflow:
+
+```
+lake exe verify -- torchlean-ibp
+```
+
+This lowers a model to the graph IR, places an input box at its input node, and propagates intervals
+to the output. The API has now moved below `Trainer`: the useful objects are `NN.IR.Graph`, the
+parameter payload, the input region, and the IBP state. The graph and verification chapters develop
+those objects carefully.
+
+Application code that needs these lower layers should use focused imports:
+
+```
+import NN.IR
+import NN.Verification
+```
+
+`import NN` is the broad umbrella for files that intentionally span models, proofs, floating-point
+semantics, backend contracts, and verification. Ordinary training code should stay with `NN.API`;
+the narrower import makes dependencies and generated documentation easier to understand.
+
+# Looking Up Exact Names
+
+The generated API page is the declaration index. In a Lean file, `#check` shows the elaborated type
+of a name, while editor hover reveals its documentation and source. The guide stays focused on the
+design and the worked programs; the API page answers exact-name questions without repeating the
+module tree here.

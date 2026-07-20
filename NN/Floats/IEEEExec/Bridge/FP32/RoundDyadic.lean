@@ -53,6 +53,267 @@ theorem toReal_signedZero (s : Bool) : toReal (if s then negZero else posZero) =
   simpa using (toReal_signedZero (s := true))
 
 /--
+Nearest-even rounding of a dyadic whose magnitude is at most the largest finite binary32 value
+cannot overflow.
+
+The initial exponent guard is ruled out by the lower `log2` magnitude bound.  At exponent `127`,
+the only remaining overflow path is a carry from a rounded 24-bit significand; that carry implies
+that the exact significand was strictly larger than `2^24 - 1`, contradicting `hbound`.
+-/
+theorem isFinite_roundDyadicToIEEE32_of_abs_le_ieeeMaxFinite (d : Dyadic)
+    (hbound : |dyadicToReal d| ≤ FP32.ieeeMaxFinite) :
+    isFinite (roundDyadicToIEEE32 d) = true := by
+  classical
+  by_cases hm : d.mant = 0
+  · have hround :
+        roundDyadicToIEEE32 d = if d.sign then negZero else posZero := by
+      simp [roundDyadicToIEEE32, hm]
+    rw [hround]
+    cases d.sign <;> decide
+  · let log2m := Nat.log2 d.mant
+    let k : Int := Int.ofNat log2m + d.exp
+    have hmbeq : (d.mant == 0) = false := (beq_eq_false_iff_ne).2 hm
+    have hkLe : k ≤ 127 := by
+      by_contra hk
+      have hk128 : (128 : Int) ≤ k := by grind
+      have hbpow128_le :
+          neuralBpow binaryRadix 128 ≤ neuralBpow binaryRadix k :=
+        (neuralBpow_le_neuralBpow_iff binaryRadix _ _).2 hk128
+      have hbpowk_le : neuralBpow binaryRadix k ≤ |dyadicToReal d| := by
+        simpa [k, log2m] using bpow_log2_add_exp_le_abs_dyadicToReal d hm
+      exact (not_le_of_gt FP32.ieeeMaxFinite_lt_bpow_128)
+        ((hbpow128_le.trans hbpowk_le).trans hbound)
+    have hkHi : ¬k > 127 := not_lt.mpr hkLe
+    by_cases hkUnder : k < -150
+    · have hround :
+          roundDyadicToIEEE32 d = if d.sign then negZero else posZero := by
+        have hlogdef : Nat.log2 d.mant = log2m := by simp [log2m]
+        have hkdef : Int.ofNat log2m + d.exp = k := by simp [k]
+        have hkHi' : ¬(127 < Int.ofNat log2m + d.exp) := by
+          simpa [k, log2m] using hkHi
+        have hkUnder' : Int.ofNat log2m + d.exp < -150 := by
+          simpa [k, log2m] using hkUnder
+        have hkHi'' : ¬(127 < (log2m : Int) + d.exp) := by simpa using hkHi'
+        have hkUnder'' : (log2m : Int) + d.exp < -150 := by simpa using hkUnder'
+        simp (config := { zeta := true }) [roundDyadicToIEEE32, hmbeq, hlogdef]
+        rw [if_neg hkHi'', if_pos hkUnder'']
+      rw [hround]
+      cases d.sign <;> decide
+    · by_cases hkSub : k < -126
+      · let fracNat : Nat :=
+          match d.exp + 149 with
+          | .ofNat sh => Nat.shiftLeft d.mant sh
+          | .negSucc sh => roundShiftRightEven d.mant (sh + 1)
+        have hlogdef : Nat.log2 d.mant = log2m := by simp [log2m]
+        have hkdef : Int.ofNat log2m + d.exp = k := by simp [k]
+        have hkHi' : ¬(127 < (log2m : Int) + d.exp) := by
+          change ¬(127 < Int.ofNat log2m + d.exp)
+          rw [hkdef]
+          exact hkHi
+        have hkUnder' : ¬((log2m : Int) + d.exp < -150) := by
+          change ¬(Int.ofNat log2m + d.exp < -150)
+          rw [hkdef]
+          exact hkUnder
+        have hkSub' : (log2m : Int) + d.exp < -126 := by
+          change Int.ofNat log2m + d.exp < -126
+          rw [hkdef]
+          exact hkSub
+        simp (config := { zeta := true }) [roundDyadicToIEEE32, hmbeq, hlogdef]
+        rw [if_neg hkHi', if_neg hkUnder', if_pos hkSub']
+        change
+          isFinite
+            (@ite IEEE32Exec (fracNat = (0 : Nat))
+              (Nat.decEq fracNat 0)
+              (if d.sign then negZero else posZero)
+              (match Nat.decLe (pow2 23) fracNat with
+              | isTrue _ => ofBits (mkBits d.sign 1 0)
+              | isFalse _ => ofBits (mkBits d.sign 0 fracNat))) = true
+        cases hzero : Nat.decEq fracNat 0 with
+        | isTrue heq =>
+          rw [if_pos heq]
+          cases d.sign <;> decide
+        | isFalse hne =>
+          rw [if_neg hne]
+          cases hdec : Nat.decLe (pow2 23) fracNat with
+          | isTrue hle =>
+              simpa [hdec] using
+                (isFinite_ofBits_mkBits_fin d.sign 1 0 (by decide) (by decide))
+          | isFalse hnle =>
+              have hfrac : fracNat < 2 ^ 23 := by
+                simpa [pow2_eq_two_pow] using Nat.lt_of_not_ge hnle
+              simpa [hdec] using
+                (isFinite_ofBits_mkBits_fin d.sign 0 fracNat (by decide) hfrac)
+      · let m24 : Nat :=
+          if log2m >= 23 then
+            roundShiftRightEven d.mant (log2m - 23)
+          else
+            Nat.shiftLeft d.mant (23 - log2m)
+        let k' : Int := if m24 == pow2 24 then k + 1 else k
+        let m24' : Nat := if m24 == pow2 24 then pow2 23 else m24
+        have hmantLt : d.mant < 2 ^ log2m.succ := by
+          have hlog : Nat.log2 d.mant = Nat.log 2 d.mant :=
+            Nat.log2_eq_log_two (n := d.mant)
+          simpa [log2m, hlog] using
+            Nat.lt_pow_succ_log_self (b := 2) (hb := Nat.one_lt_two) d.mant
+        have hm24Le : m24 ≤ 2 ^ 24 := by
+          by_cases hge : log2m ≥ 23
+          · let sh := log2m - 23
+            have hlog : log2m = sh + 23 := by
+              simpa [sh, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using
+                (Nat.sub_add_cancel hge).symm
+            have hpowEq : 2 ^ log2m.succ = (2 ^ sh) * (2 ^ 24) := by
+              rw [hlog]
+              simp [Nat.succ_eq_add_one, Nat.pow_add, Nat.mul_assoc]
+            have hmantLt' : d.mant < (2 ^ sh) * (2 ^ 24) :=
+              hmantLt.trans_eq hpowEq
+            have hqLt : Nat.shiftRight d.mant sh < 2 ^ 24 := by
+              simpa [Nat.shiftRight_eq_div_pow] using Nat.div_lt_of_lt_mul hmantLt'
+            have hm24Le' :
+                roundShiftRightEven d.mant sh ≤ Nat.shiftRight d.mant sh + 1 :=
+              roundShiftRightEven_le_shiftRight_add1 d.mant sh
+            simpa [m24, hge, sh] using hm24Le'.trans (Nat.succ_le_of_lt hqLt)
+          · have hlt : log2m < 23 := lt_of_not_ge hge
+            let sh := 23 - log2m
+            have hpowPos : 0 < 2 ^ sh := Nat.pow_pos (by decide)
+            have hmul :
+                d.mant * 2 ^ sh < (2 ^ log2m.succ) * 2 ^ sh :=
+              Nat.mul_lt_mul_of_pos_right hmantLt hpowPos
+            have hsum : log2m.succ + sh = 24 := by
+              grind
+            have hmul' : d.mant * 2 ^ sh < 2 ^ (log2m.succ + sh) := by
+              simpa [Nat.pow_add] using hmul
+            have hshift : Nat.shiftLeft d.mant sh < 2 ^ 24 := by
+              simpa [Nat.shiftLeft_eq, hsum] using hmul'
+            exact le_of_lt (by simpa [m24, hge, sh] using hshift)
+        have hk'Le : k' ≤ 127 := by
+          by_cases hcarry : m24 == pow2 24
+          · have hm24Eq : m24 = pow2 24 := (beq_iff_eq).mp hcarry
+            have hge : log2m ≥ 23 := by
+              by_contra hnot
+              have hlt : log2m < 23 := lt_of_not_ge hnot
+              let sh := 23 - log2m
+              have hpowPos : 0 < 2 ^ sh := Nat.pow_pos (by decide)
+              have hmul :
+                  d.mant * 2 ^ sh < (2 ^ log2m.succ) * 2 ^ sh :=
+                Nat.mul_lt_mul_of_pos_right hmantLt hpowPos
+              have hsum : log2m.succ + sh = 24 := by grind
+              have hmul' : d.mant * 2 ^ sh < 2 ^ (log2m.succ + sh) := by
+                simpa [Nat.pow_add] using hmul
+              have hm24Lt : m24 < pow2 24 := by
+                have hshift : Nat.shiftLeft d.mant sh < 2 ^ 24 := by
+                  simpa [Nat.shiftLeft_eq, hsum] using hmul'
+                simpa [m24, hnot, sh, pow2_eq_two_pow] using hshift
+              exact (Nat.ne_of_lt hm24Lt) hm24Eq
+            let sh := log2m - 23
+            have hlog : log2m = sh + 23 := by
+              simpa [sh, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using
+                (Nat.sub_add_cancel hge).symm
+            have hround : roundShiftRightEven d.mant sh = pow2 24 := by
+              simpa [m24, hge, sh] using hm24Eq
+            have hpredNat : (pow2 24 - 1) * pow2 sh < d.mant :=
+              pred_mul_pow2_lt_of_roundShiftRightEven_eq
+                d.mant sh (pow2 24) hround (pow2_pos 24)
+            have hpredReal :
+                (((pow2 24 - 1) * pow2 sh : Nat) : ℝ) < (d.mant : ℝ) := by
+              exact_mod_cast hpredNat
+            by_contra hk'Hi
+            have hkEq : k = 127 := by
+              have : 127 < k + 1 := by simpa [k', hcarry] using lt_of_not_ge hk'Hi
+              grind
+            have hexpSum : Int.ofNat sh + d.exp = 104 := by
+              have hlogInt : Int.ofNat log2m = Int.ofNat sh + 23 := by
+                simpa using congrArg Int.ofNat hlog
+              have hkEq' : Int.ofNat log2m + d.exp = 127 := by
+                simpa [k] using hkEq
+              rw [hlogInt] at hkEq'
+              grind
+            have hscale :
+                ((pow2 sh : Nat) : ℝ) * neuralBpow binaryRadix d.exp =
+                  neuralBpow binaryRadix 104 := by
+              calc
+                ((pow2 sh : Nat) : ℝ) * neuralBpow binaryRadix d.exp =
+                    neuralBpow binaryRadix (Int.ofNat sh) *
+                      neuralBpow binaryRadix d.exp := by
+                        simp [pow2_eq_two_pow, neuralBpow, binaryRadix, NeuralRadix.toReal]
+                _ = neuralBpow binaryRadix (Int.ofNat sh + d.exp) :=
+                  (neuralBpow.add_exp binaryRadix _ _).symm
+                _ = neuralBpow binaryRadix 104 := by rw [hexpSum]
+            have hmaxLt : FP32.ieeeMaxFinite < |dyadicToReal d| := by
+              calc
+                FP32.ieeeMaxFinite =
+                    ((2 ^ 24 - 1 : Nat) : ℝ) * neuralBpow binaryRadix 104 :=
+                  FP32.ieeeMaxFinite_eq
+                _ = (((pow2 24 - 1) * pow2 sh : Nat) : ℝ) *
+                      neuralBpow binaryRadix d.exp := by
+                  rw [← hscale]
+                  rw [Nat.cast_mul, Nat.cast_sub (by decide : 1 ≤ pow2 24)]
+                  simp only [pow2_eq_two_pow]
+                  ring
+                _ < (d.mant : ℝ) * neuralBpow binaryRadix d.exp :=
+                  mul_lt_mul_of_pos_right hpredReal (neuralBpow.pos binaryRadix _)
+                _ = |dyadicToReal d| := (abs_dyadicToReal d).symm
+            exact (not_lt_of_ge hbound) hmaxLt
+          · simpa [k', hcarry] using hkLe
+        have hk'Hi : ¬k' > 127 := not_lt.mpr hk'Le
+        let expNat := Int.toNat (k' + 127)
+        let fracNat := m24' - pow2 23
+        have hk'Ge : (-126 : Int) ≤ k' := by
+          have hkGe : (-126 : Int) ≤ k := not_lt.mp hkSub
+          by_cases hcarry : m24 == pow2 24
+          · simp [k', hcarry]
+            grind
+          · simpa [k', hcarry] using hkGe
+        have hexpNat : expNat < 255 := by
+          have hnonneg : 0 ≤ k' + 127 := by grind
+          have hlt : k' + 127 < (255 : Int) := by grind
+          simpa [expNat, Int.toNat_of_nonneg hnonneg] using hlt
+        have hfracNat : fracNat < 2 ^ 23 := by
+          by_cases hcarry : m24 == pow2 24
+          · simp [fracNat, m24', hcarry]
+          · have hm24Ne : m24 ≠ pow2 24 := by
+              intro heq
+              exact hcarry ((beq_iff_eq).2 heq)
+            have hm24Lt : m24 < 2 ^ 24 := by
+              apply lt_of_le_of_ne hm24Le
+              simpa [pow2_eq_two_pow] using hm24Ne
+            have hm24'Eq : m24' = m24 := by simp [m24', hm24Ne]
+            dsimp [fracNat]
+            rw [hm24'Eq]
+            simp [pow2_eq_two_pow]
+            grind
+        have hround :
+            roundDyadicToIEEE32 d = ofBits (mkBits d.sign expNat fracNat) := by
+          have hlogdef : Nat.log2 d.mant = log2m := by simp [log2m]
+          have hkdef : Int.ofNat log2m + d.exp = k := by simp [k]
+          have hkHi' : ¬(127 < (log2m : Int) + d.exp) := by
+            change ¬(127 < Int.ofNat log2m + d.exp)
+            rw [hkdef]
+            exact hkHi
+          have hkUnder' : ¬((log2m : Int) + d.exp < -150) := by
+            change ¬(Int.ofNat log2m + d.exp < -150)
+            rw [hkdef]
+            exact hkUnder
+          have hkSub' : ¬((log2m : Int) + d.exp < -126) := by
+            change ¬(Int.ofNat log2m + d.exp < -126)
+            rw [hkdef]
+            exact hkSub
+          have hk'Hi0 :
+              ¬(127 <
+                (if
+                    (if 23 ≤ log2m then
+                      roundShiftRightEven d.mant (log2m - 23)
+                    else d.mant <<< (23 - log2m)) = pow2 24 then
+                  (log2m : Int) + d.exp + 1
+                else (log2m : Int) + d.exp)) := by
+            simpa [m24, k', k, beq_iff_eq] using hk'Hi
+          simp (config := { zeta := true }) [roundDyadicToIEEE32, hmbeq, hlogdef]
+          rw [if_neg hkHi', if_neg hkUnder', if_neg hkSub']
+          rw [if_neg hk'Hi0]
+          simp [expNat, fracNat, m24', k', m24, k, beq_iff_eq]
+        rw [hround]
+        exact isFinite_ofBits_mkBits_fin d.sign expNat fracNat hexpNat hfracNat
+
+/--
 Refinement theorem (finite/no-overflow): rounding an exact dyadic with the executable IEEE32 kernel
 agrees with the Flocq-style `FP32` rounding-on-`ℝ` model.
 

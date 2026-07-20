@@ -174,6 +174,7 @@ if [[ "$run_default" == true ]]; then
   run "$LAKE" exe torchlean pytorch_export_check
   run "$LAKE" exe torchlean floats_arb_ieee_compare
   run "$LAKE" exe torchlean float32_modes
+  run "$LAKE" exe torchlean numerical_certificate
   run "$LAKE" exe torchlean graphspec --backend eager
   run "$LAKE" exe torchlean ir_axis_ops --dtype float --backend eager
   run "$LAKE" exe torchlean one_semantic_universe --samples 3

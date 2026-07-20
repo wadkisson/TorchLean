@@ -69,6 +69,11 @@ initialization seeds automatically (PyTorch-style ergonomics).
 -/
 namespace Internal
 
+/-- Parameter initialization for an affine layer. `none` selects Xavier-uniform weights. -/
+structure Linear where
+  weightInit? : Option _root_.Runtime.Autograd.Torch.Init.Scheme := none
+  biasInit : _root_.Runtime.Autograd.Torch.Init.Scheme := .zeros
+
 /--
 Linear layer on the last axis (prefix-shape preserving).
 
@@ -84,22 +89,26 @@ The leading “prefix” dimensions are treated as a batch (they are flattened t
   inDim)`,
 the affine map is applied once, and the result is reshaped back).
 -/
-def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
+def linearWith (inDim outDim : Nat) (cfg : Linear) (seedW seedB : Nat := 0)
     (pfx : Spec.Shape := Spec.Shape.scalar) :
     Sequential (pfx.appendDim inDim) (pfx.appendDim outDim) :=
   let WShape : Spec.Shape := .dim outDim (.dim inDim .scalar)
   let bShape : Spec.Shape := .dim outDim .scalar
-  let w0 : Spec.Tensor Float WShape := _root_.Runtime.Autograd.Torch.Init.xavierW
-    (outDim := outDim) (inDim := inDim) (seed := seedW)
+  let weightInit := cfg.weightInit?.getD (.xavierUniform inDim outDim)
+  let w0 : Spec.Tensor Float WShape := _root_.Runtime.Autograd.Torch.Init.tensor
+    (s := WShape) (sch := weightInit) (seed := seedW)
   let b0 : Spec.Tensor Float bShape := _root_.Runtime.Autograd.Torch.Init.tensor
-    (s := bShape) (sch := .zeros) (seed := seedB)
+    (s := bShape) (sch := cfg.biasInit) (seed := seedB)
   let batch : Nat := Spec.Shape.size pfx
   of
     { kind := s!"Linear({inDim}, {outDim})"
       paramShapes := [WShape, bShape]
       initParams := tensorpack! w0, b0
-      runtimeInit := some (.cons (.xavierUniform inDim outDim seedW)
-        (.cons .zeros .nil))
+      runtimeInit := some (.cons
+        (_root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.FloatInit.ofScheme weightInit seedW)
+        (.cons
+          (_root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.FloatInit.ofScheme cfg.biasInit seedB)
+          .nil))
       paramRequiresGrad := [true, true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -130,6 +139,12 @@ def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
                   simp [sOut, batch, Spec.Shape.size_appendDim, Spec.Shape.size])
             ) : m (TorchLean.RefTy (m := m) (α := α) sOut))
     }
+
+/-- Linear layer with Xavier-uniform weights and zero bias. -/
+def linear (inDim outDim : Nat) (seedW seedB : Nat := 0)
+    (pfx : Spec.Shape := Spec.Shape.scalar) :
+    Sequential (pfx.appendDim inDim) (pfx.appendDim outDim) :=
+  linearWith inDim outDim {} seedW seedB pfx
 
 /--
 Vanilla RNN layer (time-major sequence, no batch axis).
@@ -228,12 +243,8 @@ def embedding (vocab embedDim : Nat) (cfg : Embedding := {}) (pfx : Spec.Shape :
       paramShapes := [WShape]
       initParams := tensorpack! w0
       runtimeInit := some (.cons
-        (match cfg.wInit with
-         | .zeros => .zeros
-         | .ones => .ones
-         | .uniform lo hi => .uniform lo hi cfg.seedW
-         | .xavierUniform fanIn fanOut => .xavierUniform fanIn fanOut cfg.seedW
-         | .kaimingUniform fanIn => .kaimingUniform fanIn cfg.seedW) .nil)
+        (_root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.FloatInit.ofScheme
+          cfg.wInit cfg.seedW) .nil)
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>
@@ -291,12 +302,8 @@ def learnedPositionalEmbedding {batch seqLen embedDim : Nat} (cfg : LearnedPosit
       paramShapes := [posShape]
       initParams := tensorpack! pos0
       runtimeInit := some (.cons
-        (match cfg.posInit with
-         | .zeros => .zeros
-         | .ones => .ones
-         | .uniform lo hi => .uniform lo hi cfg.seedPos
-         | .xavierUniform fanIn fanOut => .xavierUniform fanIn fanOut cfg.seedPos
-         | .kaimingUniform fanIn => .kaimingUniform fanIn cfg.seedPos) .nil)
+        (_root_.Runtime.Autograd.TorchLean.Module.RuntimeInit.FloatInit.ofScheme
+          cfg.posInit cfg.seedPos) .nil)
       paramRequiresGrad := [true]
       forward := fun _ {α} _ _ =>
         fun {m} _ _ =>

@@ -341,6 +341,10 @@ structure MultiheadAttention where
   headDim : Nat
   /-- Base seed for deterministic parameter initialization. -/
   seedW : Nat := 0
+  /-- Projection-weight initialization. `none` retains Xavier-uniform initialization. -/
+  weightInit? : Option _root_.Runtime.Autograd.Torch.Init.Scheme := none
+  /-- Add a trainable bias after the output projection. -/
+  outputBias : Bool := false
 
 /--
 Multi-head self-attention with an explicit nonzero sequence length proof.
@@ -351,9 +355,14 @@ def multiheadAttentionWith {batch n dModel : Nat} (cfg : MultiheadAttention) (hN
     (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     Sequential (.dim batch (.dim n (.dim dModel .scalar))) (.dim batch (.dim n (.dim dModel .scalar)))
       :=
-  TorchLean.Layers.attention (batch := batch) (n := n) (dModel := dModel)
-    (numHeads := cfg.numHeads) (headDim := cfg.headDim)
-    (hN := hN) (seedW := cfg.seedW) (mask := mask)
+  if cfg.outputBias then
+    TorchLean.Layers.attentionOutputBias (batch := batch) (n := n) (dModel := dModel)
+      (numHeads := cfg.numHeads) (headDim := cfg.headDim)
+      (hN := hN) (seedW := cfg.seedW) (weightInit? := cfg.weightInit?) (mask := mask)
+  else
+    TorchLean.Layers.attention (batch := batch) (n := n) (dModel := dModel)
+      (numHeads := cfg.numHeads) (headDim := cfg.headDim)
+      (hN := hN) (seedW := cfg.seedW) (weightInit? := cfg.weightInit?) (mask := mask)
 
 /--
 Multi-head self-attention using `NeZero` to hide the nonzero sequence length proof.

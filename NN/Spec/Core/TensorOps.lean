@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Spec.Core.Context
-public import NN.Spec.Core.Tensor.Core
+public import NN.Spec.Core.Utils
 
 /-!
 # Elementwise tensor operations (`Spec.Tensor.*_spec`)
@@ -53,6 +53,21 @@ def mapSpec {s : Shape} (f : α → α) : Tensor α s → Tensor α s
   | Tensor.scalar x => Tensor.scalar (f x)
   | Tensor.dim g => Tensor.dim (fun i => mapSpec f (g i))
 
+omit [Context α] in
+/-- Transport a pointwise tensor property through an elementwise operation. -/
+theorem forall_mapSpec {p q : α → Prop} {f : α → α} {s : Shape} {x : Tensor α s}
+    (hx : Forall p x) (hf : ∀ a, p a → q (f a)) :
+    Forall q (mapSpec f x) := by
+  induction s with
+  | scalar =>
+      cases x with
+      | scalar a => exact hf a (by simpa using hx)
+  | dim n inner ih =>
+      cases x with
+      | dim values =>
+          intro i
+          exact ih (hx i)
+
 /--
 Map a binary function over two tensors of the same shape.
 
@@ -65,6 +80,25 @@ Broadcasting is handled separately in `NN/Spec/Core/TensorReductionShape.lean`.
 def map2Spec {α β γ : Type} (f : α → β → γ) : ∀ {s : Shape}, Tensor α s → Tensor β s → Tensor γ s
   | Shape.scalar, Tensor.scalar x, Tensor.scalar y => Tensor.scalar (f x y)
   | Shape.dim _ _, Tensor.dim fx, Tensor.dim fy => Tensor.dim (fun i => map2Spec f (fx i) (fy i))
+
+/-- Transport two pointwise properties through a binary shape-preserving operation. -/
+theorem forall_map2Spec {α β γ : Type} {p : α → Prop} {q : β → Prop} {r : γ → Prop}
+    {f : α → β → γ} {s : Shape} {x : Tensor α s} {y : Tensor β s}
+    (hx : Forall p x) (hy : Forall q y) (hf : ∀ a b, p a → q b → r (f a b)) :
+    Forall r (map2Spec f x y) := by
+  induction s with
+  | scalar =>
+      cases x with
+      | scalar a =>
+          cases y with
+          | scalar b => exact hf a b (by simpa using hx) (by simpa using hy)
+  | dim n inner ih =>
+      cases x with
+      | dim xs =>
+          cases y with
+          | dim ys =>
+              intro i
+              exact ih (hx i) (hy i)
 
 /-- Element‑wise addition (shape preserved). -/
 def addSpec {α : Type} [Add α] {s : Shape} (T₁ T₂ : Tensor α s) : Tensor α s :=
@@ -109,6 +143,21 @@ def scaleSpec {α : Type} [Mul α] {s : Shape} (t : Tensor α s) (scalar : α) :
 /-- Square each element of a tensor. -/
 def squareSpec {s : Shape} (t : Tensor α s) : Tensor α s :=
   mapSpec (fun x => x * x) t
+
+/-- Squaring is elementwise multiplication with the same tensor on both inputs. -/
+theorem squareSpec_eq_mulSpec {s : Shape} (t : Tensor α s) :
+    squareSpec t = mulSpec t t := by
+  induction s with
+  | scalar =>
+      cases t
+      rfl
+  | dim n inner ih =>
+      cases t with
+      | dim values =>
+          simp only [squareSpec, mapSpec, mulSpec, map2Spec]
+          congr 1
+          funext i
+          exact ih (values i)
 
 /-- Square root of each element (clamped to `max x 0` to stay total). -/
 def sqrtSpec {s : Shape} (t : Tensor α s) : Tensor α s :=

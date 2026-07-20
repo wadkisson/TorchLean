@@ -15,9 +15,9 @@ Named backend profiles bundle the choices that should move together:
 
 - target/build availability,
 - execution configuration,
-- capsule registry,
+- ordered capsule modules,
 - graph lowering mode,
-- and acceptance policy.
+- and assurance policy.
 
 This gives downstream APIs one object to pass around instead of separately threading flags such as
 "CUDA", "LibTorch enabled", "trusted external allowed", and "coalesce adjacent graph nodes".
@@ -27,21 +27,6 @@ This gives downstream APIs one object to pass around instead of separately threa
 
 namespace NN
 namespace Backend
-
-/-- Which capsule registry a profile uses. -/
-inductive RegistryMode where
-  | default
-  | withLibTorch
-  deriving DecidableEq, Repr
-
-namespace RegistryMode
-
-/-- Capsule registry selected by a registry mode. -/
-def capsules : RegistryMode → List KernelCapsule
-  | .default => Registry.defaultCapsules
-  | .withLibTorch => Registry.withLibTorchCapsules
-
-end RegistryMode
 
 /-- How graph-node plans are lowered to backend execution groups. -/
 inductive LoweringMode where
@@ -54,12 +39,25 @@ structure BackendProfile where
   name : String
   config : ExecutionConfig
   target : Target
-  registryMode : RegistryMode := .default
+  capsuleModules : List Registry.CapsuleModule := Registry.maintainedModules
   loweringMode : LoweringMode := .coalesced
-  acceptancePolicy : AcceptancePolicy := .strict
   deriving Repr
 
 namespace BackendProfile
+
+/--
+Extend a profile with operation/provider capsule modules without changing model semantics, target
+selection, lowering, or assurance policy.
+
+A new contribution replaces an existing module with the same name. Duplicate names within `modules`
+are still rejected when the profile is planned.
+-/
+def withCapsuleModules (p : BackendProfile) (modules : List Registry.CapsuleModule) :
+    BackendProfile :=
+  let names := modules.map (·.name)
+  { p with
+    capsuleModules :=
+      modules ++ p.capsuleModules.filter (fun old => !names.contains old.name) }
 
 /-- Planner capabilities declared by the profile target; runtime execution probes separately. -/
 def availability (p : BackendProfile) : Availability :=
@@ -67,20 +65,22 @@ def availability (p : BackendProfile) : Availability :=
 
 /-- Capsule registry selected by the profile. -/
 def registry (p : BackendProfile) : List KernelCapsule :=
-  p.registryMode.capsules
+  Registry.flatten p.capsuleModules
 
 /-- Plan operations using the profile registry, target, and execution config. -/
-def planOps (p : BackendProfile) (ops : List BackendOp) : Except String ExecutionPlan :=
+def planOps (p : BackendProfile) (ops : List BackendOp) : Except String ExecutionPlan := do
+  Registry.validateModules p.capsuleModules
   NN.Backend.planOpsAvailable p.config p.availability p.registry ops
 
-/-- Gate a planned operation sequence under the profile's acceptance policy. -/
+/-- Gate a planned operation sequence under the profile's assurance policy. -/
 def gateOps (p : BackendProfile) (ops : List BackendOp) : Except String GateResult := do
   let plan ← p.planOps ops
-  pure <| plan.gate p.acceptancePolicy
+  pure <| plan.gate p.config.assurance
 
 /-- Plan runtime-relevant IR nodes using the profile registry, target, and execution config. -/
 def planGraphNodes (p : BackendProfile) (g : NN.IR.Graph) :
-    Except String NN.Backend.IR.GraphExecutionPlan :=
+    Except String NN.Backend.IR.GraphExecutionPlan := do
+  Registry.validateModules p.capsuleModules
   NN.Backend.IR.checkedPlanGraphNodesWithRegistry p.config p.availability p.registry g
 
 /-- Lower a graph-node execution plan according to the profile's lowering mode. -/
@@ -95,7 +95,7 @@ def acceptGraph (p : BackendProfile) (g : NN.IR.Graph) :
     Except String AcceptedPlanResult := do
   let graphPlan ← p.planGraphNodes g
   let loweringPlan := p.lowerGraphPlan graphPlan
-  pure <| acceptGraphPlan graphPlan loweringPlan p.acceptancePolicy
+  pure <| acceptGraphPlan graphPlan loweringPlan p.config.assurance
 
 /-- Maintained portable CPU/reference profile with runtime guards and regression evidence. -/
 def checkedCpu : BackendProfile :=
@@ -103,12 +103,11 @@ def checkedCpu : BackendProfile :=
     config :=
       { device := .cpu
         backend := .auto
-        trustPolicy := .checked
+        assurance := .checked
         vjpMode := .torchLeanTape }
     target := Target.portableCpu
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .checkedRuntime }
+    capsuleModules := Registry.maintainedModules
+    loweringMode := .coalesced }
 
 /-- Checked CPU/reference profile for a named operating system and architecture. -/
 def checkedCpuTarget (os : OperatingSystem) (arch : Architecture := .unknown) : BackendProfile :=
@@ -122,12 +121,11 @@ def checkedCuda : BackendProfile :=
     config :=
       { device := .cuda
         backend := .auto
-        trustPolicy := .checked
+        assurance := .checked
         vjpMode := .torchLeanTape }
     target := Target.linuxCuda false
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy := .checkedRuntime }
+    capsuleModules := Registry.maintainedModules
+    loweringMode := .coalesced }
 
 /--
 LibTorch forward scaling profile.
@@ -139,26 +137,12 @@ def libTorchForwardCuda : BackendProfile :=
   { name := "libtorch_forward_cuda"
     config :=
       { device := .cuda
-        backend := .only .libTorch
-        trustPolicy := .allowTrustedExternal
+        backend := .prefer .libTorch
+        assurance := .external
         vjpMode := .torchLeanTape }
     target := Target.linuxCuda true
-    registryMode := .withLibTorch
-    loweringMode := .coalesced
-    acceptancePolicy := .allowTrustedRuntime }
-
-/-- Explicit LibTorch autograd scaling profile. Trusted external backward boundaries are visible. -/
-def libTorchAutogradCuda : BackendProfile :=
-  { name := "libtorch_autograd_cuda"
-    config :=
-      { device := .cuda
-        backend := .only .libTorch
-        trustPolicy := .allowTrustedExternal
-        vjpMode := .externalAutograd }
-    target := Target.linuxCuda true
-    registryMode := .withLibTorch
-    loweringMode := .coalesced
-    acceptancePolicy := .allowTrustedRuntime }
+    capsuleModules := Registry.maintainedModules ++ [Registry.libTorchModule]
+    loweringMode := .coalesced }
 
 /-- Checked macOS CPU/reference profile. -/
 def macOSCpu : BackendProfile :=
@@ -168,56 +152,21 @@ def macOSCpu : BackendProfile :=
 def windowsCpu : BackendProfile :=
   checkedCpuTarget .windows .x86_64
 
-/-- Construct a named target whose runtime capsules are not implemented yet. -/
-def future
-    (name : String)
-    (device : Device)
-    (target : Target)
-    (backend : BackendPreference := .auto)
-    (trustPolicy : TrustPolicy := .checked)
-    (vjpMode : VJPMode := .torchLeanTape)
-    (acceptancePolicy : AcceptancePolicy := .strict) : BackendProfile :=
-  { name
-    config := { device, backend, trustPolicy, vjpMode }
-    target
-    registryMode := .default
-    loweringMode := .coalesced
-    acceptancePolicy }
-
 /--
-Future Metal/MPS profile.
+Maintained execution profile for a device, when TorchLean currently provides one.
 
-The target and device are named now, but the default registry has no Metal capsules yet. Planning a
-non-reference op under this profile therefore fails with a missing-capsule error instead of falling
-back silently to CUDA or CPU.
+Targets such as Metal, ROCm, TPU, and custom accelerators remain expressible through `Target` and
+caller-supplied profiles. They are not silently converted into profiles with empty registries.
 -/
-def futureMetal : BackendProfile :=
-  future "future_metal" .metal Target.macOSMetal
+def maintainedForDevice? : Device → Option BackendProfile
+  | .cpu => some checkedCpu
+  | .cuda => some checkedCuda
+  | .rocm | .metal | .wasm | .tpu | .trainium | .custom | .external => none
 
-/-- Future ROCm profile. It is a named planning target until HIP/ROCm capsules are added. -/
-def futureRocm : BackendProfile :=
-  future "future_rocm" .rocm Target.linuxRocm
-
-/-- Future WebGPU/WASM profile. It is a named planning target until WebGPU capsules are added. -/
-def futureWasm : BackendProfile :=
-  future "future_wasm" .wasm Target.wasm
-
-/-- Future TPU/XLA profile. It is a named planning target until TPU capsules are added. -/
-def futureTpu : BackendProfile :=
-  future "future_tpu" .tpu Target.linuxTpu
-
-/-- Future AWS Trainium/Neuron profile. It is a named planning target until Neuron capsules exist. -/
-def futureTrainium : BackendProfile :=
-  future "future_trainium" .trainium Target.linuxTrainium
-
-/-- Future first-party/lab custom accelerator profile. -/
-def futureCustomChip : BackendProfile :=
-  future "future_custom_chip" .custom Target.customChip
-
-/-- Future caller-supplied external accelerator profile. -/
-def futureExternal : BackendProfile :=
-  future "future_external" .external Target.external
-    (.only .external) .allowTrustedExternal .externalAutograd .allowTrustedRuntime
+/-- Whether this profile registers at least one capsule for its selected device. -/
+def hasDeviceCapsule (profile : BackendProfile) : Bool :=
+  profile.registry.any fun capsule =>
+    capsule.device == profile.config.device
 
 end BackendProfile
 

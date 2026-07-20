@@ -72,6 +72,69 @@ theorem toReal_sub_eq_fp32Round (x y : IEEE32Exec) {dx dy : Dyadic}
     _ = fp32Round (toReal x - toReal y) := by
       simp [hnegReal, sub_eq_add_neg]
 
+/--
+Subtraction of two finite, nonnegative binary32 values cannot overflow.
+
+Both operands lie between zero and the largest finite binary32 value, so their exact difference
+lies in the symmetric interval bounded by that value. The executable dyadic rounder therefore
+returns a finite result.
+-/
+theorem isFinite_sub_of_isFinite_of_nonneg (x y : IEEE32Exec)
+    (hx : isFinite x = true) (hy : isFinite y = true)
+    (hx0 : 0 ≤ toReal x) (hy0 : 0 ≤ toReal y) :
+    isFinite (sub x y) = true := by
+  obtain ⟨dx, hdx⟩ := exists_toDyadic?_of_isFinite hx
+  obtain ⟨dy, hdy⟩ := exists_toDyadic?_of_isFinite hy
+  let dyNeg : Dyadic := { sign := (!dy.sign), mant := dy.mant, exp := dy.exp }
+  have hdyNeg : toDyadic? (neg y) = some dyNeg := by
+    simpa [dyNeg] using (toDyadic?_neg_of_toDyadic?_some (x := y) (d := dy) hdy)
+  have hsub :
+      sub x y = roundDyadicToIEEE32 (addDyadic dx dyNeg) := by
+    simpa [sub] using
+      (add_eq_roundDyadicToIEEE32_of_toDyadic? (x := x) (y := neg y)
+        (dx := dx) (dy := dyNeg) hdx hdyNeg)
+  have hnegReal : toReal (neg y) = -toReal y :=
+    toReal_neg_eq_neg (x := y) (d := dy) hdy
+  have hreal :
+      dyadicToReal (addDyadic dx dyNeg) = toReal x - toReal y := by
+    calc
+      dyadicToReal (addDyadic dx dyNeg) =
+          dyadicToReal dx + dyadicToReal dyNeg :=
+        dyadicToReal_addDyadic_exact (a := dx) (b := dyNeg)
+      _ = toReal x + toReal (neg y) := by simp [toReal_eq, hdx, hdyNeg]
+      _ = toReal x - toReal y := by rw [hnegReal]; ring
+  have hxMax : toReal x ≤ FP32.ieeeMaxFinite :=
+    (le_abs_self (toReal x)).trans (abs_toReal_le_ieeeMaxFinite_of_isFinite x hx)
+  have hyMax : toReal y ≤ FP32.ieeeMaxFinite :=
+    (le_abs_self (toReal y)).trans (abs_toReal_le_ieeeMaxFinite_of_isFinite y hy)
+  have hbound : |dyadicToReal (addDyadic dx dyNeg)| ≤ FP32.ieeeMaxFinite := by
+    rw [hreal, abs_le]
+    constructor <;> linarith
+  rw [hsub]
+  exact isFinite_roundDyadicToIEEE32_of_abs_le_ieeeMaxFinite _ hbound
+
+/--
+Executable Sterbenz theorem for finite binary32 values.
+
+If two positive operands are within a factor of two, then bit-level subtraction is finite and
+denotes the exact real difference. The result combines executable-operation refinement,
+representability of finite bit patterns, and the rounded-real Sterbenz theorem.
+-/
+theorem toReal_sub_eq_sub_of_sterbenz (x y : IEEE32Exec)
+    (hx : isFinite x = true) (hy : isFinite y = true)
+    (hxpos : 0 < toReal x) (hypos : 0 < toReal y)
+    (hxy : toReal x ≤ 2 * toReal y) (hyx : toReal y ≤ 2 * toReal x) :
+    toReal (sub x y) = toReal x - toReal y := by
+  obtain ⟨dx, hdx⟩ := exists_toDyadic?_of_isFinite hx
+  obtain ⟨dy, hdy⟩ := exists_toDyadic?_of_isFinite hy
+  have hsub : isFinite (sub x y) = true :=
+    isFinite_sub_of_isFinite_of_nonneg x y hx hy hxpos.le hypos.le
+  rw [toReal_sub_eq_fp32Round x y hdx hdy hsub]
+  exact round32_sub_exact_of_sterbenz
+    (toReal_neuralGenericFormat_of_isFinite x hx)
+    (toReal_neuralGenericFormat_of_isFinite y hy)
+    hxpos hypos hxy hyx
+
 /-- Finite refinement for multiplication: `IEEE32Exec.mul` = exact real mul + float32 rounding. -/
 theorem toReal_mul_eq_fp32Round (x y : IEEE32Exec) {dx dy : Dyadic}
     (hx : toDyadic? x = some dx) (hy : toDyadic? y = some dy)

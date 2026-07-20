@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Proofs.RuntimeApprox.NF.BackwardOps.Sparse
+public import NN.Proofs.RuntimeApprox.NF.ShapeOps
 
 /-!
 # NF Backward Approximation Backend
@@ -35,89 +36,6 @@ variable {β : NeuralRadix} {fexp : ℤ → ℤ} [NeuralValidExp fexp]
 variable {rnd : ℝ → ℤ} [NeuralValidRndToNearest rnd]
 
 local notation "R" => TorchLean.Floats.NF β fexp rnd
-
--- `toSpec` is already defined in `NN.Proofs.RuntimeApprox.NF.Ops`.
-
-private lemma toSpec_one_bound :
-    abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) (1 : R) - (1 : ℝ)) ≤
-      neuralUlp β fexp (1 : ℝ) / 2 := by
-  -- `1 : R` is `NF.ofReal 1`, so this is the standard single-step rounding error bound.
-  convert
-    (Proofs.RuntimeRoundingApprox.roundR_abs_error (β := β) (fexp := fexp) (rnd := rnd) (1 : ℝ))
-    using 1
-  · simp [NFBackend.toSpec, TorchLean.Floats.NF.toReal, Proofs.RuntimeRoundingApprox.roundR]
-    exact congrArg (fun x => abs (x - (1 : ℝ)))
-      (show (1 : R).val = neuralRound (β := β) (fexp := fexp) rnd 1 from rfl)
-
-omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
-lemma approxT_fill_const {cS : ℝ} {cR : R} {eps : ℝ} (h : abs (toSpec (β := β) (fexp := fexp) (rnd
-  := rnd) cR - cS) ≤ eps) :
-    ∀ {s : Shape}, approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-      (Spec.fill cS s) (Spec.fill cR s) eps := by
-  intro s
-  induction s with
-  | scalar =>
-      simpa [Spec.fill] using (approxT_scalar_iff (α := R)
-        (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (x := cS) (xR := cR) (eps := eps)
-          |>.2 h)
-  | dim n s ih =>
-      cases n with
-      | zero =>
-          -- vacuous: `Fin 0` is empty, and the `foldl max` is `0`.
-          have heps : 0 ≤ eps := le_trans (abs_nonneg _) h
-          simpa [Spec.fill, approxT, approxWith, tensorToSpec, linfNorm,
-            RuntimeApprox.linfNorm,
-            tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-            tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec, Spec.mapTensor] using heps
-      | succ n =>
-          -- Each component satisfies the IH; take the `foldl max` upper bound.
-          have heps : 0 ≤ eps := le_trans (abs_nonneg _) h
-          -- Unfold `approxT` for the outer `.dim`.
-          -- Reduce to a `foldl max` bound over component distances.
-          have hcomp :
-              ∀ i : Fin (Nat.succ n),
-                tensorDistance (α := SpecScalar) linfNorm
-                    (Spec.fill cS s)
-                    (tensorToSpec (α := R)
-                      (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (Spec.fill cR s))
-                  ≤ eps := by
-            intro i
-            -- This is exactly the IH at the inner shape (independent of `i`).
-            simpa [approxT, approxWith] using ih
-          have hfold :=
-            List.foldl_max_le_of_le (List.finRange (Nat.succ n))
-              (fun i =>
-                tensorDistance (α := SpecScalar) linfNorm
-                    (Spec.fill cS s)
-                    (tensorToSpec (α := R)
-                      (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (Spec.fill cR s)))
-              (acc := (0 : ℝ)) (eps := eps) heps (by
-                intro i hi
-                simpa using hcomp i)
-          -- Finish by rewriting back to the dim tensor form.
-          simpa [Spec.fill, approxT, approxWith, tensorToSpec, linfNorm,
-            RuntimeApprox.linfNorm,
-            tensorDistance, NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub,
-            tensorLinfNorm, Spec.Tensor.subSpec, Spec.Tensor.map2Spec, Spec.mapTensor] using hfold
-
-lemma approxT_fill_one :
-    ∀ {s : Shape}, approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-      (Spec.fill (1 : ℝ) s) (Spec.fill (1 : R) s) (neuralUlp β fexp (1 : ℝ) /
-        2) := by
-  intro s
-  exact
-    approxT_fill_const (β := β) (fexp := fexp) (rnd := rnd)
-      (cS := (1 : ℝ)) (cR := (1 : R))
-      (eps := neuralUlp β fexp (1 : ℝ) / 2)
-      (toSpec_one_bound (β := β) (fexp := fexp) (rnd := rnd)) (s := s)
-
-lemma approxT_fill_zero :
-    ∀ {s : Shape}, approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-      (Spec.fill (0 : ℝ) s) (Spec.fill (0 : R) s) 0 := by
-  intro s
-  refine approxT_fill_const (β := β) (fexp := fexp) (rnd := rnd) (cS := (0 : ℝ)) (cR := (0 : R))
-    (eps := 0) ?_ (s := s)
-  simp
 
 lemma idx_shape_eq_of_i_eq {Γ : List Shape} {s₁ s₂ : Shape} (a : Idx Γ s₁) (b : Idx Γ s₂)
     (h : a.i = b.i) : s₁ = s₂ := by

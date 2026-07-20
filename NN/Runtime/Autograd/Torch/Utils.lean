@@ -58,6 +58,7 @@ inductive Scheme where
   | zeros
   | ones
   | uniform (lo hi : Float)
+  | normal (mean std : Float)
   | xavierUniform (fanIn fanOut : Nat)
   | kaimingUniform (fanIn : Nat)
   deriving Repr
@@ -93,6 +94,11 @@ def sampleAt (sch : Scheme) (seed idx : Nat) : Float :=
   | .ones => 1.0
   | .uniform lo hi =>
       lo + rand01 seed idx * (hi - lo)
+  | .normal mean std =>
+      let u1 := (Float.ofNat (splitmix64 (splitmix64 (UInt64.ofNat seed)) +
+        UInt64.ofNat (2 * idx)).toUInt32.toNat + 1) / 4294967297.0
+      let u2 := rand01 seed (2 * idx + 1)
+      mean + std * Float.sqrt (-2.0 * Float.log u1) * Float.cos (6.283185307179586 * u2)
   | .xavierUniform fanIn fanOut =>
       let denom := (Float.ofNat fanIn) + (Float.ofNat fanOut)
       let limit := Float.sqrt (6.0 / denom)

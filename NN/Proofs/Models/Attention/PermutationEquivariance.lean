@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.Proofs.Analysis.Softmax
 public import NN.Proofs.Tensor.Basic
 public import NN.Spec.Layers.Attention
 
@@ -97,16 +98,9 @@ equivariance without reasoning about how the stabilizing shift `m` is chosen.
 
 namespace SoftmaxEquivariance
 
-set_option linter.auxLemma false in
-/-- Eliminate a scalar tensor using the same matcher as `Activation.softmax_vec_spec`. -/
-private abbrev scalarElim {β : Sort _} (t : Tensor ℝ .scalar) (k : ℝ → β) : β :=
-  Activation.softmaxVecSpec.match_1 (motive := fun _ => β) t k
-
-@[simp] private theorem scalarElim_scalar {β : Sort _} (k : ℝ → β) (v : ℝ) :
-    scalarElim (β := β) (Spec.Tensor.scalar v) k = k v := rfl
-
+/-- Read the value of a scalar tensor. -/
 private abbrev scalarVal (t : Tensor ℝ .scalar) : ℝ :=
-  scalarElim (β := ℝ) t (fun v => v)
+  Spec.Tensor.toScalar t
 
 /-- Plain (unstabilized) softmax on a vector tensor. Proof helper. -/
 private def softmaxVecPlain {n : Nat} (t : Tensor ℝ (.dim n .scalar)) : Tensor ℝ (.dim n .scalar) :=
@@ -128,7 +122,7 @@ private theorem softmax_vec_spec_eq_plain {n : Nat} (t : Tensor ℝ (.dim (Nat.s
       -- Define `m` in the same shape as the spec definition (folding over indices with a `match`).
       let m : ℝ :=
         (List.finRange (Nat.succ n)).foldl
-          (fun acc i => scalarElim (β := ℝ) (f i) (fun v => max acc v))
+          (fun acc i => max acc (scalarVal (f i)))
           first
       -- Denominators: shifted vs plain.
       let denomPlain : ℝ := ∑ j : Fin (Nat.succ n), Real.exp (x j)
@@ -162,114 +156,33 @@ private theorem softmax_vec_spec_eq_plain {n : Nat} (t : Tensor ℝ (.dim (Nat.s
                   simp [hdenomShift, sub_eq_add_neg, Real.exp_add]
           _ = Real.exp (x i) / denomPlain := by
                 simpa [mul_assoc] using (mul_div_mul_right (Real.exp (x i)) denomPlain hmne)
-      -- Relate the implementation's list-fold denominator to the `∑` form (`denomShift`).
-      have hfold :
-          (List.finRange (Nat.succ n)).foldl (fun acc j => acc + Real.exp (x j - m)) 0 = denomShift := by
-        dsimp [denomShift]
-        simpa using
-          (Spec.finRange_foldl_add_eq_finset_sum (n := Nat.succ n) (f := fun j => Real.exp (x j - m)))
-      -- Finish by simplifying the scalar combinators and rewriting the denominator fold.
-      have hTerm :
-          ∀ j : Fin (Nat.succ n),
-            scalarElim (β := ℝ)
-                (Spec.Tensor.mapSpec MathFunctions.exp
-                  (Spec.Tensor.map2Spec (fun a b => a - b) (f j) (Spec.Tensor.scalar m)))
-                (fun v => v) =
-              Real.exp (x j - m) := by
+      -- Expose the present tensor reduction through its extensional sum theorem. This proof no
+      -- longer depends on whether `sumSpec` is implemented by a list fold or a recursive loop.
+      have hshiftedCoord : ∀ j : Fin (Nat.succ n),
+          Spec.toVec (Activation.maxShiftedExpVecSpec (Spec.Tensor.dim f)) j =
+            Real.exp (x j - m) := by
         intro j
         cases hj : f j with
         | scalar xj =>
-            simp [scalarElim, scalarVal, Spec.Tensor.mapSpec, Spec.Tensor.map2Spec, x, hj]
-            rfl
-      have hfun :
-          (fun (acc : ℝ) (j : Fin (Nat.succ n)) =>
-              acc +
-                scalarElim (β := ℝ)
-                  (Spec.Tensor.mapSpec MathFunctions.exp
-                    (Spec.Tensor.map2Spec (fun a b => a - b) (f j) (Spec.Tensor.scalar m)))
-                  (fun v => v))
-            =
-          (fun (acc : ℝ) (j : Fin (Nat.succ n)) => acc + Real.exp (x j - m)) := by
-        funext acc j
-        simp [hTerm j]
-      have hden :
-          (List.finRange (Nat.succ n)).foldl
-              (fun acc j =>
-                acc +
-                  scalarElim (β := ℝ)
-                    (Spec.Tensor.mapSpec MathFunctions.exp
-                      (Spec.Tensor.map2Spec (fun a b => a - b) (f j) (Spec.Tensor.scalar m)))
-                    (fun v => v))
-              0
-            =
-          denomShift := by
-        simpa [hfun] using hfold
-
-      -- Reduce to the real-valued cancellation lemma `hcancel` and lift through `Tensor.scalar`.
-      cases hi : f i with
-      | scalar xi =>
-          have hcancel' : Real.exp (xi - m) / denomShift = Real.exp xi / denomPlain := by
-            simpa [x, scalarVal, scalarElim, hi] using hcancel
-          have hgoal :
-              MathFunctions.exp
-                    (xi -
-                      List.foldl (fun acc i => scalarElim (β := ℝ) (f i) (fun v => max acc v))
-                        (scalarElim (β := ℝ) (f ⟨0, Nat.succ_pos n⟩) (fun v => v))
-                        (List.finRange (Nat.succ n))) /
-                  List.foldl
-                      (fun acc i =>
-                        acc +
-                          scalarElim (β := ℝ)
-                            (Spec.Tensor.mapSpec MathFunctions.exp
-                              (Spec.Tensor.map2Spec (fun x1 x2 => x1 - x2) (f i)
-                                (Spec.Tensor.scalar
-                                  (List.foldl
-                                    (fun acc i => scalarElim (β := ℝ) (f i) (fun v => max acc v))
-                                    (scalarElim (β := ℝ) (f ⟨0, Nat.succ_pos n⟩) (fun v => v))
-                                    (List.finRange (Nat.succ n))))))
-                            (fun v => v))
-                      (0 : ℝ)
-                      (List.finRange (Nat.succ n))
-                =
-              Real.exp xi /
-                ∑ x : Fin (Nat.succ n),
-                  Real.exp (scalarElim (β := ℝ) (f x) (fun v => v)) := by
-            have htmp := hcancel'
-            -- Replace the finite-sum denominator (`denomShift`) with the list-fold denominator used
-            -- by the spec definition.
-            rw [← hden] at htmp
-            simpa [denomPlain, x, m, first, scalarVal, scalarElim, MathFunctions.exp] using htmp
-          -- Normalized form of `hgoal` matching the shape produced by the `simp`-unfolding below.
-          have hgoal' :
-              MathFunctions.exp
-                    (xi -
-                      List.foldl (fun acc i => scalarElim (β := ℝ) (f i) (fun v => max acc v))
-                        (scalarElim (β := ℝ) (f 0) (fun v => v))
-                        (List.finRange (n + 1))) /
-                  List.foldl
-                      (fun acc i =>
-                        acc +
-                          scalarElim (β := ℝ)
-                            (Spec.Tensor.mapSpec MathFunctions.exp
-                              (Spec.Tensor.map2Spec (fun x1 x2 => x1 - x2) (f i)
-                                (Spec.Tensor.scalar
-                                  (List.foldl
-                                    (fun acc i => scalarElim (β := ℝ) (f i) (fun v => max acc v))
-                                    (scalarElim (β := ℝ) (f 0) (fun v => v))
-                                    (List.finRange (n + 1))))))
-                            (fun v => v))
-                      (0 : ℝ)
-                      (List.finRange (n + 1))
-                =
-              Real.exp xi /
-                ∑ x : Fin (n + 1),
-                  Real.exp (scalarElim (β := ℝ) (f x) (fun v => v)) := by
-            simpa [Nat.succ_eq_add_one] using hgoal
-          -- Unfold the scalar tensor ops at index `i` and use `hgoal`.
-          simp [hi, scalarVal, scalarElim, Spec.replicate, Spec.Tensor.mapSpec, Spec.Tensor.map2Spec,
-            Spec.Tensor.subSpec, Spec.Tensor.expSpec]
-          -- `simp` has unfolded the tensor combinators, so the goal is a scalar identity.
-          simpa [scalarVal, scalarElim, MathFunctions.exp] using hgoal'
+            simp [Activation.maxShiftedExpVecSpec, Activation.maxVecSpec, Spec.replicate,
+              Spec.Tensor.expSpec, Spec.Tensor.subSpec, Spec.Tensor.mapSpec,
+              Spec.Tensor.map2Spec, Spec.toVec, m, first, x, scalarVal, hj,
+              Proofs.mathfunc_exp_eq_rexp]
+      have hsumShift :
+          Spec.Tensor.sumSpec (Activation.maxShiftedExpVecSpec (Spec.Tensor.dim f)) =
+            denomShift := by
+        rw [Spec.sum_spec_vec]
+        exact Finset.sum_congr rfl (fun j _ => hshiftedCoord j)
+      have hsoft :
+          Spec.toVec
+              (Activation.softmaxVecSpec (α := ℝ) (n := Nat.succ n) (Spec.Tensor.dim f)) i =
+            Real.exp (x i - m) / denomShift := by
+        rw [Proofs.toVec_softmaxVecSpec, hshiftedCoord, hsumShift]
+      apply (Spec.Tensor.scalarEquiv ℝ).injective
+      change Spec.toVec
+          (Activation.softmaxVecSpec (α := ℝ) (n := Nat.succ n) (Spec.Tensor.dim f)) i =
+        Real.exp (x i) / denomPlain
+      exact hsoft.trans hcancel
 
 /-- Plain softmax commutes with reindexing (permuting coordinates). -/
 private theorem softmaxVecPlain_reindexOuter {n : Nat} (σ : Equiv.Perm (Fin n))
@@ -286,7 +199,10 @@ private theorem softmaxVecPlain_reindexOuter {n : Nat} (σ : Equiv.Perm (Fin n))
       have hden :
           (∑ j : Fin n, Real.exp (x (σ j))) = ∑ j : Fin n, Real.exp (x j) := by
         simpa using (Equiv.sum_comp σ (fun j => Real.exp (x j)))
-      simp [x, hden, scalarVal, scalarElim]
+      change Spec.Tensor.scalar (Real.exp (x (σ i)) / ∑ j, Real.exp (x (σ j))) =
+        Spec.Tensor.scalar (Real.exp (x (σ i)) / ∑ j, Real.exp (x j))
+      exact congrArg Spec.Tensor.scalar
+        (congrArg (fun denominator => Real.exp (x (σ i)) / denominator) hden)
 
 /-- Spec vector softmax commutes with reindexing (permuting coordinates). -/
 theorem softmax_vec_spec_reindexOuter {n : Nat} (σ : Equiv.Perm (Fin (Nat.succ n)))

@@ -7,404 +7,363 @@ open Verso.Genre Manual
 tag := "reinforcement-learning"
 %%%
 
-Reinforcement learning is a good test for TorchLean because the model is only one part of the
-system. A policy interacts with an environment, records transitions, computes returns and
-advantages, and updates actor and critic networks. In mainstream code, many of these objects live
-as mutable Python arrays. TorchLean gives them Lean side names.
+In supervised learning, the dataset is usually fixed before training starts. In reinforcement
+learning, the current policy helps create its own future data. A complete application therefore
+contains more than a neural network:
 
-The familiar pieces are still here: Gymnasium environments, actor-critic networks, replay buffers,
-PPO returns and advantages, CPU/CUDA execution, and editor visualizations. The difference is that
-each piece has a Lean side name. The
-[runtime RL API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL.lean), [specification RL API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL.lean), and
-[RL proofs API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Core.lean) are separate: the split lets us say
-precisely what is proved, what is checked at runtime, and what is still an external assumption.
+$$`\text{environment}
+\longrightarrow\text{transition}
+\longrightarrow\text{rollout or replay}
+\longrightarrow\text{return and advantage}
+\longrightarrow\text{policy/value update}.`
 
-The main references behind the executable examples are Sutton and Barto's reinforcement-learning
-textbook (http://incompleteideas.net/book/the-book-2nd.html), DQN by Mnih et al.
-(Nature 2015, https://www.nature.com/articles/nature14236), PPO by Schulman et al.
-(2017, https://arxiv.org/abs/1707.06347), and Gymnasium's environment API
-(https://gymnasium.farama.org/). TorchLean cites these for algorithm lineage; Lean source names
-still determine the actual checked object.
+Each arrow carries assumptions. Is the observation shape correct? Is the action valid? Is the
+reward finite? Does `done` mean termination, truncation, or either? Did the rollout keep its fields
+aligned? TorchLean gives those questions explicit runtime and specification objects.
 
-# The Objects In One Picture
+There are three complementary layers:
 
-The RL path has three pieces:
+- [`NN.Spec.RL`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL.lean) defines
+  environments, MDPs, Bellman operators, returns, and advantages;
+- [`NN.Runtime.RL`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL.lean) implements
+  checked transitions, replay, rollouts, PPO, and Gymnasium communication;
+- [`NN.Proofs.RL`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Core.lean) proves
+  structural, numerical, and dynamic-programming facts about named objects from the first two
+  layers.
 
-$$`\text{Gymnasium or Lean environment}
-\;\to\; \text{checked transition boundary}
-\;\to\; \text{TorchLean rollout tensors}`
+The easiest way to see the pieces together is a small GridWorld run.
 
-$$`\text{Spec.RL MDP semantics}
-\;\longleftrightarrow\; \text{Runtime.RL algorithms}
-\;\longleftrightarrow\; \text{Proofs.RL theorems}`
+# A Complete PPO GridWorld Run
 
-The left side is the world of interaction. The middle is the executable training path. The right
-side is the mathematical account of the same objects. Mainstream ML systems often blur those
-boundaries because that makes it easy to move fast. TorchLean keeps them visible because that makes
-it possible to audit and prove claims later.
-
-The operational pipeline is:
+The environment is a `4 × 4` GridWorld defined in Lean. The actor and critic use a fixed rollout
+horizon of 64. Run one update on CPU and send the artifacts to temporary files:
 
 ```
-environment step
-  -> checked transition
-  -> rollout buffer
-  -> return / advantage computation
-  -> PPO loss
-  -> policy and value update
-  -> optional MDP theorem
+lake exe torchlean ppo_gridworld --device cpu \
+  --updates 1 \
+  --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
+  --log /tmp/ppo-gridworld-trainlog.json \
+  --policy /tmp/ppo-gridworld-policy.json \
+  --path /tmp/ppo-gridworld-path.json
 ```
 
-For off-policy examples, replace "rollout buffer" by "replay buffer" and read the update as a
-sampled minibatch computation. The same boundary principle holds: the learner consumes typed
-transition data, not uninspected Python objects.
+The current checkout produces:
 
-The runtime umbrella [NN.Runtime.RL API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL.lean) collects the executable pieces:
+```
+torchlean ppo_gridworld: PPO on Lean-native GridWorld (4x4, horizon=64) (device=cpu)
+  env: pure Lean dynamics + boundary contract check + formal MDP validity proof available
+  eval(step=0) avg_return=-0.400000
+  update=0 avg_return=3.600000
+  wrote TrainLog JSON: /tmp/ppo-gridworld-trainlog.json
+torchlean ppo_gridworld: wrote policy snapshot to /tmp/ppo-gridworld-policy.json
+torchlean ppo_gridworld: wrote path snapshot to /tmp/ppo-gridworld-path.json
+torchlean ppo_gridworld: done
+torchlean ppo_gridworld: ok
+```
 
-- [Runtime.RL.Core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Core.lean) contains typed transitions, returns, TD errors,
-  action encodings, and rollout helpers with tensor shapes.
-- [Runtime.RL.Replay](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Replay.lean) contains bounded FIFO replay buffers for
-  off policy algorithms.
-- [Runtime.RL.Boundary](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Boundary.lean) checks externally supplied observations,
-  rewards, actions, and done flags before they enter training.
-- [Runtime.RL.Gymnasium](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Gymnasium.lean) is the subprocess bridge to Python
-  Gymnasium.
-- [Runtime.RL.PPO](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/PPO.lean) contains PPO rollout and sample collection with a fixed horizon.
-- [Runtime.RL.Numerics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Numerics.lean) contains checked float32 diagnostics for
-  RL recurrences.
+This trace contains three different results:
 
-# MDP Semantics First
+1. the PPO/autograd program completed one update;
+2. a greedy-policy evaluation changed on this seeded run;
+3. the command wrote a scalar curve, a policy table, and a decoded path.
 
-The spec side is not "whatever the Python environment did." In
-[NN.Spec.RL API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL.lean), TorchLean collects several MDP vocabularies:
+Only the first is an optimizer execution fact. The second is an empirical observation from one
+small run. The third gives inspectable evidence. The formal MDP facts described below are separate
+theorems.
 
-- [Spec.RL.Core](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Core.lean) gives discounted backups, TD residuals, returns, and
-  GAE style algebra over rollout data.
-- [Spec.RL.Environment](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Environment.lean) gives a pure Gymnasium style environment
-  contract with explicit latent state.
-- [Spec.RL.MDP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/MDP.lean) gives deterministic finite MDPs over finite states and
-  actions.
-- [Spec.RL.FiniteStochasticMDP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/FiniteStochasticMDP.lean) gives finite stochastic
-  transition kernels.
-- [Spec.RL.MarkovMDP](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/MarkovMDP.lean) gives the heavier measurable-space development.
-- [Spec.RL.Envs.GridWorld](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Envs/GridWorld.lean) gives a concrete finite GridWorld
-  environment used by the PPO example.
+The implementation is
+[`NN/Examples/Models/RL/PPOGridWorld.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOGridWorld.lean).
+The pure environment is
+[`NN.Spec.RL.Envs.GridWorld`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Envs/GridWorld.lean).
 
-The first practical difference from ordinary framework code appears in the Bellman backup. In
-PyTorch code, it is usually a line in a training loop:
+# What Enters A Rollout
 
-$$`target = reward + \gamma(1-done)\,nextValue`
+For a discrete action space of size `A`, one PPO step stores:
 
-In TorchLean, that line is also a named semantic object. The proof layer can state and prove facts
-about the Bellman operator rather than reconstructing a tensor expression after the fact.
-[NN.Proofs.RL.MDP API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/MDP.lean), for example, proves monotonicity and contraction
-facts for finite discounted MDPs. It is the classic dynamic programming theorem, but attached to the
-same finite state vocabulary used by the examples.
+$$`(s_t,\;a_t,\;\log\pi_{\mathrm{old}}(a_t\mid s_t),\;
+r_t,\;d_t,\;V(s_t),\;V(s_{t+1})).`
 
-The theorem shape is the one from standard dynamic programming:
+The Lean structure in
+[`NN.Runtime.RL.PPO.Rollout`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/PPO/Rollout.lean)
+uses:
 
-$$`\operatorname{BellmanPolicy}_{\gamma,\pi}(V)(s)
-= r(s,\pi(s))+\gamma\,\mathbb{E}_{s'}[V(s')]`
+- `state : Tensor α obsShape`;
+- `action : Fin nActions`;
+- scalar old log probability, reward, value, and next value;
+- a Boolean episode-boundary marker.
 
-$$`\operatorname{BellmanOptimality}_{\gamma}(V)(s)
-= \max_a\left(r(s,a)+\gamma\,\mathbb{E}_{s'}[V(s')]\right)`
+A `Rollout α obsShape nActions horizon` contains an array plus a proof that its size is exactly
+`horizon`. This avoids the “parallel arrays drifted out of sync” failure common in hand-written
+buffers.
 
-$$`0\le\gamma<1
-\quad\Longrightarrow\quad
-\operatorname{BellmanPolicy}_{\gamma,\pi}
-\text{ and }
-\operatorname{BellmanOptimality}_{\gamma}
-\text{ are sup-norm contractions}`
+Converting a rollout to an actor-critic minibatch produces:
 
-The proof pages state this as `bellmanPolicy_contraction`,
+$$`\begin{aligned}
+\text{states}&:T\times\text{obsShape},\\
+\text{actionsOneHot}&:T\times A,\\
+\text{oldLogProb}&:T,\\
+\text{advantages}&:T,\\
+\text{valueTarget}&:T\times1.
+\end{aligned}`
+
+The conversion is total because the horizon invariant is already present.
+
+# Returns And Generalized Advantage Estimation
+
+Let `d_t` be one when timestep `t` ends an episode and zero otherwise. The one-step temporal
+difference residual is
+
+$$`\delta_t
+=r_t+\gamma(1-d_t)V(s_{t+1})-V(s_t).`
+
+Generalized Advantage Estimation runs backward:
+
+$$`A_t
+=\delta_t+\gamma\lambda(1-d_t)A_{t+1}.`
+
+The corresponding value target is
+
+$$`R_t=A_t+V(s_t).`
+
+TorchLean keeps the list-level definitions in
+[`NN.Spec.RL.Core`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Core.lean)
+and tensor-shaped runtime siblings in
+[`NN.Runtime.RL.Core`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Core.lean).
+`Rollout.toActorCriticSample` computes value targets from the unnormalized advantages, then
+z-score normalizes advantages for the policy term.
+
+This is more than a documentation choice. Months after an experiment, the definition answers
+questions that a log cannot: whether truncation stopped bootstrapping, whether normalization
+changed value targets, and which direction the recurrence traversed the rollout.
+
+# The PPO Objective
+
+For the sampled action at timestep `t`, define
+
+$$`r_t(\theta)
+=\exp\!\left(
+\log\pi_\theta(a_t\mid s_t)
+-\log\pi_{\theta_{\mathrm{old}}}(a_t\mid s_t)
+\right).`
+
+The clipped surrogate is
+
+$$`L^{\mathrm{clip}}_t(\theta)
+=\min\!\left(
+r_t(\theta)A_t,\;
+\operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)A_t
+\right).`
+
+The actor minimizes the negative mean surrogate. The critic receives a value loss, and the full
+autograd program can add an entropy term. The categorical action log probability is implemented
+from `logSoftmax` and a one-hot action tensor in
+[`NN.Runtime.RL.PolicyGradient.Autograd`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/PolicyGradient/Autograd.lean).
+
+The ratio, clipping, return, and advantage computations also have checked binary32 helpers under
+[`NN.Runtime.RL.Numerics.Float32`](https://github.com/lean-dojo/TorchLean/tree/main/NN/Runtime/RL/Numerics/Float32).
+They use the executable `IEEE32Exec` semantics and return `Except String ...`, so a NaN, infinity,
+or failed finite-path precondition is visible rather than entering the update silently.
+
+These helpers establish properties of selected scalar recurrences. They do not prove that every
+native CUDA operation in the whole PPO training loop refines the bit-level interpreter.
+
+# Bellman Operators And Fixed Points
+
+The same vocabulary supports classical MDP theorems. For a fixed policy `π`,
+
+$$`(T^\pi V)(s)
+=r(s,\pi(s))
++\gamma\mathbb E_{s'\sim P(\cdot\mid s,\pi(s))}[V(s')].`
+
+The optimality operator is
+
+$$`(T^\star V)(s)
+=\max_a\left(
+r(s,a)+\gamma\mathbb E_{s'\sim P(\cdot\mid s,a)}[V(s')]
+\right).`
+
+For `0 ≤ γ < 1`, both are contractions in the sup norm:
+
+$$`\|TV-TW\|_\infty
+\le\gamma\|V-W\|_\infty.`
+
+The Markov-MDP proof file
+[`NN.Proofs.RL.MarkovMDP`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/MarkovMDP.lean)
+contains the named results `bellmanPolicy_contraction`,
 `bellmanOptimality_contraction`, `bellmanPolicy_fixedPoint_unique`, and
-`bellmanOptimality_fixedPoint_unique`. RL belongs in the verification guide because the runtime PPO
-examples and the mathematical Bellman facts share the same vocabulary for states, actions, rewards,
-and horizons.
+`bellmanOptimality_fixedPoint_unique`.
 
-# The Gymnasium Boundary
+These are real dynamic-programming theorems. They do not prove PPO convergence: PPO updates a
+parameterized stochastic policy using sampled finite trajectories, which is a different
+mathematical object.
 
-We still use Gymnasium because it is the ecosystem boundary most RL users know. CartPole and Atari
-Pong should not require us to reimplement every environment in Lean. But the boundary is explicit.
+# External Environments
 
-The [Gymnasium client API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Gymnasium/Client.lean) talks to
-`scripts/rl/gymnasium_server.py` with one JSON request/response per line. On startup,
-the Lean client asks the server to describe the observation shape and action count, then checks
-that they match the Lean types expected by the training code. On every reset and step, observations
-and rewards are parsed into typed tensors and checked by the boundary contract.
+GridWorld is fully represented in Lean. CartPole and Pong are not. Reimplementing every simulator
+inside the theorem prover would make TorchLean isolated from the ecosystem, so the runtime can
+start a Python Gymnasium process and communicate through one JSON request and response per line.
 
-The contract itself is in [NN.Runtime.RL.Boundary.Core API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Boundary/Core.lean).
-It can require finite observations, finite rewards, observation ranges, reward ranges, and sensible
-done flag behavior. The output type is not an untyped Python dictionary. It is a
-`Spec.RL.ObservedTransition` with a `Fin nActions` action.
+The bridge lives in
+[`NN.Runtime.RL.Gymnasium`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Gymnasium.lean).
+At startup, Lean asks the process for the observation shape and number of actions. On reset and
+step, the returned values pass through
+[`NN.Runtime.RL.Boundary`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Boundary/Core.lean).
 
-The boundary contract is not a full theorem about Gymnasium or ALE. It turns common deployment
-assumptions into checked preconditions. If the server returns `NaN`, an action outside the valid
-range, the wrong observation shape, or a RAM byte outside the declared range, the transition does
-not silently enter the PPO batch.
+A boundary contract may require:
 
-For a proof handle on a checked transition, the wrapper in
-[NN.Proofs.RL.Gymnasium API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Gymnasium.lean) returns the transition bundled with
-a proof of `Runtime.RL.Boundary.ContractHolds`. The pattern is runtime checking first, then a small
-theorem that converts the successful check into a proposition future proofs can consume.
+- every observation entry to be finite;
+- every reward to be finite;
+- observations and rewards to lie in declared closed intervals;
+- actions to satisfy `action < nActions`;
+- `terminated` and `truncated` not to be simultaneously true.
 
-# Replay Buffers Without Mystery Mutation
+After checking, an action is a `Fin nActions` and the transition is a
+`Spec.RL.ObservedTransition`. A malformed Python dictionary never becomes training data merely
+because it could be decoded as JSON.
 
-Off policy algorithms need replay. In mainstream code, replay buffers are often mutable Python
-objects whose shape invariants are enforced by convention. TorchLean's
-[NN.Runtime.RL.Replay API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Replay.lean) defines a bounded FIFO buffer over
-typed transitions:
+This is a checked interface, not a proof of the simulator. TorchLean does not establish that
+Gymnasium's CartPole dynamics are Markov, that ALE emulates the Atari hardware correctly, or that
+the Python process honored its random seed.
 
-$$`\operatorname{Buffer}(\alpha,obsShape,nActions)`
+# CartPole And Pong RAM
 
-The type says that every stored observation has the same `obsShape` and every action belongs to
-`Fin nActions`. The buffer has a capacity, pushes drop the oldest item when full, and sampling is
-deterministic from an explicit seed/counter pair when random sampling is requested.
+Install the optional external dependency:
 
-The proof layer in [NN.Proofs.RL.Replay API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Replay.lean) certifies structural
-facts such as:
+```
+python3 -m pip install --user 'gymnasium>=1.0'
+```
 
-- empty buffers have size zero,
-- zero capacity buffers remain empty after a push,
-- pushing with room increases size by one,
-- pushing when full preserves capacity by evicting an old item.
+Then a short CartPole run is:
 
-Those facts are modest, but they matter. A DQN theorem should not have to assume that the storage
-layer forgot neither shape nor capacity. The repository also includes
-[NN.Examples.Models.RL.DQNReplay source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/DQNReplay.lean) as a small
-compact example that uses the replay layer.
+```
+lake exe torchlean ppo_cartpole --device cpu \
+  --updates 1 --eval-every 1 \
+  --eval-episodes 1 --eval-max-steps 8
+```
 
-The DQN replay example is intentionally narrower than a full Atari training script:
+The command expects a four-entry observation and two actions. Its actor and critic are MLPs with
+hidden width 32, rollout horizon 64, discount `0.99`, GAE parameter `0.95`, and Adam learning rate
+`3 × 10⁻⁴`. Those values are defined in
+[`PPOCartPole.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOCartPole.lean),
+not inferred from a generic PPO label.
+
+The optional Pong path uses RAM observations to keep the JSON-lines boundary inspectable:
+
+```
+python3 -m pip install --user 'gymnasium>=1.0' ale-py
+
+lake exe torchlean ppo_pong_ram --device cpu \
+  --check-env-only
+```
+
+The environment is `ALE/Pong-v5`, each observation has 128 byte-valued entries, and the action
+space has six elements. A pixel PPO implementation would require a much higher-throughput
+transport; the RAM example is intentionally about the checked environment boundary.
+
+# Off-Policy Data: DQN Replay
+
+Off-policy algorithms reuse transitions. TorchLean's
+[`Replay.Buffer`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Replay.lean)
+is a bounded FIFO array indexed by scalar type, observation shape, and action count. Pushing into a
+full buffer drops the oldest transition; sampling is deterministic from explicit seed and counter
+values.
+
+Run the self-contained example:
 
 ```
 lake exe torchlean dqn_replay
 ```
 
-It checks the off-policy data path: transitions enter a typed buffer, samples are drawn from a
-bounded store, and the value-learning loss can be computed from the minibatch. That is the right
-size for a replay-buffer contract. A claim about DQN performance would require an environment,
-policy, exploration schedule, target-network update rule, and evaluation protocol.
-
-# PPO Rollouts, Returns, And Advantages
-
-PPO is the clearest full example because it exercises almost every boundary. The top level
-import is [NN.Runtime.RL.PPO API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/PPO.lean), with the data layout for a fixed horizon
-in [NN.Runtime.RL.PPO.Rollout API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/PPO/Rollout.lean).
-
-The rollout record stores the same fields a PyTorch implementation would store:
-
-- `state`,
-- `action`,
-- `oldLogProb`,
-- `reward`,
-- `done`,
-- `value`,
-- `nextValue`.
-
-The difference is that the rollout carries the invariant that it has exactly the configured
-horizon. Conversion to an actor critic minibatch is therefore a total typed operation, not a
-collection of unchecked array reshapes. `Rollout.toActorCriticSample` builds:
-
-- a state tensor of shape `horizon × obsShape`,
-- one hot actions of shape `horizon × nActions`,
-- old log probabilities,
-- normalized advantages,
-- value targets computed from returns.
-
-The advantage and return equations point back to the same RL core semantics. Generalized Advantage
-Estimation uses the familiar recursion:
-
-$$`\delta_t
-= r_t+\gamma(1-done_t)V(s_{t+1})-V(s_t)`
-
-$$`A_t
-= \delta_t+\gamma\lambda(1-done_t)A_{t+1}`
-
-TorchLean keeps this recurrence as a Lean definition, feeds its tensorized result to the PPO
-autograd loss, and exposes the intermediate objects in examples and widgets. That makes it much
-easier to answer "which formula did we train with?" months later.
-
-The clipped PPO objective is the next object in the chain:
-
-$$`r_t(\theta)
-=
-\frac{\pi_\theta(a_t\mid s_t)}
-{\pi_{\theta_{\mathrm{old}}}(a_t\mid s_t)}`
-
-$$`L^{\mathrm{CLIP}}(\theta)
-=
-\mathbb E_t\left[
-\min\!\left(r_t(\theta)A_t,
-\operatorname{clip}(r_t(\theta),1-\epsilon,1+\epsilon)A_t\right)
-\right].`
-
-TorchLean's checked numerics for ratios, clipping, returns, and advantages are local pieces of that
-larger PPO story.
-
-A compact Lean-side reading checklist for PPO is:
+Current output:
 
 ```
-#check Spec.RL.discountedReturnsDone
-#check Spec.RL.generalizedAdvantageEstimation
-#check Runtime.RL.PPO.Rollout
-#check Runtime.RL.Numerics.Float32.ppoClippedObjectiveFromRatioIEEE32ExecChecked
+dqn_replay: begin
+stored transitions: 2
+sampled transitions: 4
+DQN minibatch MSE loss:   0.917800
+DQN minibatch Huber loss: 0.452500
+soft target update example: 1.000000
+dqn_replay: ok
 ```
 
-Those declarations name the recurrence, the fixed-horizon data object, and the checked scalar
-float32 helper. The actor-critic training loop uses them as pieces of a larger executable system.
+The sample count can exceed the stored count because this compact demonstration samples with
+replacement. The example computes DQN targets, MSE and Huber losses, and a soft target-network
+update. It is not a full epsilon-greedy environment training run.
 
-# Checked Float32 Numerics
+The proof module
+[`NN.Proofs.RL.Replay`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Replay.lean)
+establishes structural facts about empty buffers, zero capacity, size growth, and eviction at
+capacity. Those are small theorems with a useful job: later DQN reasoning need not assume that the
+storage layer preserved its own capacity invariant.
 
-RL code is numerically touchy. Rewards, bootstraps, exponentiated log probability ratios, and
-advantage normalization all create opportunities for `NaN`, `Inf`, or accidental semantic mismatch
-between notes over the reals and float32 execution.
+# Hands-On Checks
 
-TorchLean's checked float32 helpers are collected in the
-[RL float32 numerics API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Runtime/RL/Numerics/Float32). They use the executable
-`IEEE32Exec` model and return `Except String ...` so finite path failures are visible. The core
-pieces are:
+## Inspect The Artifacts
 
-- [Returns](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Numerics/Float32/Returns.lean): checked discounted backups and
-  returns over a fixed horizon.
-- [Advantage](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Numerics/Float32/Advantage.lean): checked TD residuals, GAE, and
-  advantage normalization.
-- [PPO](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Numerics/Float32/PPO.lean): checked importance ratios and clipped PPO
-  surrogate pieces.
-- [Intervals](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/RL/Numerics/Float32/Intervals.lean): interval diagnostics for
-  RL scalar recurrences.
-
-The proof bridge is in [NN.Proofs.RL.Floats.IEEE32Exec API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Floats/IEEE32Exec.lean)
-and [NN.Proofs.RL.Floats.CheckedRuntime API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Floats/CheckedRuntime.lean). The
-theorem shape for users is:
-
-$$`\operatorname{checkedRuntime}(inputs)=\operatorname{ok}(result)
-\Longrightarrow
-\text{finite hypotheses hold}
-\Longrightarrow
-\operatorname{toReal}(result)
-\text{ matches round-after-each-primitive FP32 semantics}`
-
-That says more than "we ran PPO in float32 and it seemed fine." The checked helpers give the scalar
-formulas a precise finite-path semantics; native backend correctness is a separate runtime agreement.
-
-# The Three PPO Examples
-
-The examples are arranged to show three different environment interfaces with one PPO
-shape.
-
-| Path | Environment | What is checked |
-|---|---|---|
-| GridWorld | Lean native | MDP semantics and transition facts |
-| CartPole | Gymnasium | observation, action, reward, and done-field contract |
-| Pong RAM | Gymnasium/ALE | observation shape and byte range |
-| DQN replay | Lean runtime | buffer shape and capacity facts |
-
-## Lean Native GridWorld
-
-[NN.Examples.Models.RL.PPOGridWorld source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOGridWorld.lean) trains an
-actor critic on a GridWorld defined in Lean. It imports the spec environment and proof hooks:
-[NN.Spec.RL.Envs.GridWorld API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/RL/Envs/GridWorld.lean) and
-[NN.Proofs.RL.Envs.GridWorld API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RL/Envs/GridWorld.lean). The example proves that
-the finite stochastic MDP view over the reals is valid, then runs the same PPO update path used by the
-external examples.
-
-The GridWorld path is the most proof friendly one: dynamics, observations, rewards, and MDP validity
-all have Lean names. The widget viewer
-[NN.Examples.RL.PPOGridWorldView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOGridWorldView.lean) reads the
-training/path artifacts so we can inspect behavior in the editor.
-
-Run:
+After the GridWorld command, compare the `before` and `after` policy arrays:
 
 ```
-lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+python3 -m json.tool /tmp/ppo-gridworld-policy.json
+python3 -m json.tool /tmp/ppo-gridworld-path.json
 ```
 
-## Gymnasium CartPole
+The policy artifact records one greedy action per grid cell. The path artifact records decoded
+`(row, column)` states. A rising scalar return is easier to interpret when these two objects agree
+with it.
 
-[NN.Examples.Models.RL.PPOCartPole source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOCartPole.lean) uses
-Gymnasium `CartPole-v1` through the subprocess bridge. The workflow is the familiar one: a Python
-environment produces observations, Lean builds the actor and critic, PPO collects rollouts, and the
-optimizer updates the model.
+## Exercise Strict Parsing
 
-The TorchLean difference is the contract. CartPole observations have shape `4`, actions live in
-`Fin 2`, and every transition must pass the boundary checker before becoming training data. The
-viewer [NN.Examples.RL.PPOCartPoleView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOCartPoleView.lean) displays the
-training log artifact.
-
-Run:
+The application runner rejects unconsumed flags. For example, `--rollout 8` is not a GridWorld
+option:
 
 ```
-python3 -m pip install --user 'gymnasium>=1.0'
-lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8
+lake exe torchlean ppo_gridworld --device cpu --updates 1 --rollout 8
 ```
 
-## Atari Pong RAM
+The command fails with an `unexpected arguments` message instead of silently running horizon 64.
+The horizon is a typed constant in this example; changing it is a source-level model change.
 
-[NN.Examples.Models.RL.PPOPongRam source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOPongRam.lean) targets
-`ALE/Pong-v5` with RAM observations. The example uses RAM rather than pixels so the JSON-lines
-bridge stays visible: the boundary checks the `128`-entry observation shape and the expected byte
-range, while the PPO model sees a typed tensor, following the same pattern as the other examples.
+## Compare CPU And CUDA
 
-The viewer [NN.Examples.RL.PPOPongRamView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOPongRamView.lean) displays
-the training curve artifact.
-
-Dependency setup for the optional ALE path:
+With a CUDA build:
 
 ```
-python3 -m pip install --user 'gymnasium>=1.0' ale-py
+lake -R -K cuda=true exe torchlean ppo_gridworld --device cuda \
+  --updates 1 --eval-every 1 --eval-episodes 1 --eval-max-steps 8 \
+  --show-backend
 ```
 
-This path is optional. It depends on a compatible external ALE/Gymnasium installation, so it is not
-part of the default `torchlean` quick-check list.
+The environment dynamics remain Lean-native. The actor, critic, and PPO autograd operations move to
+the selected CUDA runtime, and `--show-backend` prints the chosen backend contracts. A successful
+CUDA run is runtime evidence; kernel-level proof status is read from those contracts rather than
+inferred from the device name.
 
-# RL Widgets And Artifacts
+# What Is Implemented Today
 
-RL examples write ordinary artifacts so users can inspect behavior without rerunning a long
-environment loop:
+TorchLean currently provides:
 
-- GridWorld policy/path files can be rendered by the GridWorld widget views.
-- PPO training logs can be rendered by `#train_log_file_view`.
-- Gymnasium boundary traces can be rendered by `#rl_boundary_rollout_file_view`.
+- executable PPO applications over a Lean environment and external Gymnasium environments;
+- typed fixed-horizon rollouts and bounded replay;
+- explicit checks for external observations, actions, rewards, and episode flags;
+- checked binary32 helpers for selected return, advantage, and PPO scalar formulas;
+- Bellman contraction and fixed-point theorems for named MDP objects;
+- structural proofs for environment and replay components.
 
-The viewer files are:
+The Bellman results cover the named MDP objects, while the PPO commands exercise the training
+system. Connecting a particular simulator and native PPO run all the way to those mathematical
+objects remains a larger end-to-end result.
 
-- [NN.Examples.RL.PPOGridWorldView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOGridWorldView.lean)
-- [NN.Examples.RL.PPOCartPoleView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOCartPoleView.lean)
-- [NN.Examples.RL.PPOPongRamView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/PPOPongRamView.lean)
-- [NN.Examples.RL.GymnasiumRolloutView source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/GymnasiumRolloutView.lean)
+# References
 
-The widgets are useful because RL output is otherwise hard to audit. A scalar reward curve can hide
-bad episode termination, malformed observations, or a mistaken action convention. Boundary and
-rollout views make those intermediate objects visible.
-
-# Interpreting A TorchLean RL Claim
-
-When an RL example succeeds, we try to be precise and fair about the claim:
-
-- The executable ran the PPO/autograd program and produced artifacts.
-- The rollout boundary checked shapes, actions, finite values, and configured ranges.
-- If the environment is defined in Lean, its MDP semantics can be used directly by proofs.
-- If the environment is Gymnasium/ALE, the external dynamics remain a named producer assumption.
-- Checked float32 helpers can connect selected scalar recurrences to `IEEE32Exec` and FP32-style
-  semantics with rounding after each primitive.
-- MDP and replay proofs certify specific structural or dynamic programming facts, not global PPO
-  convergence.
-
-It is less flashy than "verified RL," but it is more honest. Each claim can be
-upgraded independently: prove more about GridWorld, add stronger Gymnasium contracts, extend
-checked PPO numerics, or connect a larger algorithm theorem to the same runtime objects.
-
-# What Is Not Claimed
-
-TorchLean's current RL layer should not be read as a proof that PPO converges, that Gymnasium's
-implementation is correct, or that native CUDA kernels are proved equivalent to every scalar helper.
-The current support is layered:
-
-- executable PPO and DQN-shaped paths;
-- transition-boundary checks for external environments;
-- typed rollout and replay objects;
-- checked float32 scalar recurrences for selected formulas;
-- MDP, environment, and replay-buffer theorems over named Lean objects.
-
-That is already useful. It lets readers see exactly where a later proof would attach, and exactly
-which external producer assumptions remain.
+- Sutton and Barto,
+  [*Reinforcement Learning: An Introduction*](http://incompleteideas.net/book/the-book-2nd.html),
+  second edition.
+- Schulman et al.,
+  [*High-Dimensional Continuous Control Using Generalized Advantage Estimation*](https://arxiv.org/abs/1506.02438),
+  2015.
+- Schulman et al.,
+  [*Proximal Policy Optimization Algorithms*](https://arxiv.org/abs/1707.06347), 2017.
+- Mnih et al.,
+  [*Human-level control through deep reinforcement learning*](https://www.nature.com/articles/nature14236),
+  2015.
+- Gymnasium, [environment API](https://gymnasium.farama.org/).

@@ -1165,18 +1165,6 @@ theorem sqrtDyadicBracket_sound (d : Dyadic) (hsign : d.sign = false) :
   rw [hsqrtSource]
   exact ⟨mul_le_mul_of_nonneg_right hlo hspos.le, mul_le_mul_of_nonneg_right hu hspos.le⟩
 
-private theorem dyadic_sign_eq_signBit (x : IEEE32Exec) {d : Dyadic}
-    (hd : toDyadic? x = some d) : d.sign = signBit x := by
-  have hxNaN : isNaN x = false := isNaN_eq_false_of_toDyadic?_some (hx := hd)
-  have hxInf : isInf x = false := isInf_eq_false_of_toDyadic?_some (hx := hd)
-  unfold toDyadic? at hd
-  simp only [hxNaN, hxInf, Bool.false_or, Bool.false_eq_true, if_false] at hd
-  split at hd
-  · split at hd
-    · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
-    · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
-  · simpa using congrArg Dyadic.sign (Option.some.inj hd.symm)
-
 private theorem toEReal_sqrtDown_le_of_nonzero (x : IEEE32Exec) {d : Dyadic}
     (hd : toDyadic? x = some d) (hxsign : signBit x = false) (hzero : isZero x = false) :
     toEReal (sqrtDown x) ≤ ((Real.sqrt (toReal x) : ℝ) : EReal) := by
@@ -1186,7 +1174,7 @@ private theorem toEReal_sqrtDown_le_of_nonzero (x : IEEE32Exec) {d : Dyadic}
   have hsqrt : sqrtDown x = roundDyadicDown (sqrtDyadicBracket d).lower := by
     simp [sqrtDown, hchoose, hxInf, hzero, hxsign, hd]
   have hround := toEReal_roundDyadicDown_le (d := (sqrtDyadicBracket d).lower)
-  have hsign : d.sign = false := (dyadic_sign_eq_signBit x hd).trans hxsign
+  have hsign : d.sign = false := (sign_eq_signBit_of_toDyadic?_some hd).trans hxsign
   have hbracket := sqrtDyadicBracket_sound d hsign
   have hxReal : toReal x = dyadicToReal d := by simp [toReal_eq, hd]
   rw [hsqrt]
@@ -1205,7 +1193,7 @@ private theorem toEReal_sqrtUp_ge_of_nonzero (x : IEEE32Exec) {d : Dyadic}
   have hsqrt : sqrtUp x = roundDyadicUp (sqrtDyadicBracket d).upper := by
     simp [sqrtUp, hchoose, hxInf, hzero, hxsign, hd]
   have hround := toEReal_roundDyadicUp_ge (d := (sqrtDyadicBracket d).upper)
-  have hsign : d.sign = false := (dyadic_sign_eq_signBit x hd).trans hxsign
+  have hsign : d.sign = false := (sign_eq_signBit_of_toDyadic?_some hd).trans hxsign
   have hbracket := sqrtDyadicBracket_sound d hsign
   have hxReal : toReal x = dyadicToReal d := by simp [toReal_eq, hd]
   rw [hsqrt]

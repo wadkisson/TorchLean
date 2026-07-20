@@ -11,29 +11,12 @@ public import NN.Floats.IEEEExec.Bridge.FP32Total.Effective
 /-!
 # Total FP32 Bridge: Minimum and Maximum
 
-“Total” bridge theorems combining:
+IEEE minimum and maximum are not ordinary real `min` and `max` on every bit pattern: NaNs and
+signed zero require explicit rules. This module proves the rounded-real equations on finite inputs
+and records the exceptional branches through `toReal?`, using the special-value semantics from the
+core bridge.
 
-- `IEEE32Exec`'s proved NaN/Inf propagation rules, and
-- the `FP32`-on-`ℝ` refinement theorems for the finite/no-overflow branch (`Bridge/FP32.lean`).
-
-The key end-user view is `toReal?`:
-- `toReal? x = none` for NaN/Inf,
-- `toReal? x = some r` for finite values, with `r : ℝ`.
-
-In most of TorchLean, the finite path is treated as real arithmetic + float32 rounding while
-special-value behavior is kept explicit. This file packages that split in one place.
-
-The per-op lemmas are phrased in the style:
-
-`toReal? (op …) = if isFinite (op …) then some (fp32Round …) else none`.
-
-That makes the trust boundary readable at the call site: the `if` is exactly where NaN/Inf (or
-overflow-to-Inf) can occur.
-
-Background references (for float32 rounding/special values):
-- IEEE 754-2019: https://doi.org/10.1109/IEEESTD.2019.8766229
-- Goldberg (1991): https://doi.org/10.1145/103162.103163
-- Flocq (Boldo–Melquiond, 2011): https://doi.org/10.1109/ARITH.2011.40
+See `FP32Total.Core` for the common finite/special-value convention.
 -/
 
 @[expose] public section

@@ -119,6 +119,16 @@ def flatten {s : Spec.Shape} : API.TorchLean.LayerCore.Seq s (.dim (Spec.Shape.s
 def dropout {s : Spec.Shape} (p : Float) (seed : Nat := 0) : API.TorchLean.LayerCore.Seq s s :=
   of <| API.TorchLean.LayerCore.dropout (s := s) p seed
 
+/-- Multi-head attention whose output projection carries a trainable bias. -/
+def attentionOutputBias (batch n dModel numHeads headDim : Nat) {hN : n ≠ 0}
+    (seedW : Nat := 0)
+    (weightInit? : Option _root_.Runtime.Autograd.Torch.Init.Scheme := none)
+    (mask : Option (Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
+    API.TorchLean.LayerCore.Seq (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
+  of <| API.TorchLean.LayerCore.multiHeadAttentionOutputBias
+    batch n dModel numHeads headDim (h1 := hN) seedW weightInit? mask
+
 /-- `Flatten -> Linear` head, with the input dimension computed from the input shape. -/
 def flattenLinear {s : Spec.Shape} (outDim : Nat) (seedW seedB : Nat := 0) :
     API.TorchLean.LayerCore.Seq s (.dim outDim .scalar) :=
@@ -223,12 +233,13 @@ attention mode, with explicit `n × dModel` shapes.
 def attention (batch n dModel numHeads headDim : Nat)
     {hN : n ≠ 0}
     (seedW : Nat := 0)
+    (weightInit? : Option _root_.Runtime.Autograd.Torch.Init.Scheme := none)
     (mask : Option (_root_.Spec.Tensor Bool (.dim n (.dim n .scalar))) := none) :
     API.TorchLean.LayerCore.Seq (.dim batch (.dim n (.dim dModel .scalar)))
       (.dim batch (.dim n (.dim dModel .scalar))) :=
   of <| API.TorchLean.LayerCore.multiHeadAttention (batch := batch)
     (n := n) (dModel := dModel) (numHeads := numHeads) (headDim := headDim)
-    (h1 := hN) (seedW := seedW) (mask := mask)
+    (h1 := hN) (seedW := seedW) (weightInit? := weightInit?) (mask := mask)
 
 end Layers
 

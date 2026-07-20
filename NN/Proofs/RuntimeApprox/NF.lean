@@ -7,12 +7,15 @@ Authors: TorchLean Team
 module
 
 public import NN.Proofs.RuntimeApprox.NF.BackwardOps
+public import NN.Proofs.RuntimeApprox.NF.Attention
 public import NN.Proofs.RuntimeApprox.NF.Conv
 public import NN.Proofs.RuntimeApprox.NF.ConvBackward
 public import NN.Proofs.RuntimeApprox.NF.ConvForward
 public import NN.Proofs.RuntimeApprox.NF.EndToEnd
 public import NN.Proofs.RuntimeApprox.NF.Linalg
+public import NN.Proofs.RuntimeApprox.NF.Normalization
 public import NN.Proofs.RuntimeApprox.NF.Ops
+public import NN.Proofs.RuntimeApprox.NF.Optimizers
 public import NN.Proofs.RuntimeApprox.NF.ReductionOps
 public import NN.Proofs.RuntimeApprox.NF.ShapeOps
 public import NN.Proofs.RuntimeApprox.NF.SoftmaxAxis
@@ -34,9 +37,11 @@ File roles:
 - `ShapeOps`: value-preserving tensor rearrangements such as replication/broadcasting.
 - `BackwardOps`: VJP bounds and `RevNode` constructors for reverse-mode composition.
 - `Conv`, `ConvForward`, `ConvBackward`: Conv2D shared error algebra plus forward/backward bounds.
-- `EndToEnd`: bridge from proof-level `RevGraph` theorems to executable `GraphData`.
-- `SoftmaxAxis`: documentation separating scalar softmax/logistic bounds from vector-valued
-  vector-valued axis softmax bounds.
+- `SoftmaxAxis`: stable last-axis softmax and its rounded VJP.
+- `Attention`: scaled-dot-product attention as one composition of the shared operator contracts.
+- `Normalization`: rank-generic affine-normalization traces with explicit denominator margins.
+- `Optimizers`: SGD, momentum-SGD, and AdamW instances of one numerical optimizer contract.
+- `EndToEnd`: architecture-independent executable graph bridges, parameter updates, and reports.
 - `Utils`: shared list-fold and tensor approximation helpers.
 
 This is the backend we can reason about inside Lean. Hardware CUDA/IEEE execution remains an

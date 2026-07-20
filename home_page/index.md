@@ -3,28 +3,46 @@
 usemathjax: true
 ---
 
-<div class="hero home-hero">
-  <div class="hero-text">
-    <p class="lede">
-      TorchLean is a Lean 4 library for neural-network code that needs to run and be reasoned
-      about. A model can train, lower to a graph, choose a backend, and still point to the Lean
-      object a theorem or checker is talking about.
+<section class="home-intro">
+  <figure class="home-overview">
+    <a
+      href="{{ '/assets/media/figures/torchlean-layout.png' | relative_url }}"
+      aria-label="Open the full TorchLean system diagram">
+      <img
+        src="{{ '/assets/media/figures/torchlean-layout.png' | relative_url }}"
+        alt="TorchLean overview: typed tensors, shared graph IR, autograd proofs, IEEE-754 semantics, certificate checking, PyTorch interoperability, CUDA providers, and model analysis."
+        loading="eager" />
+    </a>
+    <figcaption>From a typed model to execution, analysis, and proof.</figcaption>
+  </figure>
+
+  <div class="home-intro-copy">
+    <p>
+      TorchLean is the first unified deep-learning framework built in Lean 4. It brings model
+      construction, training, and formal reasoning into one library, so executable neural-network
+      code and the mathematics used to study it do not become separate projects.
     </p>
 
-    <div class="home-actions" aria-label="Primary links">
-      <a class="primary-link" href="{{ '/blueprint/Introduction/' | relative_url }}">Start reading</a>
-      <a class="secondary-link" href="{{ '/examples/' | relative_url }}">View examples</a>
-      <a class="secondary-link" href="https://arxiv.org/abs/2602.22631">Read the paper</a>
-    </div>
-  </div>
-</div>
+    <p>
+      You use it much like an ordinary ML library: define a model, load tensors, and train on CPU
+      or GPU. Tensor shapes are part of the types, so incompatible layers and malformed operations
+      are caught while the program is being written rather than during a training run.
+    </p>
 
-<div class="home-overview">
-  <img
-    src="{{ '/assets/media/figures/torchlean-layout.png' | relative_url }}"
-    alt="TorchLean overview: typed tensors, shared graph IR, selected reverse-mode autograd proofs, IEEE-754 semantics, certificate checking, PyTorch round trip, CUDA trust boundary, approximation theorems, and Lean verification."
-    loading="lazy" />
-</div>
+    <p>
+      Once a model runs, its Lean definition can be lowered to the graph used by the runtime.
+      Backends and accelerated kernels remain explicit, including the assumptions made at external
+      library boundaries. The graph can then be studied with formally verified floating-point
+      arithmetic, autograd theorems, robustness bounds, and certificate checkers.
+    </p>
+  </div>
+
+  <div class="home-actions" aria-label="Primary links">
+    <a class="primary-link" href="{{ '/blueprint/Introduction/' | relative_url }}">Start reading</a>
+    <a class="secondary-link" href="{{ '/examples/' | relative_url }}">View examples</a>
+    <a class="secondary-link" href="https://arxiv.org/abs/2602.22631">Read the paper</a>
+  </div>
+</section>
 
 ## Working Paths
 

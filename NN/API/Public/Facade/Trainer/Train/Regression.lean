@@ -83,7 +83,7 @@ def trainedHandle {σ τ : Shape} {α : Type}
     (trainer : Regression σ τ)
     (runner : NN.API.train.Manual.Runner α trainer.task)
     (steps : Nat) (before after : α) :
-    Regression.TrainResult σ τ :=
+    TrainResult σ τ :=
   let predict :=
     fun (xFloat : Tensor.T Float σ) => do
       Manual.evalMode (task := trainer.task) runner
@@ -93,8 +93,8 @@ def trainedHandle {σ τ : Shape} {α : Type}
   let predictBatch :=
     fun (xsFloat : List (Tensor.T Float σ)) => do
       xsFloat.mapM predict
-  let verify :=
-    fun (request : Regression.LInfIBPRequest σ) => do
+  let verifyRobustLInf :=
+    fun (centerFloat : Tensor.T Float σ) (eps : Float) => do
       Manual.evalMode (task := trainer.task) runner
       let params : nn.ParamTensors α
           (NN.API.TorchLean.Supervised.paramShapes trainer.task) ←
@@ -105,8 +105,8 @@ def trainedHandle {σ τ : Shape} {α : Type}
         match Verification.compileForward (α := α) trainer.model params' with
         | .ok c => pure c
         | .error e => throw <| IO.userError e
-      let center := Tensor.castFloat (Runtime.ofFloat (α := α)) request.center
-      let ps := Verification.seedLInfBall compiled center (Runtime.ofFloat request.eps)
+      let center := Tensor.castFloat (Runtime.ofFloat (α := α)) centerFloat
+      let ps := Verification.seedLInfBall compiled center (Runtime.ofFloat eps)
       let ibp := Verification.runIBP compiled ps
       let outB ←
         match Verification.outputBox? compiled ibp with
@@ -123,7 +123,7 @@ def trainedHandle {σ τ : Shape} {α : Type}
         after := toString after }
     predict := predict
     predictBatch := predictBatch
-    verify := verify }
+    verifyRobustLInf? := some verifyRobustLInf }
 
 /--
 Shared regression training core for already-parsed public runtime settings.
@@ -138,7 +138,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
     (afterTrain : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
       NN.API.train.Manual.Runner α trainer.task → IO β) :
-    IO (Regression.TrainResult σ τ × β) := do
+    IO (TrainResult σ τ × β) := do
   withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ runner => do
     let dataset ← data.build (α := α)
     IO.println s!"dataset size = {dataset.size}"
@@ -184,7 +184,7 @@ attached to the trainer.
 def trainWithRun {σ τ : Shape} (trainer : Regression σ τ)
     (data : Dataset σ τ) (run : RunConfig := trainer.runConfig) (opts : TrainOptions := {})
     (probes : List (Probe σ) := []) :
-    IO (Regression.TrainResult σ τ) := do
+    IO (TrainResult σ τ) := do
   let (report, _) ← Regression.Internal.trainDatasetWithRunConfigCore trainer run data
     (opts.toTrainConfig run.optimizer) probes
     (fun {_} _ _ _ _ _ => pure ())
@@ -201,7 +201,7 @@ The compact public entrypoint for ordinary user code:
 -/
 def train {σ τ : Shape} (trainer : Regression σ τ)
     (data : Dataset σ τ) (opts : TrainOptions := {}) (probes : List (Probe σ) := []) :
-    IO (Regression.TrainResult σ τ) :=
+    IO (TrainResult σ τ) :=
   trainWithRun trainer data trainer.runConfig opts probes
 
 end Regression

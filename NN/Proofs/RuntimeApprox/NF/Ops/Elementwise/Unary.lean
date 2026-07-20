@@ -62,6 +62,39 @@ theorem approxT_scale_spec {s : Shape} (c : R) :
           (x := x) (xR := xR) (eps := eps) hx))
   simpa [scaleSpec, scaleBoundTensor] using h
 
+/-- Tensor scaling with an approximate runtime coefficient.
+
+If `xR` approximates `xS` by `eps` and the runtime coefficient `cR` approximates `cS` by `epsC`,
+then this theorem accounts for both perturbations and the final rounded multiplication. It is the
+coefficient-aware counterpart of `approxT_scale_spec`.
+-/
+theorem approxT_scale_spec_of_approx {s : Shape} (cS : ℝ) (cR : R) :
+    ∀ {xS : SpecTensor s} {xR : Tensor R s} {eps epsC : ℝ},
+      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR eps →
+      abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) cR - cS) ≤ epsC →
+        approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+          (scaleSpec (α := SpecScalar) (s := s) xS cS)
+          (scaleSpec (α := R) (s := s) xR cR)
+          (linfNorm (scaleApproxBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+            (s := s) eps epsC cR xR)) := by
+  intro xS xR eps epsC hx hc
+  have h :=
+    approxT_map_spec_of_scalar_bound (α := R)
+      (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+      (s := s) (fS := fun x => x * cS) (fR := fun xR => xR * cR)
+      (bnd := fun a eps =>
+        (abs a + eps) * epsC +
+          (abs (toSpec (β := β) (fexp := fexp) (rnd := rnd) cR) + epsC) * eps +
+          neuralUlp β fexp
+            (a * toSpec (β := β) (fexp := fexp) (rnd := rnd) cR) / 2)
+      (xS := xS) (xR := xR) (eps := eps) hx (by
+        intro x xR hx
+        simpa using
+          (approx_mul_nf (β := β) (fexp := fexp) (rnd := rnd)
+            (x := x) (y := cS) (xR := xR) (yR := cR)
+            (epsx := eps) (epsy := epsC) hx hc))
+  simpa [scaleSpec, scaleApproxBoundTensor] using h
+
 /-- `approxT` bound for elementwise negation (`neg_spec`) over arbitrary tensor shapes. -/
 theorem approxT_neg_spec {s : Shape} :
     ∀ {xS : SpecTensor s} {xR : Tensor R s} {eps : ℝ},
@@ -122,13 +155,87 @@ theorem approxT_exp_spec {s : Shape} :
       rnd))
       (s := s)
       (fS := MathFunctions.exp) (fR := MathFunctions.exp)
-      (bnd := fun a eps =>
-        Real.exp a + Real.exp (a + eps) + neuralUlp β fexp (Real.exp a) / 2)
+      (bnd := fun a eps => expErrorBound (β := β) (fexp := fexp) a eps)
       (xS := xS) (xR := xR) (eps := eps) hx (by
         intro x xR hx
         simpa [Proofs.mathfunc_exp_eq_rexp] using
           (approx_exp_nf (β := β) (fexp := fexp) (rnd := rnd) (x := x) (xR := xR) (eps := eps) hx))
   simpa [expSpec, expBoundTensor] using h
+
+/-- Shape-generic square-root approximation on a certified positive tensor domain.
+
+The pointwise lower bound is carried by `Tensor.Forall`; the global condition `eps < η` guarantees
+that every rounded input remains positive. The output budget is assembled entrywise and reduced by
+the same infinity norm used throughout `approxT`.
+-/
+theorem approxT_sqrt_spec_of_pos_lb {s : Shape} (η : ℝ) (hη : 0 < η) :
+    ∀ {xS : SpecTensor s} {xR : Tensor R s} {eps : ℝ},
+      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR eps →
+      Tensor.Forall (fun x : ℝ => η ≤ x) xS →
+      eps < η →
+        approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+          (sqrtSpec xS) (sqrtSpec xR)
+          (linfNorm (sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+            (s := s) η eps xR)) := by
+  induction s with
+  | scalar =>
+      intro xS xR eps hx hdom hbudget
+      cases xS with
+      | scalar x =>
+          cases xR with
+          | scalar xR =>
+              have hx' := (approxT_scalar_iff (α := R)
+                (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).mp hx
+              have hsqrt := approx_sqrt_clamp_nf_of_lb
+                (β := β) (fexp := fexp) (rnd := rnd)
+                hη (le_trans (by simpa using hdom) (le_max_left x 0)) hx'
+              apply (approxT_scalar_iff (α := R)
+                (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))).mpr
+              change
+                abs
+                    (toSpec (β := β) (fexp := fexp) (rnd := rnd)
+                        (MathFunctions.sqrt (max xR 0)) -
+                      Real.sqrt (max x 0)) ≤
+                  abs
+                    (eps / Real.sqrt η +
+                      neuralUlp β fexp
+                        (Real.sqrt
+                          (max (toSpec (β := β) (fexp := fexp) (rnd := rnd) xR) 0)) / 2)
+              exact le_trans hsqrt (le_abs_self _)
+  | dim n inner ih =>
+      intro xS xR eps hx hdom hbudget
+      cases xS with
+      | dim valuesS =>
+          cases xR with
+          | dim valuesR =>
+              let bound := linfNorm
+                (sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                  (s := .dim n inner) η eps (Tensor.dim valuesR))
+              have hbound : 0 ≤ bound := by
+                simpa [bound] using
+                  (linf_norm_nonneg
+                    (t := sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                      (s := .dim n inner) η eps (Tensor.dim valuesR)))
+              refine approxT_dim_of_forall
+                (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
+                (xS := sqrtSpec (Tensor.dim valuesS))
+                (xR := sqrtSpec (Tensor.dim valuesR))
+                (eps := bound) hbound ?_
+              intro i
+              have hxI := approxT_dim_get (α := R)
+                (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) hx i
+              have hlocal := ih hxI (by simpa using hdom i) hbudget
+              have hle :
+                  linfNorm (sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                    (s := inner) η eps (valuesR i)) ≤ bound := by
+                have h := linf_norm_le_get_dim
+                  (t := sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                    (s := .dim n inner) η eps (Tensor.dim valuesR)) i
+                change
+                  linfNorm (sqrtPosBoundTensor (β := β) (fexp := fexp) (rnd := rnd)
+                    (s := inner) η eps (valuesR i)) ≤ bound at h
+                exact h
+              exact approxT_mono hlocal hle
 
 /--
 `approxT` bound for elementwise hyperbolic tangent (`tanh`) over arbitrary tensor shapes.

@@ -18,7 +18,7 @@ public import NN.Tests.Runtime.Cuda.Utils
 
 Low-level stress coverage that goes beyond the small eager-tape tests:
 
-- exact/deterministic RNG behavior for `randUniform` and `bernoulliMask`,
+- reference/deterministic RNG behavior for `randUniform`, `randNormal`, and `bernoulliMask`,
 - explicit `Buffer.release` lifecycle semantics,
 - finalization of short-lived external buffer wrappers,
 - large-buffer elementwise/reduction checks on direct `Cuda.Buffer` ops,
@@ -77,6 +77,16 @@ def expectedBernoulliArray (n : Nat) (keepProb : Float) (key : UInt64) : FloatAr
     let unitUniform := expectedUniformValue key i
     if keepProb > unitUniform then 1.0 else 0.0)
 
+def expectedNormalValue (mean std : Float) (key : UInt64) (i : Nat) : Float :=
+  let r1 := (Random.splitmix64 (key + UInt64.ofNat (2 * i))).toUInt32.toNat
+  let r2 := (Random.splitmix64 (key + UInt64.ofNat (2 * i + 1))).toUInt32.toNat
+  let u1 := (Float.ofNat r1 + 1.0) / 4294967297.0
+  let u2 := Float.ofNat r2 / 4294967296.0
+  mean + std * Float.sqrt (-2.0 * Float.log u1) * Float.cos (6.283185307179586 * u2)
+
+def expectedNormalArray (n : Nat) (mean std : Float) (key : UInt64) : FloatArray :=
+  buildFloatArray n (expectedNormalValue mean std key)
+
 def assertFloatIsNaN (msg : String) (x : Float) : IO Unit := do
   if !x.isNaN then
     throw <| IO.userError s!"{msg}: expected NaN, got {x}"
@@ -98,6 +108,18 @@ def runRngStress : IO Unit := do
   let uLarge1 := Buffer.toFloatArray (Buffer.randUniform (UInt32.ofNat nLarge) key)
   let uLarge2 := Buffer.toFloatArray (Buffer.randUniform (UInt32.ofNat nLarge) key)
   assertFloatArrayEq "randUniform deterministic repeat" uLarge1 uLarge2
+
+  let normalMean : Float := -0.25
+  let normalStd : Float := 0.75
+  let normalSmall :=
+    Buffer.toFloatArray (Buffer.randNormal (UInt32.ofNat nSmall) normalMean normalStd key)
+  let normalExpected := expectedNormalArray nSmall normalMean normalStd key
+  assertFloatArrayApprox "randNormal reference prefix" normalSmall normalExpected (tol := 5e-5)
+  let normalLarge1 :=
+    Buffer.toFloatArray (Buffer.randNormal (UInt32.ofNat nLarge) normalMean normalStd key)
+  let normalLarge2 :=
+    Buffer.toFloatArray (Buffer.randNormal (UInt32.ofNat nLarge) normalMean normalStd key)
+  assertFloatArrayEq "randNormal deterministic repeat" normalLarge1 normalLarge2
 
   let keepProb : Float := 0.35
   let mSmall := Buffer.toFloatArray (Buffer.bernoulliMask (UInt32.ofNat nSmall) keepProb key)

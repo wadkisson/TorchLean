@@ -12,31 +12,38 @@ public import NN.Examples.Models.Common.RealData
 /-!
 # Char-GPT (minGPT-style) Example
 
-This example mirrors the classic "character-level GPT on a single text file" walkthrough popularized
-by Andrej Karpathy's minGPT/nanoGPT teaching material:
+This example follows the character-level Transformer from Andrej Karpathy's
+"Let's build GPT: from scratch, in code, spelled out" lecture:
 
 - build an alphabet (`itos`) from the training text,
 - build a `stoi` tokenizer from that alphabet,
 - train a compact causal Transformer to predict the next character,
 - sample text continuations from a prompt.
 
-It uses TorchLean's one-hot token interface (`batch × seqLen × vocab`) so the whole example stays in
-the same typed tensor world as the rest of the codebase.
+The `karpathy` preset follows the lecture configuration: batch size 64, context length 256, width 384,
+six attention heads, six pre-normalized Transformer blocks, ReLU feed-forward layers, dropout 0.2,
+AdamW, and 5,000 updates. The CUDA command executes the numerical path in float32. TorchLean applies
+dropout to the attention and feed-forward
+sublayer outputs; unlike the lecture code, it does not yet apply a second dropout to the attention
+weights themselves. All dimensions remain command-line choices.
 
-Implementation note: training draws a fresh deterministic random window each step, following the
-minGPT/nanoGPT batching pattern. The `--windows` flag is accepted as a corpus-scale hint for shared
-scripts, but this command does not precompute a fixed window table.
+Training draws a fresh deterministic batch of corpus windows at every step.  The windows are built
+on demand, so a long run does not retain thousands of large one-hot tensors in host memory.
 
-Quick run:
+Quick check:
 
 ```bash
 lake -R -K cuda=true build torchlean:exe
-lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0
+lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --preset smoke
 ```
 
-`chargpt` is the character-tokenizer teaching path. It rebuilds deterministic training windows from
-the corpus, so it is not part of the 10-step CUDA check tier. Use `gpt2` or `text_gpt2` for the
-compact GPT-style 10-step checks.
+Full lecture experiment:
+
+```bash
+lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --preset karpathy
+```
+
+Reference: <https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py>.
 -/
 
 @[expose] public section
@@ -63,21 +70,88 @@ def buildAlphabet (s : String) : Array Char :=
 /-- Default JSON loss-curve path for this command. -/
 def defaultLogJson : System.FilePath := ModelZoo.trainLogPath "chargpt"
 
+/-- Architecture and evaluation controls independent of the corpus and runtime device. -/
+structure ExperimentConfig where
+  width : Nat
+  heads : Nat
+  layers : Nat
+  dropout : Float
+  steps : Nat
+  batch : Nat
+  seqLen : Nat
+  learningRate : Float
+  evalEvery : Nat
+  evalIters : Nat
+  generate : Nat
+  deriving Repr
+
+namespace ExperimentConfig
+
+/-- Fast configuration used to validate the complete training and generation path. -/
+def smoke : ExperimentConfig :=
+  { width := 32
+    heads := 4
+    layers := 2
+    dropout := 0.0
+    steps := 2
+    batch := 2
+    seqLen := 16
+    learningRate := 3e-4
+    evalEvery := 1
+    evalIters := 1
+    generate := 32 }
+
+/-- Hyperparameters from Karpathy's final Tiny Shakespeare lecture model. -/
+def karpathy : ExperimentConfig :=
+  { width := 384
+    heads := 6
+    layers := 6
+    dropout := 0.2
+    steps := 5000
+    batch := 64
+    seqLen := 256
+    learningRate := 3e-4
+    evalEvery := 500
+    evalIters := 200
+    generate := 500 }
+
+def ofName (name : String) : Except String ExperimentConfig :=
+  match name.trimAscii.toString.toLower with
+  | "smoke" => .ok smoke
+  | "karpathy" => .ok karpathy
+  | other => .error s!"unknown --preset '{other}'; expected smoke or karpathy"
+
+end ExperimentConfig
+
 /-- Help text for character-level GPT training. -/
 def usage : String :=
   String.intercalate "\n"
     [ "torchlean chargpt: character-level GPT training"
     , ""
     , "Usage:"
-    , "  lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare [flags]"
+    , "  lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --preset PRESET [flags]"
     , ""
-    , "Quick check:"
-    , "  lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare --steps 1 --batch 1 --seq-len 1 --generate 0"
+    , "Presets:"
+    , "  smoke       two-update end-to-end CUDA check"
+    , "  karpathy    full Tiny Shakespeare lecture experiment"
+    , ""
+    , "Architecture:"
+    , "  --width N       embedding width"
+    , "  --heads N       attention heads; must divide width"
+    , "  --layers N      Transformer blocks"
+    , "  --dropout P     dropout probability in [0, 1)"
+    , "  --batch N       training windows per update"
+    , "  --seq-len N     context length"
+    , "  --steps N       optimizer updates"
+    , "  --lr FLOAT      AdamW learning rate"
+    , "  --eval-every N  validation cadence; 0 disables intermediate evaluation"
+    , "  --eval-iters N  batches averaged at each validation point"
+    , "  --load-params P load an exact Float parameter checkpoint"
+    , "  --save-params P save final parameters"
     , ""
     , "Notes:"
-    , "  - CUDA is required; CPU eager mode is too slow for this path."
-    , "  - This command is the character-tokenizer walkthrough, not the 10-step CUDA check target."
-    , "  - Use `torchlean gpt2` or `torchlean text_gpt2` for compact GPT-style 10-step checks."
+    , "  - Training and validation use disjoint 90/10 corpus splits."
+    , "  - CUDA runs use TorchLean's float32 runtime; CPU runs use Lean's host Float."
     ]
 
 /-- Decode token ids for terminal output with control characters escaped. -/
@@ -90,7 +164,8 @@ def asciiAllowed (c : Char) : Bool :=
 
 /-- Fitted predictor for a runtime-sized character GPT model. -/
 abbrev Predictor (batch seqLen vocab : Nat) :=
-  Tensor.T Float (shape![batch, seqLen, vocab]) → IO (Tensor.T Float (shape![batch, seqLen, vocab]))
+  Tensor.T Float (.dim (batch * seqLen) .scalar) →
+    IO (Tensor.T Float (shape![batch, seqLen, vocab]))
 
 /-- Autoregressively extend character token ids using a trained CharGPT model. -/
 partial def generateSampledFromIds
@@ -119,8 +194,8 @@ partial def generateSampledFromIds
   let b0 : Fin batch := ⟨0, Nat.pos_of_ne_zero hBatch⟩
   text.autoregressiveTokenIds seqLen padId promptIds gen
     (fun padded predPos => do
-        let x : Tensor.T Float (shape![batch, seqLen, vocab]) :=
-          text.causalLmXOneHotBatch (α := Float) batch seqLen vocab padded (padId := padId)
+        let x : Tensor.T Float (.dim (batch * seqLen) .scalar) :=
+          Data.causalLmTokenIdFloatVec (α := Float) batch seqLen padded
         let logits ← predict x
         pure (text.batchLogitScoresAt logits b0 predPos))
     (allowId := allowId)
@@ -133,98 +208,175 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runFloat exeName args
     (banner := fun _ => s!"{exeName}: char-level GPT training")
     (k := fun opts rest => do
-      if !opts.usesCuda then
-        throw <| IO.userError s!"{exeName}: use --device cuda (CPU char-gpt is extremely slow in eager mode)"
       let (corpus, rest) ← takeInputText rest
-      let defaultSteps : Nat := if opts.usesCuda then 1 else 0
-      let (train, rest) ← ModelZoo.orThrow exeName <|
-        text.BatchedCheckpointedWindowedTrainGenerationOptions.parse
-          exeName rest defaultLogJson defaultSteps 0.0005 1 1 1
-          { prompt := "First Citizen:"
-            generate := 0
+      let (presetName?, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takeFlagValueOnce rest "preset"
+      let defaults ← ModelZoo.orThrow exeName <|
+        ExperimentConfig.ofName (presetName?.getD "smoke")
+      let presetName := presetName?.getD "smoke" |>.trimAscii.toString.toLower
+      let defaultPrompt :=
+        if presetName == "karpathy" then "\n" else "First Citizen:"
+      let generationDefaults : text.GenerationOptions :=
+        if presetName == "karpathy" then
+          { prompt := defaultPrompt
+            generate := defaults.generate
+            temperature := 1.0
+            topK := 0
+            repeatPenalty := 1.0
+            repeatWindow := 0
+            seed := 1337
+            asciiOnly := false }
+        else
+          { prompt := defaultPrompt
+            generate := defaults.generate
             temperature := 0.9
             topK := 12
             repeatPenalty := 1.15
             repeatWindow := 64
             seed := 7
             asciiOnly := false }
+      let (train, rest) ← ModelZoo.orThrow exeName <|
+        text.BatchedCheckpointedWindowedTrainGenerationOptions.parse
+          exeName rest defaultLogJson defaults.steps defaults.learningRate 1
+          defaults.batch defaults.seqLen generationDefaults
           (allowZeroSteps := true)
+      let (width, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takePositiveNatFlagDefault rest exeName "width" defaults.width
+      let (heads, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takePositiveNatFlagDefault rest exeName "heads" defaults.heads
+      let (layers, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takePositiveNatFlagDefault rest exeName "layers" defaults.layers
+      let (dropout, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takeNonnegativeFloatFlagDefault rest exeName "dropout" defaults.dropout
+      let (evalEvery, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takeNatFlagDefault rest "eval-every" defaults.evalEvery
+      let (evalIters, rest) ← ModelZoo.orThrow exeName <|
+        TorchLean.CLI.takePositiveNatFlagDefault rest exeName "eval-iters" defaults.evalIters
       CLI.requireNoArgs exeName rest
+      if dropout >= 1.0 then
+        throw <| IO.userError s!"{exeName}: --dropout must be smaller than 1"
+      if width % heads != 0 then
+        throw <| IO.userError s!"{exeName}: --heads must divide --width"
       let alphabetFull := buildAlphabet corpus
-      -- Keep the compact model's output head small. Characters outside this prefix map to `unkId`.
-      let alphabet := alphabetFull.extract 0 (Nat.min 16 alphabetFull.size)
-      let tok := text.Tokenizer.ofAlphabet alphabet (unkId := 0) (unkChar := '?')
+      let tok := text.Tokenizer.ofAlphabet alphabetFull (unkId := 0) (unkChar := '?')
       let vocab := tok.vocabSize
       let batch := train.batch
       let seqLen := train.seqLen
 
-      let σ : Shape := shape![batch, seqLen, vocab]
-      let τ : Shape := σ
-      let cfg : nn.models.CausalOneHotConfig :=
+      let σ : Shape := .dim (batch * seqLen) .scalar
+      let τ : Shape := shape![batch, seqLen, vocab]
+      let cfg : nn.models.CausalTransformerConfig :=
         { batch := batch
           seqLen := seqLen
           vocab := vocab
-          numHeads := 1
-          headDim := 1
-          ffnHidden := 2
-          layers := 1 }
-      let mkModel : nn.M (nn.Sequential σ τ) :=
-        if hSeq : seqLen = 0 then
-          nn.linear vocab vocab (.dim batch (.dim seqLen .scalar))
-        else
-          have h_dModel : nn.models.CausalOneHotConfig.dModel cfg ≠ 0 := by
-            simp [nn.models.CausalOneHotConfig.dModel, cfg]
-          nn.models.causalTransformerOneHot cfg (h_seqLen := hSeq) (h_dModel := h_dModel)
+          numHeads := heads
+          headDim := width / heads
+          ffnHidden := 4 * width
+          layers := layers
+          activation := .relu
+          dropout? := if dropout == 0.0 then none else some dropout
+          normFirst := true
+          attentionOutputBias := true
+          parameterInit? := some (.normal 0.0 0.02) }
+      if seqLen = 0 then
+        throw <| IO.userError s!"{exeName}: --seq-len must be positive"
+      if cfg.dModel = 0 then
+        throw <| IO.userError s!"{exeName}: model width must be positive"
+      let invalidModel : nn.Sequential σ τ :=
+        nn.of
+          { kind := "InvalidCharGptConfiguration"
+            paramShapes := []
+            initParams := .nil
+            paramRequiresGrad := []
+            forward := fun _ {α} _ _ =>
+              fun {m} _ _ =>
+                fun _x => _root_.Runtime.Autograd.Torch.const
+                  (m := m) (α := α) (Spec.zeros α τ) }
+      let model : nn.Sequential σ τ :=
+        if hSeq : seqLen = 0 then invalidModel
+        else if hModel : cfg.dModel = 0 then invalidModel
+        else nn.run train.seed <|
+          nn.models.causalTransformerTokenId cfg (h_seqLen := hSeq) (h_dModel := hModel)
 
-      let toksList := tok.encode corpus
-      let toks := toksList.toArray
-      let usableStarts : Nat := text.Corpus.usableTokenStarts toks.size seqLen
+      let allTokens := (tok.encode corpus).toArray
+      let split := allTokens.size * 9 / 10
+      let trainTokens := allTokens.extract 0 split
+      let valTokens := allTokens.extract split allTokens.size
+      if trainTokens.size <= seqLen || valTokens.size <= seqLen then
+        throw <| IO.userError s!"{exeName}: corpus split is too short for context length {seqLen}"
 
-      let mkBatchSample (step : Nat) : SupervisedSample Float σ τ :=
-        Data.causalLmOneHotSampleRowsFromTokenArray
-          (α := Float) batch seqLen vocab toks train.seed step (padId := 0)
-
-      /-
-      CharGPT trains on deterministic random-looking windows.  We spell those windows out as a
-      finite dataset so the example remains easy to inspect: the seed controls the window schedule,
-      while `trainer.train` owns checkpointing, optimizer stepping, and prediction.
-      -/
-      let windowCount := Nat.max 1 train.steps
-      let samples : List (SupervisedSample Float σ τ) :=
-        (List.range windowCount).map mkBatchSample
-      let run := Trainer.runConfig opts { optimizer := optim.adam { lr := train.lr } }
-      let trainer := Trainer.new mkModel <|
-        Trainer.Config.fromRunConfig run .crossEntropy
-      trainer.printInfo
-      let trained ← trainer.train
-        (Data.floatSamples samples)
-        { steps := train.steps
-          cudaMemWatch := train.cudaMemWatch
-          log := .disabled
-          loadParams? := train.loadParams?
-          saveParams? := train.saveParams? }
-      let (beforeLoss, afterLoss) ←
-        Trainer.TrainSummary.requireAndPrintFloatLosses exeName trained.report
-          (steps? := some train.steps) (lr? := some train.lr)
+      let mkBatchSample (step : Nat) : SupervisedSample Float σ σ :=
+        Data.causalLmTokenIdSampleRowsFromTokenArray
+          (α := Float) batch seqLen trainTokens train.seed step (padId := 0)
+      let mkValSample (step : Nat) : SupervisedSample Float σ σ :=
+        Data.causalLmTokenIdSampleRowsFromTokenArray
+          (α := Float) batch seqLen valTokens (train.seed + 1000003) step (padId := 0)
+      let trainDef := nn.models.causalTransformerTokenIdLmScalarModuleDef cfg model
+      let evalDef := nn.models.causalTransformerTokenIdLmScalarModuleDefWithMode .eval cfg model
+      let module ← TorchLean.Module.instantiateFloat trainDef opts
+      match train.loadParams? with
+      | none => pure ()
+      | some path =>
+          Checkpoint.loadModuleParamBits module path
+          IO.println s!"  loaded params: {path}"
+      let optimizer := _root_.Runtime.Autograd.TorchLean.Optim.adamw
+        (α := Float) (paramShapes := nn.paramShapes model)
+        train.lr 0.01 0.9 0.999 1e-8
+      let optimizerState ← TorchLean.Module.initOptim module optimizer
+      let optimizerStateRef ← IO.mkRef optimizerState
+      let storedScalarCount :=
+        (nn.paramShapes model).foldl (fun total shape => total + Shape.size shape) 0
+      let trainableParameterCount :=
+        (List.zip (nn.paramShapes model) (nn.paramRequiresGrad model)).foldl
+          (fun total entry => if entry.2 then total + Shape.size entry.1 else total) 0
+      IO.println s!"  trainable_parameters={trainableParameterCount}"
+      if storedScalarCount != trainableParameterCount then
+        IO.println s!"  non_trainable_state_scalars={storedScalarCount - trainableParameterCount}"
+      let evalLoss : IO Float := do
+        let losses ← (List.range evalIters).mapM fun i => do
+          let loss ← TorchLean.Module.forwardWithParams
+            evalDef opts module.trainer.params (mkValSample i)
+          pure (Spec.Tensor.toScalar loss)
+        pure (losses.foldl (· + ·) 0.0 / Float.ofNat losses.length)
+      let beforeLoss ← evalLoss
+      IO.println s!"  step 0: val loss={beforeLoss}"
+      for step in [0:train.steps] do
+        let state ← optimizerStateRef.get
+        let state' ← TorchLean.Module.stepWith module optimizer state (mkBatchSample step)
+        optimizerStateRef.set state'
+        let done := step + 1
+        if evalEvery != 0 && (done % evalEvery == 0 || done == train.steps) then
+          let loss ← evalLoss
+          IO.println s!"  step {done}: val loss={loss}"
+      let afterLoss ← evalLoss
+      let predict := fun (x : Tensor.T Float σ) => do
+        nn.forward model opts .eval module.trainer.params x
       let promptIds := tok.encode train.prompt
       let allowId : Nat → Bool :=
         if train.asciiOnly then
-          fun i => asciiAllowed (alphabet.getD i '?')
+          fun i => asciiAllowed (alphabetFull.getD i '?')
         else
           fun _ => true
       let outIds ←
-        generateSampledFromIds batch seqLen vocab trained.predict promptIds
+        generateSampledFromIds batch seqLen vocab predict promptIds
           train.generate train.temperature train.topK train.seed train.repeatWindow train.repeatPenalty
           (allowId := allowId) (padId := 0)
       let sampled := escapeCharIdsForDisplay tok outIds
+      match train.saveParams? with
+      | none => pure ()
+      | some path =>
+          Checkpoint.saveModuleParamBits module path
+          IO.println s!"  wrote params: {path}"
       IO.println s!"  vocab={vocab} (unique chars)"
+      IO.println s!"  architecture=width {width}, heads {heads}, layers {layers}, dropout {dropout}"
       IO.println s!"  sampled={sampled}"
       text.writeGenerationTrainLog
         train.log "CharGPT (minGPT-style)" train.steps beforeLoss afterLoss
         train.toGenerationOptions sampled
         #[ModelZoo.deviceNote opts,
           s!"vocab={vocab}",
-          s!"usable_windows={usableStarts}",
+          s!"train_tokens={trainTokens.size}",
+          s!"validation_tokens={valTokens.size}",
           ModelZoo.cudaMemWatchNote opts train.steps train.cudaMemWatch]
       pure 0)
 

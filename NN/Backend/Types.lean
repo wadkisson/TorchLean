@@ -54,13 +54,13 @@ def cliName : Device → String
 before calling this function. -/
 def parse? : String → Option Device
   | "cpu" => some .cpu
-  | "cuda" | "gpu" => some .cuda
-  | "rocm" | "amd" => some .rocm
-  | "metal" | "mps" => some .metal
-  | "wasm" | "webgpu" => some .wasm
-  | "tpu" | "xla" => some .tpu
-  | "trainium" | "neuron" => some .trainium
-  | "custom" | "custom-chip" => some .custom
+  | "cuda" => some .cuda
+  | "rocm" => some .rocm
+  | "metal" => some .metal
+  | "wasm" => some .wasm
+  | "tpu" => some .tpu
+  | "trainium" => some .trainium
+  | "custom" => some .custom
   | "external" => some .external
   | _ => none
 
@@ -69,7 +69,7 @@ def parse (value : String) : Except String Device :=
   match parse? value with
   | some device => pure device
   | none =>
-      throw s!"unknown --device {value} (supported names: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
+      throw s!"unknown device {value} (known targets: cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
 
 end Device
 
@@ -122,47 +122,25 @@ inductive BackendOp where
   | safeLog
   | logSoftmax
   | softmax
-  | sum
   | reduceSum
   | reduceMean
-  | flatten
   | reshape
   | permute
-  | transpose2d
-  | swapAdjacentAtDepth
-  | transpose3dFirstToLast
-  | transpose3dLastToFirst
-  | transpose3dLastTwo
-  | broadcastTo
-  | concatVectors
-  | concatLeadingAxis
-  | sliceLeadingAxisRange
-  | gatherScalar
-  | gatherScalarNat
-  | gatherRow
-  | gatherVecNat
-  | gatherRowsNat
-  | scatterAddVec
-  | scatterAddRow
+  | broadcast
+  | concat
+  | slice
+  | gather
+  | scatterAdd
   | matmul
-  | bmm
   | linear
   | mseLoss
   | layerNorm
   | batchNorm
-  | batchNormChannelFirst
   | conv
-  | conv2d
   | convTranspose
-  | convTranspose2d
   | maxPool
-  | maxPool2d
-  | maxPool2dPad
   | smoothMaxPool
-  | smoothMaxPool2d
   | avgPool
-  | avgPool2d
-  | avgPool2dPad
   | fftFno
   | selectiveScan
   | scaledDotProductAttention
@@ -196,47 +174,25 @@ def name : BackendOp → String
   | .safeLog => "safe_log"
   | .logSoftmax => "log_softmax"
   | .softmax => "softmax"
-  | .sum => "sum"
   | .reduceSum => "reduce_sum"
   | .reduceMean => "reduce_mean"
-  | .flatten => "flatten"
   | .reshape => "reshape"
   | .permute => "permute"
-  | .transpose2d => "transpose2d"
-  | .swapAdjacentAtDepth => "swapAdjacentAtDepth"
-  | .transpose3dFirstToLast => "transpose3d_first_to_last"
-  | .transpose3dLastToFirst => "transpose3d_last_to_first"
-  | .transpose3dLastTwo => "transpose3d_last_two"
-  | .broadcastTo => "broadcastTo"
-  | .concatVectors => "concat_vectors"
-  | .concatLeadingAxis => "concat_leading_axis"
-  | .sliceLeadingAxisRange => "slice_leading_axis_range"
-  | .gatherScalar => "gather_scalar"
-  | .gatherScalarNat => "gather_scalar_nat"
-  | .gatherRow => "gather_row"
-  | .gatherVecNat => "gather_vec_nat"
-  | .gatherRowsNat => "gather_rows_nat"
-  | .scatterAddVec => "scatter_add_vec"
-  | .scatterAddRow => "scatter_add_row"
+  | .broadcast => "broadcast"
+  | .concat => "concat"
+  | .slice => "slice"
+  | .gather => "gather"
+  | .scatterAdd => "scatter_add"
   | .matmul => "matmul"
-  | .bmm => "bmm"
   | .linear => "linear"
   | .mseLoss => "mse_loss"
   | .layerNorm => "layer_norm"
   | .batchNorm => "batch_norm"
-  | .batchNormChannelFirst => "batchnorm_channel_first"
   | .conv => "conv"
-  | .conv2d => "conv2d"
   | .convTranspose => "conv_transpose"
-  | .convTranspose2d => "conv_transpose2d"
   | .maxPool => "max_pool"
-  | .maxPool2d => "max_pool2d"
-  | .maxPool2dPad => "max_pool2d_pad"
   | .smoothMaxPool => "smooth_max_pool"
-  | .smoothMaxPool2d => "smooth_max_pool2d"
   | .avgPool => "avg_pool"
-  | .avgPool2d => "avg_pool2d"
-  | .avgPool2dPad => "avg_pool2d_pad"
   | .fftFno => "fft_fno"
   | .selectiveScan => "selective_scan"
   | .scaledDotProductAttention => "scaled_dot_product_attention"
@@ -268,35 +224,63 @@ inductive TrustLevel where
   | trustedExternal
   deriving DecidableEq, Repr
 
-/-- User- or CI-selected policy for which backend capsules may be used. -/
-inductive TrustPolicy where
-  | verifiedOnly
-  | checked
-  | fuzzedOk
-  | allowTrustedExternal
+/--
+One policy for the complete assurance boundary of a backend plan.
+
+The first three fields control which implementation trust levels the planner may select. The
+remaining fields control which kinds of evidence may discharge the selected capsule's shape,
+layout, value, and VJP obligations. Keeping these decisions in one record prevents a profile from
+selecting a capsule under one policy and auditing it under a contradictory second policy.
+-/
+structure AssurancePolicy where
+  allowChecked : Bool := false
+  allowFuzzed : Bool := false
+  allowTrustedExternal : Bool := false
+  requireEvidence : Bool := true
+  allowRuntimeGuards : Bool := false
+  allowTestEvidence : Bool := false
   deriving DecidableEq, Repr
 
-namespace TrustPolicy
+namespace AssurancePolicy
 
-/-- Whether a policy admits a capsule at the given trust level. -/
-def accepts : TrustPolicy -> TrustLevel -> Bool
-  | .verifiedOnly, .verified => true
-  | .verifiedOnly, _ => false
-  | .checked, .verified => true
-  | .checked, .checked => true
-  | .checked, _ => false
-  | .fuzzedOk, .trustedExternal => false
-  | .fuzzedOk, _ => true
-  | .allowTrustedExternal, _ => true
+/-- Proof-oriented policy: every capsule must be verified and every obligation proof-backed. -/
+def verified : AssurancePolicy := {}
 
-end TrustPolicy
+/--
+Maintained TorchLean runtime policy.
+
+Checked implementations, runtime guards, regression evidence, and fuzz evidence are accepted, but
+trusted external implementations are not.
+-/
+def checked : AssurancePolicy :=
+  { allowChecked := true
+    allowFuzzed := true
+    allowRuntimeGuards := true
+    allowTestEvidence := true }
+
+/--
+Explicit external-provider policy.
+
+This is the policy used when a caller deliberately delegates a numerical kernel to LibTorch or
+another external implementation. The selected boundary remains visible in the execution audit.
+-/
+def external : AssurancePolicy :=
+  { checked with allowTrustedExternal := true }
+
+/-- Whether the policy admits a capsule with the given implementation trust level. -/
+def acceptsTrust (policy : AssurancePolicy) : TrustLevel → Bool
+  | .verified => true
+  | .checked => policy.allowChecked
+  | .fuzzed => policy.allowFuzzed
+  | .trustedExternal => policy.allowTrustedExternal
+
+end AssurancePolicy
 
 /-- How a backend capsule treats gradients. -/
 inductive VJPMode where
   | none
   | torchLeanTape
   | backendVJP
-  | externalAutograd
   deriving DecidableEq, Repr
 
 /-- Backend preference requested by a runtime configuration. -/
@@ -310,7 +294,7 @@ inductive BackendPreference where
 structure ExecutionConfig where
   device : Device := .cpu
   backend : BackendPreference := .auto
-  trustPolicy : TrustPolicy := .checked
+  assurance : AssurancePolicy := .checked
   vjpMode : VJPMode := .torchLeanTape
   deriving Repr
 

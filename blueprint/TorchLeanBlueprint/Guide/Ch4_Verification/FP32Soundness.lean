@@ -37,6 +37,40 @@ approximation theorem says each relevant logit can move by at most `0.03`. For a
 the margin can shrink by at most `0.06`. The FP32 margin is still at least `0.06`, so the
 classification claim survives rounding.
 
+# Run The Two Float32 Views
+
+TorchLean includes a small forward-and-backward comparison using the same MLP parameters in host
+`Float` arithmetic and in the executable `IEEE32Exec` semantics:
+
+```
+lake exe torchlean float32_modes
+```
+
+The command first names the available meanings:
+
+```
+Float32 mode: FP32: proof semantics (round-on-ℝ), finite-only; no NaN/Inf
+Float32 mode: IEEE32Exec: executable IEEE-754 binary32 kernel (bit-level; includes NaN/Inf)
+```
+
+It then prints the output, parameter gradients, and input gradient for both executable paths. The
+final comparison on the bundled example is:
+
+```
+max_abs_diff(Float vs IEEE32Exec) =
+  0.0000000762939453835542735760100185871124267578125
+```
+
+This number is an observation about one input and one network. It is not a uniform error theorem.
+The proof task is to derive a bound `ε` from input ranges, parameter ranges, and the sequence of
+rounded operations, then prove that every execution covered by those hypotheses differs from the
+real specification by at most `ε`.
+
+Try changing the example's weights by a power of two and by a nearby non-power-of-two decimal. The
+former often passes through binary arithmetic exactly; the latter exposes rounding earlier. The
+experiment gives intuition for the formal representability and ULP theorems developed in the
+floating-point chapters.
+
 # Finite Path First
 
 TorchLean separates two questions:

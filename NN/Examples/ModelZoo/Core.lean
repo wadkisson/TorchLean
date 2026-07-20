@@ -38,22 +38,6 @@ def parseTrainFlags (exeName : String) (args : List String)
     Except String (TrainFlags × List String) :=
   NN.API.Common.parseModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr allowZeroSteps
 
-/-- Parse shared CSV path plus optimizer/training flags for model-zoo commands. -/
-def parseCsvTrainFlags (exeName : String) (args : List String)
-    (defaultCsv defaultLogPath : System.FilePath) (defaultSteps : Nat := 1)
-    (defaultLr : Float := 1e-3) :
-    Except String (CsvTrainFlags × List String) :=
-  NN.API.Common.parseCsvModelTrainFlags exeName args defaultCsv defaultLogPath defaultSteps
-    defaultLr
-
-/-- Parse shared seeded optimizer/training flags for model-zoo commands. -/
-def parseSeededTrainFlags (exeName : String) (args : List String)
-    (defaultLogPath : System.FilePath) (defaultSteps : Nat := 1) (defaultLr : Float := 1e-3)
-    (allowZeroSteps : Bool := false) :
-    Except String (SeededTrainFlags × List String) :=
-  NN.API.Common.parseSeededModelTrainFlags exeName args defaultLogPath defaultSteps defaultLr
-    allowZeroSteps
-
 namespace LoggedTrainFlags
 
 /-- Build public trainer options from logged model-zoo flags. -/

@@ -52,7 +52,6 @@ errors immediately.
 -/
 def dispatchCudaOpt {α β : Type} (s : EagerSession α) (op : NN.Backend.BackendOp)
     (cpu : IO β) (cuda : IO (Option β)) : IO β := do
-  let _ ← s.selectedCapsule op
   if Options.device s.opts == .cuda then
     let r? ← cuda
     match r? with
@@ -60,6 +59,7 @@ def dispatchCudaOpt {α β : Type} (s : EagerSession α) (op : NN.Backend.Backen
     | none =>
         throw <| IO.userError s!"torch: cuda: `{op.name}` is unsupported by the eager CUDA backend"
   else
+    let _ ← s.requireCapsuleProvider op .reference "TorchLean's reference CPU executor"
     cpu
 
 /--
@@ -70,9 +70,9 @@ reference capsules, but these eager branches below call TorchLean's native CUDA 
 profile selects another provider, failing here is better than silently running a different backend.
 -/
 def requireNativeCudaCapsule {α : Type} (s : EagerSession α) (op : NN.Backend.BackendOp) : IO Unit := do
-  let _ ← s.selectedCapsule op
   unless s.opts.usesCuda do
     throw <| IO.userError s!"torch: native CUDA capsule requested for CPU op `{op.name}`"
+  let _ ← s.requireCapsuleProvider op .nativeCuda "TorchLean's native CUDA executor"
 
 /--
 Validate one float-encoded token id and return the corresponding `Nat`.

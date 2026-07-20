@@ -13,10 +13,9 @@ public import NN.Backend.Attention
 
 Optional LibTorch-backed capsules.
 
-These capsules are intentionally separated from the default registry. Enabling them means accepting
-an external implementation boundary. Its SDPA bridge uses TorchLean's hard boolean-mask
-convention. Forward-only and external-autograd
-paths are separate capsules so the planner can name the exact trust boundary.
+These capsules are intentionally separated from the maintained registry. Adding the module means
+accepting an external implementation boundary. The SDPA bridge uses TorchLean's hard boolean-mask
+convention and supplies forward values only; TorchLean retains the tape and local backward rule.
 -/
 
 @[expose] public section
@@ -27,7 +26,7 @@ namespace LibTorch
 
 /-- Optional LibTorch capsules currently known to the planner. -/
 def capsules : List KernelCapsule :=
-  [Attention.libTorchSDPAForward, Attention.libTorchSDPAAutograd]
+  [Attention.libTorchSDPAForward]
 
 end LibTorch
 end Backend

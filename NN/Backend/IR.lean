@@ -55,24 +55,24 @@ def op? : NN.IR.OpKind → Option BackendOp
   | .mseLoss => some .mseLoss
   | .matmul => some .matmul
   | .linear => some .linear
-  | .conv2d .. => some .conv2d
-  | .maxPool2d .. => some .maxPool2d
-  | .maxPool2dPad .. => some .maxPool2dPad
-  | .avgPool2d .. => some .avgPool2d
-  | .avgPool2dPad .. => some .avgPool2dPad
-  | .broadcastTo .. => some .broadcastTo
+  | .conv2d .. => some .conv
+  | .maxPool2d .. => some .maxPool
+  | .maxPool2dPad .. => some .maxPool
+  | .avgPool2d .. => some .avgPool
+  | .avgPool2dPad .. => some .avgPool
+  | .broadcastTo .. => some .broadcast
   | .reduceSum .. => some .reduceSum
   | .reduceMean .. => some .reduceMean
-  | .sum => some .sum
+  | .sum => some .reduceSum
   | .softmax .. => some .softmax
   | .layernorm .. => some .layerNorm
   | .reshape .. => some .reshape
-  | .flatten .. => some .flatten
-  | .concat .. => some .concatLeadingAxis
-  | .swap_first_two => some .swapAdjacentAtDepth
-  | .transpose3dLastTwo => some .transpose3dLastTwo
+  | .flatten .. => some .reshape
+  | .concat .. => some .concat
+  | .swap_first_two => some .permute
+  | .transpose3dLastTwo => some .permute
   | .permute .. => some .permute
-  | .batchNorm2dNchwEval .. => some .batchNormChannelFirst
+  | .batchNorm2dNchwEval .. => some .batchNorm
 
 /-- Backend operation requested by a graph node, if the node needs runtime work. -/
 def nodeOp? (n : NN.IR.Node) : Option BackendOp :=

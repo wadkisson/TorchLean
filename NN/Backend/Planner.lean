@@ -47,19 +47,10 @@ def admissible (cfg : ExecutionConfig) (p : ExecutionPlan) : Bool :=
 
 end ExecutionPlan
 
-/-- Put preferred-provider capsules first while preserving the relative order otherwise. -/
-def orderByPreference (cfg : ExecutionConfig) (capsules : List KernelCapsule) :
-    List KernelCapsule :=
-  match cfg.backend with
-  | .prefer p =>
-      capsules.filter (fun c => c.provider == p) ++
-      capsules.filter (fun c => !(c.provider == p))
-  | _ => capsules
-
 /-- Choose a backend capsule for one operation. -/
 def planOp (cfg : ExecutionConfig) (registry : List KernelCapsule)
     (op : BackendOp) : Except String PlannedKernel := do
-  match chooseCapsuleFor? cfg op (orderByPreference cfg registry) with
+  match chooseCapsuleFor? cfg op registry with
   | some capsule => pure { op, capsule }
   | none =>
       throw s!"no admissible backend capsule for op {op.name} on device {cfg.device.cliName}"

@@ -2,209 +2,291 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Why Functional Programming?" =>
+#doc (Manual) "Why The Model Is Written As A Function" =>
 %%%
 tag := "why_functional"
 %%%
 
-The reason TorchLean uses a functional style is not aesthetic. It is about making state visible.
+A neural network is usually introduced as a function
 
-In ordinary ML code, a forward pass may read parameters, update normalization buffers, consult a
-random generator, depend on train/eval mode, and leave gradients in mutable fields. The convenience
-is real, but it complicates the question a verifier eventually has to ask: which function did this
-model compute?
+$$`f_\theta : X\to Y`.
 
-Functional programming gives us a clean way to answer. A layer is a function from inputs and
-parameters to outputs. A training step is a function from old parameters, data, gradients, optimizer
-state, and random generator state to new values. Nothing essential is lost; the difference is that
-every value that matters to a theorem has a name.
+The notation tells us something important: the output depends on an input `x` and parameters `θ`.
+Real training code has more dependencies. Batch normalization reads and updates running statistics.
+Dropout depends on a mode and a random mask. An optimizer carries momentum or moment estimates. A
+checkpoint loader reads bytes from a file. A GPU execution owns buffers whose lifetime matters.
 
-State does not disappear. It becomes an argument, a return value, or a named boundary. Once state is
-visible, ordinary mathematical questions apply. Did this step use the old momentum or the new
-momentum? Was this dropout mask sampled in
-training mode or skipped in evaluation mode? Did this certificate check the payload before or after
-an import conversion? A functional style gives those questions handles.
+TorchLean does not pretend that these effects disappear. It begins with a functional description so
+that each dependency can be named before an efficient runtime decides how to store it.
 
-# The Problem with Mutable State
+# Start With An Ordinary Function
 
-In an ML script, state is everywhere. BatchNorm has running statistics. Dropout depends on mode and
-randomness. Optimizers carry momentum or Adam moments. Autoregressive models carry KV caches and
-position counters. Tokenizers carry vocabularies and special-token conventions. Parameters can be
-shared. These are normal features of practical systems.
-
-The problem is that a theorem cannot reason about state that never appears in the object being
-checked. In many frameworks, a model is an object with mutable fields. A call that looks like an
-ordinary forward pass may update a buffer, consult a hidden random generator, write to gradient
-storage, or depend on whether some parameter tensor is shared with another module. That style is
-convenient for experimentation, but it makes the mathematical question less direct: which function
-did the network compute?
-
-A Python-style sketch makes the issue concrete:
+Here is the smallest possible affine model:
 
 ```
-class Layer:
-    def __call__(self, x):
-        self.calls += 1          # hidden state change
-        self.running_mean *= 0.9 # another hidden state change
-        return self.weight * x + self.bias
+structure Affine where
+  weight : Float
+  bias : Float
+deriving Repr
+
+def Affine.forward (p : Affine) (x : Float) : Float :=
+  p.weight * x + p.bias
+
+#eval Affine.forward { weight := 2.0, bias := 0.5 } 3.0
 ```
 
-The return value is incomplete evidence. The next call can behave differently because this call
-changed the object. If a proof, exporter, or verifier ignores those mutations, it may reason about a
-different computation from the one that actually ran.
+Running the file with
 
-The same issue appears in more realistic layers. BatchNorm is not merely an affine expression; in
-training mode it also updates running estimates, while in evaluation mode it reads stored estimates.
-A useful specification must say which mode is active and which statistics are used. In a functional
-presentation, that distinction can be made explicit:
+```
+lake env lean Affine.lean
+```
+
+prints:
+
+```
+6.500000
+```
+
+There is no hidden parameter lookup in `Affine.forward`. If we want another model, we pass another
+`Affine` value. If we want another input, we pass another `Float`. The same definition can be
+evaluated by the compiler or mentioned in a proposition:
+
+```
+def HasExpectedOutput : Prop :=
+  Affine.forward { weight := 2.0, bias := 0.5 } 3.0 = 6.5
+```
+
+`HasExpectedOutput` is a statement, not a proof. Proving claims about executable floating-point
+operations takes a little more machinery, which we will build later. For now, notice the useful
+split between the model family `Affine.forward` and the concrete model
+`{ weight := 2.0, bias := 0.5 }`.
+
+# Parameters Are Inputs To The Program
+
+TorchLean's layer representation follows the same idea at tensor scale. A layer records an ordered
+list of parameter shapes, initial values for those tensors, gradient flags, and a forward program.
+When that program runs, it receives the current parameter references and the input. Training may
+replace the live parameter values many times without changing the architecture.
+
+For a two-layer MLP:
+
+```
+import NN.API
+
+open TorchLean
+
+def model : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
+  nn.Sequential![
+    nn.linear 2 4,
+    nn.relu,
+    nn.linear 4 1
+  ]
+
+def initialized :=
+  nn.run 2026 model
+
+#eval (nn.paramShapes initialized).map Shape.toList
+```
+
+Lean prints:
+
+```
+[[4, 2], [4], [1, 4], [1]]
+```
+
+These are the first weight matrix, first bias, second weight matrix, and second bias. Their order is
+part of the forward program's type. `nn.initParams initialized` returns the corresponding initial
+payload; a trained runtime owns a later payload with the same shape list.
+
+Try changing the hidden width from `4` to `6` in both linear layers. The printed parameter shapes
+become:
+
+```
+[[6, 2], [6], [1, 6], [1]]
+```
+
+Now change only the second layer to `nn.linear 6 1`. The model no longer elaborates: the preceding
+ReLU produces a length-four vector, while the final layer requires length six. The functional
+composition and the dependent shape type catch the disagreement at the model boundary.
+
+# Initialization Is A Pure State Computation
+
+The linear layers need random initial weights. Rather than reading an unnamed global generator,
+public layer constructors return `nn.M`, a deterministic state computation over a seed stream.
+
+```
+def firstBuild := nn.run 2026 model
+def secondBuild := nn.run 2026 model
+def anotherBuild := nn.run 7 model
+```
+
+`firstBuild` and `secondBuild` consume the same sequence of initialization seeds. `anotherBuild`
+uses the same architecture and parameter shapes but a different initialization stream.
+
+This distinction matters when reproducing a run. The architecture alone does not determine the
+initial parameter values. TorchLean can therefore state separately:
+
+- which seeded builder describes the architecture;
+- which seed initialized it;
+- which parameter payload is currently used;
+- whether a theorem concerns the initial or trained payload.
+
+The public trainer accepts either the builder or an already initialized model:
+
+```
+def fromBuilder :=
+  Trainer.new model { task := .regression, seed := 2026 }
+
+def fromValue :=
+  Trainer.new initialized { task := .regression, seed := 999 }
+```
+
+In the first definition, `Trainer.new` uses `2026` to run the builder. In the second, the model is
+already built, so the seed does not reinitialize it. This behavior is implemented by the public
+`Trainer.ToModel` instances rather than by inspecting the value at runtime.
+
+# An Optimizer Is A State Transition
+
+Plain SGD can be written as
+
+$$`\theta_{t+1}=\theta_t-\eta g_t`.
+
+Momentum adds another state variable:
+
+$$`
+\begin{aligned}
+v_{t+1} &= \mu v_t+g_t,\\
+\theta_{t+1} &= \theta_t-\eta v_{t+1}.
+\end{aligned}
+`
+
+A direct Lean version makes both outputs explicit:
+
+```
+structure StepState where
+  weight : Float
+  velocity : Float
+deriving Repr
+
+def momentumStep
+    (learningRate momentum gradient : Float)
+    (state : StepState) : StepState :=
+  let velocity := momentum * state.velocity + gradient
+  { weight := state.weight - learningRate * velocity
+    velocity }
+
+#eval momentumStep 0.1 0.9 0.25
+  { weight := 2.0, velocity := 0.0 }
+```
+
+The result is:
+
+```
+{ weight := 1.975000, velocity := 0.250000 }
+```
+
+Nothing in this definition mutates `state`; it returns the next state. Adam and AdamW carry more
+fields, but the semantic picture is the same. This makes it possible to state a theorem about one
+exact update convention, including epsilon placement, bias correction, and weight decay.
+
+The performance runtime need not allocate a fresh high-level tree for every update. It can reuse
+uniquely owned Lean arrays, mutate references inside `IO`, or update native device buffers. The
+functional rule says what the update means. The runtime implementation decides how to realize it.
+
+# Mode Is An Argument, Not Background Knowledge
+
+Some layers denote different functions during training and evaluation. Dropout samples a mask in
+training and is the identity in evaluation. Batch normalization uses batch statistics and updates
+running buffers during training; evaluation reads those saved statistics.
+
+A small sketch shows the relevant interface:
 
 ```
 inductive Mode where
   | train
   | eval
 
-structure BatchNormState where
-  runningMean : Float
-  runningVar : Float
+structure RunningMean where
+  value : Float
 
-def batchNormSketch
-    (mode : Mode) (state : BatchNormState) (x gamma beta : Float) :
-    Float × BatchNormState :=
+def normalizeSketch
+    (mode : Mode) (state : RunningMean) (x : Float) :
+    Float × RunningMean :=
   match mode with
   | .eval =>
-      let y := gamma * (x - state.runningMean) + beta
-      (y, state)
+      (x - state.value, state)
   | .train =>
-      let newState :=
-        { runningMean := 0.9 * state.runningMean + 0.1 * x
-          runningVar := state.runningVar }
-      let y := gamma * x + beta
-      (y, newState)
+      let next := { value := 0.9 * state.value + 0.1 * x }
+      (x - next.value, next)
 ```
 
-This is only the state-changing core of BatchNorm, not a production definition. The important part
-is the interface: the state that changes is returned. A theorem about evaluation mode can
-quantify over `state` without pretending a hidden object field stayed fixed.
+This is not TorchLean's BatchNorm formula; it is the shape of the dependency. The actual
+`LayerDef.forward` receives a `Mode`, and `LayerDef.updateBuffers` optionally returns updated
+parameter or buffer tensors. `nn.programWithMode` and `nn.updateBuffers` compose that behavior
+through a sequential model.
 
-# Pure Functions are Mathematical Functions
+This is not purity for purity's sake. It lets a graph export or theorem say whether it describes
+`.train` or `.eval`, instead of leaving the reader to guess.
 
-In a pure functional language such as Lean, ordinary functions have no side effects. A TorchLean
-layer takes explicit inputs, including its parameters, and returns an explicit output. The simplest
-version is affine arithmetic:
+# Effects Still Have A Home
 
-```
-structure Affine1D where
-  w : Float
-  b : Float
-
-def affine1D (p : Affine1D) (x : Float) : Float :=
-  p.w * x + p.b
-```
-
-Here the mathematical reading and the executable reading coincide: `affine1D p x` computes
-`p.w * x + p.b`. There is no hidden `.grad` field, no object identity, and no accidental parameter
-mutation that a theorem has to account for later.
-
-The same idea scales to tensors. In TorchLean, a layer is still read as
-
-$$`\operatorname{forward}(\theta, x) = y`
-
-but the values now carry tensor shapes, scalar semantics, and graph structure as needed. We can
-prove facts about the same definitions that examples and checkers inspect.
-
-# Explicit Effects And Explicit Randomness
-
-Randomness is another place where ML code often hides state. A dropout layer is not a mathematical
-function of its input alone during training; it also depends on a mask, seed, or generator state.
-TorchLean's discipline is to represent that dependency instead of burying it inside an object.
+Reading a dataset and launching a kernel are effects, so their result types mention `IO`:
 
 ```
-structure DropoutSketchState where
-  seed : Nat
+def readManifest (path : System.FilePath) : IO String := do
+  IO.FS.readFile path
 
-def dropoutSketch
-    (mode : Mode) (state : DropoutSketchState) (x : Float) :
-    Float × DropoutSketchState :=
-  match mode with
-  | .eval => (x, state)
-  | .train =>
-      let keep := state.seed % 2 == 0
-      let x' := if keep then 2.0 * x else 0.0
-      (x', { seed := state.seed + 1 })
+def announce (message : String) : IO Unit := do
+  IO.println message
 ```
 
-Again, the sketch is not a full RNG. It records the contract: training consumes state and returns
-new state; evaluation does not sample a mask. This is the difference between an executable recipe
-and a proof-ready object.
+A pure parser can inspect the returned string. A pure checker can inspect a parsed certificate. A
+theorem can describe the checker. The filesystem and the launched kernel remain effects, while the
+objects we reason about after those calls can still be ordinary Lean values.
 
-# Training Still Changes Things
+TorchLean uses the same separation for training:
 
-Functional programming does not mean that training is static. It means that change is represented by
-new values instead of silent updates to existing ones.
+- model construction and initialization are pure seed-state computations;
+- the model's mathematical operations have pure interpretations;
+- public training is an `IO` session with mutable parameters, optimizer state, tapes, and buffers;
+- checkers consume stable Lean data;
+- theorems state what accepted data implies.
 
-```
-def sgdStep (eta gradW gradB : Float) (p : Affine1D) : Affine1D :=
-  { w := p.w - eta * gradW
-    b := p.b - eta * gradB }
-```
+# Why This Can Still Be Fast
 
-The step is still an update, but now the update has a type and a result. An optimizer step takes an
-old parameter bundle and returns a new parameter bundle. A logger takes an old log state and returns
-an updated log state. A random generator takes an old seed or generator state and returns the next
-one. The training loop remains inspectable because state changes appear at the places where the
-program says they happen.
+Lean 4 uses deterministic reference counting. When an immutable value has a unique owner, compiled
+code can often reuse its storage. TorchLean also uses explicitly mutable runtime objects and foreign
+buffers where the workload calls for them.
 
-This makes optimizer claims more precise. A statement about SGD can talk about one update:
+It would therefore be misleading to equate “functional interface” with “copy every tensor after
+every operation.” The source-level interface controls dependencies. Storage ownership and mutation
+belong to the execution strategy.
 
-$$`\theta_{t+1} = \theta_t - \eta \nabla L(\theta_t)`
+The same separation lets several backends implement one model. A CPU evaluator, native CUDA
+kernel, or external provider receives the same explicit inputs, so changing device does not require
+rewriting the model around a different collection of hidden fields.
 
-whereas a statement about Adam needs the first-moment state, second-moment state, step counter, and
-bias-correction convention. If those fields are implicit, a theorem about "the optimizer" is already
-underspecified. If they are data, the statement can choose exactly the update rule it means.
+# A Useful Reading Test
 
-This also clarifies trust boundaries. If a CUDA kernel, a PyTorch exporter, or an external
-certificate producer contributes a value, TorchLean can name that imported value and state what is
-assumed about it. The proof does not have to pretend that an external side effect was a Lean
-definition.
+When you encounter a TorchLean definition, ask three questions:
 
-# Reference Counting And Practical Execution
+1. Which values determine the result?
+2. Is the definition pure, a deterministic state computation such as `nn.M`, or an `IO` action?
+3. If state changes, where is the old state and where is the new state named?
 
-The usual worry about pure code is that it allocates too much. Lean 4 uses deterministic reference
-counting, and values with a unique owner can often be updated in place under the hood. That means
-the functional style does not require the runtime to behave naively.
+These questions are more useful than trying to label the whole repository “functional.” Training
+and native execution are stateful jobs; specifications and many model transformations are pure.
+The types make the difference visible.
 
-For TorchLean, this matters because tensor code needs both a clean semantics and a realistic path to
-performance. We can write programs as transformations of values, while the runtime is still allowed
-to perform safe buffer reuse when uniqueness makes it possible.
+# Further Reading
 
-# Where Purity Stops
-
-Pure definitions are not the whole program. Loading a checkpoint, opening a socket to a Python
-process, invoking a CUDA kernel, writing a JSON log, or calling Arb for interval arithmetic are
-effects. Lean marks ordinary effects in the type with `IO`, and TorchLean uses documented runtime
-and FFI boundaries for native or external systems.
-
-That distinction is part of the trust story. A pure Lean definition can be unfolded in a theorem. An
-`IO` action can be run, tested, and wrapped by a checker, but its external behavior is not proved
-merely because the call is written in Lean syntax. "This action produced an artifact" is distinct
-from "this theorem says accepted artifacts imply a semantic property."
-
-# Related Design Ideas
-
-The same design principle appears throughout formal methods: keep executable code, specifications,
-and proof obligations close enough that they stay aligned. TorchLean applies that principle to
-neural networks. State is data. Shapes are part of the interface. Semantics are named. Proof
-artifacts are built around the same definitions that model examples use.
-
-Functional programming matters here because it turns hidden context into data. Parameters, optimizer
-state, random seeds, logs, masks, imported artifacts, and certificate payloads can all be passed,
-saved, inspected, and mentioned in theorem statements. TorchLean does not remove state from ML. It
-makes the state part of the computation we can talk about.
-
-## References
-
-- Lean 4 documentation: https://lean-lang.org/doc/reference/latest/
-- Ullrich and de Moura, "Counting Immutable Beans: Reference Counting Optimized for Purely
-  Functional Programming", IFL 2019. https://arxiv.org/abs/1908.05647
-- George et al., "BRIDGE: Building Representations In Domain Guided Program Synthesis",
-  arXiv:2511.21104.
+- Ullrich and de Moura, ["Counting Immutable Beans: Reference Counting Optimized for Purely
+  Functional Programming"](https://arxiv.org/abs/1908.05647), IFL 2019.
+- Lean 4 language reference:
+  [Functions](https://lean-lang.org/doc/reference/latest/Terms/Functions/) and
+  [Do notation](https://lean-lang.org/doc/reference/latest/Terms/Do-Notation/).
+- TorchLean's
+  [`LayerDef`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/NN/Core.lean)
+  and
+  [`Seq`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/TorchLean/NN/Seq.lean)
+  definitions.

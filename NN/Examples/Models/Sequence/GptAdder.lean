@@ -139,7 +139,7 @@ local instance : NeZero seqLen := ⟨by decide⟩
 local instance : NeZero dModel := ⟨by decide⟩
 
 /-- GPT configuration shared by the typed shapes and model constructor. -/
-def cfg : nn.models.CausalOneHotConfig :=
+def cfg : nn.models.CausalTransformerConfig :=
   { batch := batch
     seqLen := seqLen
     vocab := vocab
@@ -151,7 +151,7 @@ def cfg : nn.models.CausalOneHotConfig :=
 
 /-- Input shape: batched one-hot digit sequences. -/
 abbrev σ : Shape :=
-  nn.models.causalOneHotShape cfg
+  nn.models.causalVocabularyShape cfg
 
 /-- Output shape: one digit-logit row per input position. -/
 abbrev τ : Shape :=
@@ -595,8 +595,6 @@ def main (args : List String) : IO UInt32 := do
   Runtime.runCudaEagerFloat exeName args
     (banner := ModelZoo.bannerWithDevice exeName "minGPT-style addition training")
     (k := fun opts rest => do
-      if !opts.usesCuda then
-        throw <| IO.userError s!"{exeName}: CUDA runtime was not selected"
       let (trainOpts, rest) ← ModelZoo.orThrow exeName <| AdderOptions.parse rest
       CLI.requireNoArgs exeName rest
       trainAdderFloat opts trainOpts)

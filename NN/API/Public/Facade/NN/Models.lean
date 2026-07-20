@@ -31,8 +31,10 @@ export NN.API.nn.models
    SeqRnnHeadConfig seqRnnHeadInShape seqRnnHeadOutShape rnnWithLinearHead lstmWithLinearHead
    TransformerEncoderConfig transformerEncoderShape transformerEncoder
    MambaTextConfig mambaTokenMat mambaLogitMat mambaTextLm mambaTrainingOffsets
-   CausalOneHotConfig causalOneHotShape causalEmbeddingShape
+   CausalTransformerConfig causalVocabularyShape causalEmbeddingShape
    causalTransformerFromEmbeddings causalTransformerOneHot
+   causalTokenIdLmInputShape causalTokenIdEmbedding causalTransformerTokenId
+   causalTransformerTokenIdLmScalarModuleDefWithMode causalTransformerTokenIdLmScalarModuleDef
    VectorGenerativeConfig vectorGenerativeConfig compactImageConfig
    vectorDataShape vectorLatentShape vectorVaeOutShape flattenBatchPrefix reconstructionSample
    vaeSample latentNoise dataNoise onesScore zerosScore
@@ -48,11 +50,11 @@ export NN.API.nn.models.KANPiecewiseLinear (basisLayer edgeFamily)
 
 end KANPiecewiseLinear
 
-namespace CausalOneHotConfig
+namespace CausalTransformerConfig
 
-export NN.API.nn.models.CausalOneHotConfig (dModel)
+export NN.API.nn.models.CausalTransformerConfig (dModel)
 
-end CausalOneHotConfig
+end CausalTransformerConfig
 
 namespace VitConfig
 

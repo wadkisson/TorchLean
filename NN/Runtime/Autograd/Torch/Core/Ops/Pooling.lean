@@ -143,7 +143,7 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .maxPool2d
+    let _ ← requireNativeCudaCapsule s .maxPool
     let inCU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inC
     let inHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inH
     let inWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inW
@@ -163,7 +163,7 @@ def maxPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
           Runtime.Autograd.Cuda.torchleanMaxPool2dBwdCuda xBuf dLdy inCU32 inHU32 inWU32 kHU32 kWU32 strideU32 paddingU32)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .maxPool2d cpu cuda
+  dispatchCudaOpt (α := α) s .maxPool cpu cuda
 
 /-- 2D max-pooling with padding (no batch axis). PyTorch: `max_pool2d(..., padding=...)`. -/
 def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -182,7 +182,7 @@ def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .maxPool2dPad
+    let _ ← requireNativeCudaCapsule s .maxPool
     let inCU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inC
     let inHU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inH
     let inWU32 ← okOrThrow <| Runtime.Autograd.Cuda.AnyBuffer.natToU32Checked inW
@@ -203,7 +203,7 @@ def maxPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
           Runtime.Autograd.Cuda.torchleanMaxPool2dBwdCuda xBuf dLdy inCU32 inHU32 inWU32 kHU32 kWU32 strideU32 paddingU32)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .maxPool2dPad cpu cuda
+  dispatchCudaOpt (α := α) s .maxPool cpu cuda
 
 /-- Smooth max-pooling (softmax pooling). Not a standard PyTorch primitive; see
   `Torch.LinkedSession.smooth_max_pool2d`. -/
@@ -221,7 +221,7 @@ def smoothMaxPool2d {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .smoothMaxPool2d
+    let _ ← requireNativeCudaCapsule s .smoothMaxPool
     let betaF ← CudaBridge.TensorConv.toFloat (α := α) beta
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
@@ -230,7 +230,7 @@ def smoothMaxPool2d {α : Type} [CudaBridge.TensorConv α] (s : EagerSession α)
         (h1 := h1) (h2 := h2) x.id betaF
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .smoothMaxPool2d cpu cuda
+  dispatchCudaOpt (α := α) s .smoothMaxPool cpu cuda
 
 /-- 2D average-pooling (no batch axis). PyTorch: `torch.nn.functional.avg_pool2d`. -/
 def avgPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -246,14 +246,14 @@ def avgPool2d {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .avgPool2d
+    let _ ← requireNativeCudaCapsule s .avgPool
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.avgPool2d (t := t0)
       (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride)
       h1 h2 x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .avgPool2d cpu cuda
+  dispatchCudaOpt (α := α) s .avgPool cpu cuda
 
 /-- 2D average-pooling with padding (no batch axis). PyTorch: `avg_pool2d(..., padding=...)`. -/
 def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Shape]
@@ -270,7 +270,7 @@ def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .avgPool2dPad
+    let _ ← requireNativeCudaCapsule s .avgPool
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow (Runtime.Autograd.Cuda.Tape.avgPool2dPad (t := t0)
       (kH := kH) (kW := kW) (inH := inH) (inW := inW) (inC := inC) (stride := stride) (padding :=
@@ -278,7 +278,7 @@ def avgPool2dPad {α : Type} (s : EagerSession α) [Context α] [DecidableEq Sha
       h1 h2 x.id)
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .avgPool2dPad cpu cuda
+  dispatchCudaOpt (α := α) s .avgPool cpu cuda
 
 end EagerSession
 

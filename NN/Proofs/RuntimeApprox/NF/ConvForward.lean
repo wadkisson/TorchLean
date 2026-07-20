@@ -705,17 +705,17 @@ theorem approxT_conv2d_spec
   intro layerS layerR outS outR bT
   classical
   have hε : 0 ≤ linfNorm bT := linf_norm_nonneg (t := bT)
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := outC)
+  refine approxT_dim_of_forall (n := outC)
     (s := .dim (conv2dOutH inH kH stride padding) (.dim (conv2dOutW inW kW stride padding)
       .scalar))
     (xS := outS) (xR := outR) (eps := linfNorm bT) hε ?_
   intro oc
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := conv2dOutH inH kH stride
+  refine approxT_dim_of_forall (n := conv2dOutH inH kH stride
     padding)
     (s := .dim (conv2dOutW inW kW stride padding) .scalar)
     (eps := linfNorm bT) hε ?_
   intro oi
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := conv2dOutW inW kW stride
+  refine approxT_dim_of_forall (n := conv2dOutW inW kW stride
     padding)
     (s := .scalar)
     (eps := linfNorm bT) hε ?_

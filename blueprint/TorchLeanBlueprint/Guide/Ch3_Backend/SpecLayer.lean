@@ -2,324 +2,268 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "The Spec Layer" =>
+#doc (Manual) "The Mathematical Specification" =>
 %%%
 tag := "spec-layer"
 %%%
 
-The spec layer is where TorchLean says what a model means before asking how it runs. A dense layer
-means `W x + b`. A softmax means a particular normalized exponential formula. A dropout training
-step means a masked operation with the mask supplied explicitly. A loss means a specific reduction
-and numerical convention.
+The model we trained earlier can be written on one line:
 
-Later layers may execute these definitions, lower them to graphs, approximate them with bounds, or
-call faster kernels. The spec layer is the reference point they have to come back to.
+$$`F_\theta(x)=W_2\,\operatorname{ReLU}(W_1x+b_1)+b_2.`
 
-TorchLean is written in Lean, which is both a programming language and an interactive theorem
-prover. For broader language background, see the official Lean texts
-[*Functional Programming in Lean*](https://lean-lang.org/functional_programming_in_lean/),
-[*Theorem Proving in Lean 4*](https://lean-lang.org/theorem_proving_in_lean4/), and
-[*The Lean Language Reference*](https://lean-lang.org/doc/reference/latest/). The main idea here is
-simple: write the mathematical object as an ordinary Lean definition, then make later layers show
-which definition they execute, differentiate, lower, or verify.
+That formula is the mathematical center of the example. It says nothing about mutable buffers,
+CUDA launches, PyTorch modules, reverse-mode tapes, or JSON files. It does say exactly how the four
+parameter tensors and the input determine the output. TorchLean's `NN.Spec` library is where such
+formulas live as Lean definitions.
 
-Spec declarations are the semantic anchors cited by runtime, autograd, graph, and verification
-statements.
+The distinction is important because executable ML code changes form constantly. A linear layer
+may be evaluated by a nested Lean function, a CPU loop, cuBLAS, or an ATen kernel. The specification
+does not try to imitate those implementations. It gives them a common statement to implement.
 
-# Semantic Anchors
+# The Tensor Behind The Formula
 
-A spec page should answer one question: when a runtime, compiler, autograd rule, or verifier says it
-is handling a layer, which Lean definition is it referring to?
+A specification tensor is defined recursively from its shape:
 
-The answer should be a spec declaration. A spec declaration fixes the formula, the tensor shapes,
-the scalar assumptions, the parameter record, and any conventions such as masks, epsilons,
-reductions, or train/eval mode.
+- a scalar shape stores one value;
+- a dimension of length `n` stores a function from `Fin n` to a smaller tensor.
 
-Each later layer gets a concrete obligation:
+Thus a vector of length two is, mathematically, two scalar values indexed by `Fin 2`; a matrix of
+shape `[3, 2]` is three such vectors. The index type prevents an out-of-range lookup. It also makes
+shape induction natural: a proof about an arbitrary tensor can follow the same scalar-or-dimension
+recursion as the datatype.
 
-- runtime code must say which specification function it implements;
-- autograd code must say which specification function it differentiates;
-- graph compilers must say which specification function their graph denotes;
-- verifiers must say which specification function their bounds or certificates concern.
+This is not a claim that CUDA stores a matrix as nested Lean functions. Native runtimes use flat,
+contiguous buffers. The specification chooses the representation that makes mathematical reasoning
+clear; a layout contract is needed when an implementation flattens that value into memory.
 
-Model code does not need to write specs by hand. The project still has a named mathematical object
-before execution speed, CUDA kernels, certificate formats, or export tools enter the discussion.
-
-# What A Spec Declaration Adds
-
-A good spec declaration tells the reader five things at once:
-
-- the tensor shapes involved,
-- the scalar assumptions needed (`Context α`, `Zero α`, `Max α`, etc.),
-- the parameter record, if the operation has trainable parameters,
-- the exact mathematical formula,
-- and the side conditions that are part of the definition, such as nonzero dimensions, masks, or
-  explicit epsilon constants.
-
-Here are representative names:
+The public aliases hide most of the recursive spelling:
 
 ```
-import NN
+import NN.Spec.Layers.Linear
+import NN.Spec.Layers.Activation
 
-open NN
 open Spec
+open Spec.Tensor
 
--- Parameterized layer semantics.
-#check LinearSpec
-#check linearSpec
-#check linearBackwardSpec
-
--- Pointwise and last-axis activation semantics.
-#check Activation.reluSpec
-#check Activation.softmaxSpec
-#check Activation.logSoftmaxSpec
-
--- Objective semantics.
-#check mseSpec
-#check crossEntropyLogitsSpec
-
--- Explicit stochastic-mode semantics.
-#check dropoutMaskedSpec
-#check dropoutInferenceSpec
+#check Tensor ℝ (shape![2])
+#check Tensor ℝ (shape![3, 2])
+#check LinearSpec ℝ 2 3
 ```
 
-At this level, a paper statement should say what it means by "the model", "the loss", "dropout",
-or "softmax". Runtime code may implement these definitions efficiently; verification code may
-overapproximate them; but the spec declaration is where the target computation is named.
+For a linear map from two inputs to three outputs,
+`LinearSpec ℝ 2 3` contains
 
-# Parameter Records Are Semantic Objects
+$$`W\in\mathbb{R}^{3\times 2},
+\qquad b\in\mathbb{R}^{3}.`
 
-The public model builder page explains how `nn.Linear` allocates parameters. The spec layer explains
-what those parameters *mean*. For a dense layer, the semantic object is `LinearSpec α inDim outDim`:
-it contains a weight matrix and a bias vector with the shapes required by the formula `W x + b`.
+The order is the same convention used by PyTorch's `nn.Linear`: output features index the rows of
+the weight matrix.
 
-That distinction matters when moving between layers:
+# One Layer, Forward And Backward
 
-- `nn.Linear` is a user-facing model builder.
-- `LinearSpec` is the mathematical parameter record.
-- `linearSpec` is the forward function over that record.
-- `linearBackwardSpec` is the reference backward contract for that layer.
+The forward definition is deliberately short:
 
-The same pattern repeats across convolution, normalization, embedding, recurrent layers, attention,
-and model-specific specs. The runtime may store parameters in a typed list or flat payload, but the
-spec layer gives those parameters their mathematical roles.
+```
+def linearSpec {α : Type} [Add α] [Mul α] [Zero α]
+    {inDim outDim : Nat}
+    (layer : LinearSpec α inDim outDim)
+    (x : Tensor α (shape![inDim])) :
+    Tensor α (shape![outDim]) :=
+  addSpec (matVecMulSpec layer.weights x) layer.bias
+```
 
-For a dense layer, the roles line up like this:
+At coordinate `i`, this means
 
-- `nn.Linear` is the user-facing layer builder.
-- `LinearSpec` is the parameter record.
-- `linearSpec` is the forward mathematical meaning.
-- `linearBackwardSpec` is the backward reference rule.
-- IR `.linear` is the graph opcode.
-- A CUDA GEMM call is a possible runtime implementation for a supported Float32 path.
+$$`y_i=b_i+\sum_{j=0}^{\mathrm{inDim}-1}W_{ij}x_j.`
 
-Those are different objects. They should agree through stated translations or assumptions, not
-because their names look similar.
+The backward specification receives an upstream cotangent
+$g=\partial L/\partial y$ and returns
 
-# Losses Are Part Of The Semantics
+$$`
+\frac{\partial L}{\partial W}=g\,x^\mathsf{T},\qquad
+\frac{\partial L}{\partial b}=g,\qquad
+\frac{\partial L}{\partial x}=W^\mathsf{T}g.
+`
 
-Training examples often talk about a model and a dataset, but a training claim is incomplete without
-the objective. TorchLean keeps losses in the spec vocabulary too.
+In Lean these three tensors have shapes `[outDim, inDim]`, `[outDim]`, and `[inDim]`. Returning a
+transposed weight gradient by accident is therefore a type error rather than a numerically plausible
+array.
 
-For example:
+The source definitions are
+[`linearSpec`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Layers/Linear.lean)
+and `linearBackwardSpec` in the same file. Later, the autograd proofs compare executable VJP rules
+with these definitions. The existence of the definitions alone does not prove the comparison.
 
-- `mseSpec predicted target` is a scalar objective over two tensors of the same shape.
-- `crossEntropySpec predicted target` is cross entropy between probability tensors. Probabilities
-  are clipped to the declared epsilon interval before taking a logarithm; the selected derivative is
-  zero outside the active clipping interval and at its kinks.
-- `crossEntropyLogitsSpec logits target` uses log-softmax internally and does not clip logits.
+# The Complete MLP Meaning
 
-For a tensor whose final axis contains the classes, both cross-entropy definitions sum over that
-class axis and average over the preceding slices. Thus logits of shape `[batch, classes]` are
-averaged over `batch`, not over `batch * classes`. The logits derivative uses the same denominator,
-so for one-hot targets it has the familiar form
+The running model is the composition of two linear specifications and a pointwise activation:
 
-$$`\frac{\operatorname{softmax}(z)-y}{\text{number of non-class slices}}.`
+```
+def twoLayerMlp
+    {α : Type} [Context α]
+    {inDim hidden outDim : Nat}
+    (first : LinearSpec α inDim hidden)
+    (second : LinearSpec α hidden outDim)
+    (x : Tensor α (shape![inDim])) :
+    Tensor α (shape![outDim]) :=
+  linearSpec second
+    (Activation.reluSpec (linearSpec first x))
+```
 
-This avoids a common ambiguity. In code, "cross entropy" may mean probabilities passed through a
-log, logits passed through a stable log-softmax, a mean reduction, a sum reduction, or a version
-with ignored labels. A verification or autograd claim needs the exact specification behind the
-phrase "cross entropy."
+Expanding this definition gives the formula at the start of the chapter. No graph traversal or
+runtime state is hidden inside it.
 
-# Sliding-Window Geometry
+The ReLU definition commits to two choices:
 
-Convolution and pooling use one dimension-general output-size function. For input extent `n`,
-kernel extent `k`, padding `p`, and stride `s`, a valid window geometry has output extent
+$$`\operatorname{ReLU}(z)=\max(z,0),`
+
+and for the selected derivative,
+
+$$`\operatorname{ReLU}'(z)=
+  \begin{cases}
+    1 & z>0,\\
+    0 & z\le 0.
+  \end{cases}`
+
+The value at the kink matters. Other subgradients are mathematically defensible, but a forward and
+backward correctness theorem needs one concrete rule. TorchLean chooses zero at the kink, matching
+the rule used by the current runtime path.
+
+# Run The Same Formula
+
+The quickest executable using this architecture is:
+
+```
+lake exe torchlean quickstart_mlp --device cpu --steps 200 --seed 2026
+```
+
+On the current example dataset it reports:
+
+```
+dataset size = 25
+mean_loss(before) = 0.761530
+mean_loss(after) = 0.003234
+heldout x=(0.25,-0.75), target=0.2, prediction(after)=[0.210239]
+```
+
+The command executes runtime tensors and an autograd tape; it does not evaluate `twoLayerMlp` by
+reducing the pure Lean definition above. The connection is made operation by operation:
+
+1. the public `nn.linear` builder fixes the same parameter shapes;
+2. its forward program emits the runtime linear operation;
+3. the graph interpreter assigns `.linear` the `linearSpec` denotation;
+4. the VJP proof identifies the selected backward rule with `linearBackwardSpec`;
+5. a backend capsule records which native provider, if any, executed the operation.
+
+This chain is why a specification is useful. It gives each bridge a stable target.
+
+# Change One Value
+
+The formula can be inspected without training. Take
+
+$$`
+W_1=\begin{bmatrix}1&1\\-1&1\end{bmatrix},
+\quad b_1=0,\quad
+W_2=\begin{bmatrix}0.8&-0.4\end{bmatrix},
+\quad b_2=0.2.
+`
+
+For $x=(0.25,-0.75)$,
+
+$$`
+W_1x=(-0.5,-1),\qquad
+\operatorname{ReLU}(W_1x)=(0,0),
+`
+
+so the exact-real output is $0.2$. Change only the first bias to $0.6$. The first hidden
+preactivation becomes $0.1$, and the output becomes
+
+$$`0.8(0.1)+0.2=0.28.`
+
+This tiny calculation is the same kind of reasoning used in interval propagation: replace one
+point by a set of possible inputs, then bound every intermediate tensor.
+
+# Scalar Polymorphism Is A Real Choice
+
+The type parameter `α` determines what the symbols `+`, `*`, `max`, `exp`, and division mean.
+TorchLean reuses the tensor structure at several scalar interpretations:
+
+| Scalar | Meaning |
+|---|---|
+| `ℝ` | exact real arithmetic used for mathematical statements |
+| `FP32` | finite binary32-grid values with a rounded-real proof model |
+| `IEEE32Exec` | executable binary32 bit patterns, including signed zero, infinity, and NaN |
+| interval contexts | sets of possible values, with outward enclosure operations |
+| runtime `Float` | Lean's native executable floating-point value |
+
+Writing one polymorphic definition is not a proof that these interpretations agree. For example,
+
+$$`\operatorname{softmax}(x)_i=
+\frac{\exp(x_i-m)}{\sum_j\exp(x_j-m)},\qquad m=\max_jx_j`
+
+is a clean real-valued formula. A binary32 implementation introduces rounding in `max`,
+subtraction, exponential approximation, summation, and division. A CUDA reduction may also choose
+a different summation tree. The later floating-point and runtime-approximation chapters state the
+conditions under which one interpretation encloses or approximates another.
+
+# Conventions That Must Be In The Definition
+
+Shapes are only one source of ambiguity. The spec layer also fixes choices that a model name does
+not determine.
+
+## Loss reductions
+
+`mseSpec` takes a global mean over all entries. Cross-entropy over logits applies log-softmax on the
+final class axis and averages over the remaining slices. Changing `mean` to `sum` changes both the
+loss and every gradient by a scale factor.
+
+## Attention masks
+
+A boolean attention mask is a hard support constraint:
+
+- `true` allows the key;
+- `false` gives the key exactly zero softmax numerator;
+- if every key in a row is blocked, the output row is zero.
+
+This is the finite formulation of a negative-infinity mask. It is not an additive score bias of
+`-1000` or any other finite sentinel. For sufficiently large logits a finite sentinel can leak
+nonzero probability into a blocked position; the hard-mask definition cannot.
+
+## Dropout
+
+Randomness is explicit. A masked dropout specification receives the mask as an argument.
+Runtime training code may generate that mask from a seed and tape state, but the semantic function
+does not consult hidden global randomness.
+
+## Invalid windows
+
+Some mathematical operations are total where the runtime is partial. A convolution output extent
+is normally
 
 $$`\left\lfloor\frac{n+2p-k}{s}\right\rfloor+1.`
 
-The Lean definition is total. It returns `0` when `k = 0`, `s = 0`, or the padded input is smaller
-than the kernel. This avoids the phantom one-element output that truncated natural-number
-subtraction can otherwise create. Runtime and graph validators may reject such unsupported calls;
-when a shape must still be computed at the specification boundary, the result is the empty output
-shape rather than an invented window.
+The shape helper defines an answer even around invalid kernel or stride configurations, while the
+runtime validator rejects unsupported calls before reaching native code. A total denotation and an
+admission check answer different questions.
 
-# Stochastic Behavior Is Made Explicit
+# A Proof Checkpoint
 
-The spec layer does not hide randomness in global state. Dropout is the simplest example:
-
-- `dropoutMaskedSpec p mask x` is the training-time mathematical operation once the mask is given.
-- `dropoutInferenceSpec p x` is the deterministic inference-time operation.
-
-The mask, seed, or random tensor belongs in the data of the computation. Later claims are then
-auditable: a theorem can say whether it is about a fixed mask, an explicit random source, or an
-inference-mode model.
-
-# Scalar Semantics
-
-The scalar type `α` is the numerical world in which the model is interpreted. The same architecture
-can be read over real numbers for clean mathematics, over `IEEE32Exec` for executable binary32
-behavior, over intervals for enclosures, or over `Float` for small runtime examples.
-
-Most TorchLean spec definitions are scalar-polymorphic: they work for any scalar type `α` that
-supports the operations a neural network definition needs.
-
-That interface is packaged as:
-
-`[Context α]`
-
-in [NN.Spec.Core.Context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Core/Context.lean).
-
-Informally, `Context α` is "a scalar type on which machine learning expressions make sense":
-arithmetic, order/comparison, and the standard functions used in activations and losses (`exp`,
-`tanh`, `sqrt`, and so on).
-
-That scalar interface lets the same network code be read as:
-
-- proofs (`α := ℝ`),
-- executable float32 models (`α := IEEE32Exec`),
-- interval enclosures (verification backends),
-- and small runtime examples (`α := Float`).
-
-## A Tiny Scalar-Polymorphic Definition
-
-This small definition shows TorchLean's "write the architecture once; choose the scalar semantics
-later" design:
+GraphSpec's checked MLP uses the same four parameter tensors:
 
 ```
-import NN
-
-open NN
-open Spec
-
-def affinePlane {α : Type} [Context α]
-    (firstRowFirstCol firstRowSecondCol secondRowFirstCol secondRowSecondCol
-      firstBias secondBias : α) :
-    Spec.Tensor α (.dim 2 .scalar) -> Spec.Tensor α (.dim 2 .scalar)
-  | x =>
-      let firstOutput := firstRowFirstCol * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
-              + firstRowSecondCol * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
-              + firstBias
-      let secondOutput := secondRowFirstCol * Tensor.toScalar (Spec.get x ⟨0, by decide⟩)
-              + secondRowSecondCol * Tensor.toScalar (Spec.get x ⟨1, by decide⟩)
-              + secondBias
-      Tensor.dim (fun
-        | ⟨0, _⟩ => Tensor.scalar firstOutput
-        | ⟨_, _⟩ => Tensor.scalar secondOutput)
+[W₁ : shape![hidden, input],
+ b₁ : shape![hidden],
+ W₂ : shape![output, hidden],
+ b₂ : shape![output]]
 ```
 
-Not every model needs to be written by hand in this style. The property we need is scalar
-instantiation: the same definition may later be instantiated at `α := ℝ`, `α := Float`, or
-`α := IEEE32Exec` without changing the architecture code.
+The theorem
+`NN.GraphSpec.Models.mlp_interp_eq_spec_mlp_forward` proves that interpreting that GraphSpec model
+is equal to the hand-written two-layer specification. Its conclusion is about two pure meanings.
+It does not mention the eager tape, CUDA, or an imported checkpoint, so it should not be reported as
+a proof of those objects.
 
-# Theorem Shapes
+That scope is not a weakness. It is the first exact link in a longer chain, and it prevents later
+engineering layers from silently changing what “the MLP” means.
 
-Most downstream claims have one of a few recognizable forms. The details differ by model family, but
-the target of the statement should be visible:
-
-- a runtime theorem says an executable program returns the same value as a spec definition;
-- an autograd theorem says a VJP or gradient routine computes the derivative of a spec definition;
-- a compiler theorem says the denotation of a lowered graph equals the spec definition;
-- a verifier theorem says a bound or certificate is sound for the spec definition, usually through
-  the shared IR denotation.
-
-Informally:
-
-$$`\text{runtime/program output}
-\;=\;
-\text{Spec.forward(params,input)}`
-
-$$`\text{Graph.denote}(g,payload,input)
-\;=\;
-\text{Spec.forward(params,input)}`
-
-$$`\text{certificate accepted}
-\;\Longrightarrow\;
-\text{property of Spec.forward over the stated input set}`
-
-CUDA, CROWN, and export layers are meaningful only after they identify the specification function
-they implement, differentiate, lower, or bound.
-
-# Inspecting A Specification
-
-When reading a spec file, make three passes:
-
-1. What function is being defined?
-2. Which scalar and shape assumptions appear in the type?
-3. Which later layer cites this definition?
-
-This habit makes the spec API easier to navigate because most declarations are reusable components
-rather than standalone programs. A layer declaration should tell us what it computes; a theorem about
-that layer should say which shape, scalar, or state assumptions it needs.
-
-For concrete code, the usual first stops are:
-
-- [Context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Core/Context.lean), for the scalar operations a spec may use,
-- [Linear layers API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Layers/Linear.lean), for dense layer semantics,
-- [Activation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Layers/Activation.lean), for ReLU, sigmoid, tanh, GELU, and related
-  operations,
-- [Loss API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Layers/Loss.lean), for scalar objectives used by examples and training
-  loops,
-- [Dropout API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Layers/Dropout.lean), for the explicit training/inference split.
-
-# Composition Boundaries
-
-The model construction chapter teaches the user-facing syntax. At the spec layer, the question is
-different: where does each piece of a model become a named mathematical object?
-
-- Layer specs name local formulas such as dense layers, convolutions, activations, normalization,
-  pooling, and recurrent steps.
-- Model specs compose those formulas into architectures, while keeping parameters explicit.
-- Loss specs name the scalar objective used by a training or verification claim.
-- Mode-specific specs separate training-time and inference-time behavior when the mathematics
-  differs.
-
-That separation is what lets a later theorem be precise. Instead of saying "the runtime matches the
-model", the theorem can say exactly which forward spec, which parameters, which loss, and which
-mode are involved.
-
-# Semantic Discipline
-
-Spec definitions should avoid hidden context. If an operation depends on a mask, epsilon, mode,
-scalar semantics, reduction convention, or parameter record, that dependency should appear in the
-definition or its type.
-
-That discipline is what the next layers use. Runtime execution, graph denotation, derivative
-statements, and verification certificates can point back to a precise specification object instead of
-to a prose description of an operation.
-
-# Architecture Specs Beyond The Small Examples
-
-The [model spec API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Models/) contains denotations for larger architecture families:
-residual networks, Vision Transformer definitions, GPT decoders, state space models,
-diffusion objectives, reinforcement learning interfaces, and scientific ML examples. The examples
-and runtime wrappers may choose different execution paths, but the spec files are where the
-mathematical forward maps and objectives are named.
-
-Tracing a larger model requires four links:
-
-1. Open the runnable example to see the user-facing workflow.
-2. Follow the import to the corresponding spec or GraphSpec model.
-3. Identify the forward spec and loss spec.
-4. Then read the runtime, autograd, or verification theorem that cites those names.
-
-# API Entry Points
-
-Concrete declarations begin with the [Context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Core/Context.lean), then the
-[layer semantics API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Layers/), the [model spec API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Models/), and the
-[autograd spec API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Spec/Autograd/).
-
-# References
-
-- TorchLean paper: https://arxiv.org/abs/2602.22631
-- Lean 4 reference manual: https://lean-lang.org/doc/reference/latest/
+The next chapter turns these formulas into typed architectures with explicit parameter layouts.

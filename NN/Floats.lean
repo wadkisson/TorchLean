@@ -13,6 +13,7 @@ public import NN.Floats.Float32
 public import NN.Floats.IEEEExec
 public import NN.Floats.Interval
 public import NN.Floats.NeuralFloat
+public import NN.Floats.Quantization
 
 /-!
 # Floating-Point Semantics

@@ -55,12 +55,12 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
       [Runtime.Scalar α] →
       (model : TorchLean.nn.Sequential σ τ) →
       Module.ScalarModule α (nn.paramShapes model) [σ, τ] → IO β) :
-    IO (Custom.TrainResult σ τ × β) := do
+    IO (TrainResult σ τ × β) := do
   let runtimeOpts := run.toOptions
   let runFor
       {α : Type} [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
       [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α] :
-      IO (Custom.TrainResult σ τ × β) := do
+      IO (TrainResult σ τ × β) := do
     Module.withScalarLossModel
         (α := α) (mkModel := pure trainer.model) (opts := runtimeOpts) (loss := trainer.loss)
         (k := fun model m => do
@@ -89,7 +89,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
               Tensor.toFloatIO yhat
           let predictBatch :=
             fun (xsFloat : List (Tensor.T Float σ)) => xsFloat.mapM predict
-          let result : Custom.TrainResult σ τ :=
+          let result : TrainResult σ τ :=
             { report :=
                 { steps := trainOpts.steps
                   before := toString before
@@ -98,7 +98,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
               predictBatch := predictBatch }
           let extra ← afterTrain (α := α) model m
           pure (result, extra))
-  let runForFloat : IO (Custom.TrainResult σ τ × β) := do
+  let runForFloat : IO (TrainResult σ τ × β) := do
     Module.withScalarLossModelFloat
         (mkModel := pure trainer.model) (opts := runtimeOpts) (loss := trainer.loss)
         (k := fun model m => do
@@ -122,7 +122,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
           let after ← meanModuleLoss model m samples
           let predict := fun (x : Tensor.T Float σ) => Module.predict runtimeOpts model m x
           let predictBatch := fun (xs : List (Tensor.T Float σ)) => xs.mapM predict
-          let result : Custom.TrainResult σ τ :=
+          let result : TrainResult σ τ :=
             { report :=
                 { steps := trainOpts.steps
                   before := toString before
@@ -152,7 +152,7 @@ choices come from `TrainOptions`, and the returned handle owns the trained model
 -/
 def trainWithRun {σ τ : Shape} (trainer : Custom σ τ)
     (data : Dataset σ τ) (run : RunConfig := trainer.runConfig) (opts : TrainOptions := {}) :
-    IO (Custom.TrainResult σ τ) := do
+    IO (TrainResult σ τ) := do
   let (report, _) ← Custom.Internal.trainDatasetWithRunConfigCore trainer run data opts
     (fun {_} _ _ _ _ _ _ => pure ())
   report.report.writeLog opts.log opts.title opts.notes
@@ -161,7 +161,7 @@ def trainWithRun {σ τ : Shape} (trainer : Custom σ τ)
 /-- Train on an in-memory dataset using this custom trainer's attached runtime settings. -/
 def train {σ τ : Shape} (trainer : Custom σ τ)
     (data : Dataset σ τ) (opts : TrainOptions := {}) :
-    IO (Custom.TrainResult σ τ) :=
+    IO (TrainResult σ τ) :=
   trainWithRun trainer data trainer.runConfig opts
 
 end Custom

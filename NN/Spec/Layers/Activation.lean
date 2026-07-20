@@ -319,6 +319,27 @@ These are the shape‑aware softmax definitions used in attention / classificati
 They recurse over outer dimensions and apply a numerically‑stable softmax to the last axis.
 -/
 
+/-- Maximum entry of a nonempty vector, returned as a scalar tensor.
+
+The fold is seeded by the first coordinate rather than by a numeric sentinel. Consequently the
+result is one of the input coordinates for every linearly ordered scalar type. Softmax and
+log-softmax share this definition so their range-reduction convention cannot drift apart.
+-/
+def maxVecSpec {n : Nat} (t : Tensor α (.dim (Nat.succ n) .scalar)) : Tensor α .scalar :=
+  match t with
+  | Tensor.dim values =>
+      let first : α := Tensor.toScalar (values ⟨0, Nat.succ_pos n⟩)
+      let maximum : α :=
+        (List.finRange (Nat.succ n)).foldl
+          (fun acc i => max acc (Tensor.toScalar (values i)))
+          first
+      Tensor.scalar maximum
+
+/-- Max-shifted exponentials shared by stable softmax and log-softmax. -/
+def maxShiftedExpVecSpec {n : Nat}
+    (t : Tensor α (.dim (Nat.succ n) .scalar)) : Tensor α (.dim (Nat.succ n) .scalar) :=
+  expSpec (subSpec t (replicate (maxVecSpec t)))
+
 /-- Softmax on a length-`n` vector.
 
 This is the "real" softmax, not the scalar logistic helper in `Activation.Math.logisticSpec`.
@@ -332,28 +353,9 @@ also a nice canonical form to reference in proofs.
 def softmaxVecSpec {n : Nat} (t : Tensor α (.dim n .scalar)) : Tensor α (.dim n .scalar) :=
   match n with
   | 0 => t
-  | Nat.succ n' =>
-      -- We pick the max by seeding the fold with the first element, so we do not need a sentinel
-      -- value (and the definition stays meaningful beyond plain floating-point).
-      let maxT : Tensor α .scalar :=
-        match t with
-        | Tensor.dim f =>
-            let first : α := match f ⟨0, Nat.succ_pos n'⟩ with | Tensor.scalar v => v
-            let maxVal : α :=
-              (List.finRange (Nat.succ n')).foldl
-                (fun acc i =>
-                  match f i with
-                  | Tensor.scalar v => max acc v)
-                first
-            Tensor.scalar maxVal
-      let shifted : Tensor α (.dim (Nat.succ n') .scalar) := subSpec t (replicate maxT)
-      let ex := expSpec shifted
-      let denom : α :=
-        match ex with
-        | Tensor.dim g =>
-            (List.finRange (Nat.succ n')).foldl
-              (fun acc i => acc + match g i with | Tensor.scalar v => v)
-              0
+  | Nat.succ _ =>
+      let ex := maxShiftedExpVecSpec t
+      let denom : α := sumSpec ex
       divSpec ex (replicate (Tensor.scalar denom))
 
 /-- Softmax along the last axis (recurses over outer dimensions).
@@ -403,25 +405,10 @@ def logSoftmaxVecSpec {n : Nat} (t : Tensor α (.dim n .scalar)) : Tensor α (.d
   match n with
   | 0 => t
   | Nat.succ n' =>
-      let maxT : Tensor α .scalar :=
-        match t with
-        | Tensor.dim f =>
-            let first : α := match f ⟨0, Nat.succ_pos n'⟩ with | Tensor.scalar v => v
-            let maxVal : α :=
-              (List.finRange (Nat.succ n')).foldl
-                (fun acc i =>
-                  match f i with
-                  | Tensor.scalar v => max acc v)
-                first
-            Tensor.scalar maxVal
+      let maxT : Tensor α .scalar := maxVecSpec t
       let shifted : Tensor α (.dim (Nat.succ n') .scalar) := subSpec t (replicate maxT)
-      let ex := expSpec shifted
-      let denom : α :=
-        match ex with
-        | Tensor.dim g =>
-            (List.finRange (Nat.succ n')).foldl
-              (fun acc i => acc + match g i with | Tensor.scalar v => v)
-              0
+      let ex := maxShiftedExpVecSpec t
+      let denom : α := sumSpec ex
       let logDenom : α := MathFunctions.log denom
       subSpec shifted (replicate (Tensor.scalar logDenom))
 

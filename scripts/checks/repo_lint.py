@@ -52,6 +52,7 @@ REMOVED_COMPATIBILITY_PATHS = {
     "NN/Examples/Verification/LiRPA.lean",
     "NN/GraphSpec/Models/TorchLean/Fno1d.lean",
     "NN/Library.lean",
+    "NN/API/Public/Facade/Trainer/Verify.lean",
     "NN/Spec/Layers/Pooling/Aliases.lean",
     "NN/Verification/TorchLean/Verified.lean",
 }

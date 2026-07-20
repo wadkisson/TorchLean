@@ -2,217 +2,219 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "What TorchLean Is" =>
+#doc (Manual) "The Problem TorchLean Solves" =>
 %%%
 tag := "overview"
 %%%
 
-TorchLean is a Lean 4 framework for building neural networks and making precise claims about them.
-Its central requirement is that the model being executed, the graph being inspected, and the object
-named in a theorem remain connected by definitions that a reader can follow.
+Suppose we train a small network, save its parameters, run it on a GPU, and later claim that its
+output stays in a safe range for every input near a test point. During that one workflow, the phrase
+"the model" can refer to at least six different things:
 
-That sentence is easy to say and surprisingly hard to maintain in an ML system. A model starts as
-source code. It may become initialized parameters, a trained checkpoint, a graph, a compiled
-runtime artifact, a batch of CUDA kernel launches, a verifier input file, and finally a statement in
-a paper. Each move can be harmless. Each move can also change a convention: row-major or column-major
-layout, logits or probabilities, train mode or evaluation mode, real arithmetic or float32, closed
-or open input bounds. TorchLean is interested in the places where those conventions stop being
-obvious.
+1. the source-level architecture;
+2. the initialized parameter tensors;
+3. the mutable parameters after training;
+4. an exported operation graph;
+5. the CPU or accelerator program that actually runs;
+6. the graph and parameter payload analyzed by a verifier.
 
-Modern ML systems are larger than a model definition. A working system may include a parameter
-file, a tokenizer, a graph export, a runtime mode, a fused kernel, a floating point convention, a
-verifier certificate, and a scientific claim. TorchLean gives those pieces names inside one Lean
-development, so runnable examples, graph semantics, numerical models, and checked artifacts can be
-read together instead of treated as unrelated files.
+Usually these objects agree. When they do not, the resulting bug can be remarkably quiet. A
+checkpoint loader may transpose a weight matrix. A verification script may forget that the model
+expects normalized inputs. A compiler may replace separate multiplication and addition with an FMA.
+The program still runs; it simply computes a different function from the one we had in mind.
 
-PyTorch remains the everyday training ecosystem for many projects. TorchLean addresses a different
-problem: preserving meaning when a model moves from source code to a graph, from a graph to a
-runtime, and from a runtime artifact to a mathematical claim. Producing an export is easy; showing
-that it contains the intended model, parameters, scalar convention, and property is the harder part.
+TorchLean was designed around that problem. It is a neural-network library, but it is also a place
+where the architecture, parameter payload, graph, arithmetic, and property can be named in the same
+language. The point is not to force every numerical kernel through Lean's evaluator. The point is
+to stop losing the identity of the computation as it moves from mathematics to execution.
 
-Model and training code begins with
-[NN.API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API.lean). Files that combine
-specifications, proofs, verification, and runtime internals can use the complete
-[`NN`](https://github.com/lean-dojo/TorchLean/blob/main/NN.lean) umbrella. Subsystem development can
-start from narrower entry points such as
-[NN.GraphSpec](https://github.com/lean-dojo/TorchLean/blob/main/NN/GraphSpec.lean),
-[NN.IR](https://github.com/lean-dojo/TorchLean/blob/main/NN/IR.lean), and
-[NN.Verification](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification.lean).
+# A First Program
 
-# What TorchLean Covers
+Application code uses the focused `NN.API` import:
 
-At a high level, TorchLean has three layers.
+```
+import NN.API
 
-First, it has a familiar ML interface: tensors, layers, datasets, optimizers, losses, autograd,
-logging, import/export, optional CUDA backed execution, and examples ranging from small MLPs to
-CNNs, ViTs, GPT models, Mamba sequence models, diffusion, operator learning,
-reinforcement learning, and scientific ML. Residual models and ResNets are represented in the
-API, spec, and GraphSpec layers.
+open TorchLean
 
-Second, it gives those programs a semantic core. Tensor shapes can appear in types. Architectures
-can be lowered to a shared graph IR whose nodes name their operations. Scalar meanings can be real
-valued, executable float32, float32 as modeled in proofs, intervals, or verifier domains. GraphSpec
-lets an architecture be described once and read both as executable structure and as symbolic graph
-structure.
+def model :
+    nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
+  nn.Sequential![
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
+  ]
+```
 
-Third, it has ways to check claims about the resulting artifacts: graphs that are well formed,
-shape inference, IBP/CROWN bounds, JSON certificate replay, robustness margins, PINN
-residuals, ODE enclosures, 3D projection certificates, attention mask contracts, and floating point
-bridge statements.
+The model accepts a length-two tensor and returns a length-one prediction. The dimensions occur in the model's
+type, so the output of a layer with width seven cannot be fed to a layer expecting width eight.
+`nn.M` means that this is a seeded model builder. It describes initialization but has not yet chosen
+the random seed or produced concrete parameter tensors.
 
-These layers do not all have the same proof status. Some are executable infrastructure, some are
-checked artifacts, and some are Lean theorems. TorchLean keeps those roles separate because they
-support different kinds of claims.
+We can initialize it directly:
 
-# What "The Same Model" Means
+```
+def initialized :=
+  nn.run 2026 model
+```
 
-TorchLean does not require every representation to be textually identical. A readable model builder,
-a compact graph, and an executable runtime value should have different shapes. The important
-question is whether a reader can follow the translations between them.
+or ask the trainer to initialize and execute it:
 
-There are three recurring relations.
+```
+def trainer :=
+  Trainer.new model
+    { task := .regression
+      optimizer := optim.adam { lr := 0.001 }
+      seed := 2026 }
+```
 
-First, an *elaboration relation* says that user-facing syntax produced a particular architecture and
-parameter interface. This is the ordinary programming layer: `nn.Sequential![...]` elaborates to a
-model description with an input shape, an output shape, and a parameter layout.
+The notation is intentionally familiar to a PyTorch user, but Lean learns more from the declaration.
+It checks the input and output dimensions while elaborating the file. It distinguishes the seeded
+builder from the initialized model. Once initialized, the model exposes the exact order and shape of
+its parameter tensors. That information is available later to the trainer, graph compiler, and
+verifier without rediscovering it from runtime metadata.
 
-Second, a *semantic relation* says that two objects denote the same mathematical function, or that
-one object soundly approximates the other. A compiler theorem is an equality-style statement. An
-interval or CROWN theorem is an enclosure-style statement. These are different claims and should not
-be collapsed into one word like "verified."
+# Opening The Model Up
 
-Third, a *runtime relation* says that some executable path is intended to implement a semantic
-object. This relation may be proved for a Lean executable fragment, checked by a regression test for
-a native kernel, or assumed at an external boundary. TorchLean's job is to name the relation and
-make the proof status visible.
+The same initialized model can participate in several parts of TorchLean.
 
-The same model, then, means "connected by explicit definitions, checks, or theorems," not "unchanged
-because the filenames look related."
+## The model description
 
-# The Design Choice
+An `nn.Sequential` stores layer definitions, parameter shapes, initialization values, gradient
+flags, and a forward program. This is the object used by the public trainer. Training creates an
+effectful runtime runner whose parameters change over time; it does not rewrite the source
+definition.
 
-Ordinary ML systems are often optimized around fast experimentation, which is the right default for
-many projects. The cost is that key facts can remain implicit: tensor shapes, parameter
-layouts, training mode, random state, scalar semantics, and the exact graph a verifier checked.
-TorchLean makes a different tradeoff. We accept more typed structure at the boundary so later tools
-can say precisely what they consumed and what they checked.
+## The equations
 
-For example, a loss that expects logits and one-hot labels of shape `[batch, classes]` should not
-silently receive labels of shape `[batch]`. A matrix multiply whose right-hand dimension is `64`
-should not be applied to activations whose last dimension is `128`. In a dynamic runtime, those
-errors may appear only after a particular batch reaches a particular kernel, or worse, they may be
-hidden by broadcasting. In TorchLean's typed tensor APIs, the shape is part of the tensor type, so
-the mismatch is rejected before the example is treated as a runnable model. If the intended design
-really is sparse labels, a squeeze, or a reshape, we name that design choice explicitly.
+The specification layer defines tensors as shape-indexed objects and gives operations such as
+matrix multiplication, softmax, normalization, and loss functions explicit mathematical meanings.
+Proofs use these definitions rather than reverse-engineering an opaque native buffer.
 
-The same discipline applies to semantic claims. A statement such as "this classifier is robust on
-this input box" is meaningful only when it says which graph, parameters, scalar interpretation, and
-checker result support the claim. Lean gives us a place to write that statement as a checked object,
-not as a comment beside a script.
+## The running program
 
-# Claim Vocabulary
+The eager runtime owns autograd tape nodes, parameter and optimizer state, and optional accelerator
+buffers. A backend profile decides which device and provider supply an operation. The checked CPU
+profile, native CUDA profile, and LibTorch-forward profile are execution choices. Selecting one does
+not, by itself, prove its kernels satisfy the mathematical specification.
 
-- A *runtime result* is what an executable path produced on some inputs. It can be useful evidence,
-  especially when compared against another backend, but it is not by itself a theorem.
-- A *check* is an executable validation step. Shape inference, JSON parsing, certificate replay, and
-  tolerance comparisons are checks. A check can reject bad artifacts, and if its implementation has
-  a theorem behind it, it may also justify a formal claim.
-- A *theorem* is a Lean statement accepted by the kernel. It may be about a model denotation, a
-  compiler pass, a derivative, a bound, or a float32 approximation.
-- A *trust boundary* is a place where TorchLean names an external producer or runtime rather than
-  pretending Lean has proved its internals.
+## The operation graph
 
-These words prevent three different results from being collapsed into one: a CUDA parity test, a
-checker that recomputes a bound, and a theorem that proves an enclosure for a supported graph
-fragment.
+`NN.IR.Graph` is a directed acyclic graph of operation-tagged nodes. Each node has parent ids and a
+declared output shape. Constants, weights, convolution parameters, and similar data live in a
+separate payload store. This separation lets the graph structure be inspected without pretending
+that two different payloads are the same trained model.
 
-# Three Views Of One Model
+## The object checked by a verifier
 
-At the top level, TorchLean presents a familiar ML API over a shared internal model.
-Application code starts from `import NN.API` and `open TorchLean`, then works with familiar concepts:
-layers, datasets, optimizers, losses, and training loops.
+The public verification compiler lowers supported forward programs and a concrete parameter payload
+to a `CompiledIR`. IBP and CROWN operate on that graph. Numerical certificates can replay
+bit-level ranges and backend policies over it. Other checkers consume external artifacts such as
+alpha-beta-CROWN leaves or PINN residual certificates.
 
-Under the hood, the same model appears in three representations:
+These are not rival implementations. They are views of the same computation made for different
+jobs. The model description is pleasant to write. The runtime is built to execute. The graph is
+easy to inspect. The equations are suitable for proofs. TorchLean's architecture is largely the
+collection of translations that lets those views meet.
 
-- *Spec layer*: the mathematical meaning of tensors, layers, losses, and model structure.
-- *Graph IR*: the DAG with named operations shared by runtime tooling, widgets, export, and verification.
-- *Runtime layer*: eager or compiled execution, autograd, optimizers, logging, and optional CUDA.
+# Shapes Catch The Bug Where It Starts
 
-The layers are intentionally different representations. Their translations, rather than similar
-names or neighboring files, establish that they describe the same model.
+A TorchLean tensor has a scalar type and a shape:
 
-# The Object We Keep In View
+$$`\operatorname{Tensor.T}\;\alpha\;s`.
 
-The object we keep returning to is a typed model. Informally, it has this shape:
+For example,
 
-$$`\mathrm{Model}_{\theta} :
-   \mathrm{Tensor}(\alpha,s_{\mathrm{in}})
-   \longrightarrow
-   \mathrm{Tensor}(\alpha,s_{\mathrm{out}})`
+```
+def predictions : Tensor.T Float (shape![32, 1]) :=
+  tensorOfList! [32, 1] (List.replicate 32 0.0)
 
-The runtime may choose `Float`, executable `IEEE32Exec`, or CUDA backed float32 buffers. A proof may
-instantiate the same architecture over real numbers, interval domains, or a float32 proof model. The
-architecture statement should be independent of the execution substrate.
+def labels : Tensor.T Float (shape![32]) :=
+  tensorOfList! [32] (List.replicate 32 0.0)
+```
 
-The whole project follows a repeated theorem pattern:
+These are different types. A loss that expects equal shapes cannot silently broadcast the label
+vector across the second axis. Lean asks us to choose: reshape the labels, squeeze the predictions,
+or use another loss. That is exactly where the ambiguity belongs.
 
-$$`\begin{aligned}
-&H(M,R)\\
-&\Longrightarrow\;
-  \forall x,\;
-  \mathrm{denote}(R)(x)
-  \in
-  \mathrm{safeSet}(\mathrm{denote}(M)(x)).
-\end{aligned}`
+Shape typing is deliberately modest. It catches structural mistakes while they are still local.
+Questions about units, label quality, normalization, finiteness, and generalization appear later as
+their own definitions and hypotheses instead of being smuggled into the word "tensor."
 
-For an exact theorem, `safeSet` is a singleton. For a finite precision or verifier theorem, it may
-be an interval, box, affine enclosure, or checker backed output region.
+# From One Output To A Statement
 
-Different chapters instantiate that pattern in different ways. Autograd statements relate a reverse
-pass to the derivative of a denotation. Runtime approximation statements relate executable values to
-real specifications. CROWN and certificate checkers establish bound properties of an IR graph. CUDA
-chapters name the native boundary when the implementation lives outside Lean.
+Suppose the trained model has parameters `θ`, its graph is `g`, and the two input features vary in a
+box `B`. A range statement might be
 
-# External Context
+$$`\forall x\in B,\qquad
+  |\operatorname{denote}(g,\theta,x)_0-y^\star|\leq\delta`.
 
-TorchLean sits between several mature traditions. PyTorch shows why an imperative, Pythonic style is
-so effective for day-to-day deep learning engineering; see Paszke et al.,
-["PyTorch: An Imperative Style, High-Performance Deep Learning Library"](https://arxiv.org/abs/1912.01703).
-Lean supplies the dependent type theory and small-kernel proof-checking discipline described in the
-[Lean language reference](https://lean-lang.org/doc/reference/latest/) and in de Moura et al.,
-["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf). Neural-network verification
-contributes the bound-propagation and certificate ideas behind TorchLean's IBP, CROWN, and
-LiRPA-style graph relaxations.
+This line records the details that are easy to lose in prose:
 
-Those references are background, not claims that TorchLean inherits their results automatically.
-TorchLean reuses ideas from the surrounding ecosystem while keeping its own proof objects, executable
-checks, and external assumptions explicit.
+- `g` identifies the operation graph;
+- `θ` identifies the concrete trained parameters;
+- `B` identifies the quantified input convention;
+- `denote` identifies the scalar and operator semantics;
+- index `0`, target `y⋆`, and tolerance `δ` identify the output property.
 
-# Fast When Needed, Explicit When It Matters
+An interval pass can compute lower and upper output bounds. A Boolean check can then confirm that the
+whole interval lies in `[y⋆-δ,y⋆+δ]`. The last ingredient is a soundness theorem saying that the
+computed interval really encloses `denote` for this graph.
 
-TorchLean separates fast execution from proof, but it does not treat them as unrelated worlds. For
-prototyping, examples can use the host runtime or optional CUDA-backed float32 paths. Formal
-guarantees use graph denotations, Float32 models, certificate checkers, and Lean theorems. The boundary
-is visible: some parts are proved in Lean, and some parts are external systems that must be named
-and checked around.
+The guide uses the following vocabulary throughout:
 
-A typical runtime bug is a checkpoint whose parameter names load successfully while one weight has
-been transposed to match a different convention. The model may still run if the surrounding
-dimensions happen to agree, but a verifier might then certify a graph and payload pair that is not the
-deployed computation. TorchLean's design pushes parameter payloads, graph lowering, and shape checks
-into explicit data so that this kind of agreement can be inspected and, where the library has the
-theorem support, proved.
+| Evidence | What it establishes |
+| --- | --- |
+| a successful run | one execution produced a value |
+| a parser or shape check | an artifact satisfies a structural predicate |
+| a certificate replay | an artifact satisfies the checker's acceptance predicate |
+| a soundness theorem | the accepted predicate implies a semantic proposition |
+| a backend assumption | an external implementation is being trusted to meet a stated contract |
+
+# Fast Kernels Still Belong
+
+PyTorch has far broader operator coverage, distributed training, mature compilers, pretrained
+models, and years of production optimization. Reimplementing all of that inside Lean would be a
+poor use of both systems.
+
+TorchLean can therefore call native CUDA or LibTorch for expensive operations. The source model,
+parameter layout, and graph remain TorchLean objects; a backend profile chooses the implementation.
+For example, LibTorch may compute the forward value of scaled dot-product attention while
+TorchLean records the tape node and applies its own backward rule. Another profile may use native
+TorchLean CUDA for both directions. Later we will inspect the capsule that records this choice.
+
+This gives the project a practical division of labor: use established kernels where scale matters,
+and use Lean to make the surrounding mathematical claim precise.
+
+# Imports
+
+Use the focused public API for application code:
+
+```
+import NN.API
+open TorchLean
+```
+
+Use the complete umbrella when one file genuinely combines application code with proofs,
+verification, floating-point semantics, backends, or widgets:
+
+```
+import NN
+open TorchLean
+```
+
+Focused subsystem imports such as `NN.IR`, `NN.Floats`, `NN.Proofs`, and `NN.Verification` avoid
+loading the whole project when only one layer is needed.
 
 # References
 
-- de Moura et al., ["The Lean Theorem Prover"](https://lean-lang.org/papers/system.pdf), CADE 2015.
-- de Moura and Ullrich, ["The Lean 4 Theorem Prover and Programming
-  Language"](https://lean-lang.org/papers/lean4.pdf), CADE 2021.
-- Paszke et al., ["PyTorch: An Imperative Style, High-Performance Deep Learning
-  Library"](https://arxiv.org/abs/1912.01703), NeurIPS 2019.
-- Gowal et al., ["On the Effectiveness of Interval Bound Propagation for Training Verifiably Robust
-  Models"](https://arxiv.org/abs/1810.12715), 2018.
-- Zhang et al., ["Efficient Neural Network Robustness Certification with General Activation
-  Functions"](https://arxiv.org/abs/1811.00866), NeurIPS 2018.
-- Xu et al., ["Automatic Perturbation Analysis for Scalable Certified Robustness and
-  Beyond"](https://arxiv.org/abs/2002.12920), NeurIPS 2020.
+- Leonardo de Moura and Sebastian Ullrich,
+  [“The Lean 4 Theorem Prover and Programming
+  Language”](https://lean-lang.org/papers/lean4.pdf), CADE 2021.
+- Adam Paszke et al.,
+  [“PyTorch: An Imperative Style, High-Performance Deep Learning
+  Library”](https://arxiv.org/abs/1912.01703), NeurIPS 2019.
+- Shiqi Wang et al.,
+  [“Beta-CROWN: Efficient Bound Propagation with Per-neuron Split Constraints for Complete and
+  Incomplete Neural Network Robustness Verification”](https://arxiv.org/abs/2103.06624),
+  NeurIPS 2021.

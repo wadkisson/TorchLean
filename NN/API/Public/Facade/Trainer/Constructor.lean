@@ -55,7 +55,7 @@ def new {model : Type u} {σ τ : Shape} [ToModel model σ τ] (m : model)
       { optimizer := cfg.optimizer
         dtype := cfg.dtype
         backend := cfg.backend
-        device := cfg.device
+        executionProfile := cfg.executionProfile
         showBackend := cfg.showBackend }
     seed := cfg.seed }
 

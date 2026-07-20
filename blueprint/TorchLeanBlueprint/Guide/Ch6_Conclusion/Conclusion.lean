@@ -2,217 +2,253 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Conclusion" =>
+#doc (Manual) "Where The Pieces Meet" =>
 %%%
 tag := "conclusion"
 %%%
 
-TorchLean is a research system for a practical problem: modern ML work mixes learned parameters,
-generated code, numerical kernels, exported graphs, verifier artifacts, and scientific claims. A
-successful run answers whether those pieces execute together. It does not, by itself, explain what
-was computed or justify the claim made from the result.
+We began with a two-input regression model:
 
-One design principle runs through the project:
+$$`
+F_\theta(x)
+=
+W_2\operatorname{ReLU}(W_1x+b_1)+b_2.
+`
 
-> a model should be runnable as ML code, inspectable as an artifact, and connected to named
-> semantics whenever a correctness, gradient, bound, or certificate claim is made.
+It became several related objects:
 
-The same thread runs through the tensor API, runtime, graph IR, floating point models,
-verification checkers, examples, and widgets.
+- a shape-checked model declaration;
+- a seeded parameter pack;
+- an executable training run;
+- an eager tape or compiled derivative graph;
+- a canonical operation IR;
+- a real-valued specification;
+- a rounded or executable floating-point interpretation;
+- a backend plan and capsule audit;
+- a verification target or checked certificate.
 
-The long-term value is especially clear in scientific computing. Neural operators, PINNs,
-controllers, 3D perception systems, and RL agents are not isolated classifiers. They sit inside
-larger mathematical and engineering arguments. A verified ML system should help those arguments name
-their assumptions, check their artifacts, and preserve meaning across runtimes.
+The objects remain separate because they answer separate questions. Their value comes from the
+explicit maps between them.
 
-The repository therefore contains more than theorem statements or training examples in isolation.
-Its scientific ML workflows, Bug Zoo cases, RL environments, generative objectives, widgets, and
-command-line tools expose the artifacts on which later claims depend. Each one should state whether
-its support comes from execution, a checker, a theorem, or an external assumption.
+# Reproduce The Path
 
-# The Working Pattern
-
-The main workflow has five steps.
-
-1. Write the model or artifact in a typed form: tensors, parameters, graph nodes, certificates,
-   datasets, or runtime logs.
-2. Choose the semantics relevant to the question: real tensors, `FP32`, `IEEE32Exec`, graph
-   denotation, autograd tapes, verifier domains, or external artifact formats.
-3. Run the computation or importer: training loop, CUDA path, PyTorch bridge, graph compiler,
-   verifier pass, or external producer.
-4. Inspect the result with ordinary outputs, widgets, logs, graph views, or certificate reports.
-5. Cite the strongest available support: executable run, Lean checker, theorem, or explicit
-  assumption.
-
-TorchLean is organized as a framework rather than a collection of isolated examples because those
-views need to meet. The same model may appear as API code, an eager runtime computation, a graph
-artifact, a verification input, and a theorem target.
-
-# Levels Of Support
-
-TorchLean uses different words for different levels of support:
-
-- *Execution*: a command runs and produces concrete tensors, logs, samples, bounds, or reports.
-- *Inspection*: the produced object is visible enough to debug, through printed output, widgets,
-  graph views, training curves, or certificate diagnostics.
-- *Checking*: Lean parses or recomputes an artifact and accepts or rejects a stated contract.
-- *Theorem support*: a Lean theorem connects the checked contract to the intended semantic claim.
-- *External assumption*: a Python exporter, CUDA kernel, dataset converter, solver, or native
-  library remains outside the proved fragment and is named as part of the claim.
-
-This distinction is practical. A loss curve can show that a run behaved sensibly. A certificate
-checker can validate a bound artifact. A theorem can state why an accepted artifact implies a
-semantic property. These are related, but they are not interchangeable.
-
-The levels often stack:
+These commands retrace the central examples:
 
 ```
-command output
-  -> persisted artifact
-  -> widget or report
-  -> checker acceptance
-  -> theorem about the checker or semantics
-  -> named external assumptions
+lake exe torchlean quickstart_tensors
+lake exe torchlean quickstart_autograd
+lake exe torchlean quickstart_mlp \
+  --device cpu --steps 200 --seed 2026
+lake exe torchlean graphspec --device cpu --backend eager
+lake exe torchlean one_semantic_universe
+lake exe torchlean float32_modes
+lake exe torchlean numerical_certificate
 ```
 
-For example, a PPO CartPole run may produce a reward log and checked transition records. The log is
-evidence that the command ran and trained through the selected runtime path. The boundary records
-are evidence that observations, actions, rewards, and done flags had the declared shape/range when
-they entered Lean. They are not a proof of Gymnasium's implementation, nor a proof that PPO
-converges. That difference is exactly what TorchLean should help readers keep straight.
+Together they show:
 
-Similarly, a diffusion run may write a PPM sample and a train log. The generative theory layer may
-prove that a formal forward Gaussian law is Gaussian, or that a sampler step is Lipschitz under
-hypotheses. Those are valuable local facts. They do not by themselves prove image quality, FID,
-dataset coverage, or equivalence of every native kernel.
+1. one shape-indexed tensor API at several scalar semantics;
+2. explicit VJPs, Jacobians, Hessians, and parameter gradients;
+3. a complete training and prediction run;
+4. structured model lowering;
+5. one IR interpreted for values and interval bounds;
+6. host Float versus executable binary32 forward/backward behavior;
+7. a graph-level numerical certificate workflow.
 
-# How To State A TorchLean Result
+Successful output is not the end of the argument. It tells us which artifact to inspect next.
 
-When writing about TorchLean, the strongest statements have a simple form:
+# A Claim, Written Carefully
 
-- name the object: model, graph, tensor, tape, certificate, parameter store, dataset, or external
-  artifact;
-- name the semantics: real, `FP32`, `IEEE32Exec`, graph denotation, verifier abstraction, or runtime
-  execution path;
-- name the support: command output, widget inspection, checker acceptance, theorem, or assumption;
-- state the property: shape agreement, gradient correctness, robustness margin, approximation
-  bound, certificate validity, or runtime behavior.
+Suppose a report says:
 
-For example, a model example run can establish that a particular training script executes and writes a
-loss trace. A verifier command can establish that a graph artifact passes a bound checker. A
-soundness theorem can establish that accepted bounds enclose the graph semantics for a supported
-fragment. A CUDA or Python path can be used, but the external part remains part of the statement
-unless a bridge theorem or replay checker covers it.
+> The trained model is robust on a box of inputs.
 
-Here are better and worse forms of the same result:
+TorchLean encourages us to expand that sentence:
 
-| Avoid | Prefer |
-|---|---|
-| "TorchLean verifies GPT-2." | "`torchlean gpt2` runs a small GPT-2-style causal Transformer example; causal mask and token-bound claims must be cited separately." |
-| "The diffusion model is proved correct." | "The diffusion example runs a denoising training path; `forwardGaussian_isGaussian` proves a formal forward-process fact." |
-| "RL is verified." | "GridWorld dynamics have Lean-side semantics; Gymnasium PPO runs through a checked transition boundary, while the simulator remains external." |
-| "The CUDA backend is proved." | "This command used CUDA; proof support depends on the specific kernel, spec, test, or runtime-conformance assumption cited." |
-| "The widget proves the graph." | "The widget renders the graph/checker state; the theorem or checker result carries the proof claim." |
+1. *Which model?* Identify architecture, parameter artifact, and graph payload.
+2. *Which input box?* Give lower and upper tensors with checked shapes.
+3. *Which robustness property?* State the output inequality or class-margin condition.
+4. *Which scalar semantics?* Exact real, finite FP32, executable IEEE32, or a native runtime.
+5. *Which method?* IBP, CROWN, α,β-CROWN artifact replay, branch-and-bound, or another checker.
+6. *Which theorem?* Name the proposition obtained when the checker accepts.
+7. *Which boundary remains trusted?* External search, parser, backend kernel, compiler, or hardware.
 
-This wording lets a reader reproduce the run, inspect the artifact, and see where a stronger theorem
-would attach.
+The longer sentence is not bureaucratic. It is the difference between a result that can be reused
+and one that cannot be audited when the model or backend changes.
 
-# Application Lessons
+# What TorchLean Owns
 
-The application chapters point to several recurring lessons.
+TorchLean can own, within Lean:
 
-- *Model examples*: modern architectures are useful because they stress different semantic
-  boundaries: masks, patch tokens, recurrent state, spectral transforms, latent variables, and
-  environments.
-- *Scientific ML*: the equation, domain, discretization, dataset, and residual/bound artifact are
-  part of the claim, not background context.
-- *BugZoo*: small theorem-sized case studies can expose real bug families more clearly than a large
-  benchmark.
-- *Widgets*: inspection improves proof engineering, but visual output does not replace a theorem.
-- *RL*: transition data is a trust boundary; Lean-native environments and Gymnasium environments
-  have different claim strength.
-- *Generative models*: runnable image/text artifacts and objective/sampler theorems are both useful,
-  but they answer different questions.
-- *CLI workflows*: command lines are part of reproducibility. Record flags, data helpers, backend,
-  dtype, artifact path, and external producers.
+- tensor shapes and layer composition;
+- mathematical operator specifications;
+- graph well-formedness and supported evaluation;
+- primitive and graph-level autograd theorems;
+- generic rounding and finite FP32 mathematics;
+- executable IEEE32 reference algorithms and proved bridges;
+- optimizer laws under their stated hypotheses;
+- soundness of implemented certificate checkers;
+- policy gates that reject missing or inadmissible evidence.
 
-# The Extension Rule
+The exact scope is determined by each declaration. An import path or chapter heading does not
+upgrade a partial theorem into a universal one.
 
-The same rule applies when extending the project. A new feature is strongest when it adds one clear
-bridge:
+# What Remains A Boundary
 
-- a new model should expose its data boundary, parameter shapes, training loop, and logs;
-- a new operator should name its spec and runtime behavior;
-- a new graph pass should state what semantics it preserves or approximates;
-- a new verifier should identify the abstract domain, checker, and soundness theorem;
-- a new external integration should specify the artifact format and producer/checker contract;
-- a new widget should render an existing Lean object rather than define a new semantic meaning.
+Real training also uses:
 
-That rule keeps TorchLean extensible without making the system vague. Every addition should make at
-least one object easier to run, inspect, check, or prove.
+- native CUDA kernels;
+- cuBLAS, cuFFT, and other accelerator libraries;
+- LibTorch and ATen;
+- C/C++ compilers, drivers, and hardware;
+- Python export and conversion scripts;
+- external verifier search;
+- datasets and scientific simulators.
 
-# Reading Claims In The Wild
+Wrapping these components in a Lean function does not prove them correct. Kernel capsules record
+provider, device, shape/layout contracts, numerical policy, VJP ownership, and evidence. External
+artifacts cross parsers and checkers. The remaining trust is named rather than disappearing into
+the phrase “verified in Lean.”
 
-When reading a TorchLean page, paper paragraph, commit message, or example README, ask five
-questions:
+# The Numerical Story
 
-1. What object is being discussed?
-2. Which semantics is attached to it?
-3. Which command, checker, widget, or theorem supports the statement?
-4. Which external producer assumptions remain?
-5. What would be required to upgrade the statement?
+The floating-point stack has three central levels:
 
-The last question is important. A runtime example can be upgraded by adding an artifact checker. A
-checker can be upgraded by proving soundness for the accepted fragment. A theorem over real tensors
-can be upgraded by adding an `IEEE32Exec` or runtime float32 bridge. A Gymnasium boundary can be
-upgraded by moving an environment into Lean or by strengthening the contract around observations and
-rewards. A CUDA fast path can be upgraded by a spec equivalence theorem, deterministic replay
-contract, or a narrower named assumption.
+```
+NeuralFloat / NF
+  generic radix, format, and rounding mathematics
 
-# Research Direction
+FP32
+  finite binary32 rounded-real proof semantics
 
-The project now has several natural next steps:
+IEEE32Exec
+  executable 32-bit IEEE representation and operations
+```
 
-- broaden model coverage while keeping examples small enough to inspect;
-- connect more runtime paths to graph artifacts and proof statements;
-- strengthen CUDA/kernel conformance stories for operators used by modern models;
-- grow BugZoo with more real incident patterns from compilers, serving systems, scientific ML, and
-  perception;
-- make verification artifacts easier to produce, replay, and cite;
-- improve widgets so large Lean objects stay readable without becoming a second semantic layer;
-- build more bridges from external ecosystems such as PyTorch, ONNX, Gymnasium, VNN-COMP, and
-  scientific-data formats into checked Lean artifacts.
+The runtime then adds CPU, CUDA, or external providers. A real-valued approximation theorem, a
+half-ULP rounding theorem, an executable bit-pattern theorem, and a CUDA parity test are different
+evidence.
 
-The next stage is a library in which every serious claim names its object, semantics, supporting
-artifact, and remaining assumptions. Different model families will require different local
-theorems; they do not need to be hidden behind one monolithic claim about all of machine learning.
+This separation makes useful compositions possible. For example:
 
-# Closing
+$$`
+|F_{\mathrm{runtime}}(x)-f(x)|
+\leq
+|F_{\mathrm{runtime}}(x)-F_{\mathbb R}(x)|
++
+|F_{\mathbb R}(x)-f(x)|.
+`
 
-TorchLean keeps two activities connected: building neural network systems and stating mathematical
-claims about them. The code can still look like ML code. The examples can still
-train, log, save, load, and call native or external tools. The difference is that the central objects
-have names in Lean, and claims about those objects can be tied to checkers, theorems, or
-explicit assumptions.
+The first term is numerical implementation error. The second is model approximation error. A
+meaningful end-to-end result needs both, with compatible domains and semantics.
 
-The standard the project should preserve is simple: identify the object, identify the semantics,
-and say what has been run, checked, proved, or assumed. If TorchLean makes that habit easier for
-neural networks, then it has met its purpose.
+# The Scaling Story
 
-# References And Anchors
+TorchLean is not meant to replace every tuned numeric kernel with a slow Lean implementation.
+Large models need industrial matrix multiplication, convolution, attention, FFT, and communication
+libraries.
 
-- George et al., [*TorchLean*](https://arxiv.org/abs/2602.22631), 2026.
-- Vaswani et al., [*Attention Is All You Need*](https://arxiv.org/abs/1706.03762), 2017.
-- He et al., [*Deep Residual Learning for Image Recognition*](https://arxiv.org/abs/1512.03385),
-  2015/2016.
-- Ho, Jain, and Abbeel, [*Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2006.11239),
-  2020.
-- Li et al., [*Fourier Neural Operator for Parametric Partial Differential
-  Equations*](https://arxiv.org/abs/2010.08895), 2020/2021.
-- Mnih et al., [*Human-level control through deep reinforcement
-  learning*](https://www.nature.com/articles/nature14236), 2015.
-- Schulman et al., [*Proximal Policy Optimization Algorithms*](https://arxiv.org/abs/1707.06347),
-  2017.
-- Gymnasium documentation, [environment API](https://gymnasium.farama.org/api/env/).
+The architectural goal is:
+
+```
+one semantic operation graph
+  -> several admissible kernel providers
+  -> explicit contract and evidence per boundary
+```
+
+TorchLean can own graph structure, shapes, loss, optimizer meaning, and proof statements while a
+provider supplies a fast value or local VJP. The assurance level may range from a proved internal
+implementation to a checked or explicitly trusted external kernel.
+
+Scaling and verification therefore meet at the backend contract, not by pretending that outsourced
+numerics were executed inside the theorem prover.
+
+# The Scientific-ML Story
+
+A PINN or neural operator usually participates in a larger chain:
+
+```
+equation and domain
+  -> discretization or simulator
+  -> dataset
+  -> model and training
+  -> prediction artifact
+  -> residual, invariant, or error certificate
+  -> Lean checker and theorem
+```
+
+The neural network is only one part. Boundary conditions, quadrature, sampling coverage, simulator
+accuracy, and interpolation between grid points can dominate the final claim.
+
+TorchLean's role is to give each artifact a typed meaning and to make the accepted implication
+precise. External computation can remain large; the checker and proposition should remain small
+enough to audit.
+
+# A Productive Development Loop
+
+When adding an operation or model:
+
+1. define the intended tensor and scalar semantics;
+2. add the shape-checked public operation;
+3. register forward and derivative behavior;
+4. lower it to explicit IR when verification/export needs it;
+5. add provider capsules for implemented runtimes;
+6. state numerical and layout policies;
+7. prove reusable semantic facts;
+8. add executable positive and negative controls;
+9. document unsupported paths and trust boundaries;
+10. run the same small model through every claimed path.
+
+Tests and proofs are complementary. Proofs establish universal propositions about formal objects.
+Tests catch wiring, FFI, build, CLI, documentation, and platform regressions that are outside or not
+yet covered by those propositions.
+
+# What To Build Next
+
+Several directions extend the same architecture:
+
+- prove graph-wide exact-real enclosure from local interval transfers;
+- expand proof-bearing reverse lowering and optimizer-error propagation;
+- add narrower conformance checkers for native and external kernels;
+- support more devices by registering real profiles and capsules, not only enum names;
+- strengthen robustness and scientific certificate formats;
+- connect quantization theory to packed runtime kernels;
+- add model families through general tensor operations rather than private image or sequence types.
+
+The criterion is not the number of features. A useful addition should reduce the distance between a
+runnable model and a precise claim without hiding a new boundary.
+
+# A Final Exercise
+
+Choose one example from the model zoo and write down:
+
+```
+input and output shapes
+parameter shapes
+loss
+data source and preprocessing
+scalar semantics
+execution mode
+device and selected providers
+forward and backward ownership
+available theorem or checker
+remaining trusted assumptions
+```
+
+Then run it with `--show-backend` and compare the report with your list. Any missing item is a
+concrete documentation, logging, or verification task.
+
+That habit is the central lesson of the guide: do not ask whether “the model” is verified as if it
+were one indivisible thing. Ask which object carries the claim, which transformation produced it,
+and which theorem or boundary connects it to what ran.
+
+# References
+
+- George et al., [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631),
+  2026.
+- Boldo and Melquiond,
+  [*Flocq: A Unified Library for Proving Floating-Point Algorithms in
+  Coq*](https://doi.org/10.1109/ARITH.2011.40), 2011.
+- George C. Necula, [*Proof-Carrying Code*](https://doi.org/10.1145/263699.263712), 1997.
 - Odena et al., [*TensorFuzz*](https://proceedings.mlr.press/v97/odena19a.html), 2019.
 - Liu et al., [*NNSmith*](https://arxiv.org/abs/2207.13066), 2022/2023.

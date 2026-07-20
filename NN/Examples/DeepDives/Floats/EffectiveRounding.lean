@@ -6,12 +6,13 @@ Authors: TorchLean Team
 
 module
 
+public import NN.Floats.FP32.Sterbenz
 public import NN.Floats.IEEEExec.Bridge.FP32Total
 public import NN.Floats.IEEEExec.DirectedRoundingSoundness
 public import NN.Floats.IEEEExec.Reductions
 public import NN.Floats.IEEEExec.Rules.SpecialRules
 public import NN.Floats.NeuralFloat.Rounding
-public import NN.Floats.NeuralFloat.Scalar.Conversion
+public import NN.Floats.Quantization
 public import NN.Spec.Core.Tensor
 public import NN.Spec.Core.TensorOps
 
@@ -32,6 +33,7 @@ open Spec
 open TorchLean.Floats
 open TorchLean.Floats.IEEE754
 open TorchLean.Floats.IEEE754.IEEE32Exec
+open TorchLean.Floats.Quantization
 
 def width : Nat := 4
 abbrev vectorShape : Spec.Shape := .dim width .scalar
@@ -88,6 +90,72 @@ theorem runtimeSum_entry_computed (i : Fin width) :
   change toReal (add posOne (ofBits 0x40000000)) = _
   exact toReal_add_eq_computed_of_isFinite posOne (ofBits 0x40000000) (by decide)
 
+/-! ## Exact subtraction, local spacing, and absorption -/
+
+/-- Sterbenz's lemma certifies the concrete binary32 subtraction `2 - 1` as exact. -/
+theorem two_sub_one_exact :
+    round₃₂ ((2 : ℝ) - 1) = (2 : ℝ) - 1 := by
+  have hOne : neuralGenericFormat binaryRadix fexp32 (1 : ℝ) := by
+    simpa [neuralBpow, binaryRadix, NeuralRadix.toReal] using
+      (neural_generic_format_bpow (β := binaryRadix) (fexp := fexp32) 0
+        (by norm_num [fexp32, FLTExp]))
+  have hTwo : neuralGenericFormat binaryRadix fexp32 (2 : ℝ) := by
+    simpa [neuralBpow, binaryRadix, NeuralRadix.toReal] using
+      (neural_generic_format_bpow (β := binaryRadix) (fexp := fexp32) 1
+        (by norm_num [fexp32, FLTExp]))
+  exact round32_sub_exact_of_sterbenz hTwo hOne (by norm_num) (by norm_num)
+    (by norm_num) (by norm_num)
+
+/--
+The corresponding executable binary32 operation also denotes the exact real subtraction.
+-/
+theorem runtime_two_sub_one_exact :
+    toReal (sub (ofBits 0x40000000) posOne) =
+      toReal (ofBits 0x40000000) - toReal posOne := by
+  have htwo : toReal (ofBits 0x40000000) = (2 : ℝ) := by
+    have h :=
+      toReal_ofBits_mkBits_fin false 128 0 (by norm_num) (by norm_num)
+    have hbits : mkBits false 128 0 = (0x40000000 : UInt32) := by decide
+    rw [hbits] at h
+    norm_num [pow2, Nat.shiftLeft_eq, neuralBpow, binaryRadix, NeuralRadix.toReal] at h ⊢
+    exact h
+  have hone : toReal posOne = (1 : ℝ) := by
+    have h :=
+      toReal_ofBits_mkBits_fin false 127 0 (by norm_num) (by norm_num)
+    have hbits : mkBits false 127 0 = (0x3f800000 : UInt32) := by decide
+    rw [hbits] at h
+    norm_num [posOne, pow2, Nat.shiftLeft_eq, neuralBpow, binaryRadix, NeuralRadix.toReal] at h ⊢
+    exact h
+  exact toReal_sub_eq_sub_of_sterbenz (ofBits 0x40000000) posOne
+    (by decide) (by decide)
+    (by rw [htwo]; norm_num) (by rw [hone]; norm_num)
+    (by rw [htwo, hone]; norm_num) (by rw [htwo, hone]; norm_num)
+
+/-- The executable ULP exponent at `1.0` is `-23`. -/
+theorem posOne_ulpExp : ulpExp? posOne = some (-23) := by
+  decide
+
+/-- The computed exponent therefore denotes the mathematical ULP at `1.0`. -/
+theorem posOne_ulp :
+    neuralBpow binaryRadix (-23) = ulp₃₂ (toReal posOne) :=
+  neuralBpow_eq_ulp32_of_ulpExp?_eq_some posOne_ulpExp
+
+/-- NaN and infinity have no finite ULP exponent. -/
+theorem posInf_ulpExp : ulpExp? posInf = none := by
+  decide
+
+/-- Adding the smallest positive subnormal does not change executable binary32 `1.0`. -/
+theorem posOne_absorbs_posMinSubnormal : absorbs posOne posMinSubnormal = true := by
+  decide
+
+/--
+The executable absorption result transports to the rounded-real binary32 specification.
+-/
+theorem posOne_add_posMinSubnormal_rounds_to_posOne :
+    round₃₂ (toReal posOne + toReal posMinSubnormal) = toReal posOne := by
+  exact round32_add_eq_left_of_absorbs_of_isFinite
+    (by decide) (by decide) (by decide) posOne_absorbs_posMinSubnormal
+
 /-! ## Named rounding modes and fused enclosures -/
 
 /-- The public mode API avoids passing a raw integer-rounding function at each call site. -/
@@ -137,7 +205,7 @@ theorem sqrt_enclosure :
 
 /-- A signed affine code set with quarter-unit spacing. The construction is not tied to a tensor
 layout or storage width; those choices only determine the integer code bounds. -/
-noncomputable def signedQuarterQuantizer : Conversion.AffineQuantizer where
+noncomputable def signedQuarterQuantizer : AffineQuantizer where
   scale := 1 / 4
   zeroPoint := 0
   qmin := -128
@@ -164,6 +232,20 @@ theorem signedQuarterQuantizer_error (x : ℝ)
     signedQuarterQuantizer.dequantize_quantize_error_le neuralNearestEven x hlo hhi
   convert h using 1
   all_goals norm_num [signedQuarterQuantizer]
+
+/-- Four valid codes, represented with the same shape-indexed tensor used by TorchLean models. -/
+def quarterCodes : Spec.Tensor ℤ vectorShape :=
+  Spec.vectorTensor (fun i => i.val)
+
+/-- Pointwise tensor Q/DQ is exact on an in-range code tensor. -/
+theorem quarterCodes_roundtrip :
+    signedQuarterQuantizer.quantizeTensor neuralNearestEven
+      (signedQuarterQuantizer.dequantizeTensor quarterCodes) = quarterCodes := by
+  apply signedQuarterQuantizer.quantizeTensor_dequantizeTensor
+  intro i
+  change (-128 : ℤ) ≤ (i.val : ℤ) ∧ (i.val : ℤ) ≤ 127
+  have hi : i.val < 4 := i.isLt
+  constructor <;> omega
 
 /-- Round-to-odd on a sufficiently fine binary grid prevents double rounding on the quarter grid. -/
 theorem quarterGrid_doubleRounding_safe (extra : ℕ) (x : ℝ) :

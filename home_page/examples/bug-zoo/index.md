@@ -123,7 +123,7 @@ model only under a named assumption.
 
 ```lean
 theorem runtimeFloat32_add_rewrites_to_ieee32
-    [RuntimeFloat32MatchesIEEE32Exec] (a b : F32) :
+    [RuntimeFloat32MatchesIEEE32Exec] (a b : _root_.Float32) :
     toIEEE32Exec (a + b) = IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b)
 ```
 

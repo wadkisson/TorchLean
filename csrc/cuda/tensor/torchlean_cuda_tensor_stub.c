@@ -287,6 +287,20 @@ LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_rand_uniform(uint32_t n, uint64_t
   return torchlean_cuda_buffer_box(out);
 }
 
+LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_rand_normal(
+    uint32_t n, double mean, double std, uint64_t key) {
+  torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc((size_t)n);
+  for (size_t i = 0; i < (size_t)n; ++i) {
+    uint32_t r1 = (uint32_t)torchlean_splitmix64(key + (uint64_t)(2 * i));
+    uint32_t r2 = (uint32_t)torchlean_splitmix64(key + (uint64_t)(2 * i + 1));
+    double u1 = ((double)r1 + 1.0) / 4294967297.0;
+    double u2 = ((double)r2) / 4294967296.0;
+    double z = sqrt(-2.0 * log(u1)) * cos(6.2831853071795864769 * u2);
+    out->data[i] = (float)(mean + std * z);
+  }
+  return torchlean_cuda_buffer_box(out);
+}
+
 LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_bernoulli_mask(uint32_t n, double keepProb, uint64_t key) {
   torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc((size_t)n);
   const double denom = 4294967296.0;  // 2^32

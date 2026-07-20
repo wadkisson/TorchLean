@@ -155,6 +155,22 @@ def get : {ss : List Shape} → EList ss → (i : Fin ss.length) → ℝ
   | _ :: ss, .cons _x xs, ⟨Nat.succ i, hi⟩ =>
       get (ss := ss) xs ⟨i, Nat.lt_of_succ_lt_succ hi⟩
 
+/-- Erase shape indices while retaining bounds in context order.
+
+This is the reporting boundary used by architecture-independent numerical traces. Proofs continue
+to use `EList`; UI and serialization code receives an ordinary list only after propagation has
+finished.
+-/
+def toList : {ss : List Shape} → EList ss → List ℝ
+  | [], .nil => []
+  | _ :: _, .cons error errors => error :: toList errors
+
+@[simp] theorem length_toList {ss : List Shape} (errors : EList ss) :
+    errors.toList.length = ss.length := by
+  induction errors with
+  | nil => rfl
+  | cons _ _ ih => simp [toList, ih]
+
 end EList
 
 -- Tensor and context approximation predicates for forward runtime graphs.

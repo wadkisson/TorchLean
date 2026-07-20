@@ -10,6 +10,7 @@ public import NN.Proofs.RuntimeApprox.Core
 public import NN.Proofs.RuntimeApprox.FP32
 public import NN.Proofs.RuntimeApprox.Graph
 public import NN.Proofs.RuntimeApprox.NF
+public import NN.Proofs.RuntimeApprox.Optimizer
 public import NN.Proofs.RuntimeApprox.Rounding
 public import NN.Proofs.RuntimeApprox.Scale
 
@@ -24,6 +25,7 @@ The runtime-approximation library is intentionally layered:
 - `Graph`: forward and reverse graph composition theorems;
 - `NF`: proof-relevant rounded tensor/operator backend;
 - `FP32`: convenient FP32-specialized layer/MLP/CROWN statements;
+- `Optimizer`: one finite-run contract for numerical optimizer updates;
 - `Scale`: optional magnitude propagation for abs/rel tolerance reporting.
 
 Leaf modules stay available for developers working on one operator family, but public entrypoints

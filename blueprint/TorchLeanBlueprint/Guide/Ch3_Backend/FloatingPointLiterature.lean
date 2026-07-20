@@ -2,253 +2,333 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Approximation and Floating Point References" =>
+#doc (Manual) "Tracking Numerical Error Through A Network" =>
 %%%
-tag := "uat-fp-literature"
+tag := "floating-point-literature"
 %%%
 
-Numerical claims in TorchLean need citations at the right semantic level. Many papers use similar
-words: approximation, robustness, bounds, finite precision. The words are not enough. Before citing
-a theorem, the relevant semantics must be clear: real-valued networks, rounded-real FP32 semantics,
-executable IEEE-754 behavior, or an abstract verifier enclosure.
+The previous chapter explained one rounded operation. A neural network contains thousands or
+billions of them. The useful question is no longer “how large can one rounding error be?” but:
 
-Good citations name the semantics of the claim. A TorchLean theorem should say whether it is about
-reals, `FP32`, `IEEE32Exec`, or a verifier enclosure, and it should name the quantity being bounded:
-pointwise error, the image of a set, or an interval overapproximation.
+> If the runtime starts near the ideal inputs, how far can its forward value, gradients, and next
+> parameter state move from the corresponding real-valued computation?
 
-# Three Questions Before Citing A Result
+TorchLean answers this compositionally. Each operation contributes a local error rule. A graph
+theorem combines those rules in forward order, a reverse-mode theorem combines the VJP rules in
+backward order, and an optimizer contract carries the resulting gradient error into the next
+training state.
 
-For a "floating-point universal approximation" claim, three concrete checks apply:
+# Two Executions Of The Same MLP
 
-1. Is the theorem about reals, about a rounded real model, or about actual executable IEEE-754 bits?
-2. What is the approximation target (a pointwise function, a direct image of a set, or an interval enclosure)?
-3. If the theorem feeds a verifier, what semantics is the verifier using?
-
-TorchLean keeps these cases separate in code:
-
-- `FP32` is the rounded real model used in proofs.
-- `IEEE32Exec` is the executable binary32 kernel.
-- `NN.IR.Graph` is the shared "this is the computation" object used by execution and verification.
-
-Two common citation chains are:
-
-- real target function, classical approximation error, FP32 rounding model, then interval or LiRPA
-  verification semantics;
-- executable `IEEE32Exec` bits, then the `FP32` proof model on the finite bridge path.
-
-# Definitions we use in this book
-
-- `direct image`: the exact output set `f(B)` of a network over an input region `B`.
-- `interval abstraction`: a sound overapproximation of `f(B)` (a box, or a box plus affine forms).
-- `rounded target`: the same computation after fixing a scalar semantics (reals vs FP32 vs IEEE bits).
-- `bridge theorem`: a statement that connects an executable semantics to a proof semantics on a
-  stated "finite path" (no NaN/Inf, no overflow, etc).
-
-The same feed-forward architecture can therefore be discussed at several incompatible levels of
-precision. Papers and theorems should name the level explicitly so readers can tell whether the
-claim concerns real valued idealization, a float model used for proofs, executable IEEE-754
-behavior, or a verifier's overapproximation of outputs.
-
-# Key References
-
-## Standards And Numerical Analysis
-
-IEEE 754 / ISO 60559 is the machine arithmetic target: binary formats, special values, rounding
-attributes, exceptions, and the claim that conforming operations have determined results under
-specified formats and rounding modes.
-
-Goldberg and Higham are the tutorial and numerical-analysis references to cite when explaining why
-floating-point operations are rounded operations, why evaluation order matters, and why forward
-error bounds are the right language for many ML proofs.
-
-## Proof Assistant Floating Point
-
-Flocq is the closest proof-engineering precedent for TorchLean's `FP32` layer: it formalizes
-floating-point arithmetic in Coq using reusable rounded-real models. FloatSpec is a Lean 4 project
-with the same broad ambition for IEEE-style arithmetic and executable reference operations.
-
-Gappa is the reference for automatic certification of floating-point bounds:
-it automates interval/error propagation and can emit independently checkable proof artifacts.
-
-CompCert is the compilation-side background: it is a verified compiler whose formal development
-includes machine floating point models.
-
-## Classical Universal Approximation
-
-Cybenko (1989), Hornik, Stinchcombe, and White (1989), Leshno et al. (1993), and Pinkus (1999).
-
-These are the right citations for the classical density statement over reals, before rounding or
-verification enter the discussion.
-
-## Quantization And Numerical Precision
-
-Sakr et al., *Analytical Guarantees on Numerical Precision of Deep Neural Networks* (ICML 2017), and
-papers on quantized ReLU approximation. The PMLR page is
-https://proceedings.mlr.press/v70/sakr17a.html.
-
-These are the right citations when the question is "what does finite precision do to my error
-budget?" rather than "can the architecture approximate at all?"
-
-## Abstract Interpretation And Interval Semantics
-
-Gehr et al., *AI2: Safety and Robustness Certification of Neural Networks with Abstract
-Interpretation* (2018), Singh et al., *An Abstract Domain for Certifying Neural Networks* (POPL
-2019), and the CROWN / LiRPA line of work.
-
-This line of work is the background for interval boxes, affine relaxations, and TorchLean's
-verification and bound propagation passes.
-
-## Floating Point Neural Networks As Robust Approximators
-
-Hwang, Saad, et al., *Floating-Point Neural Networks Are Provably Robust Universal Approximators*
-([arXiv:2506.16065](https://arxiv.org/abs/2506.16065), CAV 2025).
-
-Among the references here, this paper is the closest match to how TorchLean separates concerns: it
-distinguishes classical approximation over the reals from finite precision effects and from the
-interval-style quantities that verification tools compute.
-
-# What TorchLean Can Cite Today
-
-TorchLean already has a chain checked by Lean that is more concrete than a paper sketch:
-
-- a classical 1D ReLU universal-approximation theorem,
-- a hinge-network variant of that theorem,
-- and an FP32-flavored version with an explicit rounding bound.
+Start with the checked-in example:
 
 ```
-import NN.MLTheory.Proofs.Approximation
-import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec
-
-#check relu_universal_approximation_Icc
-#check relu_universal_approximation_Icc_hinge
-#check relu_universal_approximation_Icc_fp32
+lake exe torchlean float32_modes
 ```
 
-Read the three theorems as a staged chain:
+It evaluates
 
-- `relu_universal_approximation_Icc` states the classical real valued universal approximation result.
-- `relu_universal_approximation_Icc_hinge` is a constructive hinge-network variant that exposes the
-  piecewise-linear structure used in later proofs.
-- `relu_universal_approximation_Icc_fp32` layers TorchLean's `FP32` rounding model on
-  top of that approximation theorem, with an explicit rounding error budget.
+$$`y=W_2\operatorname{ReLU}(W_1x+b_1)+b_2`
 
-Together they illustrate the pattern the rest of the numerics chapters follow: establish the
-real valued property, fix a scalar semantics, then package a compositional error or refinement
-lemma that links the two.
-
-# Which Citation Goes With Which Claim?
-
-Use this map when writing a paper, proposal, or technical note:
-
-- ReLU networks approximate continuous functions over reals: cite
-  `relu_universal_approximation_Icc` and the classical universal approximation references.
-- FP32 rounded networks approximate a real target with an error budget: cite
-  `relu_universal_approximation_Icc_fp32`, Higham-style forward error analysis, and the TorchLean
-  `FP32` semantics.
-- Executable IEEE32 statements: cite the `relu_universal_approximation_Icc_ieee32exec_*` family
-  together with IEEE 754 / ISO 60559 and the `IEEE32Exec` semantics.
-- Interval or LiRPA enclosures: cite the IBP/CROWN objects together with abstract interpretation
-  and LiRPA references.
-- Proof-assistant float semantics: cite `FP32`, `IEEE32Exec`, and related work such as Flocq,
-  FloatSpec, Gappa, and CompCert.
-
-## There is also an executable IEEE32Exec theorem line
-
-For statements phrased directly over the executable binary32 model instead of the rounded real
-`FP32` layer, the repo also contains the start of that line in:
-
-- [IEEE32Exec universal approximation theorem](https://github.com/lean-dojo/TorchLean/blob/main/NN/MLTheory/Proofs/Approximation/Universal/UniversalApproximationIEEE32Exec.lean)
-
-The most visible theorem names there are:
+twice. The first run uses Lean's host `Float`; the second uses `IEEE32Exec`. Both runs then compute
+the parameter and input VJPs. A shortened output is:
 
 ```
-import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximationIEEE32Exec
+== Float (runtime) ==
+y = [2.080000]
+hiddenBiasGrad = [0.700000, 0.800000, 0.900000]
+inputGrad = [0.760000, 1.000000]
 
-#check relu_universal_approximation_Icc_ieee32exec_minimal
-#check relu_universal_approximation_Icc_ieee32exec_threeTerm
-#check relu_universal_approximation_Icc_ieee32exec_twoTerm
+== Float32 (IEEE32Exec) ==
+y = [2.080000]
+hiddenBiasGrad = [0.700000, 0.800000, 0.900000]
+inputGrad = [0.760000, 1.000000]
+
+max_abs_diff(Float vs IEEE32Exec) =
+  0.0000000762939453835542735760100185871124267578125
 ```
 
-That does not replace the `FP32` layer. It complements it: `FP32` is still the cleanest place to
-package compositional rounding arguments, while the `IEEE32Exec` theorems support statements closer
-to executable binary32 behavior itself.
+The values look identical at six decimal places. The final line shows that they are not. This is a
+good experiment, but we want more than the distance observed at one input. We want a bound derived
+from the operations in the model.
 
-# What A Full Paper Statement Still Has To Package
+# The Approximation Relation
 
-The remaining work is concrete theorem packaging. A paper-ready theorem has to quantify over:
+Let `x` be an ideal real tensor and `x̂` its rounded counterpart. TorchLean writes the basic
+coordinatewise relation as
 
-- the real target function or real network being approximated;
-- the scalar semantics used by the executable model (`FP32`, `IEEE32Exec`, or a runtime bridge);
-- the classical approximation error `ε_appx`;
-- the finite precision or rounding error `ε_fp32`;
-- the interval, CROWN/LiRPA, or certificate error term `ε_verify`, if the statement is
-  verifier side;
-- the bridge hypotheses: finite values, no overflow, fixed reduction order, and any runtime/native
-  agreement assumptions.
+$$`\operatorname{approxT}(x,\widehat x,\varepsilon)
+  \quad\Longleftrightarrow\quad
+  \forall i,\;
+  |\operatorname{toSpec}(\widehat x_i)-x_i|\leq\varepsilon`.
 
-A paper-ready theorem usually has to spend three budgets: approximation error from the real model,
-finite-precision error from the scalar semantics, and verification error from the enclosure method.
-Those budgets should be named separately before they are added:
+The scalar map `toSpec` decodes the runtime scalar into the real-valued specification. For `NF`, it
+is simply the stored real value. For another runtime type, the map can be different.
 
-$$`\varepsilon_{\mathrm{total}}
+The bound is intentionally separate from the tensor. The same runtime value may be known to
+approximate several ideal values with different errors, and graph propagation should update the
+bound without rebuilding the tensor.
+
+# A Linear Layer By Hand
+
+For one output coordinate, an exact affine layer computes
+
+$$`y_j=\sum_{k=0}^{n-1}W_{jk}x_k+b_j`.
+
+Suppose the runtime has approximations `Ŵ`, `x̂`, and `b̂` with coordinatewise errors
+`ε_W`, `ε_x`, and `ε_b`. Before accounting for arithmetic rounding, one product satisfies
+
+$$`
+|\widehat W_{jk}\widehat x_k-W_{jk}x_k|
+\leq
+|W_{jk}|\,\varepsilon_x
++|x_k|\,\varepsilon_W
++\varepsilon_W\varepsilon_x.
+`
+
+This identity comes from adding and subtracting `W_{jk}x̂_k`:
+
+$$`
+\widehat W\widehat x-Wx
+=W(\widehat x-x)+x(\widehat W-W)
+  +(\widehat W-W)(\widehat x-x).
+`
+
+Now add the local multiplication error `ρ_mul` and the rounding introduced by each accumulation.
+For a fixed-left dot product, a conservative recurrence is
+
+$$`
+\begin{aligned}
+E_0 &= 0,\\
+P_k &=
+  |W_{jk}|\,\varepsilon_x
+  +|x_k|\,\varepsilon_W
+  +\varepsilon_W\varepsilon_x
+  +\rho_{\rm mul}(W_{jk},x_k),\\
+E_{k+1} &= E_k+P_k+\rho_{\rm add}(s_k,p_k).
+\end{aligned}
+`
+
+Finally add `ε_b` and the rounding of the bias addition. This explains why a linear-layer theorem
+needs more than the half-ULP bound from the previous chapter. It also needs the chosen reduction
+order and magnitude information for the operands.
+
+TorchLean packages this calculation in the `NF` runtime-approximation backend. Matrix
+multiplication, convolution, reductions, and scalar arithmetic each provide an error transformer
+and a theorem proving that transformer valid.
+
+# ReLU Does Not Amplify Existing Error
+
+ReLU is easier because it is 1-Lipschitz:
+
+$$`
+|\operatorname{ReLU}(u)-\operatorname{ReLU}(v)|
+\leq |u-v|.
+`
+
+If the runtime ReLU itself is exact for the declared scalar semantics, an incoming bound `ε`
+remains `ε`. The interesting case is when `u` and `v` lie on opposite sides of zero. The derivative
+changes discontinuously there, but the forward Lipschitz bound still holds.
+
+This difference between forward and backward sensitivity matters. A small perturbation can leave
+the ReLU output close while changing which VJP branch is selected. Backward approximation
+therefore carries branch hypotheses or a bound that covers both possibilities rather than blindly
+reusing the forward proof.
+
+# Softmax And Normalization Need Range Information
+
+For a nonlinear operation such as softmax, a global absolute-error rule is usually too weak.
+TorchLean's stable softmax first subtracts the row maximum:
+
+$$`
+\operatorname{softmax}(z)_i
 =
-\varepsilon_{\mathrm{appx}}
-+
-\varepsilon_{\mathrm{fp32}}
-+
-\varepsilon_{\mathrm{verify}}`
+\frac{\exp(z_i-\max_j z_j)}
+     {\sum_k\exp(z_k-\max_j z_j)}.
+`
 
-At that point, the verification and floating-point chapters belong together.
+Now every exponent input is nonpositive, the denominator is at least one, and the output lies in
+`[0,1]`. Those range facts control the local Lipschitz and rounding terms.
 
-A typical citation bundle for this combined topic is:
+Layer normalization has a similar chain:
 
-- `Floating-Point Semantics` for `FP32`, `IEEE32Exec`, and bridge theorems;
-- `FP32 Soundness Notes` for the rounding model used in proofs and its theorem names;
-- `Verification` for the interval / LiRPA / certificate side;
-- [approximation proofs](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/Proofs/Approximation/) for the universal-approximation
-  theorems themselves.
+$$`
+x
+\longmapsto \mu
+\longmapsto x-\mu
+\longmapsto (x-\mu)^2
+\longmapsto \sigma^2+\epsilon
+\longmapsto \sqrt{\sigma^2+\epsilon}
+\longmapsto
+\frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}.
+`
 
-## A practical citation map
+The positive stabilization constant is not decoration. It gives the square root and division a
+domain margin. TorchLean's local rule records that margin explicitly, then composes the mean,
+subtraction, square, reduction, square root, and division bounds.
 
-When writing a paper, proposal, or technical note, divide the claim as follows:
+# Composition Over A Graph
 
-- classical approximation over reals:
-  cite `relu_universal_approximation_Icc` and the classical UAT references;
-- explicit `FP32` rounding on top of the approximation theorem:
-  cite `relu_universal_approximation_Icc_fp32` plus the FP32 semantics and theorems;
-- executable IEEE-754-flavored approximation statements:
-  cite the `relu_universal_approximation_Icc_ieee32exec_*` family;
-- interval or verifier side semantics:
-  cite this bibliography together with `Verification` and the abstract-interpretation / LiRPA papers.
+A proof-bearing `RevGraph` stores, for every node:
 
-Related guide pages: *Floating-Point Semantics* (`FP32` vs `IEEE32Exec`), *FP32 Soundness Notes*
-(transfer lemmas and theorem names), *Verification* (IBP/CROWN and certificates).
+- the exact forward operation;
+- the rounded forward operation;
+- an error transformer for the forward result;
+- the exact and rounded VJPs;
+- an error transformer for the VJP;
+- proofs for both transformers.
+
+`RevGraph.eval_approx` follows the graph in topological order. If the input context satisfies its
+declared bounds, the runtime output context satisfies the bounds computed by
+`RevGraph.evalBounds`.
+
+The executable graph interpreter uses `GraphData`. The theorem
+
+```
+Proofs.RuntimeApprox.NFBackend.eval_approx_graphData
+```
+
+connects that interpreter to the same forward result. The graph may have come from an MLP, CNN,
+transformer, or neural operator; composition depends on its operations and shapes, not its model
+family name.
+
+# Backward Error Follows The Tape In Reverse
+
+Reverse mode starts from a seed cotangent and applies local VJPs from outputs back to inputs and
+parameters. For a composition `h(x)=g(f(x))`,
+
+$$`
+\bar x
+=J_f(x)^\mathsf{T}
+  J_g(f(x))^\mathsf{T}\bar h.
+`
+
+The rounded pass perturbs the saved forward values, the seed, each local VJP, and every gradient
+accumulation. `RevGraph.backpropBounds` mirrors the runtime traversal and computes the resulting
+error context. The theorem
+
+```
+Proofs.RuntimeApprox.NFBackend.backprop_approx_graphData
+```
+
+states that `GraphData.backpropCtx` stays inside that context whenever the inputs and seed satisfy
+their initial approximation relations.
+
+This is why TorchLean keeps saved values in the numerical model. A backward rule for multiplication
+uses the opposite operand; a normalization VJP uses saved statistics; attention backward uses
+probabilities and mask semantics from the forward pass. Bounding only the final forward output
+would throw away the information needed to analyze those gradients.
+
+# The Optimizer Is Part Of The Numerical Story
+
+Training does not stop at a gradient. SGD computes
+
+$$`\theta^+=\theta-\eta g`.
+
+If `θ̂`, `η̂`, and `ĝ` approximate their ideal values, the next parameter bound combines the old
+parameter error, learning-rate error, gradient error, and local multiplication/subtraction
+rounding.
+
+Momentum adds a state recurrence. AdamW adds first and second moments, bias correction, square root,
+division, and weight decay. Rather than hard-code each optimizer into the graph theorem, TorchLean
+uses `NumericalStepContract`. A contract supplies:
+
+- ideal and rounded optimizer states;
+- an approximation relation for the state;
+- ideal and rounded update functions;
+- an error transformer for the new state and parameters;
+- a theorem that the transformer is sound.
+
+The generic theorem
+
+```
+Proofs.RuntimeApprox.NFBackend.backprop_optimizer_update_approx_graphData
+```
+
+takes one parameter gradient from reverse mode and passes it through any optimizer satisfying that
+interface. SGD, momentum SGD, and AdamW reuse the same graph theorem.
+
+# Run A Graph Certificate
+
+The executable companion to these approximation theorems works over the canonical IR:
+
+```
+lake exe torchlean numerical_certificate
+```
+
+The example constructs a two-layer MLP from ordinary IR operations:
+
+```
+input [1,2]
+  -> matmul [2,3]
+  -> add bias [1,3]
+  -> ReLU
+  -> matmul [3,1]
+  -> add bias [1,1]
+```
+
+It generates outward-rounded binary32 ranges for every node, binds them to the selected backend
+profile, and replays a concrete `IEEE32Exec` execution. The final report includes:
+
+```
+  ok  two-layer MLP certificate
+  ok  two-layer MLP IEEE replay
+```
+
+The same executable also performs negative experiments. It corrupts a range, duplicates a
+registry contract, changes the registry identity, violates a square-root domain, and asks a CUDA
+capsule with an implementation-dependent reduction order to satisfy a fixed-left certificate. Each
+case is rejected.
+
+Open
+[`GraphNumericalCertificate.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/GraphNumericalCertificate.lean)
+and find `mlpGraph`, `mlpSources`, `mlpPayload`, `mlpCertificate`, and `mlpReplay`. Change one weight
+source interval so that it no longer contains the payload value, then rerun the command. Replay
+will identify the node whose value escaped the claimed enclosure.
+
+# What We Can Display During Training
+
+`trainingStepTrace` turns the computed bounds into a UI-friendly record:
+
+```
+structure TrainingStepTrace where
+  optimizer : String
+  parameterIndex : Nat
+  forwardBounds : List ℝ
+  backwardBounds : List ℝ
+  gradientBound : ℝ
+  parameterBound : ℝ
+  optimizerStateBounds : List (String × ℝ)
+  stepData : List (String × ℝ)
+```
+
+The trace is architecture-independent. A frontend can attach names such as
+`transformer.blocks.3.attention.q_proj.weight` after lowering, but propagation itself only needs the
+typed graph and parameter index. This is the basis for an InfoView or training dashboard that shows
+how numerical uncertainty changes at each step.
+
+# The Main Lesson
+
+A half-ULP theorem is local. A model-level bound comes from composing many local theorems in the
+order used by the program. Forward propagation, reverse mode, and optimizer updates each need their
+own recurrence, but they share the same approximation relation and scalar rounding theory.
+
+This is where `NeuralFloat` becomes part of TorchLean rather than a floating-point library sitting
+beside it. Its generic rounding facts feed operator contracts; operator contracts feed graph
+theorems; graph theorems feed a training-step bound.
 
 # References
 
-- Hwang, Saad, et al. *Floating-Point Neural Networks Are Provably Robust Universal Approximators*.
-  arXiv:2506.16065, CAV 2025. https://arxiv.org/abs/2506.16065
-- Cybenko, G. *Approximation by superpositions of a sigmoidal function*. 1989.
-- Hornik, Stinchcombe, and White. *Multilayer feedforward networks are universal approximators*.
-  Neural Networks, 1989.
-- Leshno et al. *Multilayer feedforward networks with a nonpolynomial activation function can
-  approximate any function*. Neural Networks, 1993.
-- Pinkus, A. *Approximation theory of the MLP model in neural networks*. Acta Numerica, 1999.
-- Sakr et al. *Analytical Guarantees on Numerical Precision of Deep Neural Networks*. ICML 2017.
-  [PMLR page](https://proceedings.mlr.press/v70/sakr17a.html)
-- Gehr et al. *AI2: Safety and Robustness Certification of Neural Networks with Abstract
-  Interpretation*. 2018.
-- Singh et al. *An Abstract Domain for Certifying Neural Networks*. POPL 2019.
-- Goldberg, D. *What Every Computer Scientist Should Know About Floating-Point Arithmetic*.
-  [Oracle-hosted reprint](https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html)
-- Higham, N. *Accuracy and Stability of Numerical Algorithms*.
-  [SIAM book page](https://epubs.siam.org/doi/book/10.1137/1.9780898718027)
-- IEEE Std 754-2019. Standard for Floating-Point Arithmetic.
-  [IEEE 754-2019](https://standards.ieee.org/standard/754-2019/)
-- ISO/IEC/IEEE 60559:2020. Floating-point arithmetic.
-  [ISO/IEC/IEEE 60559:2020](https://standards.ieee.org/standard/60559-2020.html)
-- Flocq project documentation. [Flocq](https://flocq.gitlabpages.inria.fr/)
-- FloatSpec for Lean 4. [FloatSpec](https://reservoir.lean-lang.org/%40Beneficial-AI-Foundation/FloatSpec)
-- Gappa, *Certifying floating-point implementations using Gappa*.
-  [Gappa paper](https://arxiv.org/abs/0801.0523)
-- CompCert commented development. [CompCert](https://compcert.org/doc/)
+- Nicholas J. Higham,
+  [*Accuracy and Stability of Numerical Algorithms*](https://doi.org/10.1137/1.9780898718027),
+  second edition, for forward error, backward error, and the standard `γ_n` style of accumulated
+  rounding analysis.
+- Jean-Michel Muller et al.,
+  [*Handbook of Floating-Point Arithmetic*](https://doi.org/10.1007/978-3-319-76526-6),
+  second edition, for ULPs, exactness, FMA, and reduction behavior.
+- Sylvie Boldo and Guillaume Melquiond,
+  [“Flocq: A Unified Library for Proving Floating-Point Algorithms in
+  Coq”](https://doi.org/10.1109/ARITH.2011.40), IEEE ARITH 2011.
+- David Goldberg,
+  [“What Every Computer Scientist Should Know About Floating-Point
+  Arithmetic”](https://doi.org/10.1145/103162.103163), *ACM Computing Surveys* 23(1), 1991.

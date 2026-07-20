@@ -447,168 +447,64 @@ It helps readers see how a simple `torch.nn` snippet maps onto TorchLean constru
 interop claims should cite the explicit PyTorch roundtrip/export examples and the artifact bridge,
 not the heuristic widget alone.
 
-# Widget Families
+# Work Through The Maintained Example
 
-The following widget families are the usual starting set.
+Open
+[NN/Examples/DeepDives/Widgets.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
+in VS Code with the Lean extension enabled. Put the cursor on each widget command and open the
+Infoview. The file is deliberately small enough to elaborate interactively.
 
-## 1. Tensor viewers
+Work through four changes:
 
-`#tensor_view`, `#anytensor_view`, `#tensor_stats_view`
+1. Change one entry of a tensor and confirm that `#tensor_view` and `#tensor_stats_view` update from
+   the same Lean value.
+2. Give an IR node the wrong declared output shape. `#shape_infer_view` should identify the first
+   disagreement; restore the shape before continuing.
+3. Replace `sampleGraph` by `sampleGraphSub` in the rewrite view and inspect the changed operation
+   tag rather than comparing raw record syntax.
+4. Compare `IEEE32Exec.posOne` with a quiet NaN. The bit viewer should expose the exponent,
+   fraction, and classification that ordinary decimal printing hides.
 
-What they show:
+The file can also be elaborated from a terminal:
 
-- small tensors as readable tables,
-- shape-erased runtime tensors,
-- min/max/mean/norm summaries for a compact numerical check.
+```
+lake env lean NN/Examples/DeepDives/Widgets.lean
+```
 
-Open:
+Terminal elaboration checks the commands and definitions, while the VS Code Infoview provides the
+interactive rendered panels. If a widget fails to elaborate, first distinguish a malformed Lean
+object from a rendering problem: replace the widget command by `#check` on the same object, then
+reintroduce the view after its type is correct.
 
-- [tensor basics example source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean)
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
+## Other Widget Sources
 
-## 2. IR viewer
+The focused examples are useful when one artifact is the whole subject:
 
-`#ir_view`
+- [Float32 modes](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/Float32Modes.lean)
+  pairs `#float32_view`, `#float32_compare_view`, and `#float32_round_view` with executable binary32
+  values.
+- [CROWN workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/CrownOpsWorkflow.lean)
+  and [IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean)
+  provide real verifier states for `#crown_view` and `#bounds_tightness_view`.
+- [Autograd basics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
+  supplies a tape for `#tape_view`, `#tape_grads_view`, and `#tape_trace_view`.
 
-What it shows:
+## File-Backed Views
 
-- node ids,
-- parent lists,
-- op tags,
-- output shapes,
-- a DOT export for GraphViz.
+Training and application commands can write artifacts that outlive the Lean process. Use
+`#train_log_file_view` or `#gpt2_train_log_file_view` for metric and text-generation logs, and
+`#rl_boundary_rollout_file_view` for checked transition records. The
+[CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean),
+[GPT widget source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Widgets/Models/Sequence/Gpt2.lean),
+and [RL rollout view](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/GymnasiumRolloutView.lean)
+show the corresponding producers.
 
-Open:
+`#runtime_ctx_view` is different: it renders the live runtime registry and accumulated gradients.
+Use it when a training step failed before writing a log and the question is which variables reached
+the runtime context.
 
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-- [TorchLean IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean)
+# Keep The Object Close
 
-## 3. Shape inference view
-
-`#shape_infer_view`
-
-What it shows:
-
-- declared shapes versus inferred shapes,
-- the first node where a shape mismatch appears,
-- fast confirmation that a graph is well-formed.
-
-Open:
-
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-- [TorchLean Transformer IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/TransformerIBPWorkflow.lean)
-
-## 4. Float32 viewers
-
-`#float32_view`, `#float32_compare_view`, `#float32_round_view`
-
-What they show:
-
-- sign, exponent, and fraction bits,
-- `qNaN` versus `sNaN`,
-- raw payloads and comparison differences,
-- how a `Float` rounds into `IEEE32Exec`.
-
-Open:
-
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-- [float32 modes example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/Float32Modes.lean)
-
-## 5. Verification views
-
-`#crown_view`, `#bounds_tightness_view`
-
-What they show:
-
-- interval boxes,
-- affine bounds,
-- which nodes widen fastest,
-- how a verification pass propagates uncertainty.
-
-Open:
-
-- [CROWN ops workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/CrownOpsWorkflow.lean)
-- [IBP workflow](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/TorchLean/IBPWorkflow.lean)
-
-## 6. Tape and gradient views
-
-`#tape_view`, `#tape_grads_view`, `#tape_trace_view`
-
-What they show:
-
-- the eager autograd tape,
-- accumulated gradients,
-- the reverse-pass contribution of each node.
-
-Open:
-
-- [autograd basics](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/AutogradBasics.lean)
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-
-## 7. Training dashboards
-
-`#train_log_view`, `#confusion_view`
-
-What they show:
-
-- loss, accuracy, and learning-rate curves,
-- a compact metric table over the most recent steps,
-- classwise confusion counts for compact classifier checks.
-
-Open:
-
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-- [CSV loader example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Data/Loaders/Csv.lean)
-- [CNN quickstart training](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleCnnTrain.lean)
-
-## 8. Runtime context views
-
-`#runtime_ctx_view`
-
-What it shows:
-
-- registered runtime variables,
-- accumulated gradients,
-- the shapes and small concrete values attached to each entry.
-
-Open:
-
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-- [runtime context API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Context.lean)
-
-## 9. Application file views
-
-`#train_log_file_view`, `#gpt2_train_log_file_view`, `#rl_boundary_rollout_file_view`,
-`#pytorch_translate_file`
-
-What they show:
-
-- JSON logs and generated-text notes from model commands,
-- RL boundary failures and rollout summaries,
-- quick source-level feedback for PyTorch-to-TorchLean sketches.
-
-Open:
-
-- [GPT widget source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Widgets/Models/Sequence/Gpt2.lean)
-- [RL boundary viewer example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/RL/GymnasiumRolloutView.lean)
-- [quickstart widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/Widgets.lean)
-
-# A Good Starting File
-
-For more complete interactive examples (kept fast enough to elaborate in an editor), open:
-
-- [widgets example](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Widgets.lean)
-
-The example shows the same ideas with short inline explanations around each example.
-
-# Widget Claim Discipline
-
-Use widgets for inspection claims:
-
-- "the widget renders the tensor values";
-- "the graph view shows the declared and inferred shapes";
-- "the RL boundary view reports which transition fields failed";
-- "the train log view displays the metrics written by the command."
-
-Do not use widget output alone as proof of a semantic theorem. The proof target is the Lean
-definition or theorem behind the object being rendered.
+A widget is most useful when it sits beside the definition that produced its input. Keep the graph
+view beside the graph, the bounds view beside the verifier state, and the training plot beside the
+file parser. Then a surprising picture has an immediate Lean object to inspect in the Infoview.

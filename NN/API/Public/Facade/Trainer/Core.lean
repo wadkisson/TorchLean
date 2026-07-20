@@ -77,8 +77,9 @@ structure RuntimeSettings where
   dtype : Runtime.DType := .float
   /-- Eager or compiled execution backend. -/
   backend : Runtime.Backend := .eager
-  /-- Requested execution device. CPU/CUDA run today; future platform targets fail explicitly. -/
-  device : Runtime.Device := .cpu
+  /-- Contract profile controlling device, providers, assurance, and VJP ownership. -/
+  executionProfile : _root_.NN.Backend.BackendProfile :=
+    _root_.NN.Backend.BackendProfile.checkedCpu
   /-- Print each accepted backend capsule when it is first used. -/
   showBackend : Bool := false
 

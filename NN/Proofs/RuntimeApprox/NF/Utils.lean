@@ -66,69 +66,6 @@ lemma foldl_flatMap {α β γ : Type} (l : List α) (g : α → List β) (f : γ
   | cons a tl ih =>
       simp [List.flatMap_cons, List.foldl_append, ih]
 
-/-!
-## Generic facts about `approxT`
-
-These lemmas are backend-independent but heavily used in NF backend developments.
--/
-
-omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
-lemma approxT_eps_nonneg {s : Shape} {xS : SpecTensor s} {xR : Tensor R s} {eps : ℝ}
-    (hx : approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR eps) :
-    0 ≤ eps := by
-  have h0 :
-      0 ≤ tensorDistance (α := SpecScalar) linfNorm xS
-        (tensorToSpec (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR) := by
-    -- `tensor_distance` is `linf_norm` of a difference, hence nonnegative.
-    simpa [NN.MLTheory.Robustness.Spec.tensorDistance, linfNorm] using
-      (linf_norm_nonneg
-        (t :=
-          NN.MLTheory.Robustness.Spec.tensorDistance.tensor_sub (α := SpecScalar) (s := s) xS
-            (tensorToSpec (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xR)))
-  exact le_trans h0 hx
-
-omit [NeuralValidExp fexp] [NeuralValidRndToNearest rnd] in
-lemma approxT_dim_of_forall {n : Nat} {s : Shape}
-    {xS : SpecTensor (.dim n s)} {xR : Tensor R (.dim n s)} {eps : ℝ}
-    (hε : 0 ≤ eps)
-    (h : ∀ i : Fin n,
-      approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-        (match xS with | .dim f => f i) (match xR with | .dim f => f i) eps) :
-    approxT (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) xS xR eps := by
-  classical
-  cases xS with
-  | dim xSf =>
-    cases xR with
-    | dim xRf =>
-      have hf :
-          ∀ i ∈ List.finRange n,
-            tensorDistance (α := SpecScalar) linfNorm (xSf i)
-                (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd))
-                  (xRf i))
-              ≤ eps := by
-        intro i _hi
-        have hfi := h i
-        simpa [approxT, approxWith] using hfi
-      have hfold :=
-        List.foldl_max_le_of_le (List.finRange n)
-          (fun i =>
-            tensorDistance (α := SpecScalar) linfNorm (xSf i)
-              (tensorToSpec (α := R) (toSpec := toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xRf
-                i)))
-          (acc := (0 : ℝ)) (eps := eps) hε hf
-      simp [approxT, approxWith, tensorDistance,
-        linfNorm, RuntimeApprox.linfNorm, tensorToSpec, Spec.mapTensor]
-      change
-        List.foldl
-          (fun a i =>
-            max a
-              (tensorLinfNorm
-                ((xSf i).subSpec
-                  (mapTensor (toSpec (β := β) (fexp := fexp) (rnd := rnd)) (xRf i)))))
-          0 (List.finRange n) ≤ eps
-      simpa [tensorDistance, linfNorm, RuntimeApprox.linfNorm, tensorToSpec, MathFunctions.abs,
-        Spec.mapTensor] using hfold
-
 end NFBackend
 
 end RuntimeApprox

@@ -546,28 +546,36 @@ main p > img:only-child {
     padding-right: 0.4rem;
   }
 
+  header .header-title-wrapper:has(.tl-guide-nav) .header-title {
+    margin-left: calc(var(--verso-burger-width) + 1.5rem);
+  }
+
   header .header-title h1 {
-    font-size: 1.55rem;
+    font-size: 1.45rem;
     white-space: nowrap;
   }
 
   header #search-wrapper {
-    flex: 1 1 7rem;
-    min-width: 6rem;
-    max-width: 10rem;
+    flex: 1 1 5rem;
+    min-width: 4rem;
+    max-width: 7rem;
   }
 
   .tl-guide-nav {
+    flex: 0 0 auto;
     margin-left: 0;
-    overflow-x: auto;
     min-width: 0;
     gap: 0.15rem;
-    padding-right: 0.55rem;
+    padding-right: 0.2rem;
+  }
+
+  .tl-guide-nav a:not(:first-child) {
+    display: none;
   }
 
   .tl-guide-nav a {
-    padding: 0.24rem 0.36rem;
-    font-size: 0.78rem;
+    padding: 0.22rem 0.3rem;
+    font-size: 0.72rem;
   }
 
   main p > img:only-child {

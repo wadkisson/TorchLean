@@ -65,7 +65,7 @@ export _root_.Runtime.Autograd.TorchLean
    maxPool2d maxPool2dPad smoothMaxPool2d avgPool2d avgPool2dPad
    relu silu gelu sigmoid tanh softmax softplus exp log inv safeLog logSoftmax
    sum flatten
-   linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention
+   linear mseLoss layerNorm batchnormChannelFirst multiHeadAttention multiHeadAttentionOutputBias
    conv convTranspose conv2d)
 export _root_.Runtime.Autograd.TorchLean
   (scalarOf tlistSingleton tlistPair tlistTriple tlistQuad trainCycleSGD trainCycleOptim meanLoss)
@@ -285,7 +285,7 @@ export _root_.Runtime.Autograd.TorchLean.NN
    layerNorm rmsNorm
    batchnormChannelFirst batchnormChannelFirstEval batchnormChannelFirstMode
    instanceNorm2dNchw groupNorm2dNchw batchNorm2dNchw batchNorm2dNchwMode
-   multiHeadAttention conv2d
+   multiHeadAttention multiHeadAttentionOutputBias conv2d
    maxPool2d maxPool2dPad avgPool2d avgPool2dPad
    singleLayer)
 

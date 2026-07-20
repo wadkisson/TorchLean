@@ -2,232 +2,309 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Execution Modes and Runners" =>
+#doc (Manual) "Choosing How A Model Runs" =>
 %%%
 tag := "execution-modes"
 %%%
 
-By now we can build a model and give it data. The next question is how that same model runs.
+Start with the same MLP:
 
-Most TorchLean examples make three runtime choices: the scalar type, the execution backend, and the
-device. These choices affect the artifact produced by the run. Eager mode produces a tape that is
-easy to inspect. Compiled mode produces a reusable graph artifact. CUDA mode places supported
-Float32 work on device buffers. The model architecture and parameter shapes remain fixed.
+$$`F_\theta:[2]\to[1]`
 
-# The Three Runtime Choices
+Its type stays `[2] → [1]` whether it runs eagerly on the CPU, through a compiled graph, or with
+native CUDA kernels. We can therefore change the runtime one choice at a time without rebuilding
+the architecture.
 
-Most runnable examples answer three questions.
+TorchLean separates four choices:
 
-1. Which scalar type should the program use?
-2. Which execution backend should run the graph?
-3. Which device should hold the numeric buffers?
+1. scalar semantics;
+2. eager or compiled execution;
+3. device/provider profile;
+4. training or evaluation mode.
 
-Typical command line flags look like:
+The easiest way to understand the choices is to run them.
 
-```
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- \
-  --dtype float --backend eager --steps 100
+# Ask The Runner
 
-lake env lean --run NN/Examples/Quickstart/SimpleMlpTrain.lean -- \
-  --dtype float --backend compiled --steps 100
-```
-
-With CUDA enabled, model examples that support device buffers add a device choice:
+The example runner documents the current surface:
 
 ```
-lake -R -K cuda=true exe torchlean mlp --device cuda --steps 100
-lake -R -K cuda=true exe torchlean mlp --device cuda --steps 1000 --cuda-mem-watch 100
+lake exe torchlean --help
 ```
 
-The flags change how the model is evaluated. They do not change the layer structure or parameter
-shapes. There is one public model definition; backend selection chooses the runtime artifact used to
-run it. The `--cuda-mem-watch` flag is only a runtime diagnostic: it asks the example to print CUDA
-allocator samples during training so that long runs expose memory drift while they are still
-running. The public model examples use the same step-counted training convention here: `--steps`
-means optimizer updates, and loader-based examples stop after that many updates rather than after an
-accidental number of data-loader passes.
-
-The runtime choices separate into four decisions:
-
-- Scalar choice: `--dtype float` or `--dtype float32` changes the numeric representation. The model
-  shape and architecture stay fixed.
-- Backend choice: `--backend eager` or `--backend compiled` changes whether the run produces an
-  eager tape or a reusable graph artifact.
-- Device choice: `--device cpu` or `--device cuda` changes whether supported numeric buffers live on the host or
-  on CUDA device memory.
-- CUDA diagnostics: `--cuda-mem-watch N` samples native allocator state every `N` training updates.
-  Long CUDA model runs choose a small default cadence so the terminal shows whether device memory is
-  steady, growing slowly, or approaching exhaustion.
-- Mode choice: train/eval mode changes runtime behavior for mode-sensitive layers such as dropout
-  or normalization. The declared model and parameter payload stay visible.
-
-# What The Public Runtime Owns
-
-Most tutorial code does not instantiate a runner manually. It builds one trainer with a public
-`Trainer.Config`, then lets `trainer.train data trainOptions` run with those scalar/backend/device
-settings.
-
-That public runtime path still creates one executable runtime object under the hood:
-
-- the declared model stays the same,
-- the runtime layer chooses the scalar/backend/device interpretation,
-- the instantiated runtime object owns parameters, buffers, mode, and any compiled executable
-  artifact.
-
-Compiled execution is the same model run through a reusable runtime object. It is a backend choice,
-not a second public forward API.
-
-The quickstart API is:
-
-- `Trainer.Config`
-- `Trainer.TrainOptions`
-- `Trainer.new`
-- `trainer.train data trainOptions`
-- `trained.predict ...` / `trained.printPrediction ...`
-
-The manual runner API still exists, but it sits under
-`Trainer.Manual`.  Use that path when you really need manual callbacks, explicit mode changes, or
-custom runtime loops.
-
-The same choice can be made in Lean code:
+For one command:
 
 ```
-def eagerTrainer :=
-  Trainer.new mkModel
-    { task := .regression
-      optimizer := optim.sgd { lr := 0.05 }
-      dtype := .float
-      backend := .eager }
-
-def compiledTrainer :=
-  Trainer.new mkModel
-    { task := .regression
-      optimizer := optim.sgd { lr := 0.05 }
-      dtype := .float
-      backend := .compiled }
+lake exe torchlean quickstart_mlp --help
 ```
 
-The two trainer values differ in runtime policy, not in architecture. If their results disagree,
-the disagreement belongs to the runtime/backend layer, not to a new model definition.
-
-# Eager Mode
-
-Eager mode is the most transparent backend while debugging. It records operations as they run, keeps
-a tape of parent links and local reverse rules, and returns explicit gradients.
-
-The closest PyTorch analogy is:
+The common flags are:
 
 ```
-loss = model(x).loss(y)
-loss.backward()
+--dtype float|ieee754exec
+--backend eager|compiled
+--device auto|cpu|cuda|rocm|metal|wasm|tpu|trainium|custom|external
+--seed N
+--show-backend
 ```
 
-In TorchLean, the corresponding data remains explicit:
+The parser knows more device names than the current runtime implements. CPU and CUDA have maintained
+profiles today; the other names reserve a clean place for future providers. Asking for one of them
+gets an error rather than a suspiciously successful CPU run.
 
-- the tape is a Lean value,
-- gradients are returned as tensors or parameter bundles,
-- widgets can inspect the recorded graph.
-
-Use eager mode to understand one step, inspect a gradient, or explain what a small example is doing.
-
-Eager mode is also the natural place to inspect failure. If a gradient is unexpectedly zero, or a
-shape conversion is not doing what you think, run the small case eagerly first. A compiled graph is
-better once you know which computation you want to repeat.
-
-# Compiled Mode
-
-Compiled mode builds a stable graph artifact before repeated execution. It is the
-better default for longer runs when the model and loss are fixed, because the graph structure is
-constructed once and then reused.
-
-The closest PyTorch analogy is the intuition behind `torch.compile`: keep the model code, but first
-turn its computation into a reusable graph. TorchLean's compiled path is more explicit because the
-artifact is a Lean runtime object and can be related to the IR and proof layers.
-
-Use compiled mode when the model and loss are fixed and the training loop will run many steps or
-many batches.
-
-Compiled mode should be read as a runtime transformation:
+For an interactive device prompt:
 
 ```
-same model + same loss + fixed input/target shapes
-  -> compiled executable artifact
-  -> repeated evaluation
+lake exe torchlean --choose quickstart_mlp --steps 20
 ```
 
-It is not a license to skip shape checks. The compiled artifact is valuable precisely because the
-model, parameter layout, and input shapes have already been made explicit.
+The prompt is opt-in so scripts and CI never block waiting for input.
 
-# Train Mode and Eval Mode
-
-Some layers behave differently during training than they do while evaluating. Dropout and batch
-normalization are the common examples. TorchLean keeps this state in the runner because these layers
-are stateful at runtime.
-
-This matches PyTorch's `model.train()` and `model.eval()` convention, but the mode is part of the
-explicit runtime object.
-
-A prediction call should therefore say whether it is using training or evaluation behavior when the
-model contains mode-sensitive layers. This is a runtime distinction. It is not a new tensor shape,
-and it is not a theorem about statistical performance.
-
-# CPU, CUDA, and Float32
-
-Device selection is separate from dtype selection. A CPU run over executable float32 semantics and a
-CUDA run over host `Float` values exercise different runtime paths. Current CUDA-facing examples
-use the supported Float32 buffer path and report when a requested combination is unsupported.
-
-In code, the public shape is:
+# Experiment 1: CPU Eager
 
 ```
-def cudaTrainer :=
-  Trainer.new mkModel
-    { task := .regression
-      optimizer := optim.adam { lr := 0.01 }
-      dtype := .float
-      backend := .eager
-      device := .cuda }
+lake exe torchlean quickstart_mlp \
+  --dtype float \
+  --backend eager \
+  --device cpu \
+  --steps 20 \
+  --seed 2026 \
+  --show-backend
 ```
 
-In command-line examples, the same choice appears as `--device cuda`. If an example says CUDA currently
-requires `--dtype float`, read that as a runtime support constraint, not as a change to the
-mathematical tensor type in the spec layer.
+Eager execution creates a session and records operations as the model runs. Every operation asks the
+profile for an admissible capsule, executes its provider, and appends a local VJP rule when gradients
+are required.
 
-# Loaders and Epochs
+On CPU, the maintained profile selects portable reference capsules. The report lets you verify that
+the requested CPU path actually ran.
 
-Training calls run the same runner repeatedly over datasets or loaders. The runtime choice is
-independent of whether examples arrive as one batch or many minibatches.
+Use eager mode when:
 
-The public declarations to read first are:
+- operation structure depends on runtime values;
+- inspecting a tape or provider selection;
+- executing the broadest dynamic frontend;
+- using the maintained CUDA runtime.
 
-- `Trainer.Config`
-- `Trainer.TrainOptions`
-- `Trainer.new`
-- `trainer.train data trainOptions`
+# Experiment 2: CPU Compiled
 
-Lower level dataset and loader loops still exist for custom runtime code, but ordinary examples
-should keep dtype, backend, device, and optimizer in the config passed to `Trainer.new`, and put
-the step count and logging options in `Trainer.TrainOptions`.
+```
+lake exe torchlean quickstart_mlp \
+  --dtype float \
+  --backend compiled \
+  --device cpu \
+  --steps 20 \
+  --seed 2026
+```
 
-# Same Architecture, Different Artifact
+Compiled execution records the fixed scalar-loss program once, including forward, JVP, and VJP
+behavior, and replays it with current parameters and data.
 
-It helps to keep this small map in mind:
+Compare the initial loss between eager and compiled using the same seed. It should agree for the
+supported deterministic program. Then compare final parameters or predictions, not only
+six-decimal loss summaries, because different execution orders can hide small discrepancies.
 
-- `--dtype float` versus `--dtype float32` changes the scalar representation. Tensor shapes and
-  model structure stay fixed.
-- `--backend eager` changes the runtime artifact to tape style execution. The public model
-  definition stays fixed.
-- `--backend compiled` changes the runtime artifact to a reusable compiled graph. The public model
-  definition stays fixed.
-- `--device cpu` versus `--device cuda` changes where supported numeric buffers live. The Lean specification and
-  declared runtime assumptions stay fixed.
+The current compiled trainer is CPU-only. It does not consume an accepted backend graph plan and it
+does not mean CUDA Graph capture. A CUDA plus compiled request fails explicitly.
 
-That separation is the reason TorchLean can be used as a tutorial framework, an executable
-experiment harness, and a verification codebase at the same time.
+# Experiment 3: Native CUDA
 
-# Runnable Sources
+Build and run:
 
-For a small runnable example, open [SimpleMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/SimpleMlpTrain.lean).
-For minibatches and epochs, open
-[MinibatchMlpTrain](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/MinibatchMlpTrain.lean). For the declarations behind
-the runner, open [NN.API.Runtime](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime.lean).
+```
+lake -R -K cuda=true exe torchlean quickstart_mlp \
+  --dtype float \
+  --backend eager \
+  --device cuda \
+  --steps 20 \
+  --seed 2026 \
+  --show-backend
+```
+
+The CUDA profile selects native capsules for supported operations. The report names reshape,
+permutation, matrix multiplication, broadcasting, addition, ReLU, and MSE providers as they are
+first used.
+
+CUDA currently requires host `Float` at the public module boundary. The native tensors use
+device-side Float32 storage and operations according to their capsules. This is a runtime boundary,
+not an identification of Lean `Float`, mathematical `FP32`, and CUDA `float`.
+
+If the project is built without CUDA support, requesting CUDA fails. The stub archives permit the
+repository to build on CPU-only systems; they do not pretend to execute GPU code.
+
+# Experiment 4: Executable IEEE Binary32
+
+```
+lake exe torchlean quickstart_mlp \
+  --dtype ieee754exec \
+  --backend eager \
+  --device cpu \
+  --steps 2 \
+  --seed 2026
+```
+
+This uses TorchLean's explicit bit-level `IEEE32Exec` scalar model. It is intentionally slower and
+best used for small reference runs and numerical experiments.
+
+The proof-oriented finite `FP32` model and exact `Real` live in theorem statements rather than the
+IO trainer. The floating-point chapter shows how those views connect.
+
+# The Same Choices In Lean
+
+```
+def eagerCpu : Trainer.RunConfig :=
+  { dtype := .float
+    backend := .eager
+    optimizer := optim.adam { lr := 0.03 } }
+
+def compiledCpu : Trainer.RunConfig :=
+  eagerCpu.compiled.cpu
+
+def eagerCuda : Trainer.RunConfig :=
+  eagerCpu.cuda
+```
+
+Attach a run configuration to a task and seed:
+
+```
+def trainerFromRun (run : Trainer.RunConfig) :=
+  Trainer.new model
+    (Trainer.Config.fromRunConfig
+      run .regression
+      (seed := 2026))
+```
+
+`trainWithRun` can apply a temporary per-call runtime override without rebuilding the model
+declaration.
+
+# Why Device Is Part Of A Profile
+
+A device choice affects more than memory location. The profile also carries:
+
+- provider preference;
+- assurance policy;
+- requested VJP ownership;
+- target operating system and architecture;
+- capsule modules available to the planner.
+
+Selecting only `.cuda` while retaining CPU provider assumptions would be an inconsistent
+configuration. `RunConfig.withDevice` therefore installs a maintained profile as one value or
+returns an error.
+
+Custom and optional LibTorch paths use `withBackendProfile`, making the larger boundary explicit.
+
+# Train And Evaluation Mode
+
+Mode-sensitive layers include dropout and normalization:
+
+```
+Trainer.Manual.trainMode runner
+Trainer.Manual.evalMode runner
+Trainer.Manual.isTraining runner
+```
+
+Training mode may sample masks or update running statistics. Evaluation mode uses the corresponding
+inference behavior. The high-level trainer enters training mode for updates and evaluation mode for
+summary predictions and retained prediction handles.
+
+Mode is independent of device and eager/compiled choice. A CUDA runner can switch mode without
+changing model architecture or provider profile.
+
+# A Small Dropout Thought Experiment
+
+Suppose:
+
+$$`y=\operatorname{Dropout}_{p}(x)`.
+
+During training, a random mask is realized and retained for the backward rule. During evaluation,
+the operation follows its deterministic inference semantics. Re-running the backward pass with a
+newly sampled mask would not differentiate the forward value that was computed.
+
+This is why RNG and mode belong to runtime state and to reproducible checkpoints.
+
+# Dynamic Operations And Compilation
+
+A fixed compiled graph needs operation structure and shapes known when recording. If a program
+reads token values and changes the graph structure while constructing it, the current `GraphM`
+compiler cannot represent that program as one fixed replay.
+
+The correct response is not to coerce the values into a graph and hope. Either:
+
+- keep that control flow in eager mode;
+- represent the choice as a supported tensor operation;
+- compile separate static branches behind an explicit runtime choice.
+
+Unsupported compiled operations are rejected.
+
+# Selecting A LibTorch Provider
+
+LibTorch is not a third execution mode. It is an optional provider inside an eager backend profile.
+The maintained bridge currently accelerates scaled-dot-product attention forward while TorchLean
+retains its tape and local backward ownership.
+
+Surrounding operations may still use native CUDA or reference capsules. Provider selection is
+per semantic operation.
+
+The next backend chapter opens the capsule and its evidence fields. At runtime, one rule matters
+immediately: training cannot choose a forward-only capsule unless the profile also supplies an
+admissible VJP path.
+
+# Unsupported Means Failure
+
+Try:
+
+```
+lake exe torchlean quickstart_mlp \
+  --device metal --steps 1
+```
+
+on the current checkout. The target name is parsed, but profile selection rejects it. This confirms
+that a future platform vocabulary is not reported as working implementation.
+
+Likewise:
+
+- CUDA requested in a CPU-only build fails;
+- compiled mode with non-CPU profile fails;
+- proof-only scalar semantics in IO fail;
+- an operation with no admissible capsule fails planning or execution.
+
+These failures protect benchmark provenance. “Requested GPU” must never become an unreported CPU
+run.
+
+# A Practical Selection Table
+
+| Goal | Scalar | Mode | Profile |
+| --- | --- | --- | --- |
+| inspect ordinary training | `Float` | eager | CPU |
+| replay a supported fixed graph | `Float` | compiled | CPU |
+| run native GPU training | `Float` | eager | CUDA |
+| inspect binary32 reference behavior | `IEEE32Exec` | eager | CPU |
+| use external attention forward | `Float` | eager | LibTorch-enabled CUDA |
+| verify/export an operation graph | semantic context | IR evaluator | no trainer profile |
+
+The final row is deliberately outside the trainer modes. Lowering a model to `NN.IR.Graph` creates
+an inspectable semantic artifact, not another high-performance runtime switch.
+
+# Record The Choice With Results
+
+A useful run report includes:
+
+```
+model architecture and parameter count
+dataset identity and preprocessing
+seed and optimizer
+scalar semantics
+eager or compiled mode
+device and provider capsules
+train/eval mode
+checkpoint and code revision
+```
+
+Without this information, two loss curves may be incomparable even when both are labeled
+“TorchLean float32.”
+
+Sources:
+
+- [`NN/API/Runtime/Module.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime/Module.lean);
+- [`Core/Types.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core/Types.lean);
+- [`Core/Trainer.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core/Trainer.lean).

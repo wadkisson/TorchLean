@@ -128,8 +128,9 @@ lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
 ```
 
 `gpt2` here is a compact GPT-style causal Transformer, not a pretrained OpenAI checkpoint.
-`chargpt` is a character-tokenizer teaching path and should stay a 1-step quick check; use `gpt2` or
-`text_gpt2` for the compact 10-step GPT-style runtime check.
+`chargpt --preset smoke` is the two-update character-tokenizer check. Use `gpt2` or `text_gpt2` for
+the compact 10-step GPT-style runtime checks, or `chargpt --preset karpathy` for the longer Tiny
+Shakespeare experiment.
 
 ## Generative, Operator, And RL Runs
 

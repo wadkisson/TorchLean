@@ -78,6 +78,28 @@ lemma le_foldl_max_of_mem {ι β : Type} [LinearOrder β] (l : List ι) (f : ι 
         simpa [List.foldl] using le_trans h1 h2
       · simpa [List.foldl] using ih (acc := max acc (f hd)) hiTail
 
+/-- A finite left fold of `max` returns either its initial accumulator or one of the values it
+visited. This complements the order bounds above with the attainment fact needed by stable
+softmax: the computed maximum is an actual input coordinate, so one max-shifted exponential is
+exactly `exp 0 = 1`. -/
+lemma foldl_max_eq_init_or_mem {ι β : Type} [LinearOrder β] (l : List ι) (f : ι → β) (acc : β) :
+    l.foldl (fun a i => max a (f i)) acc = acc ∨
+      ∃ i ∈ l, l.foldl (fun a j => max a (f j)) acc = f i := by
+  induction l generalizing acc with
+  | nil => simp
+  | cons hd tl ih =>
+      rcases ih (acc := max acc (f hd)) with hinit | ⟨i, hi, hvalue⟩
+      · by_cases h : acc ≤ f hd
+        · right
+          refine ⟨hd, by simp, ?_⟩
+          simpa [List.foldl, max_eq_right h] using hinit
+        · left
+          have hle : f hd ≤ acc := le_of_not_ge h
+          simpa [List.foldl, max_eq_left hle] using hinit
+      · right
+        refine ⟨i, by simp [hi], ?_⟩
+        simpa [List.foldl] using hvalue
+
 -- Left-fold addition lemmas used to normalize finite sums in later proofs.
 
 /--

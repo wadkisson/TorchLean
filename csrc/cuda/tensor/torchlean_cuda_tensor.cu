@@ -587,6 +587,18 @@ __global__ void torchlean_rand_uniform_f32(float* out, size_t n, uint64_t key) {
   }
 }
 
+__global__ void torchlean_rand_normal_f32(float* out, size_t n, float mean, float std,
+                                          uint64_t key) {
+  TORCHLEAN_GRID_STRIDE_LOOP(i, n) {
+    uint32_t r1 = (uint32_t)torchlean_splitmix64(key + (uint64_t)(2 * i));
+    uint32_t r2 = (uint32_t)torchlean_splitmix64(key + (uint64_t)(2 * i + 1));
+    float u1 = ((float)r1 + 1.0f) / 4294967297.0f;
+    float u2 = (float)(((double)r2) / 4294967296.0);
+    float z = sqrtf(-2.0f * logf(u1)) * cosf(6.2831853071795864769f * u2);
+    out[i] = mean + std * z;
+  }
+}
+
 __global__ void torchlean_bernoulli_mask_f32(float* out, size_t n, float keepProb, uint64_t key) {
   TORCHLEAN_GRID_STRIDE_LOOP(i, n) {
     uint64_t z = torchlean_splitmix64(key + (uint64_t)i);
@@ -849,6 +861,20 @@ extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_rand_uniform(uint32_t 
   dim3 threads = dim3(kBlockSize);
   torchlean_rand_uniform_f32<<<blocks, threads>>>(out->data, (size_t)n, key);
   checkCuda(cudaGetLastError(), "cuda rand_uniform kernel launch failed");
+  return torchlean_cuda_buffer_box(out);
+}
+
+extern "C" LEAN_EXPORT lean_obj_res torchlean_cuda_buffer_rand_normal(
+    uint32_t n, double meanHost, double stdHost, uint64_t key) {
+  torchlean_cuda_buffer* out = torchlean_cuda_buffer_alloc((size_t)n);
+  if (n == 0) {
+    return torchlean_cuda_buffer_box(out);
+  }
+  dim3 blocks = torchlean_blocks_for((size_t)n);
+  dim3 threads = dim3(kBlockSize);
+  torchlean_rand_normal_f32<<<blocks, threads>>>(out->data, (size_t)n, (float)meanHost,
+                                                 (float)stdHost, key);
+  checkCuda(cudaGetLastError(), "cuda rand_normal kernel launch failed");
   return torchlean_cuda_buffer_box(out);
 }
 

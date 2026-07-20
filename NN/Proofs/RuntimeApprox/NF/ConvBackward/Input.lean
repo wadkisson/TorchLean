@@ -823,17 +823,17 @@ theorem approxT_conv2d_input_deriv_spec
   intro layerS layerR outS outR bT
   classical
   have hε : 0 ≤ linfNorm bT := linf_norm_nonneg (t := bT)
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := inC)
+  refine approxT_dim_of_forall (n := inC)
     (s := .dim inH (.dim inW .scalar))
     (xS := outS) (xR := outR) (eps := linfNorm bT) hε ?_
   intro ic
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := inH)
+  refine approxT_dim_of_forall (n := inH)
     (s := .dim inW .scalar)
     (xS := (match outS with | .dim f => f ic))
     (xR := (match outR with | .dim f => f ic))
     (eps := linfNorm bT) hε ?_
   intro ii
-  refine approxT_dim_of_forall (β := β) (fexp := fexp) (rnd := rnd) (n := inW)
+  refine approxT_dim_of_forall (n := inW)
     (s := .scalar)
     (xS := (match (match outS with | .dim f => f ic) with | .dim g => g ii))
     (xR := (match (match outR with | .dim f => f ic) with | .dim g => g ii))

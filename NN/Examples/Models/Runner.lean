@@ -54,7 +54,7 @@ def usage : String :=
     , "  autoencoder | vae | gan | diffusion | ppo_cartpole | dqn_replay"
     , "  pytorch_roundtrip | pytorch_export_check"
     , "  data_csv | data_npy | data_cifar10"
-    , "  float32_modes | graphspec | ir_axis_ops | one_semantic_universe"
+    , "  float32_modes | numerical_certificate | graphspec | ir_axis_ops | one_semantic_universe"
     , ""
     , "Runtime flags:"
     , "  --choose                         ask for runtime choices before running"
@@ -107,34 +107,6 @@ def hasDeviceFlag : List String → Bool
   | a :: rest =>
       a.startsWith "--device=" || hasDeviceFlag rest
 
-/-- Detect whether the command line selects CUDA. -/
-def hasCudaDeviceFlag : List String → Bool
-  | [] => false
-  | "--device" :: "cuda" :: _ => true
-  | "--device" :: "gpu" :: _ => true
-  | a :: rest =>
-      a == "--device=cuda" || a == "--device=gpu" || hasCudaDeviceFlag rest
-
-/-- Device selected by runner/runtime arguments. Last device flag wins. -/
-def selectedDeviceFromArgs (args : List String) :
-    Except String NN.Backend.Device :=
-  let rec go (current : NN.Backend.Device) :
-      List String → Except String NN.Backend.Device
-    | [] => pure current
-    | "--device" :: value :: rest => do
-        let d ← TorchLean.Runtime.Device.parse value
-        go d rest
-    | "--device" :: [] =>
-        throw "missing value after --device (supported: auto | cpu | cuda | rocm | metal | wasm | tpu | trainium | custom | external)"
-    | a :: rest =>
-        if a.startsWith "--device=" then do
-          let d ← TorchLean.Runtime.Device.parse
-            ((a.drop "--device=".length).toString)
-          go d rest
-        else
-          go current rest
-  go .cpu args
-
 /-- Read one line, treating EOF as the default answer. -/
 def readPromptLine : IO String := do
   try
@@ -152,14 +124,10 @@ partial def askDevice : IO (List String) := do
   (← IO.getStdout).flush
   match (← readPromptLine).toLower with
   | "" | "1" | "cpu" => pure ["--device", "cpu"]
-  | "2" | "cuda" | "gpu" => pure ["--device", "cuda"]
+  | "2" | "cuda" => pure ["--device", "cuda"]
   | _ =>
       IO.println "Please choose 1/cpu or 2/cuda."
       askDevice
-
-/-- Whether the chosen or already supplied arguments select CUDA. -/
-def selectsCuda (deviceArgs args : List String) : Bool :=
-  deviceArgs == ["--device", "cuda"] || hasCudaDeviceFlag args
 
 /--
 Fill in missing runtime choices interactively.
@@ -241,6 +209,8 @@ def runCmd (cmd : String) (args : List String) : IO UInt32 := do
   | "float32_modes" =>
       NN.Examples.DeepDives.Floats.Float32Modes.main args
       pure 0
+  | "numerical_certificate" =>
+      NN.Examples.DeepDives.Floats.GraphNumericalCertificate.main args
   | "graphspec" =>
       NN.Examples.DeepDives.GraphSpec.Tutorial.main args
       pure 0

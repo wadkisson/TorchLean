@@ -89,7 +89,7 @@ def conv2d {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .conv2d
+    let _ ← requireNativeCudaCapsule s .conv
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.conv2d (t := t0)
@@ -99,7 +99,7 @@ def conv2d {α : Type} (s : EagerSession α) [Context α]
         kernel.id bias.id input.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .conv2d cpu cuda
+  dispatchCudaOpt (α := α) s .conv cpu cuda
 
 /--
 N-D transpose convolution for channels-first tensors `(inC, spatial...)` (no batch axis).
@@ -159,7 +159,7 @@ def convTranspose2d {α : Type} (s : EagerSession α) [Context α]
     s.tape.set t1
     pure { id := id }
   let cuda := do
-    let _ ← requireNativeCudaCapsule s .convTranspose2d
+    let _ ← requireNativeCudaCapsule s .convTranspose
     let t0 ← s.cudaTape.get
     let (t1, id) ← okOrThrow <|
       Runtime.Autograd.Cuda.Tape.convTranspose2d (t := t0)
@@ -169,7 +169,7 @@ def convTranspose2d {α : Type} (s : EagerSession α) [Context α]
         kernel.id bias.id input.id
     s.cudaTape.set t1
     pure (some { id := id })
-  dispatchCudaOpt (α := α) s .convTranspose2d cpu cuda
+  dispatchCudaOpt (α := α) s .convTranspose cpu cuda
 
 end EagerSession
 

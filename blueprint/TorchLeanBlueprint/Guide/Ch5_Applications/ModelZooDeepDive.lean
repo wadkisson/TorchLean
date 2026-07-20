@@ -2,475 +2,349 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Model Examples Deep Dive" =>
+#doc (Manual) "Three Complete Model Runs" =>
 %%%
 tag := "model-examples-deep-dive"
 %%%
 
-The model examples exercise TorchLean as a whole system. A tensor library can look good on
-an MLP. A graph IR can look good on a two layer verifier fixture. A CUDA backend can look good on a
-single matmul. The example suite asks a harder question: can the same API, runtime, graph boundary,
-data helpers, and verification boundaries survive modern model shapes that users actually recognize?
+This chapter runs three applications far enough to inspect the objects that move through
+TorchLean. The first is a character-level Transformer, where sequence length, masking, and
+generation matter. The second compares residual and patch-token vision models on the same prepared
+dataset. The third is a Fourier neural operator, where the important boundary is the spectral
+kernel rather than an image or token representation.
 
-We built the [model examples API](https://github.com/lean-dojo/TorchLean/tree/main/NN/Examples/Models/) to answer that question
-as an executable model suite rather than a benchmark leaderboard. The default runs are compact, but
-the stress they apply is real: causal windows, residual branches, patch tokens, selective scan,
-spectral convolution, stochastic denoising, replay buffers, PPO rollouts, Python environment
-bridges, CUDA fast paths, and graph/verification boundaries that must remain explicit.
+The commands below were run against the current checkout. The displayed losses are deterministic
+for the stated seeds and one-example datasets, but they are not performance benchmarks. Their
+purpose is to make the data path, model shape, runtime selection, and generated artifacts concrete.
 
-Read each model along five axes:
+# Case Study One: CharGPT
 
-- *API*: does the public model API express the architecture?
-- *Runtime*: can the example train, log, save, load, or sample?
-- *Graph*: does the graph/IR story remain visible?
-- *CUDA*: does the accelerated path match the intended runtime boundary?
-- *Verification*: does the example point to a spec, theorem, checker, or explicit producer
-  assumption?
+The Tiny Shakespeare experiment is the clearest sequence-model application because it begins with
+a text file and ends with both a trained parameter file and generated text.
 
-# Model Families And Stress Tests
-
-Most examples are dispatched by [NN.Examples.Models.Runner source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Runner.lean):
-
-```
-lake exe torchlean <example> [flags...]
-```
-
-That runner dispatches to model files that own their data path, model constructor, optimizer, logs,
-and caveats. When the docs say "run `gpt2`", the code path is not hidden in a script; it ends in a
-namespaced Lean `main`.
-
-The examples are organized by stressor:
-
-- *MLP, KAN, CNN*: baseline supervised training stresses parameters, optimizers, data loaders,
-  edge-basis layers, and image tensors.
-- *GPT-2 style and CharGPT*: causal language model commands stress causal windows, tokenization,
-  generation probes, save/load, and logs.
-- *Mamba*: the selective scan example stresses sequence modeling without attention, recurrent state,
-  and CUDA paths for selective scan.
-- *RNN/LSTM/GRU style recurrence*: recurrent text and forecasting examples stress recurrent state,
-  gated cells, short text windows, and forecasting data.
-- *Residual/ResNet specs*: residual blocks stress skip wiring, convolution shape facts, and graph
-  shape discipline. The runnable vision commands currently stay with CNN and ViT.
-- *ViT*: the patch-token vision transformer stresses image patches, token sequences, and attention
-  blocks.
-- *FNO*: the Burgers operator learning example stresses scientific data, spectral kernels, and a CUDA
-  primitive backed by cuFFT.
-- *Diffusion and latent generators*: the generative examples stress stochastic schedules,
-  reconstruction targets, and generator/discriminator losses.
-- *RL examples*: PPO and replay examples stress trajectories, environment boundaries, replay, and
-  policy/value losses.
-
-There is no separate GRU command in the runner. GRU still appears here as
-part of the gated recurrent design space: TorchLean's present runnable recurrent coverage is RNN,
-LSTM, and LSTM forecasting; a future GRU example would stress the same typed recurrent state and
-runtime loop boundary with a smaller gate set.
-
-The common model example contract is that an example should make the data boundary, model, loss, optimizer,
-and logs visible. It does not need to be large to be valuable.
-It needs to make clear what was run, what data entered, what state changed, and which semantic
-contract the example points back to.
-
-# Baselines That Still Matter
-
-The MLP, KAN, and CNN examples are not just warmups. They are where the public training API proves
-it can handle ordinary user expectations before the architecture becomes exotic:
-
-```
-lake exe torchlean mlp --device cpu --steps 10
-lake exe torchlean kan --device cpu --steps 10
-lake -R -K cuda=true exe torchlean cnn --device cuda --n-total 1 --steps 1
-```
-
-The MLP checks the minimal tabular training path. The KAN command checks that learned edge-function
-bases can fit the same trainer and optimizer surface. The CNN command checks image tensors,
-convolution/pooling layers, and CUDA execution on a recognizable vision workload. If these commands
-are not clear, the larger examples will be harder to interpret.
-
-The useful reading pattern is:
-
-```
-data source -> typed tensors -> model parameters -> loss -> optimizer step -> log artifact
-```
-
-Every later model family keeps that line but adds a harder piece: masks, recurrence, spectral
-transforms, latent variables, or an environment boundary.
-
-The architecture equations are familiar, but the TorchLean reading is specific:
-
-- causal language models estimate $`p_\theta(x_t\mid x_{<t})` and rely on the mask property
-  $`j>i\Rightarrow A_{ij}=0`;
-- residual blocks compute $`x\mapsto F_\theta(x)+S_\theta(x)`, so both branches must agree on
-  output shape;
-- state-space models use $`h_{t+1}=A_t h_t+B_t x_t` and $`y_t=C_t h_t+D_t x_t`, so prefix
-  causality is a real contract;
-- FNO layers use spectral convolution, informally
-  $`u\mapsto \mathcal F^{-1}(R_\theta\cdot \mathcal F(u))`, which is why the cuFFT boundary matters.
-
-# GPT-2-Style Models And CharGPT
-
-The GPT APIs to look for are:
-
-- [NN.Examples.Models.Sequence.Gpt2 source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Gpt2.lean), a small
-  byte level causal language model with GPT-2 ingredients.
-- [NN.Examples.Models.Sequence.TextGpt2 source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/TextGpt2.lean), a
-  trainer over a text corpus that can use GPT-2 BPE assets.
-- [NN.Examples.Models.Sequence.CharGpt source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/CharGpt.lean), a
-  character model in the minGPT family with deterministic random windows and generation probes.
-- [NN.Examples.Models.Sequence.Gpt2Saved source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Gpt2Saved.lean),
-  which exercises saved parameter loading and prompting.
-- [NN.Examples.Models.Sequence.GptAdder source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/GptAdder.lean), a
-  minGPT-family algorithmic addition task that stresses CUDA runtime checking.
-
-A typical small run is:
+Prepare the corpus:
 
 ```
 python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake -R -K cuda=true exe torchlean gpt2 --device cuda \
-  --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
 ```
 
-For CharGPT:
+Then run the two-update smoke configuration:
 
 ```
-lake -R -K cuda=true exe torchlean chargpt --device cuda --tiny-shakespeare \
-  --steps 1 --batch 1 --seq-len 1 --generate 0 --prompt "ROMEO:"
+lake -R -K cuda=true exe torchlean chargpt --device cuda \
+  --tiny-shakespeare --preset smoke \
+  --save-params /tmp/chargpt-params.json \
+  --log /tmp/chargpt-trainlog.json
 ```
 
-These examples stress the API in a way MLPs do not. The model shape depends on vocabulary, sequence
-length, number of heads, head dimension, and transformer depth. The data path has to turn raw text
-into bounded token windows. The runtime has to carry a long eager tape through embeddings, attention
-blocks, layer style operations, and output logits. The logging path writes before/after losses and
-decoded reports so generated text can be compared across training checkpoints.
-
-The semantic core is still a typed next token map:
-
-$$`\mathrm{tokens}_{0:T}
-\longmapsto
-\mathrm{logits}_{0:T,\;0:|\mathcal V|}`
-
-Masking and positions are not decoration. A causal mask says token `i` may not attend to future
-token `j>i`; RoPE or positional embeddings say which position each key and query belongs to. Those
-are exactly the kinds of bugs the BugZoo and CUDA chapters keep naming.
-
-They also stress the boundary between "GPT-family model" and "GPT-2". TorchLean's `gpt2` command is not
-OpenAI's pretrained GPT-2-small. It is a small causal Transformer with GPT-2-like ingredients,
-chosen so the Lean side runtime, tokenizer path, parameter handling, and CUDA hooks can be exercised
-locally. The right citations for the architecture lineage are Radford et al., "Language Models are
-Unsupervised Multitask Learners" (OpenAI technical report, 2019,
-[PDF](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)),
-Vaswani et al., "Attention Is All You Need" (NeurIPS 2017, https://arxiv.org/abs/1706.03762), and
-Karpathy's minGPT educational implementation (https://github.com/karpathy/minGPT) for the compact
-training example style.
-
-The command writes a training log when requested:
+The current run reports:
 
 ```
-lake -R -K cuda=true exe torchlean gpt2 --device cuda --tiny-shakespeare \
-  --steps 10 --windows 1 --generate 64 --prompt "ROMEO:" \
-  --log data/model_zoo/gpt2_trainlog.json
+torchlean chargpt: char-level GPT training
+  trainable_parameters=30017
+  step 0: val loss=4.207507
+  step 1: val loss=4.195092
+  step 2: val loss=4.174880
+  wrote params: /tmp/chargpt-params.json
+  vocab=65 (unique chars)
+  architecture=width 32, heads 4, layers 2, dropout 0.000000
+  sampled="First Citizen:ITJ?P,bduOc$Eaf'yjhYXGLHkR3vQq;V"
+  wrote TrainLog JSON: /tmp/chargpt-trainlog.json
+torchlean chargpt: ok
 ```
 
-Open that artifact with the GPT widget rather than reading generated text out of a terminal scroll:
+The sample is mostly noise because two optimizer updates are not language training. The useful
+facts are elsewhere in the trace:
+
+- the corpus produced a 65-character vocabulary;
+- the model has 30,017 trainable scalar parameters;
+- validation is computed on a disjoint ten-percent corpus suffix;
+- the loss decreased at both reported updates;
+- parameter and training-log artifacts were written explicitly.
+
+## The Architecture
+
+The command constructs a `CausalTransformerConfig` from the runtime options:
+
+$$`D=32,\qquad H=4,\qquad D_h=D/H=8,\qquad L=2.`
+
+For a batch of token windows `I ∈ Fin V`, the model first gathers embeddings
+
+$$`E[I]\in\mathbb{R}^{B\times T\times D},`
+
+adds a learned positional table, and applies two pre-normalized Transformer blocks. In one block,
+
+$$`\begin{aligned}
+Z_1&=X+\operatorname{Dropout}
+  \left(\operatorname{MHA}(\operatorname{LN}(X))\right),\\
+Z_2&=Z_1+\operatorname{Dropout}
+  \left(W_2\,\rho(W_1\operatorname{LN}(Z_1)+b_1)+b_2\right).
+\end{aligned}`
+
+The final layer normalization and linear projection produce logits
+
+$$`\operatorname{logits}\in\mathbb{R}^{B\times T\times V}.`
+
+The training target is the same token window shifted by one position. Cross entropy at location
+`t` therefore uses the target character `x_{t+1}`.
+
+The mask is semantic, not merely a convenient floating-point bias:
+
+$$`j>i\quad\Longrightarrow\quad
+\operatorname{attentionWeight}_{i,j}=0.`
+
+The source of the shared architecture is
+[`NN/API/Models/Gpt2.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Gpt2.lean).
+The corpus split, configuration presets, evaluation loop, generation, and checkpoint handling are
+in
+[`NN/Examples/Models/Sequence/CharGpt.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/CharGpt.lean).
+
+## Make The Run Your Own
+
+Every structural parameter in the smoke preset can be overridden:
 
 ```
-#gpt2_train_log_file_view "data/model_zoo/gpt2_trainlog.json"
+lake -R -K cuda=true exe torchlean chargpt --device cuda \
+  --tiny-shakespeare --preset smoke \
+  --width 64 --heads 4 --layers 3 --seq-len 64 \
+  --batch 8 --steps 20 --eval-every 5 --eval-iters 4
 ```
 
-That widget is still an inspection tool. The semantic claim remains about the causal model, token
-ids, parameter store, and runtime command that produced the log.
+Two constraints are worth testing deliberately.
 
-# Mamba
+First, `--heads` must divide `--width`, because the model width is split into equal head dimensions.
+Try `--width 30 --heads 4`; the command rejects the configuration before training.
 
-[NN.Examples.Models.Sequence.Mamba source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Mamba.lean) keeps the
-sequence coverage broader than attention. The Mamba command trains a byte level language model through
-the public Mamba API:
+Second, increasing `seq-len` increases attention work quadratically:
 
-```
-python3 scripts/datasets/download_example_data.py --tiny-shakespeare
-lake -R -K cuda=true exe torchlean mamba --device cuda \
-  --tiny-shakespeare --steps 1 --windows 1 --generate 0 --prompt "ROMEO:"
-```
+$$`\operatorname{cost}_{\mathrm{attention}}
+=O(BHT^2D_h).`
 
-The specification side includes state space material that later theorems can use in
-[NN.Spec.Models.Mamba API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Mamba.lean), including run-list length facts for
-compact Mamba blocks. The API side in [NN.API.Models.Mamba API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Mamba.lean)
-builds a trainable model with a gated recurrent core. The runtime side can use CUDA fast paths for
-the float32 selective scan family when built with CUDA.
+Increasing width mostly changes matrix multiplication; increasing context changes both the score
+matrix and its stored autograd state. This is why a “larger Transformer” is not described by
+parameter count alone.
 
-This example stresses a different runtime shape: recurrent state, scan computation, gating, and
-generation. Attention bugs are not the only sequence bugs. Mamba models make us care about state
-update conventions, scan order, and assumptions for specific kernels.
-
-The paper anchor is Gu and Dao, "Mamba: Linear-Time Sequence Modeling with Selective State Spaces"
-(2023, https://arxiv.org/abs/2312.00752).
-
-The recurrent scan has the form:
-
-$$`h_{t+1}=A_t h_t + B_t x_t,\qquad
-y_t=C_t h_t + D_t x_t`
-
-The details differ by implementation, but the proof pressure is the same: state shape, scan order,
-and parameter broadcasting must be explicit.
-
-# RNN, LSTM, And The GRU Gap
-
-The current runnable recurrent examples are:
-
-- [NN.Examples.Models.Sequence.Rnn source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Rnn.lean), a vanilla RNN
-  text-window runtime check.
-- [NN.Examples.Models.Sequence.Lstm source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Lstm.lean), an LSTM
-  text-window runtime check.
-- [NN.Examples.Models.Supervised.LstmRegression source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Supervised/LstmRegression.lean),
-  a more natural LSTM forecasting tutorial over household power windows.
-
-The small text commands are short:
+The `karpathy` preset records the well-known lecture configuration: batch 64, context 256, width
+384, six heads, six blocks, dropout 0.2, and 5,000 updates. It is a real long-running experiment,
+not a quick check:
 
 ```
-lake -R -K cuda=true exe torchlean rnn --device cuda --tiny-shakespeare --steps 1
-lake -R -K cuda=true exe torchlean lstm --device cuda --tiny-shakespeare --steps 1
+lake -R -K cuda=true exe torchlean chargpt --device cuda \
+  --tiny-shakespeare --preset karpathy
 ```
 
-The forecasting run is the better tutorial:
+TorchLean follows the architecture and hyperparameter lineage of Karpathy's lecture model, but the
+runtime and implementation are TorchLean's. It does not claim bit-for-bit identity with the Python
+program or with a pretrained GPT-2 checkpoint.
 
-```
-python3 scripts/datasets/download_example_data.py --household-power --household-power-windows 512
-lake -R -K cuda=true exe torchlean lstm_regression --device cuda --steps 200 --windows 96
-```
+# Case Study Two: Two Views Of CIFAR
 
-These examples stress recurrent state handling: hidden state shape, application at each time step,
-heads distributed across time, and optimizer updates through unfolded computation. The LSTM regression
-case also stresses real time series data and a loss that readers can interpret as forecasting
-error rather than token reconstruction.
-
-A recurrent cell has the shape:
-
-$$`(h_t,x_t)\longmapsto(h_{t+1},y_t)`
-
-An LSTM cell carries more state:
-
-$$`(h_t,c_t,x_t)\longmapsto(h_{t+1},c_{t+1},y_t)`
-
-That extra carried state is why recurrent examples are good documentation tests: framework code may
-store the state implicitly, while a proof needs to reason about the actual transition that ran.
-
-There is no `gru` subcommand today, even though "LSTM/GRU/RNN" is often used as one category in ML
-writing. TorchLean covers vanilla RNN and LSTM executables; GRU is a natural extension point rather
-than a file currently cited as present. The classic recurrent
-citations are Hochreiter and Schmidhuber, "Long Short-Term Memory" (Neural Computation 1997,
-https://www.bioinf.jku.at/publications/older/2604.pdf) and Cho et al., "Learning Phrase
-Representations using RNN Encoder Decoder for Statistical Machine Translation" (2014,
-https://arxiv.org/abs/1406.1078) for GRU style gating.
-
-# ResNet
-
-The public [ResNet API](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/ResNet.lean)
-constructs residual networks over an arbitrary number of spatial dimensions. A configuration fixes
-the channel widths, block counts, convolution parameters, and class count; the resulting model uses
-the same typed layer API as other TorchLean models.
-
-ResNet stresses the graph boundary because residual connections create branching structure that later rejoins.
-A purely sequential chain can postpone many mistakes; a residual add makes shape agreement explicit. If the
-shortcut branch and the convolution branch disagree, the typed construction has to confront the
-mismatch before training or verification treats the block as valid.
-
-The residual block contract is:
-
-$$`x \longmapsto F_\theta(x)+S_\theta(x)`
-
-Both branches must land in the same shape before the addition exists. That short condition is one of
-the main reasons typed architectures help.
-
-The paper anchor is He et al., "Deep Residual Learning for Image Recognition" (CVPR 2016,
-https://arxiv.org/abs/1512.03385).
-
-# Vision Transformers
-
-[NN.Examples.Models.Vision.Vit source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/Vit.lean) trains a compact
-ViT style CIFAR classifier:
+ResNet and ViT consume the same prepared CIFAR arrays but impose different structure on them. The
+examples make that difference visible while sharing the same trainer, optimizer, loss, and runtime
+surface.
 
 ```
 python3 scripts/datasets/download_example_data.py --cifar10
-lake -R -K cuda=true exe torchlean vit --device cuda --n-total 1 --steps 1
+
+lake exe torchlean resnet --device cpu --n-total 1 --steps 1 \
+  --log /tmp/resnet-trainlog.json
+
+lake exe torchlean vit --device cpu --n-total 1 --steps 1 \
+  --log /tmp/vit-trainlog.json
 ```
 
-The corresponding spec material in [NN.Spec.Models.Vit API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Models/Vit.lean) names
-ViT configurations and proves that standard patch 16 config records are well formed. The executable
-uses much smaller dimensions, but it stresses the same class of concerns: converting images to
-patches, token embeddings, dimensions compatible with attention, and classifier heads.
-
-ViT connects the vision and sequence parts of TorchLean. It asks the image loader
-to produce CIFAR shaped tensors, then asks the model API to treat patches as tokens. That crossover
-is a common source of shape bugs in ordinary frameworks.
-
-The shape contract is:
-
-$$`\mathrm{image}(C,H,W)
-\longmapsto
-\mathrm{patches}(N_{\mathrm{patch}},d_{\mathrm{model}})
-\longmapsto
-\mathrm{tokens}`
-
-The verifier and runtime should not have to guess which image layout or patch convention was used.
-
-The paper anchor is Dosovitskiy et al., "An Image is Worth 16x16 Words: Transformers for Image
-Recognition at Scale" (ICLR 2021, https://arxiv.org/abs/2010.11929).
-
-# FNO
-
-[NN.Examples.Models.Operators.Fno1dBurgers source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Operators/Fno1dBurgers.lean)
-is the main scientific ML example. It trains a Fourier neural operator on a prepared one dimensional
-Burgers dataset:
+Observed summaries:
 
 ```
-python3 NN/Examples/Data/prepare_fno1d_burgers.py --download --grid 32 --ntrain 128 --ntest 32
+torchlean resnet: ResNet CIFAR training (device=cpu)
+dataset size = 1
+mean_loss(before) = 2.333221
+mean_loss(after) = 2.327496
+steps=1 loss0=2.333221 loss1=2.327496
+torchlean resnet: ok
+```
 
+```
+torchlean vit: ViT CIFAR training (device=cpu)
+dataset size = 1
+mean_loss(before) = 2.302585
+mean_loss(after) = 2.300389
+steps=1 loss0=2.302585 loss1=2.300389
+torchlean vit: ok
+```
+
+Both are ten-class models, but they organize computation differently.
+
+## Residual Geometry
+
+The current
+[`ResNet application`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/ResNet.lean)
+crops each image to `3 × 8 × 8`, lifts it to four hidden channels, applies two shape-preserving
+residual blocks, globally averages the spatial axes, and emits ten logits.
+
+At every residual join, both branches have shape
+
+$$`1\times4\times8\times8.`
+
+That equality is part of model construction. The optimizer never sees a malformed residual block.
+It may still see a numerically poor model, a bad label, or an incorrect unproved kernel; shape
+typing solves one problem rather than pretending to solve all of them.
+
+## Patch Geometry
+
+The
+[`ViT application`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/Vit.lean)
+uses a convolution to create patch embeddings, reshapes the patch grid into a token sequence, and
+applies one Transformer encoder block. If the patch output grid is `H' × W'`, the token count is
+
+$$`N=H'W'.`
+
+The conversion
+
+$$`B\times D\times H'\times W'
+\longrightarrow B\times N\times D`
+
+is an explicit layer in the public ViT model. It is not a hidden `view` whose correctness depends on
+remembering which axis currently stores channels.
+
+## A Useful Comparison
+
+Try ten updates on both commands:
+
+```
+lake exe torchlean resnet --device cpu --n-total 8 --steps 10
+lake exe torchlean vit --device cpu --n-total 8 --steps 10
+```
+
+Do not compare the final losses as if this were a controlled architecture benchmark. The examples
+are intentionally compact and their initialization and capacity differ. Instead, compare:
+
+- model summaries and parameter shapes;
+- the residual join versus the spatial-to-token conversion;
+- the backend capsules printed by adding `--show-backend`;
+- the JSON metadata written by `--log`.
+
+That comparison teaches more about TorchLean's architecture than a single accuracy number.
+
+# Case Study Three: A Burgers Neural Operator
+
+The Fourier neural operator example learns the terminal-time solution map for the viscous Burgers
+equation
+
+$$`\partial_t u+u\,\partial_xu=\nu\,\partial_{xx}u,
+\qquad x\in[0,1],`
+
+from sampled initial conditions. Each training pair is
+
+$$`u_0(x_i)\longmapsto u_T(x_i),\qquad i=0,\ldots,31.`
+
+Prepare the public dataset:
+
+```
+python3 NN/Examples/Data/prepare_fno1d_burgers.py \
+  --download --grid 32 --ntrain 128 --ntest 32
+```
+
+A one-update CUDA run over four training fields and two held-out fields is:
+
+```
 lake -R -K cuda=true exe torchlean fno1d_burgers --device cuda \
-  --steps 700 --lr 0.003 --plot-csv data/real/fno/predictions.csv
+  --steps 1 --lr 0.003 \
+  --train-rows 4 --test-rows 2 --eval-rows 2 \
+  --log /tmp/fno-trainlog.json \
+  --plot-csv /tmp/fno-predictions.csv
 ```
 
-FNO stresses a runtime boundary that language and vision models do not: spectral convolution. The
-public model applies a dense tensor-product DFT over an arbitrary number of spatial axes while
-carrying real and imaginary components separately. CUDA execution replaces that dense calculation
-with the fused `spectralConv1dRfft` autograd primitive backed by cuFFT.
-
-The operator learning map is:
-
-$$`u_0(\cdot)\longmapsto u_T(\cdot)`
-
-The FNO does not predict one label for one image; it learns an operator between function-like
-signals. The example belongs next to Scientific ML verification, not only next to ordinary supervised
-classification.
-
-The example also stresses artifact hygiene. A helper prepares `.npy` arrays, Lean trains the model,
-and a plotting helper renders a prediction CSV. The Python scripts are data/artifact utilities, not
-the owner of the model semantics.
-
-The model stressor is spectral convolution:
+The current output identifies the numerical path before reporting the loss:
 
 ```
-input grid -> lift -> Fourier modes -> learned spectral multiplier -> inverse transform -> projection
+torchlean fno1d_burgers: native real-split FNO1D Burgers
+  device=cuda backend=eager
+  grid=32 width=8 modes=8 blocks=1
+  rows train=4 test=2 eval_prefix=2
+  spectral path=fused cuFFT RFFT autograd op
+  before: train_mse=0.482041 test_mse=0.486850
+  step 1: train_mse=0.481925 test_mse=0.486735
+  after: train_mse=0.481925 test_mse=0.486735
+  wrote prediction CSV: /tmp/fno-predictions.csv
+  wrote TrainLog JSON: /tmp/fno-trainlog.json
+torchlean fno1d_burgers: ok
 ```
 
-That line is why FNO is a good scientific ML example. It tests tensor layouts, real data, operator
-learning, and the CPU/CUDA split in one small command. The trained result should be read as an
-operator-learning runtime artifact. PINN residual certificates, ODE enclosures, and Lyapunov checks
-are the places where scientific claims become checker artifacts.
-
-The paper anchor is Li et al., "Fourier Neural Operator for Parametric Partial Differential
-Equations" (ICLR 2021, https://arxiv.org/abs/2010.08895).
-
-# Diffusion And Other Generative Commands
-
-The generative commands are:
+Plot the prediction artifact with:
 
 ```
-lake -R -K cuda=true exe torchlean autoencoder --device cuda --steps 1 --n-total 1
-lake -R -K cuda=true exe torchlean mae --device cuda --steps 1 --n-total 1
-lake -R -K cuda=true exe torchlean vae --device cuda --steps 1 --n-total 1
-lake -R -K cuda=true exe torchlean vqvae --device cuda --steps 1 --n-total 1
-lake -R -K cuda=true exe torchlean gan --device cuda --steps 1 --n-total 1
-lake -R -K cuda=true exe torchlean diffusion --device cuda --dataset cifar10 --n-total 1 --steps 1 --hidden-c 1 --T 2
+python3 NN/Examples/Data/plot_fno1d_burgers.py \
+  --csv /tmp/fno-predictions.csv
 ```
 
-These examples stress stochastic and reconstruction oriented training. Diffusion adds timestep
-schedules, noising, denoising, and sampling artifacts. VAE, VQ-VAE, and GAN examples connect a
-runnable training API to objective definitions used by theorems in the
-[generative theory API](https://github.com/lean-dojo/TorchLean/tree/main/NN/MLTheory/Generative/). The companion generative guide explains
-that boundary in more detail.
+## What The Spectral Layer Computes
 
-These examples are more than larger MLP variants. They force the API to express latent shapes,
-reconstruction targets, score targets, generator/discriminator pairs, patch masks, and image-valued
-sampling outputs.
+Let `v ∈ ℝ^{N×C}` be a field with `C` latent channels. The spectral branch computes a discrete
+Fourier transform, retains `m` modes at each end of the real spectrum, multiplies those modes by
+learned complex weights, and transforms back:
 
-The expected artifacts differ by family:
+$$`\widehat v_k
+=\sum_{j=0}^{N-1}v_j e^{-2\pi i jk/N},`
 
-| Command | Primary artifact | Typical claim |
-|---|---|---|
-| `autoencoder` | reconstruction loss/log | encoder-decoder runtime path ran |
-| `mae` | masked reconstruction log | patch mask and reconstruction objective ran |
-| `vae` | beta-VAE style loss/log | latent-objective shaped path ran |
-| `vqvae` | reconstruction/codebook-shaped loss/log | finite-codebook objective path ran |
-| `gan` | generator/discriminator loss log | LSGAN-shaped scalar objectives ran |
-| `diffusion` | train log and optional PPM sample | noising/denoising/sampler path ran |
+$$`\widehat y_k
+=R_{\theta,k}\widehat v_k
+\quad\text{for retained }k,\qquad
+y=\mathcal F^{-1}(\widehat y).`
 
-The generative theory modules then give stronger local facts about objectives and sampler steps.
-Do not read image quality, distribution matching, or convergence into a short command unless a
-separate experiment and theorem actually state those claims.
+A pointwise linear branch is added before the activation. The command uses grid `N=32`, width `8`,
+eight retained modes on each side, and one spectral residual block.
 
-# RL Workflows
+The public
+[`FNO constructor`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/FNO.lean)
+states the grid and mode constraints independently of the backend. The
+[`Burgers application`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Operators/Fno1dBurgers.lean)
+chooses between:
 
-The RL examples are different from the supervised and generative examples because the data is produced
-by an environment boundary rather than read from a static tensor file:
+- a portable dense multidimensional DFT path;
+- a fused CUDA real-FFT autograd operation backed by cuFFT.
 
-- [NN.Examples.Models.RL.PPOCartPole source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOCartPole.lean) trains an
-  actor critic on Gymnasium `CartPole-v1` through a Python subprocess bridge.
-- [NN.Examples.Models.RL.PPOGridWorld source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOGridWorld.lean) gives a
-  smaller controlled PPO environment.
-- [NN.Examples.Models.RL.PPOPongRam source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/PPOPongRam.lean) exercises a
-  larger observation/action setting.
-- [NN.Examples.Models.RL.DQNReplay source](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/RL/DQNReplay.lean) focuses on the
-  off policy replay and minibatch update pieces.
+The output line `spectral path=fused cuFFT RFFT autograd op` is therefore part of the scientific
+record. It says which external numerical provider produced the transform. It does not turn cuFFT
+into a Lean-proved implementation.
 
-For CartPole:
+## Change The Evidence, Not Only The Runtime
+
+Run the same small dataset on CPU:
 
 ```
-lake -R -K cuda=true exe torchlean ppo_cartpole --device cuda --updates 50
+lake exe torchlean fno1d_burgers --device cpu \
+  --steps 1 --train-rows 4 --test-rows 2 --eval-rows 2
 ```
 
-For the DQN replay mini example:
+The command reports `spectral path=portable dense multidimensional DFT`. The model contract and
+dataset remain the same, but the numerical provider changes. This is precisely the kind of
+comparison for which backend capsules are useful: provider, reduction policy, layout, and evidence
+can change without silently changing the model's mathematical interface.
 
-```
-lake exe torchlean dqn_replay
-```
+# Reading The Three Runs
 
-RL stresses producer/checker boundaries harder than ordinary supervised learning. TorchLean can
-typecheck the tensors that enter training, define the policy/value losses, and write logs that
-widgets can read. When Gymnasium is the environment, raw observations are checked against a runtime
-boundary contract before becoming training data. TorchLean checks the imported tensors and payloads
-that enter the Lean side, while the external simulator remains a named producer.
+The three applications stress different parts of TorchLean:
 
-The paper anchors are Mnih et al., "Human-level control through deep reinforcement learning"
-(Nature 2015, https://www.nature.com/articles/nature14236) for DQN and Schulman et al., "Proximal
-Policy Optimization Algorithms" (2017, https://arxiv.org/abs/1707.06347) for PPO. The environment
-API reference is Gymnasium by the Farama Foundation (https://gymnasium.farama.org/).
+| Application | Structural pressure | External boundary | Primary artifact |
+|---|---|---|---|
+| CharGPT | causal windows, heads, depth, token IDs | CUDA kernels and corpus file | checkpoint, validation log, generated text |
+| ResNet / ViT | residual joins or patch-token layout | CIFAR arrays and selected runtime | classification loss log |
+| FNO | field shape, retained Fourier modes | dataset preparation and cuFFT on CUDA | train/test loss and prediction CSV |
 
-The interaction loop is:
+The next two chapters add stochastic state. In generative modeling and reinforcement learning, the
+network is only one part of the run, so schedules, samplers, environments, and rollout data matter
+as much as the architecture.
 
-$$`s_t \xrightarrow{\pi_\theta} a_t
-\xrightarrow{\mathrm{env}} (r_t,s_{t+1})`
+# References
 
-TorchLean can type and check the policy, rollout buffers, returns, and PPO losses. If the
-environment is Gymnasium, the environment transition itself remains an external producer step.
-
-For Pong RAM, the command name follows the runner:
-
-```
-lake -R -K cuda=true exe torchlean ppo_pong_ram --device cuda --updates 1 \
-  --eval-every 1 --eval-episodes 1 --eval-max-steps 8
-```
-
-This example is useful because the observation boundary is larger but still inspectable: a fixed RAM
-vector crosses from Gymnasium/ALE into typed TorchLean rollout data.
-
-# API, Runtime, Graph, CUDA, Verification
-
-The model examples are best read as five overlapping tests:
-
-- *API*: can modern models be expressed as typed Lean constructors rather than opaque Python
-  modules?
-- *Runtime*: can eager autograd, optimizers, logs, save/load paths, and data loaders run end to end?
-- *Graph*: can branchy, tokenized, recurrent, and spectral programs be lowered or related to shared
-  graph concepts when needed?
-- *CUDA*: can GPU execution accelerate examples without changing their public model shape?
-- *Verification*: can examples point to specs used by theorems and make any remaining producer or
-  runtime assumptions explicit?
-
-The answer is layered. MLP, KAN, CNN, ViT, GPT, Mamba, FNO, diffusion, and RL commands exercise
-real runtime APIs. ResNet is currently an API/spec and GraphSpec example rather than a `torchlean`
-command. Some model families also have dedicated spec or theory declarations with citeable theorem
-names. Not every command has full verification. Not every CUDA kernel has a fully proved
-equivalence to a high level spec. Not every external data source is trusted.
-
-That layered view is a feature of the example suite. Readers can see where TorchLean is already a proof
-artifact, where it is a runnable ML artifact, and where the bridge between those two worlds is still
-being strengthened.
+- Karpathy,
+  [*Let's build GPT: from scratch, in code, spelled out*](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py),
+  2023.
+- He et al., [*Deep Residual Learning for Image Recognition*](https://arxiv.org/abs/1512.03385),
+  2015/2016.
+- Dosovitskiy et al.,
+  [*An Image Is Worth 16x16 Words*](https://arxiv.org/abs/2010.11929), 2020/2021.
+- Li et al.,
+  [*Fourier Neural Operator for Parametric Partial Differential Equations*](https://arxiv.org/abs/2010.08895),
+  2020/2021.

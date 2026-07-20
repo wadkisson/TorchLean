@@ -183,6 +183,122 @@ This claim needs careful wording. TorchLean does not collapse "correct gradient"
 "float gradient close to correct gradient" into one claim. The first is an equality theorem over the
 ideal semantics. The second is an approximation theorem with a tolerance.
 
+# Numerical Traces For The Canonical IR
+
+The proof-relevant `FwdGraph` and `RevGraph` explain how local approximation theorems compose. Model
+export and backend planning, however, use the canonical op-tagged `NN.IR.Graph`. TorchLean connects
+that graph directly to executable binary32 through
+[the graph numerical certificate checker](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/NumericalCertificate.lean).
+It does not introduce a second deployment graph or a second interval type.
+
+A certificate contains source enclosures, one derived range per IR node, the name of the range
+registry, and the existing backend execution audit. A successful `check` stores the graph inside
+`CheckedCertificate`; later replay cannot silently substitute a different graph or rule set.
+Checking performs three independent executable validations:
+
+1. validate that source and derived endpoints are finite and ordered;
+2. reconstruct every supported range transfer from the graph;
+3. re-run backend planning and compare the selected kernel capsules and numerical policies.
+
+`GraphRangeRegistry` dispatches by primitive operation, not model family. The built-in transfers
+cover source and shape-only nodes, pooling, arithmetic, inverse, ReLU, absolute value, directed
+square root with a checked nonnegative domain, fixed-left reductions, matrix multiplication, MSE,
+LayerNorm, softmax, sigmoid, tanh, sine, and cosine. Exponential is currently unsupported.
+An unsupported operation fails at its node id; it is not replaced by an uninformative whole
+interval.
+
+```
+#check Proofs.RuntimeApprox.NumericalCertificate.generateChecked
+#check Proofs.RuntimeApprox.NumericalCertificate.GraphRangeRegistry
+#check Proofs.RuntimeApprox.NumericalCertificate.numericalCoverage
+#check Proofs.RuntimeApprox.NumericalCertificate.executeIEEE32
+#check Proofs.RuntimeApprox.NumericalCertificate.CheckedRealExecution
+#check Proofs.RuntimeApprox.NumericalCertificate.CheckedExecution.errorTrace
+#check Proofs.RuntimeApprox.NumericalCertificate.tensor_error_le_width_of_check
+#check Proofs.RuntimeApprox.NumericalCertificate.execution_error_trace_of_check
+```
+
+`GraphRangeContract.derive` is an executable range transformer, not a soundness theorem.
+`generateChecked` and `check` establish that the stored trace is exactly the trace reconstructed by
+the selected registry and backend plan; they do not establish that every reconstructed interval
+encloses the graph's real denotation.
+
+`executeIEEE32` evaluates the same `NN.IR.Graph` with TorchLean's bit-level `IEEE32Exec` context and
+checks every intermediate value against the stored ranges, rejecting NaN and infinity. This is a
+reference replay, not an agreement theorem for a high-throughput backend.
+`CheckedRealExecution` carries the separate semantic evidence: its fields require both the real
+denotation equality and a pointwise real enclosure proof. When that evidence is supplied,
+`CheckedExecution.errorTrace` combines the real enclosure with the successful IEEE replay to prove
+a pointwise error trace whose bound is the interval width. A successful range check or replay alone
+cannot stand in for the missing real-semantics proof.
+
+Reduction order is read from the selected capsule. The portable reference capsules advertise the
+fixed left fold used by the canonical tensor semantics. Native CUDA and LibTorch accumulations are
+marked implementation-defined, so a fixed-left certificate cannot accidentally certify a cuBLAS,
+cuDNN, fused-attention, or parallel-reduction schedule. Those paths require the order-independent
+reduction bounds described in the floating-point chapter or a stronger backend-specific contract.
+
+The local interval lemmas for arithmetic and selected nonlinear operations follow the inclusion
+principle of IEEE 1788-2015. The current registry does not yet compose those lemmas into a theorem
+that every accepted graph trace encloses exact graph semantics. The separation between local
+rounding facts and a composed global error follows the standard treatment in Higham,
+*Accuracy and Stability of Numerical Algorithms*, 2nd edition.
+
+The canonical `NN.IR.Graph` compiler currently proves forward semantic preservation only. Its
+compiled nodes do not yet carry proved VJPs, so this certificate should not be described as a
+canonical-IR backward certificate. Backward numerical theorems use the proof-bearing `RevGraph`
+path below, which erases to executable autograd `GraphData` without discarding its VJP rules. An
+autograd-capable lowering from canonical IR would need an additional correspondence theorem.
+
+# Run A Complete Model Check
+
+The executable example
+[GraphNumericalCertificate.lean](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Floats/GraphNumericalCertificate.lean)
+ends with a two-layer MLP rather than a single isolated operator. Run it from the repository root:
+
+```
+lake exe torchlean numerical_certificate
+```
+
+The model is a matrix pipeline with shapes that remain visible in the IR:
+
+```
+input [1,2]
+  -> matmul [2,3]
+  -> add bias [1,3]
+  -> ReLU
+  -> matmul [3,1]
+  -> add bias [1,1]
+```
+
+Its last two report rows are labels emitted by the example:
+
+```
+  ok  two-layer MLP certificate
+  ok  two-layer MLP IEEE replay
+```
+
+`mlpCertificate` checks that all ten graph nodes have a registered numerical rule. It derives every
+range, selects the CPU capsules, and stores the graph, registry identity, source assumptions,
+ranges, and backend audit in one artifact. `mlpReplay` then supplies concrete weights, biases, and
+input values, executes the stored graph with `IEEE32Exec`, and checks every intermediate tensor.
+The same file tests rejection of a tampered range, an unsupported operation, a violated
+square-root domain, and an incompatible reduction policy. These Boolean and `Except` checks are
+useful regression evidence; the example does not construct a `CheckedRealExecution`, so it is not
+by itself a proof that the MLP's exact real execution is enclosed.
+
+There is no MLP-specific branch in this process. The checker sees input, constant, matrix
+multiplication, addition, and ReLU nodes. Other architectures can use the same walk when their
+primitive operations are covered. New primitives extend the executable registry with a
+`GraphRangeContract`; a semantic certificate additionally needs a theorem connecting that
+contract's derived interval to the operation's real semantics.
+
+The [complete numerical-runtime walkthrough](https://lean-dojo.github.io/TorchLean/examples/numerical-runtime/)
+shows the model definitions, the five replay stages, the backend-capsule audit, and the handoff to
+backward and optimizer bounds. It also states the current compiler boundary explicitly: canonical
+IR has checked forward replay, while backward and optimizer composition currently begins from a
+proof-bearing `RevGraph`.
+
 # NF Operations: Rounded Real Arithmetic
 
 The largest collection of local rules is
@@ -219,9 +335,9 @@ lemmas in
 [NN.Proofs.RuntimeApprox.NF.ReductionOps](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/ReductionOps.lean):
 
 ```
-#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_sum_by_row_2d
-#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_mean_by_row_2d
-#check NN.Proofs.RuntimeApprox.NF.approxT_reduce_sum_by_column_2d
+#check Proofs.RuntimeApprox.NFBackend.approxT_reduce_sum_by_row_2d
+#check Proofs.RuntimeApprox.NFBackend.approxT_reduce_mean_by_row_2d
+#check Proofs.RuntimeApprox.NFBackend.approxT_reduce_sum_by_column_2d
 ```
 
 The row-sum theorem is not just "sum is close to sum." It accounts for the number of accumulated
@@ -229,12 +345,52 @@ terms and for the same row/column indexing used by the executable reducer. That 
 detail that matters for LayerNorm, attention logits, pooled features, and minibatch losses.
 
 Softmax needs even more care. Scalar logistic-style bounds are not a proof of axis softmax, because
-axis softmax couples every coordinate through the denominator. TorchLean keeps that boundary
-visible in
-[NN.Proofs.RuntimeApprox.NF.SoftmaxAxis](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/SoftmaxAxis.lean):
-the file states the intended location for a future vector/axis theorem and explicitly avoids
-pretending that scalar bounds cover the coupled denominator proof. That is a useful negative result:
-the absence of a theorem is recorded as a boundary, not papered over by an approximate-looking name.
+axis softmax couples every coordinate through the denominator. TorchLean's
+[axis softmax approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/SoftmaxAxis.lean)
+proves the conditional NF rounded-real forward theorem `approxT_softmaxVecSpec`: it accounts for
+max subtraction, exponential approximation, a sequential denominator sum, and division, under an
+explicit denominator-error margin. `approxT_softmaxRowsSpec` lifts the result rowwise.
+
+Hard masking uses exact Boolean mask semantics, including an exact-zero theorem for an all-blocked
+row. `HardMaskedRowsEvidence` records the selected maxima, their approximation proofs, positive
+real denominator lower bounds, and rounded denominator margins required by
+`approxT_hardMaskedSoftmaxRowsSpec_of_max`. Backward bounds are provided by
+`approxT_softmaxBackwardFromWeightsVecSpec` and `approxT_softmaxBackwardVecSpec`. The analytic facts
+`sum_softmaxVec`, `sum_softmaxJvp`, and `abs_softmaxJvp_le_two_mul` establish normalization,
+zero-sum JVP coordinates, and the dimension-independent bound `|vjp_i| <= 2G`.
+
+These are NF rounded-real theorems, not automatic claims about `IEEE32Exec`, a fused attention
+kernel, or native binary32. The numerical-certificate registry's softmax rule only derives the
+coarse range `[0,1]`; that range is not a forward-error theorem.
+
+## Normalization And Attention
+
+Normalization and attention compose several domain-sensitive operations, so TorchLean records an
+intermediate error trace instead of assigning one unexplained tolerance to the layer. The
+[normalization approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Normalization.lean)
+handles arbitrary tensor rank once the selected mean and variance reductions have been certified.
+Its centering, variance stabilization, square root, division, and affine stages expose the lower
+bounds needed to keep the denominator away from zero. In particular,
+`approxT_normalizeCore` assumes approximation evidence for the input, mean, variance, scale, bias,
+and epsilon, plus a positive exact stabilized-variance lower bound and strict rounded-error
+margins. It does not derive the mean and variance reduction bounds itself.
+
+The [attention approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Attention.lean)
+builds scaled dot-product attention from matrix multiplication, scaling, stable axis softmax, and a
+second matrix multiplication. A hard attention mask is semantic: blocked entries have zero
+softmax numerator. It is not represented by adding a large finite negative constant, which would
+change the function for sufficiently large logits. Backend capsules must therefore advertise a
+matching mask convention before their output can inherit this theorem. The public masked theorem
+`approxT_scaledDotProductAttention_masked` consumes `HardMaskedRowsEvidence`; the canonical
+inverse-square-root scale theorem also requires a positive feature dimension and a square-root
+margin. These are conditional NF approximation theorems, not proofs for arbitrary fused attention
+implementations.
+
+```
+#check Proofs.RuntimeApprox.NFBackend.normalizeCoreErrorTrace
+#check Proofs.RuntimeApprox.NFBackend.approxT_normalizeCore
+#check Proofs.RuntimeApprox.Attention.approxT_scaledDotProductAttention_masked
+```
 
 # Convolution Forward And Backward
 
@@ -265,6 +421,36 @@ The convolution backward API covers the three reverse operators:
 It also packages the result as `conv2dRevNode`, so the backward approximation theorem can compose
 convolution with the rest of a reverse graph. Here is the local-to-global pattern in its cleanest
 form: first prove the hard local operator approximation, then hand it to `RevGraph`.
+
+# Rounded Optimizer Steps
+
+The backward theorem produces approximate gradients; a training claim must still account for the
+optimizer arithmetic. The generic
+[optimizer numerical contract](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Optimizer.lean)
+records an exact state, a rounded state, their relation, a one-step bound transformer, and the proof
+that the relation survives one update. `NumericalStepContract.run_approx` proves the corresponding
+finite-run result once for every optimizer satisfying that interface.
+
+The concrete [NF optimizer proofs](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Optimizers.lean)
+use the public optimizer equations directly:
+
+- SGD propagates learning-rate, gradient, and parameter error;
+- momentum SGD additionally propagates the momentum-buffer error;
+- AdamW records errors for both moments, bias correction, square root, adaptive division,
+  decoupled weight decay, and the final subtraction.
+
+AdamW needs more than a nominal epsilon. Its theorem requires a positive lower bound on the exact
+bias-corrected second moment and explicit margins showing that rounding does not cross either the
+square-root or division boundary. This is the numerical counterpart of the recurrence in Kingma and
+Ba's Adam paper (https://arxiv.org/abs/1412.6980) and the decoupled decay in Loshchilov and Hutter's
+AdamW paper (https://arxiv.org/abs/1711.05101).
+
+```
+#check Proofs.RuntimeApprox.Optimizer.NumericalStepContract.run_approx
+#check Proofs.RuntimeApprox.NFBackend.Optimizer.approxT_sgd_update
+#check Proofs.RuntimeApprox.NFBackend.Optimizer.approxT_momentumSGD_update
+#check Proofs.RuntimeApprox.NFBackend.Optimizer.approxT_adamW_update
+```
 
 # Scale Aware Tolerances
 
@@ -330,13 +516,18 @@ autograd algebra, verifier bounds, FP32 semantics, and runtime approximation as 
 layers because they are different mathematical facts that happen to support one deployment
 workflow.
 
-# End To End NF Graph Snippets
+# End To End Rounded Training
 
-The normal-form end-to-end file packages the graph story into two declarations:
+The normal-form end-to-end file connects the proof-bearing reverse graph to executable autograd
+`GraphData`, extracts typed parameter gradients, and composes those gradients with the optimizer
+contracts:
 
 ```
-#check NN.Proofs.RuntimeApprox.NF.eval_approx_graphData
-#check NN.Proofs.RuntimeApprox.NF.backprop_approx_graphData
+#check Proofs.RuntimeApprox.NFBackend.eval_approx_graphData
+#check Proofs.RuntimeApprox.NFBackend.backprop_approx_graphData
+#check Proofs.RuntimeApprox.NFBackend.backprop_gradient_approx_graphData
+#check Proofs.RuntimeApprox.NFBackend.backprop_optimizer_update_approx_graphData
+#check Proofs.RuntimeApprox.NFBackend.trainingStepTrace
 ```
 
 These are graph-level bridge theorems:
@@ -345,10 +536,46 @@ These are graph-level bridge theorems:
   spec forward graph when the local node approximation obligations have been supplied.
 - `backprop_approx_graphData` says the same style of statement for reverse accumulation, with the
   accumulation error model still explicit.
+- `backprop_optimizer_update_approx_graphData` applies any numerical optimizer contract to one typed
+  parameter gradient produced by that executable reverse pass. SGD uses trivial step evidence;
+  AdamW supplies its bias-correction and positivity margins through `StepData`. A model with several
+  parameter tensors applies the same theorem at each parameter index.
+- `trainingStepTrace` computes a proof-free report of forward, backward, gradient, parameter, and
+  optimizer-state bounds. Its interpretation comes from the surrounding approximation theorems,
+  not from the report record itself.
 
 That is the runtime approximation analogue of the autograd proof architecture. Local operator
 lemmas are the leaves; graph theorems compose them; deployment claims then combine the graph theorem
 with any scalar/backend assumptions.
+
+## Reading One Bounded Training Step
+
+Take a parameter tensor at index `i`. The real reverse pass produces `g_spec`; executable rounded
+reverse mode produces `g_run`; and `backprop_gradient_approx_graphData` proves
+
+$$`\|\operatorname{toSpec}(g_{\mathrm{run}})-g_{\mathrm{spec}}\|_\infty
+\le \varepsilon_g.`
+
+Suppose the current parameters and learning rate have errors `epsilon_p` and `epsilon_lr`. For SGD,
+the two executions perform the same public equation in their respective scalar systems,
+
+$$`p' = p-\eta g.`
+
+`sgdStepBound` first bounds the rounded product `eta * g`, including both input errors and the new
+multiplication rounding, then bounds the final subtraction. The graph-level theorem returns
+
+$$`\|\operatorname{toSpec}(p'_{\mathrm{run}})-p'_{\mathrm{spec}}\|_\infty
+\le \varepsilon_{p'}`
+
+with `epsilon_p'` equal to that computed bound, not a user-chosen test tolerance. Momentum SGD uses
+the same theorem and additionally returns a bound for the updated momentum buffer.
+
+For AdamW, the route is longer: update both moments, apply bias correction, take the second-moment
+square root, form the adaptive learning rate, apply decoupled decay, and subtract the Adam update.
+`AdamWStepErrorTrace` keeps the error after each stage. Its `StepData` asks for a positive `eta`
+below every exact corrected second moment and checks that the rounded error remains smaller than
+the square-root and denominator margins. The optimizer theorem remains the same; only the local
+contract's validity evidence is richer than SGD's.
 
 # Runtime Approximation APIs
 
@@ -367,6 +594,9 @@ bounds, compose them over forward and backward graphs, and finally connect the r
 - The [scale approximation API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Scale/ScaleApprox.lean) supports scale-aware error bounds.
 - The [autograd algebra link API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Graph/LinkAutogradAlgebra.lean)
   connects approximation to the autograd proof layer.
+- The [optimizer contract API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/Optimizer.lean)
+  and [NF optimizer instances](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/RuntimeApprox/NF/Optimizers.lean)
+  continue the backward error budget through parameter updates.
 
 # Runtime Agreement
 

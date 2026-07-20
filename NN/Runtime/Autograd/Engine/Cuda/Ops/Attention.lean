@@ -34,11 +34,9 @@ Forward structure matches `Spec.MultiHeadAttention.forward`:
 4. combine heads, then output projection `@ Wo`
 
 Masking:
-- If `useFlash = false`, the composed TorchLean fallback uses hard-mask semantics: blocked entries
-  contribute zero softmax numerator, matching the proof-facing attention spec.
-- If `useFlash = true`, the current CUDA build dispatches to the native fused runtime capsule.
-  Optional LibTorch SDPA capsules use the same hard boolean-mask semantics, but remain separate
-  external runtime and autograd boundaries.
+- Every provider uses hard-mask semantics: blocked entries contribute zero softmax numerator.
+- The selected capsule determines the forward provider and VJP owner. Native CUDA uses its fused
+  VJP; the TorchLean and LibTorch-forward routes record the same TorchLean local VJP.
 - This incurs a host-to-device copy for the mask (since the mask is a host `Tensor Bool`).
 -/
 
@@ -47,23 +45,33 @@ def multiHeadAttention
   (t : Tape) (wqId wkId wvId woId xId : Nat)
   (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none)
   (attentionCapsule : NN.Backend.KernelCapsule := NN.Backend.Attention.nativeFlashAttention) :
-  Result (Tape × Nat) := do
-  let useFlash ← NN.Backend.Attention.cudaUsesNativeFlash attentionCapsule
+  IO (Result (Tape × Nat)) := (do
+  ExceptT.mk (pure <|
+    attentionCapsule.validateEagerRequest NN.Backend.Attention.scaledDotProductOp .cuda
+  )
+  match attentionCapsule.provider, attentionCapsule.vjpMode with
+  | .nativeCuda, .backendVJP => pure ()
+  | .torchLean, .torchLeanTape => pure ()
+  | .libTorch, .torchLeanTape => pure ()
+  | provider, vjpMode =>
+      throw <|
+        s!"attention capsule `{attentionCapsule.name}` has no eager executor for " ++
+          s!"provider `{reprStr provider}` with VJP mode `{reprStr vjpMode}`"
   have _ := h1
   let one32 : UInt32 := 1
   let depth0 : UInt32 := 0
   let depth1 : UInt32 := 1
-  let n32 ← u32 n
-  let h32 ← u32 numHeads
-  let dModel32 ← u32 dModel
-  let head32 ← u32 headDim
+  let n32 ← ExceptT.mk (pure <| u32 n)
+  let h32 ← ExceptT.mk (pure <| u32 numHeads)
+  let dModel32 ← ExceptT.mk (pure <| u32 dModel)
+  let head32 ← ExceptT.mk (pure <| u32 headDim)
   let projDim : Nat := numHeads * headDim
-  let proj32 ← u32 projDim
-  let wq ← requireValue (t := t) wqId (.dim dModel (.dim projDim .scalar))
-  let wk ← requireValue (t := t) wkId (.dim dModel (.dim projDim .scalar))
-  let wv ← requireValue (t := t) wvId (.dim dModel (.dim projDim .scalar))
-  let wo ← requireValue (t := t) woId (.dim projDim (.dim dModel .scalar))
-  let x ← requireValue (t := t) xId (.dim n (.dim dModel .scalar))
+  let proj32 ← ExceptT.mk (pure <| u32 projDim)
+  let wq ← ExceptT.mk (pure <| requireValue (t := t) wqId (.dim dModel (.dim projDim .scalar)))
+  let wk ← ExceptT.mk (pure <| requireValue (t := t) wkId (.dim dModel (.dim projDim .scalar)))
+  let wv ← ExceptT.mk (pure <| requireValue (t := t) wvId (.dim dModel (.dim projDim .scalar)))
+  let wo ← ExceptT.mk (pure <| requireValue (t := t) woId (.dim projDim (.dim dModel .scalar)))
+  let x ← ExceptT.mk (pure <| requireValue (t := t) xId (.dim n (.dim dModel .scalar)))
   -- Projections: (n,dModel) @ (dModel,projDim) -> (n,projDim)
   let Q := Buffer.bmm x wq one32 n32 dModel32 proj32
   let K := Buffer.bmm x wk one32 n32 dModel32 proj32
@@ -88,23 +96,27 @@ def multiHeadAttention
         let axisMap : Array Nat := #[0, 1, 2]
         let maskB := Buffer.broadcastTo mF inDims outDims axisMap
         (Buffer.releaseThen mF maskB, 1)
-  -- Fused native attention over split heads. This replaces the composed
-  -- `scores -> mask -> softmax -> bmm` path while keeping the same spec contract.
   let (outHeads, attentionWorkspace) ←
-    if useFlash then
-      let outHeads := Buffer.flashAttentionFwd Qh Kh Vh maskB hasMask h32 n32 head32 scale
-      pure (outHeads, ([] : List Buffer))
-    else
+    match attentionCapsule.provider with
+    | .nativeCuda =>
+        let outHeads := Buffer.flashAttentionFwd Qh Kh Vh maskB hasMask h32 n32 head32 scale
+        pure (outHeads, ([] : List Buffer))
+    | .libTorch =>
+        let outHeads ← Buffer.libTorchSDPAFwd Qh Kh Vh maskB hasMask h32 n32 head32 scale
+        pure (outHeads, ([] : List Buffer))
+    | .torchLean =>
       let KhT := Buffer.swapAdjacentAtDepth Kh dimsHead depth1
       let scores := Buffer.bmm Qh KhT h32 n32 head32 n32
       let scaled0 := Buffer.scale scores scale
-      let rowsFold32 ← u32 (numHeads * n)
-      let attnOwned :=
+      let rowsFold32 ← ExceptT.mk (pure <| u32 (numHeads * n))
+      let attnOwned : Buffer.WithWorkspace :=
         match mask with
         | none => rowSoftmaxForward scaled0 rowsFold32 n32
         | some _ => rowHardMaskedSoftmaxForward scaled0 maskB rowsFold32 n32
       let outHeads := Buffer.bmm attnOwned.value Vh h32 n32 n32 head32
       pure (outHeads, [KhT, scores, scaled0, attnOwned.value] ++ attnOwned.workspace)
+    | provider =>
+        throw s!"attention provider `{reprStr provider}` is not implemented by the CUDA tape"
   -- combine heads: swap to (n,numHeads,headDim), then reshape to (n,projDim)
   let swapped := Buffer.swapAdjacentAtDepth outHeads dimsHead depth0  -- (n,numHeads,headDim)
   let concat := swapped  -- view as (n,projDim)
@@ -130,7 +142,7 @@ def multiHeadAttention
         let dSwapped := dConcat -- view (n,numHeads,headDim)
         let dOutHeads := Buffer.swapAdjacentAtDepth dSwapped dimsView depth0 -- (numHeads,n,headDim)
         let (dQh, dKh, dVh) ←
-          if useFlash then
+          if attentionCapsule.provider == .nativeCuda then
             let (dQh, dKh, dVh) :=
               Buffer.flashAttentionBwd Qh Kh Vh maskB dOutHeads hasMask h32 n32 head32 scale
             -- The fused VJP reads `dOutHeads` but returns three fresh gradient buffers. Thread the
@@ -194,7 +206,7 @@ def multiHeadAttention
           (wvId, { s := .dim dModel (.dim projDim .scalar), buf := dWv }),
           (woId, { s := .dim projDim (.dim dModel .scalar), buf := dWo })
         ] }
-  pure (t.addNode node)
+  pure (t.addNode node) : ExceptT String IO (Tape × Nat)).run
 
 end Tape
 

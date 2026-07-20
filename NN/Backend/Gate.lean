@@ -24,51 +24,16 @@ particular run mode.
 namespace NN
 namespace Backend
 
-/-- Policy used to accept or reject a selected backend plan after audit/recheck. -/
-structure AcceptancePolicy where
-  requireEvidence : Bool := true
-  allowRuntimeGuards : Bool := false
-  allowTestEvidence : Bool := false
-  allowTrustedBoundaries : Bool := false
-  allowFuzzEvidence : Bool := true
-  deriving Repr
-
-namespace AcceptancePolicy
-
-/-- Strict verification-oriented policy: no missing, fuzz-only, or trusted-boundary evidence. -/
-def strict : AcceptancePolicy :=
-  { requireEvidence := true
-    allowTrustedBoundaries := false
-    allowFuzzEvidence := false }
-
-/-- Runtime policy for maintained paths with guards and regression coverage. -/
-def checkedRuntime : AcceptancePolicy :=
-  { requireEvidence := true
-    allowRuntimeGuards := true
-    allowTestEvidence := true
-    allowTrustedBoundaries := false
-    allowFuzzEvidence := true }
-
-/-- Runtime scaling policy: guards/tests are admitted and trusted external boundaries are explicit. -/
-def allowTrustedRuntime : AcceptancePolicy :=
-  { requireEvidence := true
-    allowRuntimeGuards := true
-    allowTestEvidence := true
-    allowTrustedBoundaries := true
-    allowFuzzEvidence := true }
-
-/-- Whether an obligation disposition is admitted by this policy. -/
-def acceptsDisposition (p : AcceptancePolicy) (d : EvidenceDisposition) : Bool :=
+/-- Whether an obligation disposition is admitted by an assurance policy. -/
+def AssurancePolicy.acceptsDisposition (p : AssurancePolicy) (d : EvidenceDisposition) : Bool :=
   match d with
   | .missing => !p.requireEvidence
-  | .trusted => p.allowTrustedBoundaries
-  | .fuzzed => p.allowFuzzEvidence
+  | .trusted => p.allowTrustedExternal
+  | .fuzzed => p.allowFuzzed
   | .guarded => p.allowRuntimeGuards
   | .tested => p.allowTestEvidence
   | .proved => true
   | .checked => true
-
-end AcceptancePolicy
 
 /-- Why a candidate plan was rejected by an acceptance gate. -/
 inductive GateFailure where
@@ -88,7 +53,7 @@ inductive GateResult where
 namespace ObligationReport
 
 /-- Whether this obligation report is admitted by an acceptance policy. -/
-def acceptedBy (policy : AcceptancePolicy) (r : ObligationReport) : Bool :=
+def acceptedBy (policy : AssurancePolicy) (r : ObligationReport) : Bool :=
   policy.acceptsDisposition r.disposition
 
 /-- Whether this obligation is fuzz-backed. -/
@@ -116,7 +81,7 @@ def fuzzReports (a : ExecutionAudit) : List ObligationReport :=
   a.obligationReports.filter ObligationReport.isFuzzed
 
 /-- Gate failures induced by an acceptance policy. -/
-def gateFailures (policy : AcceptancePolicy) (a : ExecutionAudit) : List GateFailure :=
+def gateFailures (policy : AssurancePolicy) (a : ExecutionAudit) : List GateFailure :=
   let missing :=
     if policy.requireEvidence then
       match a.missingReports with
@@ -125,7 +90,7 @@ def gateFailures (policy : AcceptancePolicy) (a : ExecutionAudit) : List GateFai
     else
       []
   let trusted :=
-    if policy.allowTrustedBoundaries then
+    if policy.allowTrustedExternal then
       []
     else
       match a.trustedBoundaryReports with
@@ -142,7 +107,7 @@ def gateFailures (policy : AcceptancePolicy) (a : ExecutionAudit) : List GateFai
       | [] => []
       | reports => [GateFailure.testEvidence reports]
   let fuzzed :=
-    if policy.allowFuzzEvidence then
+    if policy.allowFuzzed then
       []
     else
       match a.fuzzReports with
@@ -151,14 +116,14 @@ def gateFailures (policy : AcceptancePolicy) (a : ExecutionAudit) : List GateFai
   missing ++ guarded ++ tested ++ trusted ++ fuzzed
 
 /-- Apply an acceptance policy to an execution audit. -/
-def gate (policy : AcceptancePolicy) (a : ExecutionAudit) : GateResult :=
+def gate (policy : AssurancePolicy) (a : ExecutionAudit) : GateResult :=
   match a.gateFailures policy with
   | [] => .accepted
   | failures => .rejected failures
 
 /-- An audit is accepted by a policy exactly when the policy reports no gate failures. -/
 theorem gate_eq_accepted_iff_gateFailures_eq_nil
-    (policy : AcceptancePolicy) (a : ExecutionAudit) :
+    (policy : AssurancePolicy) (a : ExecutionAudit) :
     a.gate policy = .accepted ↔ a.gateFailures policy = [] := by
   unfold gate
   cases a.gateFailures policy <;> simp
@@ -168,11 +133,11 @@ end ExecutionAudit
 namespace ExecutionPlan
 
 /-- Apply an acceptance policy to a selected execution plan. -/
-def gate (policy : AcceptancePolicy) (p : ExecutionPlan) : GateResult :=
+def gate (policy : AssurancePolicy) (p : ExecutionPlan) : GateResult :=
   p.audit.gate policy
 
 /-- Whether a selected execution plan is accepted by a policy. -/
-def acceptedBy (policy : AcceptancePolicy) (p : ExecutionPlan) : Bool :=
+def acceptedBy (policy : AssurancePolicy) (p : ExecutionPlan) : Bool :=
   match p.gate policy with
   | .accepted => true
   | .rejected _ => false
@@ -183,14 +148,14 @@ end ExecutionPlan
 structure AcceptedKernel where
   op : BackendOp
   capsule : KernelCapsule
-  policy : AcceptancePolicy
+  policy : AssurancePolicy
   gateProof : ({ kernels := [{ op, capsule }] } : ExecutionPlan).gate policy = .accepted
 
 instance : Repr AcceptedKernel where
   reprPrec k _ := Std.Format.text s!"AcceptedKernel({k.op.name}, {k.capsule.name})"
 
 /-- Gate a planned kernel and return a value that an executor can consume only on success. -/
-def PlannedKernel.accept (policy : AcceptancePolicy) (k : PlannedKernel) :
+def PlannedKernel.accept (policy : AssurancePolicy) (k : PlannedKernel) :
     Except (List GateFailure) AcceptedKernel :=
   let plan : ExecutionPlan := { kernels := [k] }
   match h : plan.gate policy with
@@ -200,11 +165,11 @@ def PlannedKernel.accept (policy : AcceptancePolicy) (k : PlannedKernel) :
 namespace GraphLoweringPlan
 
 /-- Apply an acceptance policy to a lowered backend plan. -/
-def gate (policy : AcceptancePolicy) (p : GraphLoweringPlan) : GateResult :=
+def gate (policy : AssurancePolicy) (p : GraphLoweringPlan) : GateResult :=
   p.toExecutionPlan.gate policy
 
 /-- Whether a lowered backend plan is accepted by a policy. -/
-def acceptedBy (policy : AcceptancePolicy) (p : GraphLoweringPlan) : Bool :=
+def acceptedBy (policy : AssurancePolicy) (p : GraphLoweringPlan) : Bool :=
   p.toExecutionPlan.acceptedBy policy
 
 end GraphLoweringPlan

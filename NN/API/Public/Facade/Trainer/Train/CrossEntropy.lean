@@ -131,7 +131,7 @@ def trainDatasetWithSelectedRunnerCore {σ τ : Shape} {β : Type} {α : Type}
     (afterTrain : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
       NN.API.train.Manual.Runner α trainer.task → IO β) :
-    IO (CrossEntropy.TrainResult σ τ × β) := do
+    IO (TrainResult σ τ × β) := do
   loadCheckpointIfSome (α := α) trainer runner opts.loadParams?
   let dataset ← data.build (α := α)
   IO.println s!"dataset size = {dataset.size}"
@@ -166,7 +166,7 @@ def trainDatasetWithSelectedRunnerCore {σ τ : Shape} {β : Type} {α : Type}
       Tensor.toFloatIO yhat
   let predictBatch :=
     fun (xsFloat : List (Tensor.T Float σ)) => xsFloat.mapM predict
-  let result : CrossEntropy.TrainResult σ τ :=
+  let result : TrainResult σ τ :=
     { report :=
         { steps := cfg.steps
           before := toString report.before
@@ -188,7 +188,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
     (afterTrain : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
       [Runtime.Scalar α] →
       NN.API.train.Manual.Runner α trainer.task → IO β) :
-    IO (CrossEntropy.TrainResult σ τ × β) := do
+    IO (TrainResult σ τ × β) := do
   withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ runner =>
     trainDatasetWithSelectedRunnerCore (α := α) trainer runner run data opts probes afterTrain)
 
@@ -207,7 +207,7 @@ attached to the trainer.
 def trainWithRun {σ τ : Shape} (trainer : CrossEntropy σ τ)
     (data : Dataset σ τ) (run : RunConfig := trainer.runConfig) (opts : TrainOptions := {})
     (probes : List (Probe σ) := []) :
-    IO (CrossEntropy.TrainResult σ τ) := do
+    IO (TrainResult σ τ) := do
   let (report, _) ← CrossEntropy.Internal.trainDatasetWithRunConfigCore trainer run data
     opts probes
     (fun {_} _ _ _ _ _ => pure ())
@@ -228,7 +228,7 @@ def trainSelected {σ τ : Shape} {α : Type}
     (trainer : CrossEntropy σ τ)
     (runtimeOpts : Options) (data : Dataset σ τ) (trainOpts : TrainOptions := {})
     (probes : List (Probe σ) := []) :
-    IO (CrossEntropy.TrainResult σ τ) := do
+    IO (TrainResult σ τ) := do
   let run := (trainer.runConfig.withOptions runtimeOpts)
   let runner ←
     NN.API.TorchLean.Trainer.instantiateConfigured
@@ -247,7 +247,7 @@ trainer, while step/logging choices live on `TrainOptions`.
 -/
 def train {σ τ : Shape} (trainer : CrossEntropy σ τ)
     (data : Dataset σ τ) (opts : TrainOptions := {}) (probes : List (Probe σ) := []) :
-    IO (CrossEntropy.TrainResult σ τ) :=
+    IO (TrainResult σ τ) :=
   trainWithRun trainer data trainer.runConfig opts probes
 
 end CrossEntropy

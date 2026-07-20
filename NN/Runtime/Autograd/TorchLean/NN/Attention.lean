@@ -38,27 +38,27 @@ def multiHeadAttention
     (batch n dModel numHeads headDim : Nat)
     {h1 : n ≠ 0}
     (seedW : Nat := 0)
+    (weightInit? : Option Torch.Init.Scheme := none)
     (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none) :
     LayerDef (.dim batch (.dim n (.dim dModel .scalar)))
       (.dim batch (.dim n (.dim dModel .scalar))) :=
   let projDim := numHeads * headDim
   let wProjShape : Shape := .dim dModel (.dim projDim .scalar)
   let wOShape : Shape := .dim projDim (.dim dModel .scalar)
-  let wq0 : Tensor Float wProjShape := Torch.Init.xavierW (outDim := dModel) (inDim := projDim)
-    (seed := seedW)
-  let wk0 : Tensor Float wProjShape := Torch.Init.xavierW (outDim := dModel) (inDim := projDim)
-    (seed := seedW + 1)
-  let wv0 : Tensor Float wProjShape := Torch.Init.xavierW (outDim := dModel) (inDim := projDim)
-    (seed := seedW + 2)
-  let wo0 : Tensor Float wOShape := Torch.Init.xavierW (outDim := projDim) (inDim := dModel) (seed
-    := seedW + 3)
+  let projInit := weightInit?.getD (.xavierUniform projDim dModel)
+  let outInit := weightInit?.getD (.xavierUniform dModel projDim)
+  let wq0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW)
+  let wk0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW + 1)
+  let wv0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW + 2)
+  let wo0 : Tensor Float wOShape := Torch.Init.tensor outInit (seed := seedW + 3)
   { kind := s!"MultiHeadAttention(heads={numHeads}, headDim={headDim})"
     paramShapes := [wProjShape, wProjShape, wProjShape, wOShape]
     initParams := Torch.tlistQuad wq0 wk0 wv0 wo0
-    runtimeInit := some <| .cons (.xavierUniform projDim dModel (seedW + 0)) <|
-      .cons (.xavierUniform projDim dModel (seedW + 1)) <|
-      .cons (.xavierUniform projDim dModel (seedW + 2)) <|
-      .cons (.xavierUniform dModel projDim (seedW + 3)) .nil
+    runtimeInit := some <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 0)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 1)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 2)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme outInit (seedW + 3)) .nil
     paramRequiresGrad := [true, true, true, true]
     forward := fun _ {α} _ _ =>
       fun {m} _ _ =>
@@ -68,6 +68,49 @@ def multiHeadAttention
             (h1 := h1)
             wq wk wv wo x (mask := mask)
   }
+
+/--
+Multi-head self-attention with a trainable bias on the final output projection.
+
+The Q/K/V projections remain bias-free.  This is the parameterization used in Karpathy's
+educational GPT implementation: the three per-head projections are linear maps without bias,
+while the projection applied after concatenating the heads is affine.
+-/
+def multiHeadAttentionOutputBias
+    (batch n dModel numHeads headDim : Nat)
+    {h1 : n ≠ 0}
+    (seedW : Nat := 0)
+    (weightInit? : Option Torch.Init.Scheme := none)
+    (mask : Option (Tensor Bool (.dim n (.dim n .scalar))) := none) :
+    LayerDef (.dim batch (.dim n (.dim dModel .scalar)))
+      (.dim batch (.dim n (.dim dModel .scalar))) :=
+  let projDim := numHeads * headDim
+  let wProjShape : Shape := .dim dModel (.dim projDim .scalar)
+  let wOShape : Shape := .dim projDim (.dim dModel .scalar)
+  let bOShape : Shape := .dim dModel .scalar
+  let projInit := weightInit?.getD (.xavierUniform projDim dModel)
+  let outInit := weightInit?.getD (.xavierUniform dModel projDim)
+  let wq0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW)
+  let wk0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW + 1)
+  let wv0 : Tensor Float wProjShape := Torch.Init.tensor projInit (seed := seedW + 2)
+  let wo0 : Tensor Float wOShape := Torch.Init.tensor outInit (seed := seedW + 3)
+  let bo0 : Tensor Float bOShape := Spec.zeros Float bOShape
+  { kind := s!"MultiHeadAttention(heads={numHeads}, headDim={headDim}, outputBias=true)"
+    paramShapes := [wProjShape, wProjShape, wProjShape, wOShape, bOShape]
+    initParams := .cons wq0 (.cons wk0 (.cons wv0 (.cons wo0 (.cons bo0 .nil))))
+    runtimeInit := some <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 0)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 1)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme projInit (seedW + 2)) <|
+      .cons (Module.RuntimeInit.FloatInit.ofScheme outInit (seedW + 3)) <|
+      .cons .zeros .nil
+    paramRequiresGrad := [true, true, true, true, true]
+    forward := fun _ {α} _ _ =>
+      fun {m} _ _ =>
+        fun wq wk wv wo bo x =>
+          TorchLean.multiHeadAttentionOutputBias (m := m) (α := α)
+            (batch := batch) (n := n) (numHeads := numHeads) (dModel := dModel)
+            (headDim := headDim) h1 wq wk wv wo bo x (mask := mask) }
 
 /-- Lift a single layer into a 1-layer sequential model. -/
 def singleLayer {σ τ : Shape} (l : LayerDef σ τ) : Seq σ τ :=

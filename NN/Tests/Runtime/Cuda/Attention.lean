@@ -145,10 +145,10 @@ def run : IO Unit := do
     (name := some "wo")
   let (t5c, xIdc) := Runtime.Autograd.Cuda.Tape.leaf (t := t4c) (Utils.tensorToAnyBuffer x)
     (name := some "x")
-  let (t6c, yIdc) ← Utils.okOrThrow
-    (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t5c)
+  let fusedResult ← Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t5c)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim)
-      (h1 := hN) wqIdc wkIdc wvIdc woIdc xIdc (mask := some mask))
+      (h1 := hN) wqIdc wkIdc wvIdc woIdc xIdc (mask := some mask)
+  let (t6c, yIdc) ← Utils.okOrThrow fusedResult
   let yCuda ← Utils.cudaValue (s := outShape) t6c yIdc
   let seedCuda : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }
@@ -173,11 +173,11 @@ def run : IO Unit := do
     (name := some "wo")
   let (t5s, xIds) := Runtime.Autograd.Cuda.Tape.leaf (t := t4s) (Utils.tensorToAnyBuffer x)
     (name := some "x")
-  let (t6s, yIds) ← Utils.okOrThrow
-    (Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t5s)
+  let composedResult ← Runtime.Autograd.Cuda.Tape.multiHeadAttention (t := t5s)
       (n := n) (numHeads := numHeads) (dModel := dModel) (headDim := headDim)
       (h1 := hN) wqIds wkIds wvIds woIds xIds (mask := some mask)
-      (attentionCapsule := NN.Backend.Attention.torchLeanComposed))
+      (attentionCapsule := NN.Backend.Attention.torchLeanComposed)
+  let (t6s, yIds) ← Utils.okOrThrow composedResult
   let yCudaComposed ← Utils.cudaValue (s := outShape) t6s yIds
   let seedComposed : Runtime.Autograd.Cuda.AnyBuffer :=
     { s := outShape, buf := Runtime.Autograd.Cuda.Buffer.full (UInt32.ofNat (Spec.Shape.size outShape)) 1.0 }

@@ -10,9 +10,11 @@ public import NN.API.Public.Training.Core.Base
 public import NN.API.Public.Training.Core.Manual
 
 /-!
-# Public Training API
+# Manual Training API
 
-Umbrella import for optimizer configuration, losses, metrics, and manual training tools.
+Umbrella import for direct runners, callback loops, losses, metrics, schedules, and training
+artifacts. Ordinary application code should use `TorchLean.Trainer`; optimizer configuration lives
+in the single public namespace `TorchLean.optim`.
 -/
 
 @[expose] public section

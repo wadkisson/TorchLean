@@ -176,6 +176,63 @@ lemma roundShiftRightEven_le_shiftRightCeilPow2 (n shift : Nat) :
         simpa [q] using (roundShiftRightEven_le_shiftRight_add1 (n := n) (shift := shift))
       simpa [hceilq1] using hle
 
+/--
+If nearest-even shift rounding returns the positive integer `r`, then the unrounded numerator is
+strictly larger than `(r - 1) * 2^shift`.
+
+The strict inequality matters at the top of the binary32 range: a rounded significand of `2^24`
+must come from a value strictly above the largest 24-bit significand `2^24 - 1`.
+-/
+theorem pred_mul_pow2_lt_of_roundShiftRightEven_eq (n shift r : Nat)
+    (hr : roundShiftRightEven n shift = r) (hrpos : 0 < r) :
+    (r - 1) * pow2 shift < n := by
+  classical
+  by_cases hshift : shift = 0
+  · subst shift
+    have hr' : n = r := by simpa [roundShiftRightEven] using hr
+    subst r
+    simp [pow2]
+    grind
+  · let q := Nat.shiftRight n shift
+    let d := pow2 shift
+    have hdpos : 0 < d := pow2_pos shift
+    have hqdle : q * d ≤ n := by
+      simpa [q, d, Nat.shiftRight_eq_div_pow, pow2_eq_two_pow] using
+        (Nat.div_mul_le_self n (2 ^ shift))
+    rcases roundShiftRightEven_eq_shiftRight_or_shiftRight_add1 n shift with hfloor | hceil
+    · have hrq : r = q := hr.symm.trans (by simpa [q] using hfloor)
+      rw [hrq] at hrpos ⊢
+      have hqpos : 0 < q := hrpos
+      exact
+        (Nat.mul_lt_mul_of_pos_right (Nat.pred_lt (Nat.ne_of_gt hqpos)) hdpos).trans_le hqdle
+    · have hrq : r = q + 1 := hr.symm.trans (by simpa [q] using hceil)
+      rw [hrq] at hrpos ⊢
+      have hqdlt : q * d < n := by
+        apply lt_of_le_of_ne hqdle
+        intro heq
+        have hshiftb : (shift == 0) = false := by simp [hshift]
+        have hshiftLeft : Nat.shiftLeft q shift = n := by
+          simpa [d, Nat.shiftLeft_eq, pow2_eq_two_pow] using heq
+        have hshiftLeft' : Nat.shiftLeft (Nat.shiftRight n shift) shift = n := by
+          simpa [q] using hshiftLeft
+        have hrem : n - Nat.shiftLeft (Nat.shiftRight n shift) shift = 0 := by
+          rw [hshiftLeft']
+          simp
+        have hhalfPos : 0 < pow2 (shift - 1) := pow2_pos (shift - 1)
+        let rem := n - Nat.shiftLeft q shift
+        have hrem0 : rem = 0 := by simpa [rem, q] using hrem
+        have hdef :
+            roundShiftRightEven n shift =
+              if rem < pow2 (shift - 1) then q
+              else if rem > pow2 (shift - 1) then q + 1
+              else if q % 2 = 0 then q else q + 1 := by
+          simp (config := { zeta := true }) [roundShiftRightEven, hshiftb, q, rem]
+        have hroundq : roundShiftRightEven n shift = q := by
+          rw [hdef]
+          simp [hrem0, hhalfPos]
+        grind
+      simpa using hqdlt
+
 /-- Convenience bundling of the lower+upper bounds used most often downstream. -/
 lemma shiftRight_le_roundShiftRightEven_le_shiftRightCeilPow2 (n shift : Nat) :
     Nat.shiftRight n shift ≤ roundShiftRightEven n shift ∧

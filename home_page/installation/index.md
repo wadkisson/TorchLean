@@ -55,7 +55,7 @@ architecture but still need platform-specific runtime work.
 
 | Platform | CPU | NVIDIA GPU | LibTorch provider | Current status |
 | --- | --- | --- | --- | --- |
-| Linux | &#10003; | &#10003; Native CUDA | Standalone CUDA SDPA bridge test | Supported; LibTorch eager dispatch is not wired |
+| Linux | &#10003; | &#10003; Native CUDA | SDPA forward with TorchLean backward | Supported |
 | macOS, Intel or Apple silicon | &#10003; | Not applicable | Not yet | CPU supported; Metal is planned |
 | Windows with WSL2 | &#10003; Linux path | &#10003; CUDA on WSL2 | Linux path | Recommended Windows setup |
 | Native Windows | Bring-up target | Not validated | Not wired | Backend target exists; native toolchain work remains |
@@ -128,8 +128,11 @@ lake -R -K cuda=true -K libtorch=true \
   -K libtorch_home=/absolute/path/to/libtorch exe libtorch_sdpa_test
 ```
 
-This enables one registered external provider. It does not route every TorchLean operation through
-PyTorch, and it does not make LibTorch part of Lean's trusted kernel.
+This enables one registered external provider. With the `libtorch_forward_cuda` profile,
+scaled-dot-product attention uses LibTorch for its forward value while the surrounding operations
+continue through TorchLean's native CUDA providers. TorchLean records the attention node and applies
+its own local VJP during backward. It does not route every operation through PyTorch, and it does
+not make LibTorch part of Lean's trusted kernel.
 
 ## macOS
 
@@ -248,14 +251,18 @@ def nativeFlashAttention : KernelCapsule :=
     op := .scaledDotProductAttention
     provider := .nativeCuda
     device := .cuda
-    specName := "Spec.flashAttention"
     trustLevel := .checked
     supportsForward := true
     vjpMode := .backendVJP
     shapeContract := ...
     layoutContract := ...
     valueContract := ...
-    vjpContract := ... }
+    vjpContract := ...
+    numericalPolicy :=
+      { rounding := .nearestEven
+        subnormals := .implementationDefined
+        contraction := .fused
+        reduction := .implementationDefined } }
 ```
 
 Each contract field contains a structured claim rather than a free-form success label. For example,
@@ -274,7 +281,7 @@ promoted to a theorem by placing it in the record.
 The planner also checks that the shape, layout, value, and VJP fields contain the corresponding claim
 for the capsule's operation. A proof attached to the wrong field is rejected. For theorem and checker
 evidence, the capsule author is still responsible for stating the exact Lean proposition represented
-by the structured claim; `specName` is an audit label, not a theorem by itself.
+by the structured claim. A summary or source name is documentation, not a theorem by itself.
 
 The record answers questions that are otherwise easy to lose in runtime plumbing:
 
@@ -282,16 +289,30 @@ The record answers questions that are otherwise easy to lose in runtime plumbing
 | --- | --- |
 | `op` | Which graph operation does this implementation claim to execute? |
 | `provider`, `device` | Which runtime family and hardware target may select it? |
-| `specName` | Which Lean-level meaning is it expected to refine? |
 | shape and layout contracts | Which dimensions, memory order, mask convention, and payload assumptions are required? |
 | value contract | What supports the forward-value claim? |
 | VJP mode and contract | Who computes the local gradient, and what supports that claim? |
-| runtime support | Is the path executable, test-only, planner-only, or not wired yet? |
 | trust level | Is the evidence proof-backed, checked, fuzzed, or an external assumption? |
+| numerical policy | Which rounding, subnormal, contraction, and reduction conventions does execution use? |
 
-Capsules are declared in the source registry. They are not invented after a run to make its backend
-look acceptable. The planner selects an existing capsule whose device, provider, gradient mode, and
-trust level satisfy the requested profile. Missing or inadmissible capsules cause planning to fail.
+The operation tag records a semantic family such as convolution, pooling, reduction, or matrix
+multiplication. Rank, axes, strides, padding, and index tensors stay in the graph payload and its
+shape proofs. A provider therefore registers one capability for a family instead of separate
+capsules for every rank-specific helper name.
+
+The numerical policy is not a proof that the kernel follows those conventions. It is the convention
+claimed by the capsule and retained in the execution audit. A theorem or checker still has to
+justify any numerical conclusion drawn from it. In particular, the graph interval checker accepts
+its fixed-left reduction transfer only for capsules that advertise `.fixedLeft`; CUDA, cuBLAS,
+cuDNN, and LibTorch reductions need an order-independent or backend-specific bound.
+
+Capsules are declared in named source modules. They are not invented after a run to make its backend
+look acceptable. Built-in operation and provider modules are flattened into the planner registry;
+downstream code can extend a profile with `BackendProfile.withCapsuleModules`. Model architectures
+do not register backends themselves: they lower to operations, and the planner selects an existing
+capsule whose device, provider, gradient mode, and trust level satisfy the requested profile.
+Adding a module with an existing name replaces the earlier contribution. Duplicate module names,
+duplicate capsule identities, and missing or inadmissible capsules cause planning to fail.
 
 ## Where The Theorems Enter
 
@@ -325,7 +346,7 @@ Proof and checker evidence carry their Lean proof terms. Source files, native sy
 guards, regression suites, and fuzz runs are recorded separately. They remain useful audit
 information, but strict acceptance does not treat them as theorems.
 
-## Planning And Trust Policies
+## Planning And Assurance Policies
 
 For each backend-visible graph operation, TorchLean follows the same sequence:
 
@@ -348,13 +369,25 @@ The maintained profiles currently have these meanings:
 | --- | --- | --- | --- |
 | `checked_cpu` | Reference CPU runtime | TorchLean tape | Implemented |
 | `checked_cuda` | Native CUDA, cuBLAS, cuFFT | TorchLean tape or named backend VJP | Implemented |
-| `libtorch_forward_cuda` | Selected LibTorch forward capsules | TorchLean tape | Registered selectively; not a universal dispatcher |
-| `libtorch_autograd_cuda` | Selected LibTorch capsules | External autograd | Explicit larger trust boundary |
-| `future_*` | Metal, ROCm, WebGPU, XLA, Neuron, custom providers | Provider-specific | Extension targets, not implemented runtimes |
+| `libtorch_forward_cuda` | Prefer registered LibTorch forward capsules, otherwise native CUDA | TorchLean tape | Implemented for scaled-dot-product attention |
 
-The default CUDA profile does not silently choose LibTorch. LibTorch SDPA remains `testOnly` until
-its capsule is connected to eager multi-head attention. External providers must be enabled
-explicitly and remain visible in the backend report.
+The default CUDA profile does not silently choose LibTorch. The LibTorch-forward profile is the
+hybrid training path: it prefers a registered LibTorch forward capsule and uses native CUDA for
+other operations. External providers must be enabled explicitly and remain visible in the backend
+report.
+
+Programmatic training code selects the complete profile as one value:
+
+```lean
+let run :=
+  ({} : TorchLean.Trainer.RunConfig)
+    |>.withBackendProfile NN.Backend.BackendProfile.libTorchForwardCuda
+    |>.withBackendReport
+```
+
+This sets the device, provider preference, assurance policy, VJP ownership, and registry together.
+Calling `withDevice` later selects the maintained profile for the new device, so a stale CUDA policy
+cannot survive a device change.
 
 The corresponding Lean definitions are in
 [`NN.Backend.Capsule`]({{ '/docs/NN/Backend/Capsule.html' | relative_url }}),

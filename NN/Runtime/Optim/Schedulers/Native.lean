@@ -11,35 +11,12 @@ public import NN.Runtime.Optim.Schedulers.Core
 /-!
 # Native Learning-Rate Schedulers
 
-Learning-rate schedulers for TorchLean runtime training.
+TorchLean-native schedules with explicit state and total formulas. Zero-length warmup or cycle
+phases have defined fallback behavior, which makes the schedules convenient for direct execution
+and theorem statements. `currentStep` is zero-indexed and `step` advances it once.
 
-Schedulers are small deterministic state machines that answer:
-
-- “what learning rate should we use *at this step*?”
-- “how do we advance to the next step?”
-
-TorchLean keeps schedulers explicit and pure so:
-- runtime code can store scheduler state in a record (or serialize it),
-- proofs and specs can refer to the exact schedule that was used.
-
-Step counter convention:
-- `currentStep` is **0-indexed**. The first call to `getLr` uses `currentStep = 0`.
-- `step` increments the counter by 1.
-
-PyTorch analogy: these mirror common `torch.optim.lr_scheduler.*` schedules, but expressed as
-simple Lean structures with `getLr` and `step`.
-
-These schedules use total formulas designed for direct execution and proof. Their state is explicit,
-and zero-length phases have documented fallback behavior.
-
-References (common schedules we implement):
-- Cosine annealing / SGDR (Loshchilov–Hutter, 2017): https://arxiv.org/abs/1608.03983
-- Cyclical learning rates (Smith, 2017): https://arxiv.org/abs/1506.01186
-- 1cycle policy (Smith, 2018): https://arxiv.org/abs/1803.09820
-
-PyTorch references:
-- `torch.optim.lr_scheduler` overview:
-  https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+`Schedulers.Core` documents the shared arithmetic, state convention, and literature. Use the
+separate `PyTorch` module when exact PyTorch phase and step-count behavior is required.
 -/
 
 @[expose] public section

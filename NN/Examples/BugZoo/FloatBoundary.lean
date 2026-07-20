@@ -46,14 +46,14 @@ Floating-point deployment semantics are either modeled by `IEEE32Exec` or isolat
 obligation.
 -/
 theorem runtimeFloat32_add_rewrites_to_ieee32
-    [RuntimeFloat32MatchesIEEE32Exec] (a b : F32) :
+    [RuntimeFloat32MatchesIEEE32Exec] (a b : _root_.Float32) :
     toIEEE32Exec (a + b) =
       IEEE32Exec.add (toIEEE32Exec a) (toIEEE32Exec b) :=
   RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_add a b
 
 /-- The same boundary is available for division, where invalid-domain bugs often surface first. -/
 theorem runtimeFloat32_div_rewrites_to_ieee32
-    [RuntimeFloat32MatchesIEEE32Exec] (a b : F32) :
+    [RuntimeFloat32MatchesIEEE32Exec] (a b : _root_.Float32) :
     toIEEE32Exec (a / b) =
       IEEE32Exec.div (toIEEE32Exec a) (toIEEE32Exec b) :=
   RuntimeFloat32MatchesIEEE32Exec.toIEEE32Exec_div a b
