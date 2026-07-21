@@ -57,40 +57,20 @@ shortTitle := "TorchLean"
 tag := "torchlean"
 %%%
 
-Most machine-learning projects begin in a familiar way: define a model, prepare some data, train,
-and inspect the result. That is enough to answer many practical questions. It tells us whether the
-loss decreased, how the model behaved on a test set, and whether a larger architecture or a longer
-run might help.
+TorchLean is a Lean 4 library for writing, training, and verifying neural networks. Models use
+shape-typed tensors, run through an executable runtime, and lower to an operation graph with
+explicit parameter payloads. Mathematical operator specifications live beside the code that uses
+them. When execution delegates to CUDA or LibTorch, the selected provider and its trust boundary
+remain visible.
 
-The difficulty begins when a numerical result is turned into a mathematical claim. By that point,
-the model may have changed form several times. The source program became initialized parameters;
-the parameters moved into runtime buffers; the runtime constructed an autograd tape; an exporter
-produced a graph; and a verifier read that graph together with its own assumptions about shapes,
-arithmetic, and the input domain. Each representation is useful, but they are not interchangeable.
-A successful training run alone does not tell us that every later tool analyzed the intended
-function.
+The running example is a small nonlinear regression network. It begins as a typed model, acquires
+concrete parameters during initialization and training, records an autograd tape, and lowers to the
+graph read by verification passes. Following those representations in order makes it possible to
+see exactly which object a theorem, certificate, or runtime result describes.
 
-TorchLean brings these stages into Lean 4. Models are written with shape-typed tensors, trained
-through an executable runtime, and lowered to an operation graph with explicit parameter payloads.
-The mathematical specification of an operator lives alongside the code that uses it. When a
-backend delegates work to native CUDA or LibTorch, the selected provider and its trust boundary
-remain part of the account of what ran.
-
-This does not require every numerical kernel to be reimplemented inside the theorem prover.
-Established accelerator libraries can still do the expensive work. Lean is used to state the model,
-record the translation into executable forms, check structural conditions, and prove the parts of
-the argument for which a theorem is available. Where an external implementation remains trusted,
-the boundary is named rather than hidden behind a generic call to a GPU.
-
-The result is a library that can be used at several levels. A new user can write and train a small
-network without first developing a proof. A verification project can inspect the lowered graph and
-establish a property over an input region. A numerical analysis can compare ideal real-valued
-semantics with finite-precision execution. These uses share definitions, but they ask different
-questions and therefore provide different kinds of evidence.
-
-We will learn the library by following one small nonlinear regression model. First we write and
-train it. Then we open it up: parameters, autograd tape, graph IR, floating-point behavior, and
-verification bounds. Once that example is familiar, we will use the same ideas for transformers,
+Later chapters develop the numerical and proof layers in detail: generic floating-point formats,
+executable binary32 arithmetic, runtime-approximation bounds, IBP and CROWN, checked certificates,
+and the interfaces to native kernels. The applications then use these tools with transformers,
 ResNets, Fourier neural operators, generative models, reinforcement learning, and scientific ML.
 
 The examples are meant to be run from the repository root. No theorem-proving background is needed

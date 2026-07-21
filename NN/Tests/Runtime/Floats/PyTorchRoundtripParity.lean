@@ -12,7 +12,7 @@ public import NN.Tensor
 public import NN.Examples.Interop.PyTorch.CNN.Import
 public import NN.Examples.Interop.PyTorch.MLP.Import
 public import NN.Examples.Interop.PyTorch.Transformer.Import
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Spec.Models.Cnn
 public import NN.Tests.Runtime.Floats.Utils
 
@@ -35,7 +35,7 @@ namespace Floats
 namespace PyTorchRoundtripParity
 
 def workDir : System.FilePath :=
-  Runtime.External.Process.artifactWorkDir "pytorch_roundtrip_parity"
+  TorchLean.External.Process.artifactWorkDir "pytorch_roundtrip_parity"
 
 def parityScriptPath : System.FilePath :=
   workDir / "compute_parity.py"
@@ -189,7 +189,7 @@ def run : IO Unit := do
     return ()
   IO.FS.createDirAll workDir
   IO.FS.writeFile parityScriptPath parityScript
-  let out ← Runtime.External.Process.runStdoutChecked
+  let out ← TorchLean.External.Process.runStdoutChecked
     (ctx := "pytorch_roundtrip_parity")
     (cmd := "python3")
     (args := #[parityScriptPath.toString])

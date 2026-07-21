@@ -33,10 +33,10 @@ def PCAModuleSpec {inDim outDim : Nat} (m : PCASpec α inDim outDim) :
   forward := pcaForwardSpec m,
   kind := "PCA",
   export_func := {
-    toPyTorch := s!"nn.Linear({inDim}, {outDim}, bias=False)",
+    -- Centering contributes the affine bias `-components * mean`.
+    toPyTorch := s!"nn.Linear({inDim}, {outDim}, bias=True)",
     dimensions := (inDim, outDim)
   }
 }
 
 end Spec
-

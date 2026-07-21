@@ -1,6 +1,10 @@
-name: CI (manual build + tests)
+name: CI
 
 on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       run_slow_proofs:
@@ -49,7 +53,7 @@ jobs:
   slow_proofs:
     name: CI (slow proofs)
     runs-on: ubuntu-latest
-    if: ${{ inputs.run_slow_proofs }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_slow_proofs }}
     timeout-minutes: 120
     steps:
       - name: Checkout

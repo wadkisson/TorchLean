@@ -6,6 +6,7 @@ Authors: TorchLean Team
 
 module
 
+public import NN.MLTheory.CROWN.BoundOps
 public import NN.Verification.Util.Json
 
 /-!
@@ -15,7 +16,7 @@ This module contains the benchmark-independent part of the VNN-COMP artifact bou
 
 - an input box plus a disjunction-of-conjunctions output spec,
 - a JSON loader for the compact `vnnlib_suite_v0_1` export format,
-- the interval-box refutation check used by VNN-COMP style safety certificates.
+- the outward-rounded interval-box refutation check used by the executable VNN-COMP runner.
 
 Model-specific checkers, such as MNIST-FC, build a graph and output bounds. The arithmetic for
 interpreting the VNNLIB rows lives here.
@@ -28,6 +29,7 @@ namespace NN.Verification.VNNComp.VNNLib
 open Lean
 open Json
 open NN.Verification.Json
+open NN.MLTheory.CROWN
 
 /-- One conjunction term `mat * y <= rhs` in a VNNLIB disjunction. -/
 abbrev Term := Array (Array Float) × Array Float
@@ -96,19 +98,12 @@ def rowLowerBoundOnBox? (row yLo yHi : Array Float) : Option Float :=
           have h : j.1 < yHi.size := by
             simp [hHi, j.2]
           yHi[j.1]'h
-        acc + min (a * lo) (a * hi)) 0.0
+        BoundOps.addDown acc
+          (min (BoundOps.mulDown a lo) (BoundOps.mulDown a hi))) 0.0
     else
       none
   else
     none
-
-/--
-Lower-bound one linear row, returning `0` when the row and interval dimensions do not match.
-
-Use `rowLowerBoundOnBox?` at checker boundaries when mismatch must be reported explicitly.
--/
-def rowLowerBoundOnBox (row yLo yHi : Array Float) : Float :=
-  (rowLowerBoundOnBox? row yLo yHi).getD 0.0
 
 /-- Check whether a conjunction term is refuted by the output interval box. -/
 def termRefutedByOutputBox (yLo yHi : Array Float) (term : Term) : Bool :=
@@ -137,6 +132,8 @@ Check whether an unsafe VNNLIB spec is refuted by an output interval box.
 
 The spec is a disjunction of conjunctions. To prove the unsafe region is empty, every disjunct must
 be refuted. For a conjunction, it is enough for one row lower bound to exceed its right-hand side.
+This executable predicate uses the explicit host-`Float` `BoundOps` boundary; its Boolean result is
+not itself a Lean theorem about real-valued graph semantics.
 -/
 def refutedByOutputBox (yLo yHi : Array Float) (spec : Spec) : Bool :=
   spec.all (termRefutedByOutputBox yLo yHi)

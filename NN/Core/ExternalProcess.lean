@@ -10,7 +10,7 @@ public import Lean.Data.Json
 import Lean
 
 /-!
-# External process helpers
+# External Process Helpers
 
 TorchLean frequently calls out to external tools (Python, Julia, ...), typically in the
 “untrusted producer, trusted checker” pattern:
@@ -29,7 +29,7 @@ keeps subprocess handling consistent and non-duplicated.
 
 @[expose] public section
 
-namespace Runtime
+namespace TorchLean
 namespace External
 namespace Process
 
@@ -154,4 +154,4 @@ def runJsonStdoutChecked (ctx : String)
 
 end Process
 end External
-end Runtime
+end TorchLean

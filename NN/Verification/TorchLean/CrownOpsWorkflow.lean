@@ -77,7 +77,7 @@ Run the softmax workflow under a chosen scalar backend `α`.
 This compiles the TorchLean model to the verifier IR and prints IBP/CROWN bounds.
 -/
 def runSoftmax {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] : IO Unit := do
   IO.println "== Workflow 1: linear -> softmax (vector) =="
   let cast : Float → α := Runtime.ofFloat
 
@@ -183,7 +183,7 @@ This compiles the TorchLean forwardProgram to the verifier IR and prints IBP/CRO
   loss.
 -/
 def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] : IO Unit := do
   IO.println "== Workflow 2: linear -> mse_loss (scalar) =="
   let cast : Float → α := Runtime.ofFloat
 
@@ -238,7 +238,7 @@ def runMSE {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToS
 
 /-- Run all CROWN-ops workflows (softmax + mse_loss) under a chosen scalar backend `α`. -/
 def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] : IO Unit := do
   runSoftmax (α := α)
   IO.println ""
   runMSE (α := α)
@@ -249,7 +249,8 @@ CLI entry point for the CROWN-ops workflow.
 This is wired into `lake exe verify -- torchlean-crown-ops`.
 -/
 def main (args : List String) : IO Unit :=
-  Runtime.runWithDType "TorchLean → IR → IBP + CROWN (ops: softmax/mse_loss)" args
+  NN.Verification.TorchLean.runWithBoundDType
+    "TorchLean → IR → IBP + CROWN (ops: softmax/mse_loss)" args
     (@runOnce)
 
 end NN.Verification.TorchLean.CrownOpsWorkflow

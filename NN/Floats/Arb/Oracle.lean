@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import Lean.Data.Json
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 import Lean
 
 /-!
@@ -173,7 +173,7 @@ back to the provided `pythonCmd` (default: `"python3"`).
 -/
 def resolvePythonCmd (pythonCmd : String) : IO String := do
   -- Allow a project-wide override for non-default python environments.
-  Runtime.External.Process.resolveCmdFromEnv "TORCHLEAN_ARB_PY" pythonCmd
+  TorchLean.External.Process.resolveCmdFromEnv "TORCHLEAN_ARB_PY" pythonCmd
 
 /--
 Run the oracle script as a subprocess and parse its stdout as JSON.
@@ -182,7 +182,7 @@ This is the shared IO boundary used by both unary queries and general JSON reque
 -/
 def runPythonJson (pythonCmd : String) (args : Array String) : IO Json := do
   let pythonCmd ← resolvePythonCmd pythonCmd
-  Runtime.External.Process.runJsonStdoutChecked (ctx := "Arb oracle")
+  TorchLean.External.Process.runJsonStdoutChecked (ctx := "Arb oracle")
     (cmd := pythonCmd) (args := args) (cwd := some ".")
 
 /-- Internal JSON helper: interpret a JSON string as a `String`, or return an error. -/

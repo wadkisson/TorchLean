@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Runtime.External.Julia
 
 /-!
@@ -20,7 +20,7 @@ trusted. This is the same “untrusted producer, trusted checker” boundary use
 Julia examples, PyTorch export runtime checks, and future certificate-producing tools.
 
 This umbrella re-exports:
-- `NN.Runtime.External.Process`, the generic subprocess/JSON/availability utilities; and
+- `NN.Core.ExternalProcess`, the generic subprocess/JSON/availability utilities; and
 - `NN.Runtime.External.Julia`, the optional Julia wrapper.
 
 Importing this file does not require Python, Julia, or any other external executable to be

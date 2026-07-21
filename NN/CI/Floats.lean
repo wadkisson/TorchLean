@@ -18,7 +18,7 @@ public import NN.Floats.FP32
 public import NN.Floats.FP32.Core
 public import NN.Floats.FP32.Error
 public import NN.Floats.FP32.Notation
-public import NN.Floats.FP32.RuntimeApprox
+public import NN.Proofs.RuntimeApprox.FP32
 public import NN.Floats.Float32
 public import NN.Floats.IEEEExec
 public import NN.Floats.IEEEExec.Bridge

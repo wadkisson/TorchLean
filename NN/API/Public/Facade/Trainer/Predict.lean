@@ -93,7 +93,7 @@ def Handle.predict {σ τ : Shape} (trainer : Handle σ τ) (x : Tensor.T Float 
   | .regression reduction =>
       let impl := Implementation.regressionHandle trainer reduction
       Implementation.Regression.Internal.withRunnerFromRunConfig impl impl.runConfig
-        (fun {_} _ _ _ _ _ runner => Implementation.predictWithRunner runner x)
+        (fun {_} _ _ _ _ _ _ runner => Implementation.predictWithRunner runner x)
   | .classification reduction =>
       let impl := Implementation.crossEntropyHandle trainer reduction
       Implementation.CrossEntropy.Internal.withRunnerFromRunConfig impl impl.runConfig

@@ -16,9 +16,9 @@ public import Lean.Data.Json
 
 Per-node IBP certificate checking.
 
-This is stronger than `NN.Verification.IBPCert`: instead of only comparing the final output bounds,
-we check that *every node*'s bounds match what Lean's `propagateIBPNode` computes from the
-certificate bounds of its parents (plus the `ParamStore` parameters).
+Lean first computes the complete interval trace from the trusted input boxes and parameters. The
+untrusted artifact is then checked against that trace. In particular, no node is ever recomputed
+from certificate-supplied parent boxes.
 
 Intended certificate JSON format:
 
@@ -37,7 +37,8 @@ length equal to that node's flattened output dimension `g.nodes[i]!.outShape.siz
 
 Trust boundary note:
 - The certificate is untrusted; we accept it only if Lean recomputation matches.
-- We allow a small tolerance due to decimal serialization in JSON.
+- A certificate interval must contain the Lean-recomputed interval componentwise. Decimal
+  serialization may widen an endpoint, but it may not move an endpoint inward.
 -/
 
 @[expose] public section
@@ -53,13 +54,15 @@ open Import.PyTorch
 open _root_.Spec
 open _root_.Spec.Tensor
 open Lean Data Json
+open TorchLean.Floats.IEEE754
 
 /-- Read an IBP node certificate from JSON on disk. -/
-def readIBPNodeCertificate (g : Graph) (path : String) : IO (Array (Option (FlatBox Float))) := do
+def readIBPNodeCertificate (g : Graph) (path : String) :
+    IO (Array (Option (FlatBox IEEE32Exec))) := do
   let topObj ← readJsonObjectFile path
   let arr ← expectFieldArray topObj "ibp" "top-level"
   if hSize : arr.size = g.nodes.size then
-    let mut out : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
+    let mut out : Array (Option (FlatBox IEEE32Exec)) := Array.mkEmpty g.nodes.size
     for i in List.finRange g.nodes.size do
       let node := g.nodes[i.val]'i.isLt
       let hArr : i.val < arr.size := by
@@ -72,38 +75,30 @@ def readIBPNodeCertificate (g : Graph) (path : String) : IO (Array (Option (Flat
   else
     throw <| IO.userError s!"ibp array length {arr.size} ≠ g.nodes.size {g.nodes.size}"
 
-/-- Check the local IBP enclosure condition for one node against a certificate entry. -/
-def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (FlatBox Float)))
-    (id : Nat) (tol : Float) : IO Bool := do
+/-- Check one artifact entry against the authoritative Lean IBP trace. -/
+def checkIBPNode (g : Graph)
+    (authoritative cert : Array (Option (FlatBox IEEE32Exec))) (id : Nat) : IO Bool := do
   let some node := g.nodes[id]?
     | IO.eprintln s!"[IBPNodeCert] node {id}: out of bounds for graph with {g.nodes.size} nodes"
       pure false
-  let needsParents :=
-    match node.kind with
-    | .input | .const _ => false
-    | _ => true
-  if needsParents && !(parentsOk g cert id) then
-    IO.eprintln s!"[IBPNodeCert] node {id}: parent boxes missing or not topo"
-    return false
-  if !(ibpNodePreconditionsOk g cert id) then
+  if !(ibpNodePreconditionsOk g authoritative id) then
     IO.eprintln
-      s!"[IBPNodeCert] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
+      s!"[IBPNodeCert] node {id}: authoritative trace violates shape/domain preconditions for {repr node.kind}"
     return false
   let certBox? :=
     match cert[id]? with
     | some entry => entry
     | none => none
-  let computed := propagateIBPNode (α := Float) g.nodes ps cert id
-  let computedBox? :=
-    match computed[id]? with
+  let authoritativeBox? :=
+    match authoritative[id]? with
     | some entry => entry
     | none => none
-  match certBox?, computedBox? with
+  match certBox?, authoritativeBox? with
   | none, _ =>
       IO.eprintln s!"[IBPNodeCert] node {id}: certificate missing (null)"
       pure false
   | _, none =>
-      IO.eprintln s!"[IBPNodeCert] node {id}: Lean propagation produced no box"
+      IO.eprintln s!"[IBPNodeCert] node {id}: authoritative Lean trace has no box"
       pure false
   | some certBox, some leanBox =>
       if certBox.dim ≠ node.outShape.size then
@@ -114,10 +109,10 @@ def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (Flat
         IO.eprintln
           s!"[IBPNodeCert] node {id}: Lean dim {leanBox.dim} ≠ outShape.size {node.outShape.size}"
         pure false
-      else if approxEqFlatBox certBox leanBox tol then
+      else if flatBoxContains certBox leanBox then
         pure true
       else
-        IO.eprintln s!"[IBPNodeCert] mismatch at node {id} ({repr node.kind})"
+        IO.eprintln s!"[IBPNodeCert] inward or mismatched bound at node {id} ({repr node.kind})"
         IO.eprintln s!"  cert: {prettyFlatBox certBox}"
         IO.eprintln s!"  lean: {prettyFlatBox leanBox}"
         pure false
@@ -125,18 +120,19 @@ def checkIBPNode (g : Graph) (ps : ParamStore Float) (cert : Array (Option (Flat
 /--
 Check a per-node IBP certificate against Lean's graph IBP propagation rules.
 
-Returns `true` iff every node's certificate bounds agree (within `tol`) with what Lean computes
-from the certificate parents + `ParamStore`.
+Returns `true` iff every node's certificate interval contains the interval recomputed from trusted
+inputs and parameters.
 -/
-def checkIBPNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) (tol : Float := 1e-5) : IO Bool :=
+def checkIBPNodeCertificate (g : Graph) (ps : ParamStore IEEE32Exec) (path : String) : IO Bool :=
   do
   let cert ← readIBPNodeCertificate g path
+  let authoritative := runIBP (α := IEEE32Exec) g ps
   let mut ok := true
   for id in [0:g.nodes.size] do
-    let okNode ← checkIBPNode g ps cert id tol
+    let okNode ← checkIBPNode g authoritative cert id
     ok := ok && okNode
   if ok then
-    IO.println "[IBPNodeCert] artifact replay matched Lean propagation at every node."
+    IO.println "[IBPNodeCert] every artifact interval encloses the authoritative Lean trace."
   pure ok
 
 end NN.Verification.IBPNodeCert

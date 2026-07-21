@@ -75,12 +75,17 @@ results below are new formal developments rather than forwarding wrappers.
 
 ### Floating-Point Semantics
 
-The floating-point work had grown in several directions at once. It now sits under
-`NN.Floats.NeuralFloat`, organized by format, rounding, scalar operations, analysis, error bounds,
-and execution policy. The library covers radix and exponent formats, directed and nearest
-rounding, round-to-odd, ULPs and neighboring values, double rounding, Sterbenz subtraction, and
-absolute and relative error bounds. Flocq influenced this organization, but this is a native Lean
-development rather than a port of the whole Coq library.
+The floating-point library now has a strict numerical boundary. `import NN.Floats` provides formats,
+rounding, finite binary32 semantics, executable IEEE binary32 operations, interval rounders, and
+scalar quantization without importing tensors, models, autograd, CUDA, certificate checkers, or
+external tools. Tensor and proof integrations live above that boundary, while optional Arb checks
+require an explicit import.
+
+The generic development under `NN.Floats.NeuralFloat` is organized by format, rounding, scalar
+operations, analysis, error bounds, and execution policy. It covers radix and exponent formats,
+directed and nearest rounding, round-to-odd, ULPs and neighboring values, double rounding, Sterbenz
+subtraction, and absolute and relative error bounds. Flocq influenced this organization, but this
+is a native Lean development rather than a port of the whole Coq library.
 
 Sterbenz subtraction now covers gradual underflow and has a binary32 specialization. Every finite
 `IEEE32Exec` bit pattern is proved representable in that specification, so the executable Sterbenz
@@ -150,12 +155,12 @@ attributing autograd semantics to a forward-only lowering.
 
 ### Tensor Quantization
 
-Uniform affine quantization now has one scalar definition and one rank-polymorphic tensor lift under
-`NN.Floats.Quantization`. The proofs cover code-range preservation, monotonicity, exact
-dequantize/quantize round trips for in-range integer tensors, and the half-step reconstruction bound
-when saturation is inactive. Layout and storage width are not part of the arithmetic: int8, uint8,
-int4, and custom code sets differ through their integer bounds rather than separate image-specific
-APIs.
+Uniform affine quantization has one scalar definition under `NN.Floats.Quantization` and one
+rank-polymorphic tensor adapter under `NN.Spec.Quantization`. The proofs cover code-range
+preservation, monotonicity, exact dequantize/quantize round trips for in-range integer tensors, and
+the half-step reconstruction bound when saturation is inactive. Layout and storage width are not
+part of the arithmetic: int8, uint8, int4, and custom code sets differ through their integer bounds
+rather than separate image-specific APIs.
 
 ### Backend Contracts
 
@@ -209,19 +214,39 @@ requested provider is unavailable, TorchLean reports that fact instead of silent
   <section>
     <h3>Certificates</h3>
     <p>
-      JSON certificate readers reject non-finite claims before array comparisons. CROWN, IBP,
-      payload, graph-evaluation, robustness, PINN, and geometry checkers state their preconditions
-      at the boundary where external artifacts become Lean objects.
+      JSON certificate readers reject non-finite claims before array comparisons. IBP certificates
+      are checked by recomputing the complete <code>IEEE32Exec</code> trace from the trusted graph,
+      parameters, and input box; an artifact may widen that trace but may not shrink it. CROWN and
+      α,β-CROWN affine entries are compared exactly with a sequential replay instead of being
+      propagated from certificate-supplied parents.
     </p>
   </section>
   <section>
     <h3>Classical models</h3>
     <p>
-      The PCA reference fitter now says exactly what it computes: one approximate leading
-      component from power iteration, with a normalized fallback for constant data. Raw covariance
-      eigenvalues are called explained variance rather than explained-variance ratios. The linear
-      SVM trainer materializes its weight vector after each update, preventing a lazy closure chain
-      from replaying the full optimization history.
+      HMM normalization records zero probability for an impossible observation, and log-likelihood
+      is partial at that boundary. GMM covariance matrices must be symmetric positive definite,
+      mixture weights must be positive and normalized, and singular inversion now fails rather
+      than returning the identity. The covariance gradients use the transpose-correct formulas.
+    </p>
+  </section>
+  <section>
+    <h3>Attention and diffusion</h3>
+    <p>
+      Multi-head attention now reshapes sequence data to
+      <code>(sequence, heads, head-dimension)</code> before exchanging the sequence and head axes.
+      The probability-flow ODE uses the required one-half score coefficient, and its Euler sampler
+      visits time points in descending order from the noisy endpoint.
+    </p>
+  </section>
+  <section>
+    <h3>Layer and model edges</h3>
+    <p>
+      Dropout is the identity in evaluation mode. Max pooling rejects padding configurations that
+      would create windows containing no input values. PCA requires at least two samples for its
+      unbiased covariance and exports the centering term as a linear bias. Linear SVM fitting calls
+      its regularization coefficient <code>lambda</code>, leaving <code>C</code> for the standard
+      inverse-strength convention.
     </p>
   </section>
 </div>

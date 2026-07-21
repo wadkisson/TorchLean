@@ -21,10 +21,10 @@ Public umbrella import for TorchLean's executable certificate checkers.
 These modules define:
 - artifact parsers (JSON → typed structures),
 - recomputation checkers that replay bound propagation inside Lean, and
-- the tolerance discipline used when comparing decimal-serialized floats to Lean recomputation.
+- directional enclosure checks for interval claims and exact binary32 checks for replay
+  transcripts.
 
 Artifacts are treated as untrusted inputs: they only receive credit after passing these checkers.
 -/
 
 @[expose] public section
-

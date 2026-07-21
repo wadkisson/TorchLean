@@ -219,8 +219,6 @@ namespace pca
 abbrev Model := Spec.PCASpec
 @[inherit_doc Spec.pcaForwardSpec]
 abbrev forward := @Spec.pcaForwardSpec
-@[inherit_doc Spec.pcaBatchedForwardSpec]
-abbrev batchForward := @Spec.pcaBatchedForwardSpec
 @[inherit_doc Spec.pcaInverseSpec]
 abbrev inverse := @Spec.pcaInverseSpec
 @[inherit_doc Spec.pcaBackwardSpec]
@@ -231,8 +229,6 @@ abbrev fitLeadingComponentApprox := @Spec.pcaFitLeadingComponentApproxSpec
 abbrev transform := @Spec.pcaTransformSpec
 @[inherit_doc Spec.pcaReconstructionErrorSpec]
 abbrev reconstructionError := @Spec.pcaReconstructionErrorSpec
-@[inherit_doc Spec.pcaExplainedVarianceSpec]
-abbrev explainedVariance := @Spec.pcaExplainedVarianceSpec
 @[inherit_doc Spec.pcaCumulativeExplainedVarianceSpec]
 abbrev cumulativeExplainedVariance := @Spec.pcaCumulativeExplainedVarianceSpec
 

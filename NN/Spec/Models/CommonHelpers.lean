@@ -117,18 +117,17 @@ def determinantSpec {α : Type} [Context α]:
 /--
 Matrix inverse via the adjugate formula (spec-level reference implementation).
 
-If `det(A) == 0`, this returns the identity matrix as a "safe default" for singular matrices.
-Otherwise it computes `adj(A) / det(A)` using cofactors and a transpose.
+The result is `none` when the determinant is zero. Returning an unrelated matrix for a singular
+input would make downstream statistical formulas appear defined when they are not.
 
-PyTorch analogue: `torch.linalg.inv` (but note the singular-case behavior differs).
+PyTorch analogue: `torch.linalg.inv`, with failure represented explicitly by `Option`.
 -/
-def inverseSpec {n : Nat}
+def inverseSpec? {n : Nat}
   (matrix : Tensor α (.dim n (.dim n .scalar))) :
-  Tensor α (.dim n (.dim n .scalar)) :=
+  Option (Tensor α (.dim n (.dim n .scalar))) :=
   let det := Tensor.toScalar (determinantSpec matrix)
   if det == 0 then
-    -- Singular matrix, return identity
-    identityTensorSpec n
+    none
   else
     -- Compute the cofactor matrix `C` and then transpose it to get the adjugate `adj(A) = Cᵀ`.
     --
@@ -142,7 +141,7 @@ def inverseSpec {n : Nat}
           Tensor.scalar (cofactor * minor_det)))
     let adjugate := matrixTransposeSpec cofactors
     -- Scale by 1/det
-    scaleSpec adjugate (1 / det)
+    some (scaleSpec adjugate (1 / det))
 
 /--
 Approximate the leading eigenpair by 20 steps of power iteration.

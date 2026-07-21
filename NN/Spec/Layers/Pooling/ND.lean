@@ -86,8 +86,11 @@ in particular, truncated natural-number subtraction never creates a phantom outp
 -/
 def poolOutSpatialPad {d : Nat} (inSpatial kernel stride padding : Vector Nat d) : Vector Nat d :=
   Vector.ofFn (fun i =>
-    Shape.slidingWindowOutDim
-      (inSpatial.get i) (kernel.get i) (stride.get i) (padding.get i))
+    if inSpatial.get i = 0 || kernel.get i = 0 || padding.get i > kernel.get i / 2 then
+      0
+    else
+      Shape.slidingWindowOutDim
+        (inSpatial.get i) (kernel.get i) (stride.get i) (padding.get i))
 
 /-- Pooling over the complete spatial extent produces one value on every spatial axis. -/
 theorem poolOutSpatialPad_global {d : Nat} (spatial : Vector Nat d)
@@ -185,8 +188,8 @@ Input lookup for hard max-pooling.
 Unlike average pooling, max pooling does not insert numeric zero for an individual padded cell:
 PyTorch's valid max-pool configurations behave as though those cells were `-∞`. TorchLean keeps
 the spec scalar-polymorphic by returning `none` for padded coordinates and ignoring them in the
-max fold. If an entire output window is padding, `maxPoolValue` returns zero; callers claiming
-PyTorch equivalence must rule out that malformed configuration.
+max fold. `poolOutSpatialPad` rejects empty input axes, empty kernels, and padding beyond PyTorch's
+half-kernel restriction, so every emitted output window contains at least one input coordinate.
 -/
 def getPaddedMaxInputVal?
     {d : Nat} {inSpatial : Vector Nat d}
@@ -219,7 +222,7 @@ def maxPoolValue
     | none, _ => best
     | some v, none => some v
     | some v, some b => if v > b then some v else best)
-  -- A generic scalar has no canonical `-∞`; zero is only the totalization for an empty window.
+  -- The default makes this helper total; valid pooling shapes always select an input value.
   best?.getD 0
 
 /--

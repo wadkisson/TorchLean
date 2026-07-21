@@ -8,6 +8,7 @@ module
 
 public import NN.Floats.IEEEExec.Bridge.FP32Total
 public import NN.MLTheory.Proofs.ReLU.Bridge.ReLUMlpBridge
+public import NN.Spec.Core.FloatInstances
 
 /-!
 # Shared IEEE32Exec helpers for approximation theorems

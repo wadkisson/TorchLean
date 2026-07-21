@@ -7,6 +7,8 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.FP32
+public import NN.Floats.Interval.Rounders
+public import NN.MLTheory.CROWN.BoundOps
 public import NN.MLTheory.CROWN.Graph
 
 /-!
@@ -34,6 +36,33 @@ abbrev FP32 := TorchLean.Floats.FP32
 namespace FP32
 
 open NN.MLTheory.CROWN.Graph
+
+/--
+Directed endpoint arithmetic for the rounded-real FP32 model.
+
+Each operation is performed on the underlying real values and rounded directly toward the
+appropriate side of the binary32 grid. The enclosure laws are
+`TorchLean.Floats.Interval.roundDown_le` and `TorchLean.Floats.Interval.le_roundUp`.
+-/
+noncomputable instance : BoundOps FP32 where
+  addDown a b :=
+    ⟨TorchLean.Floats.Interval.roundDown
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val + b.val)⟩
+  addUp a b :=
+    ⟨TorchLean.Floats.Interval.roundUp
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val + b.val)⟩
+  subDown a b :=
+    ⟨TorchLean.Floats.Interval.roundDown
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val - b.val)⟩
+  subUp a b :=
+    ⟨TorchLean.Floats.Interval.roundUp
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val - b.val)⟩
+  mulDown a b :=
+    ⟨TorchLean.Floats.Interval.roundDown
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val * b.val)⟩
+  mulUp a b :=
+    ⟨TorchLean.Floats.Interval.roundUp
+      (β := TorchLean.Floats.binaryRadix) (fexp := TorchLean.Floats.fexp32) (a.val * b.val)⟩
 
 /-- Run IBP over `FP32` graph semantics. -/
 noncomputable def runIBP (g : Graph) (ps : NN.MLTheory.CROWN.Graph.ParamStore FP32) :

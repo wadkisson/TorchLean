@@ -1210,6 +1210,29 @@ def lint_repo(*, fail_on_warn: bool) -> list[Finding]:
                 findings.append(Finding("ERROR", path, line, col, msg))
 
         rel = path.relative_to(REPO_ROOT).as_posix()
+
+        # Keep the numerical library reusable without importing tensors, models, runtimes, or
+        # verification. TorchLean-specific adapters must point into `NN.Floats`, never the reverse.
+        if rel == "NN/Floats.lean" or rel.startswith("NN/Floats/"):
+            for m in re.finditer(
+                r"^\s*(?:public\s+)?import\s+(NN\.[A-Za-z0-9_.]+)\s*$",
+                masked,
+                flags=re.MULTILINE,
+            ):
+                imported = m.group(1)
+                if not (imported == "NN.Floats" or imported.startswith("NN.Floats.")
+                        or imported == "NN.Core" or imported.startswith("NN.Core.")):
+                    line, col = _line_col(text, m.start(1))
+                    findings.append(
+                        Finding(
+                            "ERROR",
+                            path,
+                            line,
+                            col,
+                            f"floating-point core imports `{imported}`; move this integration to the spec, proof, runtime, or verification layer.",
+                        )
+                    )
+
         is_shape_generic_public_api = any(
             rel.startswith(prefix)
             for prefix in (

@@ -12,7 +12,7 @@ public import NN.Floats.IEEEExec.DirectedRoundingSoundness
 public import NN.Floats.IEEEExec.Reductions
 public import NN.Floats.IEEEExec.Rules.SpecialRules
 public import NN.Floats.NeuralFloat.Rounding
-public import NN.Floats.Quantization
+public import NN.Spec.Quantization
 public import NN.Spec.Core.Tensor
 public import NN.Spec.Core.TensorOps
 

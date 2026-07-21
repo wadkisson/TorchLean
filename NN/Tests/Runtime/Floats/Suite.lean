@@ -13,6 +13,7 @@ public import NN.Tests.Runtime.Floats.ONNXBridge
 public import NN.Tests.Runtime.Floats.PINNDerivResidual
 public import NN.Tests.Runtime.Floats.PyTorchRoundtripParity
 public import NN.Tests.Runtime.Floats.RLCheck
+public import NN.Tests.Runtime.Floats.StandaloneImport
 public import NN.Tests.Runtime.Floats.TorchLeanIRExecEquivCheck
 public import NN.Tests.Runtime.Floats.TorchLeanIndexShapeCheck
 public import NN.Tests.Runtime.Floats.TorchLeanOpsCheck
@@ -42,6 +43,7 @@ def run : IO Unit := do
   Tests.Floats.ONNXBridge.run
   Tests.Floats.PyTorchRoundtripParity.run
   Tests.Floats.RLCheck.run
+  Tests.Floats.StandaloneImport.run
   Tests.Floats.PinnDerivResidual.run
   Tests.Floats.TorchLeanOpsCheck.run
   Tests.Floats.TorchLeanIndexShapeCheck.run

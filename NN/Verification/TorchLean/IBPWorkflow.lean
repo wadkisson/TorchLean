@@ -62,7 +62,7 @@ def paramShapes : List Spec.Shape := nn.paramShapes model
 
 /-- Runtime-selected typed runner used by the CLI entrypoint. -/
 def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   let params : nn.ParamTensors α paramShapes :=
     nn.ParamTensors.quad
@@ -99,7 +99,7 @@ CLI entry point for the TorchLean → IR → IBP workflow.
 This is wired into `lake exe verify -- torchlean-ibp`.
 -/
 def main (args : List String) : IO Unit := do
-  Runtime.runWithDType "TorchLean → IR → IBP (small MLP)" args
+  NN.Verification.TorchLean.runWithBoundDType "TorchLean → IR → IBP (small MLP)" args
     (@runMain)
 
 end NN.Verification.TorchLean.IBPWorkflow

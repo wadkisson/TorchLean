@@ -12,7 +12,7 @@ public import NN.API.Public.TensorPack
 public import NN.MLTheory.CROWN.Core
 public import NN.MLTheory.CROWN.Graph
 public import NN.Runtime.PyTorch.Import.Core
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Verification.Robustness.TopLabel
 public import NN.Verification.TorchLean.Compile
 public import NN.Verification.Util.Json
@@ -255,7 +255,7 @@ Run the certified-accuracy evaluation once, under a chosen scalar backend `α`.
 This compiles the linear classifier to the verifier IR, then checks each example's `L∞` box using
 IBP and a simple affine pass.
 -/
-def runOnce {α : Type} [Semantics.Scalar α] [DecidableEq Shape] [ToString α]
+def runOnce {α : Type} [Semantics.Scalar α] [BoundOps α] [DecidableEq Shape] [ToString α]
     [Runtime.Scalar α] (opts : DigitsOpts) : IO DigitsReport := do
   let cast : Float → α := Runtime.ofFloat
   let linF ← loadWeights opts.weights
@@ -351,11 +351,10 @@ def main (args : List String) : IO Unit := do
     match parseArgs rest with
     | .ok o => pure o
     | .error msg => throw <| IO.userError msg
-  match (← NN.API.DType.withRuntime dtype (fun {α} _ _ _ _ => do
+  NN.Verification.TorchLean.withBoundDType dtype
+    (fun {α} _ _ _ _ _ => do
       let _ ← runOnce (α := α) opts
-      pure ())) with
-  | .ok () => pure ()
-  | .error msg => throw <| IO.userError msg
+      pure ())
 
 /--
 Train a fresh digits classifier, compile it through the TorchLean verifier path, and certify it.
@@ -376,13 +375,13 @@ def mainTrainThenCertify (args : List String) : IO Unit := do
     | .ok o => pure o
     | .error msg => throw <| IO.userError msg
 
-  let pythonCmd ← Runtime.External.Process.resolveCmdFromEnv "TORCHLEAN_PYTHON" "python3"
-  let python ← Runtime.External.Process.ensureCmdAvailable
+  let pythonCmd ← TorchLean.External.Process.resolveCmdFromEnv "TORCHLEAN_PYTHON" "python3"
+  let python ← TorchLean.External.Process.ensureCmdAvailable
     "Python 3" pythonCmd #["--version"] (some "TORCHLEAN_PYTHON")
   IO.println s!"[digits] training/export script: {opts.script}"
   IO.println s!"[digits] exported weights: {opts.certify.weights}"
   IO.println s!"[digits] exported dataset: {opts.certify.dataset}"
-  let out ← Runtime.External.Process.runStdoutChecked
+  let out ← TorchLean.External.Process.runStdoutChecked
     (ctx := "digits train/export")
     (cmd := python)
     (args := trainerArgs opts)
@@ -392,14 +391,13 @@ def mainTrainThenCertify (args : List String) : IO Unit := do
     IO.println trainLog
   IO.println "[digits] Python export complete; entering Lean certification path."
 
-  match (← NN.API.DType.withRuntime dtype (fun {α} _ _ _ _ => do
+  NN.Verification.TorchLean.withBoundDType dtype
+    (fun {α} _ _ _ _ _ => do
       let report ← runOnce (α := α) opts.certify
       if report.total = 0 then
         throw <| IO.userError "digits train-then-certify produced an empty report"
       IO.println
         (s!"[digits] report: total={report.total}, nominal={report.nominalOk}, " ++
-          s!"ibp={report.ibpOk}, crown={report.crownOk}"))) with
-  | .ok () => pure ()
-  | .error msg => throw <| IO.userError msg
+          s!"ibp={report.ibpOk}, crown={report.crownOk}"))
 
 end NN.Verification.Robustness.Digits

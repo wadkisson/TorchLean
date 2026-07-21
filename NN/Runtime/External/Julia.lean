@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import Lean.Data.Json
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 import Lean
 
 /-!
@@ -54,7 +54,7 @@ If the environment variable `TORCHLEAN_JULIA` is set, it takes precedence. Other
 to `juliaCmd` (default: `"julia"`), which is expected to be on `PATH`.
 -/
 def resolveJuliaCmd (juliaCmd : String := "julia") : IO String := do
-  Runtime.External.Process.resolveCmdFromEnv "TORCHLEAN_JULIA" juliaCmd
+  TorchLean.External.Process.resolveCmdFromEnv "TORCHLEAN_JULIA" juliaCmd
 
 /-!
 ## Availability checks
@@ -68,7 +68,7 @@ This is conservative by design: any exception (including “executable not found
 -/
 def isAvailable (juliaCmd : String := "julia") : IO Bool := do
   let cmd ← resolveJuliaCmd juliaCmd
-  Runtime.External.Process.isCmdAvailable cmd #["--version"]
+  TorchLean.External.Process.isCmdAvailable cmd #["--version"]
 
 /--
 Require Julia to be available and return the resolved command.
@@ -77,7 +77,7 @@ This is suitable for example runners that want a friendly error message when Jul
 -/
 def ensureAvailable (juliaCmd : String := "julia") : IO String := do
   let cmd ← resolveJuliaCmd juliaCmd
-  Runtime.External.Process.ensureCmdAvailable "Julia" cmd #["--version"] (some "TORCHLEAN_JULIA")
+  TorchLean.External.Process.ensureCmdAvailable "Julia" cmd #["--version"] (some "TORCHLEAN_JULIA")
 
 /-!
 ## Running Julia
@@ -93,7 +93,7 @@ integrations.
 def run (args : Array String) (cwd : Option String := some ".") (juliaCmd : String := "julia") :
     IO String := do
   let cmd ← ensureAvailable juliaCmd
-  Runtime.External.Process.runStdoutChecked (ctx := "Julia") (cmd := cmd) (args := args) (cwd := cwd)
+  TorchLean.External.Process.runStdoutChecked (ctx := "Julia") (cmd := cmd) (args := args) (cwd := cwd)
 
 /--
 Run Julia and parse `stdout` as JSON.
@@ -104,7 +104,7 @@ Julia process and parses that payload.
 def runJson (args : Array String) (cwd : Option String := some ".") (juliaCmd : String := "julia") :
     IO Json := do
   let cmd ← ensureAvailable juliaCmd
-  Runtime.External.Process.runJsonStdoutChecked (ctx := "Julia")
+  TorchLean.External.Process.runJsonStdoutChecked (ctx := "Julia")
     (cmd := cmd) (args := args) (cwd := cwd)
 
 end Julia

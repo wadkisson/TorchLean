@@ -46,6 +46,7 @@ The public code shape is:
 import NN.API
 open TorchLean
 
+/-- A two-layer regression model. The dimensions are checked when the layers are composed. -/
 def model :=
   nn.Sequential![
     nn.Linear 2 8,
@@ -53,24 +54,30 @@ def model :=
     nn.Linear 8 1
   ]
 
+-- Four input rows, each containing two features.
 def xs : Tensor.T Float (shape![4, 2]) :=
   tensorOfList! [4, 2] [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
 
+-- One regression target for each input row.
 def ys : Tensor.T Float (shape![4, 1]) :=
   tensorOfList! [4, 1] [0.2, 1.0, 1.0, 1.8]
 
+-- The dataset type records the feature and target shapes expected by the trainer.
 def data : Trainer.Dataset (.dim 2 .scalar) (.dim 1 .scalar) :=
   Data.tensorDataset xs ys
 
 def trainOnce : IO Unit := do
+  -- Select the loss from the regression task and train through the compiled Float32 path.
   let trainer :=
     Trainer.new model
       { task := .regression
         optimizer := optim.sgd { lr := 0.05 }
         backend := .compiled
         dtype := .float32 }
+  -- Inspect the initialized model before any parameter updates.
   let initialPrediction ← trainer.predict (tensorOfList! [2] [0.5, -0.25])
   IO.println s!"initial={Tensor.pretty initialPrediction}"
+  -- Training returns a new trainer containing the updated parameters and run history.
   let trained ← trainer.train data { steps := 200, batchSize := 16, logEvery := 25 }
   trained.printSummary
 ```
@@ -117,6 +124,20 @@ Downstream model and training files should start from:
 import NN.API
 open TorchLean
 ```
+
+The floating-point library can also be used on its own:
+
+```lean
+import NN.Floats
+open TorchLean.Floats
+```
+
+This import provides generic formats and rounding, finite binary32 semantics, executable IEEE
+binary32 operations, interval rounders, and scalar quantization. It does not import tensors,
+models, autograd, CUDA, certificate checkers, or external numerical tools. More specialized users
+can import `NN.Floats.NeuralFloat`, `NN.Floats.FP32`, `NN.Floats.IEEEExec`, or
+`NN.Floats.Interval` directly. Tensor quantization and runtime-approximation proofs are separate
+adapters under `NN.Spec.Quantization` and `NN.Proofs.RuntimeApprox.FP32`.
 
 For local development against a checkout, use a path dependency instead:
 

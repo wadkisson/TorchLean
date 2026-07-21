@@ -158,7 +158,7 @@ private def buildLibtorchSDPASo (pkg : Package) := do
       compileSharedLib soFile (#[o.toString] ++ libtorchSDPALinkArgs lt) "g++"
     return art.path
 
-/-- Linkable error-returning symbols for CUDA builds that do not enable LibTorch. -/
+/-- Linkable error-returning symbols when the CUDA LibTorch provider is unavailable. -/
 private def buildLibtorchSDPAStub (pkg : Package) := do
   let lean ← getLeanInstall
   let srcJob ← inputFile (pkg.dir / "csrc/cuda/kernels/torchlean_libtorch_sdpa_stub.c") false
@@ -175,7 +175,7 @@ target torchlean_libtorch_sdpa_so pkg : FilePath :=
     pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_skipped"))
 
 target torchlean_libtorch_sdpa_stub pkg : FilePath :=
-  if cudaEnabled && !libtorchEnabled then
+  if !cudaEnabled || !libtorchEnabled then
     buildLibtorchSDPAStub pkg
   else
     pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_stub_skipped"))
@@ -184,8 +184,7 @@ target torchlean_libtorch_sdpa_stub pkg : FilePath :=
 lean_lib NN where
   moreLinkObjs :=
     if cudaEnabled && libtorchEnabled then #[torchlean_libtorch_sdpa_so]
-    else if cudaEnabled then #[torchlean_libtorch_sdpa_stub]
-    else #[]
+    else #[torchlean_libtorch_sdpa_stub]
   -- `NN:docs` should document the whole maintained Lean surface, including examples and CLI
   -- dispatchers. Keep tests out of this library surface; they build through `nn_tests_suite`.
   roots := #[

@@ -11,6 +11,7 @@ public import NN.Floats.Interval.IEEEExec32Soundness
 public import NN.IR.Graph
 public import NN.IR.Semantics
 public import NN.Proofs.Analysis.Softmax
+public import NN.Spec.Core.FloatInstances
 public import NN.Spec.Core.TensorOps
 
 /-!

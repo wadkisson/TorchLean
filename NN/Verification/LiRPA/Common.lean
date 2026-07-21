@@ -41,7 +41,7 @@ def seedNaturalInputBox (inputId dim : Nat) (eps : Float)
 
 /-- Recompute Lean IBP bounds and compare them against a JSON certificate. -/
 def checkIBPCert (g : Graph) (ps : ParamStore Float) (outId : Nat)
-    (path : String) (tol : Float := 1e-5) : IO Unit :=
-  NN.Verification.IBPCert.checkOrThrow g ps outId path (tol := tol)
+    (path : String) : IO Unit :=
+  NN.Verification.IBPCert.checkOrThrow g ps outId path
 
 end NN.Verification.LiRPA

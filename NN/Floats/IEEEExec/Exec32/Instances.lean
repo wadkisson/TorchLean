@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.IEEEExec.Exec32.Transcendentals
+public import NN.Core.Numeric
 
 /-!
 # IEEE32 Executable Instances
@@ -259,11 +260,6 @@ instance : Numbers IEEE32Exec where
   log10 := ofFloat (Float.log 10)
   log10000 := ofFloat (Float.log 10000)
   epsilon := ofFloat (1e-6)
-
-/-- `Context` instance so the spec layer can execute with `IEEE32Exec` scalars. -/
-instance : Context IEEE32Exec := {
-  decidable_gt := fun x y => inferInstanceAs (Decidable (x > y))
-}
 
 end IEEE32Exec
 

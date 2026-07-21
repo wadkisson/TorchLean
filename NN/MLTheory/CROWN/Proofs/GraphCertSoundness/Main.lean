@@ -307,7 +307,7 @@ theorem cert_encloses_semantics
                                             (hx := by simpa [x] using hxEnc)
                                             (hy := by simpa [y] using hyEnc)
                                         have hBoxEq := by
-                                          letI : BoundOps ℝ := instBoundOpsDefault ℝ
+                                          letI : BoundOps ℝ := instBoundOpsReal
                                           exact
                                             (NN.MLTheory.CROWN.Graph.Theorems.box_add_on_eq (α := ℝ)
                                               n1 lo1 hi1 lo2 hi2)
@@ -363,19 +363,19 @@ theorem cert_encloses_semantics
                                                   { dim := n1,
                                                       lo := Tensor.map2Spec
                                                         (@BoundOps.addDown ℝ inferInstance
-                                                          (instBoundOpsDefault ℝ)) lo1 lo2,
+                                                          instBoundOpsReal) lo1 lo2,
                                                       hi := Tensor.map2Spec
                                                         (@BoundOps.addUp ℝ inferInstance
-                                                          (instBoundOpsDefault ℝ)) hi1 hi2 }
+                                                          instBoundOpsReal) hi1 hi2 }
                                               { n := v1.n
                                                 v :=
                                                   Tensor.addSpec (α := ℝ) v1.v
                                                       (castDimScalar (α := ℝ) hxy.symm v2.v) } := by
                                             have hdown :
-                                                (@BoundOps.addDown ℝ inferInstance (instBoundOpsDefault ℝ)) =
+                                                (@BoundOps.addDown ℝ inferInstance instBoundOpsReal) =
                                                   (fun x y : ℝ => x + y) := rfl
                                             have hup :
-                                                (@BoundOps.addUp ℝ inferInstance (instBoundOpsDefault ℝ)) =
+                                                (@BoundOps.addUp ℝ inferInstance instBoundOpsReal) =
                                                   (fun x y : ℝ => x + y) := rfl
                                             simpa [Tensor.addSpec, Tensor.map2Spec, hdown, hup] using hCanon
                                         simpa [hBoxEq] using hCanon'
@@ -678,7 +678,7 @@ theorem cert_encloses_semantics
                                             (hx := by simpa [x] using hxEnc)
                                             (hy := by simpa [y] using hyEnc)
                                         have hBoxEq := by
-                                          letI : BoundOps ℝ := instBoundOpsDefault ℝ
+                                          letI : BoundOps ℝ := instBoundOpsReal
                                           exact
                                             (NN.MLTheory.CROWN.Graph.Theorems.box_sub_on_eq (α := ℝ)
                                               n1 lo1 hi1 lo2 hi2)
@@ -731,19 +731,19 @@ theorem cert_encloses_semantics
                                                   { dim := n1,
                                                       lo := Tensor.map2Spec
                                                         (@BoundOps.subDown ℝ inferInstance
-                                                          (instBoundOpsDefault ℝ)) lo1 hi2,
+                                                          instBoundOpsReal) lo1 hi2,
                                                       hi := Tensor.map2Spec
                                                         (@BoundOps.subUp ℝ inferInstance
-                                                          (instBoundOpsDefault ℝ)) hi1 lo2 }
+                                                          instBoundOpsReal) hi1 lo2 }
                                               { n := v1.n
                                                 v :=
                                                   Tensor.subSpec (α := ℝ) v1.v
                                                       (castDimScalar (α := ℝ) hxy.symm v2.v) } := by
                                             have hdown :
-                                                (@BoundOps.subDown ℝ inferInstance (instBoundOpsDefault ℝ)) =
+                                                (@BoundOps.subDown ℝ inferInstance instBoundOpsReal) =
                                                   (fun x y : ℝ => x - y) := rfl
                                             have hup :
-                                                (@BoundOps.subUp ℝ inferInstance (instBoundOpsDefault ℝ)) =
+                                                (@BoundOps.subUp ℝ inferInstance instBoundOpsReal) =
                                                   (fun x y : ℝ => x - y) := rfl
                                             simpa [Tensor.subSpec, Tensor.map2Spec, hdown, hup] using hCanon
                                         simpa [hBoxEq] using hCanon'

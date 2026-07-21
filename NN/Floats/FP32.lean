@@ -8,7 +8,6 @@ module
 
 public import NN.Floats.FP32.Error
 public import NN.Floats.FP32.Notation
-public import NN.Floats.FP32.RuntimeApprox
 public import NN.Floats.FP32.Sterbenz
 import Mathlib.Algebra.Order.Algebra
 
@@ -22,8 +21,10 @@ import Mathlib.Algebra.Order.Algebra
 - the real-level helper operators (`round32`/`ulp32`/`eps32`, plus unicode aliases),
 - per-op absolute error bounds (`*_abs_error`),
 - interval-style enclosure corollaries (`*_mem_Icc`).
-- convenient wrappers that restate those bounds using the generic `≈[t]` tolerance relation.
 - exact subtraction for nearby representable operands via Sterbenz's lemma.
+
+The TorchLean-specific `≈[t]` adapter lives in `NN.Proofs.RuntimeApprox.FP32`; it is intentionally
+not part of this numerical umbrella.
 
 Most of the implementation lives under `NN/Floats/FP32/*` to keep the code navigable.
 -/

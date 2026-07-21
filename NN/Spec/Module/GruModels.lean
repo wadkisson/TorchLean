@@ -199,7 +199,7 @@ structure BiGRUModel (α : Type) (inputSize hiddenSize outputSize : Nat) where
 Bundle of parameters for a stacked GRU language model with deterministic dropout.
 
 This model uses a list of GRU layers (all with `hiddenSize` input/output) and applies
-`dropout_inference_spec` scaling between the GRU stack and the output projection.
+evaluation-mode dropout between the GRU stack and the output projection.
 -/
 structure GRULanguageModel (α : Type) (vocabSize hiddenSize : Nat) where
   /-- embedding. -/
@@ -383,7 +383,7 @@ def multilayerGruForward {seqLen inputSize hiddenSize outputSize numLayers : Nat
 Forward pass for `GRULanguageModel` (teacher forcing, time-major).
 
 This runs the embedding, then a stack of GRU layers with provided initial hiddens, applies
-deterministic dropout scaling (`dropout_inference_spec`), and projects to vocabulary logits.
+evaluation-mode dropout (`dropoutInferenceSpec`), and projects to vocabulary logits.
 -/
 def gruLmForward {seqLen vocabSize hiddenSize : Nat}
   (model : GRULanguageModel α vocabSize hiddenSize)
@@ -413,8 +413,8 @@ def gruLmForward {seqLen vocabSize hiddenSize : Nat}
 
   let (gru_output, final_hiddens) := process_gru_layers model.gru_layers initial_hiddens embedded h
 
-  -- Deterministic dropout (inference-style scaling).
-  -- For a training-style variant, see `Spec.dropout_masked_spec` in `NN/Spec/Layers/Dropout.lean`.
+  -- Evaluation-mode dropout.
+  -- For a training-style variant, see `Spec.dropoutMaskedSpec` in `NN/Spec/Layers/Dropout.lean`.
   let dropped_output := dropoutInferenceSpec (p := model.dropout_rate) gru_output
 
   -- Project to vocabulary

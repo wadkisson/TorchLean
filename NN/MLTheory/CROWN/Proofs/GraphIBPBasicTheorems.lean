@@ -148,7 +148,7 @@ theorem valid_ofFlatBox_real (B : FlatBox ℝ) (hB : B.Valid) :
 /-- Validity is preserved by interval addition on `FlatBox` (over `ℝ`). -/
 theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid) :
     (box_add (α := ℝ) B1 B2).Valid := by
-  letI : BoundOps ℝ := instBoundOpsDefault ℝ
+  letI : BoundOps ℝ := instBoundOpsReal
   cases B1 with
   | mk n1 lo1 hi1 =>
     cases B2 with
@@ -209,7 +209,7 @@ theorem valid_box_add_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid)
 /-- Validity is preserved by interval subtraction on `FlatBox` (over `ℝ`). -/
 theorem valid_box_sub_real (B1 B2 : FlatBox ℝ) (h1 : B1.Valid) (h2 : B2.Valid) :
     (box_sub (α := ℝ) B1 B2).Valid := by
-  letI : BoundOps ℝ := instBoundOpsDefault ℝ
+  letI : BoundOps ℝ := instBoundOpsReal
   cases B1 with
   | mk n1 lo1 hi1 =>
     cases B2 with

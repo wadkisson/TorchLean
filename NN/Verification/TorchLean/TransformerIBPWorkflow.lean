@@ -84,7 +84,7 @@ def modelLoss {α : Type} [Context α] [DecidableEq Spec.Shape] :
 
 /-- Runtime-selected typed runner used by the CLI entrypoint. -/
 def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] (withCrown : Bool) : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] (withCrown : Bool) : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   let params : nn.ParamTensors α paramShapes :=
     nn.ParamTensors.septuple
@@ -152,12 +152,14 @@ def runMain {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [To
 
 /-- Runtime-selected typed runner for the default IBP-only path. -/
 def runMainDefault {α : Type}
-    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
+    [BoundOps α] : IO Unit :=
   runMain (α := α) false
 
 /-- Runtime-selected typed runner for the heavier IBP+CROWN path. -/
 def runMainWithCrown {α : Type}
-    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α] : IO Unit :=
+    [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α] [Runtime.Scalar α]
+    [BoundOps α] : IO Unit :=
   runMain (α := α) true
 
 /--
@@ -179,10 +181,12 @@ def main (args : List String) : IO Unit := do
   let withCrown : Bool := parsedWithCrown.1
   let restArgs : List String := parsedWithCrown.2
   if withCrown then
-    Runtime.runWithDType "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
+    NN.Verification.TorchLean.runWithBoundDType
+      "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
       (@runMainWithCrown)
   else
-    Runtime.runWithDType "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
+    NN.Verification.TorchLean.runWithBoundDType
+      "TorchLean (MHA+LayerNorm+MSE) → IR → IBP" restArgs
       (@runMainDefault)
 
 end NN.Verification.TorchLean.TransformerIBPWorkflow

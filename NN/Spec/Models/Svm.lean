@@ -25,9 +25,8 @@ There are two "layers" in this file:
 - `LinearSVM`: the clean mathematical model + objective + backward pass (VJP-style gradients);
 - `fitLinearSVM`/`predict`: a small training + prediction wrapper used by runtime checks and examples.
 
-Note on naming: classic SVM literature often uses a parameter `C` that weights the hinge term.
-In this file, `fitLinearSVM` takes a parameter named `C`, but we use it as the L2
-regularization strength (the `lambda` in `LinearSVM.backward`) to keep the baseline small.
+Classic SVM literature often uses `C` for the weight on the hinge term. This implementation instead
+uses the equivalent primal form with an explicit L2 coefficient named `lambda`.
 
 References:
 - Cortes and Vapnik, "Support-Vector Networks", 1995.
@@ -228,11 +227,11 @@ Fit a linear SVM by deterministic gradient descent on the primal objective.
 
 Parameters:
 - `learning_rate`: gradient step size
-- `C`: regularization strength (treated as `lambda`)
+- `lambda`: L2 regularization strength
 - `iterations`: number of GD steps
 -/
 def fitLinearSVM {n p : ℕ} (X : Tensor α (.dim n (.dim p .scalar))) (y : Tensor α (.dim n .scalar))
-                 (learning_rate : α) (C : α) (iterations : Nat) : SVM p n α :=
+                 (learning_rate : α) (lambda : α) (iterations : Nat) : SVM p n α :=
   -- Initialize weights with zeros
   let initial_weights : Tensor α (.dim p .scalar) := fill (0 : α) (.dim p .scalar)
   let initial_bias := (0 : α)
@@ -244,7 +243,7 @@ def fitLinearSVM {n p : ℕ} (X : Tensor α (.dim n (.dim p .scalar))) (y : Tens
     | 0 => (weights, bias)
     | Nat.succ k =>
         let m : LinearSVM p α := { w := weights, b := bias }
-        let (grad_w, grad_b, _dX) := LinearSVM.backward (n := n) (p := p) (lambda := C) m X y
+        let (grad_w, grad_b, _dX) := LinearSVM.backward (n := n) (p := p) (lambda := lambda) m X y
         -- `Spec.Tensor` is functional.  Without materialization, every step leaves `new_weights`
         -- as a closure over the entire preceding optimization history; the next batch pass then
         -- replays that history for every coordinate and example.  Materialization is

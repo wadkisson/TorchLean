@@ -17,6 +17,7 @@ public import NN.Proofs.Gradients.Activation
 public import NN.Proofs.RuntimeApprox.Graph.ForwardApprox
 public import NN.Proofs.RuntimeApprox.Rounding.RoundingApprox
 public import NN.Proofs.Utils.List
+public import NN.Spec.Core.FloatInstances
 public import NN.Spec.Core.TensorReductionShape
 public import NN.Spec.Layers.Activation
 

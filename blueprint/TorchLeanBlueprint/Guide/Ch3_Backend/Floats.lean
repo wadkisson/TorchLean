@@ -11,6 +11,28 @@ Neural-network papers write equations over real numbers. Hardware evaluates a se
 operations. Most of the time we can ignore the difference. This chapter is about the times when we
 cannot.
 
+# Using The Numerical Library By Itself
+
+The floating-point development is a reusable numerical library inside the TorchLean package. A
+downstream Lean project can depend on TorchLean and import only:
+
+```
+import NN.Floats
+open TorchLean.Floats
+```
+
+That import does not bring in tensors, model definitions, autograd, CUDA, certificate checkers, or
+external numerical tools. It provides the generic format and rounding theory, the finite binary32
+model, executable IEEE binary32 arithmetic, proved interval rounders, and scalar affine
+quantization. Narrower imports such as `NN.Floats.NeuralFloat`, `NN.Floats.FP32`,
+`NN.Floats.IEEEExec`, and `NN.Floats.Interval` are useful when a file needs only one layer.
+
+Connections to the rest of TorchLean point in the other direction. `NN.Spec.Quantization` lifts the
+scalar quantizer to shape-indexed tensors. `NN.Proofs.RuntimeApprox.FP32` connects finite binary32
+semantics to runtime-approximation proofs. Arb-based transcendental checks are optional and require
+the explicit import `NN.Floats.Arb`. The numerical core therefore remains usable without adopting
+TorchLean's model or runtime APIs.
+
 # Begin With A Calculation
 
 Take the three exact real numbers
@@ -429,10 +451,11 @@ $$`q(x)=\operatorname{clamp}
 
 $$`\widehat{x}(q)=s(q-z)`.
 
-The rank-polymorphic tensor lift applies these equations at every coordinate. TorchLean proves code
-range, monotonicity, in-range code round trips, and the half-step reconstruction bound when
-saturation is inactive. Later runtime work can add packed int8 or int4 storage without changing
-these scalar theorems.
+The scalar definition and its arithmetic theorems live in `NN.Floats.Quantization`. The separate
+`NN.Spec.Quantization` adapter applies the same equations at every coordinate of a shape-indexed
+tensor. Together they prove code range, monotonicity, in-range code round trips, and the half-step
+reconstruction bound when saturation is inactive. Later runtime work can add packed int8 or int4
+storage without changing these scalar theorems.
 
 # From Lean Semantics To A Training Run
 

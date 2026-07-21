@@ -197,11 +197,15 @@ These theorems should not be confused with the JSON node-certificate checkers:
 - `checkCROWNNodeCertificate`;
 - `checkAlphaBetaCROWNNodeCertificate`.
 
-Those `IO Bool` functions parse `Float` arrays, recompute IBP and affine nodes, and compare values
-within a tolerance (default `1e-4`). The alpha-beta checker also validates branch-vector lengths,
-entries, and phase consistency. There is currently no theorem that turns acceptance of either
-approximate `Float` checker into exact `CrownCertLocalOK`. Thus checker acceptance is reproducible
-runtime evidence, not by itself an instance of `crown_checker_encloses_semantics`.
+Those `IO Bool` functions parse finite decimal fields into `IEEE32Exec`, recompute the complete IBP
+trace from trusted inputs and parameters, and replay affine nodes from previously recomputed affine
+data. A serialized interval may be wider than the recomputed interval but may not move inward.
+Affine replay data must match exactly at the binary32 level. The alpha-beta checker also validates
+branch-vector lengths, entries, and phase consistency.
+
+There is currently no theorem that turns acceptance of either executable checker into
+`CrownCertLocalOK`. Checker acceptance is reproducible binary32 replay evidence, not by itself an
+instance of `crown_checker_encloses_semantics`.
 
 # From Bounds To A Robustness Claim
 
@@ -278,7 +282,7 @@ A verification report should make the following boundary visible:
 | `runIBP?_encloses_evalGraphRec` | proof-side real IBP encloses proof-side real semantics | every executable IBP implementation |
 | `cert_encloses_semantics` | enclosure from exact local IBP and semantic hypotheses | that a JSON/Float checker supplied those hypotheses |
 | `alphaCrown_transfer_sound` / `alphaBetaCrown_transfer_sound` | exact real local affine transfer soundness | approximate artifact-checker acceptance |
-| CROWN node checker returns `true` | artifact parses and recomputed Float data match within tolerance | exact-real CROWN soundness |
+| CROWN node checker returns `true` | artifact intervals contain the authoritative `IEEE32Exec` IBP trace and affine entries exactly match a sequential `IEEE32Exec` replay | exact-real CROWN soundness |
 | alpha-beta leaf checker succeeds | represented boxes and witness fields pass structural/numeric checks | network-bound provenance or root coverage |
 | numerical range check plus IEEE replay | stored trace and one reference execution pass executable checks | real semantic enclosure without `CheckedRealExecution` |
 | FP32 approximation theorem | rounded-real output is within its stated budget | native IEEE behavior without finite refinement |

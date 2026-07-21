@@ -41,8 +41,8 @@ Certificate JSON format:
 - `0`  = unconstrained / unstable
 - `1`  = forced active (`0 ≤ z`)
 
-As with the α-CROWN checker, the certificate is accepted only if Lean recomputation matches the
-provided affine bounds up to a small float tolerance.
+As with the α-CROWN checker, the certificate is accepted only if the provided binary32 affine
+bounds exactly match Lean recomputation.
 -/
 
 @[expose] public section
@@ -59,13 +59,14 @@ open Import.PyTorch
 open _root_.Spec
 open _root_.Spec.Tensor
 open Lean Data Json
+open TorchLean.Floats.IEEE754
 
 /-!
 Helpers for the alpha/beta-CROWN style node certificate checker.
 
-These are the JSON-facing utilities for the checker: they parse imported bounds, compare
-decimal-serialized floats with an explicit tolerance, and keep shape mismatches from reaching the
-semantic checker.
+These are the JSON-facing utilities for the checker: they parse imported bounds, require exact
+binary32 agreement for affine replay data, and keep shape mismatches from reaching the semantic
+checker.
 -/
 
 /-- Parse a JSON integer (used for beta vectors). -/
@@ -108,11 +109,11 @@ structure AlphaBetaCROWNNodeCertificate where
   /-- Affine-propagation context, including the chosen input node and flattened input dimension. -/
   ctx : AffineCtx
   /-- Optional per-node interval bounds used by nonlinear CROWN steps. -/
-  ibp : Array (Option (FlatBox Float))
+  ibp : Array (Option (FlatBox IEEE32Exec))
   /-- Optional per-node affine lower/upper bounds. -/
-  crown : Array (Option (FlatAffineBounds Float))
+  crown : Array (Option (FlatAffineBounds IEEE32Exec))
   /-- Optional per-node α values for ReLU lower relaxations. -/
-  alpha : Array (Option (FlatVec Float))
+  alpha : Array (Option (FlatVec IEEE32Exec))
   /-- Optional per-node β phase annotations for ReLU nodes. -/
   beta : Array (Option (Array Int))
 
@@ -141,36 +142,46 @@ def readAlphaBetaCROWNNodeCertificate (g : Graph) (path : String) : IO AlphaBeta
 
 /-- Check the local alpha/beta-CROWN enclosure condition for one node against a certificate entry.
   -/
-def checkAlphaBetaCROWNNode (g : Graph) (ps : ParamStore Float)
-    (certIbp : Array (Option (FlatBox Float)))
-    (certAlpha : Array (Option (FlatVec Float)))
+def checkAlphaBetaCROWNNode (g : Graph) (ps : ParamStore IEEE32Exec)
+    (authoritativeIbp : Array (Option (FlatBox IEEE32Exec)))
+    (certAlpha : Array (Option (FlatVec IEEE32Exec)))
     (certBeta : Array (Option (Array Int)))
-    (certCrown : Array (Option (FlatAffineBounds Float)))
+    (authoritativeCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
+    (certCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
     (ctx : AffineCtx)
-    (id : Nat) (tol : Float) : IO Bool := do
+    (id : Nat) : IO (Bool × Option (FlatAffineBounds IEEE32Exec)) := do
   let computed? :=
-    alphaBetaCrownStepNode? (α := Float) g.nodes ps certIbp certAlpha certBeta certCrown ctx id
-  checkCROWNLikeNode "CROWNNodeCertAlphaBeta" g certIbp certCrown ctx id tol computed?
+    alphaBetaCrownStepNode? (α := IEEE32Exec) g.nodes ps authoritativeIbp certAlpha certBeta
+      authoritativeCrown ctx id
+  let ok ←
+    checkCROWNLikeNode "CROWNNodeCertAlphaBeta" g authoritativeIbp authoritativeCrown certCrown ctx
+      id computed?
+  pure (ok, computed?)
 
 /--
 Check a per-node α/β-CROWN certificate against Lean's propagation rules.
 
-Returns `true` iff every supplied IBP box is locally recomputed by Lean and every node's affine
-bounds agree (within `tol`) with Lean's α/β-CROWN step.
+Returns `true` iff every supplied IBP box contains Lean's authoritative recomputation and every
+node's affine replay data agrees exactly with Lean's α/β-CROWN step.
 -/
-def checkAlphaBetaCROWNNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) (tol : Float := 1e-4) :
+def checkAlphaBetaCROWNNodeCertificate (g : Graph) (ps : ParamStore IEEE32Exec) (path : String) :
     IO Bool :=
   do
   let cert ← readAlphaBetaCROWNNodeCertificate g path
+  let authoritativeIbp := runIBP (α := IEEE32Exec) g ps
+  let mut authoritativeCrown : Array (Option (FlatAffineBounds IEEE32Exec)) :=
+    Array.replicate g.nodes.size none
   let mut ok := true
   for id in [0:g.nodes.size] do
-    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g ps cert.ibp id tol
-    let okCrown ←
-      checkAlphaBetaCROWNNode g ps cert.ibp cert.alpha cert.beta cert.crown cert.ctx id tol
+    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g authoritativeIbp cert.ibp id
+    let (okCrown, computed?) ←
+      checkAlphaBetaCROWNNode g ps authoritativeIbp cert.alpha cert.beta authoritativeCrown
+        cert.crown cert.ctx id
+    authoritativeCrown := authoritativeCrown.set! id computed?
     ok := ok && okIbp && okCrown
   if ok then
     IO.println
-      "[CROWNNodeCertAlphaBeta] artifact replay matched Lean IBP and α/β-CROWN steps."
+      "[CROWNNodeCertAlphaBeta] artifact matched an authoritative Lean IBP and alpha/beta-CROWN replay."
   pure ok
 
 end NN.Verification.CROWNNodeCertAlphaBeta

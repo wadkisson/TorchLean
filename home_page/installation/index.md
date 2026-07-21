@@ -213,9 +213,22 @@ lake build
 Most model files need only:
 
 ```lean
-import NN
+import NN.API
 open TorchLean
 ```
+
+The numerical library has a smaller independent import:
+
+```lean
+import NN.Floats
+open TorchLean.Floats
+```
+
+It includes formats, rounding, finite binary32 semantics, executable IEEE binary32 operations,
+interval rounders, and scalar quantization. It does not load the tensor, model, autograd, CUDA,
+certificate, or external-tool layers. Use `NN.Spec.Quantization` when tensor quantization is needed,
+and `NN.Proofs.RuntimeApprox.FP32` when connecting binary32 arithmetic to runtime-approximation
+proofs.
 
 For development against a neighboring checkout, use a path dependency:
 

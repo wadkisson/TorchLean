@@ -6,14 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import Mathlib.Algebra.Order.Group.Unbundled.Abs
-public import Mathlib.Analysis.Complex.Exponential
-public import Mathlib.Analysis.Complex.Trigonometric
-public import Mathlib.Analysis.SpecialFunctions.Log.Basic
-public import Mathlib.Analysis.SpecialFunctions.Pow.Real
-public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
-public import Mathlib.Data.Real.Basic
-public import Mathlib.Analysis.Real.Sqrt
+public import NN.Core.Numeric
 public import Mathlib.Logic.Basic
 
 /-!
@@ -75,38 +68,6 @@ transcendental functions (exp/tanh/log/sqrt) used by activations and losses.
 
 @[expose] public section
 
--- Define generic type and instances of Floats (computation) and Reals (proofs)
-
-/-- Scalar transcendental functions used in activations and losses. -/
-class MathFunctions (α : Type) where
-  exp : α → α
-  tanh : α → α
-  cosh : α → α
-  sqrt : α → α
-  abs : α → α
-  log : α → α
-  pi : α
-  cos : α → α
-  sin : α → α
-  sinh : α → α
-
-/-- Common scalar constants used in model definitions. -/
-class Numbers (α : Type) where
-  neg_point_five : α
-  neg_one : α
-  pointone : α
-  pointfive : α
-  one : α
-  zero : α
-  two : α
-  three : α
-  four : α
-  five : α
-  ten : α
-  log10 : α
-  log10000 : α
-  epsilon : α
-
 /-- The full scalar interface required by spec‑level tensors and models. -/
 class Context (α : Type) extends
   Inhabited α, One α, Zero α,
@@ -128,81 +89,6 @@ end Context
 /-- A `Context` includes a decidable `>` relation; expose it as a standard typeclass. -/
 instance {α : Type} [Context α] : DecidableRel ((· > ·) : α → α → Prop) :=
   Context.decidable_gt
-
--- Expose scalar math operations inside the standard context instances below.
-open MathFunctions
-
-/-- `MathFunctions` instance for Lean's `Float` (runtime-oriented backend). -/
-instance : MathFunctions Float where
-  exp := Float.exp
-  tanh := Float.tanh
-  cosh := Float.cosh
-  sqrt := Float.sqrt
-  abs := Float.abs
-  log := Float.log
-  pi := 3.14159265358979323846
-  cos := Float.cos
-  sin := Float.sin
-  sinh := Float.sinh
-
-/-- `MathFunctions` instance for `ℝ` (proof backend, noncomputable). -/
-noncomputable instance : MathFunctions ℝ where
-  exp := Real.exp
-  tanh := Real.tanh
-  cosh := Real.cosh
-  sinh := Real.sinh
-  sqrt := Real.sqrt
-  abs := fun x => |x|
-  log := Real.log
-  pi := Real.pi
-  cos := Real.cos
-  sin := Real.sin
-
-/-- `Numbers` literals for `Float` (runtime-oriented backend). -/
-instance : Numbers Float where
-  neg_point_five := -0.5
-  neg_one := -1
-  pointone := 0.1
-  pointfive := 0.5
-  zero      := 0
-  one       := 1
-  two       := 2
-  three     := 3
-  four      := 4
-  five      := 5
-  ten       := 10
-  log10     := Float.log 10
-  log10000  := Float.log 10000
-  epsilon   := 1e-6
-
-/-- `Numbers` literals for `ℝ` (proof backend, noncomputable). -/
-noncomputable instance : Numbers ℝ where
-  neg_point_five := -0.5
-  neg_one := -1
-  pointone := 0.1
-  pointfive := 0.5
-  zero      := 0
-  one       := 1
-  two       := 2
-  three     := 3
-  four      := 4
-  five      := 5
-  ten       := 10
-  log10     := Real.log 10
-  log10000  := Real.log 10000
-  epsilon   := 1e-6
-
-/-- Coerce naturals into `Float` using `Float.ofNat`. -/
-instance : Coe Nat Float where
-  coe := Float.ofNat
-
-/-- Coerce naturals into `ℝ` via the standard `Nat`-to-real coercion. -/
-instance : Coe Nat ℝ where
-  coe := fun n => (n : ℕ) -- this uses Real.ofNat
-
-/-- Coerce naturals into `ℚ` via the standard `Nat`-to-rational coercion. -/
-instance : Coe Nat ℚ where
-  coe := fun n => (n : Nat)
 
 /-!
 ## Rational Backend

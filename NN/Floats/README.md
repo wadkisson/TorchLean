@@ -1,6 +1,6 @@
 # Floats (`NN/Floats`)
 
-This directory contains TorchLean's floating point backends and the theory that connects them.
+This directory contains TorchLean's floating-point semantics and their supporting numerical theory.
 
 - `FP32/`: a proof oriented, finite float32 model based on rounding over `ℝ`.
 - `NeuralFloat/`: generic rounding over `ℝ` (`NeuralRadix`, `NF`, rounding, ULPs, and error bounds).
@@ -8,15 +8,20 @@ This directory contains TorchLean's floating point backends and the theory that 
   addition and multiplication, and rounded division and square root.
 - `IEEEExec/`: an executable IEEE-754 binary32 kernel (`IEEE32Exec`) plus bridge theorems to `FP32`.
 - `Interval/`: interval and enclosure utilities, including quantized intervals over `ℝ` and executable endpoint intervals.
-- `Arb/`: an external Arb/FLINT oracle backend (python-flint) for ball and interval enclosures.
+- `Arb/`: an optional external Arb/FLINT oracle adapter (python-flint) for ball and interval
+  enclosures. It is not imported by `NN.Floats`.
 
 The generic theory is a native Lean development informed by Flocq's organization and results. It is
 not a claim that every Coq module has been translated. TorchLean keeps the parts used by its tensor,
 error-analysis, verification, and runtime-refinement developments, and proves executable binary32
 behavior separately under `IEEEExec/`.
 
-If you want the whole float chapter, import `NN.Floats`. If you only want a single
-float32 name to depend on, import `NN.Floats.Float32`.
+Import `NN.Floats` for the complete Lean-native numerical library. This import does not include
+tensors, models, autograd, CUDA, certificate checkers, or external processes. Import a narrower
+umbrella such as `NN.Floats.NeuralFloat`, `NN.Floats.FP32`, `NN.Floats.IEEEExec`, or
+`NN.Floats.Interval` when only one layer is needed. The tensor adapter for affine quantization lives
+in `NN.Spec.Quantization`, and runtime-approximation results live in
+`NN.Proofs.RuntimeApprox.FP32`.
 
 Executable examples that exercise this infrastructure live under `NN/Examples/`.
 
@@ -97,7 +102,7 @@ Where to look:
 - `NN/Floats/NeuralFloat/Format.lean` for representable grids,
 - `NN/Floats/NeuralFloat/Rounding.lean` for rounding semantics,
 - `NN/Floats/NeuralFloat/Scalar.lean` for `NF`,
-- `NN/Floats/Quantization.lean` for affine scalar and tensor quantization,
+- `NN/Floats/Quantization.lean` for scalar affine quantization,
 - `NN/Floats/NeuralFloat/Analysis/SterbenzFLT.lean` for exact subtraction with gradual underflow,
 - `NN/Floats/NeuralFloat/Analysis.lean` and `NN/Floats/NeuralFloat/Error.lean` for numerical bounds.
 

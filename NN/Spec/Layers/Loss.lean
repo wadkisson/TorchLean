@@ -49,41 +49,41 @@ inductive LossType
 | logCosh                -- Log-Cosh Loss
 
 /-- Loss configuration record that names the selected loss family. -/
-structure Loss (α : Type) (n p : ℕ) where
+structure Loss where
   /-- Selected loss family for this configuration. -/
   lossType : LossType
   -- Note: regularization would be added here if needed
 
 /-- Configuration selecting mean-squared-error loss. -/
-def Loss.mse {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.mse : Loss :=
   { lossType := LossType.mse }
 
 /-- Configuration selecting mean-absolute-error loss. -/
-def Loss.mae {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.mae : Loss :=
   { lossType := LossType.mae }
 
 /-- Configuration selecting Huber loss. -/
-def Loss.huber {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.huber : Loss :=
   { lossType := LossType.huber }
 
 /-- Cross-entropy loss configuration. -/
-def Loss.crossEntropy {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.crossEntropy : Loss :=
   { lossType := LossType.crossEntropy }
 
 /-- Configuration selecting hinge loss. -/
-def Loss.hinge {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.hinge : Loss :=
   { lossType := LossType.hinge }
 
 /-- Poisson loss configuration. -/
-def Loss.poisson {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.poisson : Loss :=
   { lossType := LossType.poisson }
 
 /-- Cosine similarity loss configuration. -/
-def Loss.cosineSimilarity {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.cosineSimilarity : Loss :=
   { lossType := LossType.cosineSimilarity }
 
 /-- Log-cosh loss configuration. -/
-def Loss.logCosh {α : Type} {n p : ℕ} : Loss α n p :=
+def Loss.logCosh : Loss :=
   { lossType := LossType.logCosh }
 
 -- Pure loss function specifications

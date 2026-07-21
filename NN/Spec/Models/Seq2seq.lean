@@ -154,7 +154,7 @@ Seq2Seq token embedding specification.
 
 Parameters:
 - `embedding`: a lookup table `E : (vocabSize × embedDim)`,
-- `dropout_rate`: a scalar `p` used by `dropout_inference_spec` (deterministic scaling).
+- `dropout_rate`: the training probability retained by the evaluation-mode dropout layer.
 
 PyTorch analogue: `nn.Embedding(vocabSize, embedDim)` plus a `nn.Dropout(p)` applied to the
 sequence of embeddings.
@@ -175,10 +175,10 @@ Output:
 - `y : (seqLen × embedDim)`, where each timestep selects a row of the embedding table.
 
 Out-of-range token ids map to a zero vector in this spec. We then apply
-`dropout_inference_spec` deterministically (no RNG), which is useful for runtime examples.
+evaluation-mode dropout deterministically (no RNG), which is useful for runtime examples.
 
 PyTorch analogue: `nn.Embedding` on an integer tensor, followed by `nn.Dropout(p)` (but with
-randomness replaced by deterministic scaling; see `NN.Spec.Layers.Dropout`).
+randomness disabled in evaluation mode; see `NN.Spec.Layers.Dropout`).
 -/
 def Seq2SeqEmbeddingSpec.forward {vocabSize embedDim seqLen : Nat}
   (embedding : Seq2SeqEmbeddingSpec α vocabSize embedDim)
@@ -196,7 +196,7 @@ def Seq2SeqEmbeddingSpec.forward {vocabSize embedDim seqLen : Nat}
         Tensor.dim (fun _ => Tensor.scalar (0 : α))
   )
 
-  -- Deterministic dropout (inference-style scaling).
+  -- Evaluation-mode dropout.
   dropoutInferenceSpec (p := embedding.dropout_rate) token_embeds
 
 /-- Seq2Seq embedding forward pass for one-hot / token distributions.
@@ -268,7 +268,7 @@ PyTorch analogue: `nn.RNN(..., batch_first=True)` (ignoring the batch axis), ret
 structure Seq2SeqRNNEncoderSpec (α : Type) [Numbers α] (embedDim hiddenDim : Nat) where
   /-- RNN cell parameters. -/
   rnn : RNNSpec α embedDim hiddenDim
-  /-- Dropout probability `p` (applied as `dropout_inference_spec` to the input sequence). -/
+  /-- Dropout probability `p` retained by evaluation-mode dropout on the input sequence. -/
   dropout_rate : α := Numbers.pointone
 
 /--
@@ -336,7 +336,7 @@ PyTorch analogue: `nn.LSTM(..., batch_first=True)` (ignoring the batch axis), re
 structure Seq2SeqLSTMEncoderSpec (α : Type) [Numbers α] (embedDim hiddenDim : Nat) where
   /-- LSTM cell parameters. -/
   lstm : LSTMSpec α embedDim hiddenDim
-  /-- Dropout probability `p` (applied as `dropout_inference_spec` to the input sequence). -/
+  /-- Dropout probability `p` retained by evaluation-mode dropout on the input sequence. -/
   dropout_rate : α := Numbers.pointone
 
 /--
@@ -417,7 +417,7 @@ structure Seq2SeqTransformerEncoderSpec (α : Type) [Context α] [Numbers α] (e
   numLayers : Nat) where
   /-- Encoder layer stack; typically length `numLayers`, but not enforced by the spec. -/
   layers : List (TransformerEncoderLayer numHeads embedDim (embedDim * 4) α)
-  /-- Dropout probability `p` (applied as `dropout_inference_spec` to the input sequence). -/
+  /-- Dropout probability `p` retained by evaluation-mode dropout on the input sequence. -/
   dropout_rate : α := Numbers.pointone
 
 /--
@@ -457,7 +457,7 @@ structure Seq2SeqDecoderSpec (α : Type) [Numbers α] (embedDim hiddenDim vocabS
     Option (Σ numHeads : Nat, MultiHeadAttention α numHeads embedDim (embedDim / numHeads)) := none
   /-- Output projection (`hiddenDim -> vocabSize`) producing per-timestep logits. -/
   output_projection : LinearSpec α hiddenDim vocabSize
-  /-- Dropout probability `p` (applied as `dropout_inference_spec` to decoder input embeddings). -/
+  /-- Dropout probability `p` retained by evaluation-mode dropout on decoder input embeddings. -/
   dropout_rate : α := Numbers.pointone
 
 /--

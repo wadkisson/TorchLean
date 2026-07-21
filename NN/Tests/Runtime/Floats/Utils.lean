@@ -9,7 +9,7 @@ module
 public import Lean.Data.Json
 public import NN.Spec.Core.Tensor
 public import NN.Tensor
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import Std
 
 /-!
@@ -67,7 +67,7 @@ def jsonFloatArrayField (j : Json) (key : String) : Except String (Array Float) 
 
 /-- Whether the active Python environment can import PyTorch. -/
 def pythonHasTorch : IO Bool := do
-  Runtime.External.Process.pythonCanImport #["torch"]
+  TorchLean.External.Process.pythonCanImport #["torch"]
 
 /-- Read the scalar payload from a scalar tensor. -/
 def scalarVal (t : Tensor Float Shape.scalar) : Float :=

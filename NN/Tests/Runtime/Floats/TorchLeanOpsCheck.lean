@@ -8,7 +8,7 @@ module
 
 public import Lean.Data.Json
 public import NN
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Spec.Core.TensorOps
 public import NN.Runtime.Autograd.TorchLean.Norm
 public import NN.Tests.Runtime.Floats.Utils
@@ -51,7 +51,7 @@ abbrev bnShape : Shape := .dim bnN (.dim bnC (.dim bnH (.dim bnW .scalar)))
 
 /-- Scratch directory for small Python parity scripts emitted by this test module. -/
 def workDir : System.FilePath :=
-  Runtime.External.Process.artifactWorkDir "ops_check"
+  TorchLean.External.Process.artifactWorkDir "ops_check"
 
 /-- Path for the generated BatchNorm parity script. -/
 def batchNormParityScriptPath : System.FilePath :=
@@ -314,7 +314,7 @@ def checkBatchNormNchwAgainstPyTorch
     return ()
   IO.FS.createDirAll workDir
   IO.FS.writeFile batchNormParityScriptPath batchNormParityScript
-  let out ← Runtime.External.Process.runStdoutChecked
+  let out ← TorchLean.External.Process.runStdoutChecked
     (ctx := "torchlean_ops_check: batchnorm pytorch parity")
     (cmd := "python3")
     (args := #[batchNormParityScriptPath.toString])
@@ -414,6 +414,83 @@ def checkLossSemantics : IO Unit := do
   assertApprox "zero-feature attention scale"
     (Spec.attentionScaleDenom (α := Float) 0) 1
 
+def checkCorrectedMathematicalSpecs : IO Unit := do
+  let dropoutInput : Tensor Float (.dim 2 .scalar) := tensorOfList! [2] [3, -4]
+  let dropoutOutput := Spec.dropoutInferenceSpec (p := 0.75) dropoutInput
+  assertApprox "evaluation dropout is identity[0]"
+    (vecVal dropoutOutput ⟨0, by decide⟩) 3
+  assertApprox "evaluation dropout is identity[1]"
+    (vecVal dropoutOutput ⟨1, by decide⟩) (-4)
+
+  let emptySpatial : Vector Nat 1 := #v[0]
+  let unitKernel : Vector Nat 1 := #v[1]
+  let unitStride : Vector Nat 1 := #v[1]
+  let zeroPadding : Vector Nat 1 := #v[0]
+  unless (Spec.poolOutSpatialPad emptySpatial unitKernel unitStride zeroPadding).get 0 = 0 do
+    throw <| IO.userError "pooling emitted a fully padded window for an empty input axis"
+
+  let schedule : Generative.Diffusion.VPLinearSchedule Float :=
+    { beta0 := 1, beta1 := 2 }
+  let epsModel : Generative.Diffusion.EpsModel Float (.dim 1 .scalar) :=
+    { eps := fun _ _ => tensorOfList! [1] [1] }
+  let state : Tensor Float (.dim 1 .scalar) := tensorOfList! [1] [2]
+  let t : Float := 0.75
+  let rhs := Generative.Diffusion.pfOdeRhs schedule epsModel state t
+  let beta := schedule.beta t
+  let sigma := schedule.sigma t
+  let expectedRhs :=
+    Numbers.neg_point_five * beta * 2 +
+      Numbers.pointfive * Generative.Diffusion.safeDiv beta sigma
+  assertApprox "probability-flow ODE coefficient"
+    (vecVal rhs ⟨0, by decide⟩) expectedRhs
+
+  let dt : Float := -0.5
+  let afterT1 := Generative.Diffusion.eulerStep
+    (Generative.Diffusion.pfOdeRhs schedule epsModel) state 1 dt
+  let expectedSample := Generative.Diffusion.eulerStep
+    (Generative.Diffusion.pfOdeRhs schedule epsModel) afterT1 0.5 dt
+  let sampled := Generative.Diffusion.pfOdeSampleEuler schedule epsModel 2 state
+  assertApprox "probability-flow Euler time order"
+    (vecVal sampled ⟨0, by decide⟩) (vecVal expectedSample ⟨0, by decide⟩)
+
+  let impossibleHmm : Spec.HMMSpec Float 1 1 :=
+    { init_prob := tensorOfList! [1] [1]
+      trans_prob := tensorOfList! [1, 1] [1]
+      emission_prob := tensorOfList! [1, 1] [0] }
+  let observations : Spec.ObservationSeq 1 := [⟨0, by decide⟩]
+  assertApprox "impossible HMM observation has zero likelihood"
+    (Spec.hmmForwardSpec impossibleHmm observations) 0
+  unless (Spec.hmmLogLikelihoodSpec impossibleHmm observations).isNone do
+    throw <| IO.userError "impossible HMM observation received a finite log-likelihood"
+
+  let singular : Tensor Float (.dim 1 (.dim 1 .scalar)) := tensorOfList! [1, 1] [0]
+  unless (Spec.inverseSpec? singular).isNone do
+    throw <| IO.userError "singular matrix inverse returned a value"
+  let invalidGmm : Spec.GMMSpec Float 1 1 :=
+    { weights := tensorOfList! [1] [1]
+      means := tensorOfList! [1, 1] [0]
+      covariances := tensorOfList! [1, 1, 1] [0] }
+  unless (Spec.gmmForwardSpec invalidGmm (tensorOfList! [1] [0])).isNone do
+    throw <| IO.userError "GMM accepted a singular covariance"
+  let unnormalizedGmm : Spec.GMMSpec Float 2 1 :=
+    { weights := tensorOfList! [2] [0.6, 0.6]
+      means := tensorOfList! [2, 1] [0, 1]
+      covariances := tensorOfList! [2, 1, 1] [1, 1] }
+  unless (Spec.gmmForwardSpec unnormalizedGmm (tensorOfList! [1] [0])).isNone do
+    throw <| IO.userError "GMM accepted mixture weights that do not sum to one"
+  let negativeDefiniteGmm : Spec.GMMSpec Float 1 2 :=
+    { weights := tensorOfList! [1] [1]
+      means := tensorOfList! [1, 2] [0, 0]
+      covariances := tensorOfList! [1, 2, 2] [-1, 0, 0, -1] }
+  unless (Spec.gmmForwardSpec negativeDefiniteGmm (tensorOfList! [2] [0, 0])).isNone do
+    throw <| IO.userError "GMM accepted a negative-definite covariance with positive determinant"
+  let validGmm : Spec.GMMSpec Float 1 2 :=
+    { weights := tensorOfList! [1] [1]
+      means := tensorOfList! [1, 2] [0, 0]
+      covariances := tensorOfList! [1, 2, 2] [2, 0.5, 0.5, 1] }
+  unless (Spec.gmmForwardSpec validGmm (tensorOfList! [2] [0, 0])).isSome do
+    throw <| IO.userError "GMM rejected a symmetric positive-definite covariance"
+
 /-- Entrypoint called by the curated float runtime suite. -/
 def run : IO Unit := do
   IO.println "torchlean_ops_check: begin"
@@ -450,6 +527,7 @@ def run : IO Unit := do
 
   checkBatchNormNchw
   checkLossSemantics
+  checkCorrectedMathematicalSpecs
 
   IO.println "torchlean_ops_check: ok"
 

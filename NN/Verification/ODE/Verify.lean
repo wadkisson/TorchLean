@@ -429,7 +429,7 @@ Compute bounds for `u(t)` and `du/dt` on a time interval.
 This evaluates IBP over the derivative graph `m.dg` after seeding an input box centered at
 `I.center` with radius `I.radius`.
 -/
-private def boundsOn {α : Type} [Context α] [DecidableEq Shape]
+private def boundsOn {α : Type} [Context α] [BoundOps α] [DecidableEq Shape]
     (ofFloat : Float → α) (m : Model α) (I : Interval) : IO (Bounds α) := do
   if m.inDim ≠ 1 then
     throw <| IO.userError s!"ODE verifier expects inputDim=1, got {m.inDim}"
@@ -828,7 +828,7 @@ Verify a single time interval by bounding `u₋, u₊, du₋, du₊` and checkin
 
 Returns `(ok, msg)` where `msg` is a short debug string explaining the first failing check.
 -/
-private def verifyInterval {α : Type} [Context α] [DecidableEq Shape] [ToString α]
+private def verifyInterval {α : Type} [Context α] [BoundOps α] [DecidableEq Shape] [ToString α]
     (ofFloat : Float → α) (rhs : Expr) (mL mU : Model α) (I : Interval) (cfg : ODEVerifierSettings) : IO (Bool
       × String) := do
   let bL ← boundsOn (α := α) ofFloat mL I
@@ -855,7 +855,8 @@ Recursive verifier for a segment interval.
 If `verifyInterval` fails on `I`, this splits the interval and recurses until either verification
 succeeds everywhere or we hit `(depth = 0)` / the `minWidth` cutoff.
 -/
-private partial def verifySegmentAux {α : Type} [Context α] [DecidableEq Shape] [ToString α]
+private partial def verifySegmentAux {α : Type} [Context α] [BoundOps α] [DecidableEq Shape]
+    [ToString α]
     (ofFloat : Float → α) (rhs : Expr) (mL mU : Model α) (I : Interval) (cfg : ODEVerifierSettings) (depth :
       Nat) : IO Bool := do
   let (ok, msg) ← verifyInterval (α := α) ofFloat rhs mL mU I cfg
@@ -881,7 +882,8 @@ Verify a full certificate segment: check initial conditions at `t0`, then recurs
 
 This loads both corridor networks (lower/upper) and then runs `verifySegmentAux` on `seg.t`.
 -/
-  private def verifySegmentWith {α : Type} [Context α] [DecidableEq Shape] [ToString α]
+  private def verifySegmentWith {α : Type} [Context α] [BoundOps α] [DecidableEq Shape]
+    [ToString α]
     (ofFloat : Float → α) (loadModel : ModelBackend → String → IO (Model α))
     (rhs : Expr) (seg : ODECertificateSegment) (cfg : ODEVerifierSettings) : IO Bool := do
   if cfg.verbose then

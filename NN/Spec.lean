@@ -8,11 +8,13 @@ module
 
 public import NN.Spec.Autograd
 public import NN.Spec.Core
+public import NN.Spec.Core.FloatInstances
 public import NN.Spec.Dynamics
 public import NN.Spec.Generative
 public import NN.Spec.Layers
 public import NN.Spec.Models
 public import NN.Spec.Module
+public import NN.Spec.Quantization
 public import NN.Spec.RL
 public import NN.Tensor
 

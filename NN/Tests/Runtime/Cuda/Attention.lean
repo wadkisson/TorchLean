@@ -86,6 +86,13 @@ def mask : Tensor Bool (shape![n, n]) :=
 def run : IO Unit := do
   IO.println "=== CUDA kernel coverage: multi_head_attention ==="
 
+  let layoutInput : Tensor Float (shape![2, 4]) :=
+    tensorOfList! [2, 4] [0, 1, 2, 3, 4, 5, 6, 7]
+  let split := Spec.splitHeadsSpec layoutInput 2 2 (by decide)
+  let expectedSplit : Tensor Float (shape![2, 2, 2]) :=
+    tensorOfList! [2, 2, 2] [0, 1, 4, 5, 2, 3, 6, 7]
+  Utils.assertTensorApprox "split-head row-major permutation" split expectedSplit (tol := 0)
+
   let specScores : Tensor Float (shape![2, 2]) :=
     tensorOfList! [2, 2] [1000.0, -1000.0, 3.0, 4.0]
   let specMask : Tensor Bool (shape![2, 2]) :=

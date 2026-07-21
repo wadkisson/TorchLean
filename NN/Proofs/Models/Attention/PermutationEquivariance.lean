@@ -407,12 +407,11 @@ theorem selfAttention_reindexOuter
 
       -- Build the (unpermuted) attention context for the scaled dot-product block.
       let ctx : Spec.AttentionContext ℝ (Nat.succ n') (Nat.succ n') projDim h1 h1 :=
-        { Q := Q, K := K, V := V, bc_sum_to_target := inferInstance, mask := none }
+        { Q := Q, K := K, V := V, mask := none }
       let ctxσ : Spec.AttentionContext ℝ (Nat.succ n') (Nat.succ n') projDim h1 h1 :=
         { Q := reindexOuter (α := ℝ) (n := Nat.succ n') (s := .dim projDim .scalar) σ Q
           K := reindexOuter (α := ℝ) (n := Nat.succ n') (s := .dim projDim .scalar) σ K
           V := reindexOuter (α := ℝ) (n := Nat.succ n') (s := .dim projDim .scalar) σ V
-          bc_sum_to_target := inferInstance
           mask := none }
 
       -- Equivariance of the scaled dot-product attention block (mask = none).

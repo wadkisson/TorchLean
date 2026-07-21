@@ -7,19 +7,18 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.NeuralFloat.Rounding.Core
-public import NN.Spec.Core.TensorOps
 
 /-!
 # Affine Quantization
 
-This module gives one affine quantizer for scalars and shape-indexed tensors. For a positive scale
+This module gives one affine quantizer for real scalars. For a positive scale
 `s`, zero point `z`, and integer code interval `[qmin, qmax]`, quantization and reconstruction are
 
 `Q(x) = clamp(round(x / s) + z, qmin, qmax)` and `D(k) = s (k - z)`.
 
-The tensor operations are pointwise lifts of these equations; they do not build batch, channel, or
-image conventions into the arithmetic. Theorems below cover code-range safety, monotonicity,
-in-range code round trips, and the half-step reconstruction bound when saturation is inactive.
+Theorems below cover code-range safety, monotonicity, in-range code round trips, and the half-step
+reconstruction bound when saturation is inactive. The shape-polymorphic tensor lift belongs to the
+TorchLean specification adapter `NN.Spec.Quantization`.
 
 The equations follow the integer-arithmetic quantization scheme used by common neural-network
 runtimes. See Jacob et al., "Quantization and Training of Neural Networks for Efficient
@@ -29,8 +28,6 @@ Integer-Arithmetic-Only Inference," CVPR 2018, doi:10.1109/CVPR.2018.00286.
 @[expose] public section
 
 namespace TorchLean.Floats.Quantization
-
-open Spec
 
 /-- Parameters of a bounded affine quantizer. -/
 structure AffineQuantizer where
@@ -65,25 +62,6 @@ noncomputable def quantize (q : AffineQuantizer) (rnd : ℝ → ℤ) (x : ℝ) :
 noncomputable def dequantize (q : AffineQuantizer) (code : ℤ) : ℝ :=
   q.scale * ((code - q.zeroPoint : ℤ) : ℝ)
 
-/-- Apply the affine quantizer independently at every coordinate of an arbitrary-rank tensor. -/
-noncomputable def quantizeTensor (q : AffineQuantizer) (rnd : ℝ → ℤ) {s : Shape}
-    (x : Tensor ℝ s) : Tensor ℤ s :=
-  mapTensor (q.quantize rnd) x
-
-/-- Reconstruct every code in an arbitrary-rank tensor on the quantizer's real grid. -/
-noncomputable def dequantizeTensor (q : AffineQuantizer) {s : Shape}
-    (codes : Tensor ℤ s) : Tensor ℝ s :=
-  mapTensor q.dequantize codes
-
-/-- Pointwise condition saying that quantization does not clip any coordinate of `x`. -/
-def SaturationInactive (q : AffineQuantizer) (rnd : ℝ → ℤ) {s : Shape}
-    (x : Tensor ℝ s) : Prop :=
-  Tensor.Forall (fun a => q.qmin ≤ q.rawCode rnd a ∧ q.rawCode rnd a ≤ q.qmax) x
-
-/-- Pointwise condition saying that every stored code belongs to the quantizer's code set. -/
-def CodesInRange (q : AffineQuantizer) {s : Shape} (codes : Tensor ℤ s) : Prop :=
-  Tensor.Forall (fun code => q.qmin ≤ code ∧ code ≤ q.qmax) codes
-
 /-- Saturation always returns a valid code. -/
 theorem clampCode_mem (q : AffineQuantizer) (code : ℤ) :
     q.qmin ≤ q.clampCode code ∧ q.clampCode code ≤ q.qmax := by
@@ -101,14 +79,6 @@ theorem clampCode_mem (q : AffineQuantizer) (code : ℤ) :
 theorem quantize_mem (q : AffineQuantizer) (rnd : ℝ → ℤ) (x : ℝ) :
     q.qmin ≤ q.quantize rnd x ∧ q.quantize rnd x ≤ q.qmax :=
   q.clampCode_mem _
-
-/-- Every coordinate produced by tensor quantization lies in the declared code interval. -/
-theorem quantizeTensor_inRange (q : AffineQuantizer) (rnd : ℝ → ℤ)
-    {s : Shape} (x : Tensor ℝ s) :
-    q.CodesInRange (q.quantizeTensor rnd x) := by
-  apply Tensor.forall_mapTensor (Tensor.forall_true x)
-  intro a _
-  exact q.quantize_mem rnd a
 
 /-- Dequantizing the zero point gives real zero. -/
 @[simp] theorem dequantize_zeroPoint (q : AffineQuantizer) :
@@ -132,26 +102,6 @@ theorem quantize_mono (q : AffineQuantizer) (rnd : ℝ → ℤ) [NeuralValidRnd 
   unfold quantize clampCode rawCode
   exact max_le_max (le_refl q.qmin) hmin
 
-/-- Pointwise order is preserved by tensor quantization. -/
-theorem quantizeTensor_mono (q : AffineQuantizer) (rnd : ℝ → ℤ) [NeuralValidRnd rnd]
-    {s : Shape} {x y : Tensor ℝ s}
-    (hxy : Tensor.Forall (fun ab : ℝ × ℝ => ab.1 ≤ ab.2) (Spec.zip x y)) :
-    Tensor.Forall (fun ab : ℤ × ℤ => ab.1 ≤ ab.2)
-      (Spec.zip (q.quantizeTensor rnd x) (q.quantizeTensor rnd y)) := by
-  induction s with
-  | scalar =>
-      cases x with
-      | scalar a =>
-          cases y with
-          | scalar b => exact q.quantize_mono rnd hxy
-  | dim n inner ih =>
-      cases x with
-      | dim xs =>
-          cases y with
-          | dim ys =>
-              intro i
-              exact ih (hxy i)
-
 /-- Every in-range integer code survives a dequantize/quantize round trip. -/
 @[simp] theorem quantize_dequantize (q : AffineQuantizer) (rnd : ℝ → ℤ) [NeuralValidRnd rnd]
     {code : ℤ} (hlo : q.qmin ≤ code) (hhi : code ≤ q.qmax) :
@@ -165,24 +115,6 @@ theorem quantizeTensor_mono (q : AffineQuantizer) (rnd : ℝ → ℤ) [NeuralVal
   rw [hrnd]
   simp only [Int.sub_add_cancel]
   exact q.clampCode_eq_self hlo hhi
-
-/-- An in-range code tensor survives pointwise dequantization and requantization exactly. -/
-theorem quantizeTensor_dequantizeTensor (q : AffineQuantizer) (rnd : ℝ → ℤ)
-    [NeuralValidRnd rnd] {s : Shape} {codes : Tensor ℤ s} (hcodes : q.CodesInRange codes) :
-    q.quantizeTensor rnd (q.dequantizeTensor codes) = codes := by
-  induction s with
-  | scalar =>
-      cases codes with
-      | scalar code =>
-          simp only [quantizeTensor, dequantizeTensor, mapTensor]
-          rw [q.quantize_dequantize rnd hcodes.1 hcodes.2]
-  | dim n inner ih =>
-      cases codes with
-      | dim values =>
-          simp only [quantizeTensor, dequantizeTensor, mapTensor]
-          congr 1
-          funext i
-          exact ih (hcodes i)
 
 /-- Without saturation, nearest affine quantization has error at most half a quantization step. -/
 theorem dequantize_rawCode_error_le (q : AffineQuantizer) (rnd : ℝ → ℤ)
@@ -208,23 +140,6 @@ theorem dequantize_quantize_error_le (q : AffineQuantizer) (rnd : ℝ → ℤ)
     abs (q.dequantize (q.quantize rnd x) - x) ≤ q.scale / 2 := by
   rw [quantize, q.clampCode_eq_self hlo hhi]
   exact q.dequantize_rawCode_error_le rnd x
-
-/-- If no coordinate clips, every tensor reconstruction error is at most half a step. -/
-theorem dequantizeTensor_quantizeTensor_error_le (q : AffineQuantizer) (rnd : ℝ → ℤ)
-    [NeuralValidRndToNearest rnd] {s : Shape} {x : Tensor ℝ s}
-    (hinactive : q.SaturationInactive rnd x) :
-    Tensor.Forall (fun e : ℝ => abs e ≤ q.scale / 2)
-      ((q.dequantizeTensor (q.quantizeTensor rnd x)).subSpec x) := by
-  induction s with
-  | scalar =>
-      cases x with
-      | scalar a =>
-          exact q.dequantize_quantize_error_le rnd a hinactive.1 hinactive.2
-  | dim n inner ih =>
-      cases x with
-      | dim values =>
-          intro i
-          exact ih (hinactive i)
 
 end AffineQuantizer
 

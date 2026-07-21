@@ -44,7 +44,7 @@ commands that parse and print runtime flags themselves. Public trainer methods a
 def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
     (trainer : Regression σ τ) (run : RunConfig)
     (k : {α : Type} → [Runtime.SemanticScalar α] → [DecidableEq Shape] → [ToString α] →
-      [Runtime.Scalar α] →
+      [Runtime.Scalar α] → [NN.MLTheory.CROWN.BoundOps α] →
       [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α] →
       NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO β := do
@@ -56,14 +56,18 @@ def withRunnerFromRunConfig {σ τ : Shape} {β : Type}
   | .float =>
       let runner ← NN.API.TorchLean.Trainer.instantiateConfiguredFloat trainer.task opts
       k (α := Float) runner
-  | dtype =>
-      match (← Trainer.Implementation.withReadableRuntime dtype (fun {α} _ _ _ _ _ => do
-          let runner ←
-            NN.API.TorchLean.Trainer.instantiateConfigured
-              (task := trainer.task) (α := α) (opts := opts)
-          k (α := α) runner)) with
-      | .ok out => pure out
-      | .error msg => throw <| IO.userError msg
+  | .float32 { mode := .ieee754Exec } =>
+      let α := TorchLean.Floats.F32 .ieee754Exec
+      let runner ←
+        NN.API.TorchLean.Trainer.instantiateConfigured
+          (task := trainer.task) (α := α) (opts := opts)
+      k (α := α) runner
+  | .real | .float32 { mode := .fp32 } =>
+      throw <| IO.userError
+        "TorchLean.Trainer.train: the selected dtype is proof-only and cannot execute training"
+  | .complex _ =>
+      throw <| IO.userError
+        "TorchLean.Trainer.train: regression verification currently supports real scalar backends"
 
 /--
 Build the public trained regression result from an already-trained runner.
@@ -79,6 +83,7 @@ Keeping this here prevents every training variant from re-copying the same train
 -/
 def trainedHandle {σ τ : Shape} {α : Type}
     [Runtime.SemanticScalar α] [DecidableEq Shape] [ToString α] [Runtime.Scalar α]
+    [NN.MLTheory.CROWN.BoundOps α]
     [_root_.Runtime.Autograd.Torch.Internal.CudaBridge.TensorConv α]
     (trainer : Regression σ τ)
     (runner : NN.API.train.Manual.Runner α trainer.task)
@@ -139,7 +144,7 @@ def trainDatasetWithRunConfigCore {σ τ : Shape} {β : Type}
       [Runtime.Scalar α] →
       NN.API.train.Manual.Runner α trainer.task → IO β) :
     IO (TrainResult σ τ × β) := do
-  withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ runner => do
+  withRunnerFromRunConfig trainer run (fun {α} _ _ _ _ _ _ runner => do
     let dataset ← data.build (α := α)
     IO.println s!"dataset size = {dataset.size}"
 

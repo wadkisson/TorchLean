@@ -8,6 +8,7 @@ module
 
 public import NN.Floats.IEEEExec.Exec32
 public import NN.MLTheory.CROWN.BoundOps
+public import NN.Spec.Core.FloatInstances
 
 /-!
 # `BoundOps` instance for `IEEE32Exec`

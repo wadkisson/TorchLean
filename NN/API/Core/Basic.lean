@@ -12,6 +12,7 @@ public import NN.Floats.Float32
 public import NN.Runtime.Autograd.TorchLean.Dual
 public import NN.Runtime.Scalar
 public import NN.Spec.Core.Complex
+public import NN.Spec.Core.FloatInstances
 public import NN.Spec.Core.Scalar
 public import NN.Tensor.API
 public import NN.API.CLI

@@ -97,7 +97,7 @@ This compiles the TorchLean program to the verifier IR, then computes output bou
 affine/CROWN-style pass.
 -/
 def runOnce {α : Type} [Runtime.SemanticScalar α] [DecidableEq Spec.Shape] [ToString α]
-    [Runtime.Scalar α] : IO Unit := do
+    [Runtime.Scalar α] [BoundOps α] : IO Unit := do
   let cast : Float → α := Runtime.ofFloat
   -- These in-source constants make the TorchLean-native verifier path fully inspectable.
   -- Data-backed robustness uses
@@ -194,7 +194,7 @@ CLI entry point for the TorchLean robustness workflow.
 This is wired into `lake exe verify -- torchlean-robustness`.
 -/
 def main (args : List String) : IO Unit :=
-  Runtime.runWithDType "TorchLean → IR → IBP/CROWN robustness" args
+  NN.Verification.TorchLean.runWithBoundDType "TorchLean → IR → IBP/CROWN robustness" args
     (@runOnce)
 
 end NN.Verification.Robustness.TorchLean

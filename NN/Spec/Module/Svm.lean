@@ -34,18 +34,18 @@ open ModSpec
 variable {α : Type} [Context α]
 
 /-- Linear SVM wrapped as an `NNModuleSpec` (single-output linear layer). -/
-def svmModule {p : ℕ} (model : SVM p 0 α) :
+def svmModule {p : ℕ} (model : LinearSVM p α) :
   NNModuleSpec α (.dim p .scalar) (.dim 1 .scalar) :=
   let weightMatrix : Tensor α (.dim 1 (.dim p .scalar)) :=
-    Tensor.dim (fun _ => model.weights)
+    Tensor.dim (fun _ => model.w)
   let biasVec : Tensor α (.dim 1 .scalar) :=
-    Tensor.dim (fun _ => Tensor.scalar model.bias)
+    Tensor.dim (fun _ => Tensor.scalar model.b)
   let lspec : Spec.LinearSpec α p 1 :=
     { weights := weightMatrix, bias := biasVec }
   Spec.LinearModuleSpec (α := α) lspec
 
 /-- `SpecChain` wrapper for linear SVM. -/
-def svmChain {p : ℕ} (model : SVM p 0 α) :
+def svmChain {p : ℕ} (model : LinearSVM p α) :
   SpecChain α (.dim p .scalar) (.dim 1 .scalar) :=
   SpecChain.single (svmModule (α := α) model)
 

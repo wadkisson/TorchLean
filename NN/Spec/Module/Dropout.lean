@@ -22,7 +22,7 @@ so they can be used in `SpecChain` pipelines and carry export metadata.
 
 Two variants are provided:
 
-- `DropoutInferenceModuleSpec p`: a deterministic "scale by keep probability" variant.
+- `DropoutInferenceModuleSpec p`: evaluation-mode dropout, hence the identity map.
 - `DropoutMaskedModuleSpec p mask`: a deterministic "training-style" dropout that takes the mask
   explicitly (useful when you want to model a particular dropout pattern).
 -/
@@ -37,11 +37,8 @@ open ModSpec
 
 variable {α : Type} [Context α]
 
-/-- Deterministic inference-time dropout wrapper.
-
-This is a pure scaling op (`x ↦ (1 - p) * x`). It is a deterministic surrogate used in some spec
-models rather than PyTorch's running training/eval state.
--/
+/-- Evaluation-mode dropout wrapper. The configured training probability is retained as module
+metadata, while the forward map is the identity. -/
 def DropoutInferenceModuleSpec {s : Shape} (p : α) : NNModuleSpec α s s :=
 { forward := fun x => dropoutInferenceSpec (α := α) (s := s) p x
   kind := "DropoutInference"
@@ -54,7 +51,7 @@ def DropoutInferenceModuleSpec {s : Shape} (p : α) : NNModuleSpec α s s :=
 /-- Deterministic masked dropout wrapper (mask is captured as data).
 
 This matches the usual training-time dropout structure with the mask made explicit instead of
-sampled. The forward uses the same scaling and epsilon-protection as `dropout_masked_spec`.
+sampled. The forward uses the same scaling and epsilon-protection as `dropoutMaskedSpec`.
 -/
 def DropoutMaskedModuleSpec {s : Shape} (p : α) (mask : Tensor Bool s) : NNModuleSpec α s s :=
 { forward := fun x => dropoutMaskedSpec (α := α) (s := s) p mask x

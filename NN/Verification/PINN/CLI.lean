@@ -62,97 +62,14 @@ open _root_.Spec
 open _root_.Spec.Tensor
 open TorchLean.Floats
 
-/- Approximate conversion ℝ → Float by rounding to `digits` decimal places. -/
-noncomputable def realToFloat (x : ℝ) (digits : Nat := 6) : Float :=
-  let pow10 : ℝ := (10 : ℝ) ^ digits
-  let y : ℝ := x * pow10
-  -- round to nearest, ties toward +∞ for simplicity
-  let y' : ℝ := if y ≥ 0 then y + 0.5 else y - 0.5
-  let n : Int := Int.floor y'
-  let nAbs : Nat := n.natAbs
-  let sgn : Float := if n ≥ 0 then 1.0 else -1.0
-  let num : Float := sgn * Float.ofNat nAbs
-  num / Float.ofNat (Nat.pow 10 digits)
-
--- Helpers and NF backend computation live here so the CLI can switch scalar backends
--- without dragging that backend-selection logic into the higher-level PDE residual code.
-
-/-- Compute primitives using a rounded backend α = NF with single-precision nearest-even. -/
-noncomputable def computePrimsAtNF (g : Graph) {β : NeuralRadix} {fexp : ℤ → ℤ} {rnd : ℝ → ℤ}
-  [NeuralValidExp fexp] [NeuralValidRnd rnd]
-    (ps : ParamStore (NF β fexp rnd)) (_useAffineU : Bool := false) : IO Prims := do
-  let outId := NN.Verification.PINN.SequentialPINNArch.graphOutputId g
-  let ibp := runIBP (α:=NF β fexp rnd) g ps
-  let outB ←
-    match NN.MLTheory.CROWN.Graph.outputBox? ibp outId with
-    | .ok outB => pure outB
-    | .error msg => throw <| IO.userError s!"IBP failed at output (NF): {msg}"
-  let uLoA := Spec.Tensor.sumSpec outB.lo
-  let uHiA := Spec.Tensor.sumSpec outB.hi
-  let uLo := realToFloat (NF.toReal uLoA)
-  let uHi := realToFloat (NF.toReal uHiA)
-  -- input dimension from node 0
-  let inDim : Nat :=
-    match g.nodes[0]? with
-    | some n0 => (match n0.outShape with | .dim n .scalar => n | _ => 1)
-    | none => 1
-  let hasY : Bool := match inDim with | 0 => false | 1 => false | _ => true
-  -- First/second derivative along X (dir 0)
-  let seedX := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 0)
-  let d1x := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedX
-  let d2x := runDeriv2D (α:=NF β fexp rnd) g ps ibp d1x
-  let d1xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d1x outId).toOption
-  let d2xOpt := (NN.MLTheory.CROWN.Graph.outputBox? d2x outId).toOption
-  let (duX, d2uX) :=
-    match d1xOpt, d2xOpt with
-    | some dxB, some d2xB =>
-      let l1 := realToFloat (NF.toReal (Spec.Tensor.sumSpec dxB.lo))
-      let h1 := realToFloat (NF.toReal (Spec.Tensor.sumSpec dxB.hi))
-      let l2 := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2xB.lo))
-      let h2 := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2xB.hi))
-      (some (l1, h1), some (l2, h2))
-    | _, _ => (none, none)
-  -- Y direction if available
-  let duY : Option (Float × Float) :=
-    if hasY then
-      let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 1)
-      let d1y := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedY
-      match NN.MLTheory.CROWN.Graph.outputBox? d1y outId with
-      | .ok dyB =>
-        let l := realToFloat (NF.toReal (Spec.Tensor.sumSpec dyB.lo))
-        let h := realToFloat (NF.toReal (Spec.Tensor.sumSpec dyB.hi))
-        some (l, h)
-      | .error _ => none
-    else none
-  let d2uY : Option (Float × Float) :=
-    if hasY then
-      let seedY := FlatBox.ofTensor (NN.Tensor.oneHotNat (α := NF β fexp rnd) inDim 1)
-      let d1y := runDerivDirectional (α:=NF β fexp rnd) g ps ibp seedY
-      let d2y := runDeriv2D (α:=NF β fexp rnd) g ps ibp d1y
-      match NN.MLTheory.CROWN.Graph.outputBox? d2y outId with
-      | .ok d2yB =>
-        let l := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2yB.lo))
-        let h := realToFloat (NF.toReal (Spec.Tensor.sumSpec d2yB.hi))
-        some (l, h)
-      | .error _ => none
-    else none
-  let base : Prims := { u := some (uLo, uHi), duX := duX, duY := duY, d2uX := d2uX, d2uY := d2uY }
-  pure base
-
-/- Backend selection for PINN CLI: choose how bounds are computed.
-   - `float`: the default executable path.
-   - `neuralfloat`: a rounding-aware path where available, with Float fallback where the
-     graph-wide propagation uses the Float propagation engine in this CLI path.
--/
+/-- Backend selection for the PINN CLI. -/
 inductive Backend where
   | float
-  | neuralfloat
 
 /-- Parse the backend flag used by the PINN residual CLI. -/
 def parseBackendVal (s : String) : Option Backend :=
   match s with
   | "float" => some .float
-  | "neuralfloat" => some .neuralfloat
   | _ => none
 
 /-- Parse a decimal Float literal used by CLI flags. -/
@@ -215,16 +132,8 @@ inductive UBoundsMethod
 def computePrimsAt (g : Graph) (ps : ParamStore Float) (uMethod : UBoundsMethod := .ibp) (backend :
   Backend := .float) : IO Prims := do
   let outId := NN.Verification.PINN.SequentialPINNArch.graphOutputId g
-  let ibp ←
-    match backend with
-    | .float => pure (runIBP (α:=Float) g ps)
-    | .neuralfloat => do
-      -- This CLI path still selects Float graph-wide propagation; rounding-aware routines are
-      -- announced and used only where the backend exposes them.
-      IO.eprintln <|
-        ("[PINN] backend=neuralfloat: using Float propagation; rounding-aware " ++
-          "routines will be used where available.")
-      pure (runIBP (α:=Float) g ps)
+  let _ := backend
+  let ibp := runIBP (α:=Float) g ps
   let outB ←
     match NN.MLTheory.CROWN.Graph.outputBox? ibp outId with
     | .ok outB => pure outB
@@ -365,7 +274,7 @@ def parseFlags (args : List String) : Except String (Opts × List String) := do
     TorchLean.CLI.takeParsedFlagDefault args "backend" "float" fun s =>
       match parseBackendVal s with
       | some backend => pure backend
-      | none => throw s!"--backend: expected float or neuralfloat; got `{s}`"
+      | none => throw s!"--backend: expected float; got `{s}`"
   pure ({ method := method, backend := backend, weights? := weights?, splitDepth := splitDepth }, args)
 
 /--
@@ -379,7 +288,7 @@ For certificate checking, use:
 
 Run:
 `lake exe verify -- pinn-cli -- [--method=ibp|crown-fwd|crown-bwd] [--split-depth=N]
-  [--backend=float|neuralfloat] [--weights=PATH.json] "<PDE>" x eps`
+  [--backend=float] [--weights=PATH.json] "<PDE>" x eps`
 or (2D):
 `lake exe verify -- pinn-cli -- [flags] "<PDE>" x y eps`
 -/
@@ -426,7 +335,7 @@ def main (args : List String) : IO Unit := do
   match rest.toArray with
   | #[pdeStr, xStr, epsStr] =>
     match backend with
-    | .float | .neuralfloat =>
+    | .float =>
       let x? := parseFloat xStr
       let eps? := parseFloat epsStr
       match x?, eps? with
@@ -465,7 +374,7 @@ def main (args : List String) : IO Unit := do
         IO.eprintln s!"invalid float input(s): x={xStr}, eps={epsStr}"
   | #[pdeStr, xStr, yStr, epsStr] =>
     match backend with
-    | .float | .neuralfloat =>
+    | .float =>
       let x? := parseFloat xStr
       let y? := parseFloat yStr
       let eps? := parseFloat epsStr
@@ -505,10 +414,10 @@ def main (args : List String) : IO Unit := do
     throw <| IO.userError <|
       ("Usage:\n  lake exe verify -- pinn-cli -- " ++
         "[--method=ibp|crown-fwd|crown-bwd] [--split-depth=N] " ++
-        "[--backend=float|neuralfloat] [--weights=path.json] \"<PDE>\" x eps   " ++
+        "[--backend=float] [--weights=path.json] \"<PDE>\" x eps   " ++
         " # 1D\n  lake exe verify -- pinn-cli -- " ++
         "[--method=ibp|crown-fwd|crown-bwd] [--split-depth=N] " ++
-        "[--backend=float|neuralfloat] [--weights=path.json] \"<PDE>\" x y eps " ++
+        "[--backend=float] [--weights=path.json] \"<PDE>\" x y eps " ++
         " # 2D")
 
 end NN.Verification.PINN.CLI

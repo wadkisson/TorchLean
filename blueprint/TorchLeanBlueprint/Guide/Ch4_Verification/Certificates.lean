@@ -141,8 +141,9 @@ There are three progressively stronger designs:
 - *Structural checking:* the artifact is self-consistent and each exported witness passes its
   stated arithmetic test. This is what `abcrown-leaf` provides.
 - *Recompute and compare:* the artifact contains a network and enough node data for Lean to
-  reproduce the bound calculation, then compare the result with the exported `lb`. TorchLean's
-  node-certificate checkers move in this direction, but use `Float` values and tolerances.
+  reproduce the bound calculation. TorchLean's node-certificate checkers recompute the complete
+  trace with `IEEE32Exec`: interval entries must contain the authoritative trace, while affine
+  replay entries must agree exactly at the binary32 level.
 - *Proof-backed soundness:* checker acceptance supplies the exact hypotheses of a theorem that
   encloses the graph semantics. This requires a proved local transfer for every supported
   operator, plus a compiler correspondence and any required floating-point bridge.
@@ -167,7 +168,8 @@ This split is important for citations:
 
 - `abcrown-leaf` checks a structural leaf artifact.
 - `checkAlphaBetaCROWNNodeCertificate` checks per-node α,β-CROWN transfer data by recomputation and
-  tolerance comparison.
+  exact binary32 transcript comparison; its interval side data may widen the recomputed boxes but
+  may never shrink them.
 - graph soundness theorems apply only when the certificate format and graph fragment supply the
   hypotheses those theorems demand.
 

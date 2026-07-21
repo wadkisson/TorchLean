@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Runtime.RL.Numerics.Float32.Returns
+public import NN.Spec.Core.FloatInstances
 
 /-!
 # Checked Float32 TD Residuals, GAE, and Advantage Normalization

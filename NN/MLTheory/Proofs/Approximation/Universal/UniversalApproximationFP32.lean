@@ -8,6 +8,7 @@ module
 
 public import NN.Floats.FP32
 public import NN.MLTheory.Proofs.Approximation.Universal.UniversalApproximation
+public import NN.Spec.Core.FloatInstances
 import Mathlib.Tactic.Linarith
 
 /-!

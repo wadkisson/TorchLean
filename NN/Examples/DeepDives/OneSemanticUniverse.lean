@@ -8,7 +8,7 @@ module
 
 public import NN.API
 public import NN.IR.Semantics
-public import NN.MLTheory.CROWN.Graph
+public import NN.MLTheory.CROWN.Extras.FP32
 
 /-!
 # One semantic universe

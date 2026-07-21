@@ -381,13 +381,10 @@ def multiHeadCrossAttention
     match QHeads, KHeads, VHeads with
     | Tensor.dim qF, Tensor.dim kF, Tensor.dim vF =>
         Tensor.dim (fun headIdx =>
-          let bc : Shape.BroadcastTo (.dim nQ .scalar) (.dim nQ (.dim nK .scalar)) :=
-            by infer_instance
           let ctx : AttentionContext α nQ nK (embedDim / headCount) hQ hK :=
             { Q := qF headIdx
               K := kF headIdx
               V := vF headIdx
-              bc_sum_to_target := bc
               mask := mask }
           scaledDotProductAttention ctx)
   let concatenated :=

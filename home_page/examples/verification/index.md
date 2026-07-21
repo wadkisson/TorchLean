@@ -209,6 +209,10 @@ VNN-COMP-style fully connected MNIST network/property pair. `camera-box3d-cert` 
 projection certificate for a 3D box artifact by recomputing the projected corners and the claimed
 2D envelope.
 
+The MNIST runner labels its result `numerically_refuted`, not `safe`. It uses outward-widened host
+`Float` operations to refute the unsafe output region, but that executable result is not itself a
+Lean theorem about real-valued network semantics.
+
 Typical output from the native CROWN example includes softmax bounds, an MSE-loss bound, a margin
 lower bound, and the backward objective bound. The exact numbers depend on dtype and runtime flags,
 but the shape of the output should look like this:

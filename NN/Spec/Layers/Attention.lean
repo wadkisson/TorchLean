@@ -123,10 +123,6 @@ structure AttentionContext (α : Type) [Context α] [DecidableRel ((· > ·) : �
   Q : Tensor α (.dim nQ (.dim dModel .scalar))
   K : Tensor α (.dim nK (.dim dModel .scalar))
   V : Tensor α (.dim nK (.dim dModel .scalar))
-  bc_sum_to_target :
-    BroadcastTo
-      (.dim nQ .scalar)
-      (.dim nQ (.dim nK .scalar))
   mask : Option (Tensor Bool (.dim nQ (.dim nK .scalar)))
 
 /-- Denominator used by scaled dot-product attention.
@@ -255,13 +251,6 @@ def scaledDotProductAttention
     | some m => hardMaskedSoftmaxSpec scaledScores m
   matMulSpec attentionWeights ctx.V
 
-/-- Alias documenting that the main attention spec uses exact hard-mask semantics. -/
-def hardMaskedScaledDotProductAttention
-  {nQ nK dModel : Nat} {h1 : nQ ≠ 0} {h2 : nK ≠ 0}
-  (ctx : AttentionContext α nQ nK dModel h1 h2) :
-  Tensor α (.dim nQ (.dim dModel .scalar)) :=
-  scaledDotProductAttention ctx
-
 /-- Backward/VJP for scaled dot-product attention.
 
 Returns `(dQ, dK, dV)` given an upstream gradient `dOut`.
@@ -368,50 +357,33 @@ gradients easy to audit.
 /-
   Split tensor into multiple attention heads
 -/
-  /-- Split `(n, dModel)` into `(numHeads, n, headDim)` by reshaping.
+  /-- Split `(n, dModel)` into `(numHeads, n, headDim)`.
 
 We store heads as the outermost axis so that "per-head computation" is just a `Tensor.dim` over
 `Fin numHeads`.
 
-PyTorch analogy: conceptually similar to reshaping `(n, numHeads*headDim)` into
-`(n, numHeads, headDim)` and then transposing to make heads a separate axis; here we go directly to
-`(numHeads, n, headDim)` because it is convenient for later definitions.
+The feature coordinate is interpreted as `(head, coordinate-within-head)`: first reshape to
+`(n, numHeads, headDim)`, then swap the token and head axes. Reshaping directly to
+`(numHeads, n, headDim)` would preserve the wrong row-major coordinate order.
 -/
   def splitHeadsSpec
-    {α : Type} [Inhabited α]
+    {α : Type} [Context α]
     {n dModel : Nat}
   (x : Tensor α (.dim n (.dim dModel .scalar)))
   (numHeads headDim : Nat)
   (h : dModel = numHeads * headDim)
   : Tensor α (.dim numHeads (.dim n (.dim headDim .scalar))) :=
-  let s₁ := .dim n (.dim dModel .scalar)
-  let s₂ := .dim numHeads (.dim n (.dim headDim .scalar))
-  have size_eq : Spec.Shape.size s₁ = Spec.Shape.size s₂ := Shape.size_eq_of_dModel_eq_numHeads_mul_headDim n
-    numHeads dModel headDim h
-  reshapeSpec x size_eq
+  let s₁ : Shape := .dim n (.dim dModel .scalar)
+  let s₂ : Shape := .dim n (.dim numHeads (.dim headDim .scalar))
+  have size_eq : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
+    change n * (dModel * 1) = n * (numHeads * (headDim * 1))
+    rw [h]
+    simp
+  Tensor.swapFirstTwoSpec (reshapeSpec x size_eq)
 
 /-
   Concatenate attention heads back into single tensor
 -/
-  /-- Concatenate a list of `numHeads` head tensors into a single `(n, numHeads*headDim)` tensor.
-
-This is a straightforward list-based definition. The newer `combine_heads_spec` below does the same
-thing starting from a tensor-of-heads representation.
--/
-  def concatHeadsSpec {n numHeads headDim : Nat}
-    (heads : List (Tensor α (.dim n (.dim headDim .scalar))))
-    (h : heads.length = numHeads) :
-    Tensor α (.dim n (.dim (numHeads * headDim) .scalar)) :=
-    concatSpec numHeads heads h
-
-/-!
-`concat_heads_spec` above is the original (list-based) definition.
-
-For proofs/automation, it's often easier to work with a **tensor of heads**
-`Tensor α (.dim numHeads (.dim n (.dim headDim .scalar)))` and then use shape-only transforms
-to combine heads back into a single `(n, numHeads*headDim)` tensor.
--/
-
   /-- Combine a tensor-of-heads back into a single `(n, numHeads*headDim)` tensor.
 
 Implementation detail:
@@ -431,18 +403,6 @@ Implementation detail:
   have hSize : Spec.Shape.size s₁ = Spec.Shape.size s₂ := by
     simp [s₁, s₂, Spec.Shape.size]
   reshapeSpec swapped hSize
-
-  /-- Convenience proof that `(n)` broadcasts to `(n,n)`.
-
-  This is kept as a small helper because some attention-style proofs and wrappers want an explicit
-  `BroadcastTo` witness rather than relying on typeclass search.
-  -/
-  @[reducible]
-  def buildBcProof (n : Nat) : BroadcastTo (Shape.dim n Shape.scalar) (Shape.dim n (Shape.dim n
-    Shape.scalar)) :=
-  -- Shape.dim n Shape.scalar broadcasts to Shape.dim n (Shape.dim n Shape.scalar)
-  -- by first broadcasting Shape.scalar to Shape.dim n Shape.scalar
-  broadcastToExpandDims
 
   /-- Multi-head attention forward pass (self-attention when `mask` is square).
 
@@ -483,7 +443,6 @@ High-level structure (PyTorch mental model):
             { Q := qF headIdx
               K := kF headIdx
               V := vF headIdx
-              bc_sum_to_target := buildBcProof n
               mask := mask }
           scaledDotProductAttention ctx)
 
@@ -531,7 +490,6 @@ def MultiHeadAttentionBackward
             { Q := qF headIdx
               K := kF headIdx
               V := vF headIdx
-              bc_sum_to_target := buildBcProof n
               mask := mask }
           scaledDotProductAttention ctx)
 
@@ -557,7 +515,6 @@ def MultiHeadAttentionBackward
               { Q := qF headIdx
                 K := kF headIdx
                 V := vF headIdx
-                bc_sum_to_target := buildBcProof n
                 mask := mask }
             (scaledDotProductAttentionBackward ctx (dF headIdx)).1
         let gK : Fin numHeads → Tensor α (.dim n (.dim headDim .scalar)) :=
@@ -566,7 +523,6 @@ def MultiHeadAttentionBackward
               { Q := qF headIdx
                 K := kF headIdx
                 V := vF headIdx
-                bc_sum_to_target := buildBcProof n
                 mask := mask }
             (scaledDotProductAttentionBackward ctx (dF headIdx)).2.1
         let gV : Fin numHeads → Tensor α (.dim n (.dim headDim .scalar)) :=
@@ -575,7 +531,6 @@ def MultiHeadAttentionBackward
               { Q := qF headIdx
                 K := kF headIdx
                 V := vF headIdx
-                bc_sum_to_target := buildBcProof n
                 mask := mask }
             (scaledDotProductAttentionBackward ctx (dF headIdx)).2.2
         (Tensor.dim gQ, Tensor.dim gK, Tensor.dim gV)
@@ -643,7 +598,6 @@ def MultiHeadAttentionJvp
             { Q := qF headIdx
               K := kF headIdx
               V := vF headIdx
-              bc_sum_to_target := buildBcProof n
               mask := mask }
           scaledDotProductAttention ctx)
 
@@ -656,7 +610,6 @@ def MultiHeadAttentionJvp
             { Q := qF headIdx
               K := kF headIdx
               V := vF headIdx
-              bc_sum_to_target := buildBcProof n
               mask := mask }
           scaledDotProductAttentionJvp ctx (dqF headIdx) (dkF headIdx) (dvF headIdx))
 
@@ -689,9 +642,7 @@ def selfAttention
   let K := matMulSpec x Wk
   let V := matMulSpec x Wv
   let ctx : AttentionContext α n n projDim h1 h1 :=
-    { Q := Q, K := K, V := V,
-      bc_sum_to_target := inferInstance,
-      mask := none }
+    { Q := Q, K := K, V := V, mask := none }
   exact matMulSpec (scaledDotProductAttention ctx) Wo
 
 
@@ -717,9 +668,7 @@ def crossAttention {α : Type} [Context α] [DecidableRel ((· > ·) : α → α
   let K := matMulSpec key Wk
   let V := matMulSpec value Wv
   let ctx : AttentionContext α n1 n2 projDim h1 h2 :=
-    { Q := Q, K := K, V := V,
-      bc_sum_to_target := inferInstance,
-      mask := none }
+    { Q := Q, K := K, V := V, mask := none }
   let attention := scaledDotProductAttention ctx
   matMulSpec attention Wo
 
@@ -741,9 +690,7 @@ def sparseAttention {α : Type} [Context α] [DecidableRel ((· > ·) : α → �
   let K := matMulSpec x Wk
   let V := matMulSpec x Wv
   let ctx : AttentionContext α n n projDim h1 h1 :=
-    { Q := Q, K := K, V := V,
-      bc_sum_to_target := inferInstance,
-      mask := sparsityPattern }
+    { Q := Q, K := K, V := V, mask := sparsityPattern }
   let attention := scaledDotProductAttention ctx
   matMulSpec attention Wo
 

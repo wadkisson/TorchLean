@@ -8,7 +8,7 @@ module
 
 public import Init.Data.Float32
 public import Init.Data.Rat
-public import NN.Floats.Interval.IEEEExec32ArbTrans
+public import NN.Floats.Interval.IEEEExec32
 
 /-!
 # Comparison helpers for executable interval examples

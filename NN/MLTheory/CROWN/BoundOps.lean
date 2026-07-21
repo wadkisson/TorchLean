@@ -22,9 +22,9 @@ Intuition:
   primitives like `addDown/addUp` and `mulDown/mulUp` so that interval propagation encloses the
   corresponding exact real operation.
 
-This file defines a small typeclass `BoundOps` and some helper combinators. The default instance
-is conservative: it just uses the scalar’s ordinary operations (no directed rounding). Specific
-backends can override it (e.g. `IEEE32Exec`).
+This file defines a small typeclass `BoundOps` and some helper combinators. There is intentionally
+no generic fallback instance: ordinary finite-precision arithmetic is not directed rounding and
+must not silently enter a sound bound-propagation path.
 
 ## Integration points in the current codebase
 
@@ -72,15 +72,71 @@ class BoundOps (α : Type) [Context α] where
   mulUp   : α → α → α
 
 /-!
-Default implementation: no directed rounding. The scalar’s own arithmetic supplies the operations.
+Exact real arithmetic needs no rounding, so its lower and upper operations coincide.
 -/
-instance (priority := 10) instBoundOpsDefault (α : Type) [Context α] : BoundOps α where
+noncomputable instance instBoundOpsReal : BoundOps ℝ where
   addDown := (· + ·)
   addUp   := (· + ·)
   subDown := (· - ·)
   subUp   := (· - ·)
   mulDown := (· * ·)
   mulUp   := (· * ·)
+
+/-!
+## Host binary64 endpoints
+
+Lean's `Float` operations round to nearest on the host binary64 format. For executable checking we
+widen every finite result by one adjacent representable value. This is deliberately an explicit
+instance rather than a generic fallback: its soundness depends on the host IEEE-754 arithmetic
+boundary documented by Lean, whereas `instBoundOpsReal` is exact and the `IEEE32Exec` instance is
+connected to TorchLean's bit-level binary32 proofs.
+-/
+
+namespace HostFloat
+
+def signMask : UInt64 := 0x8000000000000000
+def posInfBits : UInt64 := 0x7ff0000000000000
+def negInfBits : UInt64 := 0xfff0000000000000
+
+/-- Adjacent binary64 value above `x`, with the usual IEEE behavior at infinities and zeros. -/
+def nextUp (x : Float) : Float :=
+  let bits := x.toBits
+  if x.isNaN || bits = posInfBits then
+    x
+  else if bits = signMask || bits = 0 then
+    Float.ofBits 1
+  else if bits &&& signMask = 0 then
+    Float.ofBits (bits + 1)
+  else
+    Float.ofBits (bits - 1)
+
+/-- Adjacent binary64 value below `x`, with the usual IEEE behavior at infinities and zeros. -/
+def nextDown (x : Float) : Float :=
+  let bits := x.toBits
+  if x.isNaN || bits = negInfBits then
+    x
+  else if bits = signMask || bits = 0 then
+    Float.ofBits (signMask + 1)
+  else if bits &&& signMask = 0 then
+    Float.ofBits (bits - 1)
+  else
+    Float.ofBits (bits + 1)
+
+end HostFloat
+
+/--
+Outward-widened host binary64 operations.
+
+This instance is suitable for executable certificate replay under the trusted host-Float boundary.
+Use `IEEE32Exec` when the binary32 endpoint calculation itself must be connected to Lean proofs.
+-/
+instance instBoundOpsFloat : BoundOps Float where
+  addDown a b := HostFloat.nextDown (a + b)
+  addUp a b := HostFloat.nextUp (a + b)
+  subDown a b := HostFloat.nextDown (a - b)
+  subUp a b := HostFloat.nextUp (a - b)
+  mulDown a b := HostFloat.nextDown (a * b)
+  mulUp a b := HostFloat.nextUp (a * b)
 
 namespace BoundOps
 

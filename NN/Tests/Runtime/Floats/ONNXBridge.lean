@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import Lean.Data.Json
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Runtime.PyTorch.Export.ONNX
 public import NN.Runtime.PyTorch.Import.TorchExport
 
@@ -30,7 +30,7 @@ namespace ONNXBridge
 open Export.PyTorch.ONNX
 
 def workDir : System.FilePath :=
-  Runtime.External.Process.artifactWorkDir "onnx_bridge_check"
+  TorchLean.External.Process.artifactWorkDir "onnx_bridge_check"
 
 def bridgePath : System.FilePath :=
   workDir / "onnx_to_torchlean_ir.py"
@@ -46,7 +46,7 @@ def assertContains (label haystack needle : String) : IO Unit := do
     throw (IO.userError s!"onnx_bridge: missing {label}: {needle}")
 
 def pythonHasONNX : IO Bool := do
-  Runtime.External.Process.pythonCanImport #["onnx", "numpy"]
+  TorchLean.External.Process.pythonCanImport #["onnx", "numpy"]
 
 def sampleModelScript : String :=
   String.intercalate "\n"
@@ -79,12 +79,12 @@ def runRealONNXRoundtrip : IO Unit := do
   IO.FS.createDirAll workDir
   IO.FS.writeFile bridgePath (generateONNXBridgeScript {})
   IO.FS.writeFile (workDir / "make_batchnorm_relu.py") sampleModelScript
-  let _ ← Runtime.External.Process.runStdoutChecked
+  let _ ← TorchLean.External.Process.runStdoutChecked
     (ctx := "onnx_bridge: build representative ONNX model")
     (cmd := "python3")
     (args := #[(workDir / "make_batchnorm_relu.py").toString])
     (cwd := some ".")
-  let _ ← Runtime.External.Process.runStdoutChecked
+  let _ ← TorchLean.External.Process.runStdoutChecked
     (ctx := "onnx_bridge: lower representative ONNX model")
     (cmd := "python3")
     (args := #[bridgePath.toString, modelPath.toString, jsonPath.toString])

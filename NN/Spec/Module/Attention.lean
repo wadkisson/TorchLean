@@ -48,7 +48,6 @@ def ScaledDotProductAttentionModuleSpec
       { Q := x
         K := x
         V := x
-        bc_sum_to_target := buildBcProof n
         mask := none }
     scaledDotProductAttention (α := α) ctx,
   kind := "ScaledDotProductSelfAttention",

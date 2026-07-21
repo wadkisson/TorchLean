@@ -6,7 +6,7 @@ Authors: TorchLean Team
 
 module
 
-public import NN.Spec.Core.Context
+public import Mathlib.Data.Rat.Defs
 
 /-!
 # Executable IEEE-754 binary32 (`IEEE32Exec`)
@@ -27,8 +27,8 @@ We implement `IEEE32Exec` as raw `UInt32` bits and provide:
 - comparisons and `min`/`max` with IEEE-754 NaN rules,
 - `sqrt` via integer arithmetic on the exact input value, rounded back to binary32.
 
-We also provide a `Context IEEE32Exec` instance so the spec layer can run modules with an
-executable scalar. That is why we import `NN.Spec.Core.Context` here.
+TorchLean's tensor specifications provide their `Context IEEE32Exec` adapter separately. The
+executable kernel itself has no dependency on tensors, models, or runtime code.
 
 ## About transcendentals
 

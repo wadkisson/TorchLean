@@ -300,7 +300,7 @@ def runBackward (net : BackwardNetwork α) : Option (BackwardState α) := do
     Given A·x + b with x ∈ [lo, hi], compute output interval.
 -/
 def evalBackwardBounds (outDim inDim : Nat) (state : BackwardState α)
-    (xB : Box α (.dim inDim .scalar)) :
+    [BoundOps α] (xB : Box α (.dim inDim .scalar)) :
     Option (Box α (.dim outDim .scalar)) :=
   let ⟨mL, nL, A_lo⟩ := state.A_lower
   let ⟨mU, nU, A_up⟩ := state.A_upper

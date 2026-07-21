@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.Floats.NeuralFloat.Rounding.Core
-public import NN.Spec.Core.Context
+public import NN.Core.Numeric
 
 /-!
 ## `NF`: a rounded scalar type (rounding-on-`ℝ`)
@@ -200,16 +200,6 @@ noncomputable instance : Numbers (NF β fexp rnd) where
   log10          := ofReal (β := β) (fexp := fexp) (rnd := rnd) (Real.log 10)
   log10000       := ofReal (β := β) (fexp := fexp) (rnd := rnd) (Real.log 10000)
   epsilon        := ofReal (β := β) (fexp := fexp) (rnd := rnd) (1e-6)
-
-/--
-`Context` instance used by TorchLean specs.
-
-We provide a decidable `>` relation by classical reasoning on `ℝ` (noncomputable, but fine for the
-spec layer).
--/
-noncomputable instance : Context (NF β fexp rnd) := {
-  decidable_gt := Classical.decRel _
-}
 
 /--
 Extract an approximate radix-`β` mantissa/exponent pair for debugging.

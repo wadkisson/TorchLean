@@ -41,7 +41,7 @@ guarantee.
 
 ## Intent / tradeoffs
 
-Like the rest of the spec layer (`determinantSpec`, `inverseSpec`, `matMulSpec`), these prioritize
+Like the rest of the spec layer (`determinantSpec`, `inverseSpec?`, `matMulSpec`), these prioritize
 **mathematical clarity** and **shape safety** over performance, and are intended for small/medium
 matrices and proof-oriented reference code. For large-scale numerics, use array-backed runtime
 kernels.

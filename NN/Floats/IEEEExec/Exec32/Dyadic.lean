@@ -90,6 +90,20 @@ Returns `none` for NaN/Inf.
       let exp : Int := (Int.ofNat e.toNat) - 150
       some { sign := s, mant := mant, exp := exp }
 
+/-- Convert an exact dyadic value to its exact rational value. -/
+def Dyadic.toRat (d : Dyadic) : Rat :=
+  let s : Int := if d.sign then -(Int.ofNat d.mant) else Int.ofNat d.mant
+  if d.exp ≥ 0 then
+    let e : Nat := Int.toNat d.exp
+    Rat.ofInt (s * Int.ofNat (pow2 e))
+  else
+    let e : Nat := Int.toNat (-d.exp)
+    (Rat.ofInt s) / (Rat.ofInt (Int.ofNat (pow2 e)))
+
+/-- Exact rational value of a finite binary32 value; returns `none` for NaN or infinity. -/
+def toRat? (x : IEEE32Exec) : Option Rat :=
+  (toDyadic? x).map Dyadic.toRat
+
 /--
 If `toDyadic? x = some d` then `x` is not a NaN.
 

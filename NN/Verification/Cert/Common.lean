@@ -7,6 +7,7 @@ Authors: TorchLean Team
 module
 
 public import NN.MLTheory.CROWN.Graph
+public import NN.MLTheory.CROWN.Extras.BoundOpsIEEE32Exec
 public import NN.Runtime.PyTorch.Import.Core
 public import NN.Spec.Core.Utils
 public import NN.Verification.Util.FloatApprox
@@ -16,7 +17,7 @@ public import Lean.Data.Json
 /-!
 # Common Certificate Helpers
 
-Shared JSON/parsing and approximate-comparison utilities for node-wise verification certificates.
+Shared JSON/parsing and comparison utilities for node-wise verification certificates.
 
 The IBP, α-CROWN, and α/β-CROWN checkers all consume the same basic artifact shapes:
 flat interval boxes, affine lower/upper bounds, and optional per-node vectors.  We keep those
@@ -27,8 +28,9 @@ format-level helpers here so the individual checkers can focus on their propagat
 - `CROWNNodeCertAlphaBeta` checks affine CROWN propagation with β phase information.
 
 The JSON artifact is always untrusted. These helpers only parse and compare data; acceptance still
-requires each checker to recompute the corresponding bound inside Lean. The float tolerances here
-exist because JSON stores decimal strings/numbers, not because the external producer is trusted.
+requires each checker to recompute the corresponding bound inside Lean. Interval claims are checked
+by outward containment, while affine replay transcripts must match the executable binary32 result
+exactly.
 -/
 
 @[expose] public section
@@ -43,6 +45,7 @@ open Import.PyTorch
 open _root_.Spec
 open _root_.Spec.Tensor
 open Lean Data Json
+open TorchLean.Floats.IEEE754
 
 /-- Whether every entry of a fixed-size vector is finite. -/
 def finiteVec (n : Nat) (v : Fin n → Float) : Bool :=
@@ -52,21 +55,17 @@ def finiteVec (n : Nat) (v : Fin n → Float) : Bool :=
 def finiteMatrix (rows cols : Nat) (A : Fin rows → Fin cols → Float) : Bool :=
   (List.finRange rows).all fun i => (List.finRange cols).all fun j => (A i j).isFinite
 
-/--
-Approximate equality for flat scalar tensors (length-`n` vectors), up to an absolute tolerance.
-
-This is used when comparing Lean-recomputed bounds to decimal-serialized JSON certificate values.
--/
-def approxEqTensor {n : Nat} (t u : Tensor Float (.dim n .scalar)) (tol : Float) : Bool :=
+/-- Bitwise equality for flat binary32 tensors. -/
+def exactEqTensor {n : Nat} (t u : Tensor IEEE32Exec (.dim n .scalar)) : Bool :=
   match t, u with
   | .dim ft, .dim fu =>
       (List.finRange n).all (fun i =>
         match ft i, fu i with
-        | .scalar a, .scalar b => approxEq a b (tol := tol))
+        | .scalar a, .scalar b => decide (a = b))
 
-/-- Approximate equality for flat matrices (shape `m × n`), up to an absolute tolerance. -/
-def approxEqMatrix {m n : Nat}
-    (A B : Tensor Float (.dim m (.dim n .scalar))) (tol : Float) : Bool :=
+/-- Bitwise equality for binary32 matrices. -/
+def exactEqMatrix {m n : Nat}
+    (A B : Tensor IEEE32Exec (.dim m (.dim n .scalar))) : Bool :=
   match A, B with
   | .dim rA, .dim rB =>
       (List.finRange m).all (fun i =>
@@ -74,24 +73,37 @@ def approxEqMatrix {m n : Nat}
         | .dim cA, .dim cB =>
             (List.finRange n).all (fun j =>
               match cA j, cB j with
-              | .scalar a, .scalar b => approxEq a b (tol := tol)))
+              | .scalar a, .scalar b => decide (a = b)))
 
-/-- Approximate equality for `FlatBox` bounds, componentwise on `lo` and `hi`. -/
-def approxEqFlatBox (B1 B2 : FlatBox Float) (tol : Float) : Bool :=
-  if h : B1.dim = B2.dim then
-    match B1, B2 with
-    | ⟨n, lo1, hi1⟩, ⟨_m, lo2, hi2⟩ =>
+/--
+Whether `outer` contains `inner` componentwise.
+
+This deliberately has no tolerance. A lower endpoint may be rounded farther down and an upper
+endpoint farther up, but a serialized certificate may never move either endpoint inward. This is
+the relation used for interval claims.
+-/
+def flatBoxContains (outer inner : FlatBox IEEE32Exec) : Bool :=
+  if h : outer.dim = inner.dim then
+    match outer, inner with
+    | ⟨n, outerLo, outerHi⟩, ⟨_m, innerLo, innerHi⟩ =>
         by
           cases h
-          exact approxEqTensor (n := n) lo1 lo2 tol && approxEqTensor (n := n) hi1 hi2 tol
-  else false
+          exact
+            match outerLo, outerHi, innerLo, innerHi with
+            | .dim olo, .dim ohi, .dim ilo, .dim ihi =>
+                (List.finRange n).all fun i =>
+                  match olo i, ohi i, ilo i, ihi i with
+                  | .scalar ol, .scalar oh, .scalar il, .scalar ih =>
+                      decide (ol <= il) && decide (ih <= oh)
+  else
+    false
 
-/-- Approximate equality for affine vectors, componentwise on matrix `A` and offset `c`. -/
-def approxEqAffineVec {n m : Nat} (a b : AffineVec Float n m) (tol : Float) : Bool :=
-  approxEqMatrix (m := m) (n := n) a.A b.A tol && approxEqTensor (n := m) a.c b.c tol
+/-- Bitwise equality for affine vectors, componentwise on matrix `A` and offset `c`. -/
+def exactEqAffineVec {n m : Nat} (a b : AffineVec IEEE32Exec n m) : Bool :=
+  exactEqMatrix (m := m) (n := n) a.A b.A && exactEqTensor (n := m) a.c b.c
 
-/-- Approximate equality for flattened affine lower/upper bounds. -/
-def approxEqFlatAffineBounds (B1 B2 : FlatAffineBounds Float) (tol : Float) : Bool :=
+/-- Bitwise equality for flattened affine lower/upper bounds. -/
+def exactEqFlatAffineBounds (B1 B2 : FlatAffineBounds IEEE32Exec) : Bool :=
   if hin : B1.inDim = B2.inDim then
     if hout : B1.outDim = B2.outDim then
       match B1, B2 with
@@ -99,13 +111,13 @@ def approxEqFlatAffineBounds (B1 B2 : FlatAffineBounds Float) (tol : Float) : Bo
           by
             cases hin
             cases hout
-            exact approxEqAffineVec (n := n1) (m := m1) lo1 lo2 tol &&
-              approxEqAffineVec (n := n1) (m := m1) hi1 hi2 tol
+            exact exactEqAffineVec (n := n1) (m := m1) lo1 lo2 &&
+              exactEqAffineVec (n := n1) (m := m1) hi1 hi2
     else false
   else false
 
 /-- Parse a flat interval box (two arrays of floats) from JSON. -/
-def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox Float)) := do
+def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox IEEE32Exec)) := do
   match j with
   | .null => pure none
   | _ =>
@@ -120,8 +132,10 @@ def parseFlatBox? (dim : Nat) (j : Json) : IO (Option (FlatBox Float)) := do
         throw <| IO.userError "Invalid ibp[i]: interval bounds must be finite"
       unless (List.finRange dim).all (fun i => decide (loVec i <= hiVec i)) do
         throw <| IO.userError "Invalid ibp[i]: every lower bound must be <= its upper bound"
-      let loT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor loVec
-      let hiT : Tensor Float (.dim dim .scalar) := Spec.vectorTensor hiVec
+      let loT : Tensor IEEE32Exec (.dim dim .scalar) :=
+        Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor loVec)
+      let hiT : Tensor IEEE32Exec (.dim dim .scalar) :=
+        Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor hiVec)
       pure (some { dim := dim, lo := loT, hi := hiT })
 
 /--
@@ -132,7 +146,7 @@ We enforce that contract at the JSON boundary, so a malformed external certifica
 accepted by executable checking while relying on proof hypotheses that are false.
 -/
 def parseAlphaVec? (dim : Nat) (j : Json) (ctx : String := "alpha[i]") :
-    IO (Option (FlatVec Float)) := do
+    IO (Option (FlatVec IEEE32Exec)) := do
   match j with
   | .null => pure none
   | _ =>
@@ -143,11 +157,13 @@ def parseAlphaVec? (dim : Nat) (j : Json) (ctx : String := "alpha[i]") :
         if !a.isFinite || a < 0.0 || a > 1.0 then
           throw <| IO.userError
             s!"Invalid {ctx}[{k.val}]: α-CROWN requires 0 ≤ alpha ≤ 1, got {a}"
-      let t : Tensor Float (.dim dim .scalar) := Spec.vectorTensor v
+      let t : Tensor IEEE32Exec (.dim dim .scalar) :=
+        Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor v)
       pure (some { n := dim, v := t })
 
 /-- Parse flattened affine bounds (lower/upper) from JSON. -/
-def parseAffineBounds? (inDim outDim : Nat) (j : Json) : IO (Option (FlatAffineBounds Float)) := do
+def parseAffineBounds? (inDim outDim : Nat) (j : Json) :
+    IO (Option (FlatAffineBounds IEEE32Exec)) := do
   match j with
   | .null => pure none
   | _ =>
@@ -167,10 +183,12 @@ def parseAffineBounds? (inDim outDim : Nat) (j : Json) : IO (Option (FlatAffineB
       unless finiteMatrix outDim inDim loA && finiteMatrix outDim inDim hiA &&
           finiteVec outDim loC && finiteVec outDim hiC do
         throw <| IO.userError "Invalid crown[i]: affine bounds must be finite"
-      let loAff : AffineVec Float inDim outDim :=
-        { A := Spec.matrixTensor loA, c := Spec.vectorTensor loC }
-      let hiAff : AffineVec Float inDim outDim :=
-        { A := Spec.matrixTensor hiA, c := Spec.vectorTensor hiC }
+      let loAff : AffineVec IEEE32Exec inDim outDim :=
+        { A := Spec.mapTensor IEEE32Exec.ofFloat (Spec.matrixTensor loA)
+          c := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor loC) }
+      let hiAff : AffineVec IEEE32Exec inDim outDim :=
+        { A := Spec.mapTensor IEEE32Exec.ofFloat (Spec.matrixTensor hiA)
+          c := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor hiC) }
       pure (some { inDim := inDim, outDim := outDim, loAff := loAff, hiAff := hiAff })
 
 /--
@@ -183,11 +201,11 @@ structure CROWNNodeCoreCertificate where
   /-- Affine-propagation context, including the chosen input node and flattened input dimension. -/
   ctx : AffineCtx
   /-- Optional per-node interval bounds used by nonlinear CROWN steps. -/
-  ibp : Array (Option (FlatBox Float))
+  ibp : Array (Option (FlatBox IEEE32Exec))
   /-- Optional per-node affine lower/upper bounds. -/
-  crown : Array (Option (FlatAffineBounds Float))
+  crown : Array (Option (FlatAffineBounds IEEE32Exec))
   /-- Optional per-node α values for ReLU lower relaxations. -/
-  alpha : Array (Option (FlatVec Float))
+  alpha : Array (Option (FlatVec IEEE32Exec))
 
 /--
 Parse the fields shared by α-CROWN and α/β-CROWN node certificates.
@@ -213,9 +231,9 @@ def parseCROWNNodeCoreCertificate (g : Graph) (topObj : Json) :
   if hIbpSize : ibpArr.size = g.nodes.size then
     if hCrownSize : crownArr.size = g.nodes.size then
       if hAlphaSize : alphaArr.size = g.nodes.size then
-        let mut ibp : Array (Option (FlatBox Float)) := Array.mkEmpty g.nodes.size
-        let mut crown : Array (Option (FlatAffineBounds Float)) := Array.mkEmpty g.nodes.size
-        let mut alpha : Array (Option (FlatVec Float)) := Array.mkEmpty g.nodes.size
+        let mut ibp : Array (Option (FlatBox IEEE32Exec)) := Array.mkEmpty g.nodes.size
+        let mut crown : Array (Option (FlatAffineBounds IEEE32Exec)) := Array.mkEmpty g.nodes.size
+        let mut alpha : Array (Option (FlatVec IEEE32Exec)) := Array.mkEmpty g.nodes.size
 
         for i in List.finRange g.nodes.size do
           let node := g.nodes[i.val]'i.isLt
@@ -261,7 +279,8 @@ def parentsOk {β : Type} (g : Graph) (cert : Array (Option β)) (id : Nat) : Bo
           false)
 
 /-- Safe lookup for optional flat boxes used by certificate-side shape checks. -/
-def getFlatBox? (cert : Array (Option (FlatBox Float))) (id : Nat) : Option (FlatBox Float) :=
+def getFlatBox? (cert : Array (Option (FlatBox IEEE32Exec))) (id : Nat) :
+    Option (FlatBox IEEE32Exec) :=
   match cert[id]? with
   | some box? => box?
   | none => none
@@ -272,7 +291,7 @@ node output. This closes the hole where a malformed certificate could make the r
 the left box on a dimension mismatch.
 -/
 def binaryElementwiseBoxesMatchOutput
-    (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
+    (g : Graph) (cert : Array (Option (FlatBox IEEE32Exec))) (id : Nat) : Bool :=
   match g.nodes[id]? with
   | none => false
   | some node =>
@@ -285,31 +304,31 @@ def binaryElementwiseBoxesMatchOutput
       | _ => false
 
 /-- Check whether a flat box is entirely inside the positive domain needed by true `log`. -/
-def flatBoxStrictlyAbove (B : FlatBox Float) (eps : Float) : Bool :=
+def flatBoxStrictlyAbove (B : FlatBox IEEE32Exec) (eps : IEEE32Exec) : Bool :=
   match B with
   | ⟨n, lo, hi⟩ =>
-      let flo := getDimScalarFn (α := Float) lo
-      let fhi := getDimScalarFn (α := Float) hi
+      let flo := getDimScalarFn (α := IEEE32Exec) lo
+      let fhi := getDimScalarFn (α := IEEE32Exec) hi
       (List.finRange n).all (fun i =>
         match flo i, fhi i with
         | .scalar l, .scalar u => l > eps && u > eps)
 
 /-- Check that every coordinate interval lies strictly on one side of zero. -/
-def flatBoxExcludesZero (B : FlatBox Float) : Bool :=
+def flatBoxExcludesZero (B : FlatBox IEEE32Exec) : Bool :=
   match B with
   | ⟨n, lo, hi⟩ =>
-      let flo := getDimScalarFn (α := Float) lo
-      let fhi := getDimScalarFn (α := Float) hi
+      let flo := getDimScalarFn (α := IEEE32Exec) lo
+      let fhi := getDimScalarFn (α := IEEE32Exec) hi
       (List.finRange n).all (fun i =>
         match flo i, fhi i with
-        | .scalar l, .scalar u => l > 0.0 || u < 0.0)
+        | .scalar l, .scalar u => l > IEEE32Exec.posZero || u < IEEE32Exec.posZero)
 
 /--
 Domain and shape preconditions that must hold before a node-wise certificate checker replays a
 bound step. These executable checks mirror the side conditions that the mathematical rules need.
 -/
 def ibpNodePreconditionsOk
-    (g : Graph) (cert : Array (Option (FlatBox Float))) (id : Nat) : Bool :=
+    (g : Graph) (cert : Array (Option (FlatBox IEEE32Exec))) (id : Nat) : Bool :=
   match g.nodes[id]? with
   | none => false
   | some node =>
@@ -333,11 +352,11 @@ def ibpNodePreconditionsOk
       | _ => true
 
 /-- Pretty-printer for a flat box, used in certificate mismatch messages. -/
-def prettyFlatBox (B : FlatBox Float) : String :=
+def prettyFlatBox (B : FlatBox IEEE32Exec) : String :=
   s!"dim={B.dim}, lo={Spec.pretty B.lo}, hi={Spec.pretty B.hi}"
 
 /-- Pretty-printer for affine bounds, used in certificate mismatch messages. -/
-def prettyAffineBounds (B : FlatAffineBounds Float) : String :=
+def prettyAffineBounds (B : FlatAffineBounds IEEE32Exec) : String :=
   s!"inDim={B.inDim}, outDim={B.outDim}, loA={Spec.pretty B.loAff.A}, loC={Spec.pretty B.loAff.c}"
 
 /--
@@ -345,15 +364,16 @@ Common node-level checker for CROWN-style affine certificates.
 
 The only difference between α-CROWN and α/β-CROWN is how the candidate affine bound is recomputed.
 Everything after that point is the same: parent availability, IBP side conditions, dimensions,
-approximate JSON equality, and diagnostic messages.
+exact binary32 transcript equality, and diagnostic messages.
 -/
 def checkCROWNLikeNode
     (label : String) (g : Graph)
-    (certIbp : Array (Option (FlatBox Float)))
-    (certCrown : Array (Option (FlatAffineBounds Float)))
+    (authoritativeIbp : Array (Option (FlatBox IEEE32Exec)))
+    (authoritativeCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
+    (certCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
     (ctx : AffineCtx)
-    (id : Nat) (tol : Float)
-    (computed? : Option (FlatAffineBounds Float)) : IO Bool := do
+    (id : Nat)
+    (computed? : Option (FlatAffineBounds IEEE32Exec)) : IO Bool := do
   let some node := g.nodes[id]?
     | IO.eprintln s!"[{label}] node {id}: out of bounds for graph with {g.nodes.size} nodes"
       pure false
@@ -361,12 +381,12 @@ def checkCROWNLikeNode
     match node.kind with
     | .input | .const _ => false
     | _ => true
-  if needsParents && !(parentsOk g certCrown id) then
+  if needsParents && !(parentsOk g authoritativeCrown id) then
     IO.eprintln s!"[{label}] node {id}: parent affine bounds missing or not topo"
     return false
-  if !(ibpNodePreconditionsOk g certIbp id) then
+  if !(ibpNodePreconditionsOk g authoritativeIbp id) then
     IO.eprintln
-      s!"[{label}] node {id}: certificate violates shape/domain preconditions for {repr node.kind}"
+      s!"[{label}] node {id}: authoritative trace violates shape/domain preconditions for {repr node.kind}"
     return false
 
   let certCrown? :=
@@ -394,7 +414,7 @@ def checkCROWNLikeNode
           (s!"[{label}] node {id}: Lean outDim {leanB.outDim} ≠ " ++
             s!"outShape.size {node.outShape.size}")
         pure false
-      else if approxEqFlatAffineBounds certB leanB tol then
+      else if exactEqFlatAffineBounds certB leanB then
         pure true
       else
         IO.eprintln s!"[{label}] mismatch at node {id} ({repr node.kind})"

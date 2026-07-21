@@ -8,6 +8,7 @@ module
 
 public import NN.Tests.Runtime.Floats.Utils
 public import NN.Verification.Cert.Common
+public import NN.Verification.Cert.IBPNodeCert
 public import Lean.Data.Json
 
 /-!
@@ -27,6 +28,7 @@ open Lean
 open NN.MLTheory.CROWN
 open NN.MLTheory.CROWN.Graph
 open NN.Verification.Cert.Common
+open TorchLean.Floats.IEEE754
 
 namespace Tests
 namespace Floats
@@ -50,15 +52,15 @@ def parseJson! (s : String) : IO Json := do
   | .ok j => pure j
   | .error e => throw <| IO.userError s!"bad test JSON: {e}"
 
-def flatBox (lo hi : Fin 2 → Float) : FlatBox Float :=
+def flatBox (lo hi : Fin 2 → Float) : FlatBox IEEE32Exec :=
   { dim := 2
-    lo := Spec.vectorTensor lo
-    hi := Spec.vectorTensor hi }
+    lo := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor lo)
+    hi := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor hi) }
 
-def flatBox3 : FlatBox Float :=
+def flatBox3 : FlatBox IEEE32Exec :=
   { dim := 3
-    lo := Spec.vectorTensor (fun _ : Fin 3 => 0.0)
-    hi := Spec.vectorTensor (fun _ : Fin 3 => 1.0) }
+    lo := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor (fun _ : Fin 3 => 0.0))
+    hi := Spec.mapTensor IEEE32Exec.ofFloat (Spec.vectorTensor (fun _ : Fin 3 => 1.0)) }
 
 def inputNode (id dim : Nat) : _root_.NN.IR.Node :=
   { id := id, parents := [], kind := .input, outShape := .dim dim .scalar }
@@ -93,7 +95,7 @@ def run : IO Unit := do
   expectRejected "non-finite interval certificate was accepted" (parseFlatBox? 2 nonfiniteBox)
 
   let b2 := flatBox (fun _ => 0.0) (fun _ => 1.0)
-  let mismatchCert : Array (Option (FlatBox Float)) := #[some b2, some flatBox3, some b2]
+  let mismatchCert : Array (Option (FlatBox IEEE32Exec)) := #[some b2, some flatBox3, some b2]
   expect "binary elementwise dimension mismatch was accepted"
     (!(ibpNodePreconditionsOk addGraph mismatchCert 2))
 
@@ -104,13 +106,24 @@ def run : IO Unit := do
   expect "positive log input was rejected"
     (ibpNodePreconditionsOk logGraph #[some positive, some positive] 1)
 
-  let emptyStore : ParamStore Float := {}
+  let emptyStore : ParamStore IEEE32Exec := {}
   let nonPositiveRun := runIBP logGraph (emptyStore.seedInputBox 0 nonPositive)
   let positiveRun := runIBP logGraph (emptyStore.seedInputBox 0 positive)
   expect "IBP evaluated raw log across its nonpositive domain boundary"
     (nonPositiveRun[1]!.isNone)
   expect "IBP failed to evaluate raw log on a positive interval"
     (positiveRun[1]!.isSome)
+
+  let inputGraph : _root_.NN.IR.Graph := { nodes := #[inputNode 0 2] }
+  let authoritative := flatBox (fun _ => 0.0) (fun _ => 1.0)
+  let inward := flatBox (fun _ => 0.0) (fun _ => 0.999999)
+  let outward := flatBox (fun _ => -0.000001) (fun _ => 1.000001)
+  let inwardAccepted ←
+    NN.Verification.IBPNodeCert.checkIBPNode inputGraph #[some authoritative] #[some inward] 0
+  expect "an inward-shrunk certificate interval was accepted" (!inwardAccepted)
+  let outwardAccepted ←
+    NN.Verification.IBPNodeCert.checkIBPNode inputGraph #[some authoritative] #[some outward] 0
+  expect "an outward-widened certificate interval was rejected" outwardAccepted
 
   IO.println "certificate_preconditions: ok"
 

@@ -308,9 +308,10 @@ def ofLinearSpecs {inDim hidDim outDim : Nat}
 /--
 Compute an output interval box via pure IBP.
 
-This is fast and always sound, but typically looser than CROWN/DeepPoly affine bounds.
+This is fast and, when `BoundOps α` supplies sound outward endpoint operations, typically looser
+than CROWN/DeepPoly affine bounds.
 -/
-def boundIbp {inDim hidDim outDim : Nat}
+def boundIbp {inDim hidDim outDim : Nat} [BoundOps α]
   (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
   -- z1 = hiddenWeight x + hiddenBias
@@ -326,7 +327,7 @@ The lower and upper affine CROWN forms for this two-layer ReLU MLP.
 The returned pair is `(lower, upper)`. `boundAffineCrown` evaluates these forms on the input box and
 takes the lower and upper endpoints.
 -/
-def affineCrownForms {inDim hidDim outDim : Nat}
+def affineCrownForms {inDim hidDim outDim : Nat} [BoundOps α]
   (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : AffineVec α inDim outDim × AffineVec α inDim outDim :=
   -- First get the ReLU intervals. Then outputWeight's sign tells us which relaxation feeds the lower or
@@ -379,7 +380,7 @@ Single-pass affine (CROWN/DeepPoly-style) bounds for the 2-layer ReLU MLP.
 This path is only the direct two-layer MLP version. The graph-level code is still the general CROWN
 API.
 -/
-def boundAffineCrown {inDim hidDim outDim : Nat}
+def boundAffineCrown {inDim hidDim outDim : Nat} [BoundOps α]
   (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
   let forms := affineCrownForms (α:=α) net xB
@@ -390,10 +391,10 @@ def boundAffineCrown {inDim hidDim outDim : Nat}
 /--
 End-to-end bound API exposed by this file.
 
-This API returns the IBP bound (sound for all backends); `boundAffineCrown` is the direct
-two-layer ReLU affine implementation.
+This API returns the IBP bound. Its enclosure guarantee depends on the selected `BoundOps`
+implementation; `boundAffineCrown` is the direct two-layer ReLU affine implementation.
 -/
-def boundAffine {inDim hidDim outDim : Nat}
+def boundAffine {inDim hidDim outDim : Nat} [BoundOps α]
   (net : TwoLayerMLP α inDim hidDim outDim)
   (xB : Box α (.dim inDim .scalar)) : Box α (.dim outDim .scalar) :=
   boundIbp (α:=α) net xB
@@ -1167,7 +1168,7 @@ Compute both IBP bounds and affine-CROWN bounds for a two-layer MLP around an `�
 
 The input set is the axis-aligned box centered at `x_center` with radius `eps` in each coordinate.
 -/
-def crownTwoLayerMlpBounds {inDim hidDim outDim : Nat}
+def crownTwoLayerMlpBounds {inDim hidDim outDim : Nat} [BoundOps α]
   (hiddenLayer : Spec.LinearSpec α inDim hidDim)
   (outputLayer : Spec.LinearSpec α hidDim outDim)
   (x_center : Tensor α (.dim inDim .scalar)) (eps : α) :

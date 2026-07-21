@@ -39,8 +39,8 @@ Certificate JSON format:
 ```
 
 Trust boundary notes:
-- The certificate is untrusted; we accept it only if Lean recomputation matches (within a float
-  tolerance due to JSON decimal serialization).
+- The certificate is untrusted; we accept it only if its binary32 affine transcript exactly
+  matches Lean recomputation.
 - Transcendental relaxations are checked only via structural recomputation, not via a formal
   "libm is correct" guarantee.
 -/
@@ -59,10 +59,11 @@ open Import.PyTorch
 open _root_.Spec
 open _root_.Spec.Tensor
 open Lean Data Json
+open TorchLean.Floats.IEEE754
 
 /-!
-The helpers below are the JSON-facing boundary for the CROWN certificate checkers.  They parse
-the artifact, compare decimal-serialized floats with an explicit tolerance, and check parent/shape
+The helpers below are the JSON-facing boundary for the CROWN certificate checkers. They parse the
+artifact, require exact binary32 agreement for affine replay data, and check parent and shape
 requirements before invoking the semantic checker.
 -/
 
@@ -72,32 +73,42 @@ def readCROWNNodeCertificate (g : Graph) (path : String) : IO CROWNNodeCoreCerti
   parseCROWNNodeCoreCertificate g topObj
 
 /-- Check the local CROWN enclosure condition for one node against a certificate entry. -/
-def checkCROWNNode (g : Graph) (ps : ParamStore Float)
-    (certIbp : Array (Option (FlatBox Float)))
-    (certAlpha : Array (Option (FlatVec Float)))
-    (certCrown : Array (Option (FlatAffineBounds Float)))
+def checkCROWNNode (g : Graph) (ps : ParamStore IEEE32Exec)
+    (authoritativeIbp : Array (Option (FlatBox IEEE32Exec)))
+    (certAlpha : Array (Option (FlatVec IEEE32Exec)))
+    (authoritativeCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
+    (certCrown : Array (Option (FlatAffineBounds IEEE32Exec)))
     (ctx : AffineCtx)
-    (id : Nat) (tol : Float) : IO Bool := do
+    (id : Nat) : IO (Bool × Option (FlatAffineBounds IEEE32Exec)) := do
   let computed? :=
-    alphaCrownStepNode? (α := Float) g.nodes ps certIbp certAlpha certCrown ctx id
-  checkCROWNLikeNode "CROWNNodeCert" g certIbp certCrown ctx id tol computed?
+    alphaCrownStepNode? (α := IEEE32Exec) g.nodes ps authoritativeIbp certAlpha
+      authoritativeCrown ctx id
+  let ok ←
+    checkCROWNLikeNode "CROWNNodeCert" g authoritativeIbp authoritativeCrown certCrown ctx id
+      computed?
+  pure (ok, computed?)
 
 /--
 Check a per-node α-CROWN certificate against Lean's propagation rules.
 
-Returns `true` iff every supplied IBP box is locally recomputed by Lean and every node's affine
-bounds agree (within `tol`) with Lean's CROWN step.
+Returns `true` iff every supplied IBP box contains Lean's authoritative recomputation and every
+node's affine replay data agrees exactly with Lean's CROWN step.
 -/
-def checkCROWNNodeCertificate (g : Graph) (ps : ParamStore Float) (path : String) (tol : Float := 1e-4) : IO Bool :=
+def checkCROWNNodeCertificate (g : Graph) (ps : ParamStore IEEE32Exec) (path : String) : IO Bool :=
   do
   let cert ← readCROWNNodeCertificate g path
+  let authoritativeIbp := runIBP (α := IEEE32Exec) g ps
+  let mut authoritativeCrown : Array (Option (FlatAffineBounds IEEE32Exec)) :=
+    Array.replicate g.nodes.size none
   let mut ok := true
   for id in [0:g.nodes.size] do
-    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g ps cert.ibp id tol
-    let okCrown ← checkCROWNNode g ps cert.ibp cert.alpha cert.crown cert.ctx id tol
+    let okIbp ← NN.Verification.IBPNodeCert.checkIBPNode g authoritativeIbp cert.ibp id
+    let (okCrown, computed?) ←
+      checkCROWNNode g ps authoritativeIbp cert.alpha authoritativeCrown cert.crown cert.ctx id
+    authoritativeCrown := authoritativeCrown.set! id computed?
     ok := ok && okIbp && okCrown
   if ok then
-    IO.println "[CROWNNodeCert] artifact replay matched Lean IBP and α-CROWN steps."
+    IO.println "[CROWNNodeCert] artifact matched an authoritative Lean IBP and alpha-CROWN replay."
   pure ok
 
 end NN.Verification.CROWNNodeCert

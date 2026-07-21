@@ -7,7 +7,7 @@ Authors: TorchLean Team
 module
 
 public import Lean.Data.Json
-public import NN.Runtime.External.Process
+public import NN.Core.ExternalProcess
 public import NN.Runtime.PyTorch.Export.TorchExport
 public import NN.Runtime.PyTorch.Import.TorchExport
 public import NN.API
@@ -53,7 +53,7 @@ def usage : String :=
     ]
 
 def workDir : System.FilePath :=
-  Runtime.External.Process.artifactWorkDir "pytorch_export_check"
+  TorchLean.External.Process.artifactWorkDir "pytorch_export_check"
 
 def bridgePath : System.FilePath :=
   workDir / "export_torchlean_graph.py"
@@ -160,7 +160,7 @@ def supportedModelSource : String :=
     ]
 
 def runCapture (ctor : String) (outPath : System.FilePath) (shape : String) : IO String := do
-  Runtime.External.Process.runStdoutChecked
+  TorchLean.External.Process.runStdoutChecked
     (ctx := s!"PyTorch graph capture ({ctor})")
     (cmd := "python")
     (args := #[bridgePath.toString, modelPath.toString, ctor, outPath.toString, "--example-shape", shape])
@@ -174,7 +174,7 @@ Python owns `.pt` loading/saving, and the graph bridge only sees the resulting i
 load trained weights in Python, capture the model graph, then ask Lean to validate the exported IR.
 -/
 def writeCheckpoint : IO Unit := do
-  let _stdout ← Runtime.External.Process.runStdoutChecked
+  let _stdout ← TorchLean.External.Process.runStdoutChecked
     (ctx := "PyTorch checkpoint reference")
     (cmd := "python")
     (args := #[

@@ -79,11 +79,11 @@ For VP SDE:
 
 The probability-flow ODE is:
 
-`dx = (-0.5 β(t) x - β(t) score(x,t)) dt`.
+`dx = (-0.5 β(t) x - 0.5 β(t) score(x,t)) dt`.
 
 Using the ε-parameterization, an approximate score is `score ≈ -(1/σ(t)) ε̂`, so:
 
-`dx = (-0.5 β(t) x + (β(t)/σ(t)) ε̂(x,t)) dt`.
+`dx = (-0.5 β(t) x + 0.5 (β(t)/σ(t)) ε̂(x,t)) dt`.
 -/
 def pfOdeRhs (sch : VPLinearSchedule α) (model : EpsModel α s) (x : Tensor α s) (t : α) :
     Tensor α s :=
@@ -91,7 +91,8 @@ def pfOdeRhs (sch : VPLinearSchedule α) (model : EpsModel α s) (x : Tensor α 
   let σ : α := sch.sigma t
   let epsHat : Tensor α s := model.eps x t
   let drift_x : Tensor α s := Tensor.scaleSpec x (Numbers.neg_point_five * β)
-  let drift_eps : Tensor α s := Tensor.scaleSpec epsHat (safeDiv β σ)
+  let drift_eps : Tensor α s :=
+    Tensor.scaleSpec epsHat (Numbers.pointfive * safeDiv β σ)
   drift_x + drift_eps
 
 /--
@@ -124,7 +125,9 @@ def pfOdeSampleEuler (sch : VPLinearSchedule α) (model : EpsModel α s)
       let rec loop : Nat → Tensor α s → Tensor α s
         | 0, x => x
         | Nat.succ i, x =>
-            let t : α := (1 : α) - ((i : α) / (n : α))
+            -- The recursive counter runs `n, n-1, ..., 1`, so these are the descending
+            -- times `1, (n-1)/n, ..., 1/n`.
+            let t : α := ((Nat.succ i : Nat) : α) / (n : α)
             loop i (eulerStep (α := α) (s := s) (pfOdeRhs (α := α) (s := s) sch model) x t dt)
       loop n x1
 

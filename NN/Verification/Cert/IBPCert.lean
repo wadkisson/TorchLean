@@ -33,7 +33,8 @@ Certificate shape:
 
 Notes on trust boundaries:
 - The JSON is an *untrusted* artifact; we only accept it if Lean recomputation agrees.
-- Agreement is checked with a tolerance because the JSON uses decimal serialization.
+- Each serialized interval must contain the interval recomputed by TorchLean. An inward endpoint is
+  rejected; an outward endpoint is allowed.
 - This checker validates an exported artifact against Lean execution. The theorem-backed path is
   separate: use `NN.Verification` when you need a Lean theorem connecting checker
   hypotheses to semantic enclosure.
@@ -61,11 +62,10 @@ open NN.Verification.Json
 /--
 Run IBP on `(g, ps)` and compare the output box at `outId` against the JSON certificate at `path`.
 
-Returns `true` iff bounds match componentwise (within tolerance).
+Returns `true` iff the serialized bounds contain the recomputed bounds componentwise.
 On mismatch, prints both Lean and JSON bounds for debugging.
 -/
-def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol : Float := 1e-5) :
-  IO Bool := do
+def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) : IO Bool := do
   let boxes := runIBP (α := Float) g ps
   let outB ←
     match NN.MLTheory.CROWN.Graph.outputBox? boxes outId with
@@ -87,15 +87,15 @@ def check (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) (tol
   let okLo :=
     (List.finRange n).all (fun i =>
       match leanLo[i.val]? with
-      | some v => approxEq v (loVec i) (tol := tol)
+      | some v => loVec i <= v
       | none => false)
   let okHi :=
     (List.finRange n).all (fun i =>
       match leanHi[i.val]? with
-      | some v => approxEq v (hiVec i) (tol := tol)
+      | some v => v <= hiVec i
       | none => false)
   if okLo && okHi then
-    IO.println "IBP certificate verified: Python and Lean agree."
+    IO.println "IBP certificate verified: serialized bounds enclose Lean recomputation."
     pure true
   else
     IO.println "Mismatch between Python and Lean IBP bounds."
@@ -115,9 +115,8 @@ Run `check` and raise a readable error on mismatch.
 Verification examples use this entrypoint when the surrounding artifact should fail loudly rather
 than returning a Boolean that a caller might ignore.
 -/
-def checkOrThrow (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String)
-    (tol : Float := 1e-5) : IO Unit := do
-  let ok ← check g ps outId path (tol := tol)
+def checkOrThrow (g : Graph) (ps : ParamStore Float) (outId : Nat) (path : String) : IO Unit := do
+  let ok ← check g ps outId path
   if !ok then
     throw <| IO.userError s!"IBP certificate mismatch: {path}"
 

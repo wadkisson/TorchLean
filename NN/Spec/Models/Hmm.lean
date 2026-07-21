@@ -126,7 +126,8 @@ trainer.
 /--
 Uniform distribution vector of length `n`.
 
-This is used as a safe fallback when a normalization sum is `0`.
+This is used to keep posterior messages total after an impossible observation has already been
+recorded by a zero scaling factor.
 -/
 private def uniformVec {n : Nat} : Tensor α (.dim n .scalar) :=
   match n with
@@ -135,15 +136,25 @@ private def uniformVec {n : Nat} : Tensor α (.dim n .scalar) :=
 
 /-- Normalize a nonnegative vector `v` to sum to `1`, returning `(v / sum(v), sum(v))`.
 
-If the sum is `0`, fall back to a uniform distribution instead of propagating
-`NaN`/division-by-zero behavior into later computations.
+If the sum is `0`, the normalized message is totalized to a uniform vector, while the returned
+scale remains `0`. The zero scale is essential: it records that the observation prefix has
+probability zero.
 -/
 def normalizeVec {n : Nat} (v : Tensor α (.dim n .scalar)) : (Tensor α (.dim n .scalar) × α) :=
   let s := sumSpec v
   if s > 0 then
     (scaleSpec v (1 / s), s)
   else
-    (uniformVec (α := α) (n := n), 1)
+    (uniformVec (α := α) (n := n), 0)
+
+/-- Sum logarithms of positive scale factors. A nonpositive factor represents zero likelihood. -/
+private def logScales? (scales : List α) : Option α :=
+  scales.foldl
+    (fun acc c =>
+      match acc with
+      | none => none
+      | some total => if c > 0 then some (total + MathFunctions.log c) else none)
+    (some 0)
 
 /-- Emission probabilities `B[:, obs]` as a vector over states. -/
 def emissionVec {nStates nObservations : Nat}
@@ -342,7 +353,7 @@ private def expectedCounts
   (Tensor α (.dim nStates .scalar) ×
    Tensor α (.dim nStates (.dim nStates .scalar)) ×
    Tensor α (.dim nStates (.dim nObservations .scalar)) ×
-   α) :=
+   Option α) :=
   -- Returns:
   -- - initial expected occupancies (for π),
   -- - expected transition counts (for A),
@@ -353,7 +364,8 @@ private def expectedCounts
       (fill (0 : α) (.dim nStates .scalar),
        fill (0 : α) (.dim nStates (.dim nStates .scalar)),
        fill (0 : α) (.dim nStates (.dim nObservations .scalar)),
-       0)
+       let s := sumSpec m.init_prob
+       if s > 0 then some (MathFunctions.log s) else none)
   | _ =>
       let (alphas, scales) := hmmForwardScaled (α := α) m observations
       let betas := hmmBackwardScaled (α := α) m observations scales
@@ -377,8 +389,7 @@ private def expectedCounts
         Tensor.dim (fun i =>
           Tensor.dim (fun o =>
             Tensor.scalar (sumGammaWhereObs (α := α) gammas observations i o)))
-      let loglik :=
-        scales.foldl (fun acc c => if c > 0 then acc + MathFunctions.log c else acc) 0
+      let loglik := logScales? (α := α) scales
       (initCounts, transCounts, emitCounts, loglik)
 
 /-- One Baum–Welch (EM) step on a single sequence. -/
@@ -386,7 +397,7 @@ def baumWelchStepSpec
   {nStates nObservations : Nat} [Inhabited (Fin nObservations)] [DecidableEq (Fin nObservations)]
   (m : HMMSpec α nStates nObservations)
   (observations : ObservationSeq nObservations) :
-  (HMMSpec α nStates nObservations × α) :=
+  (HMMSpec α nStates nObservations × Option α) :=
   let (initCounts, transCounts, emitCounts, loglik) := expectedCounts (α := α) m observations
   let init_prob :=
     let (v, _) := normalizeVec (α := α) initCounts
@@ -400,18 +411,22 @@ def baumWelchEpochSpec
   {nStates nObservations : Nat} [Inhabited (Fin nObservations)] [DecidableEq (Fin nObservations)]
   (m : HMMSpec α nStates nObservations)
   (dataset : List (ObservationSeq nObservations)) :
-  (HMMSpec α nStates nObservations × α) :=
+  (HMMSpec α nStates nObservations × Option α) :=
   let init0 := fill (0 : α) (.dim nStates .scalar)
   let trans0 := fill (0 : α) (.dim nStates (.dim nStates .scalar))
   let emit0 := fill (0 : α) (.dim nStates (.dim nObservations .scalar))
   let (initSum, transSum, emitSum, ll) :=
     dataset.foldl (fun (acc : Tensor α (.dim nStates .scalar) ×
                         Tensor α (.dim nStates (.dim nStates .scalar)) ×
-                        Tensor α (.dim nStates (.dim nObservations .scalar)) × α) obs =>
+                        Tensor α (.dim nStates (.dim nObservations .scalar)) × Option α) obs =>
       let (accInit, accTrans, accEmit, accLL) := acc
       let (iC, tC, eC, llik) := expectedCounts (α := α) m obs
-      (addSpec accInit iC, addSpec accTrans tC, addSpec accEmit eC, accLL + llik)
-    ) (init0, trans0, emit0, 0)
+      let nextLL :=
+        match accLL, llik with
+        | some a, some b => some (a + b)
+        | _, _ => none
+      (addSpec accInit iC, addSpec accTrans tC, addSpec accEmit eC, nextLL)
+    ) (init0, trans0, emit0, some 0)
   let init_prob := (normalizeVec (α := α) initSum).1
   let trans_prob := normalizeRows (α := α) transSum
   let emission_prob := normalizeRows (α := α) emitSum
@@ -471,13 +486,13 @@ We compute this from the same scaling factors used in the EM implementation:
 def hmmLogLikelihoodSpec {nStates nObservations : Nat} [Inhabited (Fin nObservations)]
   (m : HMMSpec α nStates nObservations)
   (observations : ObservationSeq nObservations) :
-  α :=
+  Option α :=
   match observations with
   | [] =>
       let s := sumSpec m.init_prob
-      if s > 0 then MathFunctions.log s else 0
+      if s > 0 then some (MathFunctions.log s) else none
   | _ =>
       let (_alphas, scales) := hmmForwardScaled (α := α) m observations
-      scales.foldl (fun acc c => if c > 0 then acc + MathFunctions.log c else acc) 0
+      logScales? (α := α) scales
 
 end Spec

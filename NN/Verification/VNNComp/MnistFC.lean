@@ -568,7 +568,7 @@ def main (args : List String) : IO Unit := do
   IO.println s!"[mnist_fc] layers={layers.size} nodes={g.nodes.size} inDim={inDim} outDim={outDim}"
   IO.println s!"[mnist_fc] instances={instances.size} mode={opts.mode}"
 
-  let mut safe : Nat := 0
+  let mut numericallyRefuted : Nat := 0
   let mut unknown : Nat := 0
   for inst in instances do
     if inst.inputLo.size != inDim || inst.inputHi.size != inDim then
@@ -579,7 +579,7 @@ def main (args : List String) : IO Unit := do
       | throw <| IO.userError s!"Instance {inst.id}: bad input_hi"
     let xB : FlatBox Float := { dim := inDim, lo := loT, hi := hiT }
     let ps : ParamStore Float := baseParams.seedInputBox inId xB
-    let isSafe ←
+    let isRefuted ←
       if opts.mode = .crownObj then
         vnnlibRefutedByCROWNObjectives g ps xB inId outId inDim outDim inst.spec
       else if opts.mode = .crownObjAlpha then
@@ -605,8 +605,13 @@ def main (args : List String) : IO Unit := do
           else
             outputBoxIBP g ps outId
         pure (NN.Verification.VNNComp.VNNLib.refutedByOutputBox yLo yHi inst.spec)
-    if isSafe then safe := safe + 1 else unknown := unknown + 1
+    if isRefuted then
+      numericallyRefuted := numericallyRefuted + 1
+    else
+      unknown := unknown + 1
 
-  IO.println s!"[mnist_fc] safe={safe} unknown={unknown} (mode={opts.mode}; sufficient UNSAT check)"
+  IO.println <|
+    (s!"[mnist_fc] numerically_refuted={numericallyRefuted} unknown={unknown} " ++
+      s!"(mode={opts.mode}; outward-rounded host Float; not a Lean safety theorem)")
 
 end NN.Verification.VNNComp.MnistFC

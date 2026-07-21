@@ -253,7 +253,7 @@ structure BiLSTMModel (α : Type) (inputSize hiddenSize outputSize : Nat) where
 Bundle of parameters for a stacked LSTM language model with deterministic dropout.
 
 This model uses a list of LSTM layers (all with `hiddenSize` input/output) and applies a
-`dropout_inference_spec` scaling step between the recurrent stack and the output projection.
+evaluation-mode dropout step between the recurrent stack and the output projection.
 -/
 structure LSTMLanguageModel (α : Type) (vocabSize hiddenSize : Nat) where
   /-- embedding. -/
@@ -555,7 +555,7 @@ def multilayerLstmForward {seqLen inputSize hiddenSize outputSize numLayers : Na
 Forward pass for `LSTMLanguageModel` (teacher forcing, time-major).
 
 This runs the embedding, then a stack of LSTM layers with provided initial states, applies
-deterministic dropout scaling (`dropout_inference_spec`), and projects to vocabulary logits.
+evaluation-mode dropout (`dropoutInferenceSpec`), and projects to vocabulary logits.
 -/
 def lstmLmForward {seqLen vocabSize hiddenSize : Nat}
   (model : LSTMLanguageModel α vocabSize hiddenSize)
@@ -580,7 +580,7 @@ def lstmLmForward {seqLen vocabSize hiddenSize : Nat}
 
   let (lstm_output, final_states) := process_lstm_layers model.lstm_layers initial_states embedded
 
-  -- Deterministic dropout (inference-style scaling).
+  -- Evaluation-mode dropout.
   let dropped_output := dropoutInferenceSpec (p := model.dropout_rate) lstm_output
 
   -- Project to vocabulary

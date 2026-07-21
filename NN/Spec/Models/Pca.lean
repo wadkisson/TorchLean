@@ -69,15 +69,6 @@ def pcaForwardSpec {inDim outDim : Nat}
   -- Project onto principal components: y = components * x_centered
   matVecMulSpec m.components centered
 
-/-- Batched forward pass: apply `pca_forward_spec` to each row. -/
-def pcaBatchedForwardSpec {batch inDim outDim : Nat}
-  (m : PCASpec α inDim outDim)
-  (input : Tensor α (.dim batch (.dim inDim .scalar))) :
-  Tensor α (.dim batch (.dim outDim .scalar)) :=
-  match input with
-  | Tensor.dim batch_fn =>
-    Tensor.dim (fun i => pcaForwardSpec m (batch_fn i))
-
 /-- Inverse transform: reconstruct `x ≈ componentsᵀ · y + mean`. -/
 def pcaInverseSpec {inDim outDim : Nat}
   (m : PCASpec α inDim outDim)
@@ -144,11 +135,14 @@ an error analysis. Numerical libraries generally use SVD or a convergent eigenso
 -/
 def pcaFitLeadingComponentApproxSpec {nSamples inDim : Nat}
   (data : Tensor α (.dim nSamples (.dim inDim .scalar)))
-  (hSamples : nSamples ≠ 0) (hDim : 0 < inDim) :
+  (hSamples : 1 < nSamples) (hDim : 0 < inDim) :
   PCASpec α inDim 1 :=
   -- Compute mean
   have inst : Shape.valid_axis_inst 0 (Shape.dim nSamples (Shape.dim inDim Shape.scalar)) := by
-    apply Shape.validAxisInstZeroAlt hSamples
+    apply Shape.validAxisInstZeroAlt
+    intro h
+    subst nSamples
+    simp at hSamples
   let mean := reduceMeanAuto 0 inst data
 
   -- Center the data
@@ -157,7 +151,7 @@ def pcaFitLeadingComponentApproxSpec {nSamples inDim : Nat}
   -- Compute covariance matrix: C = (1/(n-1)) * X^T * X
   -- Using n-1 for unbiased estimator (Bessel's correction)
   let covariance := matMulSpec (matrixTransposeSpec centered_data) centered_data
-  let n_minus_1 := max 1 (nSamples - 1) -- Ensure we don't divide by zero
+  let n_minus_1 := nSamples - 1
   let covariance_scaled := scaleSpec covariance (1 / (n_minus_1 : α))
 
   let (eigenvalue, eigenvector) := leadingEigenpairPowerIterationApproxSpec covariance_scaled
@@ -195,16 +189,6 @@ def pcaReconstructionErrorSpec {inDim outDim : Nat}
   have inst : Shape.valid_axis_inst 0 (Shape.dim inDim Shape.scalar) := by
     apply Shape.validAxisInstZeroAlt h
   toScalar (reduceSumAuto 0 squared_error)
-
-/-- Explained variance (eigenvalues of the selected components).
-
-If you want the *ratio* (normalized to sum to `1`), you need to divide by the total variance of the
-original data; this file keeps just the raw eigenvalues.
--/
-def pcaExplainedVarianceSpec {inDim outDim : Nat}
-  (m : PCASpec α inDim outDim) :
-  Tensor α (.dim outDim .scalar) :=
-  m.explained_variance
 
 /-- Cumulative explained variance (prefix sums of `explained_variance`). -/
 def pcaCumulativeExplainedVarianceSpec {α : Type} [Add α] [Zero α]

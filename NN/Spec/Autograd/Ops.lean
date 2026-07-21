@@ -579,7 +579,7 @@ def applyMaskOp {s : Shape} (mask : Tensor Bool s) : OpSpec α s s :=
 { forward      := fun x => map2Spec (fun v b => if b then v else 0) x mask
 , backward     := fun _x dLdy => map2Spec (fun g b => if b then g else 0) dLdy mask }
 
-/-- Deterministic inference-style dropout scaling. -/
+/-- Evaluation-mode dropout, which is the identity in both the forward and backward maps. -/
 def dropoutInferenceOp {s : Shape} (p : α) : OpSpec α s s :=
 { forward      := fun x => dropoutInferenceSpec (α:=α) p x
 , backward     := fun _x dLdy => dropoutInferenceBackwardSpec (α:=α) p dLdy }

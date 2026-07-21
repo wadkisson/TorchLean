@@ -64,28 +64,6 @@ open TorchLean.Floats
 
 namespace IEEE32Exec
 
-/-! ## Exact rational view of float32 values -/
-
-/-- Convert an exact dyadic `(-1)^sign * mant * 2^exp` into an exact rational (`ℚ`). -/
-def Dyadic.toRat (d : Dyadic) : Rat :=
-  let s : Int := if d.sign then -(Int.ofNat d.mant) else Int.ofNat d.mant
-  if d.exp ≥ 0 then
-    let e : Nat := Int.toNat d.exp
-    Rat.ofInt (s * Int.ofNat (pow2 e))
-  else
-    let e : Nat := Int.toNat (-d.exp)
-    (Rat.ofInt s) / (Rat.ofInt (Int.ofNat (pow2 e)))
-
-/--
-Exact rational value of a finite `IEEE32Exec` float.
-
-Returns `none` for NaN/Inf.
--/
-def toRat? (x : IEEE32Exec) : Option Rat :=
-  match toDyadic? x with
-  | some d => some d.toRat
-  | none => none
-
 /-! ## Outward rounding from `ℚ` to `IEEE32Exec` -/
 
 /--
