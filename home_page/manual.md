@@ -27,12 +27,12 @@ scientific ML artifacts, certificate formats, and Lean proof statements.
    runnable program and the mathematical object close together.
 2. [Building Models]({{ '/blueprint/Building-Models/' | relative_url }}) starts from familiar ML:
    tensors, layers, datasets, losses, optimizers, and short training runs.
-3. [Runtime and Interop]({{ '/blueprint/Runtime___-Autograd___-and-Interop/' | relative_url }})
+3. [Runtime and Interop]({{ '/blueprint/Runtime-And-Interop/' | relative_url }})
    follows execution: eager runs, compiled runs, autograd, backend selection, checkpoints, and
    PyTorch interop boundaries.
-4. [Semantics and Graphs]({{ '/blueprint/Semantics-and-Graphs/' | relative_url }}) introduces the
+4. [Semantics and Graphs]({{ '/blueprint/Graphs-And-Numerics/' | relative_url }}) introduces the
    graph objects that runtime tools, exporters, widgets, and verification passes share.
-5. [Verification and Certificates]({{ '/blueprint/Verification-and-Certificates/' | relative_url }})
+5. [Verification and Certificates]({{ '/blueprint/Verification/' | relative_url }})
    shows how bounds, imported artifacts, trusted producers, numerical bridges, and Lean theorems fit
    together.
 

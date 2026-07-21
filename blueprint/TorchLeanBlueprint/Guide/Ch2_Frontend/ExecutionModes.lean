@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Choosing How A Model Runs" =>
+#doc (Manual) "Execution And Backends" =>
 %%%
 tag := "execution-modes"
 %%%
+
 
 Start with the same MLP:
 
@@ -109,202 +110,86 @@ does not mean CUDA Graph capture. A CUDA plus compiled request fails explicitly.
 
 # Experiment 3: Native CUDA
 
-Build and run:
+Build TorchLean with the CUDA Lake configuration and run two training steps on device:
 
 ```
 lake -R -K cuda=true exe torchlean quickstart_mlp \
-  --dtype float \
-  --backend eager \
-  --device cuda \
-  --steps 20 \
-  --seed 2026 \
-  --show-backend
+  --device cuda --steps 2 --seed 2026 --show-backend
 ```
 
-The CUDA profile selects native capsules for supported operations. The report names reshape,
-permutation, matrix multiplication, broadcasting, addition, ReLU, and MSE providers as they are
-first used.
+`-R` rebuilds targets affected by the Lake configuration, and `-K cuda=true` selects the CUDA
+source and link flags. The command requires a working `nvcc` and CUDA toolkit; on machines without
+CUDA, keep Experiments 1–2 on `--device cpu` and treat this section as documentation of the
+maintained GPU path. When the build succeeds, the backend report should name native CUDA capsules
+for supported operations such as `matmul`.
 
-CUDA currently requires host `Float` at the public module boundary. The native tensors use
-device-side Float32 storage and operations according to their capsules. This is a runtime boundary,
-not an identification of Lean `Float`, mathematical `FP32`, and CUDA `float`.
+# Inside The Backend Planner
 
-If the project is built without CUDA support, requesting CUDA fails. The stub archives permit the
-repository to build on CPU-only systems; they do not pretend to execute GPU code.
+The previous page selected CPU, CUDA, or an optional provider from the public API. Now we can look
+at the less visible question: when a graph asks for matrix multiplication, attention, or a
+reduction, how does TorchLean decide which implementation is allowed to answer?
 
-# Experiment 4: Executable IEEE Binary32
+A device name is not enough. One CUDA build may contain a hand-written kernel, a cuBLAS call, and a
+LibTorch bridge for different operations. Their layouts, numerical behavior, backward support, and
+supporting evidence differ. The backend planner keeps those differences in data and either returns
+an accepted plan or explains why it could not make one.
 
-```
-lake exe torchlean quickstart_mlp \
-  --dtype ieee754exec \
-  --backend eager \
-  --device cpu \
-  --steps 2 \
-  --seed 2026
-```
+The path is:
 
-This uses TorchLean's explicit bit-level `IEEE32Exec` scalar model. It is intentionally slower and
-best used for small reference runs and numerical experiments.
+$$`
+\text{operation}+\text{profile}+\text{available providers}
+\longrightarrow \text{capsule}
+\longrightarrow \text{audit}
+\longrightarrow \text{accepted kernel}.
+`
 
-The proof-oriented finite `FP32` model and exact `Real` live in theorem statements rather than the
-IO trainer. The floating-point chapter shows how those views connect.
+That path, rather than another tour of command-line flags, is the subject of this chapter.
 
-# The Same Choices In Lean
+# Kernel Capsules
 
-```
-def eagerCpu : Trainer.RunConfig :=
-  { dtype := .float
-    backend := .eager
-    optimizer := optim.adam { lr := 0.03 } }
+Suppose a graph reaches scaled dot-product attention. TorchLean currently knows three maintained
+ways to compute it: a composed TorchLean expression, a native fused CUDA implementation, and a
+LibTorch forward bridge with a TorchLean-owned backward pass. The operation is the same; the
+implementation contract is not.
 
-def compiledCpu : Trainer.RunConfig :=
-  eagerCpu.compiled.cpu
-
-def eagerCuda : Trainer.RunConfig :=
-  eagerCpu.cuda
-```
-
-Attach a run configuration to a task and seed:
+A `KernelCapsule` records those differences:
 
 ```
-def trainerFromRun (run : Trainer.RunConfig) :=
-  Trainer.new model
-    (Trainer.Config.fromRunConfig
-      run .regression
-      (seed := 2026))
+structure KernelCapsule where
+  name : String
+  op : BackendOp
+  provider : Provider
+  device : Device
+  trustLevel : TrustLevel
+  supportsForward : Bool
+  vjpMode : VJPMode
+  shapeContract : ContractDescriptor
+  layoutContract : ContractDescriptor
+  valueContract : ContractDescriptor
+  vjpContract : ContractDescriptor
+  numericalPolicy : NumericalPolicy
+  notes : String
 ```
 
-`trainWithRun` can apply a temporary per-call runtime override without rebuilding the model
-declaration.
+Capsules are declared before the run and registered with the backend. The planner may select one
+only when its device, provider, gradient mode, and assurance level fit the requested profile. If no
+capsule fits, planning stops with an error.
 
-# Why Device Is Part Of A Profile
+Capsules are collected in named `CapsuleModule`s. Built-in attention, native CUDA, portable
+reference, and optional LibTorch code contribute modules to the same registry. A downstream
+provider can prepend another module with `BackendProfile.withCapsuleModules`; it does not add a new
+model class or a branch to the graph walker. The model still lowers to ordinary `BackendOp`s, and
+the planner either finds an admissible capsule for each operation or reports the missing operation.
+Adding a module with an existing name replaces that module. Planning rejects repeated module names
+and repeated capsule identities, so provider precedence cannot change through accidental duplicate
+registration.
 
-A device choice affects more than memory location. The profile also carries:
-
-- provider preference;
-- assurance policy;
-- requested VJP ownership;
-- target operating system and architecture;
-- capsule modules available to the planner.
-
-Selecting only `.cuda` while retaining CPU provider assumptions would be an inconsistent
-configuration. `RunConfig.withDevice` therefore installs a maintained profile as one value or
-returns an error.
-
-Custom and optional LibTorch paths use `withBackendProfile`, making the larger boundary explicit.
-
-# Train And Evaluation Mode
-
-Mode-sensitive layers include dropout and normalization:
+`BackendOp` names semantic operation families such as matrix multiplication, reduction, pooling, or
+convolution. Rank, axes, padding, strides, and index tensors remain in the graph payload. This keeps
+capability discovery general without erasing the information needed to state the operation
+correctly.
 
 ```
-Trainer.Manual.trainMode runner
-Trainer.Manual.evalMode runner
-Trainer.Manual.isTraining runner
+#check NN.Backend.Registry.CapsuleModule
+#check NN.Backend.BackendProfile.withCapsuleModules
 ```
-
-Training mode may sample masks or update running statistics. Evaluation mode uses the corresponding
-inference behavior. The high-level trainer enters training mode for updates and evaluation mode for
-summary predictions and retained prediction handles.
-
-Mode is independent of device and eager/compiled choice. A CUDA runner can switch mode without
-changing model architecture or provider profile.
-
-# A Small Dropout Thought Experiment
-
-Suppose:
-
-$$`y=\operatorname{Dropout}_{p}(x)`.
-
-During training, a random mask is realized and retained for the backward rule. During evaluation,
-the operation follows its deterministic inference semantics. Re-running the backward pass with a
-newly sampled mask would not differentiate the forward value that was computed.
-
-This is why RNG and mode belong to runtime state and to reproducible checkpoints.
-
-# Dynamic Operations And Compilation
-
-A fixed compiled graph needs operation structure and shapes known when recording. If a program
-reads token values and changes the graph structure while constructing it, the current `GraphM`
-compiler cannot represent that program as one fixed replay.
-
-The correct response is not to coerce the values into a graph and hope. Either:
-
-- keep that control flow in eager mode;
-- represent the choice as a supported tensor operation;
-- compile separate static branches behind an explicit runtime choice.
-
-Unsupported compiled operations are rejected.
-
-# Selecting A LibTorch Provider
-
-LibTorch is not a third execution mode. It is an optional provider inside an eager backend profile.
-The maintained bridge currently accelerates scaled-dot-product attention forward while TorchLean
-retains its tape and local backward ownership.
-
-Surrounding operations may still use native CUDA or reference capsules. Provider selection is
-per semantic operation.
-
-The next backend chapter opens the capsule and its evidence fields. At runtime, one rule matters
-immediately: training cannot choose a forward-only capsule unless the profile also supplies an
-admissible VJP path.
-
-# Unsupported Means Failure
-
-Try:
-
-```
-lake exe torchlean quickstart_mlp \
-  --device metal --steps 1
-```
-
-on the current checkout. The target name is parsed, but profile selection rejects it. This confirms
-that a future platform vocabulary is not reported as working implementation.
-
-Likewise:
-
-- CUDA requested in a CPU-only build fails;
-- compiled mode with non-CPU profile fails;
-- proof-only scalar semantics in IO fail;
-- an operation with no admissible capsule fails planning or execution.
-
-These failures protect benchmark provenance. “Requested GPU” must never become an unreported CPU
-run.
-
-# A Practical Selection Table
-
-| Goal | Scalar | Mode | Profile |
-| --- | --- | --- | --- |
-| inspect ordinary training | `Float` | eager | CPU |
-| replay a supported fixed graph | `Float` | compiled | CPU |
-| run native GPU training | `Float` | eager | CUDA |
-| inspect binary32 reference behavior | `IEEE32Exec` | eager | CPU |
-| use external attention forward | `Float` | eager | LibTorch-enabled CUDA |
-| verify/export an operation graph | semantic context | IR evaluator | no trainer profile |
-
-The final row is deliberately outside the trainer modes. Lowering a model to `NN.IR.Graph` creates
-an inspectable semantic artifact, not another high-performance runtime switch.
-
-# Record The Choice With Results
-
-A useful run report includes:
-
-```
-model architecture and parameter count
-dataset identity and preprocessing
-seed and optimizer
-scalar semantics
-eager or compiled mode
-device and provider capsules
-train/eval mode
-checkpoint and code revision
-```
-
-Without this information, two loss curves may be incomparable even when both are labeled
-“TorchLean float32.”
-
-Sources:
-
-- [`NN/API/Runtime/Module.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Runtime/Module.lean);
-- [`Core/Types.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core/Types.lean);
-- [`Core/Trainer.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Torch/Core/Trainer.lean).

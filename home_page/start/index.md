@@ -37,24 +37,19 @@ certificates, and two-stage Lyapunov experiments.
 
 ## Where To Go Next
 
-1. [Installation]({{ '/installation/' | relative_url }}) covers Linux, macOS, Windows/WSL, CUDA,
-   optional LibTorch integration, and backend capsules.
+1. [Installation]({{ '/installation/' | relative_url }}) covers Linux, macOS, Windows/WSL, CUDA, and
+   optional LibTorch integration.
 2. [Building Models]({{ '/blueprint/Building-Models/' | relative_url }}) introduces typed tensors,
-   layers, parameter packs, datasets, losses, optimizers, and the public trainer.
-3. [Runtime and Interop]({{ '/blueprint/Runtime___-Autograd___-and-Interop/' | relative_url }})
-   explains eager and compiled execution, autograd, runtime artifacts, PyTorch interop boundaries,
-   data streams, and backend selection.
-4. [Semantics and Graphs]({{ '/blueprint/Semantics-and-Graphs/' | relative_url }}) explains the
-   graph IR, graph denotation, shape discipline, named operations, and why verifiers reuse the same
-   graph rather than inventing a second model language.
-5. [Floating Point and Native Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/' | relative_url }})
-   separates real-valued specifications, executable Float32 models, CUDA/native execution, and
-   external producer assumptions.
-6. [Verification and Certificates]({{ '/blueprint/Verification-and-Certificates/' | relative_url }})
-   covers IBP/CROWN bounds, imported artifacts, optimizer laws, autograd proof APIs, scientific
-   ML certificates, and trust boundaries.
-7. [Examples]({{ '/examples/' | relative_url }}) collects runnable model, scientific ML,
-   verification, text, diffusion, geometry, and Bug Zoo workflows.
+   layers, datasets, training, and the public trainer.
+3. [Runtime And Interop]({{ '/blueprint/Runtime-And-Interop/' | relative_url }})
+   explains execution backends, autograd, and PyTorch interop.
+4. [Graphs And Numerics]({{ '/blueprint/Graphs-And-Numerics/' | relative_url }}) covers graph IR,
+   floating-point semantics, and native/CUDA boundaries.
+5. [Verification]({{ '/blueprint/Verification/' | relative_url }})
+   covers bounds, certificates, autograd/approximation proofs, and the theory map.
+6. [Applications]({{ '/blueprint/Applications/' | relative_url }}) and
+   [Examples]({{ '/examples/' | relative_url }}) collect runnable models, CLI tools, and Bug Zoo
+   workflows.
 
 ## Common Next Steps
 
@@ -63,7 +58,7 @@ certificates, and two-stage Lyapunov experiments.
 - Check a certificate or bound pass: [Verification Bounds]({{ '/examples/verification/' | relative_url }}).
 - Read the public import path: `import NN; open TorchLean`.
 - Explore module ownership: [Graphs]({{ '/graphs/' | relative_url }}).
-- Understand CUDA assumptions: [GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+- Understand CUDA assumptions: [Native Boundaries]({{ '/blueprint/Graphs-And-Numerics/Native-Boundaries/' | relative_url }}).
 
 When changing code, keep the edit loop small at first: run one example, inspect the file it writes,
 then run the matching checker when the example has one.

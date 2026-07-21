@@ -333,7 +333,7 @@ checker predicate did this command use?
 - 3D geometry certificate checker:
   [`NN.Verification.Geometry3D`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Geometry3D.lean)
 - Verification guide chapter:
-  [Verification and Certificates]({{ '/blueprint/Verification-and-Certificates/Verification/' | relative_url }})
+  [Verification and Certificates]({{ '/blueprint/Verification/Verification/' | relative_url }})
 
 The examples provide commands that check the relevant graph, bound, or certificate artifact in
 Lean, rather than relying only on plots or external Python objects.

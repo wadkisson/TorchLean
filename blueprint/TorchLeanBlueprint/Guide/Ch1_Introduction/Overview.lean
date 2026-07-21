@@ -2,12 +2,13 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "The Problem TorchLean Solves" =>
+#doc (Manual) "Getting Started" =>
 %%%
 tag := "overview"
 %%%
 
-Suppose we train a small network, save its parameters, run it on a GPU, and later claim that its
+
+Suppose we train a small AI model, save its parameters, run it on a GPU, and later claim that its
 output stays in a safe range for every input near a test point. During that one workflow, the phrase
 "the model" can refer to at least six different things:
 
@@ -102,7 +103,7 @@ not, by itself, prove its kernels satisfy the mathematical specification.
 
 `NN.IR.Graph` is a directed acyclic graph of operation-tagged nodes. Each node has parent ids and a
 declared output shape. Constants, weights, convolution parameters, and similar data live in a
-separate payload store. This separation lets the graph structure be inspected without pretending
+separate payload store. This separation lets the graph structure be inspected without assuming that
 that two different payloads are the same trained model.
 
 ## The object checked by a verifier
@@ -133,88 +134,158 @@ def labels : Tensor.T Float (shape![32]) :=
   tensorOfList! [32] (List.replicate 32 0.0)
 ```
 
-These are different types. A loss that expects equal shapes cannot silently broadcast the label
-vector across the second axis. Lean asks us to choose: reshape the labels, squeeze the predictions,
-or use another loss. That is exactly where the ambiguity belongs.
+# Why Running The Model Is Not The Whole Story
 
-Shape typing is deliberately modest. It catches structural mistakes while they are still local.
-Questions about units, label quality, normalization, finiteness, and generalization appear later as
-their own definitions and hypotheses instead of being smuggled into the word "tensor."
+Suppose a ten-class image classifier returns logits
+`f_θ(x₀) ∈ ℝ¹⁰` and the largest entry is at index `3`. Then the ordinary prediction is class `3`
+on that one image `x₀`. That answers a pointwise question: what did the network output for this
+exact input?
 
-# From One Output To A Statement
+A local robustness claim asks something stronger. Fix a radius `ε > 0` and consider every image
+`x` whose pixel values stay within `ε` of `x₀` in the `∞`-norm (each coordinate may move by at most
+`ε`). For the predicted class to be stable on that whole box, class `3` must keep the largest logit
+at every such `x`: for every competing class `j ≠ 3`,
 
-Suppose the trained model has parameters `θ`, its graph is `g`, and the two input features vary in a
-box `B`. A range statement might be
+$$`f_\theta(x)_3 - f_\theta(x)_j > 0`.
 
-$$`\forall x\in B,\qquad
-  |\operatorname{denote}(g,\theta,x)_0-y^\star|\leq\delta`.
+In other words, the margin of class `3` over every rival must stay positive on the entire
+neighborhood, not merely at the original photograph. The difference is visible in the quantifiers.
+A prediction is one computation:
 
-This line records the details that are easy to lose in prose:
+$$`f_\theta(x_0)=y`.
 
-- `g` identifies the operation graph;
-- `θ` identifies the concrete trained parameters;
-- `B` identifies the quantified input convention;
-- `denote` identifies the scalar and operator semantics;
-- index `0`, target `y⋆`, and tolerance `δ` identify the output property.
+A local robustness statement concerns every point in a region:
 
-An interval pass can compute lower and upper output bounds. A Boolean check can then confirm that the
-whole interval lies in `[y⋆-δ,y⋆+δ]`. The last ingredient is a soundness theorem saying that the
-computed interval really encloses `denote` for this graph.
+$$`\forall x,\quad \lVert x-x_0\rVert_\infty\leq\varepsilon
+  \Longrightarrow
+  f_\theta(x)_y-f_\theta(x)_j>0
+  \quad\text{for every }j\ne y`.
 
-The guide uses the following vocabulary throughout:
+The first line is a calculation. The second is a theorem about an uncountable set. No amount of
+random sampling changes that quantifier. A verifier needs a description of the region and a way to
+bound the network everywhere inside it.
 
-| Evidence | What it establishes |
-| --- | --- |
-| a successful run | one execution produced a value |
-| a parser or shape check | an artifact satisfies a structural predicate |
-| a certificate replay | an artifact satisfies the checker's acceptance predicate |
-| a soundness theorem | the accepted predicate implies a semantic proposition |
-| a backend assumption | an external implementation is being trusted to meet a stated contract |
+# A Mask With The Right Shape And The Wrong Meaning
 
-# Fast Kernels Still Belong
+Some of the most important mistakes are perfectly well typed. Attention masking is a good example.
+For query `i`, let `Aᵢ` be the keys that are allowed to receive attention. A hard mask means
 
-PyTorch has far broader operator coverage, distributed training, mature compilers, pretrained
-models, and years of production optimization. Reimplementing all of that inside Lean would be a
-poor use of both systems.
+$$`
+\operatorname{attention}_{ij}
+=
+\begin{cases}
+\dfrac{\exp(s_{ij})}
+      {\sum_{k\in A_i}\exp(s_{ik})}, & j\in A_i,\\[1.2ex]
+0, & j\notin A_i.
+\end{cases}
+`
 
-TorchLean can therefore call native CUDA or LibTorch for expensive operations. The source model,
-parameter layout, and graph remain TorchLean objects; a backend profile chooses the implementation.
-For example, LibTorch may compute the forward value of scaled dot-product attention while
-TorchLean records the tape node and applies its own backward rule. Another profile may use native
-TorchLean CUDA for both directions. Later we will inspect the capsule that records this choice.
+Blocked entries never enter the denominator and receive exactly zero weight. A common numerical
+shortcut instead adds a large negative constant `-C` to a blocked logit before softmax:
 
-This gives the project a practical division of labor: use established kernels where scale matters,
-and use Lean to make the surrounding mathematical claim precise.
+$$`
+\widetilde{\operatorname{attention}}_{ij}
+=
+\frac{\exp(s_{ij}-C)}
+     {\sum_{k\in A_i}\exp(s_{ik})
+       +\sum_{k\notin A_i}\exp(s_{ik}-C)}.
+`
 
-# Imports
+For ordinary logits and a large `C`, this value may underflow to zero in a particular floating-point
+run. Mathematically, however, it is positive for every finite `C`. Worse, the shortcut is not safe
+for arbitrary logits. If a blocked score is `C+100`, then subtracting `C` leaves the very large score
+`100`; the supposedly blocked key can dominate the softmax.
 
-Use the focused public API for application code:
+Both implementations have the same tensor shapes. Both run. Tests with moderate random logits may
+make them look identical. The bug is in the definition of masking.
+
+TorchLean's specification uses the hard-mask equation: blocked entries have zero numerator. Runtime
+providers must implement that meaning or advertise a different operation. This is a useful example
+of the library's larger design. Types settle structural questions; specifications settle semantic
+ones.
+
+# Coordinates Are Part Of The Claim
+
+Now suppose the model consumes normalized vectors:
+
+$$`N(x)_i=\frac{x_i-\mu_i}{\sigma_i}`.
+
+If the raw input lies in a box
+
+# A First Walk Through The API
+
+The shortest useful TorchLean import is:
 
 ```
 import NN.API
+
 open TorchLean
 ```
 
-Use the complete umbrella when one file genuinely combines application code with proofs,
-verification, floating-point semantics, backends, or widgets:
+It gives application code five main places to begin:
+
+- `Tensor` for shape-indexed tensor values and constructors;
+- `nn` for layers, blocks, model families, and seeded initialization;
+- `Data` for in-memory datasets, loaders, checkpoints, and text helpers;
+- `optim` for optimizer configurations;
+- `Trainer` for prediction, training, summaries, and the public verification bridge.
+
+We will take those names in order and use each one once. Every command below runs from the
+repository root.
+
+# First Contact: Print A Few Tensors
+
+Run:
 
 ```
-import NN
+lake exe torchlean quickstart_tensors
+```
+
+The checked-in example prints:
+
+```
+== Quickstart: tensor basics ==
+[Float] [0.100000, 0.200000, 0.300000, 0.400000]
+[ℚ] [1/10, 1/5, 3/10, 2/5]
+[Int] [1, 2, 3, 4]
+[IEEE32Exec] [0.100000, 0.200000, 0.300000, 0.400000]
+[Float] [[[1.000000, 2.000000], [3.000000, 4.000000]],
+         [[5.000000, 6.000000], [7.000000, 8.000000]]]
+Expected failure printing Tensor ℝ: Refusing to print `Tensor ℝ` ...
+```
+
+The same tensor structure can carry several scalar types. `Float` is Lean's executable host
+floating type. `ℚ` is exact rational arithmetic. `IEEE32Exec` is TorchLean's executable bit-level
+binary32 model. `ℝ` is useful in specifications and proofs, but arbitrary real values do not have a
+general executable printer.
+
+Open
+[`NN/Examples/Quickstart/TensorBasics.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Quickstart/TensorBasics.lean)
+and find the definitions of `xF`, `xQ`, and `x32`. The values look alike when printed, but their
+types select different arithmetic.
+
+# Build A Small File Of Your Own
+
+Create `Tour.lean` at the repository root:
+
+```
+import NN.API
+
 open TorchLean
+
+def point : Tensor.T Float (shape![2]) :=
+  tensorOfList! [2] [0.25, -0.75]
+
+def model : nn.M (nn.Sequential (.dim 2 .scalar) (.dim 1 .scalar)) :=
+  nn.Sequential![
+    nn.linear 2 8,
+    nn.relu,
+    nn.linear 8 1
+  ]
+
+def initialized :=
+  nn.run 2026 model
+
+#eval Tensor.pretty point
+#eval IO.println (nn.info initialized)
 ```
-
-Focused subsystem imports such as `NN.IR`, `NN.Floats`, `NN.Proofs`, and `NN.Verification` avoid
-loading the whole project when only one layer is needed.
-
-# References
-
-- Leonardo de Moura and Sebastian Ullrich,
-  [“The Lean 4 Theorem Prover and Programming
-  Language”](https://lean-lang.org/papers/lean4.pdf), CADE 2021.
-- Adam Paszke et al.,
-  [“PyTorch: An Imperative Style, High-Performance Deep Learning
-  Library”](https://arxiv.org/abs/1912.01703), NeurIPS 2019.
-- Shiqi Wang et al.,
-  [“Beta-CROWN: Efficient Bound Propagation with Per-neuron Split Constraints for Complete and
-  Incomplete Neural Network Robustness Verification”](https://arxiv.org/abs/2103.06624),
-  NeurIPS 2021.

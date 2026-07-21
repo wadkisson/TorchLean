@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Tensors That Remember Their Shapes" =>
+#doc (Manual) "Tensors And Models" =>
 %%%
 tag := "tensors-shapes"
 %%%
+
 
 Most tensor libraries carry a shape beside a buffer and check compatibility when an operation
 runs. TorchLean also carries the shape in the Lean type. A function that accepts a length-four
@@ -81,9 +82,18 @@ def rankFourShape : Shape := shape![8, 3, 32, 32]
 ```
 
 `rankFourShape` is not an “image shape” at the type level. It is an ordinary rank-four tensor.
-NCHW, NHWC, sequence, and feature conventions belong to operations and models, not to separate
-tensor datatypes. This is why the same tensor core can represent language tokens, PDE grids,
-volumetric data, batched matrices, or an unusual scientific coordinate system.
+Layout conventions belong to operations and models, not to separate tensor datatypes. In vision
+code those conventions are often abbreviated:
+
+- _NCHW_: batch `N`, channels `C`, height `H`, width `W` — so `shape![8, 3, 32, 32]` is eight RGB
+  images of size `32×32` with channels first;
+- _NHWC_: the same axes with channels last — `shape![8, 32, 32, 3]`.
+
+Sequence models instead treat axes as batch × time × features; scientific grids may use batch ×
+channels × spatial axes of any rank. TorchLean stores only the shape index; the meaning of each
+axis is fixed by the layer or operator that consumes the tensor. That is why the same tensor core
+can represent language tokens, PDE grids, volumetric data, batched matrices, or an unusual
+scientific coordinate system.
 
 # Literals Prove Their Own Shape
 
@@ -119,215 +129,130 @@ shape.
 
 When the scalar type is ambiguous, make it explicit:
 
-```
-def q : Tensor.T Rat (shape![2, 2]) :=
-  tensor! (ty := Rat) [[1, 2], [3, 4]]
-```
+# Building A Model
 
-For a flat literal, `tensorOfList!` proves the length obligation:
+A TorchLean model begins as a map between tensor shapes. Initialization, loss functions, optimizer
+state, and execution devices are attached later. This separation is useful even before proving a
+theorem: the architecture can be inspected without allocating parameters, and the same model can
+be initialized twice with different seeds or interpreted by different runtimes.
 
-```
-def v : Tensor.T Float (shape![4]) :=
-  tensorOfList! [4] [0.0, 1.0, 2.0, 3.0]
-```
+We will sketch three public-API models that share the same composition mechanism. The running
+example through later chapters is the MLP; the CNN and transformer show that vision and sequence
+layouts are ordinary shape-indexed `nn.Sequential` values, not separate frameworks.
 
-In scalar-polymorphic runtime code, `tensorF! cast dims values` authors constants as `Float` and
-maps a supplied `Float → α` conversion over them. The conversion is visible because changing scalar
-semantics is not merely changing storage metadata.
+# A Layer Is A Checked Shape Map
 
-# Indexing Is Total
-
-The recursive representation of a tensor mirrors its shape:
+The public layer type is:
 
 ```
-Tensor α (.dim n rest)
+nn.LayerDef inputShape outputShape
 ```
 
-contains a function from `Fin n` to `Tensor α rest`. An index has both a natural number and a proof
-that it is smaller than the dimension. Consequently, indexing does not return `Option α` and does
-not throw an out-of-range exception: an invalid index cannot be constructed without supplying a
-false proof.
-
-For the matrix above, the first row can be written:
+A sequential model has:
 
 ```
-def firstRow : Tensor.T Float (shape![2]) :=
-  match x with
-  | .dim rows => rows ⟨0, by decide⟩
+nn.Sequential inputShape outputShape
 ```
 
-The output shape is visible in the function type. Indexing once removed the outer dimension; it did
-not flatten or reinterpret the remaining data.
+The input and output shapes are indices of the type, so composition requires equality at the
+boundary. If:
 
-This representation is particularly pleasant in proofs. A theorem about a rank-`n+1` tensor can
-introduce an arbitrary `i : Fin size` and apply the induction hypothesis to the smaller tensor at
-that index.
+$$`f:s_0\to s_1`
 
-# Runtime Data Must Earn A Shape
+and
 
-A file or network payload arrives as bytes and runtime dimensions. Lean cannot know its shape
-before reading it. The correct boundary is therefore a checked constructor:
+$$`g:s_1\to s_2`,
 
-```
-def loadVector4 (xs : List Float) :
-    Except String (Tensor.T Float (shape![4])) :=
-  Tensor.ofList [4] xs
-```
+then `g` may follow `f`. A layer expecting `s_3` cannot be inserted there merely because the two
+shapes contain the same number of values.
 
-`Tensor.ofList` checks that the list length equals the product of the dimensions. Only the success
-branch returns the typed tensor.
-
-For dimensions that are themselves known only at runtime:
+Model builders use:
 
 ```
-def loadDynamic (dims : List Nat) (xs : List Float) :=
-  NN.Tensor.dynamicOfList dims xs
+nn.M A
 ```
 
-the result packages an existential shape together with the corresponding tensor. A caller may
-inspect the dimensions, establish that they equal the shape required by a model, and then cross
-into the statically typed API.
+which is a seeded construction of `A`. It allocates deterministic seeds for parameterized layers
+but does not run a forward pass or optimizer update.
 
-This is a recurring TorchLean pattern:
+# The Running MLP
 
-```
-untyped external payload
-  -> parser
-  -> runtime validation
-  -> typed Lean object
-  -> theorem or model API
-```
-
-The check proves something about the accepted payload. It does not prove that every future file is
-valid, and it does not certify the code that produced the file.
-
-# Scalar Type Is More Than A DType Label
-
-These tensors have the same shape and different semantics:
-
-| Tensor element | Meaning |
-| --- | --- |
-| `Float` | executable host floating point |
-| `Rat` or `ℚ` | executable exact rationals |
-| `Real` or `ℝ` | proof-level exact reals |
-| `TorchLean.Floats.F32 .ieee754Exec` | executable bit-level binary32 |
-| `TorchLean.Floats.F32 .fp32` | finite rounded-real binary32 proof model |
-
-The public trainer has a `dtype` option, but it is selecting a scalar interpretation, not adding a
-decorative field to an untyped buffer. Executable trainer paths reject `.real` and the
-noncomputable `.fp32` proof mode. The executable binary32 constructor is:
+Here is the model used throughout the introduction:
 
 ```
-def x32 :
-    Tensor.T (TorchLean.Floats.F32 .ieee754Exec) (shape![3]) :=
-  tensor32! [0.1, 0.2, 0.3]
+import NN.API
+open TorchLean
+
+def inDim : Nat := 2
+def hidden : Nat := 8
+def outDim : Nat := 1
+
+def model :
+    nn.M (nn.Sequential (shape![inDim]) (shape![outDim])) :=
+  nn.Sequential![
+    nn.linear inDim hidden,
+    nn.relu,
+    nn.linear hidden outDim
+  ]
 ```
 
-The decimal source literal `0.1` is converted to a binary32 bit pattern. The floating-point chapter
-explains why the printed decimal and the stored mathematical value are not identical.
-
-# Linear Layers Preserve Prefix Dimensions
-
-PyTorch's `Linear(in_features, out_features)` acts on the last axis. TorchLean follows that useful
-convention while checking the complete map. The same layer:
+Read the macro from top to bottom:
 
 ```
-nn.linear 2 8
+input [2]
+  -> linear 2 8
+hidden [8]
+  -> relu
+hidden [8]
+  -> linear 8 1
+output [1]
 ```
 
-can occur in:
+`ReLU` is shape-preserving. The two linear layers each change the final feature axis. The macro
+checks that the chain is composable and returns one `Sequential [2] [1]`.
+
+The parameter layout follows PyTorch's linear-layer convention:
+
+$$`
+W:\operatorname{Tensor}\;\alpha\;[\mathrm{out},\mathrm{in}],
+\qquad
+b:\operatorname{Tensor}\;\alpha\;[\mathrm{out}].
+`
+
+# A Small Convolutional Classifier
+
+For images, the public helper `nn.models.cnn` builds a convolutional classifier over an NCHW
+minibatch. The compact CIFAR example uses batch `1`, three input channels, an `8×8` crop, and ten
+output classes; the full configuration lives in
+[`NN/Examples/Models/Vision/Cnn.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/Cnn.lean).
+Download the CIFAR arrays first (about 170 MB; the Toronto host can be slow), then run the model:
 
 ```
-shape![2]              -> shape![8]
-shape![batch, 2]       -> shape![batch, 8]
-shape![batch, time, 2] -> shape![batch, time, 8]
+python3 scripts/datasets/download_example_data.py --cifar10
+lake exe torchlean cnn --device cpu --n-total 1 --steps 1
 ```
 
-The prefix is not hard-coded as “batch” or “time.” It is any leading shape. This permits one linear
-definition to work for single examples, minibatches, sequences, and higher-rank collections.
+The important point for this chapter is architectural: convolution, pooling, and the linear head
+are still ordinary layers composed into one `nn.Sequential`, indexed by the input and output shapes
+of that pipeline.
 
-Now try changing the second linear layer in the quickstart MLP from `nn.linear 8 1` to
-`nn.linear 7 1` without changing the preceding layer. The sequential model no longer composes:
-one layer produces a last dimension of eight while the next requires seven. The error appears when
-the model is defined, before initialization, data loading, or training.
+# A Transformer Encoder Block
 
-# Reshape Changes Structure, Not Data
-
-A reshape from `[2,3]` to `[6]` is permitted because both shapes contain six values. It still needs
-an explicit operation because the indexing interpretation changes. Conversely, reshaping `[2,3]`
-to `[2,4]` is impossible because the element counts differ.
-
-The layout convention matters at the representation boundary. In row-major order:
-
-$$`\operatorname{flatIndex}(i,j)=3i+j`
-
-for a `2 × 3` matrix. A column-major native library would use a different equation. Shape equality
-does not prove layout agreement, so backend capsules record layout requirements separately.
-
-# Specification Tensors And Runtime Buffers
-
-`Spec.Tensor` is a nested total function, a representation chosen for definitions and proofs.
-Runtime CPU and CUDA code uses arrays, native storage, or device buffers. These are not competing
-public tensor systems; they are two representations with an explicit bridge.
-
-The deep-dive file
-[`Tensors/Basic.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Tensors/Basic.lean)
-shows both:
+Sequence models use the same composition surface. A single encoder block is:
 
 ```
-def matrixArray : TensorArray.Tensor Float [2, 3] :=
-  TensorArray.ofArray
-    #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-    [2, 3]
-    (by simp)
-
-def matrixSpec : Spec.Tensor Float (listToShape [2, 3]) :=
-  toTensor matrixArray
+def block :
+    nn.M (nn.Sequential (shape![1, 16, 32]) (shape![1, 16, 32])) :=
+  nn.models.transformerEncoder
+    { batch := 1
+      seqLen := 16
+      dModel := 32
+      numHeads := 4
+      headDim := 8
+      ffnHidden := 64 }
 ```
 
-`TensorArray` makes row-major storage explicit. `Spec.Tensor` makes shape recursion explicit.
-Conversion theorems and runtime checks connect them.
-
-# Inspect Tensors In The Lean Infoview
-
-Open
-[`NN/Examples/DeepDives/Tensors/Basic.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/DeepDives/Tensors/Basic.lean)
-in VS Code with the Lean extension. Place the cursor on:
-
-```
-#tensor_view matrixSpecView
-#tensor_stats_view matrixSpecView
-```
-
-The first widget renders the matrix; the second summarizes its values. Move the cursor to
-`firstRowSpecView` to see the shape change after indexing. The widget declarations are `meta`
-because the editor evaluates them for display. Ordinary model code continues to use plain `def`.
-
-# What Shape Safety Proves
-
-If a model accepts `Tensor.T α inputShape`, Lean checks that every statically represented layer
-composes and that the final result has the declared output shape. It can also check that a parsed
-runtime payload has the length promised by its dimensions.
-
-Shape safety does not, by itself, prove:
-
-- that external memory uses the expected row-major layout;
-- that two axes have the intended domain meaning;
-- that a CUDA kernel wrote within bounds;
-- that an arithmetic operation is numerically correct;
-- that training converges.
-
-Those are separate contracts. Keeping them separate is stronger than calling a tensor “safe”
-without saying which property was established.
-
-# Continue With Models
-
-The next chapter turns shape maps into layers and model architectures. The most useful sources to
-keep nearby are:
-
-- [`NN/Tensor/API.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Tensor/API.lean) for
-  constructors and operations;
-- [`NN/Spec/Core/Tensor.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Spec/Core/Tensor.lean)
-  for the recursive specification representation;
-- [`NN/Proofs/Tensor/Basic.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Proofs/Tensor/Basic.lean)
-  for flattening, unflattening, and algebraic laws.
+The shape `1 × 16 × 32` is batch × sequence length × model width. Attention and the feed-forward
+sublayer preserve that shape. The runnable text example is
+`lake exe torchlean transformer --device cpu --tiny-shakespeare --steps 1`; see
+[`NN/Examples/Models/Sequence/Transformer.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/Transformer.lean).

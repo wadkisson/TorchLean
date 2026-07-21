@@ -33,7 +33,7 @@ from urllib.parse import urlparse
 import numpy as np
 
 
-CIFAR10_URL = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+CIFAR10_URL = "https://cave.cs.toronto.edu/kriz/cifar-10-python.tar.gz"
 CIFAR10_MD5 = "c58f30108f718f92721af3b95e74349a"
 TINY_SHAKESPEARE_URL = (
     "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"

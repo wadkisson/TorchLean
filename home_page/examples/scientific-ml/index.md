@@ -112,7 +112,7 @@ TorchLean owns the pieces that should be typed, inspectable, or connected to ver
     <strong>Model shape contract</strong>
     <em>The FNO config fixes the grid, channel width, Fourier modes, block count, and parameter shapes.</em>
   </a>
-  <a href="{{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}">
+  <a href="{{ '/blueprint/Graphs-And-Numerics/Native-Boundaries/' | relative_url }}">
     <span>03</span>
     <strong>Runtime boundary</strong>
     <em>The CUDA path is fast, but its role is named: a fused real-FFT kernel implements the TorchLean FNO step.</em>

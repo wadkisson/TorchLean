@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Differentiation By Example" =>
+#doc (Manual) "Autograd And Runtime" =>
 %%%
 tag := "autograd-walkthrough"
 %%%
+
 
 Reverse-mode automatic differentiation is usually introduced as “call backward and read the
 gradients.” TorchLean makes the derivative object explicit: a function, input, and output
@@ -127,303 +128,79 @@ seedOut : Tensor α outputShape
 dx      : Tensor α inputShape
 ```
 
-For a scalar output, choosing seed one gives the ordinary gradient. For a vector output, the seed
-selects a linear combination of output rows without materializing the whole Jacobian.
+# What Actually Runs
 
-# Elementwise Square
-
-Let:
-
-$$`g(x_0,x_1)=(x_0^2,x_1^2)`.
-
-Its Jacobian is diagonal:
-
-$$`
-J_g(x)=
-\begin{bmatrix}
-2x_0&0\\
-0&2x_1
-\end{bmatrix}.
-`
-
-The TorchLean definition and VJP are:
+The previous chapter used one public call:
 
 ```
-def square :
-    autograd.func.Fn (shape![2]) (shape![2]) :=
-  fun x => nn.functional.square x
-
-def vjpExample : IO Unit := do
-  let x : Tensor.T Float (shape![2]) :=
-    tensor! [0.5, -1.2]
-  let seed : Tensor.T Float (shape![2]) :=
-    tensor! [1.0, 1.0]
-  let dx ←
-    autograd.func.vjp
-      (alpha := Float) square x seed
-  IO.println s!"dx={Tensor.pretty dx}"
+autograd.model.valueAndGradParamsScalar ...
 ```
 
-The result is:
+Behind that call, TorchLean may construct a tape, replay a compiled derivative graph, invoke native
+CUDA kernels, and return a dependent gradient pack. Other parts of the repository also use explicit
+IR graphs and backend execution plans. These objects are related, but they are not interchangeable.
 
-$$`
-J_g(x)^\mathsf T(1,1)=(1,-2.4).
-`
+This chapter identifies each artifact, its lifetime, and the claim it can support.
 
-Change the seed to `(1,10)`. The expected result becomes `(1,-24)`. This is a clean way to see that
-a VJP is not “the gradient” of a vector-valued function until an output cotangent is chosen.
+# Four Objects Commonly Called “The Graph”
 
-# Full Jacobians
+| Object | Purpose | Contains |
+| --- | --- | --- |
+| eager tape | reverse-mode execution | values, parents, local VJPs |
+| compiled derivative graph | repeated runtime execution | forward, JVP, VJP closures |
+| `NN.IR.Graph` | inspection and verification | explicit operation tags and payload references |
+| backend execution plan | provider selection | accepted capsules and audit metadata |
 
-TorchLean provides:
+A fifth object, a CUDA Graph capture, is a device launch-replay mechanism. Selecting TorchLean's
+`.compiled` backend does not mean CUDA Graph capture.
 
-- `jacfwd`, one output-shaped column per input coordinate;
-- `jacrev`, one input-shaped row per output coordinate.
+Confusing these artifacts leads to bad guarantees. For example, accepting a backend plan does not
+prove that the compiled trainer executed it, and proving an IR semantics theorem does not certify a
+native tape node whose provider was never related to that IR operation.
 
-For `square` at `(0.5,-1.2)`, the quickstart prints:
+# Eager Execution
 
-```
-col[0] = [1.000000, -0.000000]
-col[1] = [0.000000, -2.400000]
-```
-
-These are the columns of the diagonal Jacobian. Reverse mode prints the same entries organized by
-rows.
-
-The result is an array of shaped tensors rather than one anonymous flat matrix. The order follows
-the row-major flattened coordinate order of the relevant shape. This preserves enough structure to
-relate a derivative coordinate back to a tensor axis.
-
-Forward mode is attractive when the input dimension is small; reverse mode is attractive when the
-output dimension is small. Building the full Jacobian requires repeating one of these products for
-each basis direction.
-
-# Parameter VJPs
-
-Consider a linear map with three outputs and two inputs:
-
-$$`y=Wx+b`,
-
-where:
-
-$$`W\in\mathbb R^{3\times2},\qquad b\in\mathbb R^3`.
-
-For an output cotangent `ȳ`, the derivatives are:
-
-$$`
-\bar W=\bar y\,x^\mathsf T,
-\qquad
-\bar b=\bar y,
-\qquad
-\bar x=W^\mathsf T\bar y.
-`
-
-With `x=(0.5,-1.2)` and `ȳ=(1,1,1)`, each row of `dW` is `x` and each bias derivative is one. The
-quickstart prints:
+Run a short eager training job:
 
 ```
-vjpOutParams (seed=ones) dW =
-  [[0.500000, -1.200000],
-   [0.500000, -1.200000],
-   [0.500000, -1.200000]]
-vjpOutParams (seed=ones) db =
-  [1.000000, 1.000000, 1.000000]
+lake exe torchlean quickstart_mlp \
+  --device cpu --backend eager --steps 2 --seed 2026
 ```
 
-The model API returns a dependent parameter pack:
+An eager session is created for the chosen scalar and profile. As the model runs, each operation:
 
-```
-let dparams ←
-  autograd.model.vjpParams
-    (alpha := Float)
-    model params x seedOut
-```
-
-`dparams` has exactly the shapes and order of `params`. There is no mutable `.grad` field that might
-contain stale values from a previous reverse pass.
-
-# A Loss Turns Output Derivatives Into Parameter Gradients
-
-For a model output and target of the same shape:
-
-```
-def loss :
-    autograd.model.OutputLoss outputShape outputShape :=
-  autograd.model.OutputLoss.mse
-
-let (lossValue, dparams) ←
-  autograd.model.valueAndGradParamsScalar
-    (alpha := Float)
-    model loss params x target
-```
-
-Conceptually:
-
-$$`
-\nabla_\theta L
-=
-J_{F_\theta}^{\theta}(x)^\mathsf T
-\nabla_{\widehat y}L(\widehat y,y).
-`
-
-The quickstart's concrete result is:
-
-```
-loss(mse) = 0.165133
-gradParams (mse) gW =
-  [[-0.156667, 0.376000],
-   [-0.160000, 0.384000],
-   [0.070000, -0.168000]]
-gradParams (mse) gb =
-  [-0.313333, -0.320000, 0.140000]
-```
-
-An optimizer consumes this pack together with parameters and its own state.
-
-# `detach` Preserves Values And Cuts Derivatives
-
-`autograd.model.OutputLoss.detach` leaves the forward value unchanged while replacing the backward
-map by zero.
-
-The quickstart checks both effects:
-
-```
-loss(mse) = 0.165133
-loss(mse ∘ detach) = 0.165133
-
-gradParams (mse ∘ detach) gW =
-  [[0.000000, 0.000000],
-   [0.000000, 0.000000],
-   [0.000000, 0.000000]]
-gradParams (mse ∘ detach) gb =
-  [0.000000, 0.000000, 0.000000]
-```
-
-This is a good diagnostic experiment: if the loss value changes, the forward implementation of
-detach is wrong; if a gradient remains nonzero, the backward edge was not cut.
-
-Detach is useful for target networks, stop-gradient estimators, contrastive objectives, and
-statistics that should not receive gradients. It also changes the mathematical objective seen by
-the optimizer, so it should never be inserted merely to make an error disappear.
-
-# JVPs And Hessian-Vector Products
-
-Forward mode computes:
-
-$$`J_f(x)v`.
-
-TorchLean exposes JVPs for functions and model parameters. Combining forward and reverse
-differentiation gives a Hessian-vector product:
-
-$$`H_f(x)v`
-
-without constructing the full Hessian.
+1. reads one or more parent values;
+2. computes and stores its output;
+3. records parent identifiers;
+4. records a local reverse rule.
 
 For:
 
-$$`f(x)=\frac{x_0^2+x_1^2}{2}`,
+$$`y=\operatorname{ReLU}(Wx+b)`,
 
-the Hessian is the identity matrix:
+the tape has operations corresponding to matrix multiplication, bias addition, and ReLU. The loss
+adds subtraction, squaring, and reduction nodes. Reverse traversal begins from cotangent one at the
+scalar loss.
 
-$$`H_f(x)=I_2`.
+CPU eager values and VJPs live on the ordinary tape. CUDA eager values are device buffers and their
+reverse actions live on the CUDA tape. Both obey the same high-level reverse traversal idea, but
+their storage and primitive providers differ.
 
-The quickstart therefore prints:
+# Gradient Accumulation Is Part Of The Tape Semantics
 
-```
-H*e[0] = [1.000000, 0.000000]
-H*e[1] = [0.000000, 1.000000]
-```
+Consider:
 
-Change the function from `mean(square x)` to `sum(square x)`. The Hessian should become `2I`.
-This variation checks both the reduction convention and second derivative.
+$$`z=x^2+x^2`.
 
-# Local Rules And The Global Reverse Pass
+The graph contains two paths from `x` to `z`. Each square contributes `2x`; the addition sends the
+output seed to both parents. The final cotangent is:
 
-At runtime, each primitive operation contributes:
+$$`\bar x=2x+2x=4x`.
 
-1. a forward value;
-2. parent references;
-3. a local VJP rule.
+The runtime must add contributions associated with the same parent identifier. A correct local VJP
+for square is insufficient if the tape traversal overwrites one contribution.
 
-Reverse traversal starts from an output seed, applies each local rule in reverse topological order,
-and adds cotangents when several paths meet. For:
+This is why TorchLean's autograd proofs have two layers:
 
-$$`z=x^2+x^2`,
-
-the two paths each contribute `2x`, so accumulation returns `4x`. A tape that overwrote one parent
-contribution instead of adding would be wrong even if the local square rule were correct.
-
-This local-to-global split also structures the proofs. Primitive derivative theorems establish the
-local rules; tape soundness establishes that reverse accumulation composes them according to the
-graph.
-
-# Runtime Derivatives And Mathematical Derivatives
-
-There are three claims to distinguish:
-
-1. the calculus derivative of the ideal real operation;
-2. the derivative program generated by TorchLean's graph/autograd transform;
-3. the numeric values produced by CPU, CUDA, or an external VJP provider.
-
-The first two can be related by Lean theorems for supported primitives and well-formed graphs. The
-third additionally needs a runtime refinement or an explicit backend boundary. A CUDA kernel may
-use floating-point rounding and a different reduction tree even when it implements the same formal
-VJP equation.
-
-The public `autograd.func` helpers execute the compiled derivative machinery directly. Trainer
-eager/compiled selection and native capsule selection are separate runtime surfaces.
-
-# Inspect The Tape In VS Code
-
-Open the widget deep dive and place the cursor on:
-
-```
-#tape_view ...
-#tape_grads_view ...
-#tape_trace_view ...
-```
-
-The views show nodes, parent edges, accumulated gradients, and reverse traversal. Use them to answer:
-
-- which operations are on the path to the scalar output?
-- where do cotangents merge?
-- which leaf corresponds to each parameter?
-- did a detached branch disappear from reverse traversal?
-
-Widgets visualize an executable artifact. They do not add a theorem to it.
-
-# API Summary
-
-For one-input tensor functions:
-
-```
-autograd.func.grad
-autograd.func.valueAndGradScalar
-autograd.func.vjp
-autograd.func.jacfwd
-autograd.func.jacrev
-autograd.func.hessian
-```
-
-For checked models:
-
-```
-autograd.model.gradParams
-autograd.model.gradInputs
-autograd.model.valueAndGrads
-autograd.model.vjpParams
-autograd.model.vjpInput
-autograd.model.jacrevParams
-autograd.model.jvpParams
-autograd.model.hvpParams
-```
-
-The next runtime chapter explains which graph or tape each call constructs and why the canonical
-verification IR is a different artifact.
-
-References:
-
-- [`NN/API/Public/Autograd/Core.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Public/Autograd/Core.lean);
-- Baydin et al.,
-  [Automatic Differentiation in Machine Learning](https://arxiv.org/abs/1502.05767);
-- [PyTorch autograd reference](https://docs.pytorch.org/docs/stable/autograd.html).
+- primitive derivative facts;
+- global tape/traversal soundness.

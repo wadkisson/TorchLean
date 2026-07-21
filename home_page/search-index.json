@@ -22,37 +22,37 @@ layout: null
   },
   {
     "title": "Graphs and IR",
-    "url": "{{ '/blueprint/Semantics-and-Graphs/Graphs-and-IR/' | relative_url }}",
+    "url": "{{ '/blueprint/Graphs-And-Numerics/Graphs-And-Specs/' | relative_url }}",
     "section": "Guide",
     "text": "graph IR lowering shapes payloads semantics execution traces bounds"
   },
   {
     "title": "Autograd Walkthrough",
-    "url": "{{ '/blueprint/Runtime___-Autograd___-and-Interop/Autograd-Walkthrough/' | relative_url }}",
+    "url": "{{ '/blueprint/Runtime-And-Interop/Autograd-And-Runtime/' | relative_url }}",
     "section": "Guide",
     "text": "autograd reverse mode tape gradients VJP training runtime"
   },
   {
     "title": "GPU and CUDA Boundaries",
-    "url": "{{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}",
+    "url": "{{ '/blueprint/Graphs-And-Numerics/Native-Boundaries/' | relative_url }}",
     "section": "Guide",
     "text": "CUDA GPU kernels native runtime trust boundary fast kernels memcheck device buffers"
   },
   {
     "title": "Backend Selection and Trust",
-    "url": "{{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}",
+    "url": "{{ '/blueprint/Runtime-And-Interop/Execution-And-Backends/' | relative_url }}",
     "section": "Guide",
     "text": "backend eager compiled CUDA ATen PyTorch runtime provider graph tape backward trust boundary"
   },
   {
     "title": "Floating-Point Semantics",
-    "url": "{{ '/blueprint/Floating-Point-and-Native-Boundaries/Floating-Point-Semantics/' | relative_url }}",
+    "url": "{{ '/blueprint/Graphs-And-Numerics/Floating-Point/' | relative_url }}",
     "section": "Guide",
     "text": "FP32 IEEE floating point real semantics rounding runtime approximation"
   },
   {
     "title": "Optimization Theory",
-    "url": "{{ '/blueprint/Verification-and-Certificates/Optimization-Theory/' | relative_url }}",
+    "url": "{{ '/blueprint/Verification/Theory-Map/' | relative_url }}",
     "section": "Guide",
     "text": "optimization theory optimizer laws TensorOptimizer StepSpec Muon orthogonalization GaLore projected SGD convergence strong convexity gradient descent"
   },

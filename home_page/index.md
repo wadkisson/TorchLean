@@ -47,22 +47,22 @@ usemathjax: true
 ## Working Paths
 
 <div class="workflow-list">
-  <a href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Autograd-Walkthrough/' | relative_url }}">
+  <a href="{{ '/blueprint/Runtime-And-Interop/Autograd-And-Runtime/' | relative_url }}">
     <span>01</span>
     <strong>Write and run models</strong>
     <em>Use Lean-native training loops, tensors, and autograd examples.</em>
   </a>
-  <a href="{{ '/blueprint/Semantics-and-Graphs/Graphs-and-IR/' | relative_url }}">
+  <a href="{{ '/blueprint/Graphs-And-Numerics/Graphs-And-Specs/' | relative_url }}">
     <span>02</span>
     <strong>Lower to graph IR</strong>
     <em>Inspect shapes, payloads, graph semantics, and executable traces.</em>
   </a>
-  <a href="{{ '/installation/#devices-providers-and-kernel-capsules' | relative_url }}">
+  <a href="{{ '/installation/#nvidia-cuda-linux--wsl2' | relative_url }}">
     <span>03</span>
     <strong>Choose a backend</strong>
-    <em>Keep one model while choosing CPU, CUDA, LibTorch, or named future accelerator targets.</em>
+    <em>Keep one model while choosing CPU or CUDA; see the CUDA page for deeper runtime notes.</em>
   </a>
-  <a href="{{ '/blueprint/Verification-and-Certificates/' | relative_url }}">
+  <a href="{{ '/blueprint/Verification/' | relative_url }}">
     <span>04</span>
     <strong>Check verification artifacts</strong>
     <em>Replay bounds and certificates, then read the Lean statements they support.</em>

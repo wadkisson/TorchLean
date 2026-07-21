@@ -174,18 +174,19 @@ target torchlean_libtorch_sdpa_so pkg : FilePath :=
   else
     pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_skipped"))
 
+/-- Always available unless the real LibTorch shared object is linked. CPU builds need these
+symbols because Lean always imports the `@[extern]` declarations. -/
 target torchlean_libtorch_sdpa_stub pkg : FilePath :=
-  if cudaEnabled && !libtorchEnabled then
-    buildLibtorchSDPAStub pkg
-  else
+  if cudaEnabled && libtorchEnabled then
     pure (Job.pure (pkg.buildDir / "torchlean_libtorch_sdpa_stub_skipped"))
+  else
+    buildLibtorchSDPAStub pkg
 
 @[default_target]
 lean_lib NN where
   moreLinkObjs :=
     if cudaEnabled && libtorchEnabled then #[torchlean_libtorch_sdpa_so]
-    else if cudaEnabled then #[torchlean_libtorch_sdpa_stub]
-    else #[]
+    else #[torchlean_libtorch_sdpa_stub]
   -- `NN:docs` should document the whole maintained Lean surface, including examples and CLI
   -- dispatchers. Keep tests out of this library surface; they build through `nn_tests_suite`.
   roots := #[

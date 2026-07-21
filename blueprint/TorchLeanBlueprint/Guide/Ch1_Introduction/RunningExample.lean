@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "A Running Example" =>
+#doc (Manual) "The Running Example" =>
 %%%
 tag := "running-example"
 %%%
+
 
 Our running example is the checked-in `quickstart_mlp` program. It is deliberately small, but it is
 not pseudocode: it builds a dataset, initializes a model, runs autograd and Adam, prints predictions,
@@ -118,146 +119,86 @@ def trainer :=
       seed := 2026 }
 ```
 
-Run the complete checked-in command from the repository root:
+# TorchLean and PyTorch
+
+TorchLean looks familiar on purpose. It has tensors, modules, parameters, autograd, optimizers,
+devices, and checkpoints because those ideas already work well in modern ML. But TorchLean is not
+PyTorch rewritten in Lean, and it is not trying to catch PyTorch by accumulating the same number of
+operators.
+
+PyTorch's center of gravity is execution. A Python program can assemble a large model dynamically,
+train it with highly tuned kernels, distribute the work over many devices, and deploy the result.
+TorchLean's center of gravity is the connection between a running model and a mathematical
+statement. It can execute models too, but it keeps asking questions that PyTorch normally leaves to
+the surrounding project: What is the exact shape contract? Which parameter payload did the verifier
+read? What equation does this graph node denote? Which arithmetic appears in the theorem?
+
+That difference is easier to see in code, so we will build the same MLP in both
+systems and follow it through initialization, autograd, compilation, and execution.
+
+# The Same MLP In Both Systems
+
+A PyTorch model commonly owns its parameters through `nn.Module`:
 
 ```
-lake exe torchlean quickstart_mlp \
-  --device cpu \
-  --steps 200 \
-  --seed 2026
+# Python / PyTorch
+model = torch.nn.Sequential(
+    torch.nn.Linear(4, 8),
+    torch.nn.ReLU(),
+    torch.nn.Linear(8, 2),
+)
+
+logits = model(x)
 ```
 
-On the current implementation, this deterministic run reports:
+The corresponding TorchLean builder is:
 
 ```
-dataset size = 25
-mean_loss(before) = 0.761530
-mean_loss(after)  = 0.003234
-
-heldout: x=(0.250000,-0.750000)
-target=0.200000
-prediction(after)=[0.210239]
-```
-
-The exact log also includes intermediate losses and the prediction before training. We will keep
-this seed and configuration fixed throughout the guide so later chapters are talking about the same
-run.
-
-# What Happens During One Step
-
-For one sampled pair `(x,y)`, the runtime performs:
-
-1. read the current four parameter tensors;
-2. compute `Linear -> ReLU -> Linear`;
-3. compute the regression loss;
-4. seed the loss cotangent with one;
-5. traverse the autograd tape backward to obtain parameter gradients;
-6. update Adam's first and second moments;
-7. replace each parameter with its updated value;
-8. release or retain runtime buffers according to ownership.
-
-The mathematical forward map is
-
-$$`f_\theta(x)
-  =W_2\,\operatorname{ReLU}(W_1x+b_1)+b_2`.
-
-The loss for a single example is a scalar function of `θ`, even though the prediction has shape
-`[1]`. Reverse mode computes vector-Jacobian products from that scalar back to all four tensors.
-Adam then uses those gradients and its optimizer state to construct the next payload.
-
-The repository contains four views of this step:
-
-- eager runtime code that actually allocates tensors and records tape nodes;
-- ideal VJP definitions used in autograd proofs;
-- rounded VJP error transformers used by runtime-approximation proofs;
-- optimizer contracts for SGD, momentum, and AdamW-style updates.
-
-That gives us a running program, an ideal derivative, and a way to discuss the gap between them.
-
-# Changing The Device
-
-The source model does not mention CPU or CUDA. Device selection belongs to the runtime
-configuration:
-
-```
-lake exe torchlean quickstart_mlp --device cpu --steps 200
-```
-
-or, in a CUDA-enabled build:
-
-```
-lake -R -K cuda=true exe torchlean \
-  quickstart_mlp --device cuda --steps 200
-```
-
-The model type and parameter layout stay put. The selected backend profile plans the operations
-using the capsules available in that build, and `--show-backend` prints the resulting plan. We will
-look inside that plan in the backend chapter; there is no need to understand it before running this
-example.
-
-# Lowering The Forward Map
-
-Verification starts from an initialized model and a concrete parameter payload:
-
-```
-import NN
+import NN.API
 
 open TorchLean
 
-#check Verification.compileForward
-  initialized
-  (nn.initParams initialized)
+def model :
+    nn.M (nn.Sequential (.dim 4 .scalar) (.dim 2 .scalar)) :=
+  nn.Sequential![
+    nn.linear 4 8,
+    nn.relu,
+    nn.linear 8 2
+  ]
 ```
 
-The result is a `CompiledIR Float` containing:
+Both programs describe an affine map, ReLU, and another affine map. Their surrounding contracts are
+different.
 
-- an `NN.IR.Graph`;
-- the payload store used by parameterized operations;
-- the distinguished input node;
-- the distinguished output node.
+In PyTorch, an eager tensor carries its shape as runtime metadata. Calling a layer inspects those
+dimensions while the program executes. PyTorch's export and compilation systems can add symbolic
+shape constraints later, but an ordinary annotation such as `torch.Tensor` does not distinguish a
+vector of length four from a matrix with four columns.
 
-For this MLP, the graph has an input, two linear operations, a ReLU, and an output path determined by
-the compiler's lowering. Each node records its parents and output shape. The parameter store carries
-the matrices and biases.
+In TorchLean, the input and output shapes index the `nn.Sequential` type. Layer composition is
+checked while Lean elaborates the definition. `nn.M` also records that `model` is a deterministic
+seed-state computation waiting to initialize its parameters.
 
-Using `nn.initParams initialized` analyzes the initial model. To analyze the trained model, the
-compiler must receive the trained runtime parameters through the lower-level manual interface or a
-saved exact-bits payload. Reusing the initial payload after training would verify another function.
+Dynamic shapes are convenient during exploration and for data-dependent programs. Shape-indexed
+types require more information up front, but they make layer composition and later theorem
+statements much cleaner. TorchLean still accepts runtime-loaded data; it checks the dimensions once
+at the boundary and then works with the resulting typed tensor.
 
-# An Input Region Instead Of One Point
+# Parameters: Object Fields Versus Explicit Payloads
 
-A forward prediction answers "what did the model return at `x`?" Verification usually asks a
-quantified question. Around the held-out point
+A PyTorch `nn.Module` registers parameter objects. Calling `model(x)` reads the module's current
+fields. An optimizer mutates those parameters, usually through gradient fields populated by
+autograd.
 
-$$`c=(0.25,-0.75)`,
+TorchLean's public model description contains parameter shapes, initialization tensors, gradient
+flags, and a forward program. The forward program receives the *live parameter payload* explicitly.
+Initialization and execution are therefore related but distinguishable:
 
-an `L∞` ball of radius `ε` is the box
+```
+def initialized :=
+  nn.run 2026 model
 
-$$`B_\varepsilon(c)
- =\{x\mid |x_i-c_i|\leq\varepsilon\text{ for }i=1,2\}`.
-
-`Verification.seedLInfBall` places this box at the graph's input node. IBP propagates one interval
-per coordinate through the graph. CROWN propagates affine lower and upper forms and can retain
-dependencies that plain intervals lose.
-
-For this one-output regression model, a useful property might be
-
-$$`\forall x\in B_\varepsilon(c),\qquad
-  |f_\theta(x)-0.2|\leq\delta`.
-
-A computed output interval `[l,u]` supports this claim when
-
-$$`0.2-\delta\leq l
-  \quad\text{and}\quad
-  u\leq 0.2+\delta`,
-
-provided a soundness theorem covers the graph operations, payload, input bounds, and scalar
-semantics used by the pass.
-
-# Where We Go From Here
-
-We now have one object worth following: a trained two-layer network with a known seed, parameter
-layout, dataset, and held-out prediction. The frontend chapters explain how its tensors and tape are
-built. The graph chapters lower the same forward map. The floating-point chapter compares ideal and
-rounded evaluations. Finally, the verification chapters replace the single held-out point with an
-entire input region.
+#check nn.paramShapes initialized
+#check nn.initParams initialized
+#check nn.forwardProgram (model := initialized)
+```

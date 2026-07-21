@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Neural Network Verification" =>
+#doc (Manual) "Verification" =>
 %%%
 tag := "verification"
 %%%
+
 
 Testing asks what a network did on the inputs we tried. Verification asks what it must do on every
 input in a set. For a classifier `f`, an input region `X`, the intended class `y`, and a competing
@@ -131,174 +132,64 @@ The proof-side real evaluator has the stronger end-to-end theorem
 theorem about those proof-side definitions; it is not automatically a theorem about every
 executable `Graph.runIBP` path.
 
-```
-#check NN.MLTheory.CROWN.CertSoundness.cert_encloses_semantics
-#check NN.MLTheory.CROWN.Proofs.runIBP?_encloses_evalGraphRec
-```
+# Proof Systems Beyond Bounds
 
-## Train, Compile, Then Bound
+Verification in TorchLean means connecting an artifact to the semantics it claims to represent.
 
-The robustness command above begins with fixed parameters so the arithmetic is easy to inspect.
-The MLP workflow exercises a longer path: train a `2 -> 100 -> 1` model with the compiled backend,
-lower the trained model, and run public IBP over a small input box.
+IBP and CROWN enclose outputs. Compiler correctness preserves graph meaning. The autograd theorems
+connect backward rules to derivatives. Runtime approximation accounts for finite precision. BugZoo
+contracts make common ML failure modes precise. These are different proof systems, but they follow
+the same discipline: name the object, state the relation, and prove or check the relation for the
+supported fragment.
 
-```
-lake exe verify -- torchlean-mlp-workflow
-```
+# Proof Obligations As Relations
 
-One seeded run prints:
+The common structure is relational. Let `S` be a semantic object, `A` an executable or imported
+artifact, and `R S A` the proposition that the artifact represents the semantics correctly. A
+compiler proof establishes `R` for the executable graph it produces. A certificate checker parses
+an untrusted artifact and returns evidence from which `R` follows. A backend contract records `R`
+as an assumption when the implementation remains outside the proved fragment.
 
-```
-== TorchLean MLP workflow (2 → 100 → 1) ==
-Training with backend=Runtime.Autograd.Torch.Backend.compiled, device=cpu
-dataset size = 3
-mean_loss(before) = 4.751697
-mean_loss(after) = 0.834089
-Checking public IBP bounds on a small input box
-IBP nodes=20 output_dim=1 lo=[1.524955] hi=[1.826789]
-```
+For a checker
 
-The loss decrease is a runtime observation. The final interval is a bound produced by the public
-IBP implementation. A theorem about the trained model additionally needs the exact parameter
-store used in compilation and a soundness bridge for this executable bound path. Keeping those
-claims separate prevents a successful training log from being mistaken for a robustness proof.
+$$`\operatorname{check}:A\to\operatorname{Except}(\mathrm{Error},W),`
 
-# CROWN, Alpha-CROWN, And Alpha-Beta-CROWN
+the useful theorem is not that the parser terminates. It has the form
 
-CROWN propagates affine lower and upper forms rather than only boxes. At an uncertain ReLU with
-`l < 0 < u`, the secant upper relaxation is
+$$`\operatorname{check}(a)=\operatorname{ok}(w)
+\quad\Longrightarrow\quad
+R(S,\operatorname{decode}(a),w).`
 
-$$`\operatorname{ReLU}(z)
-\le \frac{u}{u-l}(z-l),`
+This direction matters. The producer may be Python, CUDA, α,β-CROWN, or a remote solver; none of
+those programs must be trusted merely because the checker accepts their output. Trust moves to the
+Lean definition of `R`, the checker, and its soundness theorem. When no such theorem exists, the
+artifact is evidence or an explicit boundary, not a certificate by vocabulary alone.
 
-while a lower relaxation may use a slope `alpha` constrained to a valid range. Alpha-CROWN
-optimizes these slopes. Alpha-beta-CROWN additionally records branch phases: an active branch uses
-`z >= 0`, and an inactive branch uses `z <= 0`.
+# IRExec Correctness: The Big Compiler Theorem
 
-TorchLean's generic theorem `crown_checker_encloses_semantics` takes an exact
-`CrownCertLocalOK` hypothesis and a separate `CrownTransferSound` proof. The local transfer
-theorems
-
-- `alphaCrown_transfer_sound`;
-- `alphaBetaCrown_transfer_sound`
-
-show that the proposition-level alpha and alpha-beta step functions satisfy
-`CrownTransferSound` under their explicit real-semantic and enclosure hypotheses. The alpha-beta
-step rejects phase choices inconsistent with the current IBP interval.
+The theorem to care about first is:
 
 ```
-#check NN.MLTheory.CROWN.CrownSoundness.crown_checker_encloses_semantics
-#check NN.MLTheory.CROWN.AlphaCrownTransferSoundness.alphaCrown_transfer_sound
-#check NN.MLTheory.CROWN.AlphaCrownTransferSoundness.alphaBetaCrown_transfer_sound
+Runtime.Autograd.Compiled.execGraphOfIR_semantics_eq
 ```
 
-These theorems should not be confused with the JSON node-certificate checkers:
+The declaration is in the
+[IR execution correctness API](https://github.com/lean-dojo/TorchLean/blob/main/NN/Runtime/Autograd/Compiled/IRExec/Correctness/SemanticEquivalence.lean).
 
-- `checkCROWNNodeCertificate`;
-- `checkAlphaBetaCROWNNodeCertificate`.
+In plain English:
 
-Those `IO Bool` functions parse `Float` arrays, recompute IBP and affine nodes, and compare values
-within a tolerance (default `1e-4`). The alpha-beta checker also validates branch-vector lengths,
-entries, and phase consistency. There is currently no theorem that turns acceptance of either
-approximate `Float` checker into exact `CrownCertLocalOK`. Thus checker acceptance is reproducible
-runtime evidence, not by itself an instance of `crown_checker_encloses_semantics`.
+> If `execGraphOfIR` successfully compiles an `NN.IR.Graph` and payload into executable compiled
+> graph data, and the graph is in the named supported fragment, then evaluating the compiled graph
+> on any input gives the same value table as the Lean denotational evaluator for the original IR
+> graph.
 
-# From Bounds To A Robustness Claim
+The theorem connects three objects:
 
-Suppose a sound bound procedure produces, for every `x` in the input box,
+- `NN.IR.Graph.denoteAll`: the reference denotational semantics of the tagged op IR.
+- `execGraphOfIR`: the compiler from IR to executable compiled graph data.
+- `ExecGraphData.denoteAll`: the compiled runtime evaluator.
 
-$$`f_y(x)\ge L_y,\qquad f_j(x)\le U_j.`
-
-Then `L_y-U_j>0` proves the pairwise class margin. A multiclass certificate repeats this for every
-`j != y`. The arithmetic is elementary; the substantive obligations are that:
-
-- the bounds enclose the exact graph semantics;
-- the graph denotes the intended model;
-- the input box denotes the intended perturbation set;
-- any rounded or native execution is related to the exact graph.
-
-For a rounded implementation with coordinate errors
-`|f_i^run(x)-f_i(x)| <= epsilon_i`, the transferred margin is
-
-$$`f_y^{run}(x)-f_j^{run}(x)
-\ge L_y-U_j-\varepsilon_y-\varepsilon_j.`
-
-The right-hand side must remain positive. A real CROWN theorem alone does not prove the native
-binary32 claim; the FP32 and runtime-approximation sections describe the additional bridge.
-
-# Executable Certificates And Imported Artifacts
-
-TorchLean currently checks several kinds of artifact, each with a deliberately limited meaning.
-
-The graph numerical certificate records source ranges, derived node ranges, a registry identity,
-and a backend-plan audit. `generateChecked` reconstructs this data, and `executeIEEE32` performs a
-bit-level reference replay while checking each intermediate tensor. A `GraphRangeContract`
-contains an executable `derive` function but no semantic soundness field. A proof-level error trace
-therefore also requires a separately constructed `CheckedRealExecution`, whose fields supply the
-real denotation and enclosure proof. See the runtime-approximation section for the complete
-boundary.
-
-The external alpha-beta-CROWN leaf checker `checkAbCrownLeafArtifact` validates the JSON schema,
-finite ordered root and leaf boxes, dimensions, containment of each represented leaf in the root,
-and the exported lower-bound witness relative to its threshold. It does not prove that the lower
-bound came from the network semantics, and it does not prove that the represented leaves cover the
-root box. Those are producer obligations.
-
-This yields three distinct uses of "certificate":
-
-- a Lean term containing proof fields;
-- an artifact accepted by a structural or numerical checker;
-- an externally produced claim whose semantic validity is assumed.
-
-The certificate chapter runs the leaf checker, changes a witness so that it must fail, and explains
-which stronger artifact would be needed to obtain root-region soundness.
-
-# Floating-Point Boundary
-
-The proof float `FP32` is `NF binaryRadix fexp32 rnd32`: a rounded-real model with gradual
-underflow. Its exponent description has no upper bound, so it does not model overflow, NaN,
-infinity, or signed-zero payload behavior. `IEEE32Exec` is the executable bit-level model.
-
-Finite refinement lemmas such as `toReal_add_eq_fp32Round`, and corresponding multiplication,
-division, and square-root bridges, connect individual finite IEEE executions to the proof-level
-rounding model. Layer and MLP theorems then propagate explicit error budgets. Neither layer is an
-unstated theorem about native hardware or a vendor reduction schedule.
-
-The generic IEEE32 CROWN theorem likewise leaves the node evaluator and
-`CrownTransferSound` proof to its caller. Choosing an IEEE scalar type does not discharge the
-floating refinement obligations.
-
-# Trust Ledger
-
-A verification report should make the following boundary visible:
-
-| Evidence | Established in current source | Not established by that evidence |
-|---|---|---|
-| `runForwardIR_eq_evalForward` | typed proved-program and IR evaluator agree | arbitrary frontend or native runtime agreement |
-| `runIBP?_encloses_evalGraphRec` | proof-side real IBP encloses proof-side real semantics | every executable IBP implementation |
-| `cert_encloses_semantics` | enclosure from exact local IBP and semantic hypotheses | that a JSON/Float checker supplied those hypotheses |
-| `alphaCrown_transfer_sound` / `alphaBetaCrown_transfer_sound` | exact real local affine transfer soundness | approximate artifact-checker acceptance |
-| CROWN node checker returns `true` | artifact parses and recomputed Float data match within tolerance | exact-real CROWN soundness |
-| alpha-beta leaf checker succeeds | represented boxes and witness fields pass structural/numeric checks | network-bound provenance or root coverage |
-| numerical range check plus IEEE replay | stored trace and one reference execution pass executable checks | real semantic enclosure without `CheckedRealExecution` |
-| FP32 approximation theorem | rounded-real output is within its stated budget | native IEEE behavior without finite refinement |
-
-The ledger is the practical rule for reading the rest of the chapter: tests catch regressions,
-checkers reject malformed evidence, contracts state obligations, and theorems prove propositions.
-One does not silently substitute for another.
-
-# References
-
-- G. E. Peterson, "Interval Arithmetic," 1969, and IEEE 1788-2015 for interval arithmetic.
-- Eric Wong and J. Zico Kolter,
-  ["Provable Defenses against Adversarial Examples via the Convex Outer Adversarial Polytope"](https://arxiv.org/abs/1711.00851),
-  ICML 2018.
-- Huan Zhang et al.,
-  ["Efficient Neural Network Robustness Certification with General Activation Functions"](https://arxiv.org/abs/1811.00866),
-  NeurIPS 2018.
-- Kaidi Xu et al.,
-  ["Automatic Perturbation Analysis for Scalable Certified Robustness and Beyond"](https://arxiv.org/abs/2002.12920),
-  NeurIPS 2020.
-- Shiqi Wang et al.,
-  ["Beta-CROWN: Efficient Bound Propagation with Per-neuron Split Constraints for Neural Network Robustness Verification"](https://arxiv.org/abs/2103.06624),
-  NeurIPS 2021.
+The theorem shape is: if `execGraphOfIR g payload` returns `ok exec`, and the named fragment
+side conditions hold, then for every input `x`, the value table produced by
+`ExecGraphData.denoteAll exec x` is the same value table produced by
+`NN.IR.Graph.denoteAll g payload x`.

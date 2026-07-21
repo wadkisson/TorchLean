@@ -111,24 +111,6 @@ main a.tl-auto-link::after {
   transform: translateY(-0.08em);
 }
 
-main :is(h1, h2, h3, h4, h5, h6) .tl-heading-anchor {
-  margin-left: 0.38em;
-  color: rgba(15, 95, 143, 0.58);
-  text-decoration: none;
-  font-size: 0.74em;
-  opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease;
-}
-
-main :is(h1, h2, h3, h4, h5, h6):hover .tl-heading-anchor,
-main :is(h1, h2, h3, h4, h5, h6) .tl-heading-anchor:focus {
-  opacity: 1;
-}
-
-main :is(h1, h2, h3, h4, h5, h6) .tl-heading-anchor:hover {
-  color: var(--tl-accent-strong);
-}
-
 .prev-next-buttons {
   gap: 0.75rem;
   margin: 0.8rem 0 1.7rem;
@@ -623,7 +605,7 @@ main p > img:only-child {
 TORCHLEAN_JS_BODY = r"""
 (function () {
   const pages = TORCHLEAN_GUIDE_PAGES;
-  const storageKey = "torchlean-guide-read-v1";
+  const storageKey = "torchlean-guide-read-v2";
   const script = document.currentScript;
   const rootUrl = new URL(".", script ? script.src : window.location.href);
 
@@ -695,6 +677,10 @@ TORCHLEAN_JS_BODY = r"""
     }
   }
 
+  function removePermalinkWidgets() {
+    document.querySelectorAll(".permalink-widget").forEach((el) => el.remove());
+  }
+
   function polishGuideHomepage() {
     if (normalizedCurrentPage() !== "index.html") return;
 
@@ -706,9 +692,6 @@ TORCHLEAN_JS_BODY = r"""
     if (duplicateContents && duplicateContents.querySelector("ol.section-toc")) {
       duplicateContents.remove();
     }
-
-    const titlePermalink = document.querySelector("main .titlepage > h1 .permalink-widget");
-    if (titlePermalink) titlePermalink.remove();
   }
 
   function scrollRatio() {
@@ -964,30 +947,75 @@ TORCHLEAN_JS_BODY = r"""
   }
 
 
-  function addHeadingAnchors() {
-    document.querySelectorAll("main h1[id], main h2[id], main h3[id], main h4[id], main h5[id], main h6[id]").forEach((heading) => {
-      if (heading.querySelector(".tl-heading-anchor")) return;
-      const a = document.createElement("a");
-      a.className = "tl-heading-anchor";
-      a.href = "#" + heading.id;
-      a.setAttribute("aria-label", "Link to this section");
-      a.textContent = "§";
-      heading.appendChild(a);
+  function cellHtml(text) {
+    const esc = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return esc
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/_([^_]+)_/g, "<em>$1</em>");
+  }
+
+  function parsePipeTable(text) {
+    const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) return null;
+    if (!lines.every((l) => l.startsWith("|") && l.endsWith("|"))) return null;
+    const split = (line) => line.slice(1, -1).split("|").map((c) => c.trim());
+    const header = split(lines[0]);
+    const sep = split(lines[1]);
+    if (!sep.every((c) => /^:?-+:?$/.test(c.replace(/\s/g, "")))) return null;
+    const rows = lines.slice(2).map(split);
+    if (!rows.length || rows.some((r) => r.length !== header.length)) return null;
+    return { header, rows };
+  }
+
+  function convertMarkdownTables() {
+    document.querySelectorAll("main p").forEach((p) => {
+      const raw = p.textContent || "";
+      if (!raw.includes("| ---") && !raw.includes("|---")) return;
+      const parsed = parsePipeTable(raw);
+      if (!parsed) return;
+      const table = document.createElement("table");
+      table.className = "tabular";
+      const thead = document.createElement("thead");
+      const hr = document.createElement("tr");
+      parsed.header.forEach((cell) => {
+        const th = document.createElement("th");
+        th.innerHTML = cellHtml(cell);
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      parsed.rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        row.forEach((cell) => {
+          const td = document.createElement("td");
+          td.innerHTML = cellHtml(cell);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      p.replaceWith(table);
     });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     mountGuideNav();
     polishGuideHomepage();
+    removePermalinkWidgets();
     replaceAsciiArrowsInText();
     autoLinkBareUrls();
     externalLinksOpenInNewTabs();
     enhanceRouteLists();
+    convertMarkdownTables();
     wrapTables();
     addCopyButtons();
     openLeanCodePanels();
     addLeanCodePanelActions();
-    addHeadingAnchors();
     mountProgress();
   });
 })();
@@ -997,13 +1025,20 @@ TORCHLEAN_JS_BODY = r"""
 def guide_pages(root: Path) -> list[str]:
     """Return generated guide pages in the reading order used by the progress widget.
 
-    Verso also emits search pages and hyphen-prefixed implementation pages; those
-    are useful assets, but they are not chapters a reader should advance through.
+    Count only leaf chapter pages (plus the guide home). Part hubs such as
+    `Introduction/index.html`, search, find, and Verso internals are excluded so
+    the progress label matches the narrative page count.
     """
     pages: list[str] = []
     for path in sorted(root.rglob("index.html")):
         rel = path.relative_to(root).as_posix()
-        if rel.startswith("-") or "/-" in rel or rel.startswith("find/"):
+        if rel.startswith("-") or "/-" in rel:
+            continue
+        if rel.startswith("find/") or rel.startswith("search/"):
+            continue
+        parts = Path(rel).parts
+        # Skip part/section hub pages: `Introduction/index.html`.
+        if len(parts) == 2 and parts[-1] == "index.html":
             continue
         pages.append(rel)
     if "index.html" in pages:
@@ -1025,7 +1060,7 @@ def inject_script(root: Path) -> None:
     script_re = re.compile(r'\s*<script defer src="[^"]*torchlean-guide-polish\.js(?:\?v=[^"]*)?"></script>\n?')
     # Verso emits a <base> tag on every generated page. A bare script URL is
     # therefore resolved relative to the guide root, even from nested pages.
-    tag = '    <script defer src="torchlean-guide-polish.js?v=20260706-nav"></script>\n'
+    tag = '    <script defer src="torchlean-guide-polish.js?v=20260721-tables-permalinks"></script>\n'
     for path in root.rglob("*.html"):
         html = path.read_text()
         if marker in html:
@@ -1291,6 +1326,16 @@ def remove_stale_search_shards(root: Path) -> None:
         path.unlink()
 
 
+def strip_permalink_widgets(root: Path) -> None:
+    """Remove Verso permalink chain icons from generated headings."""
+    widget_re = re.compile(r'\s*<span class="permalink-widget[^"]*">.*?</span>', re.S)
+    for path in root.rglob("*.html"):
+        html = path.read_text()
+        new_html = widget_re.sub("", html)
+        if new_html != html:
+            path.write_text(new_html)
+
+
 def main() -> int:
     """CLI entry point for the post-Verso guide polish pass."""
     parser = argparse.ArgumentParser()
@@ -1316,6 +1361,7 @@ def main() -> int:
     rewrite_repository_links(args.guide)
     add_fragment_aliases(args.guide)
     remove_stale_search_shards(args.guide)
+    strip_permalink_widgets(args.guide)
     inject_script(args.guide)
     return 0
 

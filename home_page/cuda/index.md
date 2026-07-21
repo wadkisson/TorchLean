@@ -99,6 +99,6 @@ Evidence levels should be stated carefully:
 | Native kernel verified | A theorem about the native CUDA implementation itself, rather than only the Lean side spec or boundary contract. |
 
 For the full explanation, read
-[GPU and CUDA Boundaries]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+[GPU and CUDA Boundaries]({{ '/blueprint/Graphs-And-Numerics/Native-Boundaries/' | relative_url }}).
 For the public runtime choice, read
-[Backend Selection and Trust]({{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}).
+[Backend Selection and Trust]({{ '/blueprint/Runtime-And-Interop/Execution-And-Backends/' | relative_url }}).

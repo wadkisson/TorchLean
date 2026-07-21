@@ -10,7 +10,7 @@ Lean.
 ## Featured Examples
 
 <div class="showcase-grid showcase-grid-featured">
-  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Semantics-and-Graphs/Graphs-and-IR/' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Graphs-And-Numerics/Graphs-And-Specs/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/graph-ir-bounds-new.png' | relative_url }}" alt="TorchLean graph IR to interval bounds example"/>
     <span class="showcase-body">
       <span class="showcase-title">Graph IR and Bounds</span>
@@ -19,7 +19,7 @@ Lean.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/Autograd-Walkthrough/' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Runtime-And-Interop/Autograd-And-Runtime/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/autograd-basics-new.png' | relative_url }}" alt="Autograd basics example"/>
     <span class="showcase-body">
       <span class="showcase-title">Autograd Basics</span>
@@ -64,7 +64,7 @@ Lean.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Runtime___-Autograd___-and-Interop/PyTorch-Round-Trip/' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Runtime-And-Interop/PyTorch-Roundtrip/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/pytorch-roundtrip-new.png' | relative_url }}" alt="PyTorch round-trip example"/>
     <span class="showcase-body">
       <span class="showcase-title">PyTorch Round Trip</span>
@@ -73,7 +73,7 @@ Lean.
     </span>
   </a>
 
-  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Floating-Point-and-Native-Boundaries/Floating-Point-Semantics/' | relative_url }}">
+  <a class="showcase-card showcase-image-card" href="{{ '/blueprint/Graphs-And-Numerics/Floating-Point/' | relative_url }}">
     <img class="showcase-media" src="{{ '/assets/media/examples/showcase/float32-ieee-new.png' | relative_url }}" alt="Float32 and IEEE-754 checks example"/>
     <span class="showcase-body">
       <span class="showcase-title">Float32 and IEEE-754</span>
@@ -129,9 +129,9 @@ Lean.
 </div>
 
 CUDA is opt-in. The build flags, runtime path, and agreement assumptions are explained in
-[GPU and CUDA]({{ '/blueprint/Floating-Point-and-Native-Boundaries/GPU-and-CUDA-Boundaries/' | relative_url }}).
+[GPU and CUDA]({{ '/blueprint/Graphs-And-Numerics/Native-Boundaries/' | relative_url }}).
 For the broader backend design, read
-[Backend Selection and Trust]({{ '/blueprint/Runtime___-Autograd___-and-Interop/Backend-Selection-and-Trust/' | relative_url }}).
+[Backend Selection and Trust]({{ '/blueprint/Runtime-And-Interop/Execution-And-Backends/' | relative_url }}).
 For long CUDA training runs, model commands also expose allocator telemetry through
 `--cuda-mem-watch N`; longer runs choose a small default cadence so device-memory behavior is visible
 while the example is running.

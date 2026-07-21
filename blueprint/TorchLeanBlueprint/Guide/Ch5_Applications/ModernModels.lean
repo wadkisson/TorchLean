@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Modern Models" =>
+#doc (Manual) "Model Zoo" =>
 %%%
 tag := "modern-models"
 %%%
+
 
 A two-layer perceptron is enough to introduce typed tensors and reverse-mode differentiation. It is
 not enough to test whether an ML library has found the right abstractions. Modern architectures add
@@ -109,169 +110,96 @@ This is a one-update integration run, not a CIFAR accuracy result. It confirms t
 array, typed residual model, cross-entropy objective, autograd tape, optimizer, and CPU runtime
 worked together.
 
-## Try A Shape Change
+# Three Complete Model Runs
 
-Open
-[`NN/Examples/Models/Vision/ResNet.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Vision/ResNet.lean)
-and inspect `cfg`. The command uses an `8 × 8` crop and four hidden channels. Changing the hidden
-width changes both residual branches and the classifier input. Removing the projection that keeps
-the branch shapes aligned is not a late runtime error: the residual composition no longer
-elaborates.
+This chapter runs three applications far enough to inspect the objects that move through
+TorchLean. The first is a character-level Transformer, where sequence length, masking, and
+generation matter. The second compares residual and patch-token vision models on the same prepared
+dataset. The third is a Fourier neural operator, where the important boundary is the spectral
+kernel rather than an image or token representation.
 
-# Vision Transformers
+The commands below were run against the current checkout. The displayed losses are deterministic
+for the stated seeds and one-example datasets, but they are not performance benchmarks. Their
+purpose is to make the data path, model shape, runtime selection, and generated artifacts concrete.
 
-A vision Transformer first turns a spatial field into a token sequence. For an input with spatial
-extent `n₁ × ... × n_d`, patch kernel `k`, stride `s`, and padding `p`, each output extent is the
-usual convolution expression
+# Case Study One: CharGPT
 
-$$`n'_i
-=\left\lfloor\frac{n_i+2p_i-k_i}{s_i}\right\rfloor+1.`
+The Tiny Shakespeare experiment is the clearest sequence-model application because it begins with
+a text file and ends with both a trained parameter file and generated text.
 
-If the patch convolution emits `D` channels, then the patch grid becomes
-
-$$`B\times D\times n'_1\times\cdots\times n'_d
-\;\longrightarrow\;
-B\times N\times D,\qquad
-N=\prod_i n'_i.`
-
-[`NN.API.Models.Vit`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Vit.lean)
-defines this conversion as `spatialToTokens`. The implementation reshapes the patch grid and moves
-the channel axis to the end. The following Transformer block therefore receives the conventional
-`batch × sequence × embedding` layout.
-
-For `H` attention heads of width `D_h`, the model width is
-
-$$`D=H D_h,`
-
-and scaled dot-product attention is
-
-$$`\operatorname{Attention}(Q,K,V)
-=\operatorname{softmax}\!\left(\frac{QK^\top}{\sqrt{D_h}}+M\right)V.`
-
-The current ViT application uses one encoder block and flattens all patch tokens before the final
-classifier. It is a compact architecture check, not an implementation of a particular pretrained
-ViT checkpoint.
+Prepare the corpus:
 
 ```
-lake exe torchlean vit --device cpu --n-total 1 --steps 1
+python3 scripts/datasets/download_example_data.py --tiny-shakespeare
 ```
 
-The observed one-example run begins at the uniform ten-class loss:
+Then run the two-update smoke configuration:
 
 ```
-mean_loss(before) = 2.302585
-mean_loss(after) = 2.300389
+lake -R -K cuda=true exe torchlean chargpt --device cuda \
+  --tiny-shakespeare --preset smoke \
+  --save-params /tmp/chargpt-params.json \
+  --log /tmp/chargpt-trainlog.json
 ```
 
-The value `2.302585` is `log 10` to the displayed precision. That is a useful sanity check: before
-the first update, the model is effectively assigning equal probability to ten classes.
+The current run reports:
 
-# Recurrence, Attention, And Causality
+```
+torchlean chargpt: char-level GPT training
+  trainable_parameters=30017
+  step 0: val loss=4.207507
+  step 1: val loss=4.195092
+  step 2: val loss=4.174880
+  wrote params: /tmp/chargpt-params.json
+  vocab=65 (unique chars)
+  architecture=width 32, heads 4, layers 2, dropout 0.000000
+  sampled="First Citizen:ITJ?P,bduOc$Eaf'yjhYXGLHkR3vQq;V"
+  wrote TrainLog JSON: /tmp/chargpt-trainlog.json
+torchlean chargpt: ok
+```
 
-Sequence models add state or a causal dependency.
+The sample is mostly noise because two optimizer updates are not language training. The useful
+facts are elsewhere in the trace:
 
-For a vanilla recurrent network,
+- the corpus produced a 65-character vocabulary;
+- the model has 30,017 trainable scalar parameters;
+- validation is computed on a disjoint ten-percent corpus suffix;
+- the loss decreased at both reported updates;
+- parameter and training-log artifacts were written explicitly.
 
-$$`h_{t+1}=\phi(W_xx_t+W_hh_t+b),\qquad
-y_t=W_yh_t+b_y.`
+## The Architecture
 
-An LSTM replaces the single update by input, forget, output, and candidate gates:
+The command constructs a `CausalTransformerConfig` from the runtime options:
+
+$$`D=32,\qquad H=4,\qquad D_h=D/H=8,\qquad L=2.`
+
+For a batch of token windows `I ∈ Fin V`, the model first gathers embeddings
+
+$$`E[I]\in\mathbb{R}^{B\times T\times D},`
+
+adds a learned positional table, and applies two pre-normalized Transformer blocks. In one block,
 
 $$`\begin{aligned}
-i_t&=\sigma(W_ix_t+U_ih_{t-1}+b_i),\\
-f_t&=\sigma(W_fx_t+U_fh_{t-1}+b_f),\\
-o_t&=\sigma(W_ox_t+U_oh_{t-1}+b_o),\\
-\tilde c_t&=\tanh(W_cx_t+U_ch_{t-1}+b_c),\\
-c_t&=f_t\odot c_{t-1}+i_t\odot\tilde c_t,\\
-h_t&=o_t\odot\tanh(c_t).
+Z_1&=X+\operatorname{Dropout}
+  \left(\operatorname{MHA}(\operatorname{LN}(X))\right),\\
+Z_2&=Z_1+\operatorname{Dropout}
+  \left(W_2\,\rho(W_1\operatorname{LN}(Z_1)+b_1)+b_2\right).
 \end{aligned}`
 
-The hidden and cell states are explicit tensors whose dimensions must remain stable across the
-unrolled sequence. The runnable `rnn`, `lstm`, and `lstm_regression` commands use that typed state
-path. There is currently no GRU training subcommand. The LiRPA verifier has a GRU-gate certificate
-fixture, but that is a different artifact and should not be presented as a trainable GRU model.
+The final layer normalization and linear projection produce logits
 
-Transformers remove recurrent state but introduce a mask. A causal language model factors
+$$`\operatorname{logits}\in\mathbb{R}^{B\times T\times V}.`
 
-$$`p_\theta(x_0,\ldots,x_T)
-=\prod_{t=0}^{T}p_\theta(x_t\mid x_0,\ldots,x_{t-1}).`
+The training target is the same token window shifted by one position. Cross entropy at location
+`t` therefore uses the target character `x_{t+1}`.
 
-Consequently, attention row `i` must assign exactly zero probability to every key `j>i`. TorchLean
-models this as a hard mask in the semantic layer. It does not use a finite additive constant such
-as `-1000` as a mathematical substitute for negative infinity.
+The mask is semantic, not merely a convenient floating-point bias:
 
-The shared GPT-family constructor in
-[`NN.API.Models.Gpt2`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Gpt2.lean)
-has the architecture
+$$`j>i\quad\Longrightarrow\quad
+\operatorname{attentionWeight}_{i,j}=0.`
 
-```
-token embedding
-  -> learned positional embedding
-  -> masked Transformer blocks
-  -> layer normalization
-  -> vocabulary projection
-```
-
-Its configuration records batch size, sequence length, vocabulary size, head count, head width,
-feed-forward width, depth, activation, dropout, normalization order, and initialization. The name
-“GPT-2-style” describes this architecture lineage. It does not mean that the command loads OpenAI
-GPT-2 weights.
-
-# State-Space Models
-
-Mamba-style models return to explicit state but allow input-dependent scan parameters. A simplified
-state-space recurrence is
-
-$$`h_{t+1}=A_t h_t+B_t x_t,\qquad
-y_t=C_t h_t+D_t x_t.`
-
-[`NN.API.Models.Mamba`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Mamba.lean)
-contains two related objects:
-
-- `mambaTextLm`, the trainable recurrent model used by the text command;
-- `selectiveMambaFloat`, a deterministic full selective block used for reference evaluation.
-
-The trainable path uses TorchLean autograd operations on CPU or CUDA. The repository also has a
-selective-scan CUDA operation for supported float execution. That runtime kernel is not thereby
-proved equivalent to every equation in the high-level Mamba specification; the kernel boundary is
-reported separately.
-
-# Neural Operators
-
-An FNO learns a map between functions sampled on a grid rather than a map between fixed feature
-vectors. One spectral block has the schematic form
-
-$$`v_{\ell+1}(x)
-=\sigma\!\left(W_\ell v_\ell(x)
-+\mathcal F^{-1}\!\left(R_\ell\cdot\mathcal F(v_\ell)\right)(x)\right).`
-
-The configuration in
-[`NN.API.Models.FNO`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/FNO.lean)
-is again parameterized by spatial rank. For every axis it requires
-
-$$`2m_i\le n_i,`
-
-so the retained low- and high-frequency bands do not overlap. The portable implementation uses a
-dense multidimensional DFT. The CUDA Burgers application selects a fused real-FFT path backed by
-cuFFT. Both paths implement the same typed field-to-field interface, but their numerical and trust
-boundaries are recorded separately.
-
-# Run Them End To End
-
-We have now seen how the model families are assembled. The next chapter takes three of them off the
-page: a character Transformer, a residual vision model, and a Fourier neural operator. It prepares
-their data, launches training, and inspects the artifacts they leave behind.
-
-# References
-
-- He et al., [*Deep Residual Learning for Image Recognition*](https://arxiv.org/abs/1512.03385),
-  2015/2016.
-- Vaswani et al., [*Attention Is All You Need*](https://arxiv.org/abs/1706.03762), 2017.
-- Dosovitskiy et al.,
-  [*An Image Is Worth 16x16 Words*](https://arxiv.org/abs/2010.11929), 2020/2021.
-- Gu and Dao,
-  [*Mamba: Linear-Time Sequence Modeling with Selective State Spaces*](https://arxiv.org/abs/2312.00752),
-  2023/2024.
-- Li et al.,
-  [*Fourier Neural Operator for Parametric Partial Differential Equations*](https://arxiv.org/abs/2010.08895),
-  2020/2021.
+The source of the shared architecture is
+[`NN/API/Models/Gpt2.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/API/Models/Gpt2.lean).
+The corpus split, configuration presets, evaluation loop, generation, and checkpoint handling are
+in
+[`NN/Examples/Models/Sequence/CharGpt.lean`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Examples/Models/Sequence/CharGpt.lean).

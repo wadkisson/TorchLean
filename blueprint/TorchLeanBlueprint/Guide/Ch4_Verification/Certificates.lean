@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Verification Certificates" =>
+#doc (Manual) "Certificates And Two-Stage Workflows" =>
 %%%
 tag := "certificates"
 %%%
+
 
 A certificate is useful when producing an answer is expensive but checking the answer can be made
 small. A branch-and-bound verifier may explore thousands of subdomains, optimize relaxation
@@ -66,7 +67,7 @@ Lean reports:
 ```
 
 To see what was actually checked, make a temporary copy whose threshold is larger than the
-exported lower bound:
+exported lower bound (requires `jq`), then re-run the checker on that file:
 
 ```
 jq '.leaves[0].threshold=[2.0] | .leaves[0].witness_margin=-1.0' \
@@ -76,7 +77,7 @@ jq '.leaves[0].threshold=[2.0] | .leaves[0].witness_margin=-1.0' \
 lake exe verify -- abcrown-leaf /tmp/torchlean_bad_leaf.json
 ```
 
-The command exits unsuccessfully:
+The second command is expected to exit unsuccessfully:
 
 ```
 [artifact] Checked 1 leaves: ok=0, bad=1
@@ -112,167 +113,82 @@ Lean or a proof-backed certificate whose local transfer rules Lean can check.
 
 Leaf nesting has the form:
 
-$$`B_\ell\subseteq B_{\mathrm{root}}.`
+# Two-Stage Verification Workflows
 
-A stronger branch certificate would also check coverage:
+A branch-and-bound verifier may spend hours splitting boxes, optimizing linear relaxations, and
+running GPU kernels. Reimplementing that search inside Lean would make the trusted story simpler,
+but it would also discard mature solvers and make large examples impractical. A two-stage workflow
+separates the expensive search from the small object that must be checked.
 
-$$`B_{\mathrm{root}}\subseteq\bigcup_\ell B_\ell.`
-
-For a semantic margin property, the target shape is:
-
-$$`\forall x\in B_\ell,\qquad c^\top f(x)\ge threshold.`
-
-The current checker accepts the artifact when every represented leaf satisfies this predicate and
-the top level metadata is coherent. It does not turn a set of leaves into a root-region proof unless
-coverage of the root by those leaves is separately supplied and checked. In this fragment, the
-certificate is structural.
-
-# Three Levels Of Checking
-
-The `v0.1` format intentionally stops at structural checking. Lean checks that every represented
-leaf lies inside the root box, that dimensions and arrays agree, that numeric fields are finite,
-and that every leaf's witness satisfies `∃ i, lb[i] > threshold[i]`.
-
-The current artifact checks `lb_i > threshold_i` for an exported lower bound. A stronger artifact
-would also check that `lb_i` is a sound lower bound for the graph on the leaf.
-
-There are three progressively stronger designs:
-
-- *Structural checking:* the artifact is self-consistent and each exported witness passes its
-  stated arithmetic test. This is what `abcrown-leaf` provides.
-- *Recompute and compare:* the artifact contains a network and enough node data for Lean to
-  reproduce the bound calculation, then compare the result with the exported `lb`. TorchLean's
-  node-certificate checkers move in this direction, but use `Float` values and tolerances.
-- *Proof-backed soundness:* checker acceptance supplies the exact hypotheses of a theorem that
-  encloses the graph semantics. This requires a proved local transfer for every supported
-  operator, plus a compiler correspondence and any required floating-point bridge.
-
-The levels can share one producer workflow, but they support different public claims.
-
-# Lean Entry Points
-
-The leaf checker is intentionally separate from CROWN node checkers:
+The producer is allowed to be complicated:
 
 ```
-#check NN.Verification.Cert.AbCrownLeafCert.checkAbCrownLeafArtifact
-#check NN.Verification.CROWNNodeCertAlphaBeta.AlphaBetaCROWNNodeCertificate
-#check NN.Verification.CROWNNodeCertAlphaBeta.checkAlphaBetaCROWNNodeCertificate
+trained model + input property
+  -> external verifier
+  -> branch-and-bound leaves and claimed lower bounds
 ```
 
-Use the first when the artifact is a branch-and-bound leaf summary. Use the second family when the
-artifact contains per-node affine bound data that Lean can recompute against a graph and parameter
-store.
+The consumer should be narrow:
 
-This split is important for citations:
+```
+JSON artifact
+  -> finite parser
+  -> schema and local predicate checks
+  -> accept or reject
+```
 
-- `abcrown-leaf` checks a structural leaf artifact.
-- `checkAlphaBetaCROWNNodeCertificate` checks per-node α,β-CROWN transfer data by recomputation and
-  tolerance comparison.
-- graph soundness theorems apply only when the certificate format and graph fragment supply the
-  hypotheses those theorems demand.
+This architecture is only valuable when the boundary is stated exactly. “Checked by Lean” may mean
+anything from parsing a JSON file to replaying every bound computation and deriving a theorem.
+TorchLean’s current α,β-CROWN leaf checker implements the former kind of boundary: it checks a
+small structural leaf format and a local threshold predicate. It does not rerun α,β-CROWN.
 
-# File Format: `abcrown_leaf_artifact_v0_1.json`
+# The Checked Artifact
 
-Top-level object:
+The bundled artifact is:
 
 ```
 {
   "format": "abcrown_leaf_artifact_v0_1",
   "input_dim": 2,
-  "root": { "lo": [-4.8, -10.8], "hi": [4.8, 10.8] },
+  "root": {
+    "lo": [-1.0, -1.0],
+    "hi": [1.0, 1.0]
+  },
   "leaves": [
     {
-      "lo": [...],
-      "hi": [...],
-      "lb": [...],
-      "threshold": [...],
+      "lo": [-1.0, -1.0],
+      "hi": [1.0, 1.0],
+      "lb": [1.0],
+      "threshold": [0.0],
       "witness_idx": 0,
-      "witness_margin": 0.123
+      "witness_margin": 1.0
     }
   ]
 }
 ```
 
-Semantics:
+The checker is
+[`checkAbCrownLeafArtifact`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Cert/AbCrownLeafCert.lean).
+It performs the following operations:
 
-- `root` describes the input box being verified.
-- For real verification runs, pass the original input-property box as `root`. If the raw dump does
-  not contain a root, the exporter can infer the componentwise leaf envelope as a structural
-  fallback, but that fallback is only the envelope of the represented leaves.
-- Each `leaf` is a sub-box of `root`.
-- The root and every leaf must contain finite coordinates ordered coordinatewise
-  (`lo[i] ≤ hi[i]`), and the leaf array must be nonempty.
-- `lb` and `threshold` are the lower bounds and thresholds reported by the external producer for
-  that leaf at the moment it was pruned or verified.
-- A leaf is considered "verified" iff `∃ i, lb[i] > threshold[i]`.
-  (This matches how `complete_verifier/input_split/branching_domains.py` filters out verified domains.)
-- `witness_idx` and `witness_margin` are a convenience witness for the check above:
-  `witness_margin = lb[witness_idx] - threshold[witness_idx]`.
-  When `witness_idx` is present, the checker validates that exact coordinate rather than searching
-  for a different witness. When `witness_margin` is present, it must accompany the index and agree
-  with the recomputed margin up to the schema tolerance.
+1. require the exact format string `abcrown_leaf_artifact_v0_1`;
+2. parse `input_dim`;
+3. parse finite floating-point root bounds and require matching dimensions;
+4. require `root.lo[i] ≤ root.hi[i]`;
+5. require a nonempty leaf array;
+6. parse each leaf’s finite `lo`, `hi`, `lb`, and `threshold` arrays;
+7. require each leaf box to satisfy
+   `root.lo ≤ leaf.lo ≤ leaf.hi ≤ root.hi`;
+8. require matching `lb` and `threshold` lengths;
+9. check either the supplied witness index or an existential coordinate with
+   `threshold[i] < lb[i]`;
+10. if a witness margin is supplied, compare it with `lb[i] - threshold[i]` at tolerance `1e-6`.
 
-The schema deliberately does not contain a neural-network graph, α slopes, β phases, or per-node
-affine forms. It is therefore a *leaf artifact*, not a full proof certificate.
-The artifact records enough to check the terminal-domain bookkeeping exported by the producer; it
-does not replay the producer's bound propagation.
+Every parsed numeric claim uses `expectFieldFiniteFloatArray` or
+`optionalFieldFiniteFloat?`. A JSON number that converts to NaN or infinity is rejected before
+ordered comparisons are used.
 
-# How To Generate
-
-TorchLean now provides the producer-side conversion helper at
-`scripts/verification/abcrown/export_leaf_artifact.py`. It converts a raw terminal-domain dump into the
-`abcrown_leaf_artifact_v0_1.json` schema and can immediately run the Lean checker:
-
-```
-python3 scripts/verification/abcrown/export_leaf_artifact.py \
-  --input NN/Examples/Verification/AbCrown/example_raw_leaf_dump.json \
-  --out _external/abcrown/leaf_artifact.json \
-  --check
-```
-
-The helper accepts common raw field names such as `x_L`, `x_U`, `lower_bounds`, and `thresholds`.
-For direct instrumentation of an external verifier, import
-`write_abcrown_leaf_artifact` from that script and call it after the verifier has collected terminal
-verified leaves. If no explicit output path is passed, that helper writes to `ABCROWN_ARTIFACT_OUT`.
-That environment variable is a TorchLean helper convention; setting it alone does not modify an
-unpatched α,β-CROWN run.
-
-If you want to use an external α,β-CROWN producer, clone it separately:
-
-```
-git clone https://github.com/Verified-Intelligence/Two-Stage_Neural_Controller_Training.git \
-  Two-Stage_Neural_Controller_Training
-```
-
-Run the external verifier, dump or instrument the terminal verified leaves, convert them with the
-TorchLean helper, then pass the resulting artifact to TorchLean's checker.
-
-# How To Check In Lean
-
-Use the unified `verify` CLI tool `abcrown-leaf` to check the converted JSON artifact against
-TorchLean's structural leaf predicate.
-
-Example:
-
-```
-lake exe verify -- abcrown-leaf
-```
-
-With no path, the command uses the bundled sample. With a path, it checks that artifact instead.
-Run `lake exe verify -- list` to see the other registered certificate and workflow checkers,
-including LiRPA, PINN, spline, logit-margin, and TorchLean-to-IR robustness paths.
-
-The leaf command is intentionally modest: it answers whether the exported leaf document satisfies
-the `v0.1` structural contract. The neural-network verification chapter gives the theorem chain
-needed for a semantic robustness result, while the two-stage chapter shows where an external
-producer enters that chain.
-
-# References
-
-- [α,β-CROWN project](https://github.com/Verified-Intelligence/alpha-beta-CROWN)
-- [β-CROWN / α,β-CROWN paper](https://arxiv.org/abs/2103.06624), covering branch and bound with
-  optimized bound propagation.
-- [LiRPA on general computational graphs](https://arxiv.org/abs/2002.12920), for automatic
-  perturbation analysis.
-- [Branch-and-bound for neural network verification](https://arxiv.org/abs/1907.10615), as one
-  representative background entry.
+The local threshold predicate is implemented in
+[`NN.Verification.Util.Array`](https://github.com/lean-dojo/TorchLean/blob/main/NN/Verification/Util/Array.lean).
+Use that helper when a certificate claims a coordinate-wise threshold crossing rather than a
+hand-written comparison over JSON arrays.

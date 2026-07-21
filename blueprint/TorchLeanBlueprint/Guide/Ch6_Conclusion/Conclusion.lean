@@ -2,10 +2,11 @@ import VersoManual
 
 open Verso.Genre Manual
 
-#doc (Manual) "Where The Pieces Meet" =>
+#doc (Manual) "Conclusion" =>
 %%%
 tag := "conclusion"
 %%%
+
 
 We began with a two-input regression model:
 
@@ -109,146 +110,3 @@ Wrapping these components in a Lean function does not prove them correct. Kernel
 provider, device, shape/layout contracts, numerical policy, VJP ownership, and evidence. External
 artifacts cross parsers and checkers. The remaining trust is named rather than disappearing into
 the phrase “verified in Lean.”
-
-# The Numerical Story
-
-The floating-point stack has three central levels:
-
-```
-NeuralFloat / NF
-  generic radix, format, and rounding mathematics
-
-FP32
-  finite binary32 rounded-real proof semantics
-
-IEEE32Exec
-  executable 32-bit IEEE representation and operations
-```
-
-The runtime then adds CPU, CUDA, or external providers. A real-valued approximation theorem, a
-half-ULP rounding theorem, an executable bit-pattern theorem, and a CUDA parity test are different
-evidence.
-
-This separation makes useful compositions possible. For example:
-
-$$`
-|F_{\mathrm{runtime}}(x)-f(x)|
-\leq
-|F_{\mathrm{runtime}}(x)-F_{\mathbb R}(x)|
-+
-|F_{\mathbb R}(x)-f(x)|.
-`
-
-The first term is numerical implementation error. The second is model approximation error. A
-meaningful end-to-end result needs both, with compatible domains and semantics.
-
-# The Scaling Story
-
-TorchLean is not meant to replace every tuned numeric kernel with a slow Lean implementation.
-Large models need industrial matrix multiplication, convolution, attention, FFT, and communication
-libraries.
-
-The architectural goal is:
-
-```
-one semantic operation graph
-  -> several admissible kernel providers
-  -> explicit contract and evidence per boundary
-```
-
-TorchLean can own graph structure, shapes, loss, optimizer meaning, and proof statements while a
-provider supplies a fast value or local VJP. The assurance level may range from a proved internal
-implementation to a checked or explicitly trusted external kernel.
-
-Scaling and verification therefore meet at the backend contract, not by pretending that outsourced
-numerics were executed inside the theorem prover.
-
-# The Scientific-ML Story
-
-A PINN or neural operator usually participates in a larger chain:
-
-```
-equation and domain
-  -> discretization or simulator
-  -> dataset
-  -> model and training
-  -> prediction artifact
-  -> residual, invariant, or error certificate
-  -> Lean checker and theorem
-```
-
-The neural network is only one part. Boundary conditions, quadrature, sampling coverage, simulator
-accuracy, and interpolation between grid points can dominate the final claim.
-
-TorchLean's role is to give each artifact a typed meaning and to make the accepted implication
-precise. External computation can remain large; the checker and proposition should remain small
-enough to audit.
-
-# A Productive Development Loop
-
-When adding an operation or model:
-
-1. define the intended tensor and scalar semantics;
-2. add the shape-checked public operation;
-3. register forward and derivative behavior;
-4. lower it to explicit IR when verification/export needs it;
-5. add provider capsules for implemented runtimes;
-6. state numerical and layout policies;
-7. prove reusable semantic facts;
-8. add executable positive and negative controls;
-9. document unsupported paths and trust boundaries;
-10. run the same small model through every claimed path.
-
-Tests and proofs are complementary. Proofs establish universal propositions about formal objects.
-Tests catch wiring, FFI, build, CLI, documentation, and platform regressions that are outside or not
-yet covered by those propositions.
-
-# What To Build Next
-
-Several directions extend the same architecture:
-
-- prove graph-wide exact-real enclosure from local interval transfers;
-- expand proof-bearing reverse lowering and optimizer-error propagation;
-- add narrower conformance checkers for native and external kernels;
-- support more devices by registering real profiles and capsules, not only enum names;
-- strengthen robustness and scientific certificate formats;
-- connect quantization theory to packed runtime kernels;
-- add model families through general tensor operations rather than private image or sequence types.
-
-The criterion is not the number of features. A useful addition should reduce the distance between a
-runnable model and a precise claim without hiding a new boundary.
-
-# A Final Exercise
-
-Choose one example from the model zoo and write down:
-
-```
-input and output shapes
-parameter shapes
-loss
-data source and preprocessing
-scalar semantics
-execution mode
-device and selected providers
-forward and backward ownership
-available theorem or checker
-remaining trusted assumptions
-```
-
-Then run it with `--show-backend` and compare the report with your list. Any missing item is a
-concrete documentation, logging, or verification task.
-
-That habit is the central lesson of the guide: do not ask whether “the model” is verified as if it
-were one indivisible thing. Ask which object carries the claim, which transformation produced it,
-and which theorem or boundary connects it to what ran.
-
-# References
-
-- George et al., [*TorchLean: Formalizing Neural Networks in Lean*](https://arxiv.org/abs/2602.22631),
-  2026.
-- Boldo and Melquiond,
-  [*Flocq: A Unified Library for Proving Floating-Point Algorithms in
-  Coq*](https://doi.org/10.1109/ARITH.2011.40), 2011.
-- George C. Necula, [*Proof-Carrying Code*](https://doi.org/10.1145/263699.263712), 1997.
-- Odena et al., [*TensorFuzz*](https://proceedings.mlr.press/v97/odena19a.html), 2019.
-- Liu et al., [*NNSmith*](https://arxiv.org/abs/2207.13066), 2022/2023.
