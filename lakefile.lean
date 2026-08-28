@@ -297,6 +297,11 @@ lean_exe torchlean_lint where
   srcDir := "scripts/checks"
   root := `TorchLeanLint
 
+-- Short MLP demo: `lake exe demo` (see demo/README.md).
+lean_exe demo where
+  srcDir := "demo"
+  root := `Demo
+
 -- Device-agnostic runnable examples (CPU by default; pass `--cuda` after building with CUDA).
 --
 -- This single executable supports all runnable examples (MLP/CNN/Transformer/Vit/ResNet/GPT2/PPO)
